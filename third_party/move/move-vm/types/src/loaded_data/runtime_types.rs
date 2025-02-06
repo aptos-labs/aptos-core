@@ -280,8 +280,8 @@ pub enum Type {
         ability: AbilityInfo,
     },
     Function {
-        args: Vec<TriompheArc<Type>>,
-        results: Vec<TriompheArc<Type>>,
+        args: Vec<Type>,
+        results: Vec<Type>,
         abilities: AbilitySet,
     },
     Reference(Box<Type>),
@@ -328,8 +328,8 @@ impl<'a> Iterator for TypePreorderTraversalIter<'a> {
                     StructInstantiation { ty_args, .. } => self.stack.extend(ty_args.iter().rev()),
 
                     Function { args, results, .. } => {
-                        self.stack.extend(args.iter().map(|rc| rc.as_ref()));
-                        self.stack.extend(results.iter().map(|rc| rc.as_ref()))
+                        self.stack.extend(args.iter());
+                        self.stack.extend(results.iter())
                     },
                 }
                 Some(ty)
@@ -1161,16 +1161,8 @@ impl TypeBuilder {
                 results,
                 abilities,
             } => {
-                let subs_elem = |count: &mut u64,
-                                 ty: &TriompheArc<Type>|
-                 -> PartialVMResult<TriompheArc<Type>> {
-                    Ok(TriompheArc::new(Self::apply_subst(
-                        ty.as_ref(),
-                        subst,
-                        count,
-                        depth + 1,
-                        check,
-                    )?))
+                let subs_elem = |count: &mut u64, ty: &Type| -> PartialVMResult<Type> {
+                    Self::apply_subst(ty, subst, count, depth + 1, check)
                 };
                 let args = args
                     .iter()
@@ -1253,10 +1245,7 @@ impl TypeBuilder {
                 } = fun.as_ref();
                 let mut to_list = |ts: &[TypeTag]| {
                     ts.iter()
-                        .map(|t| {
-                            self.create_ty_impl(t, resolver, count, depth + 1)
-                                .map(TriompheArc::new)
-                        })
+                        .map(|t| self.create_ty_impl(t, resolver, count, depth + 1))
                         .collect::<VMResult<Vec<_>>>()
                 };
                 Function {

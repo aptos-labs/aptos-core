@@ -139,6 +139,7 @@ impl ClosureMask {
 #[cfg(test)]
 mod closure_mask_tests {
     use super::*;
+
     #[test]
     fn extract_compose_roundtrip_test() {
         // mask.compose(mask.extract(v, true), mask.extract(v, false)) == v

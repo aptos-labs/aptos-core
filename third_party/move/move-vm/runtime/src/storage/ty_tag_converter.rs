@@ -246,7 +246,7 @@ impl<'a> TypeTagConverter<'a> {
                 results,
                 abilities,
             } => {
-                let to_vec = |ts: &[triomphe::Arc<Type>],
+                let to_vec = |ts: &[Type],
                               gas_ctx: &mut PseudoGasContext|
                  -> PartialVMResult<Vec<TypeTag>> {
                     ts.iter()
