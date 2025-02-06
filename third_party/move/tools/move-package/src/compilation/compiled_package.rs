@@ -588,6 +588,10 @@ impl CompiledPackage {
         }
         let mut flags = if resolution_graph.build_options.test_mode {
             Flags::testing()
+        } else if resolution_graph.build_options.generate_docs {
+            // Just set for docgen so that #[verify_only] functions will not be
+            // compiled and included into either compiled modules or abis
+            Flags::verification()
         } else {
             Flags::empty()
         };
@@ -697,6 +701,7 @@ impl CompiledPackage {
                         language_version: Some(effective_language_version),
                         compiler_version: Some(version),
                         compile_test_code: flags.keep_testing_functions(),
+                        compile_verify_code: flags.is_verification(),
                         experiments: config.experiments.clone(),
                         external_checks,
                         ..Default::default()
