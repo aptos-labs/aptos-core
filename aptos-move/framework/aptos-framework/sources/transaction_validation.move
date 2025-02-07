@@ -549,6 +549,7 @@ module aptos_framework::transaction_validation {
             error::out_of_range(EOUT_OF_GAS)
         );
         let transaction_fee_amount = txn_gas_price * gas_used;
+        let account_addr = signer::address_of(&account);
 
         // it's important to maintain the error code consistent with vm
         // to do failed transaction cleanup.
@@ -565,18 +566,19 @@ module aptos_framework::transaction_validation {
                 );
             };
 
+            let upgrade_to_concurrent = features::is_upgrade_fee_payer_to_concurrent_fa_store_enabled() && (account_addr != gas_payer);
+
             if (transaction_fee_amount > storage_fee_refunded) {
                 let burn_amount = transaction_fee_amount - storage_fee_refunded;
-                transaction_fee::burn_fee(gas_payer, burn_amount);
+                transaction_fee::burn_fee(gas_payer, burn_amount, upgrade_to_concurrent);
             } else if (transaction_fee_amount < storage_fee_refunded) {
                 let mint_amount = storage_fee_refunded - transaction_fee_amount;
-                transaction_fee::mint_and_refund(gas_payer, mint_amount);
+                transaction_fee::mint_and_refund(gas_payer, mint_amount, upgrade_to_concurrent);
             };
         };
 
         // Increment sequence number
-        let addr = signer::address_of(&account);
-        account::increment_sequence_number(addr);
+        account::increment_sequence_number(account_addr);
     }
 
     inline fun skip_auth_key_check(is_simulation: bool, auth_key: &Option<vector<u8>>): bool {
@@ -681,7 +683,9 @@ module aptos_framework::transaction_validation {
         );
         let transaction_fee_amount = txn_gas_price * gas_used;
 
+        let account_addr = signer::address_of(&account);
         let gas_payer_address = signer::address_of(&gas_payer);
+
         // it's important to maintain the error code consistent with vm
         // to do failed transaction cleanup.
         if (!features::transaction_simulation_enhancement_enabled() || !skip_gas_payment(
@@ -699,10 +703,11 @@ module aptos_framework::transaction_validation {
                     error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
                 );
             };
+            let upgrade_to_concurrent = features::is_upgrade_fee_payer_to_concurrent_fa_store_enabled() && (account_addr != gas_payer_address);
 
             if (transaction_fee_amount > storage_fee_refunded) {
                 let burn_amount = transaction_fee_amount - storage_fee_refunded;
-                transaction_fee::burn_fee(gas_payer_address, burn_amount);
+                transaction_fee::burn_fee(gas_payer_address, burn_amount, upgrade_to_concurrent);
                 permissioned_signer::check_permission_consume(
                     &gas_payer,
                     (burn_amount as u256),
@@ -710,7 +715,7 @@ module aptos_framework::transaction_validation {
                 );
             } else if (transaction_fee_amount < storage_fee_refunded) {
                 let mint_amount = storage_fee_refunded - transaction_fee_amount;
-                transaction_fee::mint_and_refund(gas_payer_address, mint_amount);
+                transaction_fee::mint_and_refund(gas_payer_address, mint_amount, upgrade_to_concurrent);
                 permissioned_signer::increase_limit(
                     &gas_payer,
                     (mint_amount as u256),
@@ -720,7 +725,6 @@ module aptos_framework::transaction_validation {
         };
 
         // Increment sequence number
-        let addr = signer::address_of(&account);
-        account::increment_sequence_number(addr);
+        account::increment_sequence_number(account_addr);
     }
 }

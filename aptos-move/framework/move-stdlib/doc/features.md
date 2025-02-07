@@ -139,6 +139,8 @@ return true.
 -  [Function `is_permissioned_signer_enabled`](#0x1_features_is_permissioned_signer_enabled)
 -  [Function `get_account_abstraction_feature`](#0x1_features_get_account_abstraction_feature)
 -  [Function `is_account_abstraction_enabled`](#0x1_features_is_account_abstraction_enabled)
+-  [Function `get_upgrade_fee_payer_to_concurrent_fa_store_feature`](#0x1_features_get_upgrade_fee_payer_to_concurrent_fa_store_feature)
+-  [Function `is_upgrade_fee_payer_to_concurrent_fa_store_enabled`](#0x1_features_is_upgrade_fee_payer_to_concurrent_fa_store_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -937,6 +939,15 @@ Lifetime: permanent
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_TREAT_FRIEND_AS_PRIVATE">TREAT_FRIEND_AS_PRIVATE</a>: u64 = 2;
+</code></pre>
+
+
+
+<a id="0x1_features_UPGRADE_FEE_PAYER_TO_CONCURRENT_FA_STORE"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_UPGRADE_FEE_PAYER_TO_CONCURRENT_FA_STORE">UPGRADE_FEE_PAYER_TO_CONCURRENT_FA_STORE</a>: u64 = 87;
 </code></pre>
 
 
@@ -3442,6 +3453,52 @@ Deprecated feature
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_account_abstraction_enabled">is_account_abstraction_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ACCOUNT_ABSTRACTION">ACCOUNT_ABSTRACTION</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_upgrade_fee_payer_to_concurrent_fa_store_feature"></a>
+
+## Function `get_upgrade_fee_payer_to_concurrent_fa_store_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_upgrade_fee_payer_to_concurrent_fa_store_feature">get_upgrade_fee_payer_to_concurrent_fa_store_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_upgrade_fee_payer_to_concurrent_fa_store_feature">get_upgrade_fee_payer_to_concurrent_fa_store_feature</a>(): u64 { <a href="features.md#0x1_features_UPGRADE_FEE_PAYER_TO_CONCURRENT_FA_STORE">UPGRADE_FEE_PAYER_TO_CONCURRENT_FA_STORE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_is_upgrade_fee_payer_to_concurrent_fa_store_enabled"></a>
+
+## Function `is_upgrade_fee_payer_to_concurrent_fa_store_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_upgrade_fee_payer_to_concurrent_fa_store_enabled">is_upgrade_fee_payer_to_concurrent_fa_store_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_upgrade_fee_payer_to_concurrent_fa_store_enabled">is_upgrade_fee_payer_to_concurrent_fa_store_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_UPGRADE_FEE_PAYER_TO_CONCURRENT_FA_STORE">UPGRADE_FEE_PAYER_TO_CONCURRENT_FA_STORE</a>)
 }
 </code></pre>
 
