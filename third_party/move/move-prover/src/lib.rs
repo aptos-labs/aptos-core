@@ -263,7 +263,6 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
     let output_prefix = options.move_sources.first().map_or("bytecode", |s| {
         Path::new(s).file_name().unwrap().to_str().unwrap()
     });
-    // println!("output prefix:{}, output_dir:{:?}", output_prefix, output_dir);
 
     // Add function targets for all functions in the environment.
     for module_env in env.get_modules() {
@@ -283,7 +282,7 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
 
     // Create processing pipeline and run it.
     let pipeline = if options.experimental_pipeline {
-        pipeline_factory::experimental_pipeline(&options.prover)
+        pipeline_factory::experimental_pipeline()
     } else {
         pipeline_factory::default_pipeline_with_options(&options.prover)
     };
@@ -294,7 +293,6 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
             .into_os_string()
             .into_string()
             .unwrap();
-        // println!("dump file base:{}", dump_file_base);
         pipeline.run_with_dump(
             env,
             &mut targets,

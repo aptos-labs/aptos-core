@@ -33,10 +33,10 @@ module 0x42::m {
         *x = R {
             v: 3
         };
-            spec {
-                assert v == 4;
-                assert global<R>(@0x1).v == 3;
-              };
+        spec {
+            assert v == 4; // this should verify
+            assert global<R>(@0x1).v == 3; // this should verify
+        };
         *x = R {
             v: 6
         };
@@ -71,12 +71,12 @@ module 0x42::m {
         if (*vector::borrow(_v, i) <= 1) {
                 vector::swap_remove(_v, i);
             } ;
-            spec {
-                assert v == vector[1, 2, 3]; // this should not verify
-              };
+        spec {
+            assert v == vector[1, 2, 3]; // this should not verify
+        };
         if (*vector::borrow(_v, i) <= 1) {
                 vector::swap_remove(_v, i);
-            } ;
+        } ;
     }
 
 }

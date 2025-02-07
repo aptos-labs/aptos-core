@@ -128,7 +128,6 @@ fn test_runner_for_feature(path: &Path, feature: &Feature) -> datatest_stable::R
 
     let mut options = Options::create_from_args(&args)?;
     options.setup_logging_for_test();
-    //options.experimental_pipeline = true;
     let no_tools = read_env_var("BOOGIE_EXE").is_empty()
         || !options.backend.use_cvc5 && read_env_var("Z3_EXE").is_empty()
         || options.backend.use_cvc5 && read_env_var("CVC5_EXE").is_empty();
@@ -223,10 +222,6 @@ fn get_flags_and_baseline(
 
     // Add flags specified via environment variable.
     flags.extend(shell_words::split(&read_env_var(ENV_FLAGS))?);
-
-    // flags.push("--keep".to_string());
-
-    //flags.push("--dump-bytecode".to_string());
 
     // Create a temporary file for output. We inject the modifier to potentially prevent
     // any races between similar named files in different directories, as it appears TempPath

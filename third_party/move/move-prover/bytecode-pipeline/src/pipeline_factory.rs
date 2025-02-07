@@ -77,9 +77,9 @@ pub fn default_pipeline() -> FunctionTargetPipeline {
     default_pipeline_with_options(&ProverOptions::default())
 }
 
-pub fn experimental_pipeline(options: &ProverOptions) -> FunctionTargetPipeline {
+pub fn experimental_pipeline() -> FunctionTargetPipeline {
     // Enter your pipeline here
-    let mut processors: Vec<Box<dyn FunctionTargetProcessor>> = vec![
+    let processors: Vec<Box<dyn FunctionTargetProcessor>> = vec![
         DebugInstrumenter::new(),
         // transformation and analysis
         EliminateImmRefsProcessor::new(),
@@ -91,32 +91,15 @@ pub fn experimental_pipeline(options: &ProverOptions) -> FunctionTargetPipeline 
         CleanAndOptimizeProcessor::new(),
         UsageProcessor::new(),
         VerificationAnalysisProcessor::new(),
-        // spec instrumentation
         LoopAnalysisProcessor::new(),
+        // spec instrumentation
         SpecInstrumentationProcessor::new(),
+        DataInvariantInstrumentationProcessor::new(),
         GlobalInvariantAnalysisProcessor::new(),
         GlobalInvariantInstrumentationProcessor::new(),
-        WellFormedInstrumentationProcessor::new(),
-        DataInvariantInstrumentationProcessor::new(),
-        // monomorphization
+        // optimization
         MonoAnalysisProcessor::new(),
-        // // spec instrumentation
-        // SpecInstrumentationProcessor::new(),
-        // DataInvariantInstrumentationProcessor::new(),
-        // GlobalInvariantAnalysisProcessor::new(),
-        // GlobalInvariantInstrumentationProcessor::new(),
-        // // optimization
-        // MonoAnalysisProcessor::new(),
     ];
-
-    // inconsistency check instrumentation should be the last one in the pipeline
-    if options.check_inconsistency {
-        processors.push(InconsistencyCheckInstrumenter::new());
-    }
-
-    if !options.for_interpretation {
-        processors.push(NumberOperationProcessor::new());
-    }
 
     let mut res = FunctionTargetPipeline::default();
     for p in processors {

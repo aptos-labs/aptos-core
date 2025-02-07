@@ -147,8 +147,6 @@ module 0x42::VerifyVector {
 
     // Moves all of the elements of the `other` vector into the `v` vector.
     fun verify_append<Element>(v: &mut vector<Element>, other: &mut vector<Element>) {
-        //let l = vector::length(&other);
-        //let o = &mut other;
         vector::reverse(other);
         while ({
             spec {
@@ -163,7 +161,6 @@ module 0x42::VerifyVector {
         }) {
             vector::push_back(v, vector::pop_back(other))
         };
-        // vector::destroy_empty(other);
     }
     spec verify_append {
         ensures len(v) == old(len(v)) + old(len(other));

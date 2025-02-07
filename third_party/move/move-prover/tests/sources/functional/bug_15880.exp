@@ -64,10 +64,10 @@ error: unknown assertion failed
    =     at tests/sources/functional/bug_15880.move:62: test3
 
 error: unknown assertion failed
-   ┌─ tests/sources/functional/bug_15880.move:75:17
+   ┌─ tests/sources/functional/bug_15880.move:75:13
    │
-75 │                 assert v == vector[1, 2, 3]; // this should not verify
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+75 │             assert v == vector[1, 2, 3]; // this should not verify
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    =     at tests/sources/functional/bug_15880.move:69: test4
    =         v = <redacted>

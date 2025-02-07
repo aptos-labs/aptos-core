@@ -8,16 +8,14 @@ use move_model::{
     ast::{self},
     exp_generator::ExpGenerator,
     model::FunctionEnv,
-    ty::{PrimitiveType, Type, BOOL_TYPE},
+    ty::{PrimitiveType, Type},
 };
 use move_stackless_bytecode::{
-    borrow_analysis::BorrowInfo,
-    fat_loop,
-    fat_loop::{FatLoopFunctionInfo, LoopUnrollingMark},
+    fat_loop::{self, FatLoopFunctionInfo, LoopUnrollingMark},
     function_data_builder::{FunctionDataBuilder, FunctionDataBuilderOptions},
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{BorrowNode, Bytecode, HavocKind, Label, Operation, PropKind},
+    stackless_bytecode::{Bytecode, HavocKind, Label, Operation, PropKind},
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -69,144 +67,6 @@ impl FunctionTargetProcessor for LoopAnalysisProcessor {
 }
 
 impl LoopAnalysisProcessor {
-    pub fn instrument_write_back_for_spec(
-        builder: &mut FunctionDataBuilder,
-        borrow_info: &BorrowInfo,
-        nodes: Vec<BorrowNode>,
-    ) {
-        for node in nodes {
-            let mut ancestors = vec![];
-            borrow_info.collect_ancestor_trees_recursive_reverse(&node, vec![], &mut ancestors);
-
-            let is_conditional = ancestors.len() > 1;
-            for (chain_index, chain) in ancestors.iter().enumerate() {
-                // sanity check: the src node of the first action must be the node itself
-                //if !chain.is_empty() {
-                assert_eq!(
-                    chain
-                        .last()
-                        .expect("The write-back chain should contain at action")
-                        .dst,
-                    node.clone()
-                );
-                //}
-
-                // decide on whether we need IsParent checks and how to instrument the checks
-                let skip_label_opt = if is_conditional {
-                    let factors =
-                        Instrumenter::get_differentiation_factors(&ancestors, chain_index);
-                    let mut last_is_parent_temp = None;
-
-                    for idx in factors {
-                        let action = &chain[idx];
-                        let temp = builder.new_temp(BOOL_TYPE.clone());
-                        builder.emit_with(|id| {
-                            Bytecode::Call(
-                                id,
-                                vec![temp],
-                                Operation::IsParent(action.dst.clone(), action.edge.clone()),
-                                vec![action.src],
-                                None,
-                            )
-                        });
-
-                        let combined_temp = match last_is_parent_temp {
-                            None => temp,
-                            Some(last_temp) => {
-                                let temp_conjunction = builder.new_temp(BOOL_TYPE.clone());
-                                builder.emit_with(|id| {
-                                    Bytecode::Call(
-                                        id,
-                                        vec![temp_conjunction],
-                                        Operation::And,
-                                        vec![last_temp, temp],
-                                        None,
-                                    )
-                                });
-                                temp_conjunction
-                            },
-                        };
-                        last_is_parent_temp = Some(combined_temp);
-                    }
-
-                    let update_label = builder.new_label();
-                    let skip_label = builder.new_label();
-                    builder.emit_with(|id| {
-                        Bytecode::Branch(
-                            id,
-                            update_label,
-                            skip_label,
-                            last_is_parent_temp
-                                .expect("There should be at least one IsParent call for a conditional write-back"),
-                        )
-                    });
-                    builder.emit_with(|id| Bytecode::Label(id, update_label));
-                    Some(skip_label)
-                } else {
-                    None
-                };
-
-                // issue a chain of write-back actions
-                for action in chain {
-                    // decide if we need a pre-writeback pack-ref (i.e., data structure invariant checking)
-                    let pre_writeback_check_opt = match &action.dst {
-                        BorrowNode::LocalRoot(..) | BorrowNode::GlobalRoot(..) => {
-                            // On write-back to a root, "pack" the reference, i.e. validate all its invariants.
-                            let target = builder.get_target();
-                            let ty = target.get_local_type(action.src);
-                            if Instrumenter::is_pack_ref_ty_self(ty, target.global_env()) {
-                                Some(action.src)
-                            } else {
-                                None
-                            }
-                        },
-                        BorrowNode::Reference(..) => None,
-                        BorrowNode::ReturnPlaceholder(..) => unreachable!("invalid placeholder"),
-                    };
-                    if let Some(idx) = pre_writeback_check_opt {
-                        builder.emit_with(|id| {
-                            Bytecode::Call(id, vec![], Operation::PackRefDeep, vec![idx], None)
-                        });
-                    }
-
-                    // emit the write-back
-                    builder.emit_with(|id| {
-                        Bytecode::Call(
-                            id,
-                            vec![],
-                            Operation::WriteBack(action.dst.clone(), action.edge.clone()),
-                            vec![action.src],
-                            None,
-                        )
-                    });
-
-                    // add a trace for written back value if it's a user variable.
-                    match action.dst {
-                        BorrowNode::LocalRoot(temp) | BorrowNode::Reference(temp) => {
-                            if temp < builder.fun_env.get_local_count().unwrap_or_default() {
-                                builder.emit_with(|id| {
-                                    Bytecode::Call(
-                                        id,
-                                        vec![],
-                                        Operation::TraceLocal(temp),
-                                        vec![temp],
-                                        None,
-                                    )
-                                });
-                            }
-                        },
-                        _ => {},
-                    }
-                }
-
-                // continued from IsParent check
-                if let Some(label) = skip_label_opt {
-                    builder.emit_with(|id| Bytecode::Label(id, label));
-                }
-            }
-        }
-    }
-
     /// Perform a loop transformation that eliminate back-edges in a loop and flatten the function
     /// CFG into a directed acyclic graph (DAG).
     ///
@@ -248,24 +108,19 @@ impl LoopAnalysisProcessor {
                         for (i, (attr_id, exp)) in
                             loop_info.spec_info().invariants.values().enumerate()
                         {
-                            if i == 0
-                                && builder
-                                    .data
-                                    .loop_invariant_write_back_map
-                                    .contains_key(attr_id)
-                            {
-                                let (info, nodes) = builder
-                                    .data
-                                    .loop_invariant_write_back_map
-                                    .get(attr_id)
-                                    .unwrap();
-                                let info_clone = info.clone();
-                                let nodes_clone = nodes.clone();
-                                Self::instrument_write_back_for_spec(
-                                    &mut builder,
-                                    &info_clone,
-                                    nodes_clone,
-                                );
+                            // insert write-back actions before the first assertion
+                            if i == 0 {
+                                if let Some((info, nodes)) =
+                                    builder.data.loop_invariant_write_back_map.get(attr_id)
+                                {
+                                    let info_clone = info.clone();
+                                    let nodes_clone = nodes.clone();
+                                    Instrumenter::instrument_write_back_for_spec(
+                                        &mut builder,
+                                        &info_clone,
+                                        nodes_clone,
+                                    );
+                                }
                             }
                             builder.set_loc_and_vc_info(
                                 builder.get_loc(*attr_id),
@@ -435,20 +290,19 @@ impl LoopAnalysisProcessor {
 
             // add instrumentations to assert loop invariants -> this is the induction case
             for (i, (attr_id, exp)) in loop_info.spec_info().invariants.values().enumerate() {
-                if i == 0
-                    && builder
-                        .data
-                        .loop_invariant_write_back_map
-                        .contains_key(attr_id)
-                {
-                    let (info, nodes) = builder
-                        .data
-                        .loop_invariant_write_back_map
-                        .get(attr_id)
-                        .unwrap();
-                    let info_clone = info.clone();
-                    let nodes_clone = nodes.clone();
-                    Self::instrument_write_back_for_spec(&mut builder, &info_clone, nodes_clone);
+                // insert write-back actions before the first assertion
+                if i == 0 {
+                    if let Some((info, nodes)) =
+                        builder.data.loop_invariant_write_back_map.get(attr_id)
+                    {
+                        let info_clone = info.clone();
+                        let nodes_clone = nodes.clone();
+                        Instrumenter::instrument_write_back_for_spec(
+                            &mut builder,
+                            &info_clone,
+                            nodes_clone,
+                        );
+                    }
                 }
                 builder.set_loc_and_vc_info(
                     builder.get_loc(*attr_id),
