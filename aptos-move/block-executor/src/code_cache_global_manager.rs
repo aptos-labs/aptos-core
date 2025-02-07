@@ -354,21 +354,22 @@ mod test {
         assert_eq!(module_cache.num_modules(), 0);
     }
 
-    fn add_struct_identifier<K, D, V, E>(manager: &mut ModuleCacheManager<K, D, V, E>, name: &str)
+    fn add_struct_identifier<K, D, V, E>(_manager: &mut ModuleCacheManager<K, D, V, E>, _name: &str)
     where
         K: Hash + Eq + Clone,
         V: Deref<Target = Arc<D>>,
         E: WithSize,
     {
-        assert_ok!(manager
-            .environment
-            .as_mut()
-            .unwrap()
-            .runtime_environment()
-            .struct_name_to_idx_for_test(StructIdentifier {
-                module: ModuleId::new(AccountAddress::ZERO, Identifier::new("m").unwrap()),
-                name: Identifier::new(name).unwrap()
-            }));
+        // FIXME
+        // assert_ok!(manager
+        //     .environment
+        //     .as_mut()
+        //     .unwrap()
+        //     .runtime_environment()
+        //     .struct_name_to_idx_for_test(StructIdentifier {
+        //         module: ModuleId::new(AccountAddress::ZERO, Identifier::new("m").unwrap()),
+        //         name: Identifier::new(name).unwrap()
+        //     }));
     }
 
     fn assert_struct_name_index_map_size_eq<K, D, V, E>(

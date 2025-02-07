@@ -13,7 +13,7 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::NumBytes,
-    identifier::IdentStr,
+    identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
 };
 use move_vm_types::{
@@ -69,12 +69,12 @@ impl LoaderV2 {
         &self,
         module_storage: &dyn ModuleStorage,
         gas_meter: &mut impl GasMeter,
-        visited: &mut BTreeMap<(&'a AccountAddress, &'a IdentStr), ()>,
+        visited: &mut BTreeMap<(&'a AccountAddress, &'a Identifier), ()>,
         referenced_modules: &'a Arena<Arc<CompiledModule>>,
         ids: I,
     ) -> VMResult<()>
     where
-        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
+        I: IntoIterator<Item = (&'a AccountAddress, &'a Identifier)>,
         I::IntoIter: DoubleEndedIterator,
     {
         // Initialize the work list (stack) and the map of visited modules.
@@ -160,11 +160,11 @@ impl Clone for LoaderV2 {
 /// already visited or if the address is special.
 #[inline]
 pub(crate) fn push_next_ids_to_visit<'a, I>(
-    stack: &mut Vec<(&'a AccountAddress, &'a IdentStr)>,
-    visited: &mut BTreeMap<(&'a AccountAddress, &'a IdentStr), ()>,
+    stack: &mut Vec<(&'a AccountAddress, &'a Identifier)>,
+    visited: &mut BTreeMap<(&'a AccountAddress, &'a Identifier), ()>,
     ids: I,
 ) where
-    I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
+    I: IntoIterator<Item = (&'a AccountAddress, &'a Identifier)>,
     I::IntoIter: DoubleEndedIterator,
 {
     for (addr, name) in ids.into_iter().rev() {

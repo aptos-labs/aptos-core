@@ -7,9 +7,9 @@ use move_binary_format::{
     file_format::SignatureToken,
 };
 use move_core_types::vm_status::StatusCode;
-use move_vm_types::loaded_data::{
-    runtime_types::{AbilityInfo, Type},
-    struct_name_indexing::StructNameIndex,
+use move_vm_types::{
+    indices::StructIdx,
+    loaded_data::runtime_types::{AbilityInfo, Type},
 };
 use triomphe::Arc as TriompheArc;
 
@@ -17,7 +17,7 @@ use triomphe::Arc as TriompheArc;
 pub fn intern_type(
     module: BinaryIndexedView,
     tok: &SignatureToken,
-    struct_name_table: &[StructNameIndex],
+    struct_name_table: &[StructIdx],
 ) -> PartialVMResult<Type> {
     let res = match tok {
         SignatureToken::Bool => Type::Bool,

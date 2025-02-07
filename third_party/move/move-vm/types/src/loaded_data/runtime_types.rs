@@ -4,7 +4,7 @@
 
 #![allow(clippy::non_canonical_partial_ord_impl)]
 
-use crate::loaded_data::struct_name_indexing::StructNameIndex;
+use crate::indices::StructIdx;
 use derivative::Derivative;
 use itertools::Itertools;
 use move_binary_format::{
@@ -127,7 +127,7 @@ impl DepthFormula {
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct StructType {
-    pub idx: StructNameIndex,
+    pub idx: StructIdx,
     pub layout: StructLayout,
     pub phantom_ty_params_mask: SmallBitVec,
     pub abilities: AbilitySet,
@@ -246,7 +246,7 @@ impl StructType {
     #[cfg(test)]
     pub fn for_test() -> StructType {
         Self {
-            idx: StructNameIndex::new(0),
+            idx: StructIdx::new(0),
             layout: StructLayout::Single(vec![]),
             phantom_ty_params_mask: SmallBitVec::new(),
             abilities: AbilitySet::EMPTY,
@@ -271,11 +271,11 @@ pub enum Type {
     Signer,
     Vector(TriompheArc<Type>),
     Struct {
-        idx: StructNameIndex,
+        idx: StructIdx,
         ability: AbilityInfo,
     },
     StructInstantiation {
-        idx: StructNameIndex,
+        idx: StructIdx,
         ty_args: TriompheArc<Vec<Type>>,
         ability: AbilityInfo,
     },
@@ -868,7 +868,7 @@ impl TypeBuilder {
     }
 
     #[inline]
-    pub fn create_struct_ty(&self, idx: StructNameIndex, ability: AbilityInfo) -> Type {
+    pub fn create_struct_ty(&self, idx: StructIdx, ability: AbilityInfo) -> Type {
         Type::Struct { idx, ability }
     }
 
@@ -1213,7 +1213,7 @@ mod unit_tests {
 
     fn struct_instantiation_ty_for_test(ty_args: Vec<Type>) -> Type {
         Type::StructInstantiation {
-            idx: StructNameIndex::new(0),
+            idx: StructIdx::new(0),
             ability: AbilityInfo::struct_(AbilitySet::EMPTY),
             ty_args: TriompheArc::new(ty_args),
         }
@@ -1221,7 +1221,7 @@ mod unit_tests {
 
     fn struct_ty_for_test() -> Type {
         Type::Struct {
-            idx: StructNameIndex::new(0),
+            idx: StructIdx::new(0),
             ability: AbilityInfo::struct_(AbilitySet::EMPTY),
         }
     }
@@ -1364,7 +1364,7 @@ mod unit_tests {
 
     #[test]
     fn test_create_struct_ty() {
-        let idx = StructNameIndex::new(0);
+        let idx = StructIdx::new(0);
         let ability_info = AbilityInfo::struct_(AbilitySet::EMPTY);
 
         // Limits are not relevant here.

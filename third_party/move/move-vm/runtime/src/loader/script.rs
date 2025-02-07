@@ -10,10 +10,9 @@ use move_binary_format::{
     file_format::{Bytecode, CompiledScript, FunctionDefinitionIndex, Signature, SignatureIndex},
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
-use move_vm_types::loaded_data::{
-    runtime_access_specifier::AccessSpecifier,
-    runtime_types::{StructIdentifier, Type},
-    struct_name_indexing::StructNameIndexMap,
+use move_vm_types::{
+    indices::IndexMapManager,
+    loaded_data::{runtime_access_specifier::AccessSpecifier, runtime_types::Type},
 };
 use std::{collections::BTreeMap, ops::Deref, sync::Arc};
 
@@ -41,18 +40,17 @@ pub struct Script {
 impl Script {
     pub(crate) fn new(
         script: Arc<CompiledScript>,
-        struct_name_index_map: &StructNameIndexMap,
+        struct_name_index_map: &IndexMapManager,
     ) -> PartialVMResult<Self> {
         let mut struct_names = vec![];
         for struct_handle in script.struct_handles() {
             let struct_name = script.identifier_at(struct_handle.name);
             let module_handle = script.module_handle_at(struct_handle.module);
-            let module_id = script.module_id_for_handle(module_handle);
-            let struct_name = StructIdentifier {
-                module: module_id,
-                name: struct_name.to_owned(),
-            };
-            struct_names.push(struct_name_index_map.struct_name_to_idx(&struct_name)?);
+            let address = script.address_identifier_at(module_handle.address);
+            let module_name = script.identifier_at(module_handle.name);
+
+            let idx = struct_name_index_map.struct_idx(address, module_name, struct_name);
+            struct_names.push(idx);
         }
 
         let mut function_refs = vec![];

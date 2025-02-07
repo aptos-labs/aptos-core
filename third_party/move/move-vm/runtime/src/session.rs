@@ -516,7 +516,7 @@ impl<'r, 'l> Session<'r, 'l> {
                     .runtime
                     .loader()
                     .struct_name_index_map(module_storage)
-                    .idx_to_struct_name(*idx)?;
+                    .struct_id_from_idx(idx);
                 Some((struct_identifier.module, struct_identifier.name))
             },
             Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | TyParam(_)
@@ -540,7 +540,7 @@ impl<'r, 'l> Session<'r, 'l> {
                 let module_id = traversal_context
                     .referenced_module_ids
                     .alloc(struct_tag.module_id());
-                (module_id.address(), module_id.name())
+                (module_id.address(), &module_id.name)
             })
             .collect::<BTreeSet<_>>();
 
@@ -560,7 +560,7 @@ impl<'r, 'l> Session<'r, 'l> {
         ids: I,
     ) -> VMResult<()>
     where
-        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
+        I: IntoIterator<Item = (&'a AccountAddress, &'a Identifier)>,
         I::IntoIter: DoubleEndedIterator,
     {
         self.move_vm

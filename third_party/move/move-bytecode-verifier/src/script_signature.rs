@@ -80,7 +80,10 @@ pub fn verify_module_function_signature_by_name(
     check_signature: FnCheckScriptSignature,
 ) -> VMResult<()> {
     let fdef_opt = module.function_defs().iter().enumerate().find(|(_, fdef)| {
-        module.identifier_at(module.function_handle_at(fdef.function).name) == name
+        module
+            .identifier_at(module.function_handle_at(fdef.function).name)
+            .as_ident_str()
+            == name
     });
     let (idx, _fdef) = fdef_opt.ok_or_else(|| {
         PartialVMError::new(StatusCode::VERIFICATION_ERROR)

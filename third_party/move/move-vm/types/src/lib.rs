@@ -36,6 +36,7 @@ macro_rules! debug_writeln {
 pub mod code;
 pub mod delayed_values;
 pub mod gas;
+pub mod indices;
 pub mod loaded_data;
 pub mod natives;
 pub mod resolver;

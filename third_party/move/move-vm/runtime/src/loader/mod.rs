@@ -31,10 +31,7 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::{
-        runtime_types::{AbilityInfo, StructType, Type},
-        struct_name_indexing::StructNameIndex,
-    },
+    loaded_data::runtime_types::{AbilityInfo, StructType, Type},
     sha3_256,
     value_serde::FunctionValueExtension,
 };
@@ -71,9 +68,10 @@ use move_binary_format::file_format::{
     StructVariantHandleIndex, StructVariantInstantiationIndex, TypeParameterIndex,
     VariantFieldHandleIndex, VariantFieldInstantiationIndex, VariantIndex,
 };
-use move_vm_types::loaded_data::{
-    runtime_types::{DepthFormula, StructLayout, TypeBuilder},
-    struct_name_indexing::StructNameIndexMap,
+use move_core_types::identifier::Identifier;
+use move_vm_types::{
+    indices::{IndexMapManager, StructIdx},
+    loaded_data::runtime_types::{DepthFormula, StructLayout, TypeBuilder},
 };
 pub use script::Script;
 pub(crate) use script::ScriptCache;
@@ -158,7 +156,7 @@ impl Loader {
     pub(crate) fn struct_name_index_map<'a>(
         &'a self,
         module_storage: &'a dyn ModuleStorage,
-    ) -> &StructNameIndexMap {
+    ) -> &IndexMapManager {
         match self {
             Self::V1(loader) => &loader.name_cache,
             Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
@@ -169,7 +167,7 @@ impl Loader {
         Self::V1(LoaderV1 {
             scripts: RwLock::new(ScriptCache::new()),
             type_cache: TypeTagCache::empty(),
-            name_cache: StructNameIndexMap::empty(),
+            name_cache: IndexMapManager::new(),
             natives,
             invalidated: RwLock::new(false),
             module_cache_hits: RwLock::new(BTreeSet::new()),
@@ -190,7 +188,7 @@ impl Loader {
                 if *invalidated {
                     *loader.scripts.write() = ScriptCache::new();
                     loader.type_cache.flush();
-                    loader.name_cache.flush();
+                    // loader.name_cache.flush();
                     *invalidated = false;
                 }
             },
@@ -249,13 +247,13 @@ impl Loader {
         module_store: &LegacyModuleStorageAdapter,
         data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
-        visited: &mut BTreeMap<(&'a AccountAddress, &'a IdentStr), ()>,
+        visited: &mut BTreeMap<(&'a AccountAddress, &'a Identifier), ()>,
         referenced_modules: &'a Arena<Arc<CompiledModule>>,
         ids: I,
         module_storage: &dyn ModuleStorage,
     ) -> VMResult<()>
     where
-        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
+        I: IntoIterator<Item = (&'a AccountAddress, &'a Identifier)>,
         I::IntoIter: DoubleEndedIterator,
     {
         let _timer = VM_TIMER.timer_with_label("Loader::check_dependencies_and_charge_gas");
@@ -341,7 +339,7 @@ impl Loader {
 
     pub fn fetch_struct_ty_by_idx(
         &self,
-        idx: StructNameIndex,
+        idx: StructIdx,
         module_store: &LegacyModuleStorageAdapter,
         module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<Arc<StructType>> {
@@ -349,7 +347,7 @@ impl Loader {
         // type below can fetch struct type by index recursively.
         let struct_name = self
             .struct_name_index_map(module_storage)
-            .idx_to_struct_name_ref(idx)?;
+            .struct_id_from_idx(&idx);
 
         match self {
             Loader::V1(_) => {
@@ -372,7 +370,7 @@ pub(crate) struct LoaderV1 {
     scripts: RwLock<ScriptCache>,
     type_cache: TypeTagCache,
     natives: NativeFunctions,
-    pub(crate) name_cache: StructNameIndexMap,
+    pub(crate) name_cache: IndexMapManager,
 
     // The below field supports a hack to workaround well-known issues with the
     // loader cache. This cache is not designed to support module upgrade or deletion.
@@ -413,7 +411,7 @@ impl Clone for LoaderV1 {
             scripts: RwLock::new(self.scripts.read().clone()),
             type_cache: self.type_cache.clone(),
             natives: self.natives.clone(),
-            name_cache: self.name_cache.clone(),
+            name_cache: IndexMapManager::new(),
             invalidated: RwLock::new(*self.invalidated.read()),
             module_cache_hits: RwLock::new(self.module_cache_hits.read().clone()),
             vm_config: self.vm_config.clone(),
@@ -838,12 +836,12 @@ impl LoaderV1 {
         module_store: &LegacyModuleStorageAdapter,
         data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
-        visited: &mut BTreeMap<(&'a AccountAddress, &'a IdentStr), ()>,
+        visited: &mut BTreeMap<(&'a AccountAddress, &'a Identifier), ()>,
         referenced_modules: &'a Arena<Arc<CompiledModule>>,
         ids: I,
     ) -> VMResult<()>
     where
-        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
+        I: IntoIterator<Item = (&'a AccountAddress, &'a Identifier)>,
         I::IntoIter: DoubleEndedIterator,
     {
         // Initialize the work list (stack) and the map of visited modules.
@@ -1715,7 +1713,7 @@ impl PseudoGasContext {
 impl LoaderV1 {
     fn struct_name_to_type_tag(
         &self,
-        struct_name_idx: StructNameIndex,
+        struct_name_idx: StructIdx,
         ty_args: &[Type],
         gas_context: &mut PseudoGasContext,
     ) -> PartialVMResult<StructTag> {
@@ -1732,7 +1730,7 @@ impl LoaderV1 {
             .collect::<PartialVMResult<Vec<_>>>()?;
         let struct_tag = self
             .name_cache
-            .idx_to_struct_tag(struct_name_idx, type_args)?;
+            .struct_tag_from_idx(&struct_name_idx, type_args);
 
         gas_context.charge_struct_tag(&struct_tag)?;
 
@@ -1803,10 +1801,10 @@ impl Loader {
 
     pub(crate) fn calculate_depth_of_struct(
         &self,
-        struct_name_idx: StructNameIndex,
+        struct_name_idx: StructIdx,
         module_store: &LegacyModuleStorageAdapter,
         module_storage: &dyn ModuleStorage,
-        visited_cache: &mut HashMap<StructNameIndex, DepthFormula>,
+        visited_cache: &mut HashMap<StructIdx, DepthFormula>,
     ) -> PartialVMResult<DepthFormula> {
         if let Some(depth_formula) = visited_cache.get(&struct_name_idx) {
             return Ok(depth_formula.clone());
@@ -1848,12 +1846,12 @@ impl Loader {
             // Same thread has put this entry previously, which means there is a recursion.
             let struct_name = self
                 .struct_name_index_map(module_storage)
-                .idx_to_struct_name_ref(struct_name_idx)?;
+                .struct_id_from_idx(&struct_name_idx);
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
                     format!(
                         "Depth formula for struct '{}' is already cached by the same thread",
-                        struct_name.as_ref(),
+                        struct_name,
                     ),
                 ),
             );
@@ -1866,7 +1864,7 @@ impl Loader {
         ty: &Type,
         module_store: &LegacyModuleStorageAdapter,
         module_storage: &dyn ModuleStorage,
-        visited_cache: &mut HashMap<StructNameIndex, DepthFormula>,
+        visited_cache: &mut HashMap<StructIdx, DepthFormula>,
     ) -> PartialVMResult<DepthFormula> {
         Ok(match ty {
             Type::Bool

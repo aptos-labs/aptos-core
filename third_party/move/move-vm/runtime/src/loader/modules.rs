@@ -28,9 +28,9 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_metrics::{Timer, VM_TIMER};
-use move_vm_types::loaded_data::{
-    runtime_types::{StructIdentifier, StructLayout, StructType, Type},
-    struct_name_indexing::{StructNameIndex, StructNameIndexMap},
+use move_vm_types::{
+    indices::{IndexMapManager, StructIdx},
+    loaded_data::runtime_types::{StructIdentifier, StructLayout, StructType, Type},
 };
 use parking_lot::RwLock;
 use std::{
@@ -118,7 +118,7 @@ impl LegacyModuleStorageAdapter {
         id: ModuleId,
         module_size: usize,
         compiled_module: Arc<CompiledModule>,
-        struct_name_index_map: &StructNameIndexMap,
+        struct_name_index_map: &IndexMapManager,
     ) -> VMResult<Arc<Module>> {
         if let Some(cached) = self.module_at(&id) {
             return Ok(cached);
@@ -288,7 +288,7 @@ impl Module {
         natives: &NativeFunctions,
         size: usize,
         module: Arc<CompiledModule>,
-        struct_name_index_map: &StructNameIndexMap,
+        struct_name_index_map: &IndexMapManager,
     ) -> PartialVMResult<Self> {
         let _timer = VM_TIMER.timer_with_label("Module::new");
 
@@ -318,13 +318,16 @@ impl Module {
                 let struct_name = module.identifier_at(struct_handle.name);
                 let module_handle = module.module_handle_at(struct_handle.module);
                 let module_id = module.module_id_for_handle(module_handle);
+                let address = module.address_identifier_at(module_handle.address);
+                let module_name = module.identifier_at(module_handle.name);
 
-                let struct_name = StructIdentifier {
+                let struct_id = StructIdentifier {
                     module: module_id,
                     name: struct_name.to_owned(),
                 };
-                struct_idxs.push(struct_name_index_map.struct_name_to_idx(&struct_name)?);
-                struct_names.push(struct_name)
+                let idx = struct_name_index_map.struct_idx(address, module_name, struct_name);
+                struct_idxs.push(idx);
+                struct_names.push(struct_id)
             }
 
             // Build signature table
@@ -571,7 +574,7 @@ impl Module {
     fn make_struct_type(
         module: &CompiledModule,
         struct_def: &StructDefinition,
-        struct_name_table: &[StructNameIndex],
+        struct_name_table: &[StructIdx],
     ) -> PartialVMResult<StructType> {
         let struct_handle = module.struct_handle_at(struct_def.struct_handle);
         let abilities = struct_handle.abilities;
@@ -618,7 +621,7 @@ impl Module {
     fn make_field(
         module: &CompiledModule,
         field: &FieldDefinition,
-        struct_name_table: &[StructNameIndex],
+        struct_name_table: &[StructIdx],
     ) -> PartialVMResult<(Identifier, Type)> {
         let ty = intern_type(
             BinaryIndexedView::Module(module),

@@ -910,7 +910,7 @@ impl InterpreterImpl {
                         gas_meter,
                         &mut traversal_context.visited,
                         traversal_context.referenced_modules,
-                        [(arena_id.address(), arena_id.name())],
+                        [(arena_id.address(), &arena_id.name)],
                         resolver.module_storage(),
                     )
                     .map_err(|err| err
@@ -1092,7 +1092,7 @@ impl InterpreterImpl {
         let struct_name = resolver
             .loader()
             .struct_name_index_map(resolver.module_storage())
-            .idx_to_struct_name(struct_idx)?;
+            .struct_id_from_idx(&struct_idx);
         if let Some(access) = AccessInstance::new(kind, struct_name, instance, addr) {
             self.access_control.check_access(access)?
         }

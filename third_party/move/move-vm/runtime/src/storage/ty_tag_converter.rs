@@ -8,20 +8,20 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     vm_status::StatusCode,
 };
-use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex};
+use move_vm_types::{indices::StructIdx, loaded_data::runtime_types::Type};
 use parking_lot::RwLock;
 use std::hash::{Hash, Hasher};
 
 /// Key type for [TypeTagCache] that corresponds to a fully-instantiated struct.
 #[derive(Clone, Eq, PartialEq)]
 struct StructKey {
-    idx: StructNameIndex,
+    idx: StructIdx,
     ty_args: Vec<Type>,
 }
 
 #[derive(Eq, PartialEq)]
 struct StructKeyRef<'a> {
-    idx: &'a StructNameIndex,
+    idx: &'a StructIdx,
     ty_args: &'a [Type],
 }
 
@@ -76,7 +76,7 @@ pub(crate) struct PricedStructTag {
 ///
 /// # Speculative execution safety
 ///
-/// A struct name corresponds to a unique [StructNameIndex]. So all non-generic structs with same
+/// A struct name corresponds to a unique [StructIdx]. So all non-generic structs with same
 /// names have the same struct tags. If structs are generic, the number of type parameters cannot
 /// be changed by the upgrade, so the tags stay the same for different "upgraded" struct versions.
 /// The type parameters themselves (vector of [Type]s in this cache used as keys) are also not
@@ -117,7 +117,7 @@ impl TypeTagCache {
     /// Returns cached struct tag and its pseudo-gas cost if it exists, and [None] otherwise.
     pub(crate) fn get_struct_tag(
         &self,
-        idx: &StructNameIndex,
+        idx: &StructIdx,
         ty_args: &[Type],
     ) -> Option<PricedStructTag> {
         self.cache
@@ -130,7 +130,7 @@ impl TypeTagCache {
     /// true if the tag was not cached before, and false otherwise.
     pub(crate) fn insert_struct_tag(
         &self,
-        idx: &StructNameIndex,
+        idx: &StructIdx,
         ty_args: &[Type],
         priced_struct_tag: &PricedStructTag,
     ) -> bool {
@@ -196,7 +196,7 @@ impl<'a> TypeTagConverter<'a> {
     /// type arguments are too complex, etc. the tag construction fails.
     pub(crate) fn struct_name_idx_to_struct_tag(
         &self,
-        struct_name_idx: &StructNameIndex,
+        struct_name_idx: &StructIdx,
         ty_args: &[Type],
     ) -> PartialVMResult<StructTag> {
         let mut gas_context = PseudoGasContext::new(self.runtime_environment.vm_config());
@@ -252,7 +252,7 @@ impl<'a> TypeTagConverter<'a> {
 
     fn struct_name_idx_to_struct_tag_impl(
         &self,
-        struct_name_idx: &StructNameIndex,
+        struct_name_idx: &StructIdx,
         ty_args: &[Type],
         gas_context: &mut PseudoGasContext,
     ) -> PartialVMResult<StructTag> {
@@ -274,7 +274,7 @@ impl<'a> TypeTagConverter<'a> {
 
         // Construct the struct tag as well.
         let struct_name_index_map = self.runtime_environment.struct_name_index_map();
-        let struct_tag = struct_name_index_map.idx_to_struct_tag(*struct_name_idx, type_args)?;
+        let struct_tag = struct_name_index_map.struct_tag_from_idx(struct_name_idx, type_args);
         gas_context.charge_struct_tag(&struct_tag)?;
 
         // Cache the struct tag. Record its gas cost as well.
@@ -299,10 +299,9 @@ mod tests {
         ability::{Ability, AbilitySet},
         account_address::AccountAddress,
         identifier::Identifier,
-        language_storage::ModuleId,
     };
     use move_vm_types::loaded_data::runtime_types::{
-        AbilityInfo, StructIdentifier, StructLayout, StructType, TypeBuilder,
+        AbilityInfo, StructLayout, StructType, TypeBuilder,
     };
     use smallbitvec::SmallBitVec;
     use std::{collections::hash_map::DefaultHasher, str::FromStr};
@@ -318,28 +317,28 @@ mod tests {
     fn test_struct_key_equivalence_and_hash() {
         let struct_keys = [
             StructKey {
-                idx: StructNameIndex::new(0),
+                idx: StructIdx::new(0),
                 ty_args: vec![],
             },
             StructKey {
-                idx: StructNameIndex::new(1),
+                idx: StructIdx::new(1),
                 ty_args: vec![Type::U8],
             },
             StructKey {
-                idx: StructNameIndex::new(2),
+                idx: StructIdx::new(2),
                 ty_args: vec![Type::Bool, Type::Vector(Arc::new(Type::Bool))],
             },
             StructKey {
-                idx: StructNameIndex::new(3),
+                idx: StructIdx::new(3),
                 ty_args: vec![
                     Type::Struct {
-                        idx: StructNameIndex::new(0),
+                        idx: StructIdx::new(0),
                         ability: AbilityInfo::struct_(AbilitySet::singleton(Ability::Key)),
                     },
                     Type::StructInstantiation {
-                        idx: StructNameIndex::new(1),
+                        idx: StructIdx::new(1),
                         ty_args: Arc::new(vec![Type::Address, Type::Struct {
-                            idx: StructNameIndex::new(2),
+                            idx: StructIdx::new(2),
                             ability: AbilityInfo::struct_(AbilitySet::singleton(Ability::Copy)),
                         }]),
                         ability: AbilityInfo::generic_struct(
@@ -363,26 +362,24 @@ mod tests {
     fn test_type_tag_cache() {
         let cache = TypeTagCache::empty();
         assert!(cache.cache.read().is_empty());
-        assert!(cache
-            .get_struct_tag(&StructNameIndex::new(0), &[])
-            .is_none());
+        assert!(cache.get_struct_tag(&StructIdx::new(0), &[]).is_none());
 
         let tag = PricedStructTag {
             struct_tag: StructTag::from_str("0x1::foo::Foo").unwrap(),
             pseudo_gas_cost: 10,
         };
-        assert!(cache.insert_struct_tag(&StructNameIndex::new(0), &[], &tag));
+        assert!(cache.insert_struct_tag(&StructIdx::new(0), &[], &tag));
 
         let tag = PricedStructTag {
             struct_tag: StructTag::from_str("0x1::foo::Foo").unwrap(),
             // Set different cost to check.
             pseudo_gas_cost: 100,
         };
-        assert!(!cache.insert_struct_tag(&StructNameIndex::new(0), &[], &tag));
+        assert!(!cache.insert_struct_tag(&StructIdx::new(0), &[], &tag));
 
         assert_eq!(cache.cache.read().len(), 1);
         let cost = cache
-            .get_struct_tag(&StructNameIndex::new(0), &[])
+            .get_struct_tag(&StructIdx::new(0), &[])
             .unwrap()
             .pseudo_gas_cost;
         assert_eq!(cost, 10);
@@ -435,20 +432,16 @@ mod tests {
         );
 
         // Structs.
-        let bar_idx = runtime_environment
-            .struct_name_index_map()
-            .struct_name_to_idx(&StructIdentifier {
-                module: ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap()),
-                name: Identifier::new("Bar").unwrap(),
-            })
-            .unwrap();
-        let foo_idx = runtime_environment
-            .struct_name_index_map()
-            .struct_name_to_idx(&StructIdentifier {
-                module: ModuleId::new(AccountAddress::TWO, Identifier::new("foo").unwrap()),
-                name: Identifier::new("Foo").unwrap(),
-            })
-            .unwrap();
+        let bar_idx = runtime_environment.struct_name_index_map().struct_idx(
+            &AccountAddress::ONE,
+            &Identifier::new("foo").unwrap(),
+            &Identifier::new("Bar").unwrap(),
+        );
+        let foo_idx = runtime_environment.struct_name_index_map().struct_idx(
+            &AccountAddress::TWO,
+            &Identifier::new("foo").unwrap(),
+            &Identifier::new("Foo").unwrap(),
+        );
 
         let struct_ty =
             ty_builder.create_struct_ty(bar_idx, AbilityInfo::struct_(AbilitySet::EMPTY));
@@ -519,14 +512,11 @@ mod tests {
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
         let ty_tag_converter = TypeTagConverter::new(&runtime_environment);
 
-        let id = StructIdentifier {
-            module: ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap()),
-            name: Identifier::new("Foo").unwrap(),
-        };
-        let idx = runtime_environment
-            .struct_name_index_map()
-            .struct_name_to_idx(&id)
-            .unwrap();
+        let idx = runtime_environment.struct_name_index_map().struct_idx(
+            &AccountAddress::ONE,
+            &Identifier::new("foo").unwrap(),
+            &Identifier::new("Foo").unwrap(),
+        );
         let struct_tag = StructTag::from_str("0x1::foo::Foo").unwrap();
 
         let mut gas_context = PseudoGasContext::new(runtime_environment.vm_config());

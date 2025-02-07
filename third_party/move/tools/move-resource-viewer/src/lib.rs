@@ -610,7 +610,7 @@ fn find_struct_def_in_module(
 ) -> anyhow::Result<StructDefinitionIndex> {
     for (i, defs) in module.struct_defs().iter().enumerate() {
         let st_handle = module.struct_handle_at(defs.struct_handle);
-        if module.identifier_at(st_handle.name) == name {
+        if module.identifier_at(st_handle.name).as_ident_str() == name {
             return Ok(StructDefinitionIndex::new(i as u16));
         }
     }
