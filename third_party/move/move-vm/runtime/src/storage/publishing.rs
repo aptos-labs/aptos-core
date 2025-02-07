@@ -218,13 +218,9 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
                 })?;
 
             // Also verify that all friends exist.
-            for (friend_addr, friend_name) in module.immediate_friends_iter() {
-                let friend_idx = staged_module_storage
-                    .runtime_environment()
-                    .struct_name_index_map()
-                    .module_idx(friend_addr, friend_name);
-                if !staged_module_storage.check_module_exists(&friend_idx)? {
-                    return Err(module_linker_error!(friend_addr, friend_name));
+            for friend_idx in module.friends.iter() {
+                if !staged_module_storage.check_module_exists(friend_idx)? {
+                    return Err(module_linker_error!(0, 0));
                 }
             }
         }

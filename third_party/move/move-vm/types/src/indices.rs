@@ -65,7 +65,9 @@ where
 const MODULE_OFFSET: u64 = 32;
 const FUNCTION_OR_STRUCT_OFFSET: u64 = 48;
 
-const ADDRESS_MASK: u64 = 0x0000_0000_FFFF_FFFF;
+const FULL_ADDRESS_MASK: u64 = 0x0000_0000_FFFF_FFFF;
+const ADDRESS_MASK: u64 = 0x0000_0000_7FFF_FFFF;
+const SPECIAL_ADDRESS_MASK: u64 = 0x0000_0000_8000_0000;
 const MODULE_MASK: u64 = 0x0000_FFFF_0000_0000;
 #[allow(dead_code)]
 const FUNCTION_OR_STRUCT_MASK: u64 = 0xFFFF_0000_0000_0000;
@@ -80,12 +82,12 @@ impl StructIdx {
 
     #[allow(dead_code)]
     pub fn module_idx(&self) -> ModuleIdx {
-        ModuleIdx(self.0 & (MODULE_MASK | ADDRESS_MASK))
+        ModuleIdx(self.0 & (MODULE_MASK | FULL_ADDRESS_MASK))
     }
 
     #[allow(dead_code)]
     pub fn address_idx(&self) -> AddressIdx {
-        AddressIdx(self.0 & ADDRESS_MASK)
+        AddressIdx(self.0 & FULL_ADDRESS_MASK)
     }
 }
 
@@ -106,12 +108,12 @@ impl FunctionIdx {
 
     #[allow(dead_code)]
     pub fn module_idx(&self) -> ModuleIdx {
-        ModuleIdx(self.0 & (MODULE_MASK | ADDRESS_MASK))
+        ModuleIdx(self.0 & (MODULE_MASK | FULL_ADDRESS_MASK))
     }
 
     #[allow(dead_code)]
     pub fn address_idx(&self) -> AddressIdx {
-        AddressIdx(self.0 & ADDRESS_MASK)
+        AddressIdx(self.0 & FULL_ADDRESS_MASK)
     }
 }
 
@@ -132,7 +134,11 @@ impl ModuleIdx {
 
     #[allow(dead_code)]
     pub fn address_idx(&self) -> AddressIdx {
-        AddressIdx(self.0 & ADDRESS_MASK)
+        AddressIdx(self.0 & FULL_ADDRESS_MASK)
+    }
+
+    pub fn is_special_addr(&self) -> bool {
+        (self.0 & SPECIAL_ADDRESS_MASK) != 0
     }
 }
 
@@ -186,7 +192,11 @@ impl IndexMapManager {
         let address_idx = self.address_index_map.value_to_idx(address);
         let module_name_idx = self.module_name_index_map.value_to_idx(module_name);
 
-        ModuleIdx((module_name_idx << MODULE_OFFSET) | address_idx)
+        if address.is_special() {
+            ModuleIdx((module_name_idx << MODULE_OFFSET) | (1 << 31) | address_idx)
+        } else {
+            ModuleIdx((module_name_idx << MODULE_OFFSET) | address_idx)
+        }
     }
 
     pub fn struct_idx(
@@ -306,7 +316,6 @@ impl IndexMapManager {
         }
     }
 
-    #[allow(dead_code)]
     pub fn function_idx(
         &self,
         address: &AccountAddress,

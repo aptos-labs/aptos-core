@@ -89,18 +89,19 @@ fn native_check_dispatch_type_compatibility_impl(
     let (rhs, rhs_id) = {
         let (module, func) = extract_function_info(&mut arguments)?;
         let function_idx = index_manager.function_idx(module.address(), &module.name, &func);
+        let module_idx = function_idx.module_idx();
 
         let is_err = if context.get_feature_flags().is_account_abstraction_enabled() {
-            !module.address().is_special()
+            !module_idx.is_special_addr()
                 && !context
                     .traversal_context()
                     .visited
-                    .contains_key(&(module.address(), &module.name))
+                    .contains_key(&module_idx)
         } else {
             !context
                 .traversal_context()
                 .visited
-                .contains_key(&(module.address(), &module.name))
+                .contains_key(&module_idx)
         };
         if is_err {
             return Err(SafeNativeError::Abort { abort_code: 2 });
@@ -188,6 +189,12 @@ fn native_load_function_impl(
 
     context.charge(FUNCTION_INFO_LOAD_FUNCTION_BASE)?;
     let (module_name, _) = extract_function_info(&mut arguments)?;
+    let index_map = context
+        .resolver
+        .module_storage
+        .runtime_environment()
+        .struct_name_index_map();
+    let module_name = index_map.module_idx(&module_name.address, &module_name.name);
 
     Err(SafeNativeError::LoadModule { module_name })
 }

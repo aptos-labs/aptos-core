@@ -25,7 +25,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::GasMeter,
-    indices::FunctionIdx,
+    indices::{FunctionIdx, ModuleIdx},
     loaded_data::runtime_types::{Type, TypeBuilder},
     values::{GlobalValue, Value},
 };
@@ -541,10 +541,11 @@ impl<'r, 'l> Session<'r, 'l> {
             .flat_map(|ty_tag| ty_tag.preorder_traversal_iter())
             .filter_map(TypeTag::struct_tag)
             .map(|struct_tag| {
-                let module_id = traversal_context
-                    .referenced_module_ids
-                    .alloc(struct_tag.module_id());
-                (module_id.address(), &module_id.name)
+                let idx = module_storage
+                    .runtime_environment()
+                    .struct_name_index_map()
+                    .module_idx_from_struct_tag(struct_tag);
+                idx
             })
             .collect::<BTreeSet<_>>();
 
@@ -556,6 +557,7 @@ impl<'r, 'l> Session<'r, 'l> {
         )
     }
 
+    #[allow(clippy::needless_lifetimes)]
     pub fn check_dependencies_and_charge_gas<'a, I>(
         &mut self,
         module_storage: &impl ModuleStorage,
@@ -564,7 +566,7 @@ impl<'r, 'l> Session<'r, 'l> {
         ids: I,
     ) -> VMResult<()>
     where
-        I: IntoIterator<Item = (&'a AccountAddress, &'a Identifier)>,
+        I: IntoIterator<Item = ModuleIdx>,
         I::IntoIter: DoubleEndedIterator,
     {
         self.move_vm

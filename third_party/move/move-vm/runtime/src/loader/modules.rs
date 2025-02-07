@@ -9,11 +9,12 @@ use crate::{
         BinaryCache,
     },
     native_functions::NativeFunctions,
+    storage::environment::DeserializedModule,
 };
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
-    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    errors::{PartialVMError, PartialVMResult, VMResult},
     file_format::{
         Bytecode, CompiledModule, FieldDefinition, FieldHandleIndex, FieldInstantiationIndex,
         FunctionDefinitionIndex, SignatureIndex, StructDefinition, StructDefinitionIndex,
@@ -46,8 +47,10 @@ use std::{
 /// elsewhere as long as it implements this `ModuleStorage` trait. Doing so would allow the caller, i.e: the
 /// adapter layer, to freely decide when to drop or persist the cache as well as determining its own eviction policy.
 pub trait LegacyModuleStorage {
+    #[allow(dead_code)]
     fn store_module(&self, module_id: &ModuleId, binary: Module) -> Arc<Module>;
     fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>>;
+    #[allow(dead_code)]
     fn fetch_module_by_ref(&self, addr: &AccountAddress, name: &IdentStr) -> Option<Arc<Module>>;
 }
 
@@ -104,6 +107,7 @@ impl LegacyModuleStorageAdapter {
         self.modules.fetch_module(id)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn module_at_by_ref(
         &self,
         addr: &AccountAddress,
@@ -114,19 +118,20 @@ impl LegacyModuleStorageAdapter {
 
     pub(crate) fn insert(
         &self,
-        natives: &NativeFunctions,
-        id: ModuleId,
-        module_size: usize,
-        compiled_module: Arc<CompiledModule>,
-        struct_name_index_map: &IndexMapManager,
+        _natives: &NativeFunctions,
+        _id: ModuleId,
+        _module_size: usize,
+        _compiled_module: Arc<CompiledModule>,
+        _struct_name_index_map: &IndexMapManager,
     ) -> VMResult<Arc<Module>> {
-        if let Some(cached) = self.module_at(&id) {
-            return Ok(cached);
-        }
-
-        let module = Module::new(natives, module_size, compiled_module, struct_name_index_map)
-            .map_err(|e| e.finish(Location::Undefined))?;
-        Ok(self.modules.store_module(&id, module))
+        unimplemented!()
+        // if let Some(cached) = self.module_at(&id) {
+        //     return Ok(cached);
+        // }
+        //
+        // let module = Module::new(natives, module_size, compiled_module, struct_name_index_map)
+        //     .map_err(|e| e.finish(Location::Undefined))?;
+        // Ok(self.modules.store_module(&id, module))
     }
 
     pub(crate) fn has_module(&self, module_id: &ModuleId) -> bool {
@@ -192,10 +197,11 @@ pub struct Module {
     pub module_idx: ModuleIdx,
 
     // size in bytes
+    #[allow(dead_code)]
     pub(crate) size: usize,
 
     // primitive pools
-    pub(crate) module: Arc<CompiledModule>,
+    pub(crate) module: Arc<DeserializedModule>,
 
     //
     // types as indexes into the Loader type list
@@ -291,10 +297,11 @@ impl Module {
     pub(crate) fn new(
         natives: &NativeFunctions,
         size: usize,
-        module: Arc<CompiledModule>,
+        deserialized_module: Arc<DeserializedModule>,
         struct_name_index_map: &IndexMapManager,
     ) -> PartialVMResult<Self> {
         let _timer = VM_TIMER.timer_with_label("Module::new");
+        let module = deserialized_module.compiled_module.as_ref();
 
         let self_module_id = module.self_id();
         let id =
@@ -343,7 +350,7 @@ impl Module {
                         .0
                         .iter()
                         .map(|sig| {
-                            intern_type(BinaryIndexedView::Module(&module), sig, &struct_idxs)
+                            intern_type(BinaryIndexedView::Module(module), sig, &struct_idxs)
                         })
                         .collect::<PartialVMResult<Vec<_>>>()?,
                 )
@@ -351,7 +358,7 @@ impl Module {
 
             for (idx, struct_def) in module.struct_defs().iter().enumerate() {
                 let definition_struct_type =
-                    Arc::new(Self::make_struct_type(&module, struct_def, &struct_idxs)?);
+                    Arc::new(Self::make_struct_type(module, struct_def, &struct_idxs)?);
                 let struct_idx = definition_struct_type.idx;
                 structs.push(StructDef {
                     field_count: definition_struct_type.field_count(None),
@@ -408,7 +415,7 @@ impl Module {
                 let function = Function::new(
                     natives,
                     findex,
-                    &module,
+                    module,
                     signature_table.as_slice(),
                     &struct_names,
                     function_idx,
@@ -445,7 +452,7 @@ impl Module {
                                     single_signature_token_map.insert(
                                         *si,
                                         intern_type(
-                                            BinaryIndexedView::Module(&module),
+                                            BinaryIndexedView::Module(module),
                                             ty,
                                             &struct_idxs,
                                         )?,
@@ -568,7 +575,7 @@ impl Module {
                 id: self_module_id,
                 module_idx: id,
                 size,
-                module,
+                module: deserialized_module,
                 structs,
                 struct_instantiations,
                 struct_variant_infos,
@@ -716,7 +723,7 @@ impl Module {
 }
 
 impl Deref for Module {
-    type Target = Arc<CompiledModule>;
+    type Target = Arc<DeserializedModule>;
 
     fn deref(&self) -> &Self::Target {
         &self.module

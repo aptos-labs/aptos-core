@@ -9,6 +9,7 @@ use crate::{
         },
         module_storage::{ambassador_impl_ModuleStorage, ModuleStorage},
     },
+    DeserializedModule,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
@@ -96,7 +97,8 @@ struct UnsyncModuleStorageImpl<'s, S, E> {
     /// Environment where this module storage is defined in.
     runtime_environment: E,
     /// Module cache with deserialized or verified modules.
-    module_cache: UnsyncModuleCache<ModuleIdx, CompiledModule, Module, BytesWithHash, NoVersion>,
+    module_cache:
+        UnsyncModuleCache<ModuleIdx, DeserializedModule, Module, BytesWithHash, NoVersion>,
 
     /// Immutable baseline storage from which one can fetch raw module bytes.
     base_storage: BorrowedOrOwned<'s, S>,
@@ -126,7 +128,7 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> UnsyncModuleStorageIm
 impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> ModuleCodeBuilder
     for UnsyncModuleStorageImpl<'s, S, E>
 {
-    type Deserialized = CompiledModule;
+    type Deserialized = DeserializedModule;
     type Extension = BytesWithHash;
     type Key = ModuleIdx;
     type Verified = Module;

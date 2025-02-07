@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::{file_format::CompiledScript, CompiledModule};
-use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
-};
+use move_core_types::language_storage::ModuleId;
+use move_vm_types::indices::ModuleIdx;
 use std::{collections::BTreeMap, sync::Arc};
 use typed_arena::Arena;
 
@@ -16,7 +15,7 @@ pub struct TraversalStorage {
 }
 
 pub struct TraversalContext<'a> {
-    pub visited: BTreeMap<(&'a AccountAddress, &'a Identifier), ()>,
+    pub visited: BTreeMap<ModuleIdx, ()>,
 
     pub referenced_scripts: &'a Arena<Arc<CompiledScript>>,
     pub referenced_modules: &'a Arena<Arc<CompiledModule>>,

@@ -42,8 +42,6 @@ macro_rules! module_cyclic_dependency_error {
             "Module {}::{} forms a cyclic dependency",
             $addr, $name
         ))
-        .finish(move_binary_format::errors::Location::Module(
-            move_core_types::language_storage::ModuleId::new(*$addr, $name.to_owned()),
-        ))
+        .finish(move_binary_format::errors::Location::Undefined)
     };
 }

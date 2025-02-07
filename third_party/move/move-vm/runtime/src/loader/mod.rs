@@ -22,7 +22,7 @@ use move_binary_format::{
 use move_bytecode_verifier::{self, cyclic_dependencies, dependencies};
 use move_core_types::{
     account_address::AccountAddress,
-    gas_algebra::{NumBytes, NumTypeNodes},
+    gas_algebra::NumTypeNodes,
     identifier::IdentStr,
     language_storage::{ModuleId, StructTag, TypeTag},
     value::MoveTypeLayout,
@@ -70,7 +70,7 @@ use move_binary_format::file_format::{
 };
 use move_core_types::identifier::Identifier;
 use move_vm_types::{
-    indices::{FunctionIdx, IndexMapManager, StructIdx},
+    indices::{FunctionIdx, IndexMapManager, ModuleIdx, StructIdx},
     loaded_data::runtime_types::{DepthFormula, StructLayout, TypeBuilder},
 };
 pub use script::Script;
@@ -242,37 +242,27 @@ impl Loader {
         }
     }
 
+    #[allow(clippy::needless_lifetimes)]
     pub(crate) fn check_dependencies_and_charge_gas<'a, I>(
         &self,
-        module_store: &LegacyModuleStorageAdapter,
-        data_store: &mut TransactionDataCache,
+        _module_store: &LegacyModuleStorageAdapter,
+        _data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
-        visited: &mut BTreeMap<(&'a AccountAddress, &'a Identifier), ()>,
-        referenced_modules: &'a Arena<Arc<CompiledModule>>,
+        visited: &mut BTreeMap<ModuleIdx, ()>,
+        _referenced_modules: &'a Arena<Arc<CompiledModule>>,
         ids: I,
         module_storage: &dyn ModuleStorage,
     ) -> VMResult<()>
     where
-        I: IntoIterator<Item = (&'a AccountAddress, &'a Identifier)>,
+        I: IntoIterator<Item = ModuleIdx>,
         I::IntoIter: DoubleEndedIterator,
     {
         let _timer = VM_TIMER.timer_with_label("Loader::check_dependencies_and_charge_gas");
         match self {
-            Self::V1(loader) => loader.check_dependencies_and_charge_gas(
-                module_store,
-                data_store,
-                gas_meter,
-                visited,
-                referenced_modules,
-                ids,
-            ),
-            Self::V2(loader) => loader.check_dependencies_and_charge_gas(
-                module_storage,
-                gas_meter,
-                visited,
-                referenced_modules,
-                ids,
-            ),
+            Self::V1(_) => unimplemented!(),
+            Self::V2(loader) => {
+                loader.check_dependencies_and_charge_gas(module_storage, gas_meter, visited, ids)
+            },
         }
     }
 
@@ -424,27 +414,28 @@ impl LoaderV1 {
 
     pub(crate) fn check_script_dependencies_and_check_gas(
         &self,
-        module_store: &LegacyModuleStorageAdapter,
+        _module_store: &LegacyModuleStorageAdapter,
         data_store: &mut TransactionDataCache,
-        gas_meter: &mut impl GasMeter,
+        _gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         script_blob: &[u8],
     ) -> VMResult<()> {
         let script =
             data_store.load_compiled_script_to_cache(script_blob, sha3_256(script_blob))?;
-        let script = traversal_context.referenced_scripts.alloc(script);
+        let _script = traversal_context.referenced_scripts.alloc(script);
 
-        // TODO(Gas): Should we charge dependency gas for the script itself?
-        self.check_dependencies_and_charge_gas(
-            module_store,
-            data_store,
-            gas_meter,
-            &mut traversal_context.visited,
-            traversal_context.referenced_modules,
-            script.immediate_dependencies_iter(),
-        )?;
-
-        Ok(())
+        unimplemented!()
+        // // TODO(Gas): Should we charge dependency gas for the script itself?
+        // self.check_dependencies_and_charge_gas(
+        //     module_store,
+        //     data_store,
+        //     gas_meter,
+        //     &mut traversal_context.visited,
+        //     traversal_context.referenced_modules,
+        //     script.immediate_dependencies_iter(),
+        // )?;
+        //
+        // Ok(())
     }
 
     // Scripts are verified and dependencies are loaded.
@@ -464,20 +455,21 @@ impl LoaderV1 {
     ) -> VMResult<LoadedFunction> {
         // Retrieve or load the script.
         let hash_value = sha3_256(script_blob);
-        let mut scripts = self.scripts.write();
+        let scripts = self.scripts.write();
         let script = match scripts.get(&hash_value) {
             Some(cached) => cached,
             None => {
-                let ver_script = self.deserialize_and_verify_script(
-                    script_blob,
-                    hash_value,
-                    data_store,
-                    module_store,
-                )?;
-
-                let script = Script::new(ver_script, &self.name_cache)
-                    .map_err(|e| e.finish(Location::Script))?;
-                scripts.insert(hash_value, script)
+                unimplemented!()
+                // let ver_script = self.deserialize_and_verify_script(
+                //     script_blob,
+                //     hash_value,
+                //     data_store,
+                //     module_store,
+                // )?;
+                //
+                // let script = Script::new(ver_script, &self.name_cache)
+                //     .map_err(|e| e.finish(Location::Script))?;
+                // scripts.insert(hash_value, script)
             },
         };
 
@@ -506,6 +498,7 @@ impl LoaderV1 {
     // So when publishing modules through the dependency DAG it may happen that a different
     // thread had loaded the module after this process fetched it from storage.
     // Caching will take care of that by asking for each dependency module again under lock.
+    #[allow(dead_code)]
     fn deserialize_and_verify_script(
         &self,
         script: &[u8],
@@ -529,7 +522,10 @@ impl LoaderV1 {
             .into_iter()
             .map(|module_id| self.load_module(&module_id, data_store, module_store))
             .collect::<VMResult<Vec<_>>>()?;
-        dependencies::verify_script(&script, loaded_deps.iter().map(|m| m.as_ref().as_ref()))?;
+        dependencies::verify_script(
+            &script,
+            loaded_deps.iter().map(|m| m.compiled_module.as_ref()),
+        )?;
         Ok(script)
     }
 
@@ -759,7 +755,7 @@ impl LoaderV1 {
                     .or_else(|| {
                         module_store
                             .module_at(module_id)
-                            .map(|m| m.module.immediate_dependencies())
+                            .map(|m| m.compiled_module.immediate_dependencies())
                     })
                     .ok_or_else(|| PartialVMError::new(StatusCode::MISSING_DEPENDENCY))
             },
@@ -778,7 +774,7 @@ impl LoaderV1 {
                         .or_else(|| {
                             module_store
                                 .module_at(module_id)
-                                .map(|m| m.module.immediate_friends())
+                                .map(|m| m.compiled_module.immediate_friends())
                         })
                         .ok_or_else(|| PartialVMError::new(StatusCode::MISSING_DEPENDENCY))
                 }
@@ -822,14 +818,15 @@ impl LoaderV1 {
     /// performance.
     ///
     /// TODO: Revisit the order of traversal. Consider switching to alphabetical order.
+    #[allow(dead_code)]
     pub(crate) fn check_dependencies_and_charge_gas<'a, I>(
         &self,
-        module_store: &LegacyModuleStorageAdapter,
-        data_store: &mut TransactionDataCache,
-        gas_meter: &mut impl GasMeter,
-        visited: &mut BTreeMap<(&'a AccountAddress, &'a Identifier), ()>,
-        referenced_modules: &'a Arena<Arc<CompiledModule>>,
-        ids: I,
+        _imodule_store: &LegacyModuleStorageAdapter,
+        _idata_store: &mut TransactionDataCache,
+        _igas_meter: &mut impl GasMeter,
+        _ivisited: &mut BTreeMap<(&'a AccountAddress, &'a Identifier), ()>,
+        _ireferenced_modules: &'a Arena<Arc<CompiledModule>>,
+        _ids: I,
     ) -> VMResult<()>
     where
         I: IntoIterator<Item = (&'a AccountAddress, &'a Identifier)>,
@@ -838,54 +835,54 @@ impl LoaderV1 {
         // Initialize the work list (stack) and the map of visited modules.
         //
         // TODO: Determine the reserved capacity based on the max number of dependencies allowed.
-        let mut stack = Vec::with_capacity(512);
-
-        for (addr, name) in ids.into_iter().rev() {
-            // TODO: Allow the check of special addresses to be customized.
-            if !addr.is_special() && visited.insert((addr, name), ()).is_none() {
-                stack.push((addr, name, true));
-            }
-        }
-
-        while let Some((addr, name, allow_loading_failure)) = stack.pop() {
-            // Load and deserialize the module only if it has not been cached by the loader.
-            // Otherwise, this will cause a significant regression in performance.
-            let (module, size) = match module_store.module_at_by_ref(addr, name) {
-                Some(module) => (module.module.clone(), module.size),
-                None => {
-                    let (module, size, _) = data_store.load_compiled_module_to_cache(
-                        ModuleId::new(*addr, name.to_owned()),
-                        allow_loading_failure,
-                    )?;
-                    (module, size)
-                },
-            };
-
-            // Extend the lifetime of the module to the remainder of the function body
-            // by storing it in an arena.
-            //
-            // This is needed because we need to store references derived from it in the
-            // work list.
-            let module = referenced_modules.alloc(module);
-
-            gas_meter
-                .charge_dependency(false, addr, name, NumBytes::new(size as u64))
-                .map_err(|err| {
-                    err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
-                })?;
-
-            // Explore all dependencies and friends that have been visited yet.
-            for (addr, name) in module
-                .immediate_dependencies_iter()
-                .chain(module.immediate_friends_iter())
-                .rev()
-            {
-                // TODO: Allow the check of special addresses to be customized.
-                if !addr.is_special() && visited.insert((addr, name), ()).is_none() {
-                    stack.push((addr, name, false));
-                }
-            }
-        }
+        // let mut stack = Vec::with_capacity(512);
+        //
+        // for (addr, name) in ids.into_iter().rev() {
+        //     // TODO: Allow the check of special addresses to be customized.
+        //     if !addr.is_special() && visited.insert((addr, name), ()).is_none() {
+        //         stack.push((addr, name, true));
+        //     }
+        // }
+        //
+        // while let Some((addr, name, allow_loading_failure)) = stack.pop() {
+        //     // Load and deserialize the module only if it has not been cached by the loader.
+        //     // Otherwise, this will cause a significant regression in performance.
+        //     let (module, size) = match module_store.module_at_by_ref(addr, name) {
+        //         Some(module) => (module.module.clone(), module.size),
+        //         None => {
+        //             let (module, size, _) = data_store.load_compiled_module_to_cache(
+        //                 ModuleId::new(*addr, name.to_owned()),
+        //                 allow_loading_failure,
+        //             )?;
+        //             (module, size)
+        //         },
+        //     };
+        //
+        //     // Extend the lifetime of the module to the remainder of the function body
+        //     // by storing it in an arena.
+        //     //
+        //     // This is needed because we need to store references derived from it in the
+        //     // work list.
+        //     let module = referenced_modules.alloc(module);
+        //
+        //     gas_meter
+        //         .charge_dependency(false, addr, name, NumBytes::new(size as u64))
+        //         .map_err(|err| {
+        //             err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
+        //         })?;
+        //
+        //     // Explore all dependencies and friends that have been visited yet.
+        //     for (addr, name) in module
+        //         .immediate_dependencies_iter()
+        //         .chain(module.immediate_friends_iter())
+        //         .rev()
+        //     {
+        //         // TODO: Allow the check of special addresses to be customized.
+        //         if !addr.is_special() && visited.insert((addr, name), ()).is_none() {
+        //             stack.push((addr, name, false));
+        //         }
+        //     }
+        // }
 
         Ok(())
     }
@@ -918,7 +915,7 @@ impl LoaderV1 {
 
         // verify that the transitive closure does not have cycles
         self.verify_module_cyclic_relations(
-            &module_ref,
+            &module_ref.compiled_module,
             &BTreeMap::new(),
             &BTreeSet::new(),
             module_store,
@@ -1046,7 +1043,7 @@ impl LoaderV1 {
         // once all dependencies are loaded, do the linking check
         let all_imm_deps = bundle_deps
             .into_iter()
-            .chain(cached_deps.iter().map(|m| m.as_ref().as_ref()));
+            .chain(cached_deps.iter().map(|m| m.compiled_module.as_ref()));
         let result = dependencies::verify_module(module, all_imm_deps);
 
         // if dependencies loading is not allowed to fail, the linking should not fail as well
@@ -1203,8 +1200,8 @@ impl<'a> Resolver<'a> {
 
     pub(crate) fn constant_at(&self, idx: ConstantPoolIndex) -> &Constant {
         match &self.binary {
-            BinaryType::Module(module) => module.module.constant_at(idx),
-            BinaryType::Script(script) => script.script.constant_at(idx),
+            BinaryType::Module(module) => module.compiled_module.constant_at(idx),
+            BinaryType::Script(script) => script.compiled_script.constant_at(idx),
         }
     }
 

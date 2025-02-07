@@ -15,12 +15,11 @@ use aptos_types::{
     vm::modules::AptosModuleExtension,
 };
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
-use move_binary_format::{
-    errors::{Location, PartialVMResult, VMResult},
-    file_format::CompiledScript,
-    CompiledModule,
+use move_binary_format::errors::{Location, PartialVMResult, VMResult};
+use move_vm_runtime::{
+    DeserializedModule, DeserializedScript, Module, RuntimeEnvironment, Script,
+    WithRuntimeEnvironment,
 };
-use move_vm_runtime::{Module, RuntimeEnvironment, Script, WithRuntimeEnvironment};
 use move_vm_types::{
     code::{
         ambassador_impl_ScriptCache, Code, ModuleCache, ModuleCode, ModuleCodeBuilder, ScriptCache,
@@ -39,7 +38,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> WithRuntimeEnvironment
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCodeBuilder for LatestView<'a, T, S> {
-    type Deserialized = CompiledModule;
+    type Deserialized = DeserializedModule;
     type Extension = AptosModuleExtension;
     type Key = ModuleIdx;
     type Verified = Module;
@@ -67,7 +66,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCodeBuilder for Late
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView<'a, T, S> {
-    type Deserialized = CompiledModule;
+    type Deserialized = DeserializedModule;
     type Extension = AptosModuleExtension;
     type Key = ModuleIdx;
     type Verified = Module;
@@ -206,7 +205,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     /// Returns the script cache.
     fn as_script_cache(
         &self,
-    ) -> &dyn ScriptCache<Key = [u8; 32], Deserialized = CompiledScript, Verified = Script> {
+    ) -> &dyn ScriptCache<Key = [u8; 32], Deserialized = DeserializedScript, Verified = Script>
+    {
         match &self.latest_view {
             ViewState::Sync(state) => state.versioned_map.script_cache(),
             ViewState::Unsync(state) => state.unsync_map.script_cache(),
@@ -218,7 +218,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         &self,
     ) -> &dyn ModuleCache<
         Key = ModuleIdx,
-        Deserialized = CompiledModule,
+        Deserialized = DeserializedModule,
         Verified = Module,
         Extension = AptosModuleExtension,
         Version = Option<TxnIndex>,

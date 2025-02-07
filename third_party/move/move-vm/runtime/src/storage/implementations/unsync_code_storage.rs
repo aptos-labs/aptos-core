@@ -11,6 +11,7 @@ use crate::{
         implementations::unsync_module_storage::{AsUnsyncModuleStorage, UnsyncModuleStorage},
         module_storage::{ambassador_impl_ModuleStorage, ModuleStorage},
     },
+    DeserializedScript,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
@@ -75,7 +76,7 @@ impl<M: ModuleStorage> UnsyncCodeStorage<M> {
 #[delegate(ModuleStorage, target = "module_storage", where = "M: ModuleStorage")]
 #[delegate(ScriptCache, target = "script_cache", where = "M: ModuleStorage")]
 pub struct UnsyncCodeStorageImpl<M> {
-    script_cache: UnsyncScriptCache<[u8; 32], CompiledScript, Script>,
+    script_cache: UnsyncScriptCache<[u8; 32], DeserializedScript, Script>,
     module_storage: M,
 }
 

@@ -37,6 +37,17 @@ impl ModuleStorage for UnreachableCodeStorage {
         unreachable!()
     }
 
+    fn fetch_existing_module_dependencies(
+        &self,
+        _idx: &ModuleIdx,
+    ) -> VMResult<Arc<Vec<ModuleIdx>>> {
+        unreachable!()
+    }
+
+    fn fetch_existing_module_friends(&self, _idx: &ModuleIdx) -> VMResult<Arc<Vec<ModuleIdx>>> {
+        unreachable!()
+    }
+
     fn fetch_deserialized_module(&self, _idx: &ModuleIdx) -> VMResult<Option<Arc<CompiledModule>>> {
         unreachable!()
     }
@@ -51,6 +62,13 @@ impl CodeStorage for UnreachableCodeStorage {
         &self,
         _serialized_script: &[u8],
     ) -> VMResult<Arc<CompiledScript>> {
+        unreachable!()
+    }
+
+    fn deserialize_and_cache_script_dependencies(
+        &self,
+        _serialized_script: &[u8],
+    ) -> VMResult<Arc<Vec<ModuleIdx>>> {
         unreachable!()
     }
 

@@ -885,18 +885,24 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
         entry_fn: &EntryFunction,
     ) -> Result<(), VMStatus> {
+        let idx = module_storage
+            .runtime_environment()
+            .struct_name_index_map()
+            .function_idx(
+                &entry_fn.module().address,
+                &entry_fn.module().name,
+                entry_fn.function_identifier(),
+            );
+
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
         if self.gas_feature_version() >= RELEASE_V1_10 {
-            let module_id = traversal_context
-                .referenced_module_ids
-                .alloc(entry_fn.module().clone());
             session.check_dependencies_and_charge_gas(
                 module_storage,
                 gas_meter,
                 traversal_context,
-                [(module_id.address(), &module_id.name)],
+                [idx.module_idx()],
             )?;
         }
 
@@ -909,14 +915,6 @@ impl AptosVM {
             )?;
         }
 
-        let idx = module_storage
-            .runtime_environment()
-            .struct_name_index_map()
-            .function_idx(
-                &entry_fn.module().address,
-                &entry_fn.module().name,
-                entry_fn.function_identifier(),
-            );
         let function = session.load_function(module_storage, &idx, entry_fn.ty_args())?;
 
         // Native entry function is forbidden.
@@ -1639,8 +1637,7 @@ impl AptosVM {
                     .module_idx(addr, name);
 
                 // TODO: Allow the check of special addresses to be customized.
-                if addr.is_special() || traversal_context.visited.insert((addr, name), ()).is_some()
-                {
+                if addr.is_special() || traversal_context.visited.insert(idx, ()).is_some() {
                     continue;
                 }
 
@@ -1658,23 +1655,19 @@ impl AptosVM {
 
                 if let Some(size) = size_if_module_exists {
                     gas_meter
-                        .charge_dependency(false, addr, name, NumBytes::new(size))
-                        .map_err(|err| {
-                            err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
-                        })?;
+                        .charge_dependency(false, &idx, NumBytes::new(size))
+                        .map_err(|err| err.finish(Location::Undefined))?;
                 }
             }
 
             // Charge all modules in the bundle that is about to be published.
             for (module, blob) in modules.iter().zip(bundle.iter()) {
-                let module_id = &module.self_id();
+                let idx = module_storage
+                    .runtime_environment()
+                    .struct_name_index_map()
+                    .module_idx(module.self_addr(), module.self_name_identifier());
                 gas_meter
-                    .charge_dependency(
-                        true,
-                        module_id.address(),
-                        module_id.name(),
-                        NumBytes::new(blob.code().len() as u64),
-                    )
+                    .charge_dependency(true, &idx, NumBytes::new(blob.code().len() as u64))
                     .map_err(|err| err.finish(Location::Undefined))?;
             }
 
@@ -1684,7 +1677,13 @@ impl AptosVM {
             // been published yet.
             let module_ids_in_bundle = modules
                 .iter()
-                .map(|module| (module.self_addr(), module.self_name_identifier()))
+                .map(|module| {
+                    let idx = module_storage
+                        .runtime_environment()
+                        .struct_name_index_map()
+                        .module_idx(module.self_addr(), module.self_name_identifier());
+                    idx
+                })
                 .collect::<BTreeSet<_>>();
 
             session.execute(|session| {
@@ -1697,7 +1696,20 @@ impl AptosVM {
                         .flat_map(|module| {
                             module
                                 .immediate_dependencies_iter()
-                                .chain(module.immediate_friends_iter())
+                                .map(|(addr, name)| {
+                                    let idx = module_storage
+                                        .runtime_environment()
+                                        .struct_name_index_map()
+                                        .module_idx(addr, name);
+                                    idx
+                                })
+                                .chain(module.immediate_friends_iter().map(|(addr, name)| {
+                                    let idx = module_storage
+                                        .runtime_environment()
+                                        .struct_name_index_map()
+                                        .module_idx(addr, name);
+                                    idx
+                                }))
                         })
                         .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
                 )

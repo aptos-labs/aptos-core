@@ -4,6 +4,7 @@
 use crate::{
     loader::{Function, Module},
     logging::expect_no_verification_errors,
+    storage::environment::DeserializedModule,
     WithRuntimeEnvironment,
 };
 use ambassador::delegatable_trait;
@@ -62,6 +63,10 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
         self.fetch_module_metadata(idx)?
             .ok_or_else(|| module_linker_error!(idx, idx))
     }
+
+    fn fetch_existing_module_dependencies(&self, idx: &ModuleIdx) -> VMResult<Arc<Vec<ModuleIdx>>>;
+
+    fn fetch_existing_module_friends(&self, idx: &ModuleIdx) -> VMResult<Arc<Vec<ModuleIdx>>>;
 
     /// Returns the deserialized module, or [None] otherwise. An error is returned if:
     ///   1. the deserialization fails, or
@@ -172,13 +177,13 @@ where
     T: WithRuntimeEnvironment
         + ModuleCache<
             Key = ModuleIdx,
-            Deserialized = CompiledModule,
+            Deserialized = DeserializedModule,
             Verified = Module,
             Extension = E,
             Version = V,
         > + ModuleCodeBuilder<
             Key = ModuleIdx,
-            Deserialized = CompiledModule,
+            Deserialized = DeserializedModule,
             Verified = Module,
             Extension = E,
         >,
@@ -204,13 +209,36 @@ where
     fn fetch_module_metadata(&self, idx: &ModuleIdx) -> VMResult<Option<Vec<Metadata>>> {
         Ok(self
             .get_module_or_build_with(idx, self)?
-            .map(|(module, _)| module.code().deserialized().metadata.clone()))
+            .map(|(module, _)| {
+                module
+                    .code()
+                    .deserialized()
+                    .compiled_module
+                    .metadata
+                    .clone()
+            }))
+    }
+
+    fn fetch_existing_module_dependencies(&self, idx: &ModuleIdx) -> VMResult<Arc<Vec<ModuleIdx>>> {
+        let module = self
+            .get_module_or_build_with(idx, self)?
+            .ok_or_else(|| module_linker_error!(0, 0))?
+            .0;
+        Ok(module.code().deserialized().deps.clone())
+    }
+
+    fn fetch_existing_module_friends(&self, idx: &ModuleIdx) -> VMResult<Arc<Vec<ModuleIdx>>> {
+        let module = self
+            .get_module_or_build_with(idx, self)?
+            .ok_or_else(|| module_linker_error!(0, 0))?
+            .0;
+        Ok(module.code().deserialized().friends.clone())
     }
 
     fn fetch_deserialized_module(&self, idx: &ModuleIdx) -> VMResult<Option<Arc<CompiledModule>>> {
         Ok(self
             .get_module_or_build_with(idx, self)?
-            .map(|(module, _)| module.code().deserialized().clone()))
+            .map(|(module, _)| module.code().deserialized().compiled_module.clone()))
     }
 
     fn fetch_verified_module(&self, idx: &ModuleIdx) -> VMResult<Option<Arc<Module>>> {
@@ -254,7 +282,7 @@ where
 ///   is clearly infeasible.
 fn visit_dependencies_and_verify<T, E, V>(
     module_id: ModuleIdx,
-    module: Arc<ModuleCode<CompiledModule, Module, E>>,
+    module: Arc<ModuleCode<DeserializedModule, Module, E>>,
     version: V,
     visited: &mut HashSet<ModuleIdx>,
     module_cache_with_context: &T,
@@ -263,13 +291,13 @@ where
     T: WithRuntimeEnvironment
         + ModuleCache<
             Key = ModuleIdx,
-            Deserialized = CompiledModule,
+            Deserialized = DeserializedModule,
             Verified = Module,
             Extension = E,
             Version = V,
         > + ModuleCodeBuilder<
             Key = ModuleIdx,
-            Deserialized = CompiledModule,
+            Deserialized = DeserializedModule,
             Verified = Module,
             Extension = E,
         >,
@@ -277,7 +305,6 @@ where
     V: Clone + Default + Ord,
 {
     let runtime_environment = module_cache_with_context.runtime_environment();
-    let index_manager = runtime_environment.struct_name_index_map();
 
     // Step 1: Local verification.
     // FIXME
@@ -295,12 +322,10 @@ where
     // Step 2: Traverse and collect all verified immediate dependencies so that we can verify
     // non-local properties of the module.
     let mut verified_dependencies = vec![];
-    for (addr, name) in locally_verified_code.immediate_dependencies_iter() {
-        let dependency_id = index_manager.module_idx(addr, name);
-
+    for dependency_id in locally_verified_code.immediate_dependencies_iter() {
         let (dependency, dependency_version) = module_cache_with_context
-            .get_module_or_build_with(&dependency_id, module_cache_with_context)?
-            .ok_or_else(|| module_linker_error!(addr, name))?;
+            .get_module_or_build_with(dependency_id, module_cache_with_context)?
+            .ok_or_else(|| module_linker_error!(0, 0))?;
 
         // Dependency is already verified!
         if dependency.code().is_verified() {
@@ -308,10 +333,10 @@ where
             continue;
         }
 
-        if visited.insert(dependency_id) {
+        if visited.insert(*dependency_id) {
             // Dependency is not verified, and we have not visited it yet.
             let verified_dependency = visit_dependencies_and_verify(
-                dependency_id,
+                *dependency_id,
                 dependency,
                 dependency_version,
                 visited,
@@ -320,7 +345,7 @@ where
             verified_dependencies.push(verified_dependency);
         } else {
             // We must have found a cycle otherwise.
-            return Err(module_cyclic_dependency_error!(addr, name));
+            return Err(module_cyclic_dependency_error!(0, 0));
         }
     }
 

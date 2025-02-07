@@ -22,9 +22,8 @@ use aptos_vm_types::module_write_set::ModuleWrite;
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
-use move_binary_format::CompiledModule;
 use move_core_types::value::MoveTypeLayout;
-use move_vm_runtime::{Module, RuntimeEnvironment};
+use move_vm_runtime::{DeserializedModule, Module, RuntimeEnvironment};
 use move_vm_types::{delayed_values::delayed_field_id::DelayedFieldID, indices::ModuleIdx};
 use std::{
     collections::{BTreeMap, HashSet},
@@ -33,7 +32,7 @@ use std::{
     sync::Arc,
 };
 
-type TxnInput<T> = CapturedReads<T, ModuleIdx, CompiledModule, Module, AptosModuleExtension>;
+type TxnInput<T> = CapturedReads<T, ModuleIdx, DeserializedModule, Module, AptosModuleExtension>;
 
 macro_rules! forward_on_success_or_skip_rest {
     ($self:ident, $txn_idx:ident, $f:ident) => {{

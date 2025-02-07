@@ -2,6 +2,8 @@
 # Please follow https://help.github.com/en/articles/ignoring-files to create a global
 # .gitignore file locally for IDE/Emacs/Vim generated files.
 **/target
+**/target-baseline
+
 **/*.rs.bk
 .idea/
 

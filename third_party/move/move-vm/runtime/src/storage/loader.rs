@@ -5,24 +5,15 @@ use crate::{
     config::VMConfig, loader::LoadedFunctionOwner, module_traversal::TraversalContext,
     storage::module_storage::ModuleStorage, CodeStorage, LoadedFunction,
 };
-use move_binary_format::{
-    access::{ModuleAccess, ScriptAccess},
-    errors::{Location, PartialVMResult, VMResult},
-    CompiledModule,
-};
-use move_core_types::{
-    account_address::AccountAddress,
-    gas_algebra::NumBytes,
-    identifier::Identifier,
-    language_storage::{ModuleId, TypeTag},
-};
+use move_binary_format::errors::{Location, PartialVMResult, VMResult};
+use move_core_types::{gas_algebra::NumBytes, language_storage::TypeTag};
 use move_vm_types::{
     gas::GasMeter,
+    indices::ModuleIdx,
     loaded_data::runtime_types::{Type, TypeBuilder},
     module_linker_error,
 };
-use std::{collections::BTreeMap, sync::Arc};
-use typed_arena::Arena;
+use std::collections::BTreeMap;
 
 /// V2 implementation of loader, which is stateless - i.e., it does not contain module or script
 /// cache. Instead, module and script storages are passed to all APIs by reference.
@@ -50,31 +41,28 @@ impl LoaderV2 {
         traversal_context: &mut TraversalContext,
         serialized_script: &[u8],
     ) -> VMResult<()> {
-        let compiled_script = code_storage.deserialize_and_cache_script(serialized_script)?;
-        let compiled_script = traversal_context.referenced_scripts.alloc(compiled_script);
+        let deps = code_storage.deserialize_and_cache_script_dependencies(serialized_script)?;
 
         // TODO(Gas): Should we charge dependency gas for the script itself?
         self.check_dependencies_and_charge_gas(
             code_storage,
             gas_meter,
             &mut traversal_context.visited,
-            traversal_context.referenced_modules,
-            compiled_script.immediate_dependencies_iter(),
+            deps.iter().copied(),
         )?;
 
         Ok(())
     }
 
-    pub(crate) fn check_dependencies_and_charge_gas<'a, I>(
+    pub(crate) fn check_dependencies_and_charge_gas<I>(
         &self,
         module_storage: &dyn ModuleStorage,
         gas_meter: &mut impl GasMeter,
-        visited: &mut BTreeMap<(&'a AccountAddress, &'a Identifier), ()>,
-        referenced_modules: &'a Arena<Arc<CompiledModule>>,
+        visited: &mut BTreeMap<ModuleIdx, ()>,
         ids: I,
     ) -> VMResult<()>
     where
-        I: IntoIterator<Item = (&'a AccountAddress, &'a Identifier)>,
+        I: IntoIterator<Item = ModuleIdx>,
         I::IntoIter: DoubleEndedIterator,
     {
         // Initialize the work list (stack) and the map of visited modules.
@@ -83,33 +71,24 @@ impl LoaderV2 {
         let mut stack = Vec::with_capacity(512);
         push_next_ids_to_visit(&mut stack, visited, ids);
 
-        let index_map = module_storage.runtime_environment().struct_name_index_map();
-
-        while let Some((addr, name)) = stack.pop() {
-            let idx = index_map.module_idx(addr, name);
+        while let Some(idx) = stack.pop() {
             let size = module_storage
                 .fetch_module_size_in_bytes(&idx)?
-                .ok_or_else(|| module_linker_error!(addr, name))?;
+                .ok_or_else(|| module_linker_error!(0, 0))?;
             gas_meter
-                .charge_dependency(false, addr, name, NumBytes::new(size as u64))
-                .map_err(|err| {
-                    err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
-                })?;
+                .charge_dependency(false, &idx, NumBytes::new(size as u64))
+                .map_err(|err| err.finish(Location::Undefined))?;
 
             // Extend the lifetime of the module to the remainder of the function body
             // by storing it in an arena.
             //
             // This is needed because we need to store references derived from it in the
             // work list.
-            let compiled_module = module_storage
-                .fetch_deserialized_module(&idx)?
-                .ok_or_else(|| module_linker_error!(addr, name))?;
-            let compiled_module = referenced_modules.alloc(compiled_module);
+            let deps = module_storage.fetch_existing_module_dependencies(&idx)?;
+            let friends = module_storage.fetch_existing_module_friends(&idx)?;
 
             // Explore all dependencies and friends that have been visited yet.
-            let imm_deps_and_friends = compiled_module
-                .immediate_dependencies_iter()
-                .chain(compiled_module.immediate_friends_iter());
+            let imm_deps_and_friends = deps.iter().chain(friends.iter()).copied();
             push_next_ids_to_visit(&mut stack, visited, imm_deps_and_friends);
         }
 
@@ -162,18 +141,18 @@ impl Clone for LoaderV2 {
 /// Given a list of addresses and module names, pushes them onto stack unless they have been
 /// already visited or if the address is special.
 #[inline]
-pub(crate) fn push_next_ids_to_visit<'a, I>(
-    stack: &mut Vec<(&'a AccountAddress, &'a Identifier)>,
-    visited: &mut BTreeMap<(&'a AccountAddress, &'a Identifier), ()>,
+pub(crate) fn push_next_ids_to_visit<I>(
+    stack: &mut Vec<ModuleIdx>,
+    visited: &mut BTreeMap<ModuleIdx, ()>,
     ids: I,
 ) where
-    I: IntoIterator<Item = (&'a AccountAddress, &'a Identifier)>,
+    I: IntoIterator<Item = ModuleIdx>,
     I::IntoIter: DoubleEndedIterator,
 {
-    for (addr, name) in ids.into_iter().rev() {
+    for idx in ids.into_iter().rev() {
         // TODO: Allow the check of special addresses to be customized.
-        if !addr.is_special() && visited.insert((addr, name), ()).is_none() {
-            stack.push((addr, name));
+        if !idx.is_special_addr() && visited.insert(idx, ()).is_none() {
+            stack.push(idx);
         }
     }
 }

@@ -2,8 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::errors::PartialVMError;
-use move_core_types::{gas_algebra::InternalGas, language_storage::ModuleId};
-use move_vm_types::{indices::FunctionIdx, loaded_data::runtime_types::Type, values::Value};
+use move_core_types::gas_algebra::InternalGas;
+use move_vm_types::{
+    indices::{FunctionIdx, ModuleIdx},
+    loaded_data::runtime_types::Type,
+    values::Value,
+};
 use smallvec::SmallVec;
 
 /// Saner representation of a native function error.
@@ -45,7 +49,7 @@ pub enum SafeNativeError {
     ///
     /// It is critical to invoke this function before calling FunctionDispatch to make sure the module loading
     /// is charged properly, otherwise it would be a potential gas issue.
-    LoadModule { module_name: ModuleId },
+    LoadModule { module_name: ModuleIdx },
 }
 
 // Allows us to keep using the `?` operator on function calls that return `PartialVMResult` inside safe natives.

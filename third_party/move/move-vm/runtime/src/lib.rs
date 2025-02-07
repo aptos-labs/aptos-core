@@ -40,7 +40,8 @@ pub use storage::implementations::unreachable_code_storage;
 pub use storage::{
     code_storage::{ambassador_impl_CodeStorage, CodeStorage},
     environment::{
-        ambassador_impl_WithRuntimeEnvironment, RuntimeEnvironment, WithRuntimeEnvironment,
+        ambassador_impl_WithRuntimeEnvironment, DeserializedModule, DeserializedScript,
+        RuntimeEnvironment, WithRuntimeEnvironment,
     },
     implementations::{
         unsync_code_storage::{AsUnsyncCodeStorage, UnsyncCodeStorage},

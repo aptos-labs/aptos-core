@@ -50,12 +50,9 @@ use aptos_vm_types::resolver::{
 };
 use bytes::Bytes;
 use claims::assert_ok;
-use move_binary_format::{
-    errors::{PartialVMError, PartialVMResult},
-    CompiledModule,
-};
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::{AsFunctionValueExtension, Module, RuntimeEnvironment};
+use move_vm_runtime::{AsFunctionValueExtension, DeserializedModule, Module, RuntimeEnvironment};
 use move_vm_types::{
     delayed_values::delayed_field_id::{DelayedFieldID, ExtractUniqueIndex},
     indices::ModuleIdx,
@@ -164,12 +161,12 @@ pub(crate) struct ParallelState<'a, T: Transaction> {
     start_counter: u32,
     counter: &'a AtomicU32,
     pub(crate) captured_reads:
-        RefCell<CapturedReads<T, ModuleIdx, CompiledModule, Module, AptosModuleExtension>>,
+        RefCell<CapturedReads<T, ModuleIdx, DeserializedModule, Module, AptosModuleExtension>>,
 }
 
 fn get_delayed_field_value_impl<T: Transaction>(
     captured_reads: &RefCell<
-        CapturedReads<T, ModuleIdx, CompiledModule, Module, AptosModuleExtension>,
+        CapturedReads<T, ModuleIdx, DeserializedModule, Module, AptosModuleExtension>,
     >,
     versioned_delayed_fields: &dyn TVersionedDelayedFieldView<DelayedFieldID>,
     wait_for: &dyn TWaitForDependency,
@@ -309,7 +306,7 @@ fn compute_delayed_field_try_add_delta_outcome_first_time(
 // and whether anything should be moved there.
 fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
     captured_reads: &RefCell<
-        CapturedReads<T, ModuleIdx, CompiledModule, Module, AptosModuleExtension>,
+        CapturedReads<T, ModuleIdx, DeserializedModule, Module, AptosModuleExtension>,
     >,
     versioned_delayed_fields: &dyn TVersionedDelayedFieldView<DelayedFieldID>,
     wait_for: &dyn TWaitForDependency,
@@ -995,7 +992,7 @@ impl<'a, T: Transaction> ViewState<'a, T> {
 pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>> {
     base_view: &'a S,
     pub(crate) global_module_cache:
-        &'a GlobalModuleCache<ModuleIdx, CompiledModule, Module, AptosModuleExtension>,
+        &'a GlobalModuleCache<ModuleIdx, DeserializedModule, Module, AptosModuleExtension>,
     pub(crate) runtime_environment: &'a RuntimeEnvironment,
     pub(crate) latest_view: ViewState<'a, T>,
     pub(crate) txn_idx: TxnIndex,
@@ -1006,7 +1003,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         base_view: &'a S,
         global_module_cache: &'a GlobalModuleCache<
             ModuleIdx,
-            CompiledModule,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >,
@@ -1034,7 +1031,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     /// Drains the parallel captured reads.
     pub(crate) fn take_parallel_reads(
         &self,
-    ) -> CapturedReads<T, ModuleIdx, CompiledModule, Module, AptosModuleExtension> {
+    ) -> CapturedReads<T, ModuleIdx, DeserializedModule, Module, AptosModuleExtension> {
         match &self.latest_view {
             ViewState::Sync(state) => state.captured_reads.take(),
             ViewState::Unsync(_) => {
@@ -1841,6 +1838,7 @@ mod test {
     use aptos_vm_types::resolver::TResourceView;
     use claims::{assert_err_eq, assert_none, assert_ok_eq, assert_some_eq};
     use move_core_types::value::{IdentifierMappingKind, MoveStructLayout, MoveTypeLayout};
+    use move_vm_runtime::DeserializedModule;
     use move_vm_types::{
         delayed_values::{
             delayed_field_id::DelayedFieldID,
@@ -1919,7 +1917,7 @@ mod test {
         let captured_reads = RefCell::new(CapturedReads::<
             TestTransactionType,
             ModuleIdx,
-            CompiledModule,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >::new());
@@ -2064,7 +2062,7 @@ mod test {
         let captured_reads = RefCell::new(CapturedReads::<
             TestTransactionType,
             ModuleIdx,
-            CompiledModule,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >::new());
@@ -2209,7 +2207,7 @@ mod test {
         let captured_reads = RefCell::new(CapturedReads::<
             TestTransactionType,
             ModuleIdx,
-            CompiledModule,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >::new());
@@ -2354,7 +2352,7 @@ mod test {
         let captured_reads = RefCell::new(CapturedReads::<
             TestTransactionType,
             ModuleIdx,
-            CompiledModule,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >::new());
@@ -2746,7 +2744,7 @@ mod test {
         counter: RefCell<u32>,
         base_view: MockStateView<KeyType<u32>>,
         empty_global_module_cache:
-            GlobalModuleCache<ModuleIdx, CompiledModule, Module, AptosModuleExtension>,
+            GlobalModuleCache<ModuleIdx, DeserializedModule, Module, AptosModuleExtension>,
         runtime_environment: RuntimeEnvironment,
     }
 

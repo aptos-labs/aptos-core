@@ -22,12 +22,9 @@ use aptos_vm::AptosVM;
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
-use move_binary_format::{
-    errors::{Location, PartialVMError, VMResult},
-    CompiledModule,
-};
+use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::vm_status::StatusCode;
-use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
+use move_vm_runtime::{DeserializedModule, Module, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, UnsyncModuleCache, WithHash},
     indices::ModuleIdx,
@@ -72,7 +69,8 @@ struct ValidationState<S> {
     /// Versioned cache for deserialized and verified Move modules. The versioning allows to detect
     /// when the version of the code is no longer up-to-date (a newer version has been committed to
     /// the state view) and update the cache accordingly.
-    module_cache: UnsyncModuleCache<ModuleIdx, CompiledModule, Module, AptosModuleExtension, usize>,
+    module_cache:
+        UnsyncModuleCache<ModuleIdx, DeserializedModule, Module, AptosModuleExtension, usize>,
     vm: AptosVM,
 }
 
@@ -110,7 +108,7 @@ impl<S> WithRuntimeEnvironment for ValidationState<S> {
 }
 
 impl<S: StateView> ModuleCache for ValidationState<S> {
-    type Deserialized = CompiledModule;
+    type Deserialized = DeserializedModule;
     type Extension = AptosModuleExtension;
     type Key = ModuleIdx;
     type Verified = Module;
@@ -213,7 +211,7 @@ impl<S: StateView> ModuleCache for ValidationState<S> {
 }
 
 impl<S: StateView> ModuleCodeBuilder for ValidationState<S> {
-    type Deserialized = CompiledModule;
+    type Deserialized = DeserializedModule;
     type Extension = AptosModuleExtension;
     type Key = ModuleIdx;
     type Verified = Module;

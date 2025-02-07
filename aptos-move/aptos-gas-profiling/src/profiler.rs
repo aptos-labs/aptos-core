@@ -21,11 +21,13 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
+    ident_str,
+    identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
 };
 use move_vm_types::{
     gas::{GasMeter, SimpleInstruction},
+    indices::ModuleIdx,
     views::{TypeView, ValueView},
 };
 
@@ -485,17 +487,16 @@ where
     fn charge_dependency(
         &mut self,
         is_new: bool,
-        addr: &AccountAddress,
-        name: &IdentStr,
+        idx: &ModuleIdx,
         size: NumBytes,
     ) -> PartialVMResult<()> {
-        let (cost, res) =
-            self.delegate_charge(|base| base.charge_dependency(is_new, addr, name, size));
+        let (cost, res) = self.delegate_charge(|base| base.charge_dependency(is_new, idx, size));
 
         if !cost.is_zero() {
             self.dependencies.push(Dependency {
                 is_new,
-                id: ModuleId::new(*addr, name.to_owned()),
+                // FIXME
+                id: ModuleId::new(AccountAddress::ONE, ident_str!("dummy").to_owned()),
                 size,
                 cost,
             });

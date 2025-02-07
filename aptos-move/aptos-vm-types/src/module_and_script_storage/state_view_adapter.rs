@@ -18,8 +18,8 @@ use move_core_types::{language_storage::TypeTag, metadata::Metadata};
 use move_vm_runtime::{
     ambassador_impl_CodeStorage, ambassador_impl_ModuleStorage,
     ambassador_impl_WithRuntimeEnvironment, AsUnsyncCodeStorage, BorrowedOrOwned, CodeStorage,
-    Function, Module, ModuleStorage, RuntimeEnvironment, Script, UnsyncCodeStorage,
-    UnsyncModuleStorage, WithRuntimeEnvironment,
+    DeserializedModule, Function, Module, ModuleStorage, RuntimeEnvironment, Script,
+    UnsyncCodeStorage, UnsyncModuleStorage, WithRuntimeEnvironment,
 };
 use move_vm_types::{
     code::{ModuleBytesStorage, ModuleCode},
@@ -105,7 +105,7 @@ impl<'s, S: StateView, E: Clone + WithRuntimeEnvironment> AptosCodeStorageAdapte
         impl Iterator<
             Item = (
                 ModuleIdx,
-                Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension>>,
+                Arc<ModuleCode<DeserializedModule, Module, AptosModuleExtension>>,
             ),
         >,
         PanicError,

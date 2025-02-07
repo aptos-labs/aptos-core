@@ -32,13 +32,14 @@ pub(crate) fn native_dispatch(
         .struct_name_index_map();
     let function_idx =
         index_manager.function_idx(module_name.address(), &module_name.name, &func_name);
+    let module_idx = function_idx.module_idx();
 
     // Check if the module is already properly charged in this transaction.
-    if !module_name.address().is_special()
+    if !module_idx.is_special_addr()
         && !context
             .traversal_context()
             .visited
-            .contains_key(&(module_name.address(), &module_name.name))
+            .contains_key(&module_idx)
     {
         return Err(SafeNativeError::Abort { abort_code: 4 });
     }

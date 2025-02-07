@@ -890,9 +890,6 @@ impl InterpreterImpl {
                 .map_err(|err| err.to_partial())
             },
             NativeResult::LoadModule { module_name } => {
-                let arena_id = traversal_context
-                    .referenced_module_ids
-                    .alloc(module_name.clone());
                 resolver
                     .loader()
                     .check_dependencies_and_charge_gas(
@@ -901,7 +898,7 @@ impl InterpreterImpl {
                         gas_meter,
                         &mut traversal_context.visited,
                         traversal_context.referenced_modules,
-                        [(arena_id.address(), &arena_id.name)],
+                        [module_name],
                         resolver.module_storage(),
                     )
                     .map_err(|err| err
@@ -914,13 +911,14 @@ impl InterpreterImpl {
                 // where it is defined automatically loaded from ModuleStorage as well. There is
                 // no resolution via ModuleStorageAdapter like in V1 design, and it will be soon
                 // removed.
-                if let Loader::V1(loader) = resolver.loader() {
-                    loader
-                        .load_module(&module_name, data_store, resolver.module_store())
-                        .map_err(|_| {
-                            PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                                .with_message(format!("Module {} doesn't exist", module_name))
-                        })?;
+                if let Loader::V1(_) = resolver.loader() {
+                    unimplemented!()
+                    // loader
+                    //     .load_module(&module_name, data_store, resolver.module_store())
+                    //     .map_err(|_| {
+                    //         PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                    //             .with_message(format!("Module {} doesn't exist", module_name))
+                    //     })?;
                 }
 
                 current_frame.pc += 1; // advance past the Call instruction in the caller

@@ -17,9 +17,12 @@
 //! This module contains the declarations and utilities to implement a native
 //! function.
 
-use crate::{indices::FunctionIdx, loaded_data::runtime_types::Type, values::Value};
+use crate::{
+    indices::{FunctionIdx, ModuleIdx},
+    loaded_data::runtime_types::Type,
+    values::Value,
+};
 pub use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::language_storage::ModuleId;
 pub use move_core_types::{gas_algebra::InternalGas, vm_status::StatusCode};
 use smallvec::{smallvec, SmallVec};
 
@@ -59,7 +62,7 @@ pub enum NativeResult {
     },
     /// Instruct the VM to load up a module into the loader and charge dependency for such operation.
     LoadModule {
-        module_name: ModuleId,
+        module_name: ModuleIdx,
     },
 }
 

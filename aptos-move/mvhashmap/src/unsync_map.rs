@@ -15,9 +15,8 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
-use move_binary_format::{file_format::CompiledScript, CompiledModule};
 use move_core_types::value::MoveTypeLayout;
-use move_vm_runtime::{Module, Script};
+use move_vm_runtime::{DeserializedModule, DeserializedScript, Module, Script};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, UnsyncModuleCache, UnsyncScriptCache},
     indices::ModuleIdx,
@@ -55,12 +54,12 @@ pub struct UnsyncMap<
     // Code caches for loader V2 implementation: contains modules and scripts.
     module_cache: UnsyncModuleCache<
         ModuleIdx,
-        CompiledModule,
+        DeserializedModule,
         Module,
         AptosModuleExtension,
         Option<TxnIndex>,
     >,
-    script_cache: UnsyncScriptCache<[u8; 32], CompiledScript, Script>,
+    script_cache: UnsyncScriptCache<[u8; 32], DeserializedScript, Script>,
 
     total_base_resource_size: AtomicU64,
     total_base_delayed_field_size: AtomicU64,
@@ -102,13 +101,18 @@ impl<
     /// Returns the module cache for this [UnsyncMap].
     pub fn module_cache(
         &self,
-    ) -> &UnsyncModuleCache<ModuleIdx, CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>
-    {
+    ) -> &UnsyncModuleCache<
+        ModuleIdx,
+        DeserializedModule,
+        Module,
+        AptosModuleExtension,
+        Option<TxnIndex>,
+    > {
         &self.module_cache
     }
 
     /// Returns the script cache for this [UnsyncMap].
-    pub fn script_cache(&self) -> &UnsyncScriptCache<[u8; 32], CompiledScript, Script> {
+    pub fn script_cache(&self) -> &UnsyncScriptCache<[u8; 32], DeserializedScript, Script> {
         &self.script_cache
     }
 
@@ -118,7 +122,7 @@ impl<
     ) -> impl Iterator<
         Item = (
             ModuleIdx,
-            Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension>>,
+            Arc<ModuleCode<DeserializedModule, Module, AptosModuleExtension>>,
         ),
     > {
         self.module_cache.into_modules_iter()

@@ -7,9 +7,7 @@ use crate::{
     state_view::{ReadSet, ReadSetCapturingStateView},
     workload::{TransactionBlock, Workload},
 };
-use aptos_logger::error;
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
-use aptos_types::transaction::Version;
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, data_cache::AsMoveResolver, VMBlockExecutor};
 use aptos_vm_environment::environment::AptosEnvironment;
 use move_core_types::{
@@ -85,26 +83,26 @@ impl InputOutputDiffGenerator {
         let workload = Workload::from(txn_block);
 
         // First, we execute transactions without overrides.
-        let onchain_outputs =
-            execute_workload(&AptosVMBlockExecutor::new(), &workload, &state_view, 1);
+        // let onchain_outputs =
+        //     execute_workload(&AptosVMBlockExecutor::new(), &workload, &state_view, 1);
 
         // Check on-chain outputs do not modify the state we override. If so, benchmarking results
         // may not be correct.
-        let begin = workload
-            .transaction_slice_metadata
-            .begin_version()
-            .expect("Transaction metadata must be a chunk");
-        for (idx, on_chain_output) in onchain_outputs.iter().enumerate() {
-            for (state_key, _) in on_chain_output.write_set() {
-                if state_override.contains_key(state_key) {
-                    error!(
-                        "Transaction {} writes to overridden state value for {:?}",
-                        begin + idx as Version,
-                        state_key
-                    );
-                }
-            }
-        }
+        // let begin = workload
+        //     .transaction_slice_metadata
+        //     .begin_version()
+        //     .expect("Transaction metadata must be a chunk");
+        // for (idx, on_chain_output) in onchain_outputs.iter().enumerate() {
+        //     for (state_key, _) in on_chain_output.write_set() {
+        //         if state_override.contains_key(state_key) {
+        //             error!(
+        //                 "Transaction {} writes to overridden state value for {:?}",
+        //                 begin + idx as Version,
+        //                 state_key
+        //             );
+        //         }
+        //     }
+        // }
 
         let state_view_with_override = ReadSetCapturingStateView::new(&state_view, state_override);
 

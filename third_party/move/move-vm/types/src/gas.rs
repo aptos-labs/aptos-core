@@ -1,14 +1,16 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::views::{TypeView, ValueView};
+use crate::{
+    indices::ModuleIdx,
+    views::{TypeView, ValueView},
+};
 use move_binary_format::{
     errors::PartialVMResult, file_format::CodeOffset, file_format_common::Opcodes,
 };
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, NumArgs, NumBytes, NumTypeNodes},
-    identifier::IdentStr,
     language_storage::ModuleId,
 };
 
@@ -334,8 +336,7 @@ pub trait GasMeter {
     fn charge_dependency(
         &mut self,
         is_new: bool,
-        addr: &AccountAddress,
-        name: &IdentStr,
+        idx: &ModuleIdx,
         size: NumBytes,
     ) -> PartialVMResult<()>;
 }
@@ -577,8 +578,7 @@ impl GasMeter for UnmeteredGasMeter {
     fn charge_dependency(
         &mut self,
         _is_new: bool,
-        _addr: &AccountAddress,
-        _name: &IdentStr,
+        _idx: &ModuleIdx,
         _size: NumBytes,
     ) -> PartialVMResult<()> {
         Ok(())

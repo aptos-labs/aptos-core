@@ -55,9 +55,8 @@ use bytes::Bytes;
 use claims::assert_none;
 use core::panic;
 use fail::fail_point;
-use move_binary_format::CompiledModule;
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
+use move_vm_runtime::{DeserializedModule, Module, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::{
     code::ModuleCache, delayed_values::delayed_field_id::DelayedFieldID, indices::ModuleIdx,
 };
@@ -120,7 +119,7 @@ where
         base_view: &S,
         global_module_cache: &GlobalModuleCache<
             ModuleIdx,
-            CompiledModule,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >,
@@ -402,7 +401,7 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         global_module_cache: &GlobalModuleCache<
             ModuleIdx,
-            CompiledModule,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >,
@@ -570,7 +569,7 @@ where
         base_view: &S,
         global_module_cache: &GlobalModuleCache<
             ModuleIdx,
-            CompiledModule,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >,
@@ -762,7 +761,7 @@ where
         module_write_set: BTreeMap<T::Key, ModuleWrite<T::Value>>,
         global_module_cache: &GlobalModuleCache<
             ModuleIdx,
-            CompiledModule,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >,
@@ -848,7 +847,7 @@ where
         base_view: &S,
         global_module_cache: &GlobalModuleCache<
             ModuleIdx,
-            CompiledModule,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >,
@@ -959,7 +958,7 @@ where
         base_view: &S,
         global_module_cache: &GlobalModuleCache<
             ModuleIdx,
-            CompiledModule,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >,
@@ -1221,13 +1220,13 @@ where
         runtime_environment: &RuntimeEnvironment,
         global_module_cache: &GlobalModuleCache<
             ModuleIdx,
-            CompiledModule,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >,
         per_block_module_cache: &impl ModuleCache<
             Key = ModuleIdx,
-            Deserialized = CompiledModule,
+            Deserialized = DeserializedModule,
             Verified = Module,
             Extension = AptosModuleExtension,
             Version = Option<TxnIndex>,
@@ -1267,7 +1266,7 @@ where
         runtime_environment: &RuntimeEnvironment,
         global_module_cache: &GlobalModuleCache<
             ModuleIdx,
-            CompiledModule,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >,
