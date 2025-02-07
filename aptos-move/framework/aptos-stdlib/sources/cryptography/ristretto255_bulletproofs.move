@@ -10,6 +10,7 @@
 module aptos_std::ristretto255_bulletproofs {
     use std::error;
     use std::features;
+    use std::vector;
     use aptos_std::ristretto255_pedersen as pedersen;
     use aptos_std::ristretto255::{Self, RistrettoPoint};
 
@@ -38,6 +39,9 @@ module aptos_std::ristretto255_bulletproofs {
 
     /// The vector lengths of values and blinding factors do not match.
     const E_VECTOR_LENGTHS_MISMATCH: u64 = 5;
+
+    /// The domain separation tag exceeded the 256-byte limit.
+    const E_DST_TOO_LONG: u64 = 6;
 
     /// The native functions have not been rolled out yet.
     const E_NATIVE_FUN_NOT_AVAILABLE: u64 = 4;
@@ -81,6 +85,8 @@ module aptos_std::ristretto255_bulletproofs {
     ///
     /// WARNING: The DST check is VERY important for security as it prevents proofs computed for one application
     /// (a.k.a., a _domain_) with `dst_1` from verifying in a different application with `dst_2 != dst_1`.
+    ///
+    /// NOTE: currently, domain separation tags of size larger than 256 bytes are not supported.
     public fun verify_range_proof_pedersen(com: &pedersen::Commitment, proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool {
         verify_range_proof(
             pedersen::commitment_as_point(com),
@@ -92,13 +98,18 @@ module aptos_std::ristretto255_bulletproofs {
     }
 
     /// Verifies a zero-knowledge range proof that the value `v` committed in `com` (as v * val_base + r * rand_base,
-    /// for some randomness `r`) satisfies `v` in `[0, 2^num_bits)`. Only works for `num_bits` in `{8, 16, 32, 64}`.
+    /// for some randomness `r`) satisfies `v` in `[0, 2^num_bits)`.
+    ///
+    /// Only works for `num_bits` in `{8, 16, 32, 64}`.
+    ///
+    /// NOTE: currently, domain separation tags of size larger than 256 bytes are not supported.
     public fun verify_range_proof(
         com: &RistrettoPoint,
         val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
         proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool
     {
         assert!(features::bulletproofs_enabled(), error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE));
+        assert!(vector::length(&dst) <= 256, error::invalid_argument(E_DST_TOO_LONG));
 
         verify_range_proof_internal(
             ristretto255::point_to_bytes(&ristretto255::point_compress(com)),
@@ -111,6 +122,8 @@ module aptos_std::ristretto255_bulletproofs {
     /// (under the default Bulletproofs commitment key; see `pedersen::new_commitment_for_bulletproof`),
     /// ensuring that all values `v` satisfy `v` in `[0, 2^num_bits)`.
     /// Only works for `num_bits` in `{8, 16, 32, 64}` and batch size (length of `comms`) in `{1, 2, 4, 8, 16}`.
+    ///
+    /// NOTE: currently, domain separation tags of size larger than 256 bytes are not supported.
     public fun verify_batch_range_proof_pedersen(
         comms: &vector<pedersen::Commitment>, proof: &RangeProof,
         num_bits: u64, dst: vector<u8>): bool
@@ -128,12 +141,15 @@ module aptos_std::ristretto255_bulletproofs {
     /// `v * val_base + r * rand_base`), ensuring that all values `v` satisfy
     /// `v` in `[0, 2^num_bits)`. Only works for `num_bits` in `{8, 16, 32, 64}` and batch size
     /// (length of the `comms`) in `{1, 2, 4, 8, 16}`.
+    ///
+    /// NOTE: currently, domain separation tags of size larger than 256 bytes are not supported.
     public fun verify_batch_range_proof(
         comms: &vector<RistrettoPoint>,
         val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
         proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool
     {
         assert!(features::bulletproofs_batch_enabled(), error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE));
+        assert!(vector::length(&dst) <= 256, error::invalid_argument(E_DST_TOO_LONG));
 
         let comms = std::vector::map_ref(comms, |com| ristretto255::point_to_bytes(&ristretto255::point_compress(com)));
 
