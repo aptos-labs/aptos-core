@@ -63,7 +63,8 @@ fn range_batch_prove<M: Measurement>(
             b.iter_with_setup(
                 || get_values(num_bits, batch_size),
                 |(v, b)| {
-                    let mut t_prv = Transcript::new(b"some DST");
+                    let dst: [u8; 256] = thread_rng().gen();
+                    let mut t_prv = Transcript::new(&dst);
                     assert!(RangeProof::prove_multiple(
                         &bg,
                         &pg,
@@ -97,8 +98,8 @@ fn range_batch_verify<M: Measurement>(
             b.iter_with_setup(
                 || {
                     let (v, b) = get_values(num_bits, batch_size);
-
-                    let mut t = Transcript::new(b"AptosBenchmark");
+                    let dst: [u8; 256] = thread_rng().gen();
+                    let mut t = Transcript::new(&dst);
 
                     let (proof, comm) = RangeProof::prove_multiple(
                         &bp_gens,
@@ -110,10 +111,10 @@ fn range_batch_verify<M: Measurement>(
                     )
                     .unwrap();
 
-                    (proof.to_bytes(), comm)
+                    (dst, proof.to_bytes(), comm)
                 },
-                |(proof_bytes, comm)| {
-                    let mut t = Transcript::new(b"AptosBenchmark");
+                |(dst, proof_bytes, comm)| {
+                    let mut t = Transcript::new(&dst);
 
                     let proof = RangeProof::from_bytes(&proof_bytes[..]).unwrap();
 
