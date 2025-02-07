@@ -276,16 +276,6 @@ impl OnChainConsensusConfig {
         }
     }
 
-    /// Window Size was not introduced until OnChainConsensusConfig V4
-    pub fn window_size(&self) -> usize {
-        match &self {
-            OnChainConsensusConfig::V1(_) => DEFAULT_WINDOW_SIZE,
-            OnChainConsensusConfig::V2(_) => DEFAULT_WINDOW_SIZE,
-            OnChainConsensusConfig::V3 { .. } => DEFAULT_WINDOW_SIZE,
-            OnChainConsensusConfig::V4 { window_size, .. } => window_size.to_owned(),
-        }
-    }
-
     pub fn is_dag_enabled(&self) -> bool {
         match self {
             OnChainConsensusConfig::V1(_) => false,
@@ -358,12 +348,6 @@ impl OnChainConsensusConfig {
                 alg,
             } => OnChainConsensusConfig::V4 {
                 alg,
-            },
-            OnChainConsensusConfig::V4 {
-                vtxn: ValidatorTxnConfig::V0,
-                alg,
-                window_size,
-            } => OnChainConsensusConfig::V4 {
                 vtxn: ValidatorTxnConfig::default_enabled(),
                 window_size: DEFAULT_WINDOW_SIZE,
             },
