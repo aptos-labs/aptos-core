@@ -82,9 +82,9 @@ pub fn default_pipeline() -> FunctionTargetPipeline {
     default_pipeline_with_options(&ProverOptions::default())
 }
 
-pub fn experimental_pipeline() -> FunctionTargetPipeline {
+pub fn experimental_pipeline(options: &ProverOptions) -> FunctionTargetPipeline {
     // Enter your pipeline here
-    let processors: Vec<Box<dyn FunctionTargetProcessor>> = vec![
+    let mut processors: Vec<Box<dyn FunctionTargetProcessor>> = vec![
         DebugInstrumenter::new(),
         // transformation and analysis
         EliminateImmRefsProcessor::new(),
@@ -96,15 +96,37 @@ pub fn experimental_pipeline() -> FunctionTargetPipeline {
         CleanAndOptimizeProcessor::new(),
         UsageProcessor::new(),
         VerificationAnalysisProcessor::new(),
-        LoopAnalysisProcessor::new(),
         // spec instrumentation
+        LoopAnalysisProcessor::new(),
         SpecInstrumentationProcessor::new(),
-        DataInvariantInstrumentationProcessor::new(),
         GlobalInvariantAnalysisProcessor::new(),
         GlobalInvariantInstrumentationProcessor::new(),
-        // optimization
+        WellFormedInstrumentationProcessor::new(),
+        DataInvariantInstrumentationProcessor::new(),
+        // monomorphization
         MonoAnalysisProcessor::new(),
+        // // spec instrumentation
+        // SpecInstrumentationProcessor::new(),
+        // DataInvariantInstrumentationProcessor::new(),
+        // GlobalInvariantAnalysisProcessor::new(),
+        // GlobalInvariantInstrumentationProcessor::new(),
+        // // optimization
+        // MonoAnalysisProcessor::new(),
     ];
+
+    if options.mutation {
+        // pass which may do nothing
+        processors.push(MutationTester::new());
+    }
+
+    // inconsistency check instrumentation should be the last one in the pipeline
+    if options.check_inconsistency {
+        processors.push(InconsistencyCheckInstrumenter::new());
+    }
+
+    if !options.for_interpretation {
+        processors.push(NumberOperationProcessor::new());
+    }
 
     let mut res = FunctionTargetPipeline::default();
     for p in processors {

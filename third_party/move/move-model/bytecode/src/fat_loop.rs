@@ -295,18 +295,30 @@ impl FatLoopBuilder {
         let asserts_as_invariants = &func_target.data.loop_invariants;
 
         let mut invariants = BTreeMap::new();
+        // let mut assert_flag = false;
         for (index, code_offset) in cfg.instr_indexes(loop_header).unwrap().enumerate() {
             let bytecode = &code[code_offset as usize];
             if index == 0 {
+                // println!("label:{:?}", bytecode);
                 assert!(matches!(bytecode, Bytecode::Label(_, _)));
             } else {
                 match bytecode {
                     Bytecode::Prop(attr_id, PropKind::Assert, exp)
                         if asserts_as_invariants.contains(attr_id) =>
                     {
+                        //println!("invariant exp:{}", exp.display(func_target.global_env()));
                         invariants.insert(code_offset, (*attr_id, exp.clone()));
+                        // if !assert_flag {
+                        //     assert_flag = true;
+                        // }
                     },
-                    _ => break,
+                    // _ if assert_flag => {
+                    //     break;
+                    // },
+                    _ => {
+                        break;
+                        //println!("invariant bytecode:{:?}", bytecode);
+                    },
                 }
             }
         }
