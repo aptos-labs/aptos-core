@@ -99,7 +99,7 @@ fn range_batch_verify<M: Measurement>(
             b.iter_with_setup(
                 || {
                     let (v, b) = get_values(num_bits, batch_size);
-                    let mut dst= [0_u8; 256];
+                    let mut dst = [0_u8; 256];
                     thread_rng().fill(&mut dst);
                     let mut t = Transcript::new(&dst);
 
