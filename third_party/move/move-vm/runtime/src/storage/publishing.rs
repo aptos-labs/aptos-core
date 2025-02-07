@@ -23,7 +23,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     code::ModuleBytesStorage,
-    indices::FunctionIdx,
+    indices::{FunctionIdx, ModuleIdx, StructIdx},
     loaded_data::runtime_types::{StructType, Type},
     module_linker_error,
 };
@@ -56,17 +56,20 @@ struct StagingModuleBytesStorage<'a, M> {
 }
 
 impl<'a, M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'a, M> {
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
-        if let Some(account_storage) = self.staged_module_bytes.get(address) {
-            if let Some(bytes) = account_storage.get(module_name) {
+    fn fetch_module_bytes(&self, idx: &ModuleIdx) -> VMResult<Option<Bytes>> {
+        let idx_map = self
+            .module_storage
+            .runtime_environment()
+            .struct_name_index_map();
+        let (address, module_name) = idx_map.module_addr_name_from_module_idx(idx);
+
+        if let Some(account_storage) = self.staged_module_bytes.get(&address) {
+            if let Some(bytes) = account_storage.get(&module_name) {
                 return Ok(Some(bytes.clone()));
             }
         }
-        self.module_storage.fetch_module_bytes(address, module_name)
+        self.module_storage
+            .fetch_module_bytes(&address, &module_name)
     }
 }
 

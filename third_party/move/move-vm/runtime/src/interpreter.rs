@@ -810,8 +810,7 @@ impl InterpreterImpl {
             },
             NativeResult::CallFunction {
                 cost,
-                module_name,
-                func_name,
+                idx,
                 ty_args,
                 args,
             } => {
@@ -820,24 +819,16 @@ impl InterpreterImpl {
                 // Note(loader_v2): when V2 loader fetches the function, the defining module is
                 // automatically loaded as well, and there is no need for preloading of a module
                 // into the cache like in V1 design.
-                if let Loader::V1(loader) = resolver.loader() {
+                if let Loader::V1(_) = resolver.loader() {
                     // Load the module that contains this function regardless of the traversal context.
                     //
                     // This is just a precautionary step to make sure that caching status of the VM will not alter execution
                     // result in case framework code forgot to use LoadFunction result to load the modules into cache
                     // and charge properly.
-                    loader
-                        .load_module(&module_name, data_store, resolver.module_store())
-                        .map_err(|_| {
-                            PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                                .with_message(format!("Module {} doesn't exist", module_name))
-                        })?;
+                    unreachable!()
                 }
-                let target_func = resolver.build_loaded_function_from_name_and_ty_args(
-                    &module_name,
-                    &func_name,
-                    ty_args,
-                )?;
+                let target_func =
+                    resolver.build_loaded_function_from_name_and_ty_args(&idx, ty_args)?;
 
                 if target_func.is_friend_or_private()
                     || target_func.module_id() == function.module_id()
@@ -1589,7 +1580,7 @@ fn check_depth_of_type_impl(
         Type::Vector(ty) => check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(1))?,
         Type::Struct { idx, .. } => {
             let formula = resolver.loader().calculate_depth_of_struct(
-                *idx,
+                idx,
                 resolver.module_store(),
                 resolver.module_storage(),
                 &mut HashMap::new(),
@@ -1607,7 +1598,7 @@ fn check_depth_of_type_impl(
                 })
                 .collect::<PartialVMResult<Vec<_>>>()?;
             let formula = resolver.loader().calculate_depth_of_struct(
-                *idx,
+                idx,
                 resolver.module_store(),
                 resolver.module_storage(),
                 &mut HashMap::new(),

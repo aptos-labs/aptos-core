@@ -61,13 +61,13 @@ pub trait LayoutConverter: LayoutConverterBase {
 // into this crate trait.
 pub(crate) trait LayoutConverterBase {
     fn vm_config(&self) -> &VMConfig;
-    fn fetch_struct_ty_by_idx(&self, idx: StructIdx) -> PartialVMResult<Arc<StructType>>;
+    fn fetch_struct_ty_by_idx(&self, idx: &StructIdx) -> PartialVMResult<Arc<StructType>>;
     fn struct_name_index_map(&self) -> &IndexMapManager;
 
     /// Required for annotated layout.
     fn struct_name_idx_to_struct_tag(
         &self,
-        idx: StructIdx,
+        idx: &StructIdx,
         ty_args: &[Type],
     ) -> PartialVMResult<StructTag>;
 
@@ -150,12 +150,12 @@ pub(crate) trait LayoutConverterBase {
             Type::Struct { idx, .. } => {
                 *count += 1;
                 let (layout, has_identifier_mappings) =
-                    self.struct_name_to_type_layout(*idx, &[], count, depth + 1)?;
+                    self.struct_name_to_type_layout(idx, &[], count, depth + 1)?;
                 (layout, has_identifier_mappings)
             },
             Type::StructInstantiation { idx, ty_args, .. } => {
                 *count += 1;
-                self.struct_name_to_type_layout(*idx, ty_args, count, depth + 1)?
+                self.struct_name_to_type_layout(idx, ty_args, count, depth + 1)?
             },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
@@ -168,7 +168,7 @@ pub(crate) trait LayoutConverterBase {
 
     fn struct_name_to_type_layout(
         &self,
-        struct_name_idx: StructIdx,
+        struct_name_idx: &StructIdx,
         ty_args: &[Type],
         count: &mut u64,
         depth: u64,
@@ -251,12 +251,12 @@ pub(crate) trait LayoutConverterBase {
 
     fn get_identifier_mapping_kind(
         &self,
-        idx: StructIdx,
+        idx: &StructIdx,
     ) -> PartialVMResult<Option<IdentifierMappingKind>> {
         if !self.vm_config().delayed_field_optimization_enabled {
             return Ok(None);
         }
-        let struct_name = self.struct_name_index_map().struct_id_from_idx(&idx);
+        let struct_name = self.struct_name_index_map().struct_id_from_idx(idx);
         Ok(IdentifierMappingKind::from_ident(
             &struct_name.module,
             &struct_name.name,
@@ -302,10 +302,10 @@ pub(crate) trait LayoutConverterBase {
                 self.type_to_fully_annotated_layout_impl(ty, count, depth + 1)?,
             )),
             Type::Struct { idx, .. } => {
-                self.struct_name_to_fully_annotated_layout(*idx, &[], count, depth + 1)?
+                self.struct_name_to_fully_annotated_layout(idx, &[], count, depth + 1)?
             },
             Type::StructInstantiation { idx, ty_args, .. } => {
-                self.struct_name_to_fully_annotated_layout(*idx, ty_args, count, depth + 1)?
+                self.struct_name_to_fully_annotated_layout(idx, ty_args, count, depth + 1)?
             },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
@@ -318,7 +318,7 @@ pub(crate) trait LayoutConverterBase {
 
     fn struct_name_to_fully_annotated_layout(
         &self,
-        struct_name_idx: StructIdx,
+        struct_name_idx: &StructIdx,
         ty_args: &[Type],
         count: &mut u64,
         depth: u64,
@@ -372,13 +372,8 @@ impl<'a> LayoutConverterBase for StorageLayoutConverter<'a> {
         self.storage.runtime_environment().vm_config()
     }
 
-    fn fetch_struct_ty_by_idx(&self, idx: StructIdx) -> PartialVMResult<Arc<StructType>> {
-        let struct_name = self.struct_name_index_map().struct_id_from_idx(&idx);
-        self.storage.fetch_struct_ty(
-            struct_name.module.address(),
-            struct_name.module.name(),
-            struct_name.name.as_ident_str(),
-        )
+    fn fetch_struct_ty_by_idx(&self, idx: &StructIdx) -> PartialVMResult<Arc<StructType>> {
+        self.storage.fetch_struct_ty(idx)
     }
 
     fn struct_name_index_map(&self) -> &IndexMapManager {
@@ -387,11 +382,11 @@ impl<'a> LayoutConverterBase for StorageLayoutConverter<'a> {
 
     fn struct_name_idx_to_struct_tag(
         &self,
-        idx: StructIdx,
+        idx: &StructIdx,
         ty_args: &[Type],
     ) -> PartialVMResult<StructTag> {
         let ty_tag_builder = TypeTagConverter::new(self.storage.runtime_environment());
-        ty_tag_builder.struct_name_idx_to_struct_tag(&idx, ty_args)
+        ty_tag_builder.struct_name_idx_to_struct_tag(idx, ty_args)
     }
 }
 
@@ -404,6 +399,7 @@ impl<'a> LayoutConverter for StorageLayoutConverter<'a> {}
 
 pub(crate) struct LoaderLayoutConverter<'a> {
     loader: &'a Loader,
+    #[allow(dead_code)]
     module_store: &'a LegacyModuleStorageAdapter,
     module_storage: &'a dyn ModuleStorage,
 }
@@ -427,20 +423,12 @@ impl<'a> LayoutConverterBase for LoaderLayoutConverter<'a> {
         self.loader.vm_config()
     }
 
-    fn fetch_struct_ty_by_idx(&self, idx: StructIdx) -> PartialVMResult<Arc<StructType>> {
+    fn fetch_struct_ty_by_idx(&self, idx: &StructIdx) -> PartialVMResult<Arc<StructType>> {
         match self.loader {
             Loader::V1(..) => {
-                self.loader
-                    .fetch_struct_ty_by_idx(idx, self.module_store, self.module_storage)
+                unimplemented!()
             },
-            Loader::V2(..) => {
-                let struct_name = self.struct_name_index_map().struct_id_from_idx(&idx);
-                self.module_storage.fetch_struct_ty(
-                    struct_name.module.address(),
-                    struct_name.module.name(),
-                    struct_name.name.as_ident_str(),
-                )
-            },
+            Loader::V2(..) => self.module_storage.fetch_struct_ty(idx),
         }
     }
 
@@ -450,7 +438,7 @@ impl<'a> LayoutConverterBase for LoaderLayoutConverter<'a> {
 
     fn struct_name_idx_to_struct_tag(
         &self,
-        idx: StructIdx,
+        idx: &StructIdx,
         ty_args: &[Type],
     ) -> PartialVMResult<StructTag> {
         match self.loader {
@@ -460,10 +448,10 @@ impl<'a> LayoutConverterBase for LoaderLayoutConverter<'a> {
                     .iter()
                     .map(|t| loader.type_to_type_tag_impl(t, &mut gas_context))
                     .collect::<PartialVMResult<Vec<_>>>()?;
-                Ok(loader.name_cache.struct_tag_from_idx(&idx, arg_tags))
+                Ok(loader.name_cache.struct_tag_from_idx(idx, arg_tags))
             },
             Loader::V2(..) => TypeTagConverter::new(self.module_storage.runtime_environment())
-                .struct_name_idx_to_struct_tag(&idx, ty_args),
+                .struct_name_idx_to_struct_tag(idx, ty_args),
         }
     }
 }

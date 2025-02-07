@@ -28,31 +28,33 @@ use move_vm_runtime::{
 };
 use move_vm_types::{
     code::{ModuleBytesStorage, ModuleCode},
-    indices::FunctionIdx,
+    indices::{FunctionIdx, ModuleIdx, StructIdx},
     loaded_data::runtime_types::{StructType, Type},
     module_storage_error,
 };
 use std::{ops::Deref, sync::Arc};
 
 /// Avoids orphan rule to implement [ModuleBytesStorage] for [StateView].
-struct StateViewAdapter<'s, S> {
+struct StateViewAdapter<'s, S, E> {
+    #[allow(dead_code)]
+    env: E,
     state_view: BorrowedOrOwned<'s, S>,
 }
 
-impl<'s, S: StateView> ModuleBytesStorage for StateViewAdapter<'s, S> {
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
-        let state_key = StateKey::module(address, module_name);
+impl<'s, S: StateView, E: WithRuntimeEnvironment> ModuleBytesStorage
+    for StateViewAdapter<'s, S, E>
+{
+    fn fetch_module_bytes(&self, idx: &ModuleIdx) -> VMResult<Option<Bytes>> {
+        let idx_map = self.env.runtime_environment().struct_name_index_map();
+        let (address, module_name) = idx_map.module_addr_name_from_module_idx(idx);
+        let state_key = StateKey::module(&address, &module_name);
         self.state_view
             .get_state_value_bytes(&state_key)
-            .map_err(|e| module_storage_error!(address, module_name, e))
+            .map_err(|e| module_storage_error!(&address, &module_name, e))
     }
 }
 
-impl<'s, S: StateView> Deref for StateViewAdapter<'s, S> {
+impl<'s, S: StateView, E: WithRuntimeEnvironment> Deref for StateViewAdapter<'s, S, E> {
     type Target = S;
 
     fn deref(&self) -> &Self::Target {
@@ -66,19 +68,23 @@ impl<'s, S: StateView> Deref for StateViewAdapter<'s, S> {
 #[derive(Delegate)]
 #[delegate(
     WithRuntimeEnvironment,
-    where = "S: StateView, E: WithRuntimeEnvironment"
+    where = "S: StateView, E: Clone + WithRuntimeEnvironment"
 )]
-#[delegate(ModuleStorage, where = "S: StateView, E: WithRuntimeEnvironment")]
-#[delegate(CodeStorage, where = "S: StateView, E: WithRuntimeEnvironment")]
+#[delegate(
+    ModuleStorage,
+    where = "S: StateView, E: Clone + WithRuntimeEnvironment"
+)]
+#[delegate(CodeStorage, where = "S: StateView, E: Clone + WithRuntimeEnvironment")]
 pub struct AptosCodeStorageAdapter<'s, S, E> {
-    storage: UnsyncCodeStorage<UnsyncModuleStorage<'s, StateViewAdapter<'s, S>, E>>,
+    storage: UnsyncCodeStorage<UnsyncModuleStorage<'s, StateViewAdapter<'s, S, E>, E>>,
 }
 
-impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosCodeStorageAdapter<'s, S, E> {
+impl<'s, S: StateView, E: Clone + WithRuntimeEnvironment> AptosCodeStorageAdapter<'s, S, E> {
     /// Creates new instance of [AptosCodeStorageAdapter] built on top of the passed state view and
     /// the provided runtime environment.
     fn from_borrowed(state_view: &'s S, runtime_environment: E) -> Self {
         let adapter = StateViewAdapter {
+            env: runtime_environment.clone(),
             state_view: BorrowedOrOwned::Borrowed(state_view),
         };
         let storage = adapter.into_unsync_code_storage(runtime_environment);
@@ -89,6 +95,7 @@ impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosCodeStorageAdapter<'s, S,
     /// provided environment.
     fn from_owned(state_view: S, runtime_environment: E) -> Self {
         let adapter = StateViewAdapter {
+            env: runtime_environment.clone(),
             state_view: BorrowedOrOwned::Owned(state_view),
         };
         let storage = adapter.into_unsync_code_storage(runtime_environment);
@@ -147,7 +154,7 @@ impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosCodeStorageAdapter<'s, S,
     }
 }
 
-impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosModuleStorage
+impl<'s, S: StateView, E: Clone + WithRuntimeEnvironment> AptosModuleStorage
     for AptosCodeStorageAdapter<'s, S, E>
 {
     fn fetch_state_value_metadata(
@@ -177,7 +184,7 @@ pub trait AsAptosCodeStorage<'s, S, E> {
     fn into_aptos_code_storage(self, runtime_environment: E) -> AptosCodeStorageAdapter<'s, S, E>;
 }
 
-impl<'s, S: StateView, E: WithRuntimeEnvironment> AsAptosCodeStorage<'s, S, E> for S {
+impl<'s, S: StateView, E: Clone + WithRuntimeEnvironment> AsAptosCodeStorage<'s, S, E> for S {
     fn as_aptos_code_storage(&'s self, runtime_environment: E) -> AptosCodeStorageAdapter<S, E> {
         AptosCodeStorageAdapter::from_borrowed(self, runtime_environment)
     }

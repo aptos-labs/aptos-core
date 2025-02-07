@@ -27,7 +27,7 @@ use move_vm_types::{
         ambassador_impl_ModuleCache, ModuleBytesStorage, ModuleCache, ModuleCode,
         ModuleCodeBuilder, UnsyncModuleCache, WithBytes, WithHash,
     },
-    indices::FunctionIdx,
+    indices::{FunctionIdx, StructIdx},
     loaded_data::runtime_types::{StructType, Type},
     sha3_256,
 };
@@ -140,10 +140,13 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> ModuleCodeBuilder
         &self,
         key: &Self::Key,
     ) -> VMResult<Option<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
-        let bytes = match self
-            .base_storage
-            .fetch_module_bytes(key.address(), key.name())?
-        {
+        let idx_map = self
+            .runtime_environment
+            .runtime_environment()
+            .struct_name_index_map();
+        let idx = idx_map.module_idx(&key.address, &key.name);
+
+        let bytes = match self.base_storage.fetch_module_bytes(&idx)? {
             Some(bytes) => bytes,
             None => return Ok(None),
         };

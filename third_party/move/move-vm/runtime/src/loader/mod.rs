@@ -335,25 +335,19 @@ impl Loader {
 
     pub fn fetch_struct_ty_by_idx(
         &self,
-        idx: StructIdx,
+        idx: &StructIdx,
         module_store: &LegacyModuleStorageAdapter,
         module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<Arc<StructType>> {
-        // Ensure we do not return a guard here (still holding the lock) because loading the struct
-        // type below can fetch struct type by index recursively.
-        let struct_name = self
-            .struct_name_index_map(module_storage)
-            .struct_id_from_idx(&idx);
-
         match self {
             Loader::V1(_) => {
+                let struct_name = self
+                    .struct_name_index_map(module_storage)
+                    .struct_id_from_idx(idx);
+
                 module_store.get_struct_type_by_identifier(&struct_name.name, &struct_name.module)
             },
-            Loader::V2(_) => module_storage.fetch_struct_ty(
-                struct_name.module.address(),
-                struct_name.module.name(),
-                struct_name.name.as_ident_str(),
-            ),
+            Loader::V2(_) => module_storage.fetch_struct_ty(idx),
         }
     }
 }
@@ -1164,12 +1158,12 @@ enum BinaryType {
 // A Resolver is a simple and small structure allocated on the stack and used by the
 // interpreter. It's the only API known to the interpreter and it's tailored to the interpreter
 // needs.
-pub(crate) struct Resolver<'a> {
+pub struct Resolver<'a> {
     loader: &'a Loader,
     module_store: &'a LegacyModuleStorageAdapter,
     binary: BinaryType,
 
-    module_storage: &'a dyn ModuleStorage,
+    pub module_storage: &'a dyn ModuleStorage,
 }
 
 impl<'a> Resolver<'a> {
@@ -1237,12 +1231,9 @@ macro_rules! build_loaded_function {
                                 function: function.clone(),
                             }))
                         },
-                        FunctionHandle::Remote { module, name } => self
-                            .build_loaded_function_from_name_and_ty_args(
-                                module,
-                                name,
-                                verified_ty_args,
-                            ),
+                        FunctionHandle::Remote { idx } => {
+                            self.build_loaded_function_from_name_and_ty_args(idx, verified_ty_args)
+                        },
                     }
                 },
                 BinaryType::Script(script) => {
@@ -1252,12 +1243,9 @@ macro_rules! build_loaded_function {
                             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                         )
                         .with_message("Scripts never have local functions".to_string())),
-                        FunctionHandle::Remote { module, name } => self
-                            .build_loaded_function_from_name_and_ty_args(
-                                module,
-                                name,
-                                verified_ty_args,
-                            ),
+                        FunctionHandle::Remote { idx } => {
+                            self.build_loaded_function_from_name_and_ty_args(idx, verified_ty_args)
+                        },
                     }
                 },
             }
@@ -1280,32 +1268,18 @@ impl<'a> Resolver<'a> {
 
     pub(crate) fn build_loaded_function_from_name_and_ty_args(
         &self,
-        module_id: &ModuleId,
-        function_name: &Identifier,
+        idx: &FunctionIdx,
         verified_ty_args: Vec<Type>,
     ) -> PartialVMResult<LoadedFunction> {
         let (module, function) = match self.loader() {
-            Loader::V1(_) => self
-                .module_store
-                .resolve_module_and_function_by_name(module_id, function_name)?,
+            Loader::V1(_) => unimplemented!(),
             Loader::V2(_) => {
-                let index_manager = self
-                    .module_storage
-                    .runtime_environment()
-                    .struct_name_index_map();
-                let idx =
-                    index_manager.function_idx(module_id.address(), &module_id.name, function_name);
                 self.module_storage
-                    .fetch_function_definition(&idx)
+                    .fetch_function_definition(idx)
                     .map_err(|_| {
                         // Note: legacy loader implementation used this error, so we need to remap.
                         PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
-                            format!(
-                                "Module or function do not exist for {}::{}::{}",
-                                module_id.address(),
-                                module_id.name(),
-                                function_name
-                            ),
+                            format!("Module or function do not exist for {}::{}::{}", 0, 1, 2),
                         )
                     })?
             },
@@ -1805,12 +1779,12 @@ impl Loader {
 
     pub(crate) fn calculate_depth_of_struct(
         &self,
-        struct_name_idx: StructIdx,
+        struct_name_idx: &StructIdx,
         module_store: &LegacyModuleStorageAdapter,
         module_storage: &dyn ModuleStorage,
         visited_cache: &mut HashMap<StructIdx, DepthFormula>,
     ) -> PartialVMResult<DepthFormula> {
-        if let Some(depth_formula) = visited_cache.get(&struct_name_idx) {
+        if let Some(depth_formula) = visited_cache.get(struct_name_idx) {
             return Ok(depth_formula.clone());
         }
 
@@ -1844,13 +1818,13 @@ impl Loader {
 
         let formula = DepthFormula::normalize(formulas);
         if visited_cache
-            .insert(struct_name_idx, formula.clone())
+            .insert(*struct_name_idx, formula.clone())
             .is_some()
         {
             // Same thread has put this entry previously, which means there is a recursion.
             let struct_name = self
                 .struct_name_index_map(module_storage)
-                .struct_id_from_idx(&struct_name_idx);
+                .struct_id_from_idx(struct_name_idx);
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
                     format!(
@@ -1895,7 +1869,7 @@ impl Loader {
             Type::TyParam(ty_idx) => DepthFormula::type_parameter(*ty_idx),
             Type::Struct { idx, .. } => {
                 let mut struct_formula = self.calculate_depth_of_struct(
-                    *idx,
+                    idx,
                     module_store,
                     module_storage,
                     visited_cache,
@@ -1922,7 +1896,7 @@ impl Loader {
                     })
                     .collect::<PartialVMResult<BTreeMap<_, _>>>()?;
                 let struct_formula = self.calculate_depth_of_struct(
-                    *idx,
+                    idx,
                     module_store,
                     module_storage,
                     visited_cache,

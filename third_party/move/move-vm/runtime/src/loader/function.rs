@@ -313,5 +313,5 @@ pub(crate) struct FunctionInstantiation {
 #[derive(Clone, Debug)]
 pub(crate) enum FunctionHandle {
     Local(Arc<Function>),
-    Remote { module: ModuleId, name: Identifier },
+    Remote { idx: FunctionIdx },
 }

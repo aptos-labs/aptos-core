@@ -9,7 +9,7 @@ use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::{Bytecode, CompiledScript, FunctionDefinitionIndex, Signature, SignatureIndex},
 };
-use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
+use move_core_types::{identifier::Identifier, vm_status::StatusCode};
 use move_vm_types::{
     indices::IndexMapManager,
     loaded_data::{runtime_access_specifier::AccessSpecifier, runtime_types::Type},
@@ -57,14 +57,11 @@ impl Script {
         for func_handle in script.function_handles().iter() {
             let func_name = script.identifier_at(func_handle.name);
             let module_handle = script.module_handle_at(func_handle.module);
-            let module_id = ModuleId::new(
-                *script.address_identifier_at(module_handle.address),
-                script.identifier_at(module_handle.name).to_owned(),
-            );
-            function_refs.push(FunctionHandle::Remote {
-                module: module_id,
-                name: func_name.to_owned(),
-            });
+            let module_name = script.identifier_at(module_handle.name);
+            let address = script.address_identifier_at(module_handle.address);
+            let function_idx = struct_name_index_map.function_idx(address, module_name, func_name);
+
+            function_refs.push(FunctionHandle::Remote { idx: function_idx });
         }
 
         let mut function_instantiations = vec![];

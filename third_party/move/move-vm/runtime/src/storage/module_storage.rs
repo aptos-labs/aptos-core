@@ -23,7 +23,7 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
-    indices::FunctionIdx,
+    indices::{FunctionIdx, StructIdx},
     loaded_data::runtime_types::{StructType, Type},
     module_cyclic_dependency_error, module_linker_error,
     value_serde::FunctionValueExtension,
@@ -130,23 +130,25 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
 
     /// Returns a struct type corresponding to the specified name. The module containing the struct
     /// will be fetched and cached beforehand.
-    fn fetch_struct_ty(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-        struct_name: &IdentStr,
-    ) -> PartialVMResult<Arc<StructType>> {
+    fn fetch_struct_ty(&self, struct_idx: &StructIdx) -> PartialVMResult<Arc<StructType>> {
+        let index_manager = self.runtime_environment().struct_name_index_map();
+        let module_id = index_manager.module_id_from_struct_idx(struct_idx);
         let module = self
-            .fetch_existing_verified_module(address, module_name)
+            .fetch_existing_verified_module(module_id.address(), module_id.name())
             .map_err(|err| err.to_partial())?;
         Ok(module
             .struct_map
-            .get(struct_name)
+            .get(struct_idx)
             .and_then(|idx| module.structs.get(*idx))
             .ok_or_else(|| {
+                let index_manager = self.runtime_environment().struct_name_index_map();
+                let module_id = index_manager.module_id_from_struct_idx(struct_idx);
+                let struct_name = index_manager.struct_name_from_idx(struct_idx);
                 PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(format!(
                     "Struct {}::{}::{} does not exist",
-                    address, module_name, struct_name
+                    module_id.address(),
+                    module_id.name(),
+                    struct_name
                 ))
             })?
             .definition_struct_type
@@ -164,12 +166,12 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
             .vm_config()
             .ty_builder
             .create_ty(ty_tag, |st| {
-                self.fetch_struct_ty(
-                    &st.address,
-                    st.module.as_ident_str(),
-                    st.name.as_ident_str(),
-                )
-                .map_err(|err| err.finish(Location::Undefined))
+                let idx = self
+                    .runtime_environment()
+                    .struct_name_index_map()
+                    .struct_idx_from_struct_tag(st);
+                self.fetch_struct_ty(&idx)
+                    .map_err(|err| err.finish(Location::Undefined))
             })
             .map_err(|err| err.to_partial())
     }
@@ -183,12 +185,10 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     ) -> VMResult<(Arc<Module>, Arc<Function>)> {
         let index_manager = self.runtime_environment().struct_name_index_map();
         let module_id = index_manager.module_id_from_idx(function_idx);
-        let function_name = index_manager.function_name_from_idx(function_idx);
-
         let module = self.fetch_existing_verified_module(module_id.address(), module_id.name())?;
         let function = module
             .function_map
-            .get(&function_name)
+            .get(function_idx)
             .and_then(|idx| module.function_defs.get(*idx))
             .ok_or_else(|| {
                 let index_manager = self.runtime_environment().struct_name_index_map();

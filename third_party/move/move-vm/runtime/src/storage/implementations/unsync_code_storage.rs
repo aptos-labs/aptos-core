@@ -25,7 +25,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     code::{ambassador_impl_ScriptCache, Code, ModuleBytesStorage, ScriptCache, UnsyncScriptCache},
-    indices::FunctionIdx,
+    indices::{FunctionIdx, StructIdx},
     loaded_data::runtime_types::{StructType, Type},
 };
 use std::sync::Arc;

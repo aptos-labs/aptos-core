@@ -139,14 +139,12 @@ impl SafeNativeBuilder {
                     InvariantViolation(err) => Err(err),
                     FunctionDispatch {
                         cost,
-                        module_name,
-                        func_name,
+                        idx,
                         ty_args,
                         args,
                     } => Ok(NativeResult::CallFunction {
                         cost,
-                        module_name,
-                        func_name,
+                        idx,
                         ty_args,
                         args,
                     }),

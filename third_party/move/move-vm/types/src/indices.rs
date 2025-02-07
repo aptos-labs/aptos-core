@@ -79,12 +79,12 @@ impl StructIdx {
     }
 
     #[allow(dead_code)]
-    fn module_idx(&self) -> ModuleIdx {
+    pub fn module_idx(&self) -> ModuleIdx {
         ModuleIdx(self.0 & (MODULE_MASK | ADDRESS_MASK))
     }
 
     #[allow(dead_code)]
-    fn address_idx(&self) -> AddressIdx {
+    pub fn address_idx(&self) -> AddressIdx {
         AddressIdx(self.0 & ADDRESS_MASK)
     }
 }
@@ -105,12 +105,12 @@ impl FunctionIdx {
     }
 
     #[allow(dead_code)]
-    fn module_idx(&self) -> ModuleIdx {
+    pub fn module_idx(&self) -> ModuleIdx {
         ModuleIdx(self.0 & (MODULE_MASK | ADDRESS_MASK))
     }
 
     #[allow(dead_code)]
-    fn address_idx(&self) -> AddressIdx {
+    pub fn address_idx(&self) -> AddressIdx {
         AddressIdx(self.0 & ADDRESS_MASK)
     }
 }
@@ -131,7 +131,7 @@ impl ModuleIdx {
     }
 
     #[allow(dead_code)]
-    fn address_idx(&self) -> AddressIdx {
+    pub fn address_idx(&self) -> AddressIdx {
         AddressIdx(self.0 & ADDRESS_MASK)
     }
 }
@@ -234,7 +234,37 @@ impl IndexMapManager {
             .to_owned()
     }
 
+    pub fn struct_name_from_idx(&self, idx: &StructIdx) -> Identifier {
+        self.struct_name_index_map.data.read().backward_map
+            [((idx.0 & FUNCTION_OR_STRUCT_MASK) >> FUNCTION_OR_STRUCT_OFFSET) as usize]
+            .to_owned()
+    }
+
+    // FIXME
     pub fn module_id_from_idx(&self, idx: &FunctionIdx) -> ModuleId {
+        let address =
+            self.address_index_map.data.read().backward_map[(idx.0 & ADDRESS_MASK) as usize];
+        let module = self.module_name_index_map.data.read().backward_map
+            [((idx.0 & MODULE_MASK) >> MODULE_OFFSET) as usize]
+            .to_owned();
+        ModuleId::new(address, module)
+    }
+
+    // FIXME
+    pub fn module_addr_name_from_module_idx(
+        &self,
+        idx: &ModuleIdx,
+    ) -> (AccountAddress, Identifier) {
+        let address =
+            self.address_index_map.data.read().backward_map[(idx.0 & ADDRESS_MASK) as usize];
+        let module = self.module_name_index_map.data.read().backward_map
+            [((idx.0 & MODULE_MASK) >> MODULE_OFFSET) as usize]
+            .to_owned();
+        (address, module)
+    }
+
+    // FIXME
+    pub fn module_id_from_struct_idx(&self, idx: &StructIdx) -> ModuleId {
         let address =
             self.address_index_map.data.read().backward_map[(idx.0 & ADDRESS_MASK) as usize];
         let module = self.module_name_index_map.data.read().backward_map

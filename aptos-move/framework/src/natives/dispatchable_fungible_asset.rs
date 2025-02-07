@@ -24,6 +24,14 @@ pub(crate) fn native_dispatch(
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let (module_name, func_name) = extract_function_info(&mut arguments)?;
+    let index_manager = context
+        .resolver
+        .module_storage
+        .runtime_environment()
+        .struct_name_index_map();
+    let function_idx =
+        index_manager.function_idx(module_name.address(), &module_name.name, &func_name);
+
     // Check if the module is already properly charged in this transaction.
     let is_err = if context.get_feature_flags().is_account_abstraction_enabled() {
         !module_name.address().is_special()
@@ -44,8 +52,7 @@ pub(crate) fn native_dispatch(
     // Use Error to instruct the VM to perform a function call dispatch.
     Err(SafeNativeError::FunctionDispatch {
         cost: context.eval_gas(DISPATCHABLE_FUNGIBLE_ASSET_DISPATCH_BASE),
-        module_name,
-        func_name,
+        idx: function_idx,
         ty_args,
         args: arguments.into_iter().collect(),
     })

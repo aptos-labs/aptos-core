@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::errors::PartialVMError;
-use move_core_types::{
-    gas_algebra::InternalGas, identifier::Identifier, language_storage::ModuleId,
-};
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use move_core_types::{gas_algebra::InternalGas, language_storage::ModuleId};
+use move_vm_types::{indices::FunctionIdx, loaded_data::runtime_types::Type, values::Value};
 use smallvec::SmallVec;
 
 /// Saner representation of a native function error.
@@ -38,8 +36,7 @@ pub enum SafeNativeError {
     /// as the MoveVM relies on this ordering to perform paranoid mode stack transition.
     FunctionDispatch {
         cost: InternalGas,
-        module_name: ModuleId,
-        func_name: Identifier,
+        idx: FunctionIdx,
         ty_args: Vec<Type>,
         args: SmallVec<[Value; 1]>,
     },

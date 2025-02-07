@@ -81,8 +81,15 @@ fn native_check_dispatch_type_compatibility_impl(
     // We need to load the modules from lhs and rhs, and cloning the bytes for module id and function name.
     context.charge(FUNCTION_INFO_CHECK_DISPATCH_TYPE_COMPATIBILITY_IMPL_BASE)?;
 
+    let index_manager = context
+        .resolver
+        .module_storage
+        .runtime_environment()
+        .struct_name_index_map();
     let (rhs, rhs_id) = {
         let (module, func) = extract_function_info(&mut arguments)?;
+        let function_idx = index_manager.function_idx(module.address(), &module.name, &func);
+
         let is_err = if context.get_feature_flags().is_account_abstraction_enabled() {
             !module.address().is_special()
                 && !context
@@ -100,16 +107,17 @@ fn native_check_dispatch_type_compatibility_impl(
         }
         (
             context
-                .load_function(&module, &func)
+                .load_function(&function_idx)
                 .map_err(|_| SafeNativeError::Abort { abort_code: 2 })?,
             module,
         )
     };
     let (lhs, lhs_id) = {
         let (module, func) = extract_function_info(&mut arguments)?;
+        let function_idx = index_manager.function_idx(module.address(), &module.name, &func);
         (
             context
-                .load_function(&module, &func)
+                .load_function(&function_idx)
                 .map_err(|_| SafeNativeError::Abort { abort_code: 2 })?,
             module,
         )

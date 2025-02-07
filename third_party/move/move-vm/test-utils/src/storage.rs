@@ -23,6 +23,7 @@ use move_core_types::{
 use move_table_extension::{TableChangeSet, TableHandle, TableResolver};
 use move_vm_types::{
     code::ModuleBytesStorage,
+    indices::ModuleIdx,
     resolver::{resource_size, ModuleResolver, ResourceResolver},
 };
 use std::{
@@ -41,11 +42,7 @@ impl BlankStorage {
 }
 
 impl ModuleBytesStorage for BlankStorage {
-    fn fetch_module_bytes(
-        &self,
-        _address: &AccountAddress,
-        _module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
+    fn fetch_module_bytes(&self, _idx: &ModuleIdx) -> VMResult<Option<Bytes>> {
         Ok(None)
     }
 }
@@ -271,14 +268,11 @@ impl InMemoryStorage {
 }
 
 impl ModuleBytesStorage for InMemoryStorage {
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
-        if let Some(account_storage) = self.accounts.get(address) {
-            return Ok(account_storage.modules.get(module_name).cloned());
-        }
+    fn fetch_module_bytes(&self, _idx: &ModuleIdx) -> VMResult<Option<Bytes>> {
+        // FIXME
+        // if let Some(account_storage) = self.accounts.get(address) {
+        //     return Ok(account_storage.modules.get(module_name).cloned());
+        // }
         Ok(None)
     }
 }
