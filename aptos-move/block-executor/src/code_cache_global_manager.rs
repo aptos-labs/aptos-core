@@ -312,11 +312,7 @@ mod test {
         state_store::{state_key::StateKey, state_value::StateValue, MockStateView},
     };
     use claims::assert_ok;
-    use move_core_types::identifier::Identifier;
-    use move_vm_types::{
-        code::{mock_verified_code, MockExtension},
-        loaded_data::runtime_types::StructIdentifier,
-    };
+    use move_vm_types::code::{mock_verified_code, MockExtension};
     use std::{
         collections::HashMap,
         sync::atomic::{AtomicU64, Ordering},

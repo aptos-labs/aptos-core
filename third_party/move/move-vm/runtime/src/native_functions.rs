@@ -225,17 +225,25 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
                     .module_store()
                     .resolve_module_and_function_by_name(module_id, function_name)?
             },
-            Loader::V2(_) => self
-                .resolver
-                .module_storage()
-                .fetch_function_definition(module_id.address(), module_id.name(), function_name)
-                // TODO(loader_v2):
-                //   Keeping this consistent with loader V1 implementation which returned that
-                //   error. Check if we can avoid remapping by replaying transactions.
-                .map_err(|_| {
-                    PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                        .with_message(format!("Module {} doesn't exist", module_id))
-                })?,
+            Loader::V2(_) => {
+                let index_manager = self
+                    .resolver
+                    .module_storage()
+                    .runtime_environment()
+                    .struct_name_index_map();
+                let idx =
+                    index_manager.function_idx(module_id.address(), &module_id.name, function_name);
+                self.resolver
+                    .module_storage()
+                    .fetch_function_definition(&idx)
+                    // TODO(loader_v2):
+                    //   Keeping this consistent with loader V1 implementation which returned that
+                    //   error. Check if we can avoid remapping by replaying transactions.
+                    .map_err(|_| {
+                        PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                            .with_message(format!("Module {} doesn't exist", module_id))
+                    })?
+            },
         };
         Ok(function)
     }

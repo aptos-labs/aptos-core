@@ -228,6 +228,21 @@ impl IndexMapManager {
         }
     }
 
+    pub fn function_name_from_idx(&self, idx: &FunctionIdx) -> Identifier {
+        self.function_name_index_map.data.read().backward_map
+            [((idx.0 & FUNCTION_OR_STRUCT_MASK) >> FUNCTION_OR_STRUCT_OFFSET) as usize]
+            .to_owned()
+    }
+
+    pub fn module_id_from_idx(&self, idx: &FunctionIdx) -> ModuleId {
+        let address =
+            self.address_index_map.data.read().backward_map[(idx.0 & ADDRESS_MASK) as usize];
+        let module = self.module_name_index_map.data.read().backward_map
+            [((idx.0 & MODULE_MASK) >> MODULE_OFFSET) as usize]
+            .to_owned();
+        ModuleId::new(address, module)
+    }
+
     // FIXME
     pub fn struct_tag_from_idx(&self, idx: &StructIdx, type_args: Vec<TypeTag>) -> StructTag {
         let address =

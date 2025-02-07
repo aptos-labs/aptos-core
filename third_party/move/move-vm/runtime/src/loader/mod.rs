@@ -70,7 +70,7 @@ use move_binary_format::file_format::{
 };
 use move_core_types::identifier::Identifier;
 use move_vm_types::{
-    indices::{IndexMapManager, StructIdx},
+    indices::{FunctionIdx, IndexMapManager, StructIdx},
     loaded_data::runtime_types::{DepthFormula, StructLayout, TypeBuilder},
 };
 pub use script::Script;
@@ -292,25 +292,21 @@ impl Loader {
 
     fn load_function_without_type_args(
         &self,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
-        data_store: &mut TransactionDataCache,
-        module_store: &LegacyModuleStorageAdapter,
+        function_idx: &FunctionIdx,
+        _data_store: &mut TransactionDataCache,
+        _module_store: &LegacyModuleStorageAdapter,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<(Arc<Module>, Arc<Function>)> {
         match self {
-            Loader::V1(loader) => {
+            Loader::V1(_loader) => {
                 // Need to load the module first, before resolving it and the function.
-                loader.load_module(module_id, data_store, module_store)?;
-                module_store
-                    .resolve_module_and_function_by_name(module_id, function_name)
-                    .map_err(|err| err.finish(Location::Undefined))
+                unimplemented!()
+                // loader.load_module(module_id, data_store, module_store)?;
+                // module_store
+                //     .resolve_module_and_function_by_name(module_id, function_name)
+                //     .map_err(|err| err.finish(Location::Undefined))
             },
-            Loader::V2(_) => module_storage.fetch_function_definition(
-                module_id.address(),
-                module_id.name(),
-                function_name,
-            ),
+            Loader::V2(_) => module_storage.fetch_function_definition(function_idx),
         }
     }
 
@@ -555,16 +551,14 @@ impl Loader {
     // The type parameters are verified with capabilities.
     pub(crate) fn load_function_with_type_arg_inference(
         &self,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
+        function_idx: &FunctionIdx,
         expected_return_type: &Type,
         data_store: &mut TransactionDataCache,
         module_store: &LegacyModuleStorageAdapter,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<LoadedFunction> {
         let (module, function) = self.load_function_without_type_args(
-            module_id,
-            function_name,
+            function_idx,
             data_store,
             module_store,
             module_storage,
@@ -601,7 +595,7 @@ impl Loader {
         }
 
         Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
-            .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
+            .map_err(|e| e.finish(Location::Undefined))?;
 
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),
@@ -614,8 +608,7 @@ impl Loader {
     // Type parameters are checked as well after every type is loaded.
     pub(crate) fn load_function(
         &self,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
+        function_idx: &FunctionIdx,
         ty_args: &[TypeTag],
         data_store: &mut TransactionDataCache,
         module_store: &LegacyModuleStorageAdapter,
@@ -624,8 +617,7 @@ impl Loader {
         let _timer = VM_TIMER.timer_with_label("Loader::load_function");
 
         let (module, function) = self.load_function_without_type_args(
-            module_id,
-            function_name,
+            function_idx,
             data_store,
             module_store,
             module_storage,
@@ -643,8 +635,13 @@ impl Loader {
                 err
             })?;
 
-        Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
-            .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
+        Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args).map_err(|err| {
+            let module_id = module_storage
+                .runtime_environment()
+                .struct_name_index_map()
+                .module_id_from_idx(function_idx);
+            err.finish(Location::Module(module_id))
+        })?;
 
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),
@@ -1284,27 +1281,34 @@ impl<'a> Resolver<'a> {
     pub(crate) fn build_loaded_function_from_name_and_ty_args(
         &self,
         module_id: &ModuleId,
-        function_name: &IdentStr,
+        function_name: &Identifier,
         verified_ty_args: Vec<Type>,
     ) -> PartialVMResult<LoadedFunction> {
         let (module, function) = match self.loader() {
             Loader::V1(_) => self
                 .module_store
                 .resolve_module_and_function_by_name(module_id, function_name)?,
-            Loader::V2(_) => self
-                .module_storage
-                .fetch_function_definition(module_id.address(), module_id.name(), function_name)
-                .map_err(|_| {
-                    // Note: legacy loader implementation used this error, so we need to remap.
-                    PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
-                        format!(
-                            "Module or function do not exist for {}::{}::{}",
-                            module_id.address(),
-                            module_id.name(),
-                            function_name
-                        ),
-                    )
-                })?,
+            Loader::V2(_) => {
+                let index_manager = self
+                    .module_storage
+                    .runtime_environment()
+                    .struct_name_index_map();
+                let idx =
+                    index_manager.function_idx(module_id.address(), &module_id.name, function_name);
+                self.module_storage
+                    .fetch_function_definition(&idx)
+                    .map_err(|_| {
+                        // Note: legacy loader implementation used this error, so we need to remap.
+                        PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
+                            format!(
+                                "Module or function do not exist for {}::{}::{}",
+                                module_id.address(),
+                                module_id.name(),
+                                function_name
+                            ),
+                        )
+                    })?
+            },
         };
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),

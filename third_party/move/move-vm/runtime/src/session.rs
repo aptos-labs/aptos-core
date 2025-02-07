@@ -25,6 +25,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::GasMeter,
+    indices::FunctionIdx,
     loaded_data::runtime_types::{Type, TypeBuilder},
     values::{GlobalValue, Value},
 };
@@ -99,9 +100,16 @@ impl<'r, 'l> Session<'r, 'l> {
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
+        let function_idx = module_storage
+            .runtime_environment()
+            .struct_name_index_map()
+            .function_idx(
+                &module_id.address,
+                &module_id.name,
+                &function_name.to_owned(),
+            );
         let func = self.move_vm.runtime.loader().load_function(
-            module_id,
-            function_name,
+            &function_idx,
             &ty_args,
             &mut self.data_cache,
             &self.module_store,
@@ -393,16 +401,14 @@ impl<'r, 'l> Session<'r, 'l> {
     pub fn load_function_with_type_arg_inference(
         &mut self,
         module_storage: &impl ModuleStorage,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
+        function_idx: &FunctionIdx,
         expected_return_type: &Type,
     ) -> VMResult<LoadedFunction> {
         self.move_vm
             .runtime
             .loader()
             .load_function_with_type_arg_inference(
-                module_id,
-                function_name,
+                function_idx,
                 expected_return_type,
                 &mut self.data_cache,
                 &self.module_store,
@@ -414,13 +420,11 @@ impl<'r, 'l> Session<'r, 'l> {
     pub fn load_function(
         &mut self,
         module_storage: &impl ModuleStorage,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
+        function_idx: &FunctionIdx,
         ty_args: &[TypeTag],
     ) -> VMResult<LoadedFunction> {
         self.move_vm.runtime.loader().load_function(
-            module_id,
-            function_name,
+            function_idx,
             ty_args,
             &mut self.data_cache,
             &self.module_store,

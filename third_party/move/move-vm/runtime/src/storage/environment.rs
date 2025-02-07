@@ -236,7 +236,7 @@ impl RuntimeEnvironment {
 
     /// Returns the re-indexing map currently used by this runtime environment to remap struct
     /// identifiers into indices.
-    pub(crate) fn struct_name_index_map(&self) -> &IndexMapManager {
+    pub fn struct_name_index_map(&self) -> &IndexMapManager {
         &self.struct_name_index_map
     }
 

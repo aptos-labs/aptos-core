@@ -138,6 +138,10 @@ impl EntryFunction {
         &self.function
     }
 
+    pub fn function_identifier(&self) -> &Identifier {
+        &self.function
+    }
+
     pub fn ty_args(&self) -> &[TypeTag] {
         &self.ty_args
     }

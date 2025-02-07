@@ -28,6 +28,7 @@ use move_vm_runtime::{
 };
 use move_vm_types::{
     code::{ModuleBytesStorage, ModuleCode},
+    indices::FunctionIdx,
     loaded_data::runtime_types::{StructType, Type},
     module_storage_error,
 };

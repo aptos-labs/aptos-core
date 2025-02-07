@@ -455,12 +455,16 @@ fn validate_and_construct(
         *max_invocations -= 1;
     }
 
-    let function = session.load_function_with_type_arg_inference(
-        module_storage,
-        &constructor.module_id,
-        constructor.func_name,
-        expected_type,
-    )?;
+    let idx = module_storage
+        .runtime_environment()
+        .struct_name_index_map()
+        .function_idx(
+            &constructor.module_id.address,
+            &constructor.module_id.name,
+            &constructor.func_name.to_owned(),
+        );
+    let function =
+        session.load_function_with_type_arg_inference(module_storage, &idx, expected_type)?;
     let mut args = vec![];
     let ty_builder = session.get_ty_builder();
     for param_ty in function.param_tys() {

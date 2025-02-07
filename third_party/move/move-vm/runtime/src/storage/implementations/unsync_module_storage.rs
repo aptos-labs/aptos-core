@@ -27,6 +27,7 @@ use move_vm_types::{
         ambassador_impl_ModuleCache, ModuleBytesStorage, ModuleCache, ModuleCode,
         ModuleCodeBuilder, UnsyncModuleCache, WithBytes, WithHash,
     },
+    indices::FunctionIdx,
     loaded_data::runtime_types::{StructType, Type},
     sha3_256,
 };

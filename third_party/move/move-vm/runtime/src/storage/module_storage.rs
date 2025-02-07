@@ -23,6 +23,7 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
+    indices::FunctionIdx,
     loaded_data::runtime_types::{StructType, Type},
     module_cyclic_dependency_error, module_linker_error,
     value_serde::FunctionValueExtension,
@@ -178,20 +179,27 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     /// types and its signature. The returned module is verified.
     fn fetch_function_definition(
         &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-        function_name: &IdentStr,
+        function_idx: &FunctionIdx,
     ) -> VMResult<(Arc<Module>, Arc<Function>)> {
-        let module = self.fetch_existing_verified_module(address, module_name)?;
+        let index_manager = self.runtime_environment().struct_name_index_map();
+        let module_id = index_manager.module_id_from_idx(function_idx);
+        let function_name = index_manager.function_name_from_idx(function_idx);
+
+        let module = self.fetch_existing_verified_module(module_id.address(), module_id.name())?;
         let function = module
             .function_map
-            .get(function_name)
+            .get(&function_name)
             .and_then(|idx| module.function_defs.get(*idx))
             .ok_or_else(|| {
+                let index_manager = self.runtime_environment().struct_name_index_map();
+                let module_id = index_manager.module_id_from_idx(function_idx);
+                let function_name = index_manager.function_name_from_idx(function_idx);
                 PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                     .with_message(format!(
                         "Function {}::{}::{} does not exist",
-                        address, module_name, function_name
+                        module_id.address(),
+                        module_id.name(),
+                        function_name
                     ))
                     .finish(Location::Undefined)
             })?
@@ -403,6 +411,7 @@ where
 /// Avoids the orphan rule to implement external [FunctionValueExtension] for any generic type that
 /// implements [ModuleStorage].
 pub struct FunctionValueExtensionAdapter<'a> {
+    #[allow(dead_code)]
     pub(crate) module_storage: &'a dyn ModuleStorage,
 }
 
@@ -421,31 +430,32 @@ impl<T: ModuleStorage> AsFunctionValueExtension for T {
 impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
     fn get_function_arg_tys(
         &self,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
-        substitution_ty_arg_tags: Vec<TypeTag>,
+        _module_id: &ModuleId,
+        _function_name: &IdentStr,
+        _substitution_ty_arg_tags: Vec<TypeTag>,
     ) -> PartialVMResult<Vec<Type>> {
-        let substitution_ty_args = substitution_ty_arg_tags
-            .into_iter()
-            .map(|tag| self.module_storage.fetch_ty(&tag))
-            .collect::<PartialVMResult<Vec<_>>>()?;
-
-        let (_, function) = self
-            .module_storage
-            .fetch_function_definition(module_id.address(), module_id.name(), function_name)
-            .map_err(|err| err.to_partial())?;
-
-        let ty_builder = &self
-            .module_storage
-            .runtime_environment()
-            .vm_config()
-            .ty_builder;
-        function
-            .param_tys()
-            .iter()
-            .map(|ty_to_substitute| {
-                ty_builder.create_ty_with_subst(ty_to_substitute, &substitution_ty_args)
-            })
-            .collect::<PartialVMResult<Vec<_>>>()
+        unimplemented!()
+        // let substitution_ty_args = substitution_ty_arg_tags
+        //     .into_iter()
+        //     .map(|tag| self.module_storage.fetch_ty(&tag))
+        //     .collect::<PartialVMResult<Vec<_>>>()?;
+        //
+        // let (_, function) = self
+        //     .module_storage
+        //     .fetch_function_definition(module_id.address(), module_id.name(), function_name)
+        //     .map_err(|err| err.to_partial())?;
+        //
+        // let ty_builder = &self
+        //     .module_storage
+        //     .runtime_environment()
+        //     .vm_config()
+        //     .ty_builder;
+        // function
+        //     .param_tys()
+        //     .iter()
+        //     .map(|ty_to_substitute| {
+        //         ty_builder.create_ty_with_subst(ty_to_substitute, &substitution_ty_args)
+        //     })
+        //     .collect::<PartialVMResult<Vec<_>>>()
     }
 }

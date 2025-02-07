@@ -391,12 +391,22 @@ impl Module {
 
             for (idx, func) in module.function_defs().iter().enumerate() {
                 let findex = FunctionDefinitionIndex(idx as TableIndex);
+
+                let def = module.function_def_at(findex);
+                let handle = module.function_handle_at(def.function);
+                let function_name = module.identifier_at(handle.name);
+                let module_name = module.self_name_identifier();
+                let address = module.address();
+                let function_idx =
+                    struct_name_index_map.function_idx(address, module_name, function_name);
+
                 let function = Function::new(
                     natives,
                     findex,
                     &module,
                     signature_table.as_slice(),
                     &struct_names,
+                    function_idx,
                 )?;
 
                 function_map.insert(function.name.to_owned(), idx);

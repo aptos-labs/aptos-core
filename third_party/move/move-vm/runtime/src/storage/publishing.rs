@@ -23,6 +23,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     code::ModuleBytesStorage,
+    indices::FunctionIdx,
     loaded_data::runtime_types::{StructType, Type},
     module_linker_error,
 };

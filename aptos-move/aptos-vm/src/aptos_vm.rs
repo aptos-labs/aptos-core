@@ -129,7 +129,10 @@ use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
     ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
-use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
+use move_vm_types::{
+    gas::{GasMeter, UnmeteredGasMeter},
+    indices::FunctionIdx,
+};
 use num_cpus;
 use once_cell::sync::OnceCell;
 use std::{
@@ -904,12 +907,15 @@ impl AptosVM {
             )?;
         }
 
-        let function = session.load_function(
-            module_storage,
-            entry_fn.module(),
-            entry_fn.function(),
-            entry_fn.ty_args(),
-        )?;
+        let idx = module_storage
+            .runtime_environment()
+            .struct_name_index_map()
+            .function_idx(
+                &entry_fn.module().address,
+                &entry_fn.module().name,
+                entry_fn.function_identifier(),
+            );
+        let function = session.load_function(module_storage, &idx, entry_fn.ty_args())?;
 
         // Native entry function is forbidden.
         if self
@@ -1514,8 +1520,11 @@ impl AptosVM {
                 continue;
             }
             *new_published_modules_loaded = true;
+
+            // THIS IS UNREACHABLE!
             let init_function =
-                session.load_function(module_storage, &module.self_id(), init_func_name, &[]);
+                session.load_function(module_storage, &FunctionIdx::new(100000000), &[]);
+
             // it is ok to not have init_module function
             // init_module function should be (1) private and (2) has no return value
             // Note that for historic reasons, verification here is treated
@@ -2683,7 +2692,12 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         module_storage: &impl AptosModuleStorage,
     ) -> anyhow::Result<Vec<Vec<u8>>> {
-        let func = session.load_function(module_storage, &module_id, &func_name, &type_args)?;
+        let idx = module_storage
+            .runtime_environment()
+            .struct_name_index_map()
+            .function_idx(&module_id.address, &module_id.name, &func_name);
+
+        let func = session.load_function(module_storage, &idx, &type_args)?;
         let metadata = vm.extract_module_metadata(module_storage, &module_id);
         let arguments = verifier::view_function::validate_view_function(
             session,

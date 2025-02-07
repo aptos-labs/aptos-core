@@ -67,6 +67,7 @@ fn expect_modules(
     })
 }
 
+#[allow(dead_code)]
 pub fn compile_modules_in_file(path: &Path) -> Result<Vec<CompiledModule>> {
     let (_, units) = MoveCompiler::from_files(
         vec![path.to_str().unwrap().to_string()],
