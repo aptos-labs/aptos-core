@@ -21,10 +21,11 @@ use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     effects::{Op as MoveStorageOp, Op},
-    language_storage::{ModuleId, StructTag},
+    language_storage::StructTag,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
+use move_vm_types::indices::ModuleIdx;
 use std::{collections::BTreeMap, sync::Arc};
 
 pub(crate) struct WriteOpConverter<'r> {
@@ -54,7 +55,7 @@ macro_rules! convert_impl {
 }
 
 impl<'r> WriteOpConverter<'r> {
-    convert_impl!(convert_module, get_module_state_value_metadata);
+    // convert_impl!(convert_module, get_module_state_value_metadata);
 
     convert_impl!(convert_aggregator, get_aggregator_v1_state_value_metadata);
 
@@ -80,15 +81,12 @@ impl<'r> WriteOpConverter<'r> {
     pub(crate) fn convert_modules_into_write_ops(
         &self,
         module_storage: &impl AptosModuleStorage,
-        verified_module_bundle: impl Iterator<Item = (ModuleId, Bytes)>,
+        verified_module_bundle: impl Iterator<Item = (ModuleIdx, Bytes)>,
     ) -> PartialVMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
         let mut writes = BTreeMap::new();
-        for (module_id, bytes) in verified_module_bundle {
-            let addr = module_id.address();
-            let name = module_id.name();
-
+        for (module_idx, bytes) in verified_module_bundle {
             let module_exists = module_storage
-                .check_module_exists(addr, name)
+                .check_module_exists(&module_idx)
                 .map_err(|e| e.to_partial())?;
             let op = if module_exists {
                 Op::Modify(bytes)
@@ -96,7 +94,7 @@ impl<'r> WriteOpConverter<'r> {
                 Op::New(bytes)
             };
 
-            let state_value_metadata = module_storage.fetch_state_value_metadata(addr, name)?;
+            let state_value_metadata = module_storage.fetch_state_value_metadata(&module_idx)?;
             let write_op = self.convert(
                 state_value_metadata,
                 op,
@@ -104,7 +102,9 @@ impl<'r> WriteOpConverter<'r> {
                 false,
             )?;
 
-            let state_key = StateKey::module_id(&module_id);
+            let idx_map = module_storage.runtime_environment().struct_name_index_map();
+            let (addr, name) = idx_map.module_addr_name_from_module_idx(&module_idx);
+            let state_key = StateKey::module(&addr, &name);
 
             // Enforce read-before-write:
             //   Modules can live in global cache, and so the DB may not see a module read even
@@ -116,12 +116,12 @@ impl<'r> WriteOpConverter<'r> {
             self.remote.read_state_value(&state_key).map_err(|err| {
                 let msg = format!(
                     "Error when enforcing read-before-write for module {}::{}: {:?}",
-                    addr, name, err
+                    module_idx, module_idx, err
                 );
                 PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg)
             })?;
 
-            writes.insert(state_key, ModuleWrite::new(module_id, write_op));
+            writes.insert(state_key, ModuleWrite::new(module_idx, write_op));
         }
         Ok(writes)
     }

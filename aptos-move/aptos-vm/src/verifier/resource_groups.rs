@@ -9,10 +9,8 @@ use move_binary_format::{
     errors::{Location, PartialVMError, VMError, VMResult},
     CompiledModule,
 };
-use move_core_types::{
-    language_storage::{ModuleId, StructTag},
-    vm_status::StatusCode,
-};
+use move_core_types::{language_storage::StructTag, vm_status::StatusCode};
+use move_vm_types::indices::ModuleIdx;
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::Arc,
@@ -43,27 +41,33 @@ pub(crate) fn validate_resource_groups(
     let mut groups = BTreeMap::new();
     let mut members = BTreeMap::new();
 
+    let index_map = module_storage.runtime_environment().struct_name_index_map();
     for module in modules {
+        let module_id = index_map.module_idx(module.self_addr(), module.self_name_identifier());
         let (new_groups, new_members) = validate_module_and_extract_new_entries(
             session,
             module_storage,
             module,
             safer_resource_groups,
         )?;
-        groups.insert(module.self_id(), new_groups);
-        members.insert(module.self_id(), new_members);
+        groups.insert(module_id, new_groups);
+        members.insert(module_id, new_members);
     }
 
     for (module_id, inner_members) in members {
         for value in inner_members.values() {
-            let value_module_id = value.module_id();
+            let value_module_id = module_storage
+                .runtime_environment()
+                .struct_name_index_map()
+                .module_idx_from_struct_tag(value);
+            #[allow(clippy::map_entry)]
             if !groups.contains_key(&value_module_id) {
                 let (inner_groups, _, _) = extract_resource_group_metadata_from_module(
                     session,
                     module_storage,
                     &value_module_id,
                 )?;
-                groups.insert(value.module_id(), inner_groups);
+                groups.insert(value_module_id, inner_groups);
             }
 
             let scope = if let Some(inner_group) = groups.get(&value_module_id) {
@@ -103,8 +107,12 @@ pub(crate) fn validate_module_and_extract_new_entries(
             (BTreeMap::new(), BTreeMap::new())
         };
 
+    let idx = module_storage
+        .runtime_environment()
+        .struct_name_index_map()
+        .module_idx(module.self_addr(), module.self_name_identifier());
     let (original_groups, original_members, mut structs) =
-        extract_resource_group_metadata_from_module(session, module_storage, &module.self_id())?;
+        extract_resource_group_metadata_from_module(session, module_storage, &idx)?;
 
     for (member, value) in original_members {
         // We don't need to re-validate new_members above.
@@ -158,7 +166,7 @@ pub(crate) fn validate_module_and_extract_new_entries(
 pub(crate) fn extract_resource_group_metadata_from_module(
     session: &mut SessionExt,
     module_storage: &impl AptosModuleStorage,
-    module_id: &ModuleId,
+    module_id: &ModuleIdx,
 ) -> VMResult<(
     BTreeMap<String, ResourceGroupScope>,
     BTreeMap<String, StructTag>,
@@ -193,21 +201,22 @@ pub(crate) fn extract_resource_group_metadata_from_module(
 }
 
 fn fetch_module(
-    session: &mut SessionExt,
+    _session: &mut SessionExt,
     module_storage: &impl AptosModuleStorage,
-    module_id: &ModuleId,
+    module_id: &ModuleIdx,
 ) -> VMResult<Arc<CompiledModule>> {
     if module_storage.is_enabled() {
-        module_storage.fetch_existing_deserialized_module(module_id.address(), module_id.name())
+        module_storage.fetch_existing_deserialized_module(module_id)
     } else {
-        #[allow(deprecated)]
-        let bytes = session.fetch_module_from_data_store(module_id)?;
-        let module = CompiledModule::deserialize_with_config(
-            &bytes,
-            &session.get_vm_config().deserializer_config,
-        )
-        .map_err(|e| e.finish(Location::Undefined))?;
-        Ok(Arc::new(module))
+        unimplemented!()
+        // #[allow(deprecated)]
+        // let bytes = session.fetch_module_from_data_store(module_id)?;
+        // let module = CompiledModule::deserialize_with_config(
+        //     &bytes,
+        //     &session.get_vm_config().deserializer_config,
+        // )
+        // .map_err(|e| e.finish(Location::Undefined))?;
+        // Ok(Arc::new(module))
     }
 }
 

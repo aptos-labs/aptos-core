@@ -26,8 +26,7 @@ macro_rules! module_linker_error {
         )
         .with_message(format!(
             "Linker Error: Module {}::{} doesn't exist",
-            $addr.to_hex(),
-            $name
+            $addr, $name
         ))
         .finish(move_binary_format::errors::Location::Undefined)
     };

@@ -20,13 +20,14 @@ use move_binary_format::{
     file_format::CompiledScript,
     CompiledModule,
 };
-use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
-};
+use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::{Module, RuntimeEnvironment, Script, WithRuntimeEnvironment};
-use move_vm_types::code::{
-    ambassador_impl_ScriptCache, Code, ModuleCache, ModuleCode, ModuleCodeBuilder, ScriptCache,
-    WithBytes,
+use move_vm_types::{
+    code::{
+        ambassador_impl_ScriptCache, Code, ModuleCache, ModuleCode, ModuleCodeBuilder, ScriptCache,
+        WithBytes,
+    },
+    indices::ModuleIdx,
 };
 use std::sync::Arc;
 
@@ -186,10 +187,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> AptosModuleStorage for LatestView<'a, T, S> {
     fn fetch_state_value_metadata(
         &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
+        idx: &ModuleIdx,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
+        let idx_map = self.runtime_environment().struct_name_index_map();
+        let id = idx_map.module_id_from_module_idx(idx);
         let state_value_metadata = self
             .get_module_or_build_with(&id, self)
             .map_err(|err| err.to_partial())?

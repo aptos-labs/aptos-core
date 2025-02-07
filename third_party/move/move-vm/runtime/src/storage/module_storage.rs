@@ -14,7 +14,6 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
@@ -23,7 +22,7 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
-    indices::{FunctionIdx, StructIdx},
+    indices::{FunctionIdx, ModuleIdx, StructIdx},
     loaded_data::runtime_types::{StructType, Type},
     module_cyclic_dependency_error, module_linker_error,
     value_serde::FunctionValueExtension,
@@ -43,98 +42,60 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
 
     /// Returns true if the module exists, and false otherwise. An error is returned if there is a
     /// storage error.
-    fn check_module_exists(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<bool>;
+    fn check_module_exists(&self, idx: &ModuleIdx) -> VMResult<bool>;
 
     /// Returns module bytes if module exists, or [None] otherwise. An error is returned if there
     /// is a storage error.
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>>;
+    fn fetch_module_bytes(&self, idx: &ModuleIdx) -> VMResult<Option<Bytes>>;
 
     /// Returns the size of a module in bytes, or [None] otherwise. An error is returned if the
     /// there is a storage error.
-    fn fetch_module_size_in_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<usize>>;
+    fn fetch_module_size_in_bytes(&self, idx: &ModuleIdx) -> VMResult<Option<usize>>;
 
     /// Returns the metadata in the module, or [None] otherwise. An error is returned if there is
     /// a storage error or the module fails deserialization.
-    fn fetch_module_metadata(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Vec<Metadata>>>;
+    fn fetch_module_metadata(&self, idx: &ModuleIdx) -> VMResult<Option<Vec<Metadata>>>;
 
     /// Returns the metadata in the module. An error is returned if there is a storage error,
     /// module fails deserialization, or does not exist.
-    fn fetch_existing_module_metadata(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Vec<Metadata>> {
-        self.fetch_module_metadata(address, module_name)?
-            .ok_or_else(|| module_linker_error!(address, module_name))
+    fn fetch_existing_module_metadata(&self, idx: &ModuleIdx) -> VMResult<Vec<Metadata>> {
+        self.fetch_module_metadata(idx)?
+            .ok_or_else(|| module_linker_error!(idx, idx))
     }
 
     /// Returns the deserialized module, or [None] otherwise. An error is returned if:
     ///   1. the deserialization fails, or
     ///   2. there is an error from the underlying storage.
-    fn fetch_deserialized_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Arc<CompiledModule>>>;
+    fn fetch_deserialized_module(&self, idx: &ModuleIdx) -> VMResult<Option<Arc<CompiledModule>>>;
 
     /// Returns the deserialized module. An error is returned if:
     ///   1. the deserialization fails,
     ///   2. there is an error from the underlying storage,
     ///   3. module does not exist.
-    fn fetch_existing_deserialized_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Arc<CompiledModule>> {
-        self.fetch_deserialized_module(address, module_name)?
-            .ok_or_else(|| module_linker_error!(address, module_name))
+    fn fetch_existing_deserialized_module(&self, idx: &ModuleIdx) -> VMResult<Arc<CompiledModule>> {
+        self.fetch_deserialized_module(idx)?
+            .ok_or_else(|| module_linker_error!(idx, idx))
     }
 
     /// Returns the verified module if it exists, or [None] otherwise. The existing module can be
     /// either in a cached state (it is then returned) or newly constructed. The error is returned
     /// if the storage fails to fetch the deserialized module and verify it.
-    fn fetch_verified_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Arc<Module>>>;
+    fn fetch_verified_module(&self, idx: &ModuleIdx) -> VMResult<Option<Arc<Module>>>;
 
     /// Returns the verified module. If it does not exist, a linker error is returned. All other
     /// errors are mapped using [expect_no_verification_errors] - since on-chain code should not
     /// fail bytecode verification.
-    fn fetch_existing_verified_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Arc<Module>> {
-        self.fetch_verified_module(address, module_name)
+    fn fetch_existing_verified_module(&self, idx: &ModuleIdx) -> VMResult<Arc<Module>> {
+        self.fetch_verified_module(idx)
             .map_err(expect_no_verification_errors)?
-            .ok_or_else(|| module_linker_error!(address, module_name))
+            .ok_or_else(|| module_linker_error!(idx, idx))
     }
 
     /// Returns a struct type corresponding to the specified name. The module containing the struct
     /// will be fetched and cached beforehand.
     fn fetch_struct_ty(&self, struct_idx: &StructIdx) -> PartialVMResult<Arc<StructType>> {
-        let index_manager = self.runtime_environment().struct_name_index_map();
-        let module_id = index_manager.module_id_from_struct_idx(struct_idx);
         let module = self
-            .fetch_existing_verified_module(module_id.address(), module_id.name())
+            .fetch_existing_verified_module(&struct_idx.module_idx())
             .map_err(|err| err.to_partial())?;
         Ok(module
             .struct_map
@@ -183,9 +144,7 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
         &self,
         function_idx: &FunctionIdx,
     ) -> VMResult<(Arc<Module>, Arc<Function>)> {
-        let index_manager = self.runtime_environment().struct_name_index_map();
-        let module_id = index_manager.module_id_from_idx(function_idx);
-        let module = self.fetch_existing_verified_module(module_id.address(), module_id.name())?;
+        let module = self.fetch_existing_verified_module(&function_idx.module_idx())?;
         let function = module
             .function_map
             .get(function_idx)
@@ -226,65 +185,47 @@ where
     E: WithBytes + WithSize + WithHash,
     V: Clone + Default + Ord,
 {
-    fn check_module_exists(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<bool> {
-        let id = ModuleId::new(*address, module_name.to_owned());
+    fn check_module_exists(&self, idx: &ModuleIdx) -> VMResult<bool> {
+        let index_manager = self.runtime_environment().struct_name_index_map();
+        let id = index_manager.module_id_from_module_idx(idx);
         Ok(self.get_module_or_build_with(&id, self)?.is_some())
     }
 
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
+    fn fetch_module_bytes(&self, idx: &ModuleIdx) -> VMResult<Option<Bytes>> {
+        let index_manager = self.runtime_environment().struct_name_index_map();
+        let id = index_manager.module_id_from_module_idx(idx);
         Ok(self
             .get_module_or_build_with(&id, self)?
             .map(|(module, _)| module.extension().bytes().clone()))
     }
 
-    fn fetch_module_size_in_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<usize>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
+    fn fetch_module_size_in_bytes(&self, idx: &ModuleIdx) -> VMResult<Option<usize>> {
+        let index_manager = self.runtime_environment().struct_name_index_map();
+        let id = index_manager.module_id_from_module_idx(idx);
         Ok(self
             .get_module_or_build_with(&id, self)?
             .map(|(module, _)| module.extension().bytes().len()))
     }
 
-    fn fetch_module_metadata(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Vec<Metadata>>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
+    fn fetch_module_metadata(&self, idx: &ModuleIdx) -> VMResult<Option<Vec<Metadata>>> {
+        let index_manager = self.runtime_environment().struct_name_index_map();
+        let id = index_manager.module_id_from_module_idx(idx);
         Ok(self
             .get_module_or_build_with(&id, self)?
             .map(|(module, _)| module.code().deserialized().metadata.clone()))
     }
 
-    fn fetch_deserialized_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Arc<CompiledModule>>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
+    fn fetch_deserialized_module(&self, idx: &ModuleIdx) -> VMResult<Option<Arc<CompiledModule>>> {
+        let index_manager = self.runtime_environment().struct_name_index_map();
+        let id = index_manager.module_id_from_module_idx(idx);
         Ok(self
             .get_module_or_build_with(&id, self)?
             .map(|(module, _)| module.code().deserialized().clone()))
     }
 
-    fn fetch_verified_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Arc<Module>>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
+    fn fetch_verified_module(&self, idx: &ModuleIdx) -> VMResult<Option<Arc<Module>>> {
+        let index_manager = self.runtime_environment().struct_name_index_map();
+        let id = index_manager.module_id_from_module_idx(idx);
 
         // Look up the verified module in cache, if it is not there, or if the module is not yet
         // verified, we need to load & verify its transitive dependencies.

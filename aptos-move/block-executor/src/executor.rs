@@ -1232,6 +1232,9 @@ where
         >,
     ) -> Result<(), PanicError> {
         let (id, write_op) = write.unpack();
+        let id = runtime_environment
+            .struct_name_index_map()
+            .module_id_from_module_idx(&id);
 
         let state_value = write_op.as_state_value().ok_or_else(|| {
             PanicError::CodeInvariantError("Modules cannot be deleted".to_string())

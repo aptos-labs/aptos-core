@@ -15,10 +15,7 @@ use move_binary_format::{
     normalized, CompiledModule, IndexKind,
 };
 use move_core_types::{
-    account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, TypeTag},
-    metadata::Metadata,
+    account_address::AccountAddress, language_storage::TypeTag, metadata::Metadata,
     vm_status::StatusCode,
 };
 use move_vm_types::{
@@ -50,26 +47,17 @@ impl<K: Ord, V: Clone> IntoIterator for VerifiedModuleBundle<K, V> {
 /// by [ModuleStorage], the most recent version of a module will be fetched.
 struct StagingModuleBytesStorage<'a, M> {
     // Modules to be published, staged temporarily.
-    staged_module_bytes: BTreeMap<AccountAddress, BTreeMap<Identifier, Bytes>>,
+    staged_module_bytes: BTreeMap<ModuleIdx, Bytes>,
     // Underlying ground-truth module storage, used as a raw byte storage.
     module_storage: &'a M,
 }
 
 impl<'a, M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'a, M> {
     fn fetch_module_bytes(&self, idx: &ModuleIdx) -> VMResult<Option<Bytes>> {
-        let idx_map = self
-            .module_storage
-            .runtime_environment()
-            .struct_name_index_map();
-        let (address, module_name) = idx_map.module_addr_name_from_module_idx(idx);
-
-        if let Some(account_storage) = self.staged_module_bytes.get(&address) {
-            if let Some(bytes) = account_storage.get(&module_name) {
-                return Ok(Some(bytes.clone()));
-            }
+        if let Some(bytes) = self.staged_module_bytes.get(idx) {
+            return Ok(Some(bytes.clone()));
         }
-        self.module_storage
-            .fetch_module_bytes(&address, &module_name)
+        self.module_storage.fetch_module_bytes(idx)
     }
 }
 
@@ -136,7 +124,10 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
                         .finish(Location::Undefined)
                     })?;
             let addr = compiled_module.self_addr();
-            let name = compiled_module.self_name();
+            let name = compiled_module.self_name_identifier();
+            let idx = runtime_environment
+                .struct_name_index_map()
+                .module_idx(addr, name);
 
             // Make sure all modules' addresses match the sender. The self address is
             // where the module will actually be published. If we did not check this,
@@ -159,7 +150,7 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
             // with the old module.
             if compatibility.need_check_compat() {
                 if let Some(old_module_ref) =
-                    existing_module_storage.fetch_deserialized_module(addr, name)?
+                    existing_module_storage.fetch_deserialized_module(&idx)?
                 {
                     let old_module = old_module_ref.as_ref();
                     if runtime_environment.vm_config().use_compatibility_checker_v2 {
@@ -181,14 +172,7 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
             }
 
             // Modules that pass compatibility checks are added to the staged storage.
-            use btree_map::Entry::*;
-            let account_module_storage =
-                match staged_module_bytes.entry(*compiled_module.self_addr()) {
-                    Occupied(entry) => entry.into_mut(),
-                    Vacant(entry) => entry.insert(BTreeMap::new()),
-                };
-            let prev =
-                account_module_storage.insert(compiled_module.self_name().to_owned(), module_bytes);
+            let prev = staged_module_bytes.insert(idx, module_bytes);
 
             // Publishing the same module in the same bundle is not allowed.
             if prev.is_some() {
@@ -215,32 +199,31 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
         };
 
         // Finally, verify the bundle, performing linking checks for all staged modules.
-        for (addr, name) in staged_module_storage
+        for module_idx in staged_module_storage
             .storage
             .byte_storage()
             .staged_module_bytes
-            .iter()
-            .flat_map(|(addr, account_storage)| {
-                account_storage
-                    .iter()
-                    .map(move |(name, _)| (addr, name.as_ident_str()))
-            })
+            .keys()
         {
             // Verify the module and its dependencies, and that they do not form a cycle.
             let module = staged_module_storage
-                .fetch_verified_module(addr, name)?
+                .fetch_verified_module(module_idx)?
                 .ok_or_else(|| {
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!(
                             "Staged module {}::{} must always exist",
-                            addr, name
+                            module_idx, module_idx
                         ))
                         .finish(Location::Undefined)
                 })?;
 
             // Also verify that all friends exist.
             for (friend_addr, friend_name) in module.immediate_friends_iter() {
-                if !staged_module_storage.check_module_exists(friend_addr, friend_name)? {
+                let friend_idx = staged_module_storage
+                    .runtime_environment()
+                    .struct_name_index_map()
+                    .module_idx(friend_addr, friend_name);
+                if !staged_module_storage.check_module_exists(&friend_idx)? {
                     return Err(module_linker_error!(friend_addr, friend_name));
                 }
             }
@@ -250,16 +233,8 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
         Ok(staged_module_storage)
     }
 
-    pub fn release_verified_module_bundle(self) -> VerifiedModuleBundle<ModuleId, Bytes> {
-        let staged_module_bytes = &self.storage.byte_storage().staged_module_bytes;
-
-        let mut bundle = BTreeMap::new();
-        for (addr, account_storage) in staged_module_bytes {
-            for (name, bytes) in account_storage {
-                bundle.insert(ModuleId::new(*addr, name.clone()), bytes.clone());
-            }
-        }
-
+    pub fn release_verified_module_bundle(self) -> VerifiedModuleBundle<ModuleIdx, Bytes> {
+        let bundle = self.storage.byte_storage().staged_module_bytes.clone();
         VerifiedModuleBundle { bundle }
     }
 }

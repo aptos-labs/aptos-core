@@ -66,13 +66,15 @@ where
         let locally_verified_script = self
             .runtime_environment()
             .build_locally_verified_script(deserialized_script)?;
+        let index_map = self.runtime_environment().struct_name_index_map();
 
         // Verify the script is correct w.r.t. its dependencies.
         let immediate_dependencies = locally_verified_script
             .immediate_dependencies_iter()
             .map(|(addr, name)| {
                 // Since module is stored on-chain, we should not see any verification errors here.
-                self.fetch_existing_verified_module(addr, name)
+                let idx = index_map.module_idx(addr, name);
+                self.fetch_existing_verified_module(&idx)
             })
             .collect::<VMResult<Vec<_>>>()?;
         let verified_script = self

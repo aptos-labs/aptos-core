@@ -83,9 +83,12 @@ impl LoaderV2 {
         let mut stack = Vec::with_capacity(512);
         push_next_ids_to_visit(&mut stack, visited, ids);
 
+        let index_map = module_storage.runtime_environment().struct_name_index_map();
+
         while let Some((addr, name)) = stack.pop() {
+            let idx = index_map.module_idx(addr, name);
             let size = module_storage
-                .fetch_module_size_in_bytes(addr, name)?
+                .fetch_module_size_in_bytes(&idx)?
                 .ok_or_else(|| module_linker_error!(addr, name))?;
             gas_meter
                 .charge_dependency(false, addr, name, NumBytes::new(size as u64))
@@ -99,7 +102,7 @@ impl LoaderV2 {
             // This is needed because we need to store references derived from it in the
             // work list.
             let compiled_module = module_storage
-                .fetch_deserialized_module(addr, name)?
+                .fetch_deserialized_module(&idx)?
                 .ok_or_else(|| module_linker_error!(addr, name))?;
             let compiled_module = referenced_modules.alloc(compiled_module);
 

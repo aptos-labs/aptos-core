@@ -7,34 +7,22 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp, WriteOpSize},
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
-    vm_status::StatusCode,
-};
+use move_core_types::vm_status::StatusCode;
 use move_vm_runtime::ModuleStorage;
+use move_vm_types::indices::ModuleIdx;
 use std::collections::BTreeMap;
 
 /// A write with a published module, also containing the information about its address and name.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ModuleWrite<V> {
-    id: ModuleId,
+    pub id: ModuleIdx,
     write_op: V,
 }
 
 impl<V: TransactionWrite> ModuleWrite<V> {
     /// Creates a new module write.
-    pub fn new(id: ModuleId, write_op: V) -> Self {
+    pub fn new(id: ModuleIdx, write_op: V) -> Self {
         Self { id, write_op }
-    }
-
-    /// Returns the address of the module written.
-    pub fn module_address(&self) -> &AccountAddress {
-        self.id.address()
-    }
-
-    /// Returns the name of the module written.
-    pub fn module_name(&self) -> &IdentStr {
-        self.id.name()
     }
 
     /// Returns the mutable reference to the write for the published module.
@@ -53,7 +41,7 @@ impl<V: TransactionWrite> ModuleWrite<V> {
     }
 
     /// Returns the module identifier with the corresponding operation.
-    pub fn unpack(self) -> (ModuleId, V) {
+    pub fn unpack(self) -> (ModuleIdx, V) {
         (self.id, self.write_op)
     }
 }
@@ -113,7 +101,7 @@ impl ModuleWriteSet {
         self.writes.iter_mut().map(move |(key, write)| {
             let prev_size = if module_storage.is_enabled() {
                 module_storage
-                    .fetch_module_size_in_bytes(write.module_address(), write.module_name())
+                    .fetch_module_size_in_bytes(&write.id)
                     .map_err(|e| e.to_partial())?
                     .unwrap_or(0) as u64
             } else {

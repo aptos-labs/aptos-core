@@ -15,8 +15,6 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress,
-    identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
 };
@@ -159,10 +157,11 @@ impl<'s, S: StateView, E: Clone + WithRuntimeEnvironment> AptosModuleStorage
 {
     fn fetch_state_value_metadata(
         &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
+        idx: &ModuleIdx,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
-        let state_key = StateKey::module(address, module_name);
+        let idx_map = self.runtime_environment().struct_name_index_map();
+        let (address, module_name) = idx_map.module_addr_name_from_module_idx(idx);
+        let state_key = StateKey::module(&address, &module_name);
         Ok(self
             .storage
             .module_storage()

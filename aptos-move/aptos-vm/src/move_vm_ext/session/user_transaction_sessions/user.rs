@@ -106,7 +106,7 @@ impl<'r, 'l> UserSession<'r, 'l> {
                 );
 
             // Check if module existed previously. If not, we do not run initialization.
-            if module_storage.check_module_exists(module.self_addr(), module.self_name())? {
+            if module_storage.check_module_exists(&idx.module_idx())? {
                 continue;
             }
 

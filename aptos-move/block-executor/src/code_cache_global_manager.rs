@@ -286,13 +286,16 @@ fn prefetch_aptos_framework<S: StateView>(
     module_cache: &mut GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
 ) -> Result<(), PanicError> {
     // If framework code exists in storage, the transitive closure will be verified and cached.
-    let maybe_loaded = code_storage
-        .fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"))
-        .map_err(|err| {
-            // There should be no errors when pre-fetching the framework, if there are, we
-            // better return an error here.
-            PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
-        })?;
+    let index_map = code_storage.runtime_environment().struct_name_index_map();
+    let idx = index_map.module_idx(
+        &AccountAddress::ONE,
+        &ident_str!("transaction_validation").to_owned(),
+    );
+    let maybe_loaded = code_storage.fetch_verified_module(&idx).map_err(|err| {
+        // There should be no errors when pre-fetching the framework, if there are, we
+        // better return an error here.
+        PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
+    })?;
 
     if maybe_loaded.is_some() {
         // Framework must have been loaded. Drain verified modules from local cache into

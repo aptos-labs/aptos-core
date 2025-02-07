@@ -222,8 +222,14 @@ impl<'r> TransactionDataCache<'r> {
 
         let mut load_res = None;
         if !account_cache.data_map.contains_key(ty) {
-            let ty_tag = match loader.type_to_type_tag(ty, module_storage)? {
-                TypeTag::Struct(s_tag) => s_tag,
+            let (module_idx, ty_tag) = match loader.type_to_type_tag(ty, module_storage)? {
+                TypeTag::Struct(s_tag) => {
+                    let idx = module_storage
+                        .runtime_environment()
+                        .struct_name_index_map()
+                        .module_idx_from_struct_tag(&s_tag);
+                    (idx, s_tag)
+                },
                 _ =>
                 // non-struct top-level value; can't happen
                 {
@@ -258,10 +264,7 @@ impl<'r> TransactionDataCache<'r> {
                 },
                 Loader::V2(_) => {
                     let metadata = module_storage
-                        .fetch_existing_module_metadata(
-                            &ty_tag.address,
-                            ty_tag.module.as_ident_str(),
-                        )
+                        .fetch_existing_module_metadata(&module_idx)
                         .map_err(|e| e.to_partial())?;
 
                     // If we need to process aggregator lifting, we pass type layout to remote.

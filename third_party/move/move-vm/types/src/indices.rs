@@ -206,6 +206,10 @@ impl IndexMapManager {
         )
     }
 
+    pub fn module_idx_from_struct_tag(&self, struct_tag: &StructTag) -> ModuleIdx {
+        self.module_idx(&struct_tag.address, &struct_tag.module)
+    }
+
     #[allow(dead_code)]
     pub fn struct_idx_from_struct_tag(&self, struct_tag: &StructTag) -> StructIdx {
         self.struct_idx(&struct_tag.address, &struct_tag.module, &struct_tag.name)
@@ -242,6 +246,16 @@ impl IndexMapManager {
 
     // FIXME
     pub fn module_id_from_idx(&self, idx: &FunctionIdx) -> ModuleId {
+        let address =
+            self.address_index_map.data.read().backward_map[(idx.0 & ADDRESS_MASK) as usize];
+        let module = self.module_name_index_map.data.read().backward_map
+            [((idx.0 & MODULE_MASK) >> MODULE_OFFSET) as usize]
+            .to_owned();
+        ModuleId::new(address, module)
+    }
+
+    // FIXME
+    pub fn module_id_from_module_idx(&self, idx: &ModuleIdx) -> ModuleId {
         let address =
             self.address_index_map.data.read().backward_map[(idx.0 & ADDRESS_MASK) as usize];
         let module = self.module_name_index_map.data.read().backward_map
