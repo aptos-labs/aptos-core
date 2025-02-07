@@ -65,6 +65,7 @@ use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, Genes
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
     module_and_script_storage::{module_storage::AptosModuleStorage, AsAptosCodeStorage},
+    resolver::NoopBlockSynchronizationKillSwitch,
     storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
@@ -1072,6 +1073,7 @@ impl FakeExecutor {
                         env.storage_gas_params().as_ref().unwrap().clone(),
                         false,
                         1_000_000_000_000_000.into(),
+                        &NoopBlockSynchronizationKillSwitch {},
                     )),
                     None,
                 ),
@@ -1182,6 +1184,7 @@ impl FakeExecutor {
                         env.storage_gas_params().as_ref().unwrap().clone(),
                         false,
                         10_000_000_000_000,
+                        &NoopBlockSynchronizationKillSwitch {},
                     ),
                     shared_buffer: Arc::clone(&a1),
                 }),
