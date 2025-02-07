@@ -526,7 +526,7 @@ pub fn verify_module_metadata(
         .iter()
         .map(|func_def| {
             let func_handle = module.function_handle_at(func_def.function);
-            let name = module.identifier_at(func_handle.name);
+            let name = module.identifier_at(func_handle.name).as_ident_str();
             (name, (func_handle, func_def))
         })
         .collect::<BTreeMap<_, _>>();
@@ -552,7 +552,7 @@ pub fn verify_module_metadata(
         .iter()
         .map(|struct_def| {
             let struct_handle = module.struct_handle_at(struct_def.struct_handle);
-            let name = module.identifier_at(struct_handle.name);
+            let name = module.identifier_at(struct_handle.name).as_ident_str();
             (name, (struct_handle, struct_def))
         })
         .collect::<BTreeMap<_, _>>();

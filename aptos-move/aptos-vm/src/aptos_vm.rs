@@ -891,7 +891,7 @@ impl AptosVM {
                 module_storage,
                 gas_meter,
                 traversal_context,
-                [(module_id.address(), module_id.name())],
+                [(module_id.address(), &module_id.name)],
             )?;
         }
 
@@ -1614,7 +1614,7 @@ impl AptosVM {
             // Charge old versions of existing modules, in case of upgrades.
             for module in modules.iter() {
                 let addr = module.self_addr();
-                let name = module.self_name();
+                let name = module.self_name_identifier();
                 let state_key = StateKey::module(addr, name);
 
                 // TODO: Allow the check of special addresses to be customized.
@@ -1662,7 +1662,7 @@ impl AptosVM {
             // been published yet.
             let module_ids_in_bundle = modules
                 .iter()
-                .map(|module| (module.self_addr(), module.self_name()))
+                .map(|module| (module.self_addr(), module.self_name_identifier()))
                 .collect::<BTreeSet<_>>();
 
             session.execute(|session| {

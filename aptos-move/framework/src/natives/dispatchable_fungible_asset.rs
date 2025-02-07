@@ -30,12 +30,12 @@ pub(crate) fn native_dispatch(
             && !context
                 .traversal_context()
                 .visited
-                .contains_key(&(module_name.address(), module_name.name()))
+                .contains_key(&(module_name.address(), &module_name.name))
     } else {
         !context
             .traversal_context()
             .visited
-            .contains_key(&(module_name.address(), module_name.name()))
+            .contains_key(&(module_name.address(), &module_name.name))
     };
     if is_err {
         return Err(SafeNativeError::Abort { abort_code: 4 });

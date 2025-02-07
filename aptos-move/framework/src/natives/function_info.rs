@@ -88,12 +88,12 @@ fn native_check_dispatch_type_compatibility_impl(
                 && !context
                     .traversal_context()
                     .visited
-                    .contains_key(&(module.address(), module.name()))
+                    .contains_key(&(module.address(), &module.name))
         } else {
             !context
                 .traversal_context()
                 .visited
-                .contains_key(&(module.address(), module.name()))
+                .contains_key(&(module.address(), &module.name))
         };
         if is_err {
             return Err(SafeNativeError::Abort { abort_code: 2 });
