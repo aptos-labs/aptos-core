@@ -36,10 +36,8 @@ use aptos_vm_types::{
 };
 use bytes::Bytes;
 use claims::{assert_ge, assert_le, assert_ok};
-use move_core_types::{
-    ident_str, identifier::IdentStr, language_storage::ModuleId, value::MoveTypeLayout,
-};
-use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use move_core_types::{identifier::IdentStr, value::MoveTypeLayout};
+use move_vm_types::{delayed_values::delayed_field_id::DelayedFieldID, indices::ModuleIdx};
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
@@ -1094,8 +1092,7 @@ where
             .iter()
             .filter(|(k, _)| k.is_module_path())
             .map(|(k, v)| {
-                let dummy_id = ModuleId::new(AccountAddress::ONE, ident_str!("dummy").to_owned());
-                let write = ModuleWrite::new(dummy_id, v.clone());
+                let write = ModuleWrite::new(ModuleIdx::new(0), v.clone());
                 (k.clone(), write)
             })
             .collect()
@@ -1256,6 +1253,7 @@ where
     ) -> HashSet<
         crate::types::InputOutputKey<
             <Self::Txn as Transaction>::Key,
+            ModuleIdx,
             <Self::Txn as Transaction>::Tag,
         >,
     > {

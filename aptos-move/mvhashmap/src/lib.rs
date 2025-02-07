@@ -13,9 +13,11 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use move_binary_format::{file_format::CompiledScript, CompiledModule};
-use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::{Module, Script};
-use move_vm_types::code::{ModuleCache, ModuleCode, SyncModuleCache, SyncScriptCache};
+use move_vm_types::{
+    code::{ModuleCache, ModuleCode, SyncModuleCache, SyncScriptCache},
+    indices::ModuleIdx,
+};
 use serde::Serialize;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 
@@ -47,7 +49,7 @@ pub struct MVHashMap<K, T, V: TransactionWrite, I: Clone> {
     deprecated_modules: VersionedModules<K, V, ExecutableTestType>,
 
     module_cache:
-        SyncModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>,
+        SyncModuleCache<ModuleIdx, CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>,
     script_cache: SyncScriptCache<[u8; 32], CompiledScript, Script>,
 }
 
@@ -111,7 +113,7 @@ where
     /// 2) committed modules.
     pub fn module_cache(
         &self,
-    ) -> &SyncModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>
+    ) -> &SyncModuleCache<ModuleIdx, CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>
     {
         &self.module_cache
     }
@@ -121,7 +123,7 @@ where
         &mut self,
     ) -> impl Iterator<
         Item = (
-            ModuleId,
+            ModuleIdx,
             Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension>>,
         ),
     > {

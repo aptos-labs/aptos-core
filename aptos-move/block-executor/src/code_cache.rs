@@ -20,7 +20,6 @@ use move_binary_format::{
     file_format::CompiledScript,
     CompiledModule,
 };
-use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::{Module, RuntimeEnvironment, Script, WithRuntimeEnvironment};
 use move_vm_types::{
     code::{
@@ -42,14 +41,18 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> WithRuntimeEnvironment
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCodeBuilder for LatestView<'a, T, S> {
     type Deserialized = CompiledModule;
     type Extension = AptosModuleExtension;
-    type Key = ModuleId;
+    type Key = ModuleIdx;
     type Verified = Module;
 
     fn build(
         &self,
         key: &Self::Key,
     ) -> VMResult<Option<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
-        let key = T::Key::from_address_and_module_name(key.address(), key.name());
+        let (addr, name) = self
+            .runtime_environment
+            .struct_name_index_map()
+            .module_addr_name_from_module_idx(key);
+        let key = T::Key::from_address_and_module_name(&addr, &name);
         self.get_raw_base_value(&key)
             .map_err(|err| err.finish(Location::Undefined))?
             .map(|state_value| {
@@ -66,7 +69,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCodeBuilder for Late
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView<'a, T, S> {
     type Deserialized = CompiledModule;
     type Extension = AptosModuleExtension;
-    type Key = ModuleId;
+    type Key = ModuleIdx;
     type Verified = Module;
     type Version = Option<TxnIndex>;
 
@@ -99,7 +102,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView
                 // If we do not do that, reads to module cache will end up reading "old" code that
                 // is stored in captured reads and is not verified.
                 let module = state.versioned_map.module_cache().insert_verified_module(
-                    key.clone(),
+                    key,
                     verified_code,
                     extension,
                     version,
@@ -146,7 +149,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView
                     state
                         .captured_reads
                         .borrow_mut()
-                        .capture_global_cache_read(key.clone(), module.clone());
+                        .capture_global_cache_read(*key, module.clone());
                     return Ok(Some((module, Self::Version::default())));
                 }
 
@@ -159,12 +162,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView
                 state
                     .captured_reads
                     .borrow_mut()
-                    .capture_per_block_cache_read(key.clone(), read.clone());
+                    .capture_per_block_cache_read(*key, read.clone());
                 Ok(read)
             },
             ViewState::Unsync(state) => {
                 if let Some(module) = self.global_module_cache.get(key) {
-                    state.read_set.borrow_mut().capture_module_read(key.clone());
+                    state.read_set.borrow_mut().capture_module_read(*key);
                     return Ok(Some((module, Self::Version::default())));
                 }
 
@@ -173,7 +176,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView
                     .unsync_map
                     .module_cache()
                     .get_module_or_build_with(key, builder)?;
-                state.read_set.borrow_mut().capture_module_read(key.clone());
+                state.read_set.borrow_mut().capture_module_read(*key);
                 Ok(read)
             },
         }
@@ -189,10 +192,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> AptosModuleStorage for Lat
         &self,
         idx: &ModuleIdx,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
-        let idx_map = self.runtime_environment().struct_name_index_map();
-        let id = idx_map.module_id_from_module_idx(idx);
         let state_value_metadata = self
-            .get_module_or_build_with(&id, self)
+            .get_module_or_build_with(idx, self)
             .map_err(|err| err.to_partial())?
             .map(|(module, _)| module.extension().state_value_metadata().clone());
         Ok(state_value_metadata)
@@ -216,7 +217,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     fn as_module_cache(
         &self,
     ) -> &dyn ModuleCache<
-        Key = ModuleId,
+        Key = ModuleIdx,
         Deserialized = CompiledModule,
         Verified = Module,
         Extension = AptosModuleExtension,

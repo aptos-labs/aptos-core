@@ -14,10 +14,7 @@ use move_binary_format::{
     file_format::CompiledScript,
     CompiledModule,
 };
-use move_core_types::{
-    language_storage::{ModuleId, TypeTag},
-    metadata::Metadata,
-};
+use move_core_types::{language_storage::TypeTag, metadata::Metadata};
 use move_vm_runtime::{
     ambassador_impl_CodeStorage, ambassador_impl_ModuleStorage,
     ambassador_impl_WithRuntimeEnvironment, AsUnsyncCodeStorage, BorrowedOrOwned, CodeStorage,
@@ -107,28 +104,30 @@ impl<'s, S: StateView, E: Clone + WithRuntimeEnvironment> AptosCodeStorageAdapte
     ) -> Result<
         impl Iterator<
             Item = (
-                ModuleId,
+                ModuleIdx,
                 Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension>>,
             ),
         >,
         PanicError,
     > {
-        let (state_view, verified_modules_iter) = self
+        let (state_view, env, verified_modules_iter) = self
             .storage
             .into_module_storage()
             .unpack_into_verified_modules_iter();
+        let index_map = env.runtime_environment().struct_name_index_map();
 
         Ok(verified_modules_iter
             .map(|(key, verified_code)| {
                 // We have cached the module previously, so we must be able to find it in storage.
+                let (address, module_name) = index_map.module_addr_name_from_module_idx(&key);
+                let state_key = StateKey::module(&address, &module_name);
+
                 let extension = state_view
-                    .get_state_value(&StateKey::module_id(&key))
+                    .get_state_value(&state_key)
                     .map_err(|err| {
                         let msg = format!(
                             "Failed to retrieve module {}::{} from storage {:?}",
-                            key.address(),
-                            key.name(),
-                            err
+                            address, module_name, err
                         );
                         PanicError::CodeInvariantError(msg)
                     })?
@@ -136,8 +135,7 @@ impl<'s, S: StateView, E: Clone + WithRuntimeEnvironment> AptosCodeStorageAdapte
                         || {
                             let msg = format!(
                                 "Module {}::{} should exist, but it does not anymore",
-                                key.address(),
-                                key.name()
+                                address, module_name
                             );
                             Err(PanicError::CodeInvariantError(msg))
                         },

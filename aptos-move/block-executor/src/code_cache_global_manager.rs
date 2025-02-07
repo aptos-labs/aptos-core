@@ -24,11 +24,9 @@ use move_binary_format::{
     errors::{Location, VMError},
     CompiledModule,
 };
-use move_core_types::{
-    account_address::AccountAddress, ident_str, language_storage::ModuleId, vm_status::VMStatus,
-};
+use move_core_types::{account_address::AccountAddress, ident_str, vm_status::VMStatus};
 use move_vm_runtime::{Module, ModuleStorage, WithRuntimeEnvironment};
-use move_vm_types::code::WithSize;
+use move_vm_types::{code::WithSize, indices::ModuleIdx};
 use parking_lot::{Mutex, MutexGuard};
 use std::{hash::Hash, ops::Deref, sync::Arc};
 
@@ -142,7 +140,7 @@ where
 /// Module cache manager used by Aptos block executor. Ensures that only one thread has exclusive
 /// access to it at a time.
 pub struct AptosModuleCacheManager {
-    inner: Mutex<ModuleCacheManager<ModuleId, CompiledModule, Module, AptosModuleExtension>>,
+    inner: Mutex<ModuleCacheManager<ModuleIdx, CompiledModule, Module, AptosModuleExtension>>,
 }
 
 impl AptosModuleCacheManager {
@@ -221,13 +219,13 @@ pub enum AptosModuleCacheManagerGuard<'a> {
     Guard {
         guard: MutexGuard<
             'a,
-            ModuleCacheManager<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+            ModuleCacheManager<ModuleIdx, CompiledModule, Module, AptosModuleExtension>,
         >,
     },
     /// Either there is no [AptosModuleCacheManager], or acquiring the lock for it failed.
     None {
         environment: AptosEnvironment,
-        module_cache: GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+        module_cache: GlobalModuleCache<ModuleIdx, CompiledModule, Module, AptosModuleExtension>,
     },
 }
 
@@ -247,7 +245,7 @@ impl<'a> AptosModuleCacheManagerGuard<'a> {
     /// Returns the references to the module cache.
     pub fn module_cache(
         &self,
-    ) -> &GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension> {
+    ) -> &GlobalModuleCache<ModuleIdx, CompiledModule, Module, AptosModuleExtension> {
         use AptosModuleCacheManagerGuard::*;
         match self {
             Guard { guard } => &guard.module_cache,
@@ -258,7 +256,7 @@ impl<'a> AptosModuleCacheManagerGuard<'a> {
     /// Returns the mutable references to the module cache.
     pub fn module_cache_mut(
         &mut self,
-    ) -> &mut GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension> {
+    ) -> &mut GlobalModuleCache<ModuleIdx, CompiledModule, Module, AptosModuleExtension> {
         use AptosModuleCacheManagerGuard::*;
         match self {
             Guard { guard } => &mut guard.module_cache,
@@ -283,7 +281,7 @@ impl<'a> AptosModuleCacheManagerGuard<'a> {
 /// error is returned.
 fn prefetch_aptos_framework<S: StateView>(
     code_storage: AptosCodeStorageAdapter<S, AptosEnvironment>,
-    module_cache: &mut GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+    module_cache: &mut GlobalModuleCache<ModuleIdx, CompiledModule, Module, AptosModuleExtension>,
 ) -> Result<(), PanicError> {
     // If framework code exists in storage, the transitive closure will be verified and cached.
     let index_map = code_storage.runtime_environment().struct_name_index_map();

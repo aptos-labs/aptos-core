@@ -23,9 +23,9 @@ use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
 use move_binary_format::CompiledModule;
-use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
+use move_core_types::value::MoveTypeLayout;
 use move_vm_runtime::{Module, RuntimeEnvironment};
-use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use move_vm_types::{delayed_values::delayed_field_id::DelayedFieldID, indices::ModuleIdx};
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
@@ -33,7 +33,7 @@ use std::{
     sync::Arc,
 };
 
-type TxnInput<T> = CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>;
+type TxnInput<T> = CapturedReads<T, ModuleIdx, CompiledModule, Module, AptosModuleExtension>;
 
 macro_rules! forward_on_success_or_skip_rest {
     ($self:ident, $txn_idx:ident, $f:ident) => {{
@@ -463,7 +463,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn get_write_summary(
         &self,
         txn_idx: TxnIndex,
-    ) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
+    ) -> HashSet<InputOutputKey<T::Key, ModuleIdx, T::Tag>> {
         match self.outputs[txn_idx as usize]
             .load_full()
             .expect("Output must exist")

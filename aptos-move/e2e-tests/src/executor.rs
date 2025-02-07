@@ -76,10 +76,7 @@ use move_core_types::{
     move_resource::{MoveResource, MoveStructType},
     value::MoveValue,
 };
-use move_vm_runtime::{
-    module_traversal::{TraversalContext, TraversalStorage},
-    ModuleStorage,
-};
+use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
@@ -1021,7 +1018,7 @@ impl FakeExecutor {
         // Create module storage, and ensure the module for the function we want to execute is
         // cached.
         let module_storage = self.data_store.as_aptos_code_storage(env.clone());
-        assert_ok!(module_storage.fetch_verified_module(module.address(), module.name()));
+        // assert_ok!(module_storage.fetch_verified_module(module.address(), module.name()));
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;

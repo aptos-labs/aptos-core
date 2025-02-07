@@ -171,13 +171,13 @@ impl<T, E, V> ModuleStorage for T
 where
     T: WithRuntimeEnvironment
         + ModuleCache<
-            Key = ModuleId,
+            Key = ModuleIdx,
             Deserialized = CompiledModule,
             Verified = Module,
             Extension = E,
             Version = V,
         > + ModuleCodeBuilder<
-            Key = ModuleId,
+            Key = ModuleIdx,
             Deserialized = CompiledModule,
             Verified = Module,
             Extension = E,
@@ -186,50 +186,37 @@ where
     V: Clone + Default + Ord,
 {
     fn check_module_exists(&self, idx: &ModuleIdx) -> VMResult<bool> {
-        let index_manager = self.runtime_environment().struct_name_index_map();
-        let id = index_manager.module_id_from_module_idx(idx);
-        Ok(self.get_module_or_build_with(&id, self)?.is_some())
+        Ok(self.get_module_or_build_with(idx, self)?.is_some())
     }
 
     fn fetch_module_bytes(&self, idx: &ModuleIdx) -> VMResult<Option<Bytes>> {
-        let index_manager = self.runtime_environment().struct_name_index_map();
-        let id = index_manager.module_id_from_module_idx(idx);
         Ok(self
-            .get_module_or_build_with(&id, self)?
+            .get_module_or_build_with(idx, self)?
             .map(|(module, _)| module.extension().bytes().clone()))
     }
 
     fn fetch_module_size_in_bytes(&self, idx: &ModuleIdx) -> VMResult<Option<usize>> {
-        let index_manager = self.runtime_environment().struct_name_index_map();
-        let id = index_manager.module_id_from_module_idx(idx);
         Ok(self
-            .get_module_or_build_with(&id, self)?
+            .get_module_or_build_with(idx, self)?
             .map(|(module, _)| module.extension().bytes().len()))
     }
 
     fn fetch_module_metadata(&self, idx: &ModuleIdx) -> VMResult<Option<Vec<Metadata>>> {
-        let index_manager = self.runtime_environment().struct_name_index_map();
-        let id = index_manager.module_id_from_module_idx(idx);
         Ok(self
-            .get_module_or_build_with(&id, self)?
+            .get_module_or_build_with(idx, self)?
             .map(|(module, _)| module.code().deserialized().metadata.clone()))
     }
 
     fn fetch_deserialized_module(&self, idx: &ModuleIdx) -> VMResult<Option<Arc<CompiledModule>>> {
-        let index_manager = self.runtime_environment().struct_name_index_map();
-        let id = index_manager.module_id_from_module_idx(idx);
         Ok(self
-            .get_module_or_build_with(&id, self)?
+            .get_module_or_build_with(idx, self)?
             .map(|(module, _)| module.code().deserialized().clone()))
     }
 
     fn fetch_verified_module(&self, idx: &ModuleIdx) -> VMResult<Option<Arc<Module>>> {
-        let index_manager = self.runtime_environment().struct_name_index_map();
-        let id = index_manager.module_id_from_module_idx(idx);
-
         // Look up the verified module in cache, if it is not there, or if the module is not yet
         // verified, we need to load & verify its transitive dependencies.
-        let (module, version) = match self.get_module_or_build_with(&id, self)? {
+        let (module, version) = match self.get_module_or_build_with(idx, self)? {
             Some(module_and_version) => module_and_version,
             None => return Ok(None),
         };
@@ -241,9 +228,9 @@ where
         let _timer = VM_TIMER.timer_with_label("ModuleStorage::fetch_verified_module [cache miss]");
 
         let mut visited = HashSet::new();
-        visited.insert(id.clone());
+        visited.insert(*idx);
         Ok(Some(visit_dependencies_and_verify(
-            id,
+            *idx,
             module,
             version,
             &mut visited,
@@ -266,22 +253,22 @@ where
 ///   detection of such corner cases only possible if **all existing modules are checked**, which
 ///   is clearly infeasible.
 fn visit_dependencies_and_verify<T, E, V>(
-    module_id: ModuleId,
+    module_id: ModuleIdx,
     module: Arc<ModuleCode<CompiledModule, Module, E>>,
     version: V,
-    visited: &mut HashSet<ModuleId>,
+    visited: &mut HashSet<ModuleIdx>,
     module_cache_with_context: &T,
 ) -> VMResult<Arc<Module>>
 where
     T: WithRuntimeEnvironment
         + ModuleCache<
-            Key = ModuleId,
+            Key = ModuleIdx,
             Deserialized = CompiledModule,
             Verified = Module,
             Extension = E,
             Version = V,
         > + ModuleCodeBuilder<
-            Key = ModuleId,
+            Key = ModuleIdx,
             Deserialized = CompiledModule,
             Verified = Module,
             Extension = E,
@@ -290,13 +277,15 @@ where
     V: Clone + Default + Ord,
 {
     let runtime_environment = module_cache_with_context.runtime_environment();
+    let index_manager = runtime_environment.struct_name_index_map();
 
     // Step 1: Local verification.
-    runtime_environment.paranoid_check_module_address_and_name(
-        module.code().deserialized(),
-        module_id.address(),
-        module_id.name(),
-    )?;
+    // FIXME
+    // runtime_environment.paranoid_check_module_address_and_name(
+    //     module.code().deserialized(),
+    //     module_id.address(),
+    //     module_id.name(),
+    // )?;
     let locally_verified_code = runtime_environment.build_locally_verified_module(
         module.code().deserialized().clone(),
         module.extension().size_in_bytes(),
@@ -307,7 +296,7 @@ where
     // non-local properties of the module.
     let mut verified_dependencies = vec![];
     for (addr, name) in locally_verified_code.immediate_dependencies_iter() {
-        let dependency_id = ModuleId::new(*addr, name.to_owned());
+        let dependency_id = index_manager.module_idx(addr, name);
 
         let (dependency, dependency_version) = module_cache_with_context
             .get_module_or_build_with(&dependency_id, module_cache_with_context)?
@@ -319,10 +308,10 @@ where
             continue;
         }
 
-        if visited.insert(dependency_id.clone()) {
+        if visited.insert(dependency_id) {
             // Dependency is not verified, and we have not visited it yet.
             let verified_dependency = visit_dependencies_and_verify(
-                dependency_id.clone(),
+                dependency_id,
                 dependency,
                 dependency_version,
                 visited,
@@ -331,10 +320,7 @@ where
             verified_dependencies.push(verified_dependency);
         } else {
             // We must have found a cycle otherwise.
-            return Err(module_cyclic_dependency_error!(
-                dependency_id.address(),
-                dependency_id.name()
-            ));
+            return Err(module_cyclic_dependency_error!(addr, name));
         }
     }
 

@@ -16,10 +16,7 @@ use move_binary_format::{
     errors::{PartialVMResult, VMResult},
     CompiledModule,
 };
-use move_core_types::{
-    language_storage::{ModuleId, TypeTag},
-    metadata::Metadata,
-};
+use move_core_types::{language_storage::TypeTag, metadata::Metadata};
 use move_vm_types::{
     code::{
         ambassador_impl_ModuleCache, ModuleBytesStorage, ModuleCache, ModuleCode,
@@ -99,7 +96,7 @@ struct UnsyncModuleStorageImpl<'s, S, E> {
     /// Environment where this module storage is defined in.
     runtime_environment: E,
     /// Module cache with deserialized or verified modules.
-    module_cache: UnsyncModuleCache<ModuleId, CompiledModule, Module, BytesWithHash, NoVersion>,
+    module_cache: UnsyncModuleCache<ModuleIdx, CompiledModule, Module, BytesWithHash, NoVersion>,
 
     /// Immutable baseline storage from which one can fetch raw module bytes.
     base_storage: BorrowedOrOwned<'s, S>,
@@ -131,20 +128,14 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> ModuleCodeBuilder
 {
     type Deserialized = CompiledModule;
     type Extension = BytesWithHash;
-    type Key = ModuleId;
+    type Key = ModuleIdx;
     type Verified = Module;
 
     fn build(
         &self,
         key: &Self::Key,
     ) -> VMResult<Option<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
-        let idx_map = self
-            .runtime_environment
-            .runtime_environment()
-            .struct_name_index_map();
-        let idx = idx_map.module_idx(&key.address, &key.name);
-
-        let bytes = match self.base_storage.fetch_module_bytes(&idx)? {
+        let bytes = match self.base_storage.fetch_module_bytes(key)? {
             Some(bytes) => bytes,
             None => return Ok(None),
         };
@@ -181,7 +172,8 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> UnsyncModuleStorage<'
         self,
     ) -> (
         BorrowedOrOwned<'s, S>,
-        impl Iterator<Item = (ModuleId, Arc<Module>)>,
+        E,
+        impl Iterator<Item = (ModuleIdx, Arc<Module>)>,
     ) {
         let verified_modules_iter =
             self.0
@@ -194,7 +186,11 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> UnsyncModuleStorage<'
                         (key, module.code().verified().clone())
                     })
                 });
-        (self.0.base_storage, verified_modules_iter)
+        (
+            self.0.base_storage,
+            self.0.runtime_environment,
+            verified_modules_iter,
+        )
     }
 
     /// Test-only method that checks the state of the module cache.
@@ -202,8 +198,8 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> UnsyncModuleStorage<'
     #[cfg(test)]
     pub(crate) fn assert_cached_state<'b>(
         &self,
-        deserialized: Vec<&'b ModuleId>,
-        verified: Vec<&'b ModuleId>,
+        deserialized: Vec<&'b ModuleIdx>,
+        verified: Vec<&'b ModuleIdx>,
     ) {
         use claims::*;
 

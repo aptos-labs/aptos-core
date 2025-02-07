@@ -21,7 +21,7 @@ use aptos_vm_types::{
     resolver::{ResourceGroupSize, TExecutorView, TResourceGroupView},
 };
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use move_vm_types::{delayed_values::delayed_field_id::DelayedFieldID, indices::ModuleIdx};
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
@@ -199,5 +199,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     fn get_write_summary(
         &self,
-    ) -> HashSet<InputOutputKey<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Tag>>;
+    ) -> HashSet<
+        InputOutputKey<<Self::Txn as Transaction>::Key, ModuleIdx, <Self::Txn as Transaction>::Tag>,
+    >;
 }

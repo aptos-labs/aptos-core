@@ -4,10 +4,7 @@
 use super::utils::{mock_tag_0, VMChangeSetBuilder};
 use crate::{
     abstract_write_op::{AbstractResourceWriteOp, GroupWrite},
-    change_set::{
-        create_vm_change_set_with_module_write_set_when_delayed_field_optimization_disabled,
-        VMChangeSet,
-    },
+    change_set::VMChangeSet,
     module_write_set::ModuleWriteSet,
     resolver::ResourceGroupSize,
     tests::utils::{
@@ -25,19 +22,12 @@ use aptos_types::{
     delayed_fields::SnapshotToStringFormula,
     error::PanicError,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
-    transaction::ChangeSet as StorageChangeSet,
-    write_set::{WriteOp, WriteSetMut},
+    write_set::WriteOp,
 };
 use bytes::Bytes;
 use claims::{assert_err, assert_matches, assert_ok, assert_some_eq};
 use move_binary_format::errors::PartialVMResult;
-use move_core_types::{
-    account_address::AccountAddress,
-    ident_str,
-    language_storage::{ModuleId, StructTag},
-    value::MoveTypeLayout,
-    vm_status::StatusCode,
-};
+use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{collections::BTreeMap, sync::Arc};
 

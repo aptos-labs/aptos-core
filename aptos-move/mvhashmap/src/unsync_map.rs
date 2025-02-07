@@ -16,9 +16,12 @@ use aptos_types::{
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
 use move_binary_format::{file_format::CompiledScript, CompiledModule};
-use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
+use move_core_types::value::MoveTypeLayout;
 use move_vm_runtime::{Module, Script};
-use move_vm_types::code::{ModuleCache, ModuleCode, UnsyncModuleCache, UnsyncScriptCache};
+use move_vm_types::{
+    code::{ModuleCache, ModuleCode, UnsyncModuleCache, UnsyncScriptCache},
+    indices::ModuleIdx,
+};
 use serde::Serialize;
 use std::{
     cell::RefCell,
@@ -50,8 +53,13 @@ pub struct UnsyncMap<
     deprecated_module_map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>)>>,
 
     // Code caches for loader V2 implementation: contains modules and scripts.
-    module_cache:
-        UnsyncModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>,
+    module_cache: UnsyncModuleCache<
+        ModuleIdx,
+        CompiledModule,
+        Module,
+        AptosModuleExtension,
+        Option<TxnIndex>,
+    >,
     script_cache: UnsyncScriptCache<[u8; 32], CompiledScript, Script>,
 
     total_base_resource_size: AtomicU64,
@@ -94,7 +102,7 @@ impl<
     /// Returns the module cache for this [UnsyncMap].
     pub fn module_cache(
         &self,
-    ) -> &UnsyncModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>
+    ) -> &UnsyncModuleCache<ModuleIdx, CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>
     {
         &self.module_cache
     }
@@ -109,7 +117,7 @@ impl<
         self,
     ) -> impl Iterator<
         Item = (
-            ModuleId,
+            ModuleIdx,
             Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension>>,
         ),
     > {
