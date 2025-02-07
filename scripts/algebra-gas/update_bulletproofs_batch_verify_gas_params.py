@@ -14,7 +14,7 @@ import math
 
 # Typically you are making a new version of gas schedule,
 # so this should be larger than `LATEST_GAS_FEATURE_VERSION` in `aptos-move/aptos-gas/src/gas_meter.rs`.
-TARGET_GAS_VERSION = 'RELEASE_V1_27'
+TARGET_GAS_VERSION = 'RELEASE_V1_28'
 
 def prettify_number(x:int) -> str:
     s = str(math.ceil(x))
