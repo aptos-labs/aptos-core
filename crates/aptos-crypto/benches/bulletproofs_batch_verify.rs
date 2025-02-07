@@ -63,7 +63,8 @@ fn range_batch_prove<M: Measurement>(
             b.iter_with_setup(
                 || get_values(num_bits, batch_size),
                 |(v, b)| {
-                    let dst: [u8; 256] = thread_rng().gen();
+                    let mut dst = [0_u8; 256];
+                    thread_rng().fill(&mut dst);
                     let mut t_prv = Transcript::new(&dst);
                     assert!(RangeProof::prove_multiple(
                         &bg,
@@ -98,7 +99,8 @@ fn range_batch_verify<M: Measurement>(
             b.iter_with_setup(
                 || {
                     let (v, b) = get_values(num_bits, batch_size);
-                    let dst: [u8; 256] = thread_rng().gen();
+                    let mut dst= [0_u8; 256];
+                    thread_rng().fill(&mut dst);
                     let mut t = Transcript::new(&dst);
 
                     let (proof, comm) = RangeProof::prove_multiple(
