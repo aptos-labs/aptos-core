@@ -13,7 +13,7 @@
 //!   iterators to aid understanding of the file format and to make it easy to generate views.
 
 use crate::{access::ModuleAccess, file_format::*};
-use move_core_types::{identifier::IdentStr, language_storage::ModuleId};
+use move_core_types::{ability::AbilitySet, identifier::IdentStr, language_storage::ModuleId};
 use std::{
     collections::{BTreeMap, BTreeSet},
     iter::DoubleEndedIterator,

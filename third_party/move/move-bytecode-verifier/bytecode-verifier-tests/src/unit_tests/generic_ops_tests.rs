@@ -5,7 +5,10 @@
 use move_binary_format::file_format::*;
 use move_bytecode_verifier::InstructionConsistency;
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
+    ability::{Ability, AbilitySet},
+    account_address::AccountAddress,
+    identifier::Identifier,
+    vm_status::StatusCode,
 };
 
 // Make a Module with 2 structs and 2 resources with one field each, and 2 functions.

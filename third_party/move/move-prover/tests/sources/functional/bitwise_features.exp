@@ -1,5 +1,5 @@
 Move prover returns: exiting with verification errors
-error: verification out of resources/timeout (global timeout set to 80s)
+error: verification out of resources/timeout (global timeout set to 40s)
     ┌─ tests/sources/functional/bitwise_features.move:127:5
     │
 127 │ ╭     public fun disable_feature_flags(disable: vector<u64>) acquires Features {

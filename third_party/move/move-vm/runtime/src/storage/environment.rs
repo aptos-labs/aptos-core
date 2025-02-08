@@ -5,10 +5,7 @@ use crate::{
     config::VMConfig,
     loader::check_natives,
     native_functions::{NativeFunction, NativeFunctions},
-    storage::{
-        struct_name_index_map::StructNameIndexMap, ty_cache::StructInfoCache,
-        ty_tag_cache::TypeTagCache, verified_module_cache::VERIFIED_MODULES_V2,
-    },
+    storage::{ty_tag_converter::TypeTagCache, verified_module_cache::VERIFIED_MODULES_V2},
     Module, Script,
 };
 use ambassador::delegatable_trait;
@@ -26,8 +23,11 @@ use move_core_types::{
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
 use move_vm_metrics::{Timer, VM_TIMER};
+use move_vm_types::loaded_data::struct_name_indexing::StructNameIndexMap;
 #[cfg(any(test, feature = "testing"))]
-use move_vm_types::loaded_data::runtime_types::{StructIdentifier, StructNameIndex};
+use move_vm_types::loaded_data::{
+    runtime_types::StructIdentifier, struct_name_indexing::StructNameIndex,
+};
 use std::sync::Arc;
 
 /// [MoveVM] runtime environment encapsulating different configurations. Shared between the VM and
@@ -55,27 +55,6 @@ pub struct RuntimeEnvironment {
     /// Caches struct tags for instantiated types. This cache can be used concurrently and
     /// speculatively because type tag information does not change with module publishes.
     ty_tag_cache: Arc<TypeTagCache>,
-
-    /// Type cache for struct layouts, tags and depths, shared across multiple threads.
-    ///
-    /// SAFETY:
-    /// Here we informally show that it is safe to share type cache across multiple threads.
-    ///
-    ///  1) Struct has been already published.
-    ///     In this case, it is fine to have multiple transactions concurrently accessing and
-    ///     caching struct tags, layouts and depth formulas. Even if transaction failed due to
-    ///     speculation, and is re-executed later, the speculative aborted execution cached a non-
-    ///     speculative existing struct information. It is safe for other threads to access it.
-    ///
-    ///  2) Struct is being published with a module.
-    ///     The design of V2 loader ensures that when modules are published, i.e., staged on top of
-    ///     the existing module storage, the runtime environment is cloned. Hence, it is not even
-    ///     possible to mutate this global cache speculatively.
-    ///  Importantly, this SHOULD NOT be mutated by speculative module publish.
-    // TODO(loader_v2):
-    //   Provide a generic (trait) implementation for clients to implement their own type caching
-    //   logic.
-    ty_cache: StructInfoCache,
 }
 
 impl RuntimeEnvironment {
@@ -105,7 +84,6 @@ impl RuntimeEnvironment {
             natives,
             struct_name_index_map: Arc::new(StructNameIndexMap::empty()),
             ty_tag_cache: Arc::new(TypeTagCache::empty()),
-            ty_cache: StructInfoCache::empty(),
         }
     }
 
@@ -272,30 +250,16 @@ impl RuntimeEnvironment {
         &self.ty_tag_cache
     }
 
-    /// Returns the type cache owned by this runtime environment which stores information about
-    /// struct layouts, tags and depth formulae.
-    pub(crate) fn ty_cache(&self) -> &StructInfoCache {
-        &self.ty_cache
-    }
-
     /// Returns the size of the struct name re-indexing cache. Can be used to bound the size of the
     /// cache at block boundaries.
     pub fn struct_name_index_map_size(&self) -> PartialVMResult<usize> {
         self.struct_name_index_map.checked_len()
     }
 
-    /// Flushes the struct information (type and tag) caches. Flushing this cache does not
-    /// invalidate struct name index map or module cache.
-    pub fn flush_struct_info_cache(&self) {
+    /// Flushes the global caches with struct name indices and struct tags. Note that when calling
+    /// this function, modules that still store indices into struct name cache must also be flushed.
+    pub fn flush_struct_name_and_tag_caches(&self) {
         self.ty_tag_cache.flush();
-        self.ty_cache.flush();
-    }
-
-    /// Flushes the global caches with struct name indices and the struct information. Note that
-    /// when calling this function, modules that still store indices into struct name cache must
-    /// also be invalidated.
-    pub fn flush_struct_name_and_info_caches(&self) {
-        self.flush_struct_info_cache();
         self.struct_name_index_map.flush();
     }
 
@@ -323,7 +287,6 @@ impl Clone for RuntimeEnvironment {
         Self {
             vm_config: self.vm_config.clone(),
             natives: self.natives.clone(),
-            ty_cache: self.ty_cache.clone(),
             struct_name_index_map: Arc::clone(&self.struct_name_index_map),
             ty_tag_cache: Arc::clone(&self.ty_tag_cache),
         }

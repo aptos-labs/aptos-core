@@ -274,7 +274,7 @@ impl Runner {
         )?;
 
         // Generate boogie code.
-        let code_writer = generate_boogie(env, &self.options, &targets)?;
+        let code_writer = generate_boogie(env, &self.options, None, &targets)?;
         check_errors(
             env,
             &self.options,

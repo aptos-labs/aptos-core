@@ -1,24 +1,24 @@
 // -- Model dump before env processor pipeline:
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
 module 0x42::mod1 {
     friend fun triple(x: u64): u64 {
         Mul<u64>(x, 3)
     }
 } // end 0x42::mod1
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
 module 0x42::test {
     use 0x42::mod1; // resolved as: 0x42::mod1
     use 0x42::mod2; // resolved as: 0x42::mod2
@@ -166,26 +166,26 @@ module 0x42::test {
 
 
 // -- Model dump after env processor unused checks:
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
 module 0x42::mod1 {
     friend fun triple(x: u64): u64 {
         Mul<u64>(x, 3)
     }
 } // end 0x42::mod1
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
 module 0x42::test {
     use 0x42::mod1; // resolved as: 0x42::mod1
     use 0x42::mod2; // resolved as: 0x42::mod2
@@ -333,26 +333,26 @@ module 0x42::test {
 
 
 // -- Model dump after env processor type parameter check:
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
 module 0x42::mod1 {
     friend fun triple(x: u64): u64 {
         Mul<u64>(x, 3)
     }
 } // end 0x42::mod1
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
 module 0x42::test {
     use 0x42::mod1; // resolved as: 0x42::mod1
     use 0x42::mod2; // resolved as: 0x42::mod2
@@ -500,26 +500,26 @@ module 0x42::test {
 
 
 // -- Model dump after env processor check recursive struct definition:
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
 module 0x42::mod1 {
     friend fun triple(x: u64): u64 {
         Mul<u64>(x, 3)
     }
 } // end 0x42::mod1
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
 module 0x42::test {
     use 0x42::mod1; // resolved as: 0x42::mod1
     use 0x42::mod2; // resolved as: 0x42::mod2
@@ -667,26 +667,26 @@ module 0x42::test {
 
 
 // -- Model dump after env processor check cyclic type instantiation:
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
 module 0x42::mod1 {
     friend fun triple(x: u64): u64 {
         Mul<u64>(x, 3)
     }
 } // end 0x42::mod1
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
 module 0x42::test {
     use 0x42::mod1; // resolved as: 0x42::mod1
     use 0x42::mod2; // resolved as: 0x42::mod2
@@ -834,26 +834,26 @@ module 0x42::test {
 
 
 // -- Model dump after env processor unused struct params check:
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
 module 0x42::mod1 {
     friend fun triple(x: u64): u64 {
         Mul<u64>(x, 3)
     }
 } // end 0x42::mod1
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
 module 0x42::test {
     use 0x42::mod1; // resolved as: 0x42::mod1
     use 0x42::mod2; // resolved as: 0x42::mod2
@@ -1001,26 +1001,26 @@ module 0x42::test {
 
 
 // -- Model dump after env processor access and use check before inlining:
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
 module 0x42::mod1 {
     friend fun triple(x: u64): u64 {
         Mul<u64>(x, 3)
     }
 } // end 0x42::mod1
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
 module 0x42::test {
     use 0x42::mod1; // resolved as: 0x42::mod1
     use 0x42::mod2; // resolved as: 0x42::mod2
@@ -1168,26 +1168,26 @@ module 0x42::test {
 
 
 // -- Model dump after env processor inlining:
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
 module 0x42::mod1 {
     friend fun triple(x: u64): u64 {
         Mul<u64>(x, 3)
     }
 } // end 0x42::mod1
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
 module 0x42::test {
     use 0x42::mod1; // resolved as: 0x42::mod1
     use 0x42::mod2; // resolved as: 0x42::mod2
@@ -1335,26 +1335,26 @@ module 0x42::test {
 
 
 // -- Model dump after env processor access and use check after inlining:
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
 module 0x42::mod1 {
     friend fun triple(x: u64): u64 {
         Mul<u64>(x, 3)
     }
 } // end 0x42::mod1
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
 module 0x42::test {
     use 0x42::mod1; // resolved as: 0x42::mod1
     use 0x42::mod2; // resolved as: 0x42::mod2
@@ -1502,26 +1502,26 @@ module 0x42::test {
 
 
 // -- Model dump after env processor acquires check:
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
 module 0x42::mod1 {
     friend fun triple(x: u64): u64 {
         Mul<u64>(x, 3)
     }
 } // end 0x42::mod1
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
 module 0x42::test {
     use 0x42::mod1; // resolved as: 0x42::mod1
     use 0x42::mod2; // resolved as: 0x42::mod2
@@ -1669,26 +1669,26 @@ module 0x42::test {
 
 
 // -- Model dump after env processor simplifier:
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
 module 0x42::mod1 {
     friend fun triple(x: u64): u64 {
         Mul<u64>(x, 3)
     }
 } // end 0x42::mod1
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
 module 0x42::test {
     use 0x42::mod1; // resolved as: 0x42::mod1
     use 0x42::mod2; // resolved as: 0x42::mod2
@@ -1815,26 +1815,26 @@ module 0x42::test {
 
 
 // -- Model dump after env processor lambda-lifting:
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
 module 0x42::mod1 {
     friend fun triple(x: u64): u64 {
         Mul<u64>(x, 3)
     }
 } // end 0x42::mod1
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
 module 0x42::test {
     use 0x42::mod1; // resolved as: 0x42::mod1
     use 0x42::mod2; // resolved as: 0x42::mod2
@@ -1964,26 +1964,26 @@ module 0x42::test {
 
 
 // -- Model dump after env processor specification checker:
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
 module 0x42::mod1 {
     friend fun triple(x: u64): u64 {
         Mul<u64>(x, 3)
     }
 } // end 0x42::mod1
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
 module 0x42::test {
     use 0x42::mod1; // resolved as: 0x42::mod1
     use 0x42::mod2; // resolved as: 0x42::mod2
@@ -2113,26 +2113,26 @@ module 0x42::test {
 
 
 // -- Model dump after env processor specification rewriter:
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
 module 0x42::mod1 {
     friend fun triple(x: u64): u64 {
         Mul<u64>(x, 3)
     }
 } // end 0x42::mod1
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
 module 0x42::test {
     use 0x42::mod1; // resolved as: 0x42::mod1
     use 0x42::mod2; // resolved as: 0x42::mod2

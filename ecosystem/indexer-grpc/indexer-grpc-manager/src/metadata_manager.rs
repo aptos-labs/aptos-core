@@ -14,6 +14,7 @@ use aptos_protos::{
     util::timestamp::Timestamp,
 };
 use dashmap::DashMap;
+use rand::{prelude::*, thread_rng};
 use std::{
     collections::{HashMap, VecDeque},
     sync::atomic::{AtomicU64, Ordering},
@@ -224,10 +225,36 @@ impl MetadataManager {
         }
     }
 
+    pub(crate) fn get_fullnode_for_request(&self) -> FullnodeDataClient<Channel> {
+        let mut rng = thread_rng();
+        // TODO(grao): Filter out bad FNs.
+        self.fullnodes
+            .iter()
+            .choose(&mut rng)
+            .map(|kv| kv.value().client.clone())
+            .unwrap()
+    }
+
+    pub(crate) fn get_fullnodes_info(&self) -> HashMap<String, VecDeque<FullnodeInfo>> {
+        self.fullnodes
+            .iter()
+            .map(|entry| (entry.key().clone(), entry.value().recent_states.clone()))
+            .collect()
+    }
+
     pub(crate) fn get_live_data_services_info(
         &self,
     ) -> HashMap<GrpcAddress, VecDeque<LiveDataServiceInfo>> {
         self.live_data_services
+            .iter()
+            .map(|entry| (entry.key().clone(), entry.value().recent_states.clone()))
+            .collect()
+    }
+
+    pub(crate) fn get_historical_data_services_info(
+        &self,
+    ) -> HashMap<GrpcAddress, VecDeque<HistoricalDataServiceInfo>> {
+        self.historical_data_services
             .iter()
             .map(|entry| (entry.key().clone(), entry.value().recent_states.clone()))
             .collect()

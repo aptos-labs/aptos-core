@@ -7,7 +7,7 @@
 
 use aptos_logger::error;
 use aptos_types::{
-    on_chain_config::{FeatureFlag, Features, OnChainConfig},
+    on_chain_config::{FeatureFlag, Features, GasScheduleV2, OnChainConfig},
     state_store::{state_key::StateKey, state_value::StateValue, StateView},
 };
 use serde::Serialize;
@@ -17,16 +17,19 @@ use std::collections::HashMap;
 pub struct OverrideConfig {
     additional_enabled_features: Vec<FeatureFlag>,
     additional_disabled_features: Vec<FeatureFlag>,
+    gas_feature_version: Option<u64>,
 }
 
 impl OverrideConfig {
     pub fn new(
         additional_enabled_features: Vec<FeatureFlag>,
         additional_disabled_features: Vec<FeatureFlag>,
+        gas_feature_version: Option<u64>,
     ) -> Self {
         Self {
             additional_enabled_features,
             additional_disabled_features,
+            gas_feature_version,
         }
     }
 
@@ -37,22 +40,39 @@ impl OverrideConfig {
         let mut state_override = HashMap::new();
 
         // Enable/disable features.
-        let (features_state_key, features_state_value) =
-            config_override::<Features, _>(state_view, |features| {
-                for feature in &self.additional_enabled_features {
-                    if features.is_enabled(*feature) {
-                        error!("Feature {:?} is already enabled", feature);
+        if !self.additional_enabled_features.is_empty()
+            || !self.additional_disabled_features.is_empty()
+        {
+            let (features_state_key, features_state_value) =
+                config_override::<Features, _>(state_view, |features| {
+                    for feature in &self.additional_enabled_features {
+                        if features.is_enabled(*feature) {
+                            error!("Feature {:?} is already enabled", feature);
+                        }
+                        features.enable(*feature);
                     }
-                    features.enable(*feature);
-                }
-                for feature in &self.additional_disabled_features {
-                    if !features.is_enabled(*feature) {
-                        error!("Feature {:?} is already disabled", feature);
+                    for feature in &self.additional_disabled_features {
+                        if !features.is_enabled(*feature) {
+                            error!("Feature {:?} is already disabled", feature);
+                        }
+                        features.disable(*feature);
                     }
-                    features.disable(*feature);
-                }
-            });
-        state_override.insert(features_state_key, features_state_value);
+                });
+            state_override.insert(features_state_key, features_state_value);
+        }
+
+        // Gas feature override.
+        if let Some(gas_feature_version) = self.gas_feature_version {
+            // Only support V2 gas schedule which has gas feature versions. Otherwise, V1 has 0
+            // version at all times, and most likely it has been so long ago we will not replay
+            // these transactions.
+            let (gas_schedule_state_key, gas_schedule_state_value) =
+                config_override::<GasScheduleV2, _>(state_view, |gas_schedule| {
+                    gas_schedule.feature_version = gas_feature_version;
+                });
+            state_override.insert(gas_schedule_state_key, gas_schedule_state_value);
+        }
+
         state_override
     }
 }

@@ -7,9 +7,10 @@ use crate::{
     expansion::ast::{self as E, Address, ModuleIdent},
     shared::{unique_map::UniqueMap, *},
 };
+use move_core_types::account_address::AccountAddress;
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
-use petgraph::{algo::toposort as petgraph_toposort, graphmap::DiGraphMap};
+use petgraph::{algo::toposort as petgraph_toposort, graphmap::DiGraphMap, visit::Dfs};
 use std::collections::{BTreeMap, BTreeSet};
 
 //**************************************************************************************************
@@ -21,8 +22,7 @@ pub fn verify(
     modules: &mut UniqueMap<ModuleIdent, E::ModuleDefinition>,
     scripts: &mut BTreeMap<Symbol, E::Script>,
 ) {
-    let imm_modules = &modules;
-    let mut context = Context::new(imm_modules);
+    let mut context = Context::new(modules);
     module_defs(&mut context, modules);
     script_defs(&mut context, scripts);
 
@@ -32,11 +32,16 @@ pub fn verify(
         addresses_by_node,
         ..
     } = context;
-    let graph = dependency_graph(&module_neighbors);
+    let imm_module_idents = modules
+        .key_cloned_iter()
+        .map(|(mident, _)| mident)
+        .collect::<Vec<_>>();
+    let graph = dependency_graph(&module_neighbors, &imm_module_idents);
+    let graph = add_implicit_vector_dependencies(graph);
     match petgraph_toposort(&graph, None) {
         Err(cycle_node) => {
             let cycle_ident = *cycle_node.node_id();
-            let error = cycle_error(&module_neighbors, cycle_ident);
+            let error = cycle_error(&module_neighbors, cycle_ident, &graph);
             compilation_env.add_diag(error);
         },
         Ok(ordered_ids) => {
@@ -86,7 +91,7 @@ enum NodeIdent {
 
 struct Context<'a> {
     modules: &'a UniqueMap<ModuleIdent, E::ModuleDefinition>,
-    // A union of uses and friends for modules (used for cyclyc dependency checking)
+    // A union of uses and friends for modules (used for cyclic dependency checking)
     // - if A uses B,    add edge A -> B
     // - if A friends B, add edge B -> A
     // NOTE: neighbors of scripts are not tracked by this field, as nothing can depend on a script
@@ -175,10 +180,45 @@ impl<'a> Context<'a> {
     }
 }
 
-fn dependency_graph(
-    deps: &BTreeMap<ModuleIdent, BTreeMap<ModuleIdent, BTreeMap<DepType, Loc>>>,
+/// If the `vector` module is present in `graph`, then add dependency edges
+/// from every module (not in the `vector` module's dependency closure) to the
+/// `vector` module. This is because modules can have implicit dependencies
+/// on the `vector` module.
+fn add_implicit_vector_dependencies(
+    mut graph: DiGraphMap<&ModuleIdent, ()>,
 ) -> DiGraphMap<&ModuleIdent, ()> {
+    let vector_module = graph.nodes().find(|m| {
+        m.value.address.into_addr_bytes().into_inner() == AccountAddress::ONE
+            && m.value.module.0.value.as_str() == "vector"
+    });
+    if let Some(vector_module) = vector_module {
+        let mut dfs = Dfs::new(&graph, vector_module);
+        // Get the transitive closure of the `vector` module and its dependencies.
+        let mut vector_dep_closure = BTreeSet::new();
+        while let Some(node) = dfs.next(&graph) {
+            vector_dep_closure.insert(node);
+        }
+        // For every module that is not in `vector_dep_closure`, add an edge to `vector_module`.
+        let all_modules = graph.nodes().collect::<Vec<_>>();
+        for module in all_modules {
+            if !vector_dep_closure.contains(module) {
+                graph.add_edge(module, vector_module, ());
+            }
+        }
+    }
+    graph
+}
+
+/// Construct a directed graph based on the dependencies `deps` between modules.
+/// `additional_nodes` are added to the graph (if they are not present in `deps`).
+fn dependency_graph<'a>(
+    deps: &'a BTreeMap<ModuleIdent, BTreeMap<ModuleIdent, BTreeMap<DepType, Loc>>>,
+    additional_nodes: &'a Vec<ModuleIdent>,
+) -> DiGraphMap<&'a ModuleIdent, ()> {
     let mut graph = DiGraphMap::new();
+    for node in additional_nodes {
+        graph.add_node(node);
+    }
     for (parent, children) in deps {
         if children.is_empty() {
             graph.add_node(parent);
@@ -194,17 +234,26 @@ fn dependency_graph(
 fn cycle_error(
     deps: &BTreeMap<ModuleIdent, BTreeMap<ModuleIdent, BTreeMap<DepType, Loc>>>,
     cycle_ident: ModuleIdent,
+    graph: &DiGraphMap<&ModuleIdent, ()>,
 ) -> Diagnostic {
-    let graph = dependency_graph(deps);
     // For printing uses, sort the cycle by location (earliest first)
-    let cycle = shortest_cycle(&graph, &cycle_ident);
+    let cycle = shortest_cycle(graph, &cycle_ident);
 
     let mut cycle_info = cycle
         .windows(2)
         .map(|pair| {
             let node = pair[0];
             let neighbor = pair[1];
-            let relations = deps.get(node).unwrap().get(neighbor).unwrap();
+            let relations = deps
+                .get(node)
+                .and_then(|neighbors| neighbors.get(neighbor).cloned())
+                .unwrap_or_else(|| {
+                    let mut mapping = BTreeMap::new();
+                    // Implicit dependency of a module on `vector` is the only one that does not
+                    // show up explicitly in `deps`. So, we add it here.
+                    mapping.insert(DepType::Use, node.loc);
+                    mapping
+                });
             match (
                 relations.get(&DepType::Use),
                 relations.get(&DepType::Friend),
@@ -212,14 +261,14 @@ fn cycle_error(
                 (Some(loc), _) => (
                     *loc,
                     DepType::Use,
-                    format!("'{}' uses '{}'", neighbor, node),
+                    format!("`{}` uses `{}`", neighbor, node),
                     node,
                     neighbor,
                 ),
                 (_, Some(loc)) => (
                     *loc,
                     DepType::Friend,
-                    format!("'{}' is a friend of '{}'", node, neighbor),
+                    format!("`{}` is a friend of `{}`", node, neighbor),
                     node,
                     neighbor,
                 ),
@@ -241,7 +290,7 @@ fn cycle_error(
             DepType::Friend => "friend",
         };
         let msg = format!(
-            "{}. This '{}' relationship creates a dependency cycle.",
+            "{}. This `{}` relationship creates a dependency cycle.",
             case_msg, case
         );
         (loc, msg)

@@ -39,7 +39,10 @@ use aptos_framework::{
 };
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
-use aptos_gas_schedule::{AptosGasParameters, VMGasParameters};
+use aptos_gas_schedule::{
+    gas_feature_versions::{RELEASE_V1_10, RELEASE_V1_27},
+    AptosGasParameters, VMGasParameters,
+};
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_metrics_core::TimerHelper;
 #[cfg(any(test, feature = "testing"))]
@@ -91,7 +94,10 @@ use aptos_vm_types::{
     },
     module_write_set::ModuleWriteSet,
     output::VMOutput,
-    resolver::{ExecutorView, ResourceGroupView},
+    resolver::{
+        BlockSynchronizationKillSwitch, ExecutorView, NoopBlockSynchronizationKillSwitch,
+        ResourceGroupView,
+    },
     storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
 };
 use ark_bn254::Bn254;
@@ -776,7 +782,7 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
-    fn validate_and_execute_script(
+    fn validate_and_execute_script<'a>(
         &self,
         session: &mut SessionExt,
         serialized_signers: &SerializedSigners,
@@ -784,8 +790,8 @@ impl AptosVM {
         // Note: cannot use AptosGasMeter because it is not implemented for
         //       UnmeteredGasMeter.
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        script: &Script,
+        traversal_context: &mut TraversalContext<'a>,
+        script: &'a Script,
     ) -> Result<(), VMStatus> {
         if !self
             .features()
@@ -803,12 +809,20 @@ impl AptosVM {
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
-        if self.gas_feature_version() >= 15 {
+        if self.gas_feature_version() >= RELEASE_V1_10 {
             session.check_script_dependencies_and_check_gas(
                 code_storage,
                 gas_meter,
                 traversal_context,
                 script.code(),
+            )?;
+        }
+        if self.gas_feature_version() >= RELEASE_V1_27 {
+            session.check_type_tag_dependencies_and_charge_gas(
+                code_storage,
+                gas_meter,
+                traversal_context,
+                script.ty_args(),
             )?;
         }
 
@@ -868,12 +882,11 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         entry_fn: &EntryFunction,
-        _txn_data: &TransactionMetadata,
     ) -> Result<(), VMStatus> {
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
-        if self.gas_feature_version() >= 15 {
+        if self.gas_feature_version() >= RELEASE_V1_10 {
             let module_id = traversal_context
                 .referenced_module_ids
                 .alloc(entry_fn.module().clone());
@@ -882,6 +895,15 @@ impl AptosVM {
                 gas_meter,
                 traversal_context,
                 [(module_id.address(), module_id.name())],
+            )?;
+        }
+
+        if self.gas_feature_version() >= RELEASE_V1_27 {
+            session.check_type_tag_dependencies_and_charge_gas(
+                module_storage,
+                gas_meter,
+                traversal_context,
+                entry_fn.ty_args(),
             )?;
         }
 
@@ -988,7 +1010,6 @@ impl AptosVM {
                         gas_meter,
                         traversal_context,
                         entry_fn,
-                        txn_data,
                     )
                 })?;
             },
@@ -1118,7 +1139,6 @@ impl AptosVM {
                                 payload.multisig_address,
                                 entry_function,
                                 new_published_modules_loaded,
-                                txn_data,
                                 change_set_configs,
                             )?;
                             let has_modules_published_to_special_address =
@@ -1263,7 +1283,6 @@ impl AptosVM {
                     txn_payload.multisig_address,
                     &entry_function,
                     new_published_modules_loaded,
-                    txn_data,
                     change_set_configs,
                 ),
         };
@@ -1408,7 +1427,6 @@ impl AptosVM {
         multisig_address: AccountAddress,
         payload: &EntryFunction,
         new_published_modules_loaded: &mut bool,
-        txn_data: &TransactionMetadata,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<UserSessionChangeSet, VMStatus> {
         // If txn args are not valid, we'd still consider the transaction as executed but
@@ -1422,7 +1440,6 @@ impl AptosVM {
                 gas_meter,
                 traversal_context,
                 payload,
-                txn_data,
             )
         })?;
 
@@ -1596,7 +1613,7 @@ impl AptosVM {
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
-        if self.gas_feature_version() >= 15 {
+        if self.gas_feature_version() >= RELEASE_V1_10 {
             // Charge old versions of existing modules, in case of upgrades.
             for module in modules.iter() {
                 let addr = module.self_addr();
@@ -2181,17 +2198,18 @@ impl AptosVM {
 
     /// Main entrypoint for executing a user transaction that also allows the customization of the
     /// gas meter to be used.
-    pub fn execute_user_transaction_with_custom_gas_meter<G, F>(
+    pub fn execute_user_transaction_with_custom_gas_meter<'a, C, G, F>(
         &self,
-        resolver: &impl AptosMoveResolver,
-        code_storage: &impl AptosCodeStorage,
+        resolver: &'a impl AptosMoveResolver,
+        code_storage: &'a C,
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
         make_gas_meter: F,
     ) -> Result<(VMStatus, VMOutput, G), VMStatus>
     where
+        C: AptosCodeStorage + BlockSynchronizationKillSwitch,
         G: AptosGasMeter,
-        F: Fn(u64, VMGasParameters, StorageGasParameters, bool, Gas) -> G,
+        F: FnOnce(u64, VMGasParameters, StorageGasParameters, bool, Gas, &'a C) -> G,
     {
         let txn_metadata = TransactionMetadata::new(txn);
 
@@ -2211,6 +2229,7 @@ impl AptosVM {
             self.storage_gas_params(log_context)?.clone(),
             is_approved_gov_script,
             initial_balance,
+            code_storage,
         );
 
         let (status, output) = self.execute_user_transaction_impl(
@@ -2231,16 +2250,16 @@ impl AptosVM {
     ///
     /// This can be useful for off-chain applications that wants to perform additional
     /// measurements or analysis while preserving the production gas behavior.
-    pub fn execute_user_transaction_with_modified_gas_meter<G, F>(
+    pub fn execute_user_transaction_with_modified_gas_meter<'a, G, F>(
         &self,
-        resolver: &impl AptosMoveResolver,
-        code_storage: &impl AptosCodeStorage,
+        resolver: &'a impl AptosMoveResolver,
+        code_storage: &'a (impl AptosCodeStorage + BlockSynchronizationKillSwitch),
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
         modify_gas_meter: F,
     ) -> Result<(VMStatus, VMOutput, G), VMStatus>
     where
-        F: Fn(ProdGasMeter) -> G,
+        F: FnOnce(ProdGasMeter<'a, NoopBlockSynchronizationKillSwitch>) -> G,
         G: AptosGasMeter,
     {
         self.execute_user_transaction_with_custom_gas_meter(
@@ -2252,13 +2271,15 @@ impl AptosVM {
              vm_gas_params,
              storage_gas_params,
              is_approved_gov_script,
-             meter_balance| {
+             meter_balance,
+             _maybe_block_synchronization_kill_switch| {
                 modify_gas_meter(make_prod_gas_meter(
                     gas_feature_version,
                     vm_gas_params,
                     storage_gas_params,
                     is_approved_gov_script,
                     meter_balance,
+                    &NoopBlockSynchronizationKillSwitch {},
                 ))
             },
         )
@@ -2268,7 +2289,7 @@ impl AptosVM {
     pub fn execute_user_transaction(
         &self,
         resolver: &impl AptosMoveResolver,
-        code_storage: &impl AptosCodeStorage,
+        code_storage: &(impl AptosCodeStorage + BlockSynchronizationKillSwitch),
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
@@ -2629,6 +2650,7 @@ impl AptosVM {
             storage_gas_params,
             /* is_approved_gov_script */ false,
             max_gas_amount.into(),
+            &NoopBlockSynchronizationKillSwitch {},
         );
 
         let resolver = state_view.as_move_resolver();
@@ -2787,7 +2809,7 @@ impl AptosVM {
         &self,
         txn: &SignatureVerifiedTransaction,
         resolver: &impl AptosMoveResolver,
-        code_storage: &impl AptosCodeStorage,
+        code_storage: &(impl AptosCodeStorage + BlockSynchronizationKillSwitch),
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         assert!(!self.is_simulation, "VM has to be created for execution");
@@ -3137,6 +3159,7 @@ impl VMValidator for AptosVM {
             storage_gas_params,
             is_approved_gov_script,
             initial_balance,
+            &NoopBlockSynchronizationKillSwitch {},
         );
         let storage = TraversalStorage::new();
 

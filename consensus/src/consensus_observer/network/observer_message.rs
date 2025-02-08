@@ -159,7 +159,7 @@ impl Display for ConsensusObserverDirectSend {
                     "BlockPayload: {}. Number of transactions: {}, limit: {:?}, proofs: {:?}",
                     block_payload.block,
                     block_payload.transaction_payload.transactions().len(),
-                    block_payload.transaction_payload.limit(),
+                    block_payload.transaction_payload.transaction_limit(),
                     block_payload.transaction_payload.payload_proofs(),
                 )
             },
@@ -361,16 +361,87 @@ impl PayloadWithProofAndLimit {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum TransactionsWithProof {
+    TransactionsWithProofAndLimits(TransactionsWithProofAndLimits),
+}
+
+impl TransactionsWithProof {
+    pub fn transactions(&self) -> Vec<SignedTransaction> {
+        match self {
+            TransactionsWithProof::TransactionsWithProofAndLimits(payload) => {
+                payload.payload_with_proof.transactions.clone()
+            },
+        }
+    }
+
+    pub fn proofs(&self) -> Vec<ProofOfStore> {
+        match self {
+            TransactionsWithProof::TransactionsWithProofAndLimits(payload) => {
+                payload.payload_with_proof.proofs.clone()
+            },
+        }
+    }
+
+    pub fn transaction_limit(&self) -> Option<u64> {
+        match self {
+            TransactionsWithProof::TransactionsWithProofAndLimits(payload) => {
+                payload.transaction_limit
+            },
+        }
+    }
+
+    pub fn gas_limit(&self) -> Option<u64> {
+        match self {
+            TransactionsWithProof::TransactionsWithProofAndLimits(payload) => payload.gas_limit,
+        }
+    }
+}
+
+/// The transaction payload and proof of each block with a transaction and block gas limit
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct TransactionsWithProofAndLimits {
+    payload_with_proof: PayloadWithProof,
+    transaction_limit: Option<u64>,
+    gas_limit: Option<u64>,
+}
+
+impl TransactionsWithProofAndLimits {
+    pub fn new(
+        payload_with_proof: PayloadWithProof,
+        transaction_limit: Option<u64>,
+        gas_limit: Option<u64>,
+    ) -> Self {
+        Self {
+            payload_with_proof,
+            transaction_limit,
+            gas_limit,
+        }
+    }
+
+    #[cfg(test)]
+    /// Returns an empty payload with proof and limit (for testing)
+    pub fn empty() -> Self {
+        Self {
+            payload_with_proof: PayloadWithProof::empty(),
+            transaction_limit: None,
+            gas_limit: None,
+        }
+    }
+}
+
 /// The transaction payload of each block
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum BlockTransactionPayload {
-    InQuorumStore(PayloadWithProof),
-    InQuorumStoreWithLimit(PayloadWithProofAndLimit),
+    // TODO: deprecate InQuorumStore* variants
+    DeprecatedInQuorumStore(PayloadWithProof),
+    DeprecatedInQuorumStoreWithLimit(PayloadWithProofAndLimit),
     QuorumStoreInlineHybrid(PayloadWithProofAndLimit, Vec<BatchInfo>),
     OptQuorumStore(
-        PayloadWithProofAndLimit,
+        TransactionsWithProof,
         /* OptQS and Inline Batches */ Vec<BatchInfo>,
     ),
+    QuorumStoreInlineHybridV2(TransactionsWithProof, Vec<BatchInfo>),
 }
 
 impl BlockTransactionPayload {
@@ -380,7 +451,7 @@ impl BlockTransactionPayload {
         proofs: Vec<ProofOfStore>,
     ) -> Self {
         let payload_with_proof = PayloadWithProof::new(transactions, proofs);
-        Self::InQuorumStore(payload_with_proof)
+        Self::DeprecatedInQuorumStore(payload_with_proof)
     }
 
     /// Creates a returns a new InQuorumStoreWithLimit transaction payload
@@ -391,7 +462,7 @@ impl BlockTransactionPayload {
     ) -> Self {
         let payload_with_proof = PayloadWithProof::new(transactions, proofs);
         let proof_with_limit = PayloadWithProofAndLimit::new(payload_with_proof, limit);
-        Self::InQuorumStoreWithLimit(proof_with_limit)
+        Self::DeprecatedInQuorumStoreWithLimit(proof_with_limit)
     }
 
     /// Creates a returns a new QuorumStoreInlineHybrid transaction payload
@@ -413,8 +484,10 @@ impl BlockTransactionPayload {
         batch_infos: Vec<BatchInfo>,
     ) -> Self {
         let payload_with_proof = PayloadWithProof::new(transactions, proofs);
-        let proof_with_limit = PayloadWithProofAndLimit::new(payload_with_proof, limit);
-        Self::OptQuorumStore(proof_with_limit, batch_infos)
+        let proof_with_limits = TransactionsWithProof::TransactionsWithProofAndLimits(
+            TransactionsWithProofAndLimits::new(payload_with_proof, limit, None),
+        );
+        Self::OptQuorumStore(proof_with_limits, batch_infos)
     }
 
     #[cfg(test)]
@@ -426,55 +499,69 @@ impl BlockTransactionPayload {
     /// Returns the list of inline batches and optimistic batches in the transaction payload
     pub fn optqs_and_inline_batches(&self) -> &[BatchInfo] {
         match self {
-            BlockTransactionPayload::QuorumStoreInlineHybrid(_, inline_batches) => inline_batches,
-            BlockTransactionPayload::OptQuorumStore(_, optqs_and_inline_batches) => {
-                optqs_and_inline_batches
-            },
-            _ => &[],
+            BlockTransactionPayload::DeprecatedInQuorumStore(_)
+            | BlockTransactionPayload::DeprecatedInQuorumStoreWithLimit(_) => &[],
+            BlockTransactionPayload::QuorumStoreInlineHybrid(_, inline_batches)
+            | BlockTransactionPayload::QuorumStoreInlineHybridV2(_, inline_batches)
+            | BlockTransactionPayload::OptQuorumStore(_, inline_batches) => inline_batches,
         }
     }
 
-    /// Returns the limit of the transaction payload
-    pub fn limit(&self) -> Option<u64> {
+    /// Returns the transaction limit of the payload
+    pub fn transaction_limit(&self) -> Option<u64> {
         match self {
-            BlockTransactionPayload::InQuorumStore(_) => None,
-            BlockTransactionPayload::InQuorumStoreWithLimit(payload) => payload.transaction_limit,
+            BlockTransactionPayload::DeprecatedInQuorumStore(_) => None,
+            BlockTransactionPayload::DeprecatedInQuorumStoreWithLimit(payload) => {
+                payload.transaction_limit
+            },
             BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _) => {
                 payload.transaction_limit
             },
-            BlockTransactionPayload::OptQuorumStore(payload, _) => payload.transaction_limit,
+            BlockTransactionPayload::QuorumStoreInlineHybridV2(payload, _)
+            | BlockTransactionPayload::OptQuorumStore(payload, _) => payload.transaction_limit(),
+        }
+    }
+
+    /// Returns the block gas limit of the payload
+    pub fn gas_limit(&self) -> Option<u64> {
+        match self {
+            BlockTransactionPayload::DeprecatedInQuorumStore(_)
+            | BlockTransactionPayload::DeprecatedInQuorumStoreWithLimit(_)
+            | BlockTransactionPayload::QuorumStoreInlineHybrid(_, _) => None,
+            BlockTransactionPayload::QuorumStoreInlineHybridV2(payload, _)
+            | BlockTransactionPayload::OptQuorumStore(payload, _) => payload.gas_limit(),
         }
     }
 
     /// Returns the proofs of the transaction payload
     pub fn payload_proofs(&self) -> Vec<ProofOfStore> {
         match self {
-            BlockTransactionPayload::InQuorumStore(payload) => payload.proofs.clone(),
-            BlockTransactionPayload::InQuorumStoreWithLimit(payload) => {
+            BlockTransactionPayload::DeprecatedInQuorumStore(payload) => payload.proofs.clone(),
+            BlockTransactionPayload::DeprecatedInQuorumStoreWithLimit(payload) => {
                 payload.payload_with_proof.proofs.clone()
             },
             BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _) => {
                 payload.payload_with_proof.proofs.clone()
             },
-            BlockTransactionPayload::OptQuorumStore(payload, _) => {
-                payload.payload_with_proof.proofs.clone()
-            },
+            BlockTransactionPayload::QuorumStoreInlineHybridV2(payload, _)
+            | BlockTransactionPayload::OptQuorumStore(payload, _) => payload.proofs(),
         }
     }
 
     /// Returns the transactions in the payload
     pub fn transactions(&self) -> Vec<SignedTransaction> {
         match self {
-            BlockTransactionPayload::InQuorumStore(payload) => payload.transactions.clone(),
-            BlockTransactionPayload::InQuorumStoreWithLimit(payload) => {
+            BlockTransactionPayload::DeprecatedInQuorumStore(payload) => {
+                payload.transactions.clone()
+            },
+            BlockTransactionPayload::DeprecatedInQuorumStoreWithLimit(payload) => {
                 payload.payload_with_proof.transactions.clone()
             },
             BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _) => {
                 payload.payload_with_proof.transactions.clone()
             },
-            BlockTransactionPayload::OptQuorumStore(payload, _) => {
-                payload.payload_with_proof.transactions.clone()
-            },
+            BlockTransactionPayload::QuorumStoreInlineHybridV2(payload, _)
+            | BlockTransactionPayload::OptQuorumStore(payload, _) => payload.transactions(),
         }
     }
 
@@ -624,16 +711,19 @@ impl BlockTransactionPayload {
     ) -> Result<(), Error> {
         // Get the payload limit
         let limit = match self {
-            BlockTransactionPayload::InQuorumStoreWithLimit(payload) => payload.transaction_limit,
-            BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _) => {
-                payload.transaction_limit
-            },
-            BlockTransactionPayload::OptQuorumStore(payload, _) => payload.transaction_limit,
-            _ => {
+            BlockTransactionPayload::DeprecatedInQuorumStore(_) => {
                 return Err(Error::InvalidMessageError(
                     "Transaction payload does not contain a limit!".to_string(),
                 ))
             },
+            BlockTransactionPayload::DeprecatedInQuorumStoreWithLimit(payload) => {
+                payload.transaction_limit
+            },
+            BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _) => {
+                payload.transaction_limit
+            },
+            BlockTransactionPayload::QuorumStoreInlineHybridV2(payload, _)
+            | BlockTransactionPayload::OptQuorumStore(payload, _) => payload.transaction_limit(),
         };
 
         // Compare the expected limit against the payload limit

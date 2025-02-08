@@ -19,6 +19,21 @@ use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_sta
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::collections::{BTreeMap, HashMap};
 
+/// Allows requesting an immediate interrupt to ongoing transaction execution. For example, this
+/// allows an early return from a useless speculative execution when block execution has already
+/// halted (e.g. due to gas limit, committing only a block prefix).
+pub trait BlockSynchronizationKillSwitch {
+    fn interrupt_requested(&self) -> bool;
+}
+
+pub struct NoopBlockSynchronizationKillSwitch {}
+
+impl BlockSynchronizationKillSwitch for NoopBlockSynchronizationKillSwitch {
+    fn interrupt_requested(&self) -> bool {
+        false
+    }
+}
+
 /// Allows to query resources from the state.
 pub trait TResourceView {
     type Key;
@@ -290,6 +305,15 @@ where
 
     fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
         self.get_usage().map_err(Into::into)
+    }
+}
+
+impl<S> BlockSynchronizationKillSwitch for S
+where
+    S: StateView,
+{
+    fn interrupt_requested(&self) -> bool {
+        false
     }
 }
 

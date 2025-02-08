@@ -6,7 +6,8 @@ use move_bytecode_verifier::{
     limits::LimitsVerifier, verify_module_with_config_for_test, VerifierConfig,
 };
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
+    ability::AbilitySet, account_address::AccountAddress, identifier::Identifier,
+    vm_status::StatusCode,
 };
 
 #[test]

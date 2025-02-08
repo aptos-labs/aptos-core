@@ -4,11 +4,9 @@
 //! Loaded representation for runtime types.
 
 use crate::limit::Limiter;
-use move_binary_format::{
-    errors::{PartialVMError, PartialVMResult},
-    file_format::AbilitySet,
-};
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
+    ability::AbilitySet,
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},

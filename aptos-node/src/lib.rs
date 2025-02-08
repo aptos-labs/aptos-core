@@ -16,6 +16,7 @@ pub mod utils;
 #[cfg(test)]
 mod tests;
 
+use crate::utils::ensure_max_open_files_limit;
 use anyhow::anyhow;
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
@@ -176,6 +177,8 @@ impl AptosNodeArgs {
                     error
                 )
             });
+
+            ensure_max_open_files_limit(config.storage.ensure_rlimit_nofile);
 
             // Start the node
             start(config, None, true).expect("Node should start correctly");

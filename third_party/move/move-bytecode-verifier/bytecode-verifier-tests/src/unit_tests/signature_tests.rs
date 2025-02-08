@@ -10,7 +10,8 @@ use move_bytecode_verifier::{
 };
 use move_bytecode_verifier_invalid_mutations::signature::{FieldRefMutation, SignatureRefMutation};
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
+    ability::AbilitySet, account_address::AccountAddress, identifier::Identifier,
+    vm_status::StatusCode,
 };
 use proptest::{collection::vec, prelude::*, sample::Index as PropIndex};
 

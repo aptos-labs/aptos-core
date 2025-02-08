@@ -823,6 +823,34 @@ module aptos_framework::coin {
         };
     }
 
+    public(friend) fun burn_from_for_gas<CoinType>(
+        account_addr: address,
+        amount: u64,
+        burn_cap: &BurnCapability<CoinType>,
+    ) acquires CoinInfo, CoinStore, CoinConversionMap, PairedFungibleAssetRefs {
+        // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
+        if (amount == 0) {
+            return
+        };
+
+        let (coin_amount_to_burn, fa_amount_to_burn) = calculate_amount_to_withdraw<CoinType>(
+            account_addr,
+            amount
+        );
+        if (coin_amount_to_burn > 0) {
+            let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
+            let coin_to_burn = extract(&mut coin_store.coin, coin_amount_to_burn);
+            burn(coin_to_burn, burn_cap);
+        };
+        if (fa_amount_to_burn > 0) {
+            fungible_asset::address_burn_from_for_gas(
+                borrow_paired_burn_ref(burn_cap),
+                primary_fungible_store::primary_store_address(account_addr, option::destroy_some(paired_metadata<CoinType>())),
+                fa_amount_to_burn
+            );
+        };
+    }
+
     /// Deposit the coin balance into the recipient's account and emit an event.
     public fun deposit<CoinType>(
         account_addr: address,
@@ -888,7 +916,7 @@ module aptos_framework::coin {
 
     /// Deposit the coin balance into the recipient's account without checking if the account is frozen.
     /// This is for internal use only and doesn't emit an DepositEvent.
-    public(friend) fun force_deposit<CoinType>(
+    public(friend) fun deposit_for_gas_fee<CoinType>(
         account_addr: address,
         coin: Coin<CoinType>
     ) acquires CoinStore, CoinConversionMap, CoinInfo {
@@ -1977,7 +2005,7 @@ module aptos_framework::coin {
         account: &signer,
         aaron: &signer,
         bob: &signer
-    ) acquires CoinConversionMap, CoinInfo, CoinStore {
+    ) acquires CoinConversionMap, CoinInfo, CoinStore, PairedFungibleAssetRefs {
         let account_addr = signer::address_of(account);
         let aaron_addr = signer::address_of(aaron);
         let bob_addr = signer::address_of(bob);
@@ -1985,17 +2013,35 @@ module aptos_framework::coin {
         account::create_account_for_test(aaron_addr);
         account::create_account_for_test(bob_addr);
         let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(account, 1, true);
-        maybe_convert_to_fungible_store<FakeMoney>(aaron_addr);
-        deposit(aaron_addr, mint<FakeMoney>(1, &mint_cap));
 
-        force_deposit(account_addr, mint<FakeMoney>(100, &mint_cap));
-        force_deposit(aaron_addr, mint<FakeMoney>(50, &mint_cap));
+        assert!(event::emitted_events<fungible_asset::Deposit>().length() == 0, 10);
+        assert!(event::emitted_events<fungible_asset::Withdraw>().length() == 0, 10);
+
+        maybe_convert_to_fungible_store<FakeMoney>(aaron_addr);
+
+        assert!(event::emitted_events<fungible_asset::Deposit>().length() == 0, 10);
+        deposit(aaron_addr, mint<FakeMoney>(1, &mint_cap));
+        assert!(event::emitted_events<fungible_asset::Deposit>().length() == 1, 10);
+
+        deposit_for_gas_fee(account_addr, mint<FakeMoney>(100, &mint_cap));
+        assert!(event::emitted_events<fungible_asset::Deposit>().length() == 1, 10);
+
+        deposit_for_gas_fee(aaron_addr, mint<FakeMoney>(50, &mint_cap));
+        assert!(event::emitted_events<fungible_asset::Deposit>().length() == 1, 10);
         assert!(
             primary_fungible_store::balance(aaron_addr, option::extract(&mut paired_metadata<FakeMoney>())) == 51,
             0
         );
         assert!(coin_balance<FakeMoney>(account_addr) == 100, 0);
-        force_deposit(bob_addr, mint<FakeMoney>(1, &mint_cap));
+        deposit_for_gas_fee(bob_addr, mint<FakeMoney>(1, &mint_cap));
+        assert!(event::emitted_events<fungible_asset::Deposit>().length() == 1, 10);
+
+        assert!(event::emitted_events<fungible_asset::Withdraw>().length() == 0, 10);
+        burn_from_for_gas(aaron_addr, 1, &burn_cap);
+        assert!(event::emitted_events<fungible_asset::Withdraw>().length() == 0, 10);
+        burn_from(aaron_addr, 1, &burn_cap);
+        assert!(event::emitted_events<fungible_asset::Withdraw>().length() == 1, 10);
+
         move_to(account, FakeMoneyCapabilities {
             burn_cap,
             freeze_cap,

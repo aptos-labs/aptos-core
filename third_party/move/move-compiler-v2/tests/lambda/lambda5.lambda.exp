@@ -114,7 +114,7 @@ module 0x8675309::M {
 ============ after LiveVarAnalysisProcessor: ================
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 8675309.M {
 
 

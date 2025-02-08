@@ -11,14 +11,15 @@ use crate::{
     emit, emitln,
     exp_builder::ExpBuilder,
     model::{
-        AbilitySet, FieldEnv, FunId, FunctionEnv, GlobalEnv, ModuleId, NodeId, Parameter,
-        QualifiedId, QualifiedInstId, StructId, TypeParameter, Visibility,
+        FieldEnv, FunId, FunctionEnv, GlobalEnv, ModuleId, NodeId, Parameter, QualifiedId,
+        QualifiedInstId, StructId, TypeParameter, Visibility,
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type, TypeDisplayContext},
 };
 use itertools::Itertools;
 use move_binary_format::file_format::AccessKind;
+use move_core_types::ability::AbilitySet;
 use std::collections::BTreeMap;
 //
 // ========================================================================================

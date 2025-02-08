@@ -122,7 +122,7 @@ where
         // If the environment caches too many struct names, flush type caches. Also flush module
         // caches because they contain indices for struct names.
         if struct_name_index_map_size > config.max_struct_name_index_map_num_entries {
-            runtime_environment.flush_struct_name_and_info_caches();
+            runtime_environment.flush_struct_name_and_tag_caches();
             self.module_cache.flush();
         }
 

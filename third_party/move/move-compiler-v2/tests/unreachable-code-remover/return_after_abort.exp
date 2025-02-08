@@ -34,7 +34,7 @@ fun m::test(): u32 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 
 

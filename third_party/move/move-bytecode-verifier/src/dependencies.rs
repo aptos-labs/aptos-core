@@ -8,14 +8,16 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        AbilitySet, Bytecode, CodeOffset, CompiledModule, CompiledScript, FunctionDefinitionIndex,
+        Bytecode, CodeOffset, CompiledModule, CompiledScript, FunctionDefinitionIndex,
         FunctionHandleIndex, ModuleHandleIndex, SignatureToken, StructHandleIndex,
         StructTypeParameter, TableIndex, Visibility,
     },
     file_format_common::VERSION_5,
     safe_unwrap, IndexKind,
 };
-use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
+use move_core_types::{
+    ability::AbilitySet, identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode,
+};
 use std::collections::{BTreeMap, BTreeSet};
 
 struct Context<'a, 'b> {
@@ -452,8 +454,22 @@ fn compare_types(
         | (SignatureToken::U256, SignatureToken::U256)
         | (SignatureToken::Address, SignatureToken::Address)
         | (SignatureToken::Signer, SignatureToken::Signer) => Ok(()),
-        (SignatureToken::Vector(ty1), SignatureToken::Vector(ty2)) => {
-            compare_types(context, ty1, ty2, def_module)
+        (SignatureToken::Vector(handle_ty), SignatureToken::Vector(def_ty)) => {
+            compare_types(context, handle_ty, def_ty, def_module)
+        },
+        (
+            SignatureToken::Function(handle_args, handle_result, handle_ab),
+            SignatureToken::Function(def_args, def_result, def_ab),
+        ) => {
+            compare_cross_module_signatures(context, handle_args, def_args, def_module)?;
+            compare_cross_module_signatures(context, handle_result, def_result, def_module)?;
+            // TODO(#15664): should we allow the definition to change to a weaker ability
+            //   requirement? Currently we do not allow `&mut` to be changed to `&` either.
+            if handle_ab == def_ab {
+                Ok(())
+            } else {
+                Err(PartialVMError::new(StatusCode::TYPE_MISMATCH))
+            }
         },
         (SignatureToken::Struct(idx1), SignatureToken::Struct(idx2)) => {
             compare_structs(context, *idx1, *idx2, def_module)
@@ -483,6 +499,7 @@ fn compare_types(
         | (SignatureToken::Address, _)
         | (SignatureToken::Signer, _)
         | (SignatureToken::Vector(_), _)
+        | (SignatureToken::Function(..), _)
         | (SignatureToken::Struct(_), _)
         | (SignatureToken::StructInstantiation(_, _), _)
         | (SignatureToken::Reference(_), _)

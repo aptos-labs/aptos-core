@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::module_and_script_storage::module_storage::AptosModuleStorage;
+use crate::{
+    module_and_script_storage::module_storage::AptosModuleStorage,
+    resolver::BlockSynchronizationKillSwitch,
+};
 use ambassador::Delegate;
 use aptos_types::{
     error::PanicError,
@@ -163,6 +166,14 @@ impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosModuleStorage
             .get_state_value(&state_key)
             .map_err(|err| module_storage_error!(address, module_name, err).to_partial())?
             .map(|state_value| state_value.into_metadata()))
+    }
+}
+
+impl<'s, S: StateView, E: WithRuntimeEnvironment> BlockSynchronizationKillSwitch
+    for AptosCodeStorageAdapter<'s, S, E>
+{
+    fn interrupt_requested(&self) -> bool {
+        false
     }
 }
 
