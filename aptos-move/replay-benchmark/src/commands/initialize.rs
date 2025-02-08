@@ -4,11 +4,10 @@
 use crate::{
     commands::{build_debugger, init_logger_and_metrics, RestAPI},
     generator::InputOutputDiffGenerator,
-    overrides::{OverrideConfig, PackageOverride},
+    overrides::OverrideConfig,
     workload::TransactionBlock,
 };
 use anyhow::anyhow;
-use aptos_framework::BuildOptions;
 use aptos_logger::Level;
 use aptos_types::on_chain_config::FeatureFlag;
 use clap::Parser;
@@ -82,13 +81,11 @@ impl InitializeCommand {
         //   2. BlockExecutorConfigFromOnchain to experiment with different block cutting based
         //      on gas limits?.
         //   3. Build options for package overrides.
-        let build_options = BuildOptions::move_2();
-        let package_override = PackageOverride::new(self.override_packages, build_options)?;
         let override_config = OverrideConfig::new(
             self.enable_features,
             self.disable_features,
             self.gas_feature_version,
-            package_override,
+            self.override_packages,
         )?;
 
         let debugger = build_debugger(self.rest_api.rest_endpoint, self.rest_api.api_key)?;

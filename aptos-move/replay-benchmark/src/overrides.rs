@@ -18,22 +18,22 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue, StateView},
 };
 use serde::Serialize;
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{BTreeSet, HashMap},
+    path::PathBuf,
+};
 
 /// Stores information about compiled Move packages and the build options used to create them. Used
 /// by the override configuration to shadow existing on-chain modules with modules defined in these
 /// packages.
-pub(crate) struct PackageOverride {
+struct PackageOverride {
     packages: Vec<BuiltPackage>,
     build_options: BuildOptions,
 }
 
 impl PackageOverride {
     /// Uses the provided build options to build multiple packages from the specified paths.
-    pub(crate) fn new(
-        package_paths: Vec<String>,
-        build_options: BuildOptions,
-    ) -> anyhow::Result<Self> {
+    fn new(package_paths: Vec<String>, build_options: BuildOptions) -> anyhow::Result<Self> {
         let packages = package_paths
             .into_iter()
             .map(|path| BuiltPackage::build(PathBuf::from(&path), build_options.clone()))
@@ -62,8 +62,11 @@ impl OverrideConfig {
         additional_enabled_features: Vec<FeatureFlag>,
         additional_disabled_features: Vec<FeatureFlag>,
         gas_feature_version: Option<u64>,
-        package_override: PackageOverride,
+        override_packages: Vec<String>,
     ) -> anyhow::Result<Self> {
+        let build_options = BuildOptions::move_2();
+        let package_override = PackageOverride::new(override_packages, build_options)?;
+
         if !additional_enabled_features
             .iter()
             .all(|f| !additional_disabled_features.contains(f))
@@ -129,16 +132,24 @@ impl OverrideConfig {
         let mut overridden_package_registries = HashMap::new();
         for package in &self.package_override.packages {
             // Modify existing package metadata or add new one.
-            let package_address = package
+            let addresses = package
                 .modules()
-                .map(|m| m.self_addr())
+                .map(|m| *m.self_addr())
+                .collect::<BTreeSet<_>>();
+            assert_eq!(
+                addresses.len(),
+                1,
+                "Modules in the same package must have the same address"
+            );
+
+            let package_address = addresses
                 .last()
                 .expect("Package must contain at least one module");
             let package_registry_state_key =
                 StateKey::resource(package_address, &PackageRegistry::struct_tag())
                     .expect("Should always be able to create state key for package registry");
 
-            let old_package_state_value =
+            let old_package_registry_state_value =
                 match overridden_package_registries.remove(&package_registry_state_key) {
                     Some(state_value) => state_value,
                     None => state_view
@@ -159,7 +170,7 @@ impl OverrideConfig {
                     err
                 )
             });
-            let new_package_state_value = old_package_state_value
+            let new_package_registry_state_value = old_package_registry_state_value
                 .map_bytes(|bytes| {
                     let mut package_registry = bcs::from_bytes::<PackageRegistry>(&bytes)
                         .expect("Package registry should deserialize");
@@ -187,7 +198,7 @@ impl OverrideConfig {
                 .expect("Modifying package never returns an error");
 
             overridden_package_registries
-                .insert(package_registry_state_key, new_package_state_value);
+                .insert(package_registry_state_key, new_package_registry_state_value);
 
             // Modify all existing modules or add new ones.
             let bytecode_version = self.package_override.build_options.bytecode_version;
@@ -216,12 +227,10 @@ impl OverrideConfig {
                                 err
                             )
                         });
-                let state_value = match onchain_state_value {
-                    Some(state_value) => {
-                        state_value.map_bytes(|_| Ok(module_bytes.into())).unwrap()
-                    },
-                    None => StateValue::new_legacy(module_bytes.into()),
-                };
+                let state_value = onchain_state_value.map_or_else(
+                    || StateValue::new_legacy(module_bytes.into()),
+                    |s| s.map_bytes(|_| Ok(module_bytes.clone().into())).unwrap(),
+                );
                 if state_override.insert(state_key, state_value).is_some() {
                     panic!(
                         "Overriding module {}::{} more than once",
