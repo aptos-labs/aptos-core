@@ -277,7 +277,7 @@ impl AptosVM {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
 
         let resolver = state_view.as_move_resolver();
-        let move_vm = MoveVmExt::new(env.clone(), &resolver);
+        let move_vm = MoveVmExt::new(env.clone());
 
         // We use an `Option` to handle the VK not being set on-chain, or an incorrect VK being set
         // via governance (although, currently, we do check for that in `keyless_account.move`).

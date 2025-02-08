@@ -148,14 +148,6 @@ impl LoaderV2 {
     }
 }
 
-impl Clone for LoaderV2 {
-    fn clone(&self) -> Self {
-        Self {
-            vm_config: self.vm_config.clone(),
-        }
-    }
-}
-
 /// Given a list of addresses and module names, pushes them onto stack unless they have been
 /// already visited or if the address is special.
 #[inline]

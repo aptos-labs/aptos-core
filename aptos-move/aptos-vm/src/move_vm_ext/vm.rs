@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_vm_ext::{warm_vm_cache::WarmVmCache, AptosMoveResolver, SessionExt, SessionId};
+use crate::move_vm_ext::{AptosMoveResolver, SessionExt, SessionId};
 use aptos_crypto::HashValue;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_native_interface::SafeNativeBuilder;
@@ -115,14 +115,8 @@ pub struct MoveVmExt {
 }
 
 impl MoveVmExt {
-    pub fn new(env: AptosEnvironment, resolver: &impl AptosMoveResolver) -> Self {
-        let vm = if env.features().is_loader_v2_enabled() {
-            MoveVM::new_with_runtime_environment(env.runtime_environment())
-        } else {
-            WarmVmCache::get_warm_vm(&env, resolver)
-                .expect("should be able to create Move VM; check if there are duplicated natives")
-        };
-
+    pub fn new(env: AptosEnvironment) -> Self {
+        let vm = MoveVM::new_with_runtime_environment(env.runtime_environment());
         Self { inner: vm, env }
     }
 

@@ -42,11 +42,7 @@ use aptos_types::{
     transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
     write_set::{TransactionWrite, WriteSet},
 };
-use aptos_vm::{
-    data_cache::AsMoveResolver,
-    move_vm_ext::{flush_warm_vm_cache, SessionId},
-    AptosVM,
-};
+use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::SessionId, AptosVM};
 use aptos_vm_environment::{
     environment::AptosEnvironment, prod_configs::aptos_prod_deserializer_config,
 };
@@ -461,7 +457,6 @@ fn add_script_execution_hash(
  *
  **************************************************************************************************/
 fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<()> {
-    flush_warm_vm_cache();
     let env = AptosEnvironment::new_with_injected_create_signer_for_gov_sim(&state_view);
     let vm = AptosVM::new(env.clone(), &state_view);
     let resolver = state_view.as_move_resolver();
@@ -616,9 +611,6 @@ pub async fn simulate_multistep_proposal(
         println!("    {}", script_name);
 
         // Create a new VM to ensure the loader is clean.
-        // The warm vm cache also needs to be explicitly flushed as it cannot detect the
-        // patches we performed.
-        flush_warm_vm_cache();
         let env = AptosEnvironment::new_with_injected_create_signer_for_gov_sim(&state_view);
         let vm = AptosVM::new(env.clone(), &state_view);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);

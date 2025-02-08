@@ -255,24 +255,6 @@ impl<'r, 'l> Session<'r, 'l> {
         )
     }
 
-    #[deprecated]
-    pub fn publish_module_bundle_relax_compatibility(
-        &mut self,
-        modules: Vec<Vec<u8>>,
-        sender: AccountAddress,
-        gas_meter: &mut impl GasMeter,
-    ) -> VMResult<()> {
-        #[allow(deprecated)]
-        self.move_vm.runtime.publish_module_bundle(
-            modules,
-            sender,
-            &mut self.data_cache,
-            &self.module_store,
-            gas_meter,
-            Compatibility::no_check(),
-        )
-    }
-
     pub fn num_mutated_resources(&self, sender: &AccountAddress) -> u64 {
         self.data_cache.num_mutated_resources(sender)
     }

@@ -133,7 +133,6 @@ lazy_static! {
 // Loader
 //
 
-#[derive(Clone)]
 pub(crate) enum Loader {
     V1(LoaderV1),
     V2(LoaderV2),
@@ -405,20 +404,6 @@ pub(crate) struct LoaderV1 {
     module_cache_hits: RwLock<BTreeSet<ModuleId>>,
 
     vm_config: VMConfig,
-}
-
-impl Clone for LoaderV1 {
-    fn clone(&self) -> Self {
-        Self {
-            scripts: RwLock::new(self.scripts.read().clone()),
-            type_cache: self.type_cache.clone(),
-            natives: self.natives.clone(),
-            name_cache: self.name_cache.clone(),
-            invalidated: RwLock::new(*self.invalidated.read()),
-            module_cache_hits: RwLock::new(self.module_cache_hits.read().clone()),
-            vm_config: self.vm_config.clone(),
-        }
-    }
 }
 
 impl LoaderV1 {

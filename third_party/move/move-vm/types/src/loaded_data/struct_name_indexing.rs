@@ -169,12 +169,6 @@ impl StructNameIndexMap {
     }
 }
 
-impl Clone for StructNameIndexMap {
-    fn clone(&self) -> Self {
-        Self(RwLock::new(self.0.read().clone()))
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
