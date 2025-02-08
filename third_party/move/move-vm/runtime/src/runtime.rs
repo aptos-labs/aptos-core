@@ -43,15 +43,6 @@ pub(crate) struct VMRuntime {
     pub(crate) module_cache: Arc<LegacyModuleCache>,
 }
 
-impl Clone for VMRuntime {
-    fn clone(&self) -> Self {
-        Self {
-            loader: self.loader.clone(),
-            module_cache: Arc::new(LegacyModuleCache::clone(&self.module_cache)),
-        }
-    }
-}
-
 impl VMRuntime {
     /// Creates a new runtime instance with provided environment.
     pub(crate) fn new(runtime_environment: &RuntimeEnvironment) -> Self {
