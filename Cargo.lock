@@ -11597,6 +11597,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytes",
+ "claims",
  "codespan-reporting",
  "memory-stats",
  "move-binary-format",
@@ -11672,6 +11673,7 @@ dependencies = [
  "move-bytecode-utils",
  "move-core-types",
  "move-table-extension",
+ "move-vm-runtime",
  "move-vm-types",
  "once_cell",
  "serde",

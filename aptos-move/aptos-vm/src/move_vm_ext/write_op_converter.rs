@@ -397,7 +397,7 @@ mod tests {
         ]));
         let resolver = state_view.as_move_resolver();
         let env = AptosEnvironment::new(&state_view);
-        let code_storage = state_view.as_aptos_code_storage(env);
+        let code_storage = state_view.as_aptos_code_storage(&env);
         // Storage slot metadata is enabled on the mainnet.
         let woc = WriteOpConverter::new(&resolver, true);
 
