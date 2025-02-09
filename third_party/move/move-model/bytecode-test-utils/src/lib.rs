@@ -5,6 +5,7 @@
 use anyhow::anyhow;
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use move_command_line_common::testing::get_compiler_exp_extension;
+use move_compiler::shared::known_attributes::KnownAttribute;
 use move_compiler_v2::{self, run_move_compiler_for_analysis, Options};
 use move_model::metadata::LanguageVersion;
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
@@ -26,16 +27,17 @@ pub fn test_runner(
     path: &Path,
     pipeline_opt: Option<FunctionTargetPipeline>,
 ) -> anyhow::Result<()> {
-    let mut options = Options {
+    let options = Options {
         sources_deps: extract_test_directives(path, "// dep:")?,
         sources: vec![path.to_string_lossy().to_string()],
         dependencies: vec![],
         named_address_mapping: move_stdlib::move_stdlib_named_addresses_strings(),
+        language_version: Some(LanguageVersion::latest()),
+        compile_verify_code: true,
+        compile_test_code: false,
+        known_attributes: KnownAttribute::get_all_attribute_names().clone(),
         ..Options::default()
     };
-    options = options.set_language_version(LanguageVersion::latest_stable());
-    options = options.set_compile_verify_code(true);
-    options = options.set_compile_test_code(false);
     let mut error_writer = Buffer::no_color();
     let env = run_move_compiler_for_analysis(&mut error_writer, options)?;
     let out = if env.has_errors() {

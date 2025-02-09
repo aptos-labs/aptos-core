@@ -11743,6 +11743,7 @@ dependencies = [
  "anyhow",
  "codespan-reporting",
  "move-command-line-common",
+ "move-compiler",
  "move-compiler-v2",
  "move-model",
  "move-prover-test-utils",
