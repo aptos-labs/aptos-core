@@ -30,7 +30,7 @@ fn failed_transaction_cleanup_charges_gas(status_code: StatusCode) {
 
     let state_view = h.executor.get_state_view();
     let env = AptosEnvironment::new(&state_view);
-    let vm = AptosVM::new(env, state_view);
+    let vm = AptosVM::new(&env, state_view);
 
     let balance = 10_000;
     let output = vm

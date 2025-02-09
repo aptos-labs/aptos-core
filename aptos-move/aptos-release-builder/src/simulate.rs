@@ -458,9 +458,9 @@ fn add_script_execution_hash(
  **************************************************************************************************/
 fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<()> {
     let env = AptosEnvironment::new_with_injected_create_signer_for_gov_sim(&state_view);
-    let vm = AptosVM::new(env.clone(), &state_view);
+    let vm = AptosVM::new(&env, &state_view);
     let resolver = state_view.as_move_resolver();
-    let module_storage = state_view.as_aptos_code_storage(env);
+    let module_storage = state_view.as_aptos_code_storage(&env);
 
     let gas_schedule =
         GasScheduleV2::fetch_config(&state_view).context("failed to fetch gas schedule v2")?;
@@ -612,11 +612,11 @@ pub async fn simulate_multistep_proposal(
 
         // Create a new VM to ensure the loader is clean.
         let env = AptosEnvironment::new_with_injected_create_signer_for_gov_sim(&state_view);
-        let vm = AptosVM::new(env.clone(), &state_view);
+        let vm = AptosVM::new(&env, &state_view);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let resolver = state_view.as_move_resolver();
-        let code_storage = state_view.as_aptos_code_storage(env);
+        let code_storage = state_view.as_aptos_code_storage(&env);
 
         let txn = account
             .account()

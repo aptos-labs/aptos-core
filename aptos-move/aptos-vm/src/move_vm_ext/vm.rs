@@ -115,9 +115,12 @@ pub struct MoveVmExt {
 }
 
 impl MoveVmExt {
-    pub fn new(env: AptosEnvironment) -> Self {
+    pub fn new(env: &AptosEnvironment) -> Self {
         let vm = MoveVM::new_with_runtime_environment(env.runtime_environment());
-        Self { inner: vm, env }
+        Self {
+            inner: vm,
+            env: env.clone(),
+        }
     }
 
     pub fn new_session<'r, R: AptosMoveResolver>(

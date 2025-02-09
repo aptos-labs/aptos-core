@@ -21,6 +21,7 @@ use move_core_types::{
 };
 #[cfg(feature = "table-extension")]
 use move_table_extension::{TableChangeSet, TableHandle, TableResolver};
+use move_vm_runtime::{RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::{
     code::ModuleBytesStorage,
     resolver::{resource_size, ModuleResolver, ResourceResolver},
@@ -92,11 +93,30 @@ struct InMemoryAccountStorage {
 }
 
 /// Simple in-memory storage that can be used as a Move VM storage backend for testing purposes.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct InMemoryStorage {
+    runtime_environment: RuntimeEnvironment,
     accounts: BTreeMap<AccountAddress, InMemoryAccountStorage>,
     #[cfg(feature = "table-extension")]
     tables: BTreeMap<TableHandle, BTreeMap<Vec<u8>, Bytes>>,
+}
+
+impl ModuleBytesStorage for InMemoryStorage {
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<Bytes>> {
+        if let Some(account_storage) = self.accounts.get(address) {
+            return Ok(account_storage.modules.get(module_name).cloned());
+        }
+        Ok(None)
+    }
+}
+impl WithRuntimeEnvironment for InMemoryStorage {
+    fn runtime_environment(&self) -> &RuntimeEnvironment {
+        &self.runtime_environment
+    }
 }
 
 impl CompiledModuleView for InMemoryStorage {
@@ -240,6 +260,16 @@ impl InMemoryStorage {
 
     pub fn new() -> Self {
         Self {
+            runtime_environment: RuntimeEnvironment::new(vec![]),
+            accounts: BTreeMap::new(),
+            #[cfg(feature = "table-extension")]
+            tables: BTreeMap::new(),
+        }
+    }
+
+    pub fn new_with_runtime_environment(runtime_environment: RuntimeEnvironment) -> Self {
+        Self {
+            runtime_environment,
             accounts: BTreeMap::new(),
             #[cfg(feature = "table-extension")]
             tables: BTreeMap::new(),
@@ -267,19 +297,6 @@ impl InMemoryStorage {
     ) {
         let account = get_or_insert(&mut self.accounts, addr, InMemoryAccountStorage::new);
         account.resources.insert(struct_tag, blob.into());
-    }
-}
-
-impl ModuleBytesStorage for InMemoryStorage {
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
-        if let Some(account_storage) = self.accounts.get(address) {
-            return Ok(account_storage.modules.get(module_name).cloned());
-        }
-        Ok(None)
     }
 }
 

@@ -24,7 +24,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage, AsUnsyncModuleStorage,
-    RuntimeEnvironment,
+    WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -255,10 +255,9 @@ fn call_script_with_args_ty_args_signers(
     ty_args: Vec<TypeTag>,
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
-    let runtime_environment = RuntimeEnvironment::new(vec![]);
-    let move_vm = MoveVM::new_with_runtime_environment(&runtime_environment);
     let storage = InMemoryStorage::new();
-    let code_storage = storage.as_unsync_code_storage(runtime_environment);
+    let move_vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
+    let code_storage = storage.as_unsync_code_storage();
     let mut session = move_vm.new_session(&storage);
 
     let traversal_storage = TraversalStorage::new();
@@ -286,16 +285,15 @@ fn call_function_with_args_ty_args_signers(
     ty_args: Vec<TypeTag>,
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
-    let runtime_environment = RuntimeEnvironment::new(vec![]);
-    let move_vm = MoveVM::new_with_runtime_environment(&runtime_environment);
     let mut storage = InMemoryStorage::new();
+    let move_vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
 
     let module_id = module.self_id();
     let mut module_blob = vec![];
     module.serialize(&mut module_blob).unwrap();
 
     storage.add_module_bytes(module_id.address(), module_id.name(), module_blob.into());
-    let module_storage = storage.as_unsync_module_storage(runtime_environment);
+    let module_storage = storage.as_unsync_module_storage();
     let mut session = move_vm.new_session(&storage);
 
     let traversal_storage = TraversalStorage::new();
@@ -781,10 +779,9 @@ fn call_missing_item() {
     // missing module
     let function_name = ident_str!("foo");
 
-    let runtime_environment = RuntimeEnvironment::new(vec![]);
-    let move_vm = MoveVM::new_with_runtime_environment(&runtime_environment);
     let mut storage = InMemoryStorage::new();
-    let module_storage = storage.as_unsync_module_storage(runtime_environment.clone());
+    let move_vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
+    let module_storage = storage.as_unsync_module_storage();
     let mut session = move_vm.new_session(&storage);
 
     let traversal_storage = TraversalStorage::new();
@@ -812,7 +809,7 @@ fn call_missing_item() {
     // missing function
 
     storage.add_module_bytes(module_id.address(), module_id.name(), module_blob.into());
-    let module_storage = storage.as_unsync_module_storage(runtime_environment);
+    let module_storage = storage.as_unsync_module_storage();
     let mut session = move_vm.new_session(&storage);
 
     let traversal_storage = TraversalStorage::new();
