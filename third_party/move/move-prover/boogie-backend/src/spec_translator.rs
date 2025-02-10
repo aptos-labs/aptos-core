@@ -1036,7 +1036,7 @@ impl<'env> SpecTranslator<'env> {
             | Operation::Deref
             | Operation::MoveTo
             | Operation::MoveFrom
-            | Operation::EarlyBind
+            | Operation::Closure(..)
             | Operation::Old => {
                 self.env.error(
                     &self.env.get_node_loc(node_id),

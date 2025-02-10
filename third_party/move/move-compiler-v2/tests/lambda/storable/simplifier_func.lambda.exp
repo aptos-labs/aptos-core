@@ -1,206 +1,41 @@
-// -- Model dump before env processor pipeline:
+// -- Model dump before bytecode pipeline
 module 0x42::mod1 {
     struct S {
         x: u64,
     }
     public fun triple(x: u64): u64 {
         {
-          let f: |u64|u64 with copy+store = |x: u64| {
-            let t: S = pack mod1::S(3);
-            x
-          };
+          let _f: |u64|u64 = closure#0mod1::triple$lambda$1();
           Mul<u64>(x, 3)
+        }
+    }
+    private fun triple$lambda$1(x: u64): u64 {
+        {
+          let _t: S = pack mod1::S(3);
+          x
         }
     }
 } // end 0x42::mod1
 
-
-// -- Model dump after env processor unused checks:
+// -- Sourcified model before bytecode pipeline
 module 0x42::mod1 {
     struct S {
         x: u64,
     }
     public fun triple(x: u64): u64 {
-        {
-          let f: |u64|u64 with copy+store = |x: u64| {
-            let t: S = pack mod1::S(3);
-            x
-          };
-          Mul<u64>(x, 3)
-        }
+        let _f = |arg0| triple$lambda$1(arg0);
+        x * 3
     }
-} // end 0x42::mod1
-
-
-// -- Model dump after env processor type parameter check:
-module 0x42::mod1 {
-    struct S {
-        x: u64,
+    fun triple$lambda$1(x: u64): u64 {
+        let _t = S{x: 3};
+        x
     }
-    public fun triple(x: u64): u64 {
-        {
-          let f: |u64|u64 with copy+store = |x: u64| {
-            let t: S = pack mod1::S(3);
-            x
-          };
-          Mul<u64>(x, 3)
-        }
-    }
-} // end 0x42::mod1
-
-
-// -- Model dump after env processor check recursive struct definition:
-module 0x42::mod1 {
-    struct S {
-        x: u64,
-    }
-    public fun triple(x: u64): u64 {
-        {
-          let f: |u64|u64 with copy+store = |x: u64| {
-            let t: S = pack mod1::S(3);
-            x
-          };
-          Mul<u64>(x, 3)
-        }
-    }
-} // end 0x42::mod1
-
-
-// -- Model dump after env processor check cyclic type instantiation:
-module 0x42::mod1 {
-    struct S {
-        x: u64,
-    }
-    public fun triple(x: u64): u64 {
-        {
-          let f: |u64|u64 with copy+store = |x: u64| {
-            let t: S = pack mod1::S(3);
-            x
-          };
-          Mul<u64>(x, 3)
-        }
-    }
-} // end 0x42::mod1
-
-
-// -- Model dump after env processor unused struct params check:
-module 0x42::mod1 {
-    struct S {
-        x: u64,
-    }
-    public fun triple(x: u64): u64 {
-        {
-          let f: |u64|u64 with copy+store = |x: u64| {
-            let t: S = pack mod1::S(3);
-            x
-          };
-          Mul<u64>(x, 3)
-        }
-    }
-} // end 0x42::mod1
-
-
-// -- Model dump after env processor access and use check before inlining:
-module 0x42::mod1 {
-    struct S {
-        x: u64,
-    }
-    public fun triple(x: u64): u64 {
-        {
-          let f: |u64|u64 with copy+store = |x: u64| {
-            let t: S = pack mod1::S(3);
-            x
-          };
-          Mul<u64>(x, 3)
-        }
-    }
-} // end 0x42::mod1
-
-
-// -- Model dump after env processor inlining:
-module 0x42::mod1 {
-    struct S {
-        x: u64,
-    }
-    public fun triple(x: u64): u64 {
-        {
-          let f: |u64|u64 with copy+store = |x: u64| {
-            let t: S = pack mod1::S(3);
-            x
-          };
-          Mul<u64>(x, 3)
-        }
-    }
-} // end 0x42::mod1
-
-
-// -- Model dump after env processor access and use check after inlining:
-module 0x42::mod1 {
-    struct S {
-        x: u64,
-    }
-    public fun triple(x: u64): u64 {
-        {
-          let f: |u64|u64 with copy+store = |x: u64| {
-            let t: S = pack mod1::S(3);
-            x
-          };
-          Mul<u64>(x, 3)
-        }
-    }
-} // end 0x42::mod1
-
-
-// -- Model dump after env processor acquires check:
-module 0x42::mod1 {
-    struct S {
-        x: u64,
-    }
-    public fun triple(x: u64): u64 {
-        {
-          let f: |u64|u64 with copy+store = |x: u64| {
-            let t: S = pack mod1::S(3);
-            x
-          };
-          Mul<u64>(x, 3)
-        }
-    }
-} // end 0x42::mod1
-
-
-// -- Model dump after env processor simplifier:
-module 0x42::mod1 {
-    struct S {
-        x: u64,
-    }
-    public fun triple(x: u64): u64 {
-        {
-          let f: |u64|u64 with copy+store = |x: u64| {
-            let t: S = pack mod1::S(3);
-            x
-          };
-          Mul<u64>(x, 3)
-        }
-    }
-} // end 0x42::mod1
-
+}
 
 
 Diagnostics:
-warning: Unused local variable `f`. Consider removing or prefixing with an underscore: `_f`
-  ┌─ tests/lambda/storable/simplifier_func.move:7:13
+error: Function-typed values not yet implemented except as parameters to calls to inline functions
+  ┌─ tests/lambda/storable/simplifier_func.move:7:19
   │
-7 │         let f = |x: u64| { let t = S { x: 3 }; x };
-  │             ^
-
-warning: Unused local variable `t`. Consider removing or prefixing with an underscore: `_t`
-  ┌─ tests/lambda/storable/simplifier_func.move:7:32
-  │
-7 │         let f = |x: u64| { let t = S { x: 3 }; x };
-  │                                ^
-
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
-  ┌─ tests/lambda/storable/simplifier_func.move:7:17
-  │
-7 │         let f = |x: u64| { let t = S { x: 3 }; x };
-  │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+7 │         let _f = (|x: u64| { let _t = S { x: 3 }; x } : |u64|u64 has drop);
+  │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
