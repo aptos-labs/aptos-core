@@ -36,9 +36,15 @@ use aptos_types::{
 };
 use bcs::to_bytes;
 use once_cell::sync::Lazy;
-use poem_openapi::{Object, Union};
+use poem_openapi::{
+    registry::{MetaSchema, MetaSchemaRef},
+    types::{IsObjectType, ParseError, ParseFromJSON, ParseResult, ToJSON, Type},
+    Object, Union,
+};
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use std::{
+    borrow::Cow,
     boxed::Box,
     convert::{From, Into, TryFrom, TryInto},
     fmt,
@@ -1965,9 +1971,9 @@ impl TryFrom<AbstractionSignature> for AccountAuthenticator {
 ///   1. A single Ed25519 key account, one private key
 ///   2. A k-of-n multi-Ed25519 key account, multiple private keys, such that k-of-n must sign a transaction.
 ///   3. A single Secp256k1Ecdsa key account, one private key
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-#[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
+//#[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum AccountSignature {
     Ed25519Signature(Ed25519Signature),
     MultiEd25519Signature(MultiEd25519Signature),
@@ -1975,6 +1981,169 @@ pub enum AccountSignature {
     MultiKeySignature(MultiKeySignature),
     NoAccountSignature(NoAccountSignature),
     AbstractionSignature(AbstractionSignature),
+}
+
+// Unfortunately to get the outcomes we want, we cannot use the autoderive, and instead manually derive this
+impl Type for AccountSignature {
+    type RawElementValueType = Self;
+    type RawValueType = Self;
+
+    const IS_REQUIRED: bool = false;
+
+    fn name() -> Cow<'static, str> {
+        "AccountSignature".into()
+    }
+
+    // TODO: Docs no longer work properly, need to be updated and looked into
+    fn schema_ref() -> MetaSchemaRef {
+        MetaSchemaRef::Inline(Box::new(MetaSchema {
+            rust_typename: Some("AccountSignature"),
+            ty: "",
+            format: None,
+            title: Some("AccountSignature".into()),
+            description: Some("The account signature scheme allows you to have two types of accounts:
+
+1. A single Ed25519 key account, one private key
+2. A k-of-n multi-Ed25519 key account, multiple private keys, such that k-of-n must sign a transaction.
+3. A single Secp256k1Ecdsa key account, one private key"),
+            external_docs: None,
+            default: None,
+            required: vec!["signature_type"],
+            properties: vec![],
+            items: None,
+            additional_properties: None,
+            enum_items: vec![],
+            deprecated: false,
+            any_of: vec![],
+            one_of: vec![
+            /*    MetaSchemaRef::Reference("AccountSignature_Ed5519Signature".into()),
+                MetaSchemaRef::Reference("AccountSignature_MultiEd25519Signature".into()),
+                MetaSchemaRef::Reference("AccountSignature_SingleKeySignature".into()),
+                MetaSchemaRef::Reference("AccountSignature_MultiKeySignature".into()),
+                MetaSchemaRef::Reference("AccountSignature_NoAccountSignature".into()),
+                MetaSchemaRef::Reference("AccountSignature_AbstractionSignature".into()),*/
+            ],
+            all_of: vec![],
+            discriminator: None,
+            read_only: false,
+            write_only: false,
+            example: Some(json!({
+                "public_key":{
+                    "value":"0x4d7139da37bda01a68efd463fcafb67effb7c5ea0b5375d18a81439ee642d0b3 ",
+                    "type":"ed25519"
+                },
+                "signature":{
+                    "value":"0x5371902e6be7a747f6ef4e5c79e69a9c6ff9d4339df2823d115d2b28223f0887a562d0ee46953894a26fda649e861dcb2c033477a6bf146332d7e3ff799d0308 ",
+                    "type":"ed25519"
+                },
+                "signature_type":"single_key",
+                "type":"single_sender"
+            })),
+            multiple_of: None,
+            maximum: None,
+            exclusive_maximum: None,
+            minimum: None,
+            exclusive_minimum: None,
+            max_length: None,
+            min_length: None,
+            pattern: None,
+            max_items: None,
+            min_items: None,
+            unique_items: None,
+            max_properties: None,
+            min_properties: None,
+        }))
+    }
+
+    fn as_raw_value(&self) -> Option<&Self::RawValueType> {
+        Some(self)
+    }
+
+    fn raw_element_iter<'a>(
+        &'a self,
+    ) -> Box<dyn Iterator<Item = &'a Self::RawElementValueType> + 'a> {
+        Box::new(vec![self].into_iter())
+    }
+}
+
+impl ParseFromJSON for AccountSignature {
+    fn parse_from_json(value: Option<Value>) -> ParseResult<Self> {
+        if let Some(val) = value.as_ref() {
+            if let Some(obj) = val.as_object() {
+                if let Some(typ) = obj.get("signature_type").and_then(Value::as_str) {
+                    // TODO: Implement the parsing here
+                    match typ {
+                        "ed25519" => {
+                            todo!()
+                        },
+                        "multied25519" => {
+                            todo!()
+                        },
+                        "single_key" => {
+                            todo!()
+                        },
+                        "multi_key" => {
+                            todo!()
+                        },
+                        "no_account" => {
+                            todo!()
+                        },
+                        "abstraction" => {
+                            todo!()
+                        },
+                        _ => Err(ParseError::custom(format!(
+                            "Unexpected signature_type {}",
+                            typ
+                        ))),
+                    }
+                } else {
+                    Err(ParseError::custom("Expected signature_type field"))
+                }
+            } else {
+                Err(ParseError::expected_type(val.clone()))
+            }
+        } else {
+            Err(ParseError::expected_input())
+        }
+    }
+}
+
+impl IsObjectType for AccountSignature {}
+
+impl ToJSON for AccountSignature {
+    fn to_json(&self) -> Option<Value> {
+        let (single_sender_type, mut value) = match self {
+            AccountSignature::Ed25519Signature(signature) => {
+                ("ed25519_signature", signature.to_json())
+            },
+            AccountSignature::MultiEd25519Signature(signature) => {
+                ("multi_ed25519_signature", signature.to_json())
+            },
+            AccountSignature::SingleKeySignature(signature) => {
+                ("single_key_signature", signature.to_json())
+            },
+            AccountSignature::MultiKeySignature(signature) => {
+                ("multi_key_signature", signature.to_json())
+            },
+            AccountSignature::NoAccountSignature(signature) => {
+                ("no_account_signature", signature.to_json())
+            },
+            AccountSignature::AbstractionSignature(signature) => {
+                ("abstraction_signature", signature.to_json())
+            },
+        };
+
+        // Put the subtype in for better parsing, anywhere that it would normally show, this includes
+        // Multiagent, fee payer, single signer
+        if let Some(val) = value.as_mut().and_then(Value::as_object_mut) {
+            // Add type for backwards compatibility, this gets overridden by TransactionSignature
+            val.insert("type".to_string(), single_sender_type.into());
+            // Add signature type for future usage
+            val.insert("signature_type".to_string(), single_sender_type.into());
+        }
+
+        value
+    }
 }
 
 impl VerifyInput for AccountSignature {
