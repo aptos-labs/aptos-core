@@ -1955,20 +1955,7 @@ fn parse_lambda(
         spanned(context.tokens.file_hash(), start_loc, end_loc, vec![])
     };
     let body = Box::new(parse_exp(context)?);
-    let abilities_start = context.tokens.start_loc();
-    let abilities = parse_with_abilities(context)?;
-    if !abilities.is_empty() {
-        let abilities_end = context.tokens.previous_end_loc();
-        let loc = make_loc(context.tokens.file_hash(), abilities_start, abilities_end);
-        require_move_version(
-            LanguageVersion::V2_2,
-            context,
-            loc,
-            "Abilities on function expressions",
-        );
-    }
-
-    Ok(Exp_::Lambda(bindings, body, capture_kind, abilities))
+    Ok(Exp_::Lambda(bindings, body, capture_kind))
 }
 
 // Parse an expression:
@@ -2532,7 +2519,7 @@ fn parse_type(context: &mut Context) -> Result<Type, Box<Diagnostic>> {
                 )
             };
             let abilities_start = context.tokens.start_loc();
-            let abilities = parse_with_abilities(context)?;
+            let abilities = parse_has_abilities_for_function_type(context)?;
             if !abilities.is_empty() {
                 let abilities_end = context.tokens.previous_end_loc();
                 let loc = make_loc(context.tokens.file_hash(), abilities_start, abilities_end);
@@ -2622,11 +2609,13 @@ fn parse_ability(context: &mut Context) -> Result<Ability, Box<Diagnostic>> {
     }
 }
 
-// Parse an optional "with" type constraint:
+// Parse an optional "has" type constraint for function types:
 //      WithAbilities =
-//          ( "with" <Ability> (+ <Ability>)* )?
-fn parse_with_abilities(context: &mut Context) -> Result<Vec<Ability>, Box<Diagnostic>> {
-    if context.tokens.peek() == Tok::Identifier && context.tokens.content() == "with" {
+//          ( "has" <Ability> (+ <Ability>)* )?
+fn parse_has_abilities_for_function_type(
+    context: &mut Context,
+) -> Result<Vec<Ability>, Box<Diagnostic>> {
+    if context.tokens.peek() == Tok::Identifier && context.tokens.content() == "has" {
         context.tokens.advance()?;
         parse_type_constraints_core(context)
     } else {

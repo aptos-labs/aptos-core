@@ -64,8 +64,8 @@ pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
     let options = env
         .get_extension::<Options>()
         .expect("Options is available");
-    let lambda_params_ok = options.experiment_on(Experiment::LAMBDA_IN_PARAMS);
-    let lambda_return_ok = options.experiment_on(Experiment::LAMBDA_IN_RETURNS);
+    let lambda_params_ok = options.experiment_on(Experiment::FUNCTION_VALUES);
+    let lambda_return_ok = options.experiment_on(Experiment::FUNCTION_VALUES);
     if lambda_params_ok && lambda_return_ok {
         return;
     }
@@ -270,7 +270,7 @@ fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv
                 },
                 ExpData::Assign(_, pat, _)
                 | ExpData::Block(_, pat, _, _)
-                | ExpData::Lambda(_, pat, _, _, _) => {
+                | ExpData::Lambda(_, pat, _, _) => {
                     pat.visit_pre_post(&mut |_, pat| {
                         if let Pattern::Struct(id, str, _, _) = pat {
                             let module_id = str.module_id;
