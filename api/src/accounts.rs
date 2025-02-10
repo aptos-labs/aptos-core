@@ -130,7 +130,7 @@ impl AccountsApi {
 
     /// Get account balance
     ///
-    /// Retrieves account balance for coins / fungible asset (only for primary fungible asset store) 
+    /// Retrieves account balance for coins / fungible asset (only for primary fungible asset store)
     /// for a given account, asset type and a specific ledger version.  If the
     /// ledger version is not specified in the request, the latest ledger version is used.
     ///
