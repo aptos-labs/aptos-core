@@ -10,7 +10,7 @@ use crate::{
     global_invariant_instrumentation::GlobalInvariantInstrumentationProcessor,
     inconsistency_check::InconsistencyCheckInstrumenter, loop_analysis::LoopAnalysisProcessor,
     memory_instrumentation::MemoryInstrumentationProcessor, mono_analysis::MonoAnalysisProcessor,
-    mut_ref_instrumentation::MutRefInstrumenter, mutation_tester::MutationTester,
+    mut_ref_instrumentation::MutRefInstrumenter,
     number_operation_analysis::NumberOperationProcessor, options::ProverOptions,
     spec_instrumentation::SpecInstrumentationProcessor,
     verification_analysis::VerificationAnalysisProcessor,
@@ -55,11 +55,6 @@ pub fn default_pipeline_with_options(options: &ProverOptions) -> FunctionTargetP
         // monomorphization
         MonoAnalysisProcessor::new(),
     ]);
-
-    if options.mutation {
-        // pass which may do nothing
-        processors.push(MutationTester::new());
-    }
 
     // inconsistency check instrumentation should be the last one in the pipeline
     if options.check_inconsistency {

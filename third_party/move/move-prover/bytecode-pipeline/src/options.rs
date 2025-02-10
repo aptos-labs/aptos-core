@@ -52,16 +52,6 @@ pub struct ProverOptions {
     /// Whether to assume wellformedness when elements are read from memory, instead of on
     /// function entry.
     pub assume_wellformed_on_access: bool,
-    /// Indicates that we should do any mutations
-    pub mutation: bool,
-    /// Indicates that we should use the add-subtract mutation on the given block
-    pub mutation_add_sub: usize,
-    /// Indicates that we should use the subtract-add mutation on the given block
-    pub mutation_sub_add: usize,
-    /// Indicates that we should use the multiply-divide mutation on the given block
-    pub mutation_mul_div: usize,
-    /// Indicates that we should use the divide-multiply mutation on the given block
-    pub mutation_div_mul: usize,
     /// Whether to use the polymorphic boogie backend.
     pub boogie_poly: bool,
     /// Whether pack/unpack should recurse over the structure.
@@ -89,7 +79,7 @@ pub struct ProverOptions {
     /// Optional names of native methods (qualified with module name, e.g., m::foo) implementing
     /// mutable borrow semantics
     pub borrow_natives: Vec<String>,
-    /// Whether to ban convertion from int to bv at the boogie backend
+    /// Whether to ban conversion from int to bv at the boogie backend
     pub ban_int_2_bv: bool,
 }
 
@@ -106,11 +96,6 @@ impl Default for ProverOptions {
             verify_scope: VerificationScope::All,
             resource_wellformed_axiom: false,
             assume_wellformed_on_access: false,
-            mutation: false,
-            mutation_add_sub: 0,
-            mutation_sub_add: 0,
-            mutation_mul_div: 0,
-            mutation_div_mul: 0,
             boogie_poly: false,
             deep_pack_unpack: false,
             auto_trace_level: AutoTraceLevel::Off,
