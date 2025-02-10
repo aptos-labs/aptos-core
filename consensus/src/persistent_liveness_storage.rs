@@ -42,7 +42,7 @@ pub trait PersistentLivenessStorage: Send + Sync {
     fn recover_from_ledger(&self) -> LedgerRecoveryData;
 
     /// Construct necessary data to start consensus.
-    fn start(&self, order_vote_enabled: bool, window_size: usize) -> LivenessStorageData;
+    fn start(&self, order_vote_enabled: bool, window_size: Option<u64>) -> LivenessStorageData;
 
     /// Persist the highest 2chain timeout certificate for improved liveness - proof for other replicas
     /// to jump to this round
@@ -65,7 +65,7 @@ pub trait PersistentLivenessStorage: Send + Sync {
 #[derive(Clone)]
 pub struct RootInfo {
     pub commit_root_block: Box<Block>,
-    pub window_root_block: Box<Block>,
+    pub window_root_block: Option<Box<Block>>,
     pub quorum_cert: QuorumCert,
     pub ordered_cert: WrappedLedgerInfo,
     pub commit_cert: WrappedLedgerInfo,
@@ -75,7 +75,7 @@ impl Debug for RootInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "RootInfo: [commit_root_block: {}, window_root_block: {}, quorum_cert: {}, ordered_cert: {}, commit_cert: {}]",
+            "RootInfo: [commit_root_block: {}, window_root_block: {:?}, quorum_cert: {}, ordered_cert: {}, commit_cert: {}]",
             self.commit_root_block, self.window_root_block, self.quorum_cert, self.ordered_cert, self.commit_cert,
         )
     }
@@ -96,22 +96,13 @@ impl LedgerRecoveryData {
         self.storage_ledger.commit_info().round()
     }
 
-    /// Finds the root (last committed block) and returns the root block, the QC to the root block
-    /// and the ledger info for the root block, return an error if it can not be found.
-    ///
-    /// We guarantee that the block corresponding to the storage's latest ledger info always exists.
-    pub fn find_root(
+    pub fn find_root_with_window(
         &self,
         blocks: &mut Vec<Block>,
         quorum_certs: &mut Vec<QuorumCert>,
         order_vote_enabled: bool,
-        window_size: usize,
+        window_size: u64,
     ) -> Result<RootInfo> {
-        info!(
-            "The last committed block id as recorded in storage: {}",
-            self.storage_ledger
-        );
-
         // We start from the block that storage's latest ledger info, if storage has end-epoch
         // LedgerInfo, we generate the virtual genesis block
         let (latest_commit_id, latest_ledger_info_sig) =
@@ -171,7 +162,7 @@ impl LedgerRecoveryData {
         let window_start_round = blocks[latest_commit_idx]
             .round()
             .saturating_add(1)
-            .saturating_sub(window_size as u64);
+            .saturating_sub(window_size);
         let epoch = blocks[latest_commit_idx].epoch();
         let mut id_to_blocks = HashMap::new();
         blocks.iter().for_each(|block| {
@@ -218,11 +209,106 @@ impl LedgerRecoveryData {
 
         Ok(RootInfo {
             commit_root_block: Box::new(commit_block),
-            window_root_block: Box::new(window_start_block),
+            window_root_block: Some(Box::new(window_start_block)),
             quorum_cert: root_quorum_cert,
             ordered_cert: root_ordered_cert,
             commit_cert: root_commit_cert,
         })
+    }
+
+    pub fn find_root_without_window(
+        &self,
+        blocks: &mut Vec<Block>,
+        quorum_certs: &mut Vec<QuorumCert>,
+        order_vote_enabled: bool,
+    ) -> Result<RootInfo> {
+        // We start from the block that storage's latest ledger info, if storage has end-epoch
+        // LedgerInfo, we generate the virtual genesis block
+        let (root_id, latest_ledger_info_sig) = if self.storage_ledger.ledger_info().ends_epoch() {
+            let genesis =
+                Block::make_genesis_block_from_ledger_info(self.storage_ledger.ledger_info());
+            let genesis_qc = QuorumCert::certificate_for_genesis_from_ledger_info(
+                self.storage_ledger.ledger_info(),
+                genesis.id(),
+            );
+            let genesis_ledger_info = genesis_qc.ledger_info().clone();
+            let genesis_id = genesis.id();
+            blocks.push(genesis);
+            quorum_certs.push(genesis_qc);
+            (genesis_id, genesis_ledger_info)
+        } else {
+            (
+                self.storage_ledger.ledger_info().consensus_block_id(),
+                self.storage_ledger.clone(),
+            )
+        };
+
+        // sort by (epoch, round) to guarantee the topological order of parent <- child
+        blocks.sort_by_key(|b| (b.epoch(), b.round()));
+
+        let root_idx = blocks
+            .iter()
+            .position(|block| block.id() == root_id)
+            .ok_or_else(|| format_err!("unable to find root: {}", root_id))?;
+        let root_block = blocks.remove(root_idx);
+        let root_quorum_cert = quorum_certs
+            .iter()
+            .find(|qc| qc.certified_block().id() == root_block.id())
+            .ok_or_else(|| format_err!("No QC found for root: {}", root_id))?
+            .clone();
+
+        let (root_ordered_cert, root_commit_cert) = if order_vote_enabled {
+            // We are setting ordered_root same as commit_root. As every committed block is also ordered, this is fine.
+            // As the block store inserts all the fetched blocks and quorum certs and execute the blocks, the block store
+            // updates highest_ordered_cert accordingly.
+            let root_ordered_cert =
+                WrappedLedgerInfo::new(VoteData::dummy(), latest_ledger_info_sig.clone());
+            (root_ordered_cert.clone(), root_ordered_cert)
+        } else {
+            let root_ordered_cert = quorum_certs
+                .iter()
+                .find(|qc| qc.commit_info().id() == root_block.id())
+                .ok_or_else(|| format_err!("No LI found for root: {}", root_id))?
+                .clone()
+                .into_wrapped_ledger_info();
+            let root_commit_cert = root_ordered_cert
+                .create_merged_with_executed_state(latest_ledger_info_sig)
+                .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
+            (root_ordered_cert, root_commit_cert)
+        };
+        info!("Consensus root block is {}", root_block);
+
+        Ok(RootInfo {
+            commit_root_block: Box::new(root_block),
+            window_root_block: None,
+            quorum_cert: root_quorum_cert,
+            ordered_cert: root_ordered_cert,
+            commit_cert: root_commit_cert,
+        })
+    }
+
+    /// Finds the root (last committed block) and returns the root block, the QC to the root block
+    /// and the ledger info for the root block, return an error if it can not be found.
+    ///
+    /// We guarantee that the block corresponding to the storage's latest ledger info always exists.
+    pub fn find_root(
+        &self,
+        blocks: &mut Vec<Block>,
+        quorum_certs: &mut Vec<QuorumCert>,
+        order_vote_enabled: bool,
+        window_size: Option<u64>,
+    ) -> Result<RootInfo> {
+        info!(
+            "The last committed block id as recorded in storage: {}",
+            self.storage_ledger
+        );
+
+        match window_size {
+            None => self.find_root_without_window(blocks, quorum_certs, order_vote_enabled),
+            Some(window_size) => {
+                self.find_root_with_window(blocks, quorum_certs, order_vote_enabled, window_size)
+            },
+        }
     }
 }
 
@@ -283,7 +369,7 @@ impl RecoveryData {
         mut quorum_certs: Vec<QuorumCert>,
         highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
         order_vote_enabled: bool,
-        window_size: usize,
+        window_size: Option<u64>,
     ) -> Result<Self> {
         let root = ledger_recovery_data
             .find_root(
@@ -312,15 +398,30 @@ impl RecoveryData {
                 )
             })?;
 
-        // TODO: Change RootInfo to a struct to be clearer?
-        let window_start_id = root.window_root_block.id();
-        let blocks_to_prune = Some(Self::find_blocks_to_prune(
-            window_start_id,
-            &mut blocks,
-            &mut quorum_certs,
-        ));
+        // If execution pool is enabled, use the window_root, else use the commit_root
+        let (blocks_to_prune, epoch) = match &root.window_root_block {
+            None => {
+                let commit_root_id = root.commit_root_block.id();
+                let epoch = root.commit_root_block.epoch();
+                let blocks_to_prune = Some(Self::find_blocks_to_prune(
+                    commit_root_id,
+                    &mut blocks,
+                    &mut quorum_certs,
+                ));
+                (blocks_to_prune, epoch)
+            },
+            Some(window_root_block) => {
+                let window_start_id = window_root_block.id();
+                let epoch = window_root_block.epoch();
+                let blocks_to_prune = Some(Self::find_blocks_to_prune(
+                    window_start_id,
+                    &mut blocks,
+                    &mut quorum_certs,
+                ));
+                (blocks_to_prune, epoch)
+            },
+        };
         info!("Blocks to prune: {:?}", blocks_to_prune);
-        let epoch = root.window_root_block.epoch();
         Ok(RecoveryData {
             last_vote: match last_vote {
                 Some(v) if v.epoch() == epoch => Some(v),
@@ -436,7 +537,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
         LedgerRecoveryData::new(latest_ledger_info)
     }
 
-    fn start(&self, order_vote_enabled: bool, window_size: usize) -> LivenessStorageData {
+    fn start(&self, order_vote_enabled: bool, window_size: Option<u64>) -> LivenessStorageData {
         info!("Start consensus recovery.");
         let raw_data = self
             .db

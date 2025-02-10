@@ -287,6 +287,7 @@ impl NodeSetup {
         ));
         let time_service = Arc::new(ClockTimeService::new(executor));
 
+        let window_size = onchain_consensus_config.window_size();
         let block_store = Arc::new(BlockStore::new(
             storage.clone(),
             initial_data,
@@ -296,7 +297,7 @@ impl NodeSetup {
             10,
             Arc::from(DirectMempoolPayloadManager::new()),
             false,
-            1,
+            window_size,
             Arc::new(Mutex::new(PendingBlocks::new())),
             None,
         ));

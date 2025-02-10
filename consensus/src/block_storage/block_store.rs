@@ -96,7 +96,7 @@ pub struct BlockStore {
     back_pressure_for_test: AtomicBool,
     order_vote_enabled: bool,
     /// Window Size for Execution Pool
-    window_size: usize,
+    window_size: Option<u64>,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
     pipeline_builder: Option<PipelineBuilder>,
 }
@@ -111,7 +111,7 @@ impl BlockStore {
         vote_back_pressure_limit: Round,
         payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
-        window_size: usize,
+        window_size: Option<u64>,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
         pipeline_builder: Option<PipelineBuilder>,
     ) -> Self {
@@ -172,7 +172,7 @@ impl BlockStore {
         vote_back_pressure_limit: Round,
         payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
-        window_size: usize,
+        window_size: Option<u64>,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
         pipeline_builder: Option<PipelineBuilder>,
         tree_to_replace: Option<Arc<RwLock<BlockTree>>>,
@@ -184,6 +184,7 @@ impl BlockStore {
             root.ordered_cert,
             root.commit_cert,
         );
+        let root_block_id = root_block.id();
 
         //verify root is correct
         assert!(
@@ -212,12 +213,24 @@ impl BlockStore {
         ));
         assert_eq!(result.root_hash(), root_metadata.accu_hash);
 
-        let pipelined_root_block = PipelinedBlock::new(
-            *window_block,
-            vec![],
-            // Create a dummy state_compute_result with necessary fields filled in.
-            result.clone(),
-        );
+        let pipelined_root_block = match window_block {
+            None => {
+                PipelinedBlock::new(
+                    *root_block,
+                    vec![],
+                    // Create a dummy state_compute_result with necessary fields filled in.
+                    result.clone(),
+                )
+            },
+            Some(window_block) => {
+                PipelinedBlock::new(
+                    *window_block,
+                    vec![],
+                    // Create a dummy state_compute_result with necessary fields filled in.
+                    result.clone(),
+                )
+            },
+        };
 
         if let Some(pipeline_builder) = &pipeline_builder {
             let pipeline_fut =
@@ -226,7 +239,7 @@ impl BlockStore {
         }
 
         let tree = BlockTree::new(
-            root_block.id(),
+            root_block_id,
             pipelined_root_block,
             root_qc,
             root_ordered_cert,
@@ -417,8 +430,11 @@ impl BlockStore {
             let now = Instant::now();
             for block in block_window.blocks() {
                 if let Some(payload) = block.payload() {
-                    self.payload_manager
-                        .prefetch_payload_data(payload, block.timestamp_usecs());
+                    self.payload_manager.prefetch_payload_data(
+                        payload,
+                        block.author().expect("Payload block must have author"),
+                        block.timestamp_usecs(),
+                    );
                 }
             }
             info!(

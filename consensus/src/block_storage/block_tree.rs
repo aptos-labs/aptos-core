@@ -283,10 +283,11 @@ impl BlockTree {
     pub fn get_ordered_block_window(
         &self,
         block: &Block,
-        window_size: usize,
+        window_size: Option<u64>,
     ) -> Option<OrderedBlockWindow> {
         // TODO: any other special cases that need to always have an empty window?
-        if block.is_nil_block() {
+        // window_size is None only if execution pool is turned off
+        if block.is_nil_block() || window_size.is_none() {
             return Some(OrderedBlockWindow::new(vec![]));
         }
 
@@ -297,9 +298,9 @@ impl BlockTree {
         // and it will return a seemingly valid OrderedBlockWindow... which is a bit unintuitive.
         // Maybe rename this function or scope it to be non-public to not confuse people in the future.
         // Revisit this later
-
+        let window_size = window_size.expect("Unexpected window size of None, assert window_size.is_none() invariant above was changed");
         let round = block.round();
-        let window_start_round = (round + 1).saturating_sub(window_size as u64);
+        let window_start_round = (round + 1).saturating_sub(window_size);
         let window_size = (round + 1) - window_start_round;
         assert!(window_size > 0, "window_size must be greater than 0");
         if window_size == 1 {
@@ -525,9 +526,12 @@ impl BlockTree {
     pub(super) fn find_window_root(
         &self,
         block_to_commit_id: HashValue,
-        window_size: usize,
+        window_size: Option<u64>,
     ) -> HashValue {
-        assert_ne!(window_size, 0, "Window size must be greater than 0");
+        // Window Size is None only if execution pool is off
+        if let Some(window_size) = window_size {
+            assert_ne!(window_size, 0, "Window size must be greater than 0");
+        }
 
         // Try to get the block, then the ordered window, then the first block's parent ID
         let block = self
@@ -630,7 +634,7 @@ impl BlockTree {
         blocks_to_commit: &[Arc<PipelinedBlock>],
         finality_proof: WrappedLedgerInfo,
         commit_decision: LedgerInfoWithSignatures,
-        window_size: usize,
+        window_size: Option<u64>,
     ) {
         info!("commit_callback blocks_to_commit: {:?}", blocks_to_commit);
 
@@ -662,7 +666,7 @@ impl BlockTree {
         block_id: HashValue,
         block_round: Round,
         commit_proof: WrappedLedgerInfo,
-        window_size: usize,
+        window_size: Option<u64>,
     ) {
         let current_round = self.commit_root().round();
         let committed_round = block_round;

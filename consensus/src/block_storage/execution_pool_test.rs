@@ -29,7 +29,7 @@ const DEFAULT_MAX_PRUNED_BLOCKS_IN_MEM: usize = 10;
 fn get_blocks_from_block_store_and_window(
     block_store: Arc<BlockStore>,
     block: &Block,
-    window_size: usize,
+    window_size: Option<u64>,
 ) -> Vec<Block> {
     let windowed_blocks = block_store
         .inner
@@ -44,7 +44,7 @@ fn get_blocks_from_block_store_and_window(
 fn get_roots(
     block: &Block,
     block_store: Arc<BlockStore>,
-    window_size: usize,
+    window_size: Option<u64>,
 ) -> (Arc<PipelinedBlock>, Option<HashValue>) {
     let block_store_inner_guard = block_store.inner.read();
     let commit_root = block_store_inner_guard.commit_root();
@@ -64,7 +64,7 @@ fn get_roots(
 /// NOTE: `num_blocks` includes the genesis block
 async fn create_block_tree_no_forks_inner<const N: usize>(
     num_blocks: u64,
-    window_size: usize,
+    window_size: Option<u64>,
     max_pruned_blocks_in_mem: usize,
 ) -> (TreeInserter, Arc<BlockStore>, [Arc<PipelinedBlock>; N]) {
     let validator_signer = ValidatorSigner::random(None);
@@ -105,7 +105,7 @@ async fn create_block_tree_no_forks_inner<const N: usize>(
 /// however ths includes a default for `max_pruned_blocks_in_mem` of 10
 async fn create_block_tree_no_forks<const N: usize>(
     num_blocks: u64,
-    window_size: usize,
+    window_size: Option<u64>,
 ) -> (TreeInserter, Arc<BlockStore>, [Arc<PipelinedBlock>; N]) {
     create_block_tree_no_forks_inner(num_blocks, window_size, DEFAULT_MAX_PRUNED_BLOCKS_IN_MEM)
         .await
@@ -122,7 +122,7 @@ async fn create_block_tree_no_forks<const N: usize>(
 ///
 /// WARNING: Be wary of changing this function, it will affect consumers downstream
 async fn create_block_tree_with_forks(
-    window_size: usize,
+    window_size: Option<u64>,
 ) -> (TreeInserter, Arc<BlockStore>, [Arc<PipelinedBlock>; 7]) {
     let validator_signer = ValidatorSigner::random(None);
     let mut inserter = TreeInserter::new_with_params(
@@ -174,7 +174,7 @@ async fn create_block_tree_with_forks(
 ///
 /// WARNING: Be wary of changing this function, it will affect consumers downstream
 async fn create_block_tree_with_forks_unordered_parents(
-    window_size: usize,
+    window_size: Option<u64>,
 ) -> (TreeInserter, Arc<BlockStore>, [Arc<PipelinedBlock>; 10]) {
     let validator_signer = ValidatorSigner::random(None);
     let mut inserter = TreeInserter::new_with_params(
@@ -237,7 +237,7 @@ async fn create_block_tree_with_forks_unordered_parents(
 ///    [`OrderedBlockWindow`](aptos_consensus_types::pipelined_block::OrderedBlockWindow).
 #[tokio::test]
 async fn test_execution_pool_block_window_3_no_commit() {
-    let window_size: usize = 3;
+    let window_size: Option<u64> = Some(3);
     let validator_signer = ValidatorSigner::random(None);
     let mut inserter = TreeInserter::new_with_params(
         validator_signer,
@@ -331,7 +331,7 @@ async fn test_execution_pool_block_window_3_no_commit() {
 
 #[tokio::test]
 async fn test_execution_pool_block_window_with_forks() {
-    let window_size: usize = 3;
+    let window_size = Some(3u64);
 
     //       ╭--> A1--> A2--> A3
     // Genesis--> B1--> B2
@@ -364,7 +364,7 @@ async fn test_execution_pool_block_window_with_forks() {
 async fn test_execution_pool_window_size_greater_than_block_store() {
     // window size > block store size
     const NUM_BLOCKS: usize = 4;
-    let window_size: usize = 10;
+    let window_size = Some(10u64);
 
     // Genesis ──> A1 ──> A2 ──> A3
     let (_, block_store, pipelined_blocks) =
@@ -385,7 +385,7 @@ async fn test_execution_pool_window_size_greater_than_block_store() {
 #[tokio::test]
 async fn test_execution_pool_block_window_with_pruning() {
     const NUM_BLOCKS: usize = 5;
-    let window_size: usize = 3;
+    let window_size = Some(3u64);
 
     // Genesis ──> A1 ──> ... ──> A4
     let (_, block_store, pipelined_blocks) =
@@ -415,7 +415,7 @@ async fn test_execution_pool_block_window_with_pruning() {
 #[tokio::test]
 async fn test_execution_pool_block_window_with_pruning_failure() {
     const NUM_BLOCKS: usize = 5;
-    let window_size: usize = 3;
+    let window_size = Some(3u64);
 
     // No pruned blocks are not kept in the block store if this is set to 0
     let max_pruned_blocks_in_mem: usize = 0;
@@ -437,7 +437,7 @@ async fn test_execution_pool_block_window_with_pruning_failure() {
 #[tokio::test]
 async fn test_window_root_window_size_0_failure() {
     const NUM_BLOCKS: usize = 5;
-    let window_size: usize = 1;
+    let window_size = Some(1u64);
     let (_, block_store, pipelined_blocks) =
         create_block_tree_no_forks::<{ NUM_BLOCKS }>(NUM_BLOCKS as u64, window_size).await;
 
@@ -445,7 +445,7 @@ async fn test_window_root_window_size_0_failure() {
     let [genesis_block, _, _, _, _] = pipelined_blocks;
 
     // Window size must be greater than 0, should panic
-    let window_size = 0;
+    let window_size = Some(0u64);
     block_store
         .inner
         .read()
@@ -456,7 +456,7 @@ async fn test_window_root_window_size_0_failure() {
 async fn test_window_root_no_forks() {
     // window_size > NUM_BLOCKS
     const NUM_BLOCKS: usize = 5;
-    let window_size: usize = 8;
+    let window_size = Some(8u64);
     let (_, block_store, pipelined_blocks) =
         create_block_tree_no_forks::<{ NUM_BLOCKS }>(NUM_BLOCKS as u64, window_size).await;
 
@@ -505,7 +505,7 @@ async fn test_window_root_no_forks() {
     // ----------------------------------------------------------------------------------------- //
 
     // window_size < NUM_BLOCKS
-    let window_size: usize = 2;
+    let window_size = Some(2u64);
     let (_, block_store, pipelined_blocks) =
         create_block_tree_no_forks::<{ NUM_BLOCKS }>(NUM_BLOCKS as u64, window_size).await;
 
@@ -549,7 +549,7 @@ async fn test_window_root_no_forks() {
 #[tokio::test]
 async fn test_window_root_with_forks() {
     // window_size > length of longest fork
-    let window_size: usize = 8;
+    let window_size = Some(8u64);
 
     //       ╭--> A1--> A2--> A3
     // Genesis--> B1--> B2
@@ -601,7 +601,7 @@ async fn test_window_root_with_forks() {
     // ----------------------------------------------------------------------------------------- //
 
     // window_size < length of longest fork
-    let window_size: usize = 1;
+    let window_size = Some(1u64);
 
     //       ╭--> A1--> A2--> A3
     // Genesis--> B1--> B2
@@ -643,7 +643,7 @@ async fn test_window_root_with_forks() {
 #[tokio::test]
 async fn test_window_root_with_non_sequential_round_forks() {
     // window_size > length of longest fork
-    let window_size: usize = 6;
+    let window_size = Some(6u64);
 
     //       ╭--> A1--> A2--> A3--> A4
     // Genesis--> B1--> B2--> B3
@@ -674,7 +674,7 @@ async fn test_window_root_with_non_sequential_round_forks() {
     assert_eq!(window_root.expect("Window root not found"), a2_r3.id());
 
     // expand window size to 7
-    let window_size: usize = 7;
+    let window_size = Some(7u64);
     let (commit_root, window_root) = get_roots(current_block, block_store.clone(), window_size);
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), current_block, window_size);
@@ -698,7 +698,7 @@ async fn test_window_root_with_non_sequential_round_forks() {
     block_store.prune_tree(a1_r1.id());
 
     // Expand window_size to 100
-    let window_size: usize = 100;
+    let window_size = Some(100u64);
     let (commit_root, window_root) = get_roots(current_block, block_store.clone(), window_size);
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), current_block, window_size);

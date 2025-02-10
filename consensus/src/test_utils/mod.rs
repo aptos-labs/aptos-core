@@ -43,6 +43,7 @@ use aptos_infallible::Mutex;
 use aptos_types::{
     block_info::BlockInfo,
     chain_id::ChainId,
+    on_chain_config::DEFAULT_ENABLED_WINDOW_SIZE,
     transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
 };
 pub use mock_payload_manager::MockPayloadManager;
@@ -87,7 +88,7 @@ pub async fn build_simple_tree() -> (Vec<Arc<PipelinedBlock>>, Arc<BlockStore>) 
     (vec![genesis_block, a1, a2, a3, b1, b2, c1], block_store)
 }
 
-fn build_empty_tree_inner(window_size: usize, max_pruned_blocks_in_mem: usize) -> BlockStore {
+fn build_empty_tree_inner(window_size: Option<u64>, max_pruned_blocks_in_mem: usize) -> BlockStore {
     let (initial_data, storage) = EmptyStorage::start_for_testing();
     BlockStore::new(
         storage,
@@ -105,7 +106,7 @@ fn build_empty_tree_inner(window_size: usize, max_pruned_blocks_in_mem: usize) -
 }
 
 pub fn build_default_empty_tree() -> Arc<BlockStore> {
-    let window_size: usize = 1;
+    let window_size = DEFAULT_ENABLED_WINDOW_SIZE;
     let max_pruned_blocks_in_mem: usize = 10;
     Arc::new(build_empty_tree_inner(
         window_size,
@@ -114,7 +115,7 @@ pub fn build_default_empty_tree() -> Arc<BlockStore> {
 }
 
 pub fn build_custom_empty_tree(
-    window_size: usize,
+    window_size: Option<u64>,
     max_pruned_blocks_in_mem: usize,
 ) -> Arc<BlockStore> {
     let block_store = build_empty_tree_inner(window_size, max_pruned_blocks_in_mem);
@@ -141,7 +142,7 @@ impl TreeInserter {
 
     pub fn new_with_params(
         signer: ValidatorSigner,
-        window_size: usize,
+        window_size: Option<u64>,
         max_pruned_blocks_in_mem: usize,
     ) -> Self {
         let block_store = build_custom_empty_tree(window_size, max_pruned_blocks_in_mem);
