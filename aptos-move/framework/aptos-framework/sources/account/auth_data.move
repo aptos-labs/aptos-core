@@ -3,8 +3,7 @@ module aptos_framework::auth_data {
 
     enum DomainAccount has copy, drop {
         V1 {
-            domain_name: String,
-            account_authentication_key: vector<u8>,
+            account_identity: vector<u8>,
         }
     }
 
@@ -30,11 +29,7 @@ module aptos_framework::auth_data {
         self is DomainV1
     }
 
-    public fun domain_name(self: &AbstractionAuthData): &String {
-        &self.account.domain_name
-    }
-
-    public fun account_authentication_key(self: &AbstractionAuthData): &vector<u8> {
-        &self.account.account_authentication_key
+    public fun account_identity(self: &AbstractionAuthData): &vector<u8> {
+        &self.account.account_identity
     }
 }
