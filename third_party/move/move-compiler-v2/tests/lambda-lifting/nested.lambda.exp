@@ -1,4 +1,4 @@
-// -- Model dump before env processor pipeline:
+// -- Model dump before bytecode pipeline
 module 0xcafe::m {
     private fun map1(x: u64,f: |u64|u64): u64 {
         (f)(x)
@@ -7,160 +7,56 @@ module 0xcafe::m {
         (f)(x)
     }
     private fun nested(x: u64,c: u64): u64 {
-        m::map1(x, |y: u64| Cast<u64>(m::map2(Cast<u8>(Sub<u64>(y, c)), |y: u8| Add<u8>(y, Cast<u8>(c)))))
+        m::map1(x, closure#1m::nested$lambda$2(c))
+    }
+    private fun nested$lambda$1(c: u64,y: u8): u8 {
+        Add<u8>(y, Cast<u8>(c))
+    }
+    private fun nested$lambda$2(c: u64,y: u64): u64 {
+        Cast<u64>(m::map2(Cast<u8>(Sub<u64>(y, c)), closure#1m::nested$lambda$1(c)))
     }
 } // end 0xcafe::m
 
-
-// -- Model dump after env processor unused checks:
+// -- Sourcified model before bytecode pipeline
 module 0xcafe::m {
-    private fun map1(x: u64,f: |u64|u64): u64 {
-        (f)(x)
+    fun map1(x: u64, f: |u64|u64): u64 {
+        f(x)
     }
-    private fun map2(x: u8,f: |u8|u8): u8 {
-        (f)(x)
+    fun map2(x: u8, f: |u8|u8): u8 {
+        f(x)
     }
-    private fun nested(x: u64,c: u64): u64 {
-        m::map1(x, |y: u64| Cast<u64>(m::map2(Cast<u8>(Sub<u64>(y, c)), |y: u8| Add<u8>(y, Cast<u8>(c)))))
+    fun nested(x: u64, c: u64): u64 {
+        map1(x, |arg0| nested$lambda$2(c, arg0))
     }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor type parameter check:
-module 0xcafe::m {
-    private fun map1(x: u64,f: |u64|u64): u64 {
-        (f)(x)
+    fun nested$lambda$1(c: u64, y: u8): u8 {
+        y + (c as u8)
     }
-    private fun map2(x: u8,f: |u8|u8): u8 {
-        (f)(x)
+    fun nested$lambda$2(c: u64, y: u64): u64 {
+        map2(y - c as u8, |arg0| nested$lambda$1(c, arg0)) as u64
     }
-    private fun nested(x: u64,c: u64): u64 {
-        m::map1(x, |y: u64| Cast<u64>(m::map2(Cast<u8>(Sub<u64>(y, c)), |y: u8| Add<u8>(y, Cast<u8>(c)))))
-    }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor check recursive struct definition:
-module 0xcafe::m {
-    private fun map1(x: u64,f: |u64|u64): u64 {
-        (f)(x)
-    }
-    private fun map2(x: u8,f: |u8|u8): u8 {
-        (f)(x)
-    }
-    private fun nested(x: u64,c: u64): u64 {
-        m::map1(x, |y: u64| Cast<u64>(m::map2(Cast<u8>(Sub<u64>(y, c)), |y: u8| Add<u8>(y, Cast<u8>(c)))))
-    }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor check cyclic type instantiation:
-module 0xcafe::m {
-    private fun map1(x: u64,f: |u64|u64): u64 {
-        (f)(x)
-    }
-    private fun map2(x: u8,f: |u8|u8): u8 {
-        (f)(x)
-    }
-    private fun nested(x: u64,c: u64): u64 {
-        m::map1(x, |y: u64| Cast<u64>(m::map2(Cast<u8>(Sub<u64>(y, c)), |y: u8| Add<u8>(y, Cast<u8>(c)))))
-    }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor unused struct params check:
-module 0xcafe::m {
-    private fun map1(x: u64,f: |u64|u64): u64 {
-        (f)(x)
-    }
-    private fun map2(x: u8,f: |u8|u8): u8 {
-        (f)(x)
-    }
-    private fun nested(x: u64,c: u64): u64 {
-        m::map1(x, |y: u64| Cast<u64>(m::map2(Cast<u8>(Sub<u64>(y, c)), |y: u8| Add<u8>(y, Cast<u8>(c)))))
-    }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor access and use check before inlining:
-module 0xcafe::m {
-    private fun map1(x: u64,f: |u64|u64): u64 {
-        (f)(x)
-    }
-    private fun map2(x: u8,f: |u8|u8): u8 {
-        (f)(x)
-    }
-    private fun nested(x: u64,c: u64): u64 {
-        m::map1(x, |y: u64| Cast<u64>(m::map2(Cast<u8>(Sub<u64>(y, c)), |y: u8| Add<u8>(y, Cast<u8>(c)))))
-    }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor inlining:
-module 0xcafe::m {
-    private fun map1(x: u64,f: |u64|u64): u64 {
-        (f)(x)
-    }
-    private fun map2(x: u8,f: |u8|u8): u8 {
-        (f)(x)
-    }
-    private fun nested(x: u64,c: u64): u64 {
-        m::map1(x, |y: u64| Cast<u64>(m::map2(Cast<u8>(Sub<u64>(y, c)), |y: u8| Add<u8>(y, Cast<u8>(c)))))
-    }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor access and use check after inlining:
-module 0xcafe::m {
-    private fun map1(x: u64,f: |u64|u64): u64 {
-        (f)(x)
-    }
-    private fun map2(x: u8,f: |u8|u8): u8 {
-        (f)(x)
-    }
-    private fun nested(x: u64,c: u64): u64 {
-        m::map1(x, |y: u64| Cast<u64>(m::map2(Cast<u8>(Sub<u64>(y, c)), |y: u8| Add<u8>(y, Cast<u8>(c)))))
-    }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor acquires check:
-module 0xcafe::m {
-    private fun map1(x: u64,f: |u64|u64): u64 {
-        (f)(x)
-    }
-    private fun map2(x: u8,f: |u8|u8): u8 {
-        (f)(x)
-    }
-    private fun nested(x: u64,c: u64): u64 {
-        m::map1(x, |y: u64| Cast<u64>(m::map2(Cast<u8>(Sub<u64>(y, c)), |y: u8| Add<u8>(y, Cast<u8>(c)))))
-    }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor simplifier:
-module 0xcafe::m {
-    private fun map1(x: u64,f: |u64|u64): u64 {
-        (f)(x)
-    }
-    private fun map2(x: u8,f: |u8|u8): u8 {
-        (f)(x)
-    }
-    private fun nested(x: u64,c: u64): u64 {
-        m::map1(x, |y: u64| Cast<u64>(m::map2(Cast<u8>(Sub<u64>(y, c)), |y: u8| Add<u8>(y, Cast<u8>(c)))))
-    }
-} // end 0xcafe::m
-
+}
 
 
 Diagnostics:
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
+error: Calls to function values other than inline function parameters not yet implemented
+  ┌─ tests/lambda-lifting/nested.move:5:9
+  │
+5 │         f(x)
+  │         ^^^^
+
+error: Calls to function values other than inline function parameters not yet implemented
+   ┌─ tests/lambda-lifting/nested.move:10:9
+   │
+10 │         f(x)
+   │         ^^^^
+
+error: Function-typed values not yet implemented except as parameters to calls to inline functions
    ┌─ tests/lambda-lifting/nested.move:15:42
    │
 15 │         map1(x, |y| (map2((y - c as u8), |y| y + (c as u8)) as u64))
    │                                          ^^^^^^^^^^^^^^^^^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
+error: Function-typed values not yet implemented except as parameters to calls to inline functions
    ┌─ tests/lambda-lifting/nested.move:15:17
    │
 15 │         map1(x, |y| (map2((y - c as u8), |y| y + (c as u8)) as u64))

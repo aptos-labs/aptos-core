@@ -1,0 +1,2 @@
+The tests here are copied over from `tests/inlining`, removing the `inline` modifier from function declarations. Some are expected to work, others produce errors because of modification
+of captured arguments or capturing references.

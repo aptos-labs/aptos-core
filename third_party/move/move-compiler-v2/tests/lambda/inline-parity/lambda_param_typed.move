@@ -1,17 +1,17 @@
 module 0x42::LambdaParam {
-    public inline fun inline_apply(f: |u64|u64, b: u64) : u64 {
+    public fun inline_apply(f: |u64|u64, b: u64) : u64 {
 	f(b)
     }
 
-    public inline fun inline_apply2(f: |u64|u64, b: u64) : u64 {
+    public fun inline_apply2(f: |u64|u64, b: u64) : u64 {
 	inline_apply(f, b)
     }
 
-    public inline fun inline_apply3(f: |u64|u64, b: u64) : u64 {
+    public fun inline_apply3(f: |u64|u64, b: u64) : u64 {
 	inline_apply4(f, b)
     }
 
-    public inline fun inline_apply4(_f: |u64|u64, b: u64) : u64 {
+    public fun inline_apply4(_f: |u64|u64, b: u64) : u64 {
 	b
     }
 

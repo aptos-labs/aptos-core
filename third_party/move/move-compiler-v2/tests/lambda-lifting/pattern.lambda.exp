@@ -1,4 +1,4 @@
-// -- Model dump before env processor pipeline:
+// -- Model dump before bytecode pipeline
 module 0xcafe::m {
     struct S<T> {
         x: T,
@@ -7,187 +7,46 @@ module 0xcafe::m {
         (f)(s, x)
     }
     private fun pattern(s: S<u64>,x: u64): u64 {
-        m::consume<u64>(s, x, |(m::S<u64>{ x }, _y: u64): (S<u64>, u64)| {
-          let y: u64 = x;
-          Add<u64>(x, y)
-        })
+        m::consume<u64>(s, x, closure#0m::pattern$lambda$1())
+    }
+    private fun pattern$lambda$1(param$0: S<u64>,_y: u64): u64 {
+        {
+          let m::S<u64>{ x } = param$0;
+          {
+            let y: u64 = x;
+            Add<u64>(x, y)
+          }
+        }
     }
 } // end 0xcafe::m
 
-
-// -- Model dump after env processor unused checks:
+// -- Sourcified model before bytecode pipeline
 module 0xcafe::m {
     struct S<T> {
         x: T,
     }
-    private fun consume<T>(s: S<T>,x: T,f: |(S<T>, T)|T): T {
-        (f)(s, x)
+    fun consume<T>(s: S<T>, x: T, f: |(S<T>, T)|T): T {
+        f(s, x)
     }
-    private fun pattern(s: S<u64>,x: u64): u64 {
-        m::consume<u64>(s, x, |(m::S<u64>{ x }, _y: u64): (S<u64>, u64)| {
-          let y: u64 = x;
-          Add<u64>(x, y)
-        })
+    fun pattern(s: S<u64>, x: u64): u64 {
+        consume<u64>(s, x, |(arg0,arg1)| pattern$lambda$1(arg0, arg1))
     }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor type parameter check:
-module 0xcafe::m {
-    struct S<T> {
-        x: T,
+    fun pattern$lambda$1(param$0: S<u64>, _y: u64): u64 {
+        let S<u64>{x: x} = param$0;
+        let y = x;
+        x + y
     }
-    private fun consume<T>(s: S<T>,x: T,f: |(S<T>, T)|T): T {
-        (f)(s, x)
-    }
-    private fun pattern(s: S<u64>,x: u64): u64 {
-        m::consume<u64>(s, x, |(m::S<u64>{ x }, _y: u64): (S<u64>, u64)| {
-          let y: u64 = x;
-          Add<u64>(x, y)
-        })
-    }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor check recursive struct definition:
-module 0xcafe::m {
-    struct S<T> {
-        x: T,
-    }
-    private fun consume<T>(s: S<T>,x: T,f: |(S<T>, T)|T): T {
-        (f)(s, x)
-    }
-    private fun pattern(s: S<u64>,x: u64): u64 {
-        m::consume<u64>(s, x, |(m::S<u64>{ x }, _y: u64): (S<u64>, u64)| {
-          let y: u64 = x;
-          Add<u64>(x, y)
-        })
-    }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor check cyclic type instantiation:
-module 0xcafe::m {
-    struct S<T> {
-        x: T,
-    }
-    private fun consume<T>(s: S<T>,x: T,f: |(S<T>, T)|T): T {
-        (f)(s, x)
-    }
-    private fun pattern(s: S<u64>,x: u64): u64 {
-        m::consume<u64>(s, x, |(m::S<u64>{ x }, _y: u64): (S<u64>, u64)| {
-          let y: u64 = x;
-          Add<u64>(x, y)
-        })
-    }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor unused struct params check:
-module 0xcafe::m {
-    struct S<T> {
-        x: T,
-    }
-    private fun consume<T>(s: S<T>,x: T,f: |(S<T>, T)|T): T {
-        (f)(s, x)
-    }
-    private fun pattern(s: S<u64>,x: u64): u64 {
-        m::consume<u64>(s, x, |(m::S<u64>{ x }, _y: u64): (S<u64>, u64)| {
-          let y: u64 = x;
-          Add<u64>(x, y)
-        })
-    }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor access and use check before inlining:
-module 0xcafe::m {
-    struct S<T> {
-        x: T,
-    }
-    private fun consume<T>(s: S<T>,x: T,f: |(S<T>, T)|T): T {
-        (f)(s, x)
-    }
-    private fun pattern(s: S<u64>,x: u64): u64 {
-        m::consume<u64>(s, x, |(m::S<u64>{ x }, _y: u64): (S<u64>, u64)| {
-          let y: u64 = x;
-          Add<u64>(x, y)
-        })
-    }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor inlining:
-module 0xcafe::m {
-    struct S<T> {
-        x: T,
-    }
-    private fun consume<T>(s: S<T>,x: T,f: |(S<T>, T)|T): T {
-        (f)(s, x)
-    }
-    private fun pattern(s: S<u64>,x: u64): u64 {
-        m::consume<u64>(s, x, |(m::S<u64>{ x }, _y: u64): (S<u64>, u64)| {
-          let y: u64 = x;
-          Add<u64>(x, y)
-        })
-    }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor access and use check after inlining:
-module 0xcafe::m {
-    struct S<T> {
-        x: T,
-    }
-    private fun consume<T>(s: S<T>,x: T,f: |(S<T>, T)|T): T {
-        (f)(s, x)
-    }
-    private fun pattern(s: S<u64>,x: u64): u64 {
-        m::consume<u64>(s, x, |(m::S<u64>{ x }, _y: u64): (S<u64>, u64)| {
-          let y: u64 = x;
-          Add<u64>(x, y)
-        })
-    }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor acquires check:
-module 0xcafe::m {
-    struct S<T> {
-        x: T,
-    }
-    private fun consume<T>(s: S<T>,x: T,f: |(S<T>, T)|T): T {
-        (f)(s, x)
-    }
-    private fun pattern(s: S<u64>,x: u64): u64 {
-        m::consume<u64>(s, x, |(m::S<u64>{ x }, _y: u64): (S<u64>, u64)| {
-          let y: u64 = x;
-          Add<u64>(x, y)
-        })
-    }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor simplifier:
-module 0xcafe::m {
-    struct S<T> {
-        x: T,
-    }
-    private fun consume<T>(s: S<T>,x: T,f: |(S<T>, T)|T): T {
-        (f)(s, x)
-    }
-    private fun pattern(s: S<u64>,x: u64): u64 {
-        m::consume<u64>(s, x, |(m::S<u64>{ x }, _y: u64): (S<u64>, u64)| {
-          let y: u64 = x;
-          Add<u64>(x, y)
-        })
-    }
-} // end 0xcafe::m
-
+}
 
 
 Diagnostics:
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
+error: Calls to function values other than inline function parameters not yet implemented
+   ┌─ tests/lambda-lifting/pattern.move:10:9
+   │
+10 │         f(s, x)
+   │         ^^^^^^^
+
+error: Function-typed values not yet implemented except as parameters to calls to inline functions
    ┌─ tests/lambda-lifting/pattern.move:15:23
    │
 15 │         consume(s, x, |S{x}, _y| { let y = x; x + y})

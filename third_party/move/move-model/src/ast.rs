@@ -21,7 +21,7 @@ use move_binary_format::{
     file_format,
     file_format::{CodeOffset, Visibility},
 };
-use move_core_types::{ability::AbilitySet, account_address::AccountAddress};
+use move_core_types::{account_address::AccountAddress, function::ClosureMask};
 use num::BigInt;
 use std::{
     borrow::Borrow,
@@ -641,7 +641,7 @@ pub enum ExpData {
     /// Represents an invocation of a function value, as a lambda.
     Invoke(NodeId, Exp, Vec<Exp>),
     /// Represents a lambda.
-    Lambda(NodeId, Pattern, Exp, LambdaCaptureKind, AbilitySet),
+    Lambda(NodeId, Pattern, Exp, LambdaCaptureKind),
     /// Represents a quantified formula over multiple variables and ranges.
     Quant(
         NodeId,
@@ -1441,7 +1441,7 @@ impl ExpData {
                     exp.visit_positions_impl(visitor)?;
                 }
             },
-            Lambda(_, _, body, _, _) => body.visit_positions_impl(visitor)?,
+            Lambda(_, _, body, _) => body.visit_positions_impl(visitor)?,
             Quant(_, _, ranges, triggers, condition, body) => {
                 for (_, range) in ranges {
                     range.visit_positions_impl(visitor)?;
@@ -1814,15 +1814,8 @@ impl ExpRewriterFunctions for LoopNestRewriter {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Operation {
     MoveFunction(ModuleId, FunId),
-    /// Build a closure by binding 1 or more leading arguments to a function value.
-    /// First argument to the operation must be a function; the remaining
-    /// arguments will be bound, in order, to the leading parameters of that function,
-    /// generating a function which takes the remaining parameters and then calls
-    /// the function with the complete set of parameters.
-    ///     (move |x, y| f(z, x, y)) === ExpData::Call(_, EarlyBind, vec![f, z])
-    ///     (move || f(z, x, y)) === ExpData::Call(_, EarlyBind, vec![f, z, x, y])
-    EarlyBind,
     Pack(ModuleId, StructId, /*variant*/ Option<Symbol>),
+    Closure(ModuleId, FunId, ClosureMask),
     Tuple,
     Select(ModuleId, StructId, FieldId),
     SelectVariants(
@@ -2667,14 +2660,13 @@ impl Operation {
     pub fn is_ok_to_remove_from_code(&self) -> bool {
         use Operation::*;
         match self {
-            MoveFunction(..) => false, // could abort
-            SpecFunction(..) => false, // Spec
-            Pack(..) => false,         // Could yield an undroppable value
+            MoveFunction(..) => false,       // could abort
+            SpecFunction(..) => false,       // Spec
+            Pack(..) | Closure(..) => false, // Could yield an undroppable value
             Tuple => true,
             Select(..) => false,         // Move-related
             SelectVariants(..) => false, // Move-related
             UpdateField(..) => false,    // Move-related
-            EarlyBind => true,
 
             // Specification specific
             Result(..) => false, // Spec
@@ -3251,7 +3243,7 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     self.fmt_exps(args)
                 )
             },
-            Lambda(id, pat, body, capture_kind, abilities) => {
+            Lambda(id, pat, body, capture_kind) => {
                 if self.verbose {
                     write!(
                         f,
@@ -3280,16 +3272,7 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                         body.display_cont(self)
                     )?;
                 }
-                if !abilities.is_subset(AbilitySet::FUNCTIONS) {
-                    let abilities_as_str = abilities
-                        .iter()
-                        .map(|a| a.to_string())
-                        .reduce(|l, r| format!("{}, {}", l, r))
-                        .unwrap_or_default();
-                    write!(f, " with {}", abilities_as_str)
-                } else {
-                    Ok(())
-                }
+                Ok(())
             },
             Block(id, pat, binding, body) => {
                 if self.verbose {
@@ -3561,18 +3544,21 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
                 }
                 Ok(())
             },
-            MoveFunction(mid, fid) => {
+            MoveFunction(mid, fid) | Closure(mid, fid, _) => {
+                let prefix = if let Closure(_, _, mask) = self.oper {
+                    format!("closure#{}", mask)
+                } else {
+                    "".to_string()
+                };
                 write!(
                     f,
-                    "{}",
+                    "{}{}",
+                    prefix,
                     self.env
                         .get_function_opt(mid.qualified(*fid))
                         .map(|fun| fun.get_full_name_str())
                         .unwrap_or_else(|| "<?unknown function?>".to_string())
                 )
-            },
-            EarlyBind => {
-                write!(f, "earlybind")
             },
             Global(label_opt) => {
                 write!(f, "global")?;

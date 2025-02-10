@@ -1,4 +1,4 @@
-// -- Model dump before env processor pipeline:
+// -- Model dump before bytecode pipeline
 module 0xc0ffee::m {
     public fun bar(): u64 {
         {
@@ -7,21 +7,9 @@ module 0xc0ffee::m {
             if Lt<u64>(i, 10) {
               i: u64 = Add<u64>(i, 1);
               if Eq<u64>(i, 5) {
-                m::brk2(|_x: u64| break);
-                m::brk2(|_x: u64| loop {
-                  if true {
-                    break
-                  } else {
-                    break
-                  }
-                });
-                m::brk2(|_x: u64| loop {
-                  if true {
-                    continue
-                  } else {
-                    break
-                  }
-                });
+                m::brk2(closure#0m::bar$lambda$1());
+                m::brk2(closure#0m::bar$lambda$2());
+                m::brk2(closure#0m::bar$lambda$3());
                 Tuple()
               } else {
                 Tuple()
@@ -33,15 +21,15 @@ module 0xc0ffee::m {
           i
         }
     }
-    private inline fun brk() {
+    private fun brk() {
         break;
         Tuple()
     }
-    private inline fun brk2(f: |u64|) {
+    private fun brk2(f: |u64|) {
         (f)(2);
         Tuple()
     }
-    private inline fun brk3() {
+    private fun brk3() {
         loop {
           if true {
             break;
@@ -51,7 +39,7 @@ module 0xc0ffee::m {
           }
         }
     }
-    private inline fun brk4() {
+    private fun brk4() {
         loop {
           if true {
             continue;
@@ -90,589 +78,134 @@ module 0xc0ffee::m {
           i
         }
     }
+    private fun bar$lambda$1(_x: u64) {
+        break
+    }
+    private fun bar$lambda$2(_x: u64) {
+        loop {
+          if true {
+            break
+          } else {
+            break
+          }
+        }
+    }
+    private fun bar$lambda$3(_x: u64) {
+        loop {
+          if true {
+            continue
+          } else {
+            break
+          }
+        }
+    }
 } // end 0xc0ffee::m
 
-
-// -- Model dump after env processor unused checks:
+// -- Sourcified model before bytecode pipeline
 module 0xc0ffee::m {
     public fun bar(): u64 {
-        {
-          let i: u64 = 0;
-          loop {
-            if Lt<u64>(i, 10) {
-              i: u64 = Add<u64>(i, 1);
-              if Eq<u64>(i, 5) {
-                m::brk2(|_x: u64| break);
-                m::brk2(|_x: u64| loop {
-                  if true {
-                    break
-                  } else {
-                    break
-                  }
-                });
-                m::brk2(|_x: u64| loop {
-                  if true {
-                    continue
-                  } else {
-                    break
-                  }
-                });
-                Tuple()
-              } else {
-                Tuple()
-              }
-            } else {
-              break
+        let i = 0;
+        while (i < 10) {
+            i = i + 1;
+            if (i == 5) {
+                brk2(|arg0| bar$lambda$1(arg0));
+                brk2(|arg0| bar$lambda$2(arg0));
+                brk2(|arg0| bar$lambda$3(arg0));
             }
-          };
-          i
-        }
+        };
+        i
     }
-    private inline fun brk() {
+    fun brk() {
         break;
-        Tuple()
     }
-    private inline fun brk2(f: |u64|) {
-        (f)(2);
-        Tuple()
+    fun brk2(f: |u64|) {
+        f(2);
     }
-    private inline fun brk3() {
-        loop {
-          if true {
+    fun brk3() {
+        while (true) {
             break;
-            Tuple()
-          } else {
-            break
-          }
         }
     }
-    private inline fun brk4() {
-        loop {
-          if true {
+    fun brk4() {
+        while (true) {
             continue;
-            Tuple()
-          } else {
-            break
-          }
         }
     }
-    private fun broken() {
+    fun broken() {
         break;
-        Tuple()
     }
-    private fun continued() {
+    fun continued() {
         continue;
-        Tuple()
     }
     public fun foo(): u64 {
-        {
-          let i: u64 = 0;
-          loop {
-            if Lt<u64>(i, 10) {
-              i: u64 = Add<u64>(i, 1);
-              if Eq<u64>(i, 5) {
-                m::brk();
-                m::brk3();
-                m::brk4();
-                Tuple()
-              } else {
-                Tuple()
-              }
-            } else {
-              break
+        let i = 0;
+        while (i < 10) {
+            i = i + 1;
+            if (i == 5) {
+                brk();
+                brk3();
+                brk4();
             }
-          };
-          i
-        }
+        };
+        i
     }
-} // end 0xc0ffee::m
-
-
-// -- Model dump after env processor type parameter check:
-module 0xc0ffee::m {
-    public fun bar(): u64 {
-        {
-          let i: u64 = 0;
-          loop {
-            if Lt<u64>(i, 10) {
-              i: u64 = Add<u64>(i, 1);
-              if Eq<u64>(i, 5) {
-                m::brk2(|_x: u64| break);
-                m::brk2(|_x: u64| loop {
-                  if true {
-                    break
-                  } else {
-                    break
-                  }
-                });
-                m::brk2(|_x: u64| loop {
-                  if true {
-                    continue
-                  } else {
-                    break
-                  }
-                });
-                Tuple()
-              } else {
-                Tuple()
-              }
-            } else {
-              break
-            }
-          };
-          i
-        }
+    fun bar$lambda$1(_x: u64) {
+        break
     }
-    private inline fun brk() {
-        break;
-        Tuple()
+    fun bar$lambda$2(_x: u64) {
+        while (true) break
     }
-    private inline fun brk2(f: |u64|) {
-        (f)(2);
-        Tuple()
+    fun bar$lambda$3(_x: u64) {
+        while (true) continue
     }
-    private inline fun brk3() {
-        loop {
-          if true {
-            break;
-            Tuple()
-          } else {
-            break
-          }
-        }
-    }
-    private inline fun brk4() {
-        loop {
-          if true {
-            continue;
-            Tuple()
-          } else {
-            break
-          }
-        }
-    }
-    private fun broken() {
-        break;
-        Tuple()
-    }
-    private fun continued() {
-        continue;
-        Tuple()
-    }
-    public fun foo(): u64 {
-        {
-          let i: u64 = 0;
-          loop {
-            if Lt<u64>(i, 10) {
-              i: u64 = Add<u64>(i, 1);
-              if Eq<u64>(i, 5) {
-                m::brk();
-                m::brk3();
-                m::brk4();
-                Tuple()
-              } else {
-                Tuple()
-              }
-            } else {
-              break
-            }
-          };
-          i
-        }
-    }
-} // end 0xc0ffee::m
-
-
-// -- Model dump after env processor check recursive struct definition:
-module 0xc0ffee::m {
-    public fun bar(): u64 {
-        {
-          let i: u64 = 0;
-          loop {
-            if Lt<u64>(i, 10) {
-              i: u64 = Add<u64>(i, 1);
-              if Eq<u64>(i, 5) {
-                m::brk2(|_x: u64| break);
-                m::brk2(|_x: u64| loop {
-                  if true {
-                    break
-                  } else {
-                    break
-                  }
-                });
-                m::brk2(|_x: u64| loop {
-                  if true {
-                    continue
-                  } else {
-                    break
-                  }
-                });
-                Tuple()
-              } else {
-                Tuple()
-              }
-            } else {
-              break
-            }
-          };
-          i
-        }
-    }
-    private inline fun brk() {
-        break;
-        Tuple()
-    }
-    private inline fun brk2(f: |u64|) {
-        (f)(2);
-        Tuple()
-    }
-    private inline fun brk3() {
-        loop {
-          if true {
-            break;
-            Tuple()
-          } else {
-            break
-          }
-        }
-    }
-    private inline fun brk4() {
-        loop {
-          if true {
-            continue;
-            Tuple()
-          } else {
-            break
-          }
-        }
-    }
-    private fun broken() {
-        break;
-        Tuple()
-    }
-    private fun continued() {
-        continue;
-        Tuple()
-    }
-    public fun foo(): u64 {
-        {
-          let i: u64 = 0;
-          loop {
-            if Lt<u64>(i, 10) {
-              i: u64 = Add<u64>(i, 1);
-              if Eq<u64>(i, 5) {
-                m::brk();
-                m::brk3();
-                m::brk4();
-                Tuple()
-              } else {
-                Tuple()
-              }
-            } else {
-              break
-            }
-          };
-          i
-        }
-    }
-} // end 0xc0ffee::m
-
-
-// -- Model dump after env processor check cyclic type instantiation:
-module 0xc0ffee::m {
-    public fun bar(): u64 {
-        {
-          let i: u64 = 0;
-          loop {
-            if Lt<u64>(i, 10) {
-              i: u64 = Add<u64>(i, 1);
-              if Eq<u64>(i, 5) {
-                m::brk2(|_x: u64| break);
-                m::brk2(|_x: u64| loop {
-                  if true {
-                    break
-                  } else {
-                    break
-                  }
-                });
-                m::brk2(|_x: u64| loop {
-                  if true {
-                    continue
-                  } else {
-                    break
-                  }
-                });
-                Tuple()
-              } else {
-                Tuple()
-              }
-            } else {
-              break
-            }
-          };
-          i
-        }
-    }
-    private inline fun brk() {
-        break;
-        Tuple()
-    }
-    private inline fun brk2(f: |u64|) {
-        (f)(2);
-        Tuple()
-    }
-    private inline fun brk3() {
-        loop {
-          if true {
-            break;
-            Tuple()
-          } else {
-            break
-          }
-        }
-    }
-    private inline fun brk4() {
-        loop {
-          if true {
-            continue;
-            Tuple()
-          } else {
-            break
-          }
-        }
-    }
-    private fun broken() {
-        break;
-        Tuple()
-    }
-    private fun continued() {
-        continue;
-        Tuple()
-    }
-    public fun foo(): u64 {
-        {
-          let i: u64 = 0;
-          loop {
-            if Lt<u64>(i, 10) {
-              i: u64 = Add<u64>(i, 1);
-              if Eq<u64>(i, 5) {
-                m::brk();
-                m::brk3();
-                m::brk4();
-                Tuple()
-              } else {
-                Tuple()
-              }
-            } else {
-              break
-            }
-          };
-          i
-        }
-    }
-} // end 0xc0ffee::m
-
-
-// -- Model dump after env processor unused struct params check:
-module 0xc0ffee::m {
-    public fun bar(): u64 {
-        {
-          let i: u64 = 0;
-          loop {
-            if Lt<u64>(i, 10) {
-              i: u64 = Add<u64>(i, 1);
-              if Eq<u64>(i, 5) {
-                m::brk2(|_x: u64| break);
-                m::brk2(|_x: u64| loop {
-                  if true {
-                    break
-                  } else {
-                    break
-                  }
-                });
-                m::brk2(|_x: u64| loop {
-                  if true {
-                    continue
-                  } else {
-                    break
-                  }
-                });
-                Tuple()
-              } else {
-                Tuple()
-              }
-            } else {
-              break
-            }
-          };
-          i
-        }
-    }
-    private inline fun brk() {
-        break;
-        Tuple()
-    }
-    private inline fun brk2(f: |u64|) {
-        (f)(2);
-        Tuple()
-    }
-    private inline fun brk3() {
-        loop {
-          if true {
-            break;
-            Tuple()
-          } else {
-            break
-          }
-        }
-    }
-    private inline fun brk4() {
-        loop {
-          if true {
-            continue;
-            Tuple()
-          } else {
-            break
-          }
-        }
-    }
-    private fun broken() {
-        break;
-        Tuple()
-    }
-    private fun continued() {
-        continue;
-        Tuple()
-    }
-    public fun foo(): u64 {
-        {
-          let i: u64 = 0;
-          loop {
-            if Lt<u64>(i, 10) {
-              i: u64 = Add<u64>(i, 1);
-              if Eq<u64>(i, 5) {
-                m::brk();
-                m::brk3();
-                m::brk4();
-                Tuple()
-              } else {
-                Tuple()
-              }
-            } else {
-              break
-            }
-          };
-          i
-        }
-    }
-} // end 0xc0ffee::m
-
-
-// -- Model dump after env processor access and use check before inlining:
-module 0xc0ffee::m {
-    public fun bar(): u64 {
-        {
-          let i: u64 = 0;
-          loop {
-            if Lt<u64>(i, 10) {
-              i: u64 = Add<u64>(i, 1);
-              if Eq<u64>(i, 5) {
-                m::brk2(|_x: u64| break);
-                m::brk2(|_x: u64| loop {
-                  if true {
-                    break
-                  } else {
-                    break
-                  }
-                });
-                m::brk2(|_x: u64| loop {
-                  if true {
-                    continue
-                  } else {
-                    break
-                  }
-                });
-                Tuple()
-              } else {
-                Tuple()
-              }
-            } else {
-              break
-            }
-          };
-          i
-        }
-    }
-    private inline fun brk() {
-        break;
-        Tuple()
-    }
-    private inline fun brk2(f: |u64|) {
-        (f)(2);
-        Tuple()
-    }
-    private inline fun brk3() {
-        loop {
-          if true {
-            break;
-            Tuple()
-          } else {
-            break
-          }
-        }
-    }
-    private inline fun brk4() {
-        loop {
-          if true {
-            continue;
-            Tuple()
-          } else {
-            break
-          }
-        }
-    }
-    private fun broken() {
-        break;
-        Tuple()
-    }
-    private fun continued() {
-        continue;
-        Tuple()
-    }
-    public fun foo(): u64 {
-        {
-          let i: u64 = 0;
-          loop {
-            if Lt<u64>(i, 10) {
-              i: u64 = Add<u64>(i, 1);
-              if Eq<u64>(i, 5) {
-                m::brk();
-                m::brk3();
-                m::brk4();
-                Tuple()
-              } else {
-                Tuple()
-              }
-            } else {
-              break
-            }
-          };
-          i
-        }
-    }
-} // end 0xc0ffee::m
-
+}
 
 
 Diagnostics:
-error: Break outside of a loop not currently supported in inline functions
+error: missing enclosing loop statement
   ┌─ tests/lambda/inline-parity/break_continue_in_lambda_typed.move:3:9
   │
 3 │         break;
   │         ^^^^^
 
-error: Break outside of a loop not supported in function-typed arguments (lambda expressions)
+error: Calls to function values other than inline function parameters not yet implemented
+  ┌─ tests/lambda/inline-parity/break_continue_in_lambda_typed.move:7:9
+  │
+7 │         f(2);
+  │         ^^^^
+
+error: missing enclosing loop statement
    ┌─ tests/lambda/inline-parity/break_continue_in_lambda_typed.move:40:32
    │
 40 │                 brk2(|_x: u64| break);
    │                                ^^^^^
+
+error: Function-typed values not yet implemented except as parameters to calls to inline functions
+   ┌─ tests/lambda/inline-parity/break_continue_in_lambda_typed.move:40:22
+   │
+40 │                 brk2(|_x: u64| break);
+   │                      ^^^^^^^^^^^^^^^
+
+error: Function-typed values not yet implemented except as parameters to calls to inline functions
+   ┌─ tests/lambda/inline-parity/break_continue_in_lambda_typed.move:41:8
+   │
+41 │         brk2(|_x: u64| while (true) { break });
+   │              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: Function-typed values not yet implemented except as parameters to calls to inline functions
+   ┌─ tests/lambda/inline-parity/break_continue_in_lambda_typed.move:42:8
+   │
+42 │         brk2(|_x: u64| while (true) { continue });
+   │              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: missing enclosing loop statement
+   ┌─ tests/lambda/inline-parity/break_continue_in_lambda_typed.move:49:2
+   │
+49 │     break;
+   │     ^^^^^
+
+error: missing enclosing loop statement
+   ┌─ tests/lambda/inline-parity/break_continue_in_lambda_typed.move:53:2
+   │
+53 │     continue;
+   │     ^^^^^^^^
