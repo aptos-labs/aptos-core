@@ -10,7 +10,7 @@ pub mod common;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aptos_in_memory_cache::caches::sync_mutex::SyncMutexCache;
+    use aptos_in_memory_cache::caches::SyncMutexCache;
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
     async fn test_insert_out_of_order() {

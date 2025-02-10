@@ -1,4 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod sync_mutex;
+mod sync_mutex;
+
+pub use sync_mutex::SyncMutexCache;

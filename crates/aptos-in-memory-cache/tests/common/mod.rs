@@ -30,7 +30,7 @@ pub struct TestCacheMetadata {
 }
 
 #[derive(Debug)]
-pub struct TestCache<C: SizedCache<NotATransaction> + 'static> {
+pub struct TestCache<C: SizedCache<usize, NotATransaction> + 'static> {
     pub metadata: Arc<TestCacheMetadata>,
     pub cache: Arc<C>,
     pub insert_notify: Arc<Notify>,
@@ -38,13 +38,13 @@ pub struct TestCache<C: SizedCache<NotATransaction> + 'static> {
     pub eviction_task: JoinHandle<()>,
 }
 
-impl<C: SizedCache<NotATransaction> + 'static> Drop for TestCache<C> {
+impl<C: SizedCache<usize, NotATransaction> + 'static> Drop for TestCache<C> {
     fn drop(&mut self) {
         self.eviction_task.abort();
     }
 }
 
-impl<C: SizedCache<NotATransaction> + 'static> TestCache<C> {
+impl<C: SizedCache<usize, NotATransaction> + 'static> TestCache<C> {
     pub fn with_capacity(
         c: C,
         eviction_trigger_size_in_bytes: usize,
@@ -75,7 +75,9 @@ impl<C: SizedCache<NotATransaction> + 'static> TestCache<C> {
     }
 }
 
-impl<C: SizedCache<NotATransaction> + 'static> Cache<usize, NotATransaction> for TestCache<C> {
+impl<C: SizedCache<usize, NotATransaction> + 'static> Cache<usize, NotATransaction>
+    for TestCache<C>
+{
     fn get(&self, key: &usize) -> Option<NotATransaction> {
         self.cache.get(key).and_then(|entry| {
             if entry.key == *key {
@@ -100,7 +102,7 @@ impl<C: SizedCache<NotATransaction> + 'static> Cache<usize, NotATransaction> for
 }
 
 /// Perform cache eviction on a separate task.
-fn spawn_eviction_task<C: SizedCache<NotATransaction> + 'static>(
+fn spawn_eviction_task<C: SizedCache<usize, NotATransaction> + 'static>(
     insert_notify: Arc<Notify>,
     highest_key: Arc<AtomicUsize>,
     metadata: Arc<TestCacheMetadata>,
