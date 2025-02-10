@@ -227,11 +227,19 @@ impl BlockStore {
                 break;
             }
             BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT.inc_by(1);
+            let target_block_retrieval_payload = match &self.window_size {
+                None => {
+                    TargetBlockRetrievalPayload::TargetBlockId(retrieve_qc.certified_block().id())
+                },
+                Some(_) => {
+                    TargetBlockRetrievalPayload::TargetRound(retrieve_qc.certified_block().round())
+                },
+            };
             let mut blocks = retriever
                 .retrieve_blocks_in_range(
                     retrieve_qc.certified_block().id(),
                     1,
-                    retrieve_qc.certified_block().round(),
+                    target_block_retrieval_payload,
                     qc.ledger_info()
                         .get_voters(&retriever.validator_addresses()),
                 )
@@ -307,7 +315,7 @@ impl BlockStore {
         execution_client: Arc<dyn TExecutionClient>,
         payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
-        window_size: usize,
+        window_size: Option<u64>,
     ) -> anyhow::Result<RecoveryData> {
         info!(
             LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer),
@@ -316,24 +324,45 @@ impl BlockStore {
             highest_quorum_cert,
         );
 
-        // For execution, we need the window starting from the highest_commit_cert + 1.
-        // TODO: what happens cross-epoch?
-        let highest_commit_cert_round = highest_commit_cert.ledger_info().ledger_info().round();
         // TODO: we should not retrieve genesis, double check this is the right way to do that
-        let target_round = max(
-            1,
-            min(
-                highest_commit_cert_round,
-                // commit_cert + 1 - (window_size - 1)
-                highest_commit_cert_round.saturating_sub(window_size as u64),
-            ),
-        );
-
-        let num_blocks = highest_quorum_cert.certified_block().round() - target_round + 1;
-        info!(
-            "fast_forward_sync window_size: {}, target_round: {}, num_blocks: {}",
-            window_size, target_round, num_blocks
-        );
+        // If execution pool is enabled, use round based block retrieval, else use target block id
+        let (target_block_retrieval_payload, num_blocks) = match window_size {
+            None => {
+                let num_blocks = highest_quorum_cert.certified_block().round()
+                    - highest_commit_cert.ledger_info().ledger_info().round()
+                    + 1;
+                let target_block_id = highest_commit_cert.commit_info().id();
+                info!(
+                    "fast_forward_sync with NO window_size: {:?}, target_block_id: {}, num_blocks: {}",
+                    window_size, target_block_id, num_blocks
+                );
+                (
+                    TargetBlockRetrievalPayload::TargetBlockId(target_block_id),
+                    num_blocks,
+                )
+            },
+            Some(window_size) => {
+                // For execution, we need the window starting from the highest_commit_cert + 1.
+                let highest_commit_cert_round =
+                    highest_commit_cert.ledger_info().ledger_info().round();
+                let target_round = max(
+                    1,
+                    min(
+                        highest_commit_cert_round,
+                        highest_commit_cert_round.saturating_sub(window_size),
+                    ),
+                );
+                let num_blocks = highest_quorum_cert.certified_block().round() - target_round + 1;
+                info!(
+                    "fast_forward_sync with window_size: {:?}, target_round: {}, num_blocks: {}",
+                    window_size, target_round, num_blocks
+                );
+                (
+                    TargetBlockRetrievalPayload::TargetRound(target_round),
+                    num_blocks,
+                )
+            },
+        };
 
         // although unlikely, we might wrap num_blocks around on a 32-bit machine
         assert!(num_blocks < std::usize::MAX as u64);
@@ -343,7 +372,7 @@ impl BlockStore {
             .retrieve_blocks_in_range(
                 highest_quorum_cert.certified_block().id(),
                 num_blocks,
-                target_round,
+                target_block_retrieval_payload,
                 highest_quorum_cert
                     .ledger_info()
                     .get_voters(&retriever.validator_addresses()),
@@ -359,12 +388,23 @@ impl BlockStore {
         );
 
         // Confirm retrieval hit at least the last round we care about
-        assert!(
-            blocks.last().expect("blocks are empty").round() <= target_round,
-            "Expecting in the retrieval response, last block should be <= {}, but got {}",
-            target_round,
-            blocks.last().expect("blocks are empty").round()
-        );
+        // Slightly different logic if using execution pool and not
+        match target_block_retrieval_payload {
+            TargetBlockRetrievalPayload::TargetBlockId(_) => {
+                assert_eq!(
+                    blocks.last().expect("blocks are empty").id(),
+                    highest_commit_cert.commit_info().id()
+                );
+            },
+            TargetBlockRetrievalPayload::TargetRound(target_round) => {
+                assert!(
+                    blocks.last().expect("blocks are empty").round() <= target_round,
+                    "Expecting in the retrieval response, last block should be <= {}, but got {}",
+                    target_round,
+                    blocks.last().expect("blocks are empty").round()
+                );
+            },
+        }
 
         let mut quorum_certs = vec![highest_quorum_cert.clone()];
         quorum_certs.extend(
@@ -389,11 +429,19 @@ impl BlockStore {
                     highest_commit_cert
                 );
                 BLOCKS_FETCHED_FROM_NETWORK_WHILE_FAST_FORWARD_SYNC.inc_by(1);
+                let target_block_retrieval_payload = match window_size {
+                    None => TargetBlockRetrievalPayload::TargetBlockId(
+                        highest_commit_certified_block.id(),
+                    ),
+                    Some(_) => TargetBlockRetrievalPayload::TargetRound(
+                        highest_commit_certified_block.round(),
+                    ),
+                };
                 let mut additional_blocks = retriever
                     .retrieve_blocks_in_range(
                         highest_commit_certified_block.id(),
                         1,
-                        highest_commit_certified_block.round(),
+                        target_block_retrieval_payload,
                         highest_commit_cert
                             .ledger_info()
                             .get_voters(&retriever.validator_addresses()),
@@ -591,6 +639,13 @@ pub struct BlockRetriever {
     pending_blocks: Arc<Mutex<PendingBlocks>>,
 }
 
+/// When execution pool is on, use `TargetRound` variant, otherwise use `TargetBlockId`
+#[derive(Clone, Copy, Debug)]
+pub enum TargetBlockRetrievalPayload {
+    TargetBlockId(HashValue),
+    TargetRound(u64),
+}
+
 impl BlockRetriever {
     pub fn new(
         network: Arc<NetworkSender>,
@@ -615,7 +670,7 @@ impl BlockRetriever {
     async fn retrieve_block_for_id_chunk(
         &mut self,
         block_id: HashValue,
-        target_round: u64,
+        target_block_retrieval_payload: TargetBlockRetrievalPayload,
         retrieve_batch_size: u64,
         mut peers: Vec<AccountAddress>,
     ) -> anyhow::Result<BlockRetrievalResponse> {
@@ -632,7 +687,9 @@ impl BlockRetriever {
             let mut futures = FuturesUnordered::new();
             if retrieve_batch_size == 1 {
                 let (tx, rx) = oneshot::channel();
-                self.pending_blocks.lock().insert_request(target_round, tx);
+                self.pending_blocks
+                    .lock()
+                    .insert_request(target_block_retrieval_payload, tx);
                 let author = self.network.author();
                 futures.push(
                     async move {
@@ -744,14 +801,25 @@ impl BlockRetriever {
     async fn retrieve_block_for_id(
         &mut self,
         block_id: HashValue,
-        target_round: u64,
+        target_block_retrieval_payload: TargetBlockRetrievalPayload,
         peers: Vec<AccountAddress>,
         num_blocks: u64,
     ) -> anyhow::Result<Vec<Block>> {
-        info!(
-            "Retrieving {} blocks starting from {} with target_round {}",
-            num_blocks, block_id, target_round
-        );
+        match &target_block_retrieval_payload {
+            TargetBlockRetrievalPayload::TargetBlockId(target_block_id) => {
+                info!(
+                    "Retrieving {} blocks starting from {} with target_block_id {}",
+                    num_blocks, block_id, target_block_id
+                );
+            },
+            TargetBlockRetrievalPayload::TargetRound(target_round) => {
+                info!(
+                    "Retrieving {} blocks starting from {} with target_round {}",
+                    num_blocks, block_id, target_round
+                );
+            },
+        }
+
         let mut progress = 0;
         let mut last_block_id = block_id;
         let mut result_blocks: Vec<Block> = vec![];
@@ -771,7 +839,7 @@ impl BlockRetriever {
             let response = self
                 .retrieve_block_for_id_chunk(
                     last_block_id,
-                    target_round,
+                    target_block_retrieval_payload,
                     retrieve_batch_size,
                     peers.clone(),
                 )
@@ -819,13 +887,27 @@ impl BlockRetriever {
             result_blocks
         );
 
-        assert_ge!(
-            target_round,
-            result_blocks
-                .last()
-                .expect("Expected at least a result_block")
-                .round()
-        );
+        match target_block_retrieval_payload {
+            TargetBlockRetrievalPayload::TargetBlockId(target_block_id) => {
+                assert_eq!(
+                    result_blocks
+                        .last()
+                        .expect("Expected at least a result_block")
+                        .id(),
+                    target_block_id
+                );
+            },
+            TargetBlockRetrievalPayload::TargetRound(target_round) => {
+                assert_ge!(
+                    target_round,
+                    result_blocks
+                        .last()
+                        .expect("Expected at least a result_block")
+                        .round()
+                );
+            },
+        }
+
         Ok(result_blocks)
     }
 
@@ -834,12 +916,17 @@ impl BlockRetriever {
         &mut self,
         initial_block_id: HashValue,
         num_blocks: u64,
-        target_round: u64,
+        target_block_retrieval_payload: TargetBlockRetrievalPayload,
         peers: Vec<AccountAddress>,
     ) -> anyhow::Result<Vec<Block>> {
         BLOCKS_FETCHED_FROM_NETWORK_IN_BLOCK_RETRIEVER.inc_by(num_blocks);
-        self.retrieve_block_for_id(initial_block_id, target_round, peers, num_blocks)
-            .await
+        self.retrieve_block_for_id(
+            initial_block_id,
+            target_block_retrieval_payload,
+            peers,
+            num_blocks,
+        )
+        .await
     }
 
     fn pick_peer(&self, first_atempt: bool, peers: &mut Vec<AccountAddress>) -> AccountAddress {
