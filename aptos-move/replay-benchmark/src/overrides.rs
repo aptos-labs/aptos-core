@@ -227,10 +227,13 @@ impl OverrideConfig {
                                 err
                             )
                         });
-                let state_value = onchain_state_value.map_or_else(
-                    || StateValue::new_legacy(module_bytes.into()),
-                    |s| s.map_bytes(|_| Ok(module_bytes.clone().into())).unwrap(),
-                );
+                let state_value = match onchain_state_value {
+                    Some(state_value) => {
+                        state_value.map_bytes(|_| Ok(module_bytes.into())).unwrap()
+                    },
+
+                    None => StateValue::new_legacy(module_bytes.into()),
+                };
                 if state_override.insert(state_key, state_value).is_some() {
                     panic!(
                         "Overriding module {}::{} more than once",
