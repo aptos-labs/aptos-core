@@ -1,19 +1,19 @@
 module 0xc0ffee::m {
-    inline fun brk() {
+    fun brk() {
         break;
     }
 
-    inline fun brk2(f: |u64|) {
+    fun brk2(f: |u64|) {
         f(2);
     }
 
-    inline fun brk3() {
+    fun brk3() {
 	while (true) {
             break;
 	}
     }
 
-    inline fun brk4() {
+    fun brk4() {
 	while (true) {
             continue;
 	}

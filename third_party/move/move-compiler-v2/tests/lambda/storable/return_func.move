@@ -17,11 +17,11 @@ module 0x42::test {
         x * y * z
     }
 
-    fun multiply_by_x(x: u64): |u64|u64 with store {
-        move |y| multiply(x, y) with store
+    fun multiply_by_x(x: u64): |u64|u64 has store {
+        |y| multiply(x, y)
     }
 
-    fun choose_function(key: u64) : |u64|u64 with store {
+    fun choose_function(key: u64) : |u64|u64 has store {
         if (key == 0) {
             double
         } else if (key == 1) {
@@ -31,39 +31,39 @@ module 0x42::test {
         }
     }
 
-    fun choose_function2(key: u64): |u64|u64 with store {
+    fun choose_function2(key: u64): |u64|u64 has store {
         if (key == 0) {
-            move |x| double(x) with store
+            |x| double(x)
         } else if (key == 1) {
-            move |x| triple(x) with store
+            |x| triple(x)
         } else if (key == 2) {
             let f = multiply_by_x(4);
-            move |x| f(x) with store
+            |x| f(x)
         } else if (key == 3) {
             let f = multiply_by_x(5);
-            move |x| f(x) with store
+            |x| f(x)
         } else if (key == 4) {
-            let f = move |y| multiply(6, y) with store;
+            let f = |y| multiply(6, y);
             f
         } else if (key == 5) {
-            move |y| multiply(y, 7) with store
+            |y| multiply(y, 7)
         } else if (key == 6) {
-            let f = move |y| multiply(6, y) with store;
-            move |x| f(x) with store
+            let f = |y| multiply(6, y);
+            |x| f(x)
         } else if (key == 7) {
             let f = multiply_by_x(5);
-            move |x| f(x) with store
+            |x| f(x)
         } else {
-            move |y| multiply3(y, 3, 4) with store
+            |y| multiply3(y, 3, 4)
         }
     }
 
-    fun choose_function3(key: u64) : |u64|u64 with store {
+    fun choose_function3(key: u64) : |u64|u64 has store {
         if (key == 0) {
-            let f = move |x| double(x) with store;
+            let f = |x| double(x);
             f
         } else if (key == 1) {
-            let g = move |x| triple(x) with store;
+            let g = |x| triple(x);
             g
         } else {
             let h = multiply_by_x(4);
@@ -71,7 +71,7 @@ module 0x42::test {
         }
     }
 
-    public fun test_functions(choose_function: |u64|(|u64|u64 with store)) {
+    public fun test_functions(choose_function: |u64|(|u64|u64 has store)) {
         let sum = vector<u64>[];
         let x = 3;
         vector::push_back(&mut sum, (choose_function(0))(x));

@@ -105,10 +105,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         runner: |p| run(p, get_config_by_name("lambda")),
         experiments: &[
             (Experiment::OPTIMIZE, true),
-            (Experiment::LAMBDA_FIELDS, true),
-            (Experiment::LAMBDA_IN_PARAMS, true),
-            (Experiment::LAMBDA_IN_RETURNS, true),
-            (Experiment::LAMBDA_VALUES, true),
+            (Experiment::FUNCTION_VALUES, true),
             (Experiment::LAMBDA_LIFTING, true),
         ],
         language_version: LanguageVersion::V2_2,

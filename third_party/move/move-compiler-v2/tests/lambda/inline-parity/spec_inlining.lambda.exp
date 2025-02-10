@@ -1,4 +1,4 @@
-// -- Model dump before env processor pipeline:
+// -- Model dump before bytecode pipeline
 module 0x42::Test {
     private fun apply(v: u64,predicate: |u64|bool): bool {
         spec {
@@ -9,7 +9,7 @@ module 0x42::Test {
     }
     public fun test_apply(x: u64) {
         {
-          let r1: bool = Test::apply(x, |v: u64| Ge<u64>(v, 0));
+          let r1: bool = Test::apply(x, closure#0Test::test_apply$lambda$1());
           spec {
             assert r1;
           }
@@ -20,7 +20,7 @@ module 0x42::Test {
             Abort(1)
           };
           {
-            let r2: bool = Test::apply(x, |v: u64| Neq<u64>(v, 0));
+            let r2: bool = Test::apply(x, closure#0Test::test_apply$lambda$2());
             spec {
               assert r2;
             }
@@ -34,408 +34,66 @@ module 0x42::Test {
           }
         }
     }
+    private fun test_apply$lambda$1(v: u64): bool {
+        Ge<u64>(v, 0)
+    }
+    private fun test_apply$lambda$2(v: u64): bool {
+        Neq<u64>(v, 0)
+    }
 } // end 0x42::Test
 
-
-// -- Model dump after env processor unused checks:
+// -- Sourcified model before bytecode pipeline
 module 0x42::Test {
-    private fun apply(v: u64,predicate: |u64|bool): bool {
-        spec {
+    fun apply(v: u64, predicate: |u64|bool): bool {
+
+        /* spec {
           assert Ge($t0, 0);
         }
+         */
         ;
-        (predicate)(v)
+        predicate(v)
     }
     public fun test_apply(x: u64) {
-        {
-          let r1: bool = Test::apply(x, |v: u64| Ge<u64>(v, 0));
-          spec {
-            assert r1;
-          }
-          ;
-          if r1 {
-            Tuple()
-          } else {
-            Abort(1)
-          };
-          {
-            let r2: bool = Test::apply(x, |v: u64| Neq<u64>(v, 0));
-            spec {
-              assert r2;
-            }
-            ;
-            if r2 {
-              Tuple()
-            } else {
-              Abort(2)
-            };
-            Tuple()
-          }
-        }
-    }
-} // end 0x42::Test
+        let r1 = apply(x, |arg0| test_apply$lambda$1(arg0));
 
-
-// -- Model dump after env processor type parameter check:
-module 0x42::Test {
-    private fun apply(v: u64,predicate: |u64|bool): bool {
-        spec {
-          assert Ge($t0, 0);
+        /* spec {
+          assert r1;
         }
+         */
         ;
-        (predicate)(v)
-    }
-    public fun test_apply(x: u64) {
-        {
-          let r1: bool = Test::apply(x, |v: u64| Ge<u64>(v, 0));
-          spec {
-            assert r1;
-          }
-          ;
-          if r1 {
-            Tuple()
-          } else {
-            Abort(1)
-          };
-          {
-            let r2: bool = Test::apply(x, |v: u64| Neq<u64>(v, 0));
-            spec {
-              assert r2;
-            }
-            ;
-            if r2 {
-              Tuple()
-            } else {
-              Abort(2)
-            };
-            Tuple()
-          }
-        }
-    }
-} // end 0x42::Test
+        if (r1) () else abort 1;
+        let r2 = apply(x, |arg0| test_apply$lambda$2(arg0));
 
-
-// -- Model dump after env processor check recursive struct definition:
-module 0x42::Test {
-    private fun apply(v: u64,predicate: |u64|bool): bool {
-        spec {
-          assert Ge($t0, 0);
+        /* spec {
+          assert r2;
         }
+         */
         ;
-        (predicate)(v)
+        if (r2) () else abort 2;
     }
-    public fun test_apply(x: u64) {
-        {
-          let r1: bool = Test::apply(x, |v: u64| Ge<u64>(v, 0));
-          spec {
-            assert r1;
-          }
-          ;
-          if r1 {
-            Tuple()
-          } else {
-            Abort(1)
-          };
-          {
-            let r2: bool = Test::apply(x, |v: u64| Neq<u64>(v, 0));
-            spec {
-              assert r2;
-            }
-            ;
-            if r2 {
-              Tuple()
-            } else {
-              Abort(2)
-            };
-            Tuple()
-          }
-        }
+    fun test_apply$lambda$1(v: u64): bool {
+        v >= 0
     }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor check cyclic type instantiation:
-module 0x42::Test {
-    private fun apply(v: u64,predicate: |u64|bool): bool {
-        spec {
-          assert Ge($t0, 0);
-        }
-        ;
-        (predicate)(v)
+    fun test_apply$lambda$2(v: u64): bool {
+        v != 0
     }
-    public fun test_apply(x: u64) {
-        {
-          let r1: bool = Test::apply(x, |v: u64| Ge<u64>(v, 0));
-          spec {
-            assert r1;
-          }
-          ;
-          if r1 {
-            Tuple()
-          } else {
-            Abort(1)
-          };
-          {
-            let r2: bool = Test::apply(x, |v: u64| Neq<u64>(v, 0));
-            spec {
-              assert r2;
-            }
-            ;
-            if r2 {
-              Tuple()
-            } else {
-              Abort(2)
-            };
-            Tuple()
-          }
-        }
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor unused struct params check:
-module 0x42::Test {
-    private fun apply(v: u64,predicate: |u64|bool): bool {
-        spec {
-          assert Ge($t0, 0);
-        }
-        ;
-        (predicate)(v)
-    }
-    public fun test_apply(x: u64) {
-        {
-          let r1: bool = Test::apply(x, |v: u64| Ge<u64>(v, 0));
-          spec {
-            assert r1;
-          }
-          ;
-          if r1 {
-            Tuple()
-          } else {
-            Abort(1)
-          };
-          {
-            let r2: bool = Test::apply(x, |v: u64| Neq<u64>(v, 0));
-            spec {
-              assert r2;
-            }
-            ;
-            if r2 {
-              Tuple()
-            } else {
-              Abort(2)
-            };
-            Tuple()
-          }
-        }
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor access and use check before inlining:
-module 0x42::Test {
-    private fun apply(v: u64,predicate: |u64|bool): bool {
-        spec {
-          assert Ge($t0, 0);
-        }
-        ;
-        (predicate)(v)
-    }
-    public fun test_apply(x: u64) {
-        {
-          let r1: bool = Test::apply(x, |v: u64| Ge<u64>(v, 0));
-          spec {
-            assert r1;
-          }
-          ;
-          if r1 {
-            Tuple()
-          } else {
-            Abort(1)
-          };
-          {
-            let r2: bool = Test::apply(x, |v: u64| Neq<u64>(v, 0));
-            spec {
-              assert r2;
-            }
-            ;
-            if r2 {
-              Tuple()
-            } else {
-              Abort(2)
-            };
-            Tuple()
-          }
-        }
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor inlining:
-module 0x42::Test {
-    private fun apply(v: u64,predicate: |u64|bool): bool {
-        spec {
-          assert Ge($t0, 0);
-        }
-        ;
-        (predicate)(v)
-    }
-    public fun test_apply(x: u64) {
-        {
-          let r1: bool = Test::apply(x, |v: u64| Ge<u64>(v, 0));
-          spec {
-            assert r1;
-          }
-          ;
-          if r1 {
-            Tuple()
-          } else {
-            Abort(1)
-          };
-          {
-            let r2: bool = Test::apply(x, |v: u64| Neq<u64>(v, 0));
-            spec {
-              assert r2;
-            }
-            ;
-            if r2 {
-              Tuple()
-            } else {
-              Abort(2)
-            };
-            Tuple()
-          }
-        }
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor access and use check after inlining:
-module 0x42::Test {
-    private fun apply(v: u64,predicate: |u64|bool): bool {
-        spec {
-          assert Ge($t0, 0);
-        }
-        ;
-        (predicate)(v)
-    }
-    public fun test_apply(x: u64) {
-        {
-          let r1: bool = Test::apply(x, |v: u64| Ge<u64>(v, 0));
-          spec {
-            assert r1;
-          }
-          ;
-          if r1 {
-            Tuple()
-          } else {
-            Abort(1)
-          };
-          {
-            let r2: bool = Test::apply(x, |v: u64| Neq<u64>(v, 0));
-            spec {
-              assert r2;
-            }
-            ;
-            if r2 {
-              Tuple()
-            } else {
-              Abort(2)
-            };
-            Tuple()
-          }
-        }
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor acquires check:
-module 0x42::Test {
-    private fun apply(v: u64,predicate: |u64|bool): bool {
-        spec {
-          assert Ge($t0, 0);
-        }
-        ;
-        (predicate)(v)
-    }
-    public fun test_apply(x: u64) {
-        {
-          let r1: bool = Test::apply(x, |v: u64| Ge<u64>(v, 0));
-          spec {
-            assert r1;
-          }
-          ;
-          if r1 {
-            Tuple()
-          } else {
-            Abort(1)
-          };
-          {
-            let r2: bool = Test::apply(x, |v: u64| Neq<u64>(v, 0));
-            spec {
-              assert r2;
-            }
-            ;
-            if r2 {
-              Tuple()
-            } else {
-              Abort(2)
-            };
-            Tuple()
-          }
-        }
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor simplifier:
-module 0x42::Test {
-    private fun apply(v: u64,predicate: |u64|bool): bool {
-        spec {
-          assert Ge($t0, 0);
-        }
-        ;
-        (predicate)(v)
-    }
-    public fun test_apply(x: u64) {
-        {
-          let r1: bool = Test::apply(x, |v: u64| Ge<u64>(v, 0));
-          spec {
-            assert r1;
-          }
-          ;
-          if r1 {
-            Tuple()
-          } else {
-            Abort(1)
-          };
-          {
-            let r2: bool = Test::apply(x, |v: u64| Neq<u64>(v, 0));
-            spec {
-              assert r2;
-            }
-            ;
-            if r2 {
-              Tuple()
-            } else {
-              Abort(2)
-            };
-            Tuple()
-          }
-        }
-    }
-} // end 0x42::Test
-
+}
 
 
 Diagnostics:
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
+error: Calls to function values other than inline function parameters not yet implemented
+  ┌─ tests/lambda/inline-parity/spec_inlining.move:6:9
+  │
+6 │         predicate(v)
+  │         ^^^^^^^^^^^^
+
+error: Function-typed values not yet implemented except as parameters to calls to inline functions
    ┌─ tests/lambda/inline-parity/spec_inlining.move:10:27
    │
 10 │         let r1 = apply(x, |v| v >= 0);
    │                           ^^^^^^^^^^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
+error: Function-typed values not yet implemented except as parameters to calls to inline functions
    ┌─ tests/lambda/inline-parity/spec_inlining.move:16:27
    │
 16 │         let r2 = apply(x, |v| v != 0);

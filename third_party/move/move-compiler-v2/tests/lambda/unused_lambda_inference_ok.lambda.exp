@@ -1,0 +1,30 @@
+// -- Model dump before bytecode pipeline
+module 0x8675309::M {
+    public fun f() {
+        {
+          let _x: |u64|u64 = closure#0M::f$lambda$1();
+          Tuple()
+        }
+    }
+    private fun f$lambda$1(i: u64): u64 {
+        Add<u64>(i, 1)
+    }
+} // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    public fun f() {
+        let _x = |arg0| f$lambda$1(arg0);
+    }
+    fun f$lambda$1(i: u64): u64 {
+        i + 1
+    }
+}
+
+
+Diagnostics:
+error: Function-typed values not yet implemented except as parameters to calls to inline functions
+  ┌─ tests/lambda/unused_lambda_inference_ok.move:5:18
+  │
+5 │         let _x = |i| i + 1;
+  │                  ^^^^^^^^^

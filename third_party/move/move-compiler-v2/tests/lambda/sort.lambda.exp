@@ -1,18 +1,18 @@
 // -- Model dump before bytecode pipeline
 module 0x42::sort {
     use std::vector;
-    public fun incorrect_sort<T>(arr: &mut vector<T>,a_less_b: |(T, T)|bool) {
+    public fun sort<T>(arr: &mut vector<T>,a_less_b: |(T, T)|bool) {
         {
           let n: u64 = vector::length<T>(Freeze(false)(arr));
-          sort::incorrect_sort_recursive<T>(arr, 0, Sub<u64>(n, 1), a_less_b)
+          sort::sort_recursive<T>(arr, 0, Sub<u64>(n, 1), a_less_b)
         }
     }
-    public fun incorrect_sort_recursive<T>(arr: &mut vector<T>,low: u64,high: u64,a_less_b: |(T, T)|bool) {
+    public fun sort_recursive<T>(arr: &mut vector<T>,low: u64,high: u64,a_less_b: |(T, T)|bool) {
         if Lt<u64>(low, high) {
           {
             let pi: u64 = Add<u64>(low, Div<u64>(high, 2));
-            sort::incorrect_sort_recursive<T>(arr, low, Sub<u64>(pi, 1), a_less_b);
-            sort::incorrect_sort_recursive<T>(arr, Add<u64>(pi, 1), high, a_less_b);
+            sort::sort_recursive<T>(arr, low, Sub<u64>(pi, 1), a_less_b);
+            sort::sort_recursive<T>(arr, Add<u64>(pi, 1), high, a_less_b);
             Tuple()
           }
         } else {
@@ -24,15 +24,15 @@ module 0x42::sort {
 
 // -- Sourcified model before bytecode pipeline
 module 0x42::sort {
-    public fun incorrect_sort<T: copy>(arr: &mut vector<T>, a_less_b: |(T, T)|bool) {
+    public fun sort<T: copy>(arr: &mut vector<T>, a_less_b: |(T, T)|bool) {
         let n = 0x1::vector::length<T>(/*freeze*/arr);
-        incorrect_sort_recursive<T>(arr, 0, n - 1, a_less_b)
+        sort_recursive<T>(arr, 0, n - 1, a_less_b)
     }
-    public fun incorrect_sort_recursive<T: copy>(arr: &mut vector<T>, low: u64, high: u64, a_less_b: |(T, T)|bool) {
+    public fun sort_recursive<T: copy>(arr: &mut vector<T>, low: u64, high: u64, a_less_b: |(T, T)|bool) {
         if (low < high) {
             let pi = low + high / 2;
-            incorrect_sort_recursive<T>(arr, low, pi - 1, a_less_b);
-            incorrect_sort_recursive<T>(arr, pi + 1, high, a_less_b);
+            sort_recursive<T>(arr, low, pi - 1, a_less_b);
+            sort_recursive<T>(arr, pi + 1, high, a_less_b);
         };
     }
 }
@@ -40,7 +40,7 @@ module 0x42::sort {
 ============ initial bytecode ================
 
 [variant baseline]
-public fun sort::incorrect_sort<#0>($t0: &mut vector<#0>, $t1: |(#0, #0)|bool) {
+public fun sort::sort<#0>($t0: &mut vector<#0>, $t1: |(#0, #0)|bool) {
      var $t2: u64
      var $t3: &vector<#0>
      var $t4: &mut vector<#0>
@@ -55,13 +55,13 @@ public fun sort::incorrect_sort<#0>($t0: &mut vector<#0>, $t1: |(#0, #0)|bool) {
   4: $t7 := infer($t2)
   5: $t8 := 1
   6: $t6 := -($t7, $t8)
-  7: sort::incorrect_sort_recursive<#0>($t4, $t5, $t6, $t1)
+  7: sort::sort_recursive<#0>($t4, $t5, $t6, $t1)
   8: return ()
 }
 
 
 [variant baseline]
-public fun sort::incorrect_sort_recursive<#0>($t0: &mut vector<#0>, $t1: u64, $t2: u64, $t3: |(#0, #0)|bool) {
+public fun sort::sort_recursive<#0>($t0: &mut vector<#0>, $t1: u64, $t2: u64, $t3: |(#0, #0)|bool) {
      var $t4: bool
      var $t5: u64
      var $t6: u64
@@ -93,13 +93,13 @@ public fun sort::incorrect_sort_recursive<#0>($t0: &mut vector<#0>, $t1: u64, $t
  11: $t14 := infer($t6)
  12: $t15 := 1
  13: $t13 := -($t14, $t15)
- 14: sort::incorrect_sort_recursive<#0>($t11, $t12, $t13, $t3)
+ 14: sort::sort_recursive<#0>($t11, $t12, $t13, $t3)
  15: $t16 := infer($t0)
  16: $t18 := infer($t6)
  17: $t19 := 1
  18: $t17 := +($t18, $t19)
  19: $t20 := infer($t2)
- 20: sort::incorrect_sort_recursive<#0>($t16, $t17, $t20, $t3)
+ 20: sort::sort_recursive<#0>($t16, $t17, $t20, $t3)
  21: goto 23
  22: label L1
  23: label L2
@@ -109,19 +109,19 @@ public fun sort::incorrect_sort_recursive<#0>($t0: &mut vector<#0>, $t1: u64, $t
 
 Diagnostics:
 error: local `a_less_b` of type `|(T, T)|bool` does not have the `copy` ability
-   ┌─ tests/lambda/inline-parity/non_lambda_arg.move:12:13
+   ┌─ tests/lambda/sort.move:12:13
    │
-12 │             incorrect_sort_recursive(arr, low, pi - 1, a_less_b);
-   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ copy needed here because value is still in use
-13 │             incorrect_sort_recursive(arr, pi + 1, high, a_less_b);
-   │             ----------------------------------------------------- used here
+12 │             sort_recursive(arr, low, pi - 1, a_less_b);
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ copy needed here because value is still in use
+13 │             sort_recursive(arr, pi + 1, high, a_less_b);
+   │             ------------------------------------------- used here
 
 error: local `a_less_b` of type `|(T, T)|bool` does not have the `drop` ability
-   ┌─ tests/lambda/inline-parity/non_lambda_arg.move:10:9
+   ┌─ tests/lambda/sort.move:10:9
    │
 10 │ ╭         if (low < high) {
 11 │ │             let pi = low + high / 2;
-12 │ │             incorrect_sort_recursive(arr, low, pi - 1, a_less_b);
-13 │ │             incorrect_sort_recursive(arr, pi + 1, high, a_less_b);
+12 │ │             sort_recursive(arr, low, pi - 1, a_less_b);
+13 │ │             sort_recursive(arr, pi + 1, high, a_less_b);
 14 │ │         };
    │ ╰─────────^ implicitly dropped here since it is no longer used
