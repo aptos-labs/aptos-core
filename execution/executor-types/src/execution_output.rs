@@ -10,7 +10,7 @@ use crate::{
 };
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::state_store::{
-    state::LedgerState, state_view::cached_state_view::ShardedStateCache,
+    state::ledger_state::LedgerState, state_view::cached_state_view::ShardedStateCache,
 };
 use aptos_types::{
     contract_event::ContractEvent,

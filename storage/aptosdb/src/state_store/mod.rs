@@ -49,7 +49,7 @@ use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail,
     state_store::{
-        state::{LedgerState, State},
+        state::{ledger_state::LedgerState, state::State},
         state_summary::{ProvableStateSummary, StateSummary},
         state_update_refs::{PerVersionStateUpdateRefs, StateUpdateRefs},
         state_view::cached_state_view::{ShardedStateCache, StateCacheShard},

@@ -14,7 +14,7 @@ use crate::{
 use anyhow::{anyhow, ensure, Result};
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
-    state_store::{state::LedgerState, state_summary::LedgerStateSummary},
+    state_store::{state::ledger_state::LedgerState, state_summary::LedgerStateSummary},
     DbReader, LedgerSummary,
 };
 use aptos_types::{proof::accumulator::InMemoryTransactionAccumulator, transaction::Version};

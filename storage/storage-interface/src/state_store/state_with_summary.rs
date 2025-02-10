@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state_store::{
-    state::{LedgerState, State},
+    state::{ledger_state::LedgerState, state::State},
     state_summary::{LedgerStateSummary, StateSummary},
 };
 use aptos_crypto::HashValue;

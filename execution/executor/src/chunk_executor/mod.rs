@@ -25,7 +25,7 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::{
     state_store::{
-        state::State, state_summary::ProvableStateSummary,
+        state::state::State, state_summary::ProvableStateSummary,
         state_view::cached_state_view::CachedStateView,
     },
     DbReaderWriter,

@@ -4,7 +4,7 @@
 use crate::{
     metrics::TIMER,
     state_store::{
-        state::State,
+        state::state::State,
         state_delta::StateDelta,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
         state_view::db_state_view::DbStateView,

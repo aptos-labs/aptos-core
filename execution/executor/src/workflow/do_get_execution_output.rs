@@ -24,7 +24,7 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::state_store::{
-    state::LedgerState, state_view::cached_state_view::CachedStateView,
+    state::ledger_state::LedgerState, state_view::cached_state_view::CachedStateView,
 };
 #[cfg(feature = "consensus-only-perf-test")]
 use aptos_types::transaction::ExecutionStatus;
@@ -521,7 +521,7 @@ impl<'a> TStateView for WriteSetStateView<'a> {
 mod tests {
     use super::Parser;
     use aptos_storage_interface::state_store::{
-        state::LedgerState, state_view::cached_state_view::CachedStateView,
+        state::ledger_state::LedgerState, state_view::cached_state_view::CachedStateView,
     };
     use aptos_types::{
         contract_event::ContractEvent,

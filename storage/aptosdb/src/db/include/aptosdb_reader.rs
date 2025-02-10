@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_storage_interface::state_store::state::State;
+use aptos_storage_interface::state_store::state::state::State;
 use aptos_storage_interface::state_store::state_summary::StateSummary;
 use aptos_types::block_info::BlockHeight;
 

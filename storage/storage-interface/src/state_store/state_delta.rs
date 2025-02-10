@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::{state::State, versioned_state_value::StateUpdate, NUM_STATE_SHARDS};
+use crate::state_store::{
+    state::state::State, versioned_state_value::StateUpdate, NUM_STATE_SHARDS,
+};
 use aptos_experimental_layered_map::LayeredMap;
 use aptos_types::{state_store::state_key::StateKey, transaction::Version};
 use itertools::Itertools;

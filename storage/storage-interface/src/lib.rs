@@ -43,14 +43,12 @@ mod metrics;
 pub mod mock;
 pub mod state_store;
 
-use crate::{
-    chunk_to_commit::ChunkToCommit,
-    state_store::{state::State, state_summary::StateSummary},
-};
+use crate::{chunk_to_commit::ChunkToCommit, state_store::state_summary::StateSummary};
 pub use aptos_types::block_info::BlockHeight;
 use aptos_types::state_store::state_key::prefix::StateKeyPrefix;
 pub use errors::AptosDbError;
 pub use ledger_summary::LedgerSummary;
+use state_store::state::state::State;
 
 pub type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 // This is last line of defense against large queries slipping through external facing interfaces,

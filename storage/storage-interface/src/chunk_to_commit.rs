@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state_store::{
-    state::LedgerState,
+    state::ledger_state::LedgerState,
     state_summary::LedgerStateSummary,
     state_update_refs::StateUpdateRefs,
     state_view::cached_state_view::ShardedStateCache,

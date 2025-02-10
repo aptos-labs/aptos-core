@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::{state::LedgerState, state_summary::LedgerStateSummary};
+use crate::state_store::{state::ledger_state::LedgerState, state_summary::LedgerStateSummary};
 use aptos_types::{
     proof::accumulator::{InMemoryAccumulator, InMemoryTransactionAccumulator},
     transaction::Version,

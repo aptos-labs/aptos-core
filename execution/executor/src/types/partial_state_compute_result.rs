@@ -8,7 +8,7 @@ use aptos_executor_types::{
     state_compute_result::StateComputeResult, LedgerUpdateOutput,
 };
 use aptos_storage_interface::{
-    state_store::{state::LedgerState, state_summary::LedgerStateSummary},
+    state_store::{state::ledger_state::LedgerState, state_summary::LedgerStateSummary},
     LedgerSummary,
 };
 use once_cell::sync::OnceCell;
