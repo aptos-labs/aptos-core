@@ -18,7 +18,7 @@ use tokio::task::JoinHandle;
 /// Checks the value of the `window_size` in the [`OnChainConsensusConfig`](OnChainConsensusConfig)
 pub async fn assert_on_chain_consensus_config_window_size(
     swarm: &mut LocalSwarm,
-    expected_window_size: usize,
+    expected_window_size: Option<usize>,
 ) {
     let rest_client = swarm.validators().next().unwrap().rest_client();
     let current_consensus_config: OnChainConsensusConfig = bcs::from_bytes(
@@ -40,7 +40,7 @@ pub async fn assert_on_chain_consensus_config_window_size(
             panic!("Expected OnChainConsensusConfig::V4, but received a different version")
         },
         OnChainConsensusConfig::V4 { window_size, .. } => {
-            assert_eq!(window_size, expected_window_size)
+            assert_eq!(window_size.map(|v| v as usize), expected_window_size)
         },
     }
 }
@@ -63,7 +63,7 @@ async fn initialize_swarm_with_window() -> (
             genesis_config.consensus_config = OnChainConsensusConfig::V4 {
                 alg: ConsensusAlgorithmConfig::default_for_genesis(),
                 vtxn: ValidatorTxnConfig::default_for_genesis(),
-                window_size: 4,
+                window_size: Some(4u64),
             };
         }))
         .with_aptos()
@@ -82,18 +82,18 @@ async fn initialize_swarm_with_window() -> (
 
 #[tokio::test]
 async fn test_window_size_onchain_config_change() {
-    let window_size: usize = 4;
+    let window_size = Some(4usize);
     let (mut swarm, cli, _faucet, root_cli_index, ..) = initialize_swarm_with_window().await;
 
     // Make sure that the current consensus config has a window size of 4
     assert_on_chain_consensus_config_window_size(&mut swarm, window_size).await;
 
     // Update consensus config with a different window_size
-    let window_size = 8;
+    let window_size = Some(8usize);
     let new_consensus_config = OnChainConsensusConfig::V4 {
         alg: ConsensusAlgorithmConfig::default_for_genesis(),
         vtxn: ValidatorTxnConfig::default_for_genesis(),
-        window_size,
+        window_size: window_size.map(|v| v as u64),
     };
     update_consensus_config(&cli, root_cli_index, new_consensus_config).await;
 
