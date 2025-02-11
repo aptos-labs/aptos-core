@@ -54,7 +54,7 @@ use aptos_storage_interface::{
         state_update_refs::{PerVersionStateUpdateRefs, StateUpdateRefs},
         state_view::cached_state_view::{ShardedStateCache, StateCacheShard},
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
-        versioned_state_value::{StateCacheEntry, StateUpdateRef},
+        versioned_state_value::{MemorizedStateRead, StateUpdateRef},
         NUM_STATE_SHARDS,
     },
     AptosDbError, DbReader, Result, StateSnapshotReceiver,
@@ -862,24 +862,29 @@ impl StateStore {
                 let old_entry = cache
                     .insert(
                         (*key).clone(),
-                        StateCacheEntry::from_state_update_ref(update),
+                        // TODO(aldenhu): Updates should carry DbStateValue directly which
+                        //     includes hot state eviction, access time refresh, etc.
+                        MemorizedStateRead::dummy_from_state_update_ref(update),
                     )
                     .unwrap_or_else(|| {
                         // n.b. all updated state items must be read and recorded in the state cache,
                         // otherwise we can't calculate the correct usage. The is_untracked() hack
                         // is to allow some db tests without real execution layer to pass.
                         assert!(ignore_state_cache_miss, "Must cache read.");
-                        StateCacheEntry::NonExistent
+                        MemorizedStateRead::NonExistent
                     });
 
-                if let StateCacheEntry::Value {
+                if let MemorizedStateRead::Value {
                     version: old_version,
-                    value: _,
+                    value: old_value,
                 } = old_entry
                 {
-                    // The value at `old_version` can be pruned once the pruning window hits
-                    // this `version`.
-                    Self::put_state_kv_index(batch, enable_sharding, version, old_version, key)
+                    // Non-existing key can be in cache but is currently not persisted
+                    if !old_value.is_hot_non_existent() {
+                        // The value at `old_version` can be pruned once the pruning window hits
+                        // this `version`.
+                        Self::put_state_kv_index(batch, enable_sharding, version, old_version, key)
+                    }
                 }
             }
         }

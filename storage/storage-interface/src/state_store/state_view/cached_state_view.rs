@@ -8,7 +8,7 @@ use crate::{
         state_delta::StateDelta,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
         state_view::db_state_view::DbStateView,
-        versioned_state_value::StateCacheEntry,
+        versioned_state_value::MemorizedStateRead,
     },
     DbReader,
 };
@@ -32,7 +32,7 @@ use std::{
     sync::Arc,
 };
 
-pub type StateCacheShard = DashMap<StateKey, StateCacheEntry>;
+pub type StateCacheShard = DashMap<StateKey, MemorizedStateRead>;
 
 static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -60,7 +60,7 @@ impl ShardedStateCache {
         &self.shards[shard_id as usize]
     }
 
-    pub fn get_cloned(&self, state_key: &StateKey) -> Option<StateCacheEntry> {
+    pub fn get_cloned(&self, state_key: &StateKey) -> Option<MemorizedStateRead> {
         self.shard(state_key.get_shard_id())
             .get(state_key)
             .map(|r| r.clone())
@@ -181,17 +181,17 @@ impl CachedStateView {
         self.speculative.base_version()
     }
 
-    fn get_uncached(&self, state_key: &StateKey) -> Result<StateCacheEntry> {
+    fn get_uncached(&self, state_key: &StateKey) -> Result<MemorizedStateRead> {
         let ret = if let Some(update) = self.speculative.get_state_update(state_key) {
             // found in speculative state, can be either a new value or a deletion
             update.to_state_value_with_version()
         } else if let Some(base_version) = self.base_version() {
-            StateCacheEntry::from_tuple_opt(
+            MemorizedStateRead::from_db_get(
                 self.reader
                     .get_state_value_with_version_by_version(state_key, base_version)?,
             )
         } else {
-            StateCacheEntry::NonExistent
+            MemorizedStateRead::NonExistent
         };
 
         Ok(ret)

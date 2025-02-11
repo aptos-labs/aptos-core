@@ -13,7 +13,6 @@ use crate::{
     },
     versioned_node_cache::VersionedNodeCache,
 };
-use aptos_crypto::hash::CryptoHash;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_logger::trace;
@@ -103,6 +102,8 @@ impl StateSnapshotCommitter {
                             .get_shard_persisted_versions(base_version)
                             .unwrap();
 
+                        let min_version = self.last_snapshot.next_version();
+
                         THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
                             snapshot
                                 .make_delta(&self.last_snapshot)
@@ -124,11 +125,8 @@ impl StateSnapshotCommitter {
 
                                         updates
                                             .iter()
-                                            .map(|(k, w)| {
-                                                (
-                                                    CryptoHash::hash(&k),
-                                                    w.value.map(|v| (CryptoHash::hash(&v), k)),
-                                                )
+                                            .filter_map(|(k, db_update)| {
+                                                db_update.to_jmt_update_opt(k, min_version)
                                             })
                                             .collect_vec()
                                     };
