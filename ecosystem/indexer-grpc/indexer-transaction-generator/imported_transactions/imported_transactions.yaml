@@ -16,6 +16,7 @@ testnet:
     5523474016: 5523474016_validator_txn
     1200394037: 1200394037_fa_v2_frozen_event
     2646510387: 2646510387_concurrent_fa
+    6616059810: 6616059810_account_abstraction_authenticator
 
     # fungible asset processor
     4462417704: 4462417704_secondary_store_burnt
