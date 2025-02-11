@@ -21,16 +21,25 @@ struct MyEvent {
 }
 
 #[test]
-fn test_module_event_enabled() {
+fn test_module_event_enabled_with_stateful_sender() {
     let mut h = MoveHarness::new_with_features(vec![FeatureFlag::MODULE_EVENT], vec![]);
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), Some(0));
+    test_module_event_enabled(&mut h, account);
+}
 
-    let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
-    let account = h.new_account_at(addr);
+#[test]
+fn test_module_event_enabled_with_stateless_sender() {
+    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::MODULE_EVENT], vec![]);
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), None);
+    test_module_event_enabled(&mut h, account);
+}
 
+#[test]
+fn test_module_event_enabled(h: &mut MoveHarness, account: Account) {
     let mut build_options = aptos_framework::BuildOptions::default();
     build_options
         .named_addresses
-        .insert("event".to_string(), addr);
+        .insert("event".to_string(), *account.address());
 
     let result = h.publish_package_with_options(
         &account,
@@ -66,10 +75,20 @@ fn test_module_event_enabled() {
 }
 
 #[test]
-fn verify_module_event_upgrades() {
+fn verify_module_event_upgrades_with_stateful_sender() {
     let mut h = MoveHarness::new_with_features(vec![FeatureFlag::MODULE_EVENT], vec![]);
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), Some(0));
+    verify_module_event_upgrades(&mut h, account);
+}
 
+#[test]
+fn verify_module_event_upgrades_with_stateless_sender() {
+    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::MODULE_EVENT], vec![]);
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), None);
+    verify_module_event_upgrades(&mut h, account);
+}
+
+fn verify_module_event_upgrades(h: &mut MoveHarness, account: Account) {
     // Initial code
     let source = r#"
         module 0xf00d::M {
