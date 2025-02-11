@@ -184,7 +184,6 @@ pub fn build_model(
     let build_config = BuildConfig {
         dev_mode,
         additional_named_addresses,
-        architecture: None,
         generate_abis: false,
         generate_docs: false,
         generate_move_model: false,
@@ -235,7 +234,6 @@ impl BuiltPackage {
         Ok(BuildConfig {
             dev_mode: options.dev,
             additional_named_addresses: options.named_addresses.clone(),
-            architecture: None,
             generate_abis: options.with_abis,
             generate_docs: false,
             generate_move_model: true,

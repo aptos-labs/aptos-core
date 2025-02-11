@@ -87,12 +87,6 @@ pub struct Test {
     /// Collect coverage information for later use with the various `move coverage` subcommands
     #[clap(long = "coverage")]
     pub compute_coverage: bool,
-
-    /// Use the EVM-based execution backend.
-    /// Does not work with --stackless.
-    #[cfg(feature = "evm-backend")]
-    #[clap(long = "evm")]
-    pub evm: bool,
 }
 
 impl Test {
@@ -116,8 +110,6 @@ impl Test {
             check_stackless_vm,
             verbose_mode,
             compute_coverage,
-            #[cfg(feature = "evm-backend")]
-            evm,
         } = self;
         let unit_test_config = UnitTestingConfig {
             filter,
@@ -128,9 +120,6 @@ impl Test {
             check_stackless_vm,
             verbose: verbose_mode,
             ignore_compile_warnings,
-            #[cfg(feature = "evm-backend")]
-            evm,
-
             ..UnitTestingConfig::default()
         };
         let result = run_move_unit_tests(

@@ -20,7 +20,6 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Debug},
     hash::Hash,
-    string::ToString,
     sync::atomic::{AtomicUsize, Ordering as AtomicOrdering},
 };
 
@@ -353,12 +352,6 @@ pub struct Flags {
     )]
     verify: bool,
 
-    /// Compilation flavor.
-    #[clap(
-        long = cli::FLAVOR,
-    )]
-    flavor: String,
-
     /// Bytecode version.
     #[clap(
         long = cli::BYTECODE_VERSION,
@@ -429,7 +422,6 @@ impl Flags {
             test: false,
             verify: false,
             shadow: false,
-            flavor: "".to_string(),
             bytecode_version: None,
             keep_testing_functions: false,
             skip_attribute_checks: false,
@@ -479,13 +471,6 @@ impl Flags {
         }
     }
 
-    pub fn set_flavor(self, flavor: impl ToString) -> Self {
-        Self {
-            flavor: flavor.to_string(),
-            ..self
-        }
-    }
-
     pub fn set_verify(self, value: bool) -> Self {
         Self {
             verify: value,
@@ -525,10 +510,6 @@ impl Flags {
 
     pub fn sources_shadow_deps(&self) -> bool {
         self.shadow
-    }
-
-    pub fn has_flavor(&self, flavor: &str) -> bool {
-        self.flavor == flavor
     }
 
     pub fn bytecode_version(&self) -> Option<u32> {

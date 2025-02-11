@@ -195,9 +195,6 @@ members = [
     "testsuite/module-publish",
     "testsuite/smoke-test",
     "testsuite/testcases",
-    "third_party/move/evm/exec-utils",
-    "third_party/move/evm/extract-ethereum-abi",
-    # third_party/move
     "third_party/move/extensions/move-table-extension",
     "third_party/move/move-binary-format",
     "third_party/move/move-binary-format/serializer-tests",
@@ -585,10 +582,7 @@ either = "1.6.1"
 enum_dispatch = "0.3.12"
 env_logger = "0.10.0"
 erased-serde = "0.3.13"
-ethabi = "18.0.0"
 ethnum = "1.5.0"
-evm = { version = "0.33.1", features = ["tracing"] }
-evm-runtime = { version = "0.33.0", features = ["tracing"] }
 dearbitrary = { version = "1.0.4", features = ["derive"] }
 fail = "0.5.0"
 ff = { version = "0.13", features = ["derive"] }
