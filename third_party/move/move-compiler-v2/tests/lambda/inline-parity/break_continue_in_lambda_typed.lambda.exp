@@ -7,9 +7,9 @@ module 0xc0ffee::m {
             if Lt<u64>(i, 10) {
               i: u64 = Add<u64>(i, 1);
               if Eq<u64>(i, 5) {
-                m::brk2(closure#0m::bar$lambda$1());
-                m::brk2(closure#0m::bar$lambda$2());
-                m::brk2(closure#0m::bar$lambda$3());
+                m::brk2(closure#0m::__lambda__1__bar());
+                m::brk2(closure#0m::__lambda__2__bar());
+                m::brk2(closure#0m::__lambda__3__bar());
                 Tuple()
               } else {
                 Tuple()
@@ -78,10 +78,10 @@ module 0xc0ffee::m {
           i
         }
     }
-    private fun bar$lambda$1(_x: u64) {
+    private fun __lambda__1__bar(_x: u64) {
         break
     }
-    private fun bar$lambda$2(_x: u64) {
+    private fun __lambda__2__bar(_x: u64) {
         loop {
           if true {
             break
@@ -90,7 +90,7 @@ module 0xc0ffee::m {
           }
         }
     }
-    private fun bar$lambda$3(_x: u64) {
+    private fun __lambda__3__bar(_x: u64) {
         loop {
           if true {
             continue
@@ -108,9 +108,9 @@ module 0xc0ffee::m {
         while (i < 10) {
             i = i + 1;
             if (i == 5) {
-                brk2(|arg0| bar$lambda$1(arg0));
-                brk2(|arg0| bar$lambda$2(arg0));
-                brk2(|arg0| bar$lambda$3(arg0));
+                brk2(|arg0| __lambda__1__bar(arg0));
+                brk2(|arg0| __lambda__2__bar(arg0));
+                brk2(|arg0| __lambda__3__bar(arg0));
             }
         };
         i
@@ -149,13 +149,13 @@ module 0xc0ffee::m {
         };
         i
     }
-    fun bar$lambda$1(_x: u64) {
+    fun __lambda__1__bar(_x: u64) {
         break
     }
-    fun bar$lambda$2(_x: u64) {
+    fun __lambda__2__bar(_x: u64) {
         while (true) break
     }
-    fun bar$lambda$3(_x: u64) {
+    fun __lambda__3__bar(_x: u64) {
         while (true) continue
     }
 }
@@ -168,35 +168,11 @@ error: missing enclosing loop statement
 3 │         break;
   │         ^^^^^
 
-error: Calls to function values other than inline function parameters not yet implemented
-  ┌─ tests/lambda/inline-parity/break_continue_in_lambda_typed.move:7:9
-  │
-7 │         f(2);
-  │         ^^^^
-
 error: missing enclosing loop statement
    ┌─ tests/lambda/inline-parity/break_continue_in_lambda_typed.move:40:32
    │
 40 │                 brk2(|_x: u64| break);
    │                                ^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/inline-parity/break_continue_in_lambda_typed.move:40:22
-   │
-40 │                 brk2(|_x: u64| break);
-   │                      ^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/inline-parity/break_continue_in_lambda_typed.move:41:8
-   │
-41 │         brk2(|_x: u64| while (true) { break });
-   │              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/inline-parity/break_continue_in_lambda_typed.move:42:8
-   │
-42 │         brk2(|_x: u64| while (true) { continue });
-   │              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: missing enclosing loop statement
    ┌─ tests/lambda/inline-parity/break_continue_in_lambda_typed.move:49:2

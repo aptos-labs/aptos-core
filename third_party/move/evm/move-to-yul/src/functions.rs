@@ -340,6 +340,9 @@ impl<'a> FunctionGenerator<'a> {
             Call(_, dest, op, srcs, _) => {
                 use Operation::*;
                 match op {
+                    Closure(..) | Invoke => {
+                        panic!("closure op codes not supported by EVM")
+                    },
                     // Move function call
                     Function(m, f, inst) => {
                         print_loc();

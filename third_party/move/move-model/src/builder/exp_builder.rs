@@ -40,6 +40,7 @@ use move_compiler::{
 use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
+    function::ClosureMask,
     value::MoveValue,
 };
 use move_ir_types::{
@@ -2230,8 +2231,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     .iter()
                     .map(|t| self.finalize_type(id, t, &mut BTreeSet::new()))
                     .collect();
-                // Also need to evaluate type constraints on type parameters
-
                 self.env().set_node_instantiation(id, inst)
             }
         }
@@ -3630,15 +3629,25 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let fun_type = self.fresh_type_var_constr(
                 loc.clone(),
                 WideningOrder::LeftToRight,
-                Constraint::SomeFunctionValue(Type::tuple(param_types), result_type),
+                Constraint::SomeFunctionValue(
+                    Type::tuple(
+                        param_types
+                            .iter()
+                            .map(|t| t.instantiate(&instantiation))
+                            .collect(),
+                    ),
+                    result_type.instantiate(&instantiation),
+                ),
             );
-            let fun_type = fun_type.instantiate(&instantiation);
             let fun_type = self.check_type(loc, &fun_type, expected_type, context);
 
             let id = self.env().new_node(loc.clone(), fun_type);
             self.env().set_node_instantiation(id, instantiation);
-            let fn_exp = ExpData::Value(id, Value::Function(module_id, fun_id));
-            return fn_exp;
+            return ExpData::Call(
+                id,
+                Operation::Closure(module_id, fun_id, ClosureMask::new_for_leading(0)),
+                vec![],
+            );
         }
 
         // If a qualified name is not explicitly specified, do not print it out
