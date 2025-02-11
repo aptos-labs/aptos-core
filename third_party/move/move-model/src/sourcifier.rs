@@ -4,8 +4,8 @@
 
 use crate::{
     ast::{
-        self, AddressSpecifier, Exp, ExpData, LambdaCaptureKind, Operation, Pattern,
-        ResourceSpecifier, TempIndex, Value,
+        AddressSpecifier, Exp, ExpData, LambdaCaptureKind, Operation, Pattern, ResourceSpecifier,
+        TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -286,15 +286,6 @@ impl<'a> Sourcifier<'a> {
                     emit!(self.writer, "{}", self.env().display(address))
                 })
             },
-            Value::Function(mid, fid) => {
-                emit!(
-                    self.writer,
-                    "{}",
-                    self.env()
-                        .get_function(mid.qualified(*fid))
-                        .get_full_name_str()
-                );
-            },
         }
     }
 
@@ -536,22 +527,9 @@ impl<'a> ExpSourcifier<'a> {
         match exp.as_ref() {
             // Following forms are all atomic and do not require parenthesis
             Invalid(_) => emit!(self.wr(), "*invalid*"),
-            Value(id, v) => {
+            Value(_, v) => {
                 let ty = self.env().get_node_type(exp.node_id());
                 self.parent.print_value(v, Some(&ty));
-                if let ast::Value::Function(..) = v {
-                    let type_inst = self.env().get_node_instantiation(*id);
-                    if !type_inst.is_empty() {
-                        emit!(
-                            self.wr(),
-                            "<{}>",
-                            type_inst
-                                .iter()
-                                .map(|ty| ty.display(&self.type_display_context))
-                                .join(", ")
-                        );
-                    }
-                }
             },
             LocalVar(_, name) => {
                 emit!(self.wr(), "{}", self.sym(*name))

@@ -124,15 +124,20 @@ impl ClosureMask {
         Some(result)
     }
 
-    /// Return the max index of captured arguments
-    pub fn max_captured(&self) -> usize {
+    /// Return the max index of captured argument, or None if none is captured.
+    pub fn max_captured(&self) -> Option<usize> {
+        if self.0 == 0 {
+            return None;
+        }
         let mut i = 0;
         let mut mask = self.0;
-        while mask != 0 {
+        loop {
             mask >>= 1;
+            if mask == 0 {
+                return Some(i);
+            }
             i += 1
         }
-        i
     }
 
     /// Return the # of captured arguments in the mask
@@ -392,7 +397,7 @@ impl fmt::Display for MoveClosure {
         } = self;
         let captured_str = mask
             .merge_placeholder_strings(
-                mask.max_captured() + 1,
+                mask.captured_count() as usize,
                 captured.iter().map(|v| v.1.to_string()).collect(),
             )
             .unwrap_or_else(|| vec!["*invalid*".to_string()])
