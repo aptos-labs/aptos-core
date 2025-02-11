@@ -402,6 +402,13 @@ pub const IMPORTED_TESTNET_TXNS_1200394037_FA_V2_FROZEN_EVENT: &[u8] = include_b
     env!("CARGO_MANIFEST_DIR"),
     "/src/json_transactions/imported_testnet_txns/1200394037_fa_v2_frozen_event.json"
 ));
+
+pub const IMPORTED_TESTNET_TXNS_6616059810_ACCOUNT_ABSTRACTION_AUTHENTICATOR: &[u8] =
+    include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/json_transactions/imported_testnet_txns/6616059810_account_abstraction_authenticator.json"
+    ));
+
 pub const ALL_IMPORTED_TESTNET_TXNS: &[&[u8]] = &[
     IMPORTED_TESTNET_TXNS_5979639459_COIN_REGISTER,
     IMPORTED_TESTNET_TXNS_1255836496_V2_FA_METADATA_,
@@ -416,6 +423,7 @@ pub const ALL_IMPORTED_TESTNET_TXNS: &[&[u8]] = &[
     IMPORTED_TESTNET_TXNS_1_GENESIS,
     IMPORTED_TESTNET_TXNS_769222973_MULTISIG,
     IMPORTED_TESTNET_TXNS_1200394037_FA_V2_FROZEN_EVENT,
+    IMPORTED_TESTNET_TXNS_6616059810_ACCOUNT_ABSTRACTION_AUTHENTICATOR,
 ];
 
 pub const IMPORTED_DEVNET_TXNS_19922017_TOKEN_V1_OFFER_CLAIM: &[u8] = include_bytes!(concat!(
