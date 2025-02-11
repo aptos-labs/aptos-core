@@ -401,6 +401,7 @@ struct ExecuteBlockCommand {
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
     command_creation_time: Instant,
     lifetime_guard: CountedRequest<()>,
+    #[allow(dead_code)]
     shuffler: Arc<dyn TransactionShuffler>,
 }
 
