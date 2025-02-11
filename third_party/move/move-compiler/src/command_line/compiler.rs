@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    attr_derivation::add_attributes_for_flavor,
     cfgir,
     command_line::{DEFAULT_OUTPUT_DIR, MOVE_COMPILED_INTERFACES_DIR},
     compiled_unit,
@@ -212,14 +211,13 @@ impl<'a> Compiler<'a> {
             pre_compiled_lib,
             compiled_module_named_address_mapping,
             flags,
-            mut known_attributes,
+            known_attributes,
         } = self;
         generate_interface_files_for_deps(
             &mut deps,
             interface_files_dir_opt,
             &compiled_module_named_address_mapping,
         )?;
-        add_attributes_for_flavor(&flags, &mut known_attributes);
         let mut compilation_env = CompilationEnv::new(flags, known_attributes);
         let (source_text, pprog_and_comments_res) =
             parse_program(&mut compilation_env, maps, targets, deps)?;

@@ -47,19 +47,8 @@ name = "move_unit_tests_move_vm_and_stackless_vm"
 harness = false
 
 [[test]]
-name = "move_unit_tests_evm"
-harness = false
-required-features = ["evm-backend"]
-
-[[test]]
 name = "build_testsuite"
 harness = false
 
-[[test]]
-name = "build_testsuite_evm"
-harness = false
-required-features = ["evm-backend"]
-
 [features]
-evm-backend = ["move-unit-test/evm-backend", "move-package/evm-backend"]
 table-extension = ["move-unit-test/table-extension"]

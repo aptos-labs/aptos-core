@@ -9,7 +9,7 @@ use crate::{
         layout::{SourcePackageLayout, REFERENCE_TEMPLATE_FILENAME},
         parsed_manifest::{FileName, PackageDigest, PackageName},
     },
-    Architecture, BuildConfig, CompilerConfig, CompilerVersion,
+    BuildConfig, CompilerConfig, CompilerVersion,
 };
 use anyhow::{bail, ensure, Context, Result};
 use colored::Colorize;
@@ -22,9 +22,11 @@ use move_command_line_common::files::{
     extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION, SOURCE_MAP_EXTENSION,
 };
 use move_compiler::{
-    attr_derivation,
     compiled_unit::{self, CompiledUnit, NamedCompiledModule, NamedCompiledScript},
-    shared::{Flags, NamedAddressMap, NumericalAddress, PackagePaths},
+    shared::{
+        known_attributes::{AttributeKind, KnownAttribute},
+        Flags, NamedAddressMap, NumericalAddress, PackagePaths,
+    },
     Compiler,
 };
 use move_compiler_v2::{external_checks::ExternalChecks, Experiment};
@@ -601,18 +603,7 @@ impl CompiledPackage {
             .compiler_config
             .known_attributes
             .clone();
-        match &resolution_graph.build_options.architecture {
-            Some(x) => {
-                match x {
-                    Architecture::Move => (),
-                    Architecture::Ethereum => {
-                        flags = flags.set_flavor("evm");
-                    },
-                };
-            },
-            None => (),
-        };
-        attr_derivation::add_attributes_for_flavor(&flags, &mut known_attributes);
+        KnownAttribute::add_attribute_names(&mut known_attributes);
 
         // Partition deps_package according whether src is available
         let (src_deps, bytecode_deps): (Vec<_>, Vec<_>) = deps_package_paths

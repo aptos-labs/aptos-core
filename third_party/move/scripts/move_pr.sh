@@ -118,7 +118,6 @@ MOVE_CRATES_V2_ENV_DEPENDENT="\
   -p move-package \
   -p move-prover-bytecode-pipeline \
   -p move-stackless-bytecode \
-  -p move-to-yul \
   -p move-transactional-test-runner \
   -p move-unit-test \
   -p move-vm-transactional-tests \

@@ -30,8 +30,6 @@ pub const TEST_SHORT: char = 't';
 pub const VERIFY: &str = "verify";
 pub const VERIFY_SHORT: char = 'v';
 
-pub const FLAVOR: &str = "flavor";
-
 pub const BYTECODE_VERSION: &str = "bytecode-version";
 
 pub const LANGUAGE_VERSION: &str = "language-version";

@@ -21,9 +21,6 @@ const KEEP_TMP: &str = "KEEP";
 const TEST_EXT: &str = "unit_test";
 const VERIFICATION_EXT: &str = "verification";
 
-/// Root of tests which require to set flavor flags.
-const FLAVOR_PATH: &str = "/flavors/";
-
 /// Root of tests which require to set skip_attribute_checks flag.
 const SKIP_ATTRIBUTE_CHECKS_PATH: &str = "/skip_attribute_checks/";
 
@@ -93,17 +90,6 @@ fn move_check_testsuite(path: &Path) -> datatest_stable::Result<()> {
 
     let mut flags = Flags::empty();
     if let Some(p) = path.to_str() {
-        if p.contains(FLAVOR_PATH) {
-            // Extract the flavor from the path. Its the directory name of the file.
-            let flavor = path
-                .parent()
-                .expect("has parent")
-                .file_name()
-                .expect("has name")
-                .to_string_lossy()
-                .to_string();
-            flags = flags.set_flavor(flavor)
-        }
         if p.contains(SKIP_ATTRIBUTE_CHECKS_PATH) {
             flags = flags.set_skip_attribute_checks(true);
         }
