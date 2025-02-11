@@ -7,9 +7,21 @@ use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag}
 use move_core_types::vm_status::StatusCode;
 
 #[test]
-fn lazy_natives() {
+fn lazy_natives_with_stateful_sender() {
     let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), Some(0));
+    lazy_natives(&mut h, acc);
+}
+
+#[test]
+fn lazy_natives_with_stateless_sender() {
+    let mut h = MoveHarness::new();
+    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), None);
+    lazy_natives(&mut h, acc);
+}
+
+#[test]
+fn lazy_natives(h: &mut MoveHarness, acc: Account) {
     // Set flag to publish the package.
     h.enable_features(vec![], vec![FeatureFlag::DISALLOW_USER_NATIVES]);
     let mut builder = PackageBuilder::new("LazyNatives");
