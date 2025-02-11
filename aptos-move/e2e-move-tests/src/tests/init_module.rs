@@ -14,17 +14,26 @@ struct ModuleData {
 }
 
 #[test]
-fn init_module() {
+fn init_module_test_with_stateful_sender() {
     let mut h = MoveHarness::new();
+    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), Some(0));
+    init_module(&mut h, acc);
+}
 
-    // Load the code
-    let acc = h.aptos_framework_account();
+#[test]
+fn init_module_test_with_stateless_sender() {
+    let mut h = MoveHarness::new();
+    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), None);
+    init_module(&mut h, acc);
+}
+
+fn init_module(h: &mut MoveHarness, acc: Account) {
     assert_success!(
         h.publish_package_cache_building(&acc, &common::test_dir_path("init_module.data/pack"))
     );
 
     // Verify that init_module was called.
-    let module_data = parse_struct_tag("0x1::test::ModuleData").unwrap();
+    let module_data = parse_struct_tag("0xcafe::test::ModuleData").unwrap();
     assert_eq!(
         h.read_resource::<ModuleData>(acc.address(), module_data.clone())
             .unwrap()
@@ -45,12 +54,24 @@ fn init_module() {
     );
 }
 
-#[test]
-fn init_module_when_republishing_package() {
-    let mut h = MoveHarness::new();
 
+#[test]
+fn init_module_when_republishing_package_test_with_stateful_sender() {
+    let mut h = MoveHarness::new();
+    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), Some(0));
+    init_module_when_republishing_package(&mut h, acc);
+}
+
+#[test]
+fn init_module_when_republishing_package_test_with_stateless_sender() {
+    let mut h = MoveHarness::new();
+    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), None);
+    init_module_when_republishing_package(&mut h, acc);
+}
+
+#[test]
+fn init_module_when_republishing_package(h: &mut MoveHarness, acc: Account) {
     // Deploy a package that initially does not have the module that has the init_module function.
-    let acc = h.aptos_framework_account();
     assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("init_module.data/pack_initial")
@@ -62,7 +83,7 @@ fn init_module_when_republishing_package() {
     );
 
     // Verify that init_module was called.
-    let module_data = parse_struct_tag("0x1::test::ModuleData").unwrap();
+    let module_data = parse_struct_tag("0xcafe::test::ModuleData").unwrap();
     assert_eq!(
         h.read_resource::<ModuleData>(acc.address(), module_data)
             .unwrap()
@@ -71,11 +92,22 @@ fn init_module_when_republishing_package() {
     );
 }
 
-#[test]
-fn init_module_with_abort_and_republish() {
-    let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x12").unwrap());
 
+#[test]
+fn init_module_with_abort_and_republish_with_stateful_sender() {
+    let mut h = MoveHarness::new();
+    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0x915").unwrap(), Some(0));
+    init_module_with_abort_and_republish(&mut h, acc);
+}
+
+#[test]
+fn init_module_with_abort_and_republish_with_stateless_sender() {
+    let mut h = MoveHarness::new();
+    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0x915").unwrap(), None);
+    init_module_with_abort_and_republish(&mut h, acc);
+}
+
+fn init_module_with_abort_and_republish(h: &mut MoveHarness, acc: Account) {
     let mut p1 = PackageBuilder::new("Pack");
     p1.add_source(
         "m.move",
