@@ -56,7 +56,7 @@ use std::{
 };
 
 /// Marker used in name of a function resulting from lambda lifting.
-const LIFTED_FUN_MARKER: &str = "$lambda$";
+const LIFTED_FUN_MARKER: &str = "__lambda__";
 
 /// Returns true if this is a function resulting from lambda lifting.
 pub fn is_lambda_lifted_fun(fun_env: &FunctionEnv) -> bool {
@@ -187,10 +187,10 @@ impl<'a> LambdaLifter<'a> {
     fn gen_closure_function_name(&mut self) -> Symbol {
         let env = self.fun_env.module_env.env;
         env.symbol_pool().make(&format!(
-            "{}{}{}",
-            self.fun_env.get_name().display(env.symbol_pool()),
+            "{}{}__{}",
             LIFTED_FUN_MARKER,
-            self.lifted.len() + 1
+            self.lifted.len() + 1,
+            self.fun_env.get_name().display(env.symbol_pool()),
         ))
     }
 
@@ -288,13 +288,14 @@ impl<'a> LambdaLifter<'a> {
     /// Attempts to rewrite a lambda by currying existing function instead of performing
     /// lambda lifting. See module documentation for background.
     fn try_to_reduce_lambda_to_curry(
+        &self,
         id: NodeId,
         lambda_params: &[Parameter],
         body: &Exp,
     ) -> Option<Exp> {
         use ExpData::*;
         match body.as_ref() {
-            Call(_, oper, args) => {
+            Call(call_id, oper, args) => {
                 match oper {
                     Operation::Closure(..) => {
                         // We might be able to do something with this,
@@ -331,14 +332,24 @@ impl<'a> LambdaLifter<'a> {
                                 return None;
                             }
                         }
-                        Some(Call(id, Operation::Closure(*mid, *fid, mask), captured).into_exp())
+                        // Create a new node id. We inherit location and type from the lambda,
+                        // but instantiation is taken from the call of the curried function.
+                        let env = self.fun_env.module_env.env;
+                        let curry_id = env.new_node(env.get_node_loc(id), env.get_node_type(id));
+                        if let Some(inst) = env.get_node_instantiation_opt(*call_id) {
+                            env.set_node_instantiation(curry_id, inst)
+                        }
+                        Some(
+                            Call(curry_id, Operation::Closure(*mid, *fid, mask), captured)
+                                .into_exp(),
+                        )
                     },
                     _ => None,
                 }
             },
             Sequence(_id, exp_vec) => {
                 if let [exp] = &exp_vec[..] {
-                    Self::try_to_reduce_lambda_to_curry(id, lambda_params, exp)
+                    self.try_to_reduce_lambda_to_curry(id, lambda_params, exp)
                 } else {
                     None
                 }
@@ -534,7 +545,7 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
 
         // Try to rewrite a lambda directly into a curry expression
         if bindings.is_empty() {
-            let possible_curry_exp = Self::try_to_reduce_lambda_to_curry(id, &lambda_params, body);
+            let possible_curry_exp = self.try_to_reduce_lambda_to_curry(id, &lambda_params, body);
             if possible_curry_exp.is_some() {
                 return possible_curry_exp;
             }
@@ -547,7 +558,6 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         let fun_name = self.gen_closure_function_name();
         let lambda_loc = env.get_node_loc(id).clone();
         let lambda_type = env.get_node_type(id);
-        let lambda_inst_opt = env.get_node_instantiation_opt(id);
         let result_type = if let Type::Fun(_, result_type, _) = &lambda_type {
             *result_type.clone()
         } else {
@@ -573,10 +583,18 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
             def: self.bind(bindings, body),
         });
 
-        // Create and return closure expression
+        // Create and return closure expression. The type instantiation
+        // of the closure expression is by the type parameters of the enclosing
+        // function.
         let id = env.new_node(lambda_loc, lambda_type);
-        if let Some(inst) = lambda_inst_opt {
-            env.set_node_instantiation(id, inst);
+        let type_param_count = self.fun_env.get_type_parameter_count();
+        if type_param_count > 0 {
+            env.set_node_instantiation(
+                id,
+                (0..type_param_count)
+                    .map(|i| Type::TypeParameter(i as u16))
+                    .collect(),
+            )
         }
         Some(
             ExpData::Call(
