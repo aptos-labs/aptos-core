@@ -171,12 +171,29 @@ impl Runner {
 
 /// Run with `cargo test test_gas -- --nocapture` to see output.
 #[test]
-fn test_gas() {
+fn test_gas_with_stateful_accounts() {
     // Start with 100 validators.
     let mut harness = MoveHarness::new_with_validators(100);
-    let account_1 = &harness.new_account_at(AccountAddress::from_hex_literal("0x121").unwrap());
-    let account_2 = &harness.new_account_at(AccountAddress::from_hex_literal("0x122").unwrap());
-    let account_3 = &harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
+    let account_1 = &harness.new_account_at(AccountAddress::from_hex_literal("0x121").unwrap(), Some(0));
+    let account_2 = &harness.new_account_at(AccountAddress::from_hex_literal("0x122").unwrap(), Some(0));
+    let account_3 = &harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap(), Some(0));
+    let publisher = &harness.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), Some(0));
+    test_gas(&mut h, account_1, account_2, account_3, publisher);
+}
+
+#[test]
+fn test_gas_with_stateless_accounts() {
+    // Start with 100 validators.
+    let mut harness = MoveHarness::new_with_validators(100);
+    let account_1 = &harness.new_account_at(AccountAddress::from_hex_literal("0x121").unwrap(), None);
+    let account_2 = &harness.new_account_at(AccountAddress::from_hex_literal("0x122").unwrap(), None);
+    let account_3 = &harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap(), None);
+    let publisher = &harness.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), None);
+    test_gas(&mut h, account_1, account_2, account_3, publisher);
+}
+
+
+fn test_gas(h: &mut MoveHarness, account_1: &Account, account_2: &Account, account_3: &Account, publisher: &Account) {
     let account_1_address = *account_1.address();
     let account_2_address = *account_2.address();
     let account_3_address = *account_3.address();
@@ -416,9 +433,6 @@ fn test_gas() {
         ),
     );
 
-    let publisher = &runner
-        .harness
-        .new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     runner.publish(
         "PublishSmall",
         publisher,
@@ -579,8 +593,8 @@ pub fn print_gas_cost_with_statement_and_tps(
 fn test_txn_generator_workloads_calibrate_gas() {
     // Start with 100 validators.
     let mut harness = MoveHarness::new_with_validators(100);
-    let account_1 = &harness.new_account_at(AccountAddress::from_hex_literal("0x121").unwrap());
-    let account_2 = &harness.new_account_at(AccountAddress::from_hex_literal("0x122").unwrap());
+    let account_1 = &harness.new_account_at(AccountAddress::from_hex_literal("0x121").unwrap(), Some(0));
+    let account_2 = &harness.new_account_at(AccountAddress::from_hex_literal("0x122").unwrap(), Some(0));
     let account_2_address = *account_2.address();
 
     // Use the gas profiler unless explicitly disabled by the user.
@@ -673,8 +687,8 @@ fn test_txn_generator_workloads_calibrate_gas() {
 
     for (large_db_tps, small_db_tps, entry_point) in &entry_points {
         if let MultiSigConfig::None = entry_point.multi_sig_additional_num() {
-            let publisher = runner.harness.new_account_with_key_pair();
-            let user = runner.harness.new_account_with_key_pair();
+            let publisher = runner.harness.new_account_with_key_pair(Some(0));
+            let user = runner.harness.new_account_with_key_pair(Some(0));
 
             let mut package_handler =
                 PackageHandler::new(entry_point.pre_built_packages(), entry_point.package_name());
