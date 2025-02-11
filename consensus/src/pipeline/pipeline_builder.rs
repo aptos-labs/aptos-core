@@ -433,7 +433,8 @@ impl PipelineBuilder {
         .shared();
         // the loop can only be abort by the caller
         let input_txns = loop {
-            match preparer.prepare_block(&block, qc_rx.clone()).await {
+            let qc = qc_rx.clone().now_or_never().flatten();
+            match preparer.prepare_block(&block, qc).await {
                 Ok(input_txns) => break input_txns,
                 Err(e) => {
                     warn!(

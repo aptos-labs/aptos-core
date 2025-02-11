@@ -12,8 +12,7 @@ use aptos_consensus_types::{block::Block, quorum_cert::QuorumCert};
 use aptos_executor_types::ExecutorResult;
 use aptos_types::transaction::SignedTransaction;
 use fail::fail_point;
-use futures::future::Shared;
-use std::{future::Future, sync::Arc, time::Instant};
+use std::{sync::Arc, time::Instant};
 
 pub struct BlockPreparer {
     payload_manager: Arc<dyn TPayloadManager>,
@@ -40,7 +39,7 @@ impl BlockPreparer {
     pub async fn prepare_block(
         &self,
         block: &Block,
-        block_qc_fut: Shared<impl Future<Output = Option<Arc<QuorumCert>>>>,
+        block_qc: Option<Arc<QuorumCert>>,
     ) -> ExecutorResult<Vec<SignedTransaction>> {
         fail_point!("consensus::prepare_block", |_| {
             use aptos_executor_types::ExecutorError;
@@ -50,9 +49,7 @@ impl BlockPreparer {
         });
         let start_time = Instant::now();
 
-        let block_voters = block_qc_fut
-            .await
-            .map(|qc| qc.ledger_info().get_voters_bitvec().clone());
+        let block_voters = block_qc.map(|qc| qc.ledger_info().get_voters_bitvec().clone());
         let (txns, max_txns_from_block_to_execute) = self
             .payload_manager
             .get_transactions(block, block_voters)
