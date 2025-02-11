@@ -1,4 +1,4 @@
-// -- Model dump before env processor pipeline:
+// -- Model dump before bytecode pipeline
 module 0x42::mod1 {
     friend fun triple(x: u64): u64 {
         Mul<u64>(x, 3)
@@ -29,1733 +29,60 @@ module 0x42::test {
     }
     private fun choose_function1(key: u64,x: u64): u64 {
         {
-          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
-            mod2::double
+          let f: |u64|u64 = if Eq<u64>(key, 0) {
+            closure#0mod2::double()
           } else {
             if Eq<u64>(key, 1) {
-              mod1::triple
+              closure#0mod1::triple()
             } else {
               if Eq<u64>(key, 2) {
-                 move|x: u64| mod3::multiply(4, x)
+                closure#1mod3::multiply(4)
               } else {
                 if Eq<u64>(key, 3) {
-                  {
-                    let x: u64 = 5;
-                     move|y: u64| mod4::alt_multiply(x, y)
-                  }
+                  closure#1mod4::alt_multiply(5)
                 } else {
                   if Eq<u64>(key, 4) {
-                    {
-                      let x: u64 = 6;
-                       move|y: u64| mod3::multiply(x, y)
-                    }
+                    closure#1mod3::multiply(6)
                   } else {
                     if Eq<u64>(key, 5) {
-                       move|x: u64| test::multiply3(3, 2, x)
+                      closure#11test::multiply3(3, 2)
                     } else {
                       if Eq<u64>(key, 6) {
-                         move|x: u64| mod3::multiply(7, x)
+                        closure#1mod3::multiply(7)
                       } else {
                         if Eq<u64>(key, 7) {
-                           move|x: u64| test::multiply3(4, 2, x)
+                          closure#11test::multiply3(4, 2)
                         } else {
                           if Eq<u64>(key, 8) {
-                             move|x: u64| test::multiply3(3, 3, x)
+                            closure#11test::multiply3(3, 3)
                           } else {
                             if Eq<u64>(key, 9) {
-                              {
-                                let x: u64 = 2;
-                                {
-                                  let y: u64 = 5;
-                                   move|z: u64| test::multiply3(Add<u64>(x, 1), y, z)
-                                }
-                              }
+                              closure#11test::multiply3(3, 5)
                             } else {
                               if Eq<u64>(key, 10) {
-                                {
-                                  let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(z, x) with copy, drop
-                                }
+                                closure#1mod4::alt_multiply(11)
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
-                                     move|x: u64| (g)(11, x)
+                                    let g: |(u64, u64)|u64 = closure#0mod3::multiply();
+                                    closure#1test::__lambda__1__choose_function1(g)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(12, x) with copy, drop;
-                                       move|x: u64| (h)(x) with copy, drop
+                                      let h: |u64|u64 = closure#1mod3::multiply(12);
+                                      closure#1test::__lambda__2__choose_function1(h)
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, 2, x);
-                                         move|z: u64| (i)(z)
+                                        let i: |u64|u64 = closure#11test::multiply3(2, 2);
+                                        closure#1test::__lambda__3__choose_function1(i)
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
-                                          let q: u64 = Sub<u64>(y, 1);
-                                          mod3::multiply(x, Add<u64>(q, 1))
-                                        };
-                                         move|x: u64| (i)(15, x)
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          };
-          (f)(x)
-        }
-    }
-    private fun multiply3(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(Mul<u64>(x, y), z)
-    }
-    public fun test_functions() {
-        {
-          let x: u64 = 3;
-          {
-            let i: u64 = 0;
-            {
-              let __update_iter_flag: bool = false;
-              {
-                let __upper_bound_value: u64 = 15;
-                loop {
-                  if true {
-                    if __update_iter_flag {
-                      i: u64 = Add<u64>(i, 1)
-                    } else {
-                      __update_iter_flag: bool = true
-                    };
-                    if Lt<u64>(i, __upper_bound_value) {
-                      {
-                        let y: u64 = test::choose_function1(i, 3);
-                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
-                          Tuple()
-                        } else {
-                          Abort(i)
-                        };
-                        Tuple()
-                      }
-                    } else {
-                      break
-                    };
-                    Tuple()
-                  } else {
-                    break
-                  }
-                };
-                Tuple()
-              }
-            }
-          }
-        }
-    }
-} // end 0x42::test
-
-
-// -- Model dump after env processor unused checks:
-module 0x42::mod1 {
-    friend fun triple(x: u64): u64 {
-        Mul<u64>(x, 3)
-    }
-} // end 0x42::mod1
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::test {
-    use 0x42::mod1; // resolved as: 0x42::mod1
-    use 0x42::mod2; // resolved as: 0x42::mod2
-    use 0x42::mod3; // resolved as: 0x42::mod3
-    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
-    private fun add_mul(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(z, Add<u64>(x, y))
-    }
-    private fun choose_function1(key: u64,x: u64): u64 {
-        {
-          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
-            mod2::double
-          } else {
-            if Eq<u64>(key, 1) {
-              mod1::triple
-            } else {
-              if Eq<u64>(key, 2) {
-                 move|x: u64| mod3::multiply(4, x)
-              } else {
-                if Eq<u64>(key, 3) {
-                  {
-                    let x: u64 = 5;
-                     move|y: u64| mod4::alt_multiply(x, y)
-                  }
-                } else {
-                  if Eq<u64>(key, 4) {
-                    {
-                      let x: u64 = 6;
-                       move|y: u64| mod3::multiply(x, y)
-                    }
-                  } else {
-                    if Eq<u64>(key, 5) {
-                       move|x: u64| test::multiply3(3, 2, x)
-                    } else {
-                      if Eq<u64>(key, 6) {
-                         move|x: u64| mod3::multiply(7, x)
-                      } else {
-                        if Eq<u64>(key, 7) {
-                           move|x: u64| test::multiply3(4, 2, x)
-                        } else {
-                          if Eq<u64>(key, 8) {
-                             move|x: u64| test::multiply3(3, 3, x)
-                          } else {
-                            if Eq<u64>(key, 9) {
-                              {
-                                let x: u64 = 2;
-                                {
-                                  let y: u64 = 5;
-                                   move|z: u64| test::multiply3(Add<u64>(x, 1), y, z)
-                                }
-                              }
-                            } else {
-                              if Eq<u64>(key, 10) {
-                                {
-                                  let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(z, x) with copy, drop
-                                }
-                              } else {
-                                if Eq<u64>(key, 11) {
-                                  {
-                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
-                                     move|x: u64| (g)(11, x)
-                                  }
-                                } else {
-                                  if Eq<u64>(key, 12) {
-                                    {
-                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(12, x) with copy, drop;
-                                       move|x: u64| (h)(x) with copy, drop
-                                    }
-                                  } else {
-                                    if Eq<u64>(key, 14) {
-                                      {
-                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, 2, x);
-                                         move|z: u64| (i)(z)
-                                      }
-                                    } else {
-                                      {
-                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
-                                          let q: u64 = Sub<u64>(y, 1);
-                                          mod3::multiply(x, Add<u64>(q, 1))
-                                        };
-                                         move|x: u64| (i)(15, x)
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          };
-          (f)(x)
-        }
-    }
-    private fun multiply3(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(Mul<u64>(x, y), z)
-    }
-    public fun test_functions() {
-        {
-          let x: u64 = 3;
-          {
-            let i: u64 = 0;
-            {
-              let __update_iter_flag: bool = false;
-              {
-                let __upper_bound_value: u64 = 15;
-                loop {
-                  if true {
-                    if __update_iter_flag {
-                      i: u64 = Add<u64>(i, 1)
-                    } else {
-                      __update_iter_flag: bool = true
-                    };
-                    if Lt<u64>(i, __upper_bound_value) {
-                      {
-                        let y: u64 = test::choose_function1(i, 3);
-                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
-                          Tuple()
-                        } else {
-                          Abort(i)
-                        };
-                        Tuple()
-                      }
-                    } else {
-                      break
-                    };
-                    Tuple()
-                  } else {
-                    break
-                  }
-                };
-                Tuple()
-              }
-            }
-          }
-        }
-    }
-} // end 0x42::test
-
-
-// -- Model dump after env processor type parameter check:
-module 0x42::mod1 {
-    friend fun triple(x: u64): u64 {
-        Mul<u64>(x, 3)
-    }
-} // end 0x42::mod1
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::test {
-    use 0x42::mod1; // resolved as: 0x42::mod1
-    use 0x42::mod2; // resolved as: 0x42::mod2
-    use 0x42::mod3; // resolved as: 0x42::mod3
-    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
-    private fun add_mul(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(z, Add<u64>(x, y))
-    }
-    private fun choose_function1(key: u64,x: u64): u64 {
-        {
-          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
-            mod2::double
-          } else {
-            if Eq<u64>(key, 1) {
-              mod1::triple
-            } else {
-              if Eq<u64>(key, 2) {
-                 move|x: u64| mod3::multiply(4, x)
-              } else {
-                if Eq<u64>(key, 3) {
-                  {
-                    let x: u64 = 5;
-                     move|y: u64| mod4::alt_multiply(x, y)
-                  }
-                } else {
-                  if Eq<u64>(key, 4) {
-                    {
-                      let x: u64 = 6;
-                       move|y: u64| mod3::multiply(x, y)
-                    }
-                  } else {
-                    if Eq<u64>(key, 5) {
-                       move|x: u64| test::multiply3(3, 2, x)
-                    } else {
-                      if Eq<u64>(key, 6) {
-                         move|x: u64| mod3::multiply(7, x)
-                      } else {
-                        if Eq<u64>(key, 7) {
-                           move|x: u64| test::multiply3(4, 2, x)
-                        } else {
-                          if Eq<u64>(key, 8) {
-                             move|x: u64| test::multiply3(3, 3, x)
-                          } else {
-                            if Eq<u64>(key, 9) {
-                              {
-                                let x: u64 = 2;
-                                {
-                                  let y: u64 = 5;
-                                   move|z: u64| test::multiply3(Add<u64>(x, 1), y, z)
-                                }
-                              }
-                            } else {
-                              if Eq<u64>(key, 10) {
-                                {
-                                  let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(z, x) with copy, drop
-                                }
-                              } else {
-                                if Eq<u64>(key, 11) {
-                                  {
-                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
-                                     move|x: u64| (g)(11, x)
-                                  }
-                                } else {
-                                  if Eq<u64>(key, 12) {
-                                    {
-                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(12, x) with copy, drop;
-                                       move|x: u64| (h)(x) with copy, drop
-                                    }
-                                  } else {
-                                    if Eq<u64>(key, 14) {
-                                      {
-                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, 2, x);
-                                         move|z: u64| (i)(z)
-                                      }
-                                    } else {
-                                      {
-                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
-                                          let q: u64 = Sub<u64>(y, 1);
-                                          mod3::multiply(x, Add<u64>(q, 1))
-                                        };
-                                         move|x: u64| (i)(15, x)
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          };
-          (f)(x)
-        }
-    }
-    private fun multiply3(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(Mul<u64>(x, y), z)
-    }
-    public fun test_functions() {
-        {
-          let x: u64 = 3;
-          {
-            let i: u64 = 0;
-            {
-              let __update_iter_flag: bool = false;
-              {
-                let __upper_bound_value: u64 = 15;
-                loop {
-                  if true {
-                    if __update_iter_flag {
-                      i: u64 = Add<u64>(i, 1)
-                    } else {
-                      __update_iter_flag: bool = true
-                    };
-                    if Lt<u64>(i, __upper_bound_value) {
-                      {
-                        let y: u64 = test::choose_function1(i, 3);
-                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
-                          Tuple()
-                        } else {
-                          Abort(i)
-                        };
-                        Tuple()
-                      }
-                    } else {
-                      break
-                    };
-                    Tuple()
-                  } else {
-                    break
-                  }
-                };
-                Tuple()
-              }
-            }
-          }
-        }
-    }
-} // end 0x42::test
-
-
-// -- Model dump after env processor check recursive struct definition:
-module 0x42::mod1 {
-    friend fun triple(x: u64): u64 {
-        Mul<u64>(x, 3)
-    }
-} // end 0x42::mod1
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::test {
-    use 0x42::mod1; // resolved as: 0x42::mod1
-    use 0x42::mod2; // resolved as: 0x42::mod2
-    use 0x42::mod3; // resolved as: 0x42::mod3
-    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
-    private fun add_mul(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(z, Add<u64>(x, y))
-    }
-    private fun choose_function1(key: u64,x: u64): u64 {
-        {
-          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
-            mod2::double
-          } else {
-            if Eq<u64>(key, 1) {
-              mod1::triple
-            } else {
-              if Eq<u64>(key, 2) {
-                 move|x: u64| mod3::multiply(4, x)
-              } else {
-                if Eq<u64>(key, 3) {
-                  {
-                    let x: u64 = 5;
-                     move|y: u64| mod4::alt_multiply(x, y)
-                  }
-                } else {
-                  if Eq<u64>(key, 4) {
-                    {
-                      let x: u64 = 6;
-                       move|y: u64| mod3::multiply(x, y)
-                    }
-                  } else {
-                    if Eq<u64>(key, 5) {
-                       move|x: u64| test::multiply3(3, 2, x)
-                    } else {
-                      if Eq<u64>(key, 6) {
-                         move|x: u64| mod3::multiply(7, x)
-                      } else {
-                        if Eq<u64>(key, 7) {
-                           move|x: u64| test::multiply3(4, 2, x)
-                        } else {
-                          if Eq<u64>(key, 8) {
-                             move|x: u64| test::multiply3(3, 3, x)
-                          } else {
-                            if Eq<u64>(key, 9) {
-                              {
-                                let x: u64 = 2;
-                                {
-                                  let y: u64 = 5;
-                                   move|z: u64| test::multiply3(Add<u64>(x, 1), y, z)
-                                }
-                              }
-                            } else {
-                              if Eq<u64>(key, 10) {
-                                {
-                                  let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(z, x) with copy, drop
-                                }
-                              } else {
-                                if Eq<u64>(key, 11) {
-                                  {
-                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
-                                     move|x: u64| (g)(11, x)
-                                  }
-                                } else {
-                                  if Eq<u64>(key, 12) {
-                                    {
-                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(12, x) with copy, drop;
-                                       move|x: u64| (h)(x) with copy, drop
-                                    }
-                                  } else {
-                                    if Eq<u64>(key, 14) {
-                                      {
-                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, 2, x);
-                                         move|z: u64| (i)(z)
-                                      }
-                                    } else {
-                                      {
-                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
-                                          let q: u64 = Sub<u64>(y, 1);
-                                          mod3::multiply(x, Add<u64>(q, 1))
-                                        };
-                                         move|x: u64| (i)(15, x)
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          };
-          (f)(x)
-        }
-    }
-    private fun multiply3(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(Mul<u64>(x, y), z)
-    }
-    public fun test_functions() {
-        {
-          let x: u64 = 3;
-          {
-            let i: u64 = 0;
-            {
-              let __update_iter_flag: bool = false;
-              {
-                let __upper_bound_value: u64 = 15;
-                loop {
-                  if true {
-                    if __update_iter_flag {
-                      i: u64 = Add<u64>(i, 1)
-                    } else {
-                      __update_iter_flag: bool = true
-                    };
-                    if Lt<u64>(i, __upper_bound_value) {
-                      {
-                        let y: u64 = test::choose_function1(i, 3);
-                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
-                          Tuple()
-                        } else {
-                          Abort(i)
-                        };
-                        Tuple()
-                      }
-                    } else {
-                      break
-                    };
-                    Tuple()
-                  } else {
-                    break
-                  }
-                };
-                Tuple()
-              }
-            }
-          }
-        }
-    }
-} // end 0x42::test
-
-
-// -- Model dump after env processor check cyclic type instantiation:
-module 0x42::mod1 {
-    friend fun triple(x: u64): u64 {
-        Mul<u64>(x, 3)
-    }
-} // end 0x42::mod1
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::test {
-    use 0x42::mod1; // resolved as: 0x42::mod1
-    use 0x42::mod2; // resolved as: 0x42::mod2
-    use 0x42::mod3; // resolved as: 0x42::mod3
-    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
-    private fun add_mul(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(z, Add<u64>(x, y))
-    }
-    private fun choose_function1(key: u64,x: u64): u64 {
-        {
-          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
-            mod2::double
-          } else {
-            if Eq<u64>(key, 1) {
-              mod1::triple
-            } else {
-              if Eq<u64>(key, 2) {
-                 move|x: u64| mod3::multiply(4, x)
-              } else {
-                if Eq<u64>(key, 3) {
-                  {
-                    let x: u64 = 5;
-                     move|y: u64| mod4::alt_multiply(x, y)
-                  }
-                } else {
-                  if Eq<u64>(key, 4) {
-                    {
-                      let x: u64 = 6;
-                       move|y: u64| mod3::multiply(x, y)
-                    }
-                  } else {
-                    if Eq<u64>(key, 5) {
-                       move|x: u64| test::multiply3(3, 2, x)
-                    } else {
-                      if Eq<u64>(key, 6) {
-                         move|x: u64| mod3::multiply(7, x)
-                      } else {
-                        if Eq<u64>(key, 7) {
-                           move|x: u64| test::multiply3(4, 2, x)
-                        } else {
-                          if Eq<u64>(key, 8) {
-                             move|x: u64| test::multiply3(3, 3, x)
-                          } else {
-                            if Eq<u64>(key, 9) {
-                              {
-                                let x: u64 = 2;
-                                {
-                                  let y: u64 = 5;
-                                   move|z: u64| test::multiply3(Add<u64>(x, 1), y, z)
-                                }
-                              }
-                            } else {
-                              if Eq<u64>(key, 10) {
-                                {
-                                  let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(z, x) with copy, drop
-                                }
-                              } else {
-                                if Eq<u64>(key, 11) {
-                                  {
-                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
-                                     move|x: u64| (g)(11, x)
-                                  }
-                                } else {
-                                  if Eq<u64>(key, 12) {
-                                    {
-                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(12, x) with copy, drop;
-                                       move|x: u64| (h)(x) with copy, drop
-                                    }
-                                  } else {
-                                    if Eq<u64>(key, 14) {
-                                      {
-                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, 2, x);
-                                         move|z: u64| (i)(z)
-                                      }
-                                    } else {
-                                      {
-                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
-                                          let q: u64 = Sub<u64>(y, 1);
-                                          mod3::multiply(x, Add<u64>(q, 1))
-                                        };
-                                         move|x: u64| (i)(15, x)
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          };
-          (f)(x)
-        }
-    }
-    private fun multiply3(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(Mul<u64>(x, y), z)
-    }
-    public fun test_functions() {
-        {
-          let x: u64 = 3;
-          {
-            let i: u64 = 0;
-            {
-              let __update_iter_flag: bool = false;
-              {
-                let __upper_bound_value: u64 = 15;
-                loop {
-                  if true {
-                    if __update_iter_flag {
-                      i: u64 = Add<u64>(i, 1)
-                    } else {
-                      __update_iter_flag: bool = true
-                    };
-                    if Lt<u64>(i, __upper_bound_value) {
-                      {
-                        let y: u64 = test::choose_function1(i, 3);
-                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
-                          Tuple()
-                        } else {
-                          Abort(i)
-                        };
-                        Tuple()
-                      }
-                    } else {
-                      break
-                    };
-                    Tuple()
-                  } else {
-                    break
-                  }
-                };
-                Tuple()
-              }
-            }
-          }
-        }
-    }
-} // end 0x42::test
-
-
-// -- Model dump after env processor unused struct params check:
-module 0x42::mod1 {
-    friend fun triple(x: u64): u64 {
-        Mul<u64>(x, 3)
-    }
-} // end 0x42::mod1
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::test {
-    use 0x42::mod1; // resolved as: 0x42::mod1
-    use 0x42::mod2; // resolved as: 0x42::mod2
-    use 0x42::mod3; // resolved as: 0x42::mod3
-    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
-    private fun add_mul(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(z, Add<u64>(x, y))
-    }
-    private fun choose_function1(key: u64,x: u64): u64 {
-        {
-          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
-            mod2::double
-          } else {
-            if Eq<u64>(key, 1) {
-              mod1::triple
-            } else {
-              if Eq<u64>(key, 2) {
-                 move|x: u64| mod3::multiply(4, x)
-              } else {
-                if Eq<u64>(key, 3) {
-                  {
-                    let x: u64 = 5;
-                     move|y: u64| mod4::alt_multiply(x, y)
-                  }
-                } else {
-                  if Eq<u64>(key, 4) {
-                    {
-                      let x: u64 = 6;
-                       move|y: u64| mod3::multiply(x, y)
-                    }
-                  } else {
-                    if Eq<u64>(key, 5) {
-                       move|x: u64| test::multiply3(3, 2, x)
-                    } else {
-                      if Eq<u64>(key, 6) {
-                         move|x: u64| mod3::multiply(7, x)
-                      } else {
-                        if Eq<u64>(key, 7) {
-                           move|x: u64| test::multiply3(4, 2, x)
-                        } else {
-                          if Eq<u64>(key, 8) {
-                             move|x: u64| test::multiply3(3, 3, x)
-                          } else {
-                            if Eq<u64>(key, 9) {
-                              {
-                                let x: u64 = 2;
-                                {
-                                  let y: u64 = 5;
-                                   move|z: u64| test::multiply3(Add<u64>(x, 1), y, z)
-                                }
-                              }
-                            } else {
-                              if Eq<u64>(key, 10) {
-                                {
-                                  let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(z, x) with copy, drop
-                                }
-                              } else {
-                                if Eq<u64>(key, 11) {
-                                  {
-                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
-                                     move|x: u64| (g)(11, x)
-                                  }
-                                } else {
-                                  if Eq<u64>(key, 12) {
-                                    {
-                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(12, x) with copy, drop;
-                                       move|x: u64| (h)(x) with copy, drop
-                                    }
-                                  } else {
-                                    if Eq<u64>(key, 14) {
-                                      {
-                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, 2, x);
-                                         move|z: u64| (i)(z)
-                                      }
-                                    } else {
-                                      {
-                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
-                                          let q: u64 = Sub<u64>(y, 1);
-                                          mod3::multiply(x, Add<u64>(q, 1))
-                                        };
-                                         move|x: u64| (i)(15, x)
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          };
-          (f)(x)
-        }
-    }
-    private fun multiply3(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(Mul<u64>(x, y), z)
-    }
-    public fun test_functions() {
-        {
-          let x: u64 = 3;
-          {
-            let i: u64 = 0;
-            {
-              let __update_iter_flag: bool = false;
-              {
-                let __upper_bound_value: u64 = 15;
-                loop {
-                  if true {
-                    if __update_iter_flag {
-                      i: u64 = Add<u64>(i, 1)
-                    } else {
-                      __update_iter_flag: bool = true
-                    };
-                    if Lt<u64>(i, __upper_bound_value) {
-                      {
-                        let y: u64 = test::choose_function1(i, 3);
-                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
-                          Tuple()
-                        } else {
-                          Abort(i)
-                        };
-                        Tuple()
-                      }
-                    } else {
-                      break
-                    };
-                    Tuple()
-                  } else {
-                    break
-                  }
-                };
-                Tuple()
-              }
-            }
-          }
-        }
-    }
-} // end 0x42::test
-
-
-// -- Model dump after env processor access and use check before inlining:
-module 0x42::mod1 {
-    friend fun triple(x: u64): u64 {
-        Mul<u64>(x, 3)
-    }
-} // end 0x42::mod1
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::test {
-    use 0x42::mod1; // resolved as: 0x42::mod1
-    use 0x42::mod2; // resolved as: 0x42::mod2
-    use 0x42::mod3; // resolved as: 0x42::mod3
-    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
-    private fun add_mul(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(z, Add<u64>(x, y))
-    }
-    private fun choose_function1(key: u64,x: u64): u64 {
-        {
-          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
-            mod2::double
-          } else {
-            if Eq<u64>(key, 1) {
-              mod1::triple
-            } else {
-              if Eq<u64>(key, 2) {
-                 move|x: u64| mod3::multiply(4, x)
-              } else {
-                if Eq<u64>(key, 3) {
-                  {
-                    let x: u64 = 5;
-                     move|y: u64| mod4::alt_multiply(x, y)
-                  }
-                } else {
-                  if Eq<u64>(key, 4) {
-                    {
-                      let x: u64 = 6;
-                       move|y: u64| mod3::multiply(x, y)
-                    }
-                  } else {
-                    if Eq<u64>(key, 5) {
-                       move|x: u64| test::multiply3(3, 2, x)
-                    } else {
-                      if Eq<u64>(key, 6) {
-                         move|x: u64| mod3::multiply(7, x)
-                      } else {
-                        if Eq<u64>(key, 7) {
-                           move|x: u64| test::multiply3(4, 2, x)
-                        } else {
-                          if Eq<u64>(key, 8) {
-                             move|x: u64| test::multiply3(3, 3, x)
-                          } else {
-                            if Eq<u64>(key, 9) {
-                              {
-                                let x: u64 = 2;
-                                {
-                                  let y: u64 = 5;
-                                   move|z: u64| test::multiply3(Add<u64>(x, 1), y, z)
-                                }
-                              }
-                            } else {
-                              if Eq<u64>(key, 10) {
-                                {
-                                  let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(z, x) with copy, drop
-                                }
-                              } else {
-                                if Eq<u64>(key, 11) {
-                                  {
-                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
-                                     move|x: u64| (g)(11, x)
-                                  }
-                                } else {
-                                  if Eq<u64>(key, 12) {
-                                    {
-                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(12, x) with copy, drop;
-                                       move|x: u64| (h)(x) with copy, drop
-                                    }
-                                  } else {
-                                    if Eq<u64>(key, 14) {
-                                      {
-                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, 2, x);
-                                         move|z: u64| (i)(z)
-                                      }
-                                    } else {
-                                      {
-                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
-                                          let q: u64 = Sub<u64>(y, 1);
-                                          mod3::multiply(x, Add<u64>(q, 1))
-                                        };
-                                         move|x: u64| (i)(15, x)
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          };
-          (f)(x)
-        }
-    }
-    private fun multiply3(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(Mul<u64>(x, y), z)
-    }
-    public fun test_functions() {
-        {
-          let x: u64 = 3;
-          {
-            let i: u64 = 0;
-            {
-              let __update_iter_flag: bool = false;
-              {
-                let __upper_bound_value: u64 = 15;
-                loop {
-                  if true {
-                    if __update_iter_flag {
-                      i: u64 = Add<u64>(i, 1)
-                    } else {
-                      __update_iter_flag: bool = true
-                    };
-                    if Lt<u64>(i, __upper_bound_value) {
-                      {
-                        let y: u64 = test::choose_function1(i, 3);
-                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
-                          Tuple()
-                        } else {
-                          Abort(i)
-                        };
-                        Tuple()
-                      }
-                    } else {
-                      break
-                    };
-                    Tuple()
-                  } else {
-                    break
-                  }
-                };
-                Tuple()
-              }
-            }
-          }
-        }
-    }
-} // end 0x42::test
-
-
-// -- Model dump after env processor inlining:
-module 0x42::mod1 {
-    friend fun triple(x: u64): u64 {
-        Mul<u64>(x, 3)
-    }
-} // end 0x42::mod1
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::test {
-    use 0x42::mod1; // resolved as: 0x42::mod1
-    use 0x42::mod2; // resolved as: 0x42::mod2
-    use 0x42::mod3; // resolved as: 0x42::mod3
-    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
-    private fun add_mul(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(z, Add<u64>(x, y))
-    }
-    private fun choose_function1(key: u64,x: u64): u64 {
-        {
-          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
-            mod2::double
-          } else {
-            if Eq<u64>(key, 1) {
-              mod1::triple
-            } else {
-              if Eq<u64>(key, 2) {
-                 move|x: u64| mod3::multiply(4, x)
-              } else {
-                if Eq<u64>(key, 3) {
-                  {
-                    let x: u64 = 5;
-                     move|y: u64| mod4::alt_multiply(x, y)
-                  }
-                } else {
-                  if Eq<u64>(key, 4) {
-                    {
-                      let x: u64 = 6;
-                       move|y: u64| mod3::multiply(x, y)
-                    }
-                  } else {
-                    if Eq<u64>(key, 5) {
-                       move|x: u64| test::multiply3(3, 2, x)
-                    } else {
-                      if Eq<u64>(key, 6) {
-                         move|x: u64| mod3::multiply(7, x)
-                      } else {
-                        if Eq<u64>(key, 7) {
-                           move|x: u64| test::multiply3(4, 2, x)
-                        } else {
-                          if Eq<u64>(key, 8) {
-                             move|x: u64| test::multiply3(3, 3, x)
-                          } else {
-                            if Eq<u64>(key, 9) {
-                              {
-                                let x: u64 = 2;
-                                {
-                                  let y: u64 = 5;
-                                   move|z: u64| test::multiply3(Add<u64>(x, 1), y, z)
-                                }
-                              }
-                            } else {
-                              if Eq<u64>(key, 10) {
-                                {
-                                  let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(z, x) with copy, drop
-                                }
-                              } else {
-                                if Eq<u64>(key, 11) {
-                                  {
-                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
-                                     move|x: u64| (g)(11, x)
-                                  }
-                                } else {
-                                  if Eq<u64>(key, 12) {
-                                    {
-                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(12, x) with copy, drop;
-                                       move|x: u64| (h)(x) with copy, drop
-                                    }
-                                  } else {
-                                    if Eq<u64>(key, 14) {
-                                      {
-                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, 2, x);
-                                         move|z: u64| (i)(z)
-                                      }
-                                    } else {
-                                      {
-                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
-                                          let q: u64 = Sub<u64>(y, 1);
-                                          mod3::multiply(x, Add<u64>(q, 1))
-                                        };
-                                         move|x: u64| (i)(15, x)
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          };
-          (f)(x)
-        }
-    }
-    private fun multiply3(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(Mul<u64>(x, y), z)
-    }
-    public fun test_functions() {
-        {
-          let x: u64 = 3;
-          {
-            let i: u64 = 0;
-            {
-              let __update_iter_flag: bool = false;
-              {
-                let __upper_bound_value: u64 = 15;
-                loop {
-                  if true {
-                    if __update_iter_flag {
-                      i: u64 = Add<u64>(i, 1)
-                    } else {
-                      __update_iter_flag: bool = true
-                    };
-                    if Lt<u64>(i, __upper_bound_value) {
-                      {
-                        let y: u64 = test::choose_function1(i, 3);
-                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
-                          Tuple()
-                        } else {
-                          Abort(i)
-                        };
-                        Tuple()
-                      }
-                    } else {
-                      break
-                    };
-                    Tuple()
-                  } else {
-                    break
-                  }
-                };
-                Tuple()
-              }
-            }
-          }
-        }
-    }
-} // end 0x42::test
-
-
-// -- Model dump after env processor access and use check after inlining:
-module 0x42::mod1 {
-    friend fun triple(x: u64): u64 {
-        Mul<u64>(x, 3)
-    }
-} // end 0x42::mod1
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::test {
-    use 0x42::mod1; // resolved as: 0x42::mod1
-    use 0x42::mod2; // resolved as: 0x42::mod2
-    use 0x42::mod3; // resolved as: 0x42::mod3
-    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
-    private fun add_mul(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(z, Add<u64>(x, y))
-    }
-    private fun choose_function1(key: u64,x: u64): u64 {
-        {
-          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
-            mod2::double
-          } else {
-            if Eq<u64>(key, 1) {
-              mod1::triple
-            } else {
-              if Eq<u64>(key, 2) {
-                 move|x: u64| mod3::multiply(4, x)
-              } else {
-                if Eq<u64>(key, 3) {
-                  {
-                    let x: u64 = 5;
-                     move|y: u64| mod4::alt_multiply(x, y)
-                  }
-                } else {
-                  if Eq<u64>(key, 4) {
-                    {
-                      let x: u64 = 6;
-                       move|y: u64| mod3::multiply(x, y)
-                    }
-                  } else {
-                    if Eq<u64>(key, 5) {
-                       move|x: u64| test::multiply3(3, 2, x)
-                    } else {
-                      if Eq<u64>(key, 6) {
-                         move|x: u64| mod3::multiply(7, x)
-                      } else {
-                        if Eq<u64>(key, 7) {
-                           move|x: u64| test::multiply3(4, 2, x)
-                        } else {
-                          if Eq<u64>(key, 8) {
-                             move|x: u64| test::multiply3(3, 3, x)
-                          } else {
-                            if Eq<u64>(key, 9) {
-                              {
-                                let x: u64 = 2;
-                                {
-                                  let y: u64 = 5;
-                                   move|z: u64| test::multiply3(Add<u64>(x, 1), y, z)
-                                }
-                              }
-                            } else {
-                              if Eq<u64>(key, 10) {
-                                {
-                                  let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(z, x) with copy, drop
-                                }
-                              } else {
-                                if Eq<u64>(key, 11) {
-                                  {
-                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
-                                     move|x: u64| (g)(11, x)
-                                  }
-                                } else {
-                                  if Eq<u64>(key, 12) {
-                                    {
-                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(12, x) with copy, drop;
-                                       move|x: u64| (h)(x) with copy, drop
-                                    }
-                                  } else {
-                                    if Eq<u64>(key, 14) {
-                                      {
-                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, 2, x);
-                                         move|z: u64| (i)(z)
-                                      }
-                                    } else {
-                                      {
-                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
-                                          let q: u64 = Sub<u64>(y, 1);
-                                          mod3::multiply(x, Add<u64>(q, 1))
-                                        };
-                                         move|x: u64| (i)(15, x)
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          };
-          (f)(x)
-        }
-    }
-    private fun multiply3(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(Mul<u64>(x, y), z)
-    }
-    public fun test_functions() {
-        {
-          let x: u64 = 3;
-          {
-            let i: u64 = 0;
-            {
-              let __update_iter_flag: bool = false;
-              {
-                let __upper_bound_value: u64 = 15;
-                loop {
-                  if true {
-                    if __update_iter_flag {
-                      i: u64 = Add<u64>(i, 1)
-                    } else {
-                      __update_iter_flag: bool = true
-                    };
-                    if Lt<u64>(i, __upper_bound_value) {
-                      {
-                        let y: u64 = test::choose_function1(i, 3);
-                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
-                          Tuple()
-                        } else {
-                          Abort(i)
-                        };
-                        Tuple()
-                      }
-                    } else {
-                      break
-                    };
-                    Tuple()
-                  } else {
-                    break
-                  }
-                };
-                Tuple()
-              }
-            }
-          }
-        }
-    }
-} // end 0x42::test
-
-
-// -- Model dump after env processor acquires check:
-module 0x42::mod1 {
-    friend fun triple(x: u64): u64 {
-        Mul<u64>(x, 3)
-    }
-} // end 0x42::mod1
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::test {
-    use 0x42::mod1; // resolved as: 0x42::mod1
-    use 0x42::mod2; // resolved as: 0x42::mod2
-    use 0x42::mod3; // resolved as: 0x42::mod3
-    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
-    private fun add_mul(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(z, Add<u64>(x, y))
-    }
-    private fun choose_function1(key: u64,x: u64): u64 {
-        {
-          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
-            mod2::double
-          } else {
-            if Eq<u64>(key, 1) {
-              mod1::triple
-            } else {
-              if Eq<u64>(key, 2) {
-                 move|x: u64| mod3::multiply(4, x)
-              } else {
-                if Eq<u64>(key, 3) {
-                  {
-                    let x: u64 = 5;
-                     move|y: u64| mod4::alt_multiply(x, y)
-                  }
-                } else {
-                  if Eq<u64>(key, 4) {
-                    {
-                      let x: u64 = 6;
-                       move|y: u64| mod3::multiply(x, y)
-                    }
-                  } else {
-                    if Eq<u64>(key, 5) {
-                       move|x: u64| test::multiply3(3, 2, x)
-                    } else {
-                      if Eq<u64>(key, 6) {
-                         move|x: u64| mod3::multiply(7, x)
-                      } else {
-                        if Eq<u64>(key, 7) {
-                           move|x: u64| test::multiply3(4, 2, x)
-                        } else {
-                          if Eq<u64>(key, 8) {
-                             move|x: u64| test::multiply3(3, 3, x)
-                          } else {
-                            if Eq<u64>(key, 9) {
-                              {
-                                let x: u64 = 2;
-                                {
-                                  let y: u64 = 5;
-                                   move|z: u64| test::multiply3(Add<u64>(x, 1), y, z)
-                                }
-                              }
-                            } else {
-                              if Eq<u64>(key, 10) {
-                                {
-                                  let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(z, x) with copy, drop
-                                }
-                              } else {
-                                if Eq<u64>(key, 11) {
-                                  {
-                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
-                                     move|x: u64| (g)(11, x)
-                                  }
-                                } else {
-                                  if Eq<u64>(key, 12) {
-                                    {
-                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(12, x) with copy, drop;
-                                       move|x: u64| (h)(x) with copy, drop
-                                    }
-                                  } else {
-                                    if Eq<u64>(key, 14) {
-                                      {
-                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, 2, x);
-                                         move|z: u64| (i)(z)
-                                      }
-                                    } else {
-                                      {
-                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
-                                          let q: u64 = Sub<u64>(y, 1);
-                                          mod3::multiply(x, Add<u64>(q, 1))
-                                        };
-                                         move|x: u64| (i)(15, x)
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          };
-          (f)(x)
-        }
-    }
-    private fun multiply3(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(Mul<u64>(x, y), z)
-    }
-    public fun test_functions() {
-        {
-          let x: u64 = 3;
-          {
-            let i: u64 = 0;
-            {
-              let __update_iter_flag: bool = false;
-              {
-                let __upper_bound_value: u64 = 15;
-                loop {
-                  if true {
-                    if __update_iter_flag {
-                      i: u64 = Add<u64>(i, 1)
-                    } else {
-                      __update_iter_flag: bool = true
-                    };
-                    if Lt<u64>(i, __upper_bound_value) {
-                      {
-                        let y: u64 = test::choose_function1(i, 3);
-                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
-                          Tuple()
-                        } else {
-                          Abort(i)
-                        };
-                        Tuple()
-                      }
-                    } else {
-                      break
-                    };
-                    Tuple()
-                  } else {
-                    break
-                  }
-                };
-                Tuple()
-              }
-            }
-          }
-        }
-    }
-} // end 0x42::test
-
-
-// -- Model dump after env processor simplifier:
-module 0x42::mod1 {
-    friend fun triple(x: u64): u64 {
-        Mul<u64>(x, 3)
-    }
-} // end 0x42::mod1
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::test {
-    use 0x42::mod1; // resolved as: 0x42::mod1
-    use 0x42::mod2; // resolved as: 0x42::mod2
-    use 0x42::mod3; // resolved as: 0x42::mod3
-    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
-    private fun add_mul(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(z, Add<u64>(x, y))
-    }
-    private fun choose_function1(key: u64,x: u64): u64 {
-        {
-          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
-            mod2::double
-          } else {
-            if Eq<u64>(key, 1) {
-              mod1::triple
-            } else {
-              if Eq<u64>(key, 2) {
-                 move|x: u64| mod3::multiply(4, x)
-              } else {
-                if Eq<u64>(key, 3) {
-                   move|y: u64| mod4::alt_multiply(5, y)
-                } else {
-                  if Eq<u64>(key, 4) {
-                     move|y: u64| mod3::multiply(6, y)
-                  } else {
-                    if Eq<u64>(key, 5) {
-                       move|x: u64| test::multiply3(3, 2, x)
-                    } else {
-                      if Eq<u64>(key, 6) {
-                         move|x: u64| mod3::multiply(7, x)
-                      } else {
-                        if Eq<u64>(key, 7) {
-                           move|x: u64| test::multiply3(4, 2, x)
-                        } else {
-                          if Eq<u64>(key, 8) {
-                             move|x: u64| test::multiply3(3, 3, x)
-                          } else {
-                            if Eq<u64>(key, 9) {
-                               move|z: u64| test::multiply3(3, 5, z)
-                            } else {
-                              if Eq<u64>(key, 10) {
-                                 move|x: u64| mod4::alt_multiply(11, x) with copy, drop
-                              } else {
-                                if Eq<u64>(key, 11) {
-                                  {
-                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
-                                     move|x: u64| (g)(11, x)
-                                  }
-                                } else {
-                                  if Eq<u64>(key, 12) {
-                                    {
-                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(12, x) with copy, drop;
-                                       move|x: u64| (h)(x) with copy, drop
-                                    }
-                                  } else {
-                                    if Eq<u64>(key, 14) {
-                                      {
-                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, 2, x);
-                                         move|z: u64| (i)(z)
-                                      }
-                                    } else {
-                                      {
-                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
-                                          let q: u64 = Sub<u64>(y, 1);
-                                          mod3::multiply(x, Add<u64>(q, 1))
-                                        };
-                                         move|x: u64| (i)(15, x)
+                                        let i: |(u64, u64)|u64 = closure#0test::__lambda__4__choose_function1();
+                                        closure#1test::__lambda__5__choose_function1(i)
                                       }
                                     }
                                   }
@@ -1811,562 +138,1497 @@ module 0x42::test {
           }
         }
     }
-} // end 0x42::test
-
-
-// -- Model dump after env processor lambda-lifting:
-module 0x42::mod1 {
-    friend fun triple(x: u64): u64 {
-        Mul<u64>(x, 3)
+    private fun __lambda__1__choose_function1(g: |(u64, u64)|u64,x: u64): u64 {
+        (g)(11, x)
     }
-} // end 0x42::mod1
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
+    private fun __lambda__2__choose_function1(h: |u64|u64,x: u64): u64 {
+        (h)(x)
     }
-} // end 0x42::mod2
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
+    private fun __lambda__3__choose_function1(i: |u64|u64,z: u64): u64 {
+        (i)(z)
     }
-} // end 0x42::mod3
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::test {
-    use 0x42::mod1; // resolved as: 0x42::mod1
-    use 0x42::mod2; // resolved as: 0x42::mod2
-    use 0x42::mod3; // resolved as: 0x42::mod3
-    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
-    private fun add_mul(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(z, Add<u64>(x, y))
-    }
-    private fun choose_function1(key: u64,x: u64): u64 {
-        {
-          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
-            mod2::double
-          } else {
-            if Eq<u64>(key, 1) {
-              mod1::triple
-            } else {
-              if Eq<u64>(key, 2) {
-                earlybind(mod3::multiply, 4)
-              } else {
-                if Eq<u64>(key, 3) {
-                  earlybind(mod4::alt_multiply, 5)
-                } else {
-                  if Eq<u64>(key, 4) {
-                    earlybind(mod3::multiply, 6)
-                  } else {
-                    if Eq<u64>(key, 5) {
-                      earlybind(test::multiply3, 3, 2)
-                    } else {
-                      if Eq<u64>(key, 6) {
-                        earlybind(mod3::multiply, 7)
-                      } else {
-                        if Eq<u64>(key, 7) {
-                          earlybind(test::multiply3, 4, 2)
-                        } else {
-                          if Eq<u64>(key, 8) {
-                            earlybind(test::multiply3, 3, 3)
-                          } else {
-                            if Eq<u64>(key, 9) {
-                              earlybind(test::multiply3, 3, 5)
-                            } else {
-                              if Eq<u64>(key, 10) {
-                                earlybind(mod4::alt_multiply, 11)
-                              } else {
-                                if Eq<u64>(key, 11) {
-                                  {
-                                    let g: |(u64, u64)|u64 with copy+store = mod3::multiply;
-                                    earlybind(g, 11)
-                                  }
-                                } else {
-                                  if Eq<u64>(key, 12) {
-                                    {
-                                      let h: |u64|u64 with copy+store = earlybind(mod3::multiply, 12);
-                                      h
-                                    }
-                                  } else {
-                                    if Eq<u64>(key, 14) {
-                                      {
-                                        let i: |u64|u64 with copy+store = earlybind(test::multiply3, 2, 2);
-                                        i
-                                      }
-                                    } else {
-                                      {
-                                        let i: |(u64, u64)|u64 with copy+store = test::choose_function1$lambda$1;
-                                        earlybind(i, 15)
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          };
-          (f)(x)
-        }
-    }
-    private fun multiply3(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(Mul<u64>(x, y), z)
-    }
-    public fun test_functions() {
-        {
-          let i: u64 = 0;
-          {
-            let __update_iter_flag: bool = false;
-            loop {
-              if true {
-                if __update_iter_flag {
-                  i: u64 = Add<u64>(i, 1)
-                } else {
-                  __update_iter_flag: bool = true
-                };
-                if Lt<u64>(i, 15) {
-                  {
-                    let y: u64 = test::choose_function1(i, 3);
-                    if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), 3)) {
-                      Tuple()
-                    } else {
-                      Abort(i)
-                    };
-                    Tuple()
-                  }
-                } else {
-                  break
-                };
-                Tuple()
-              } else {
-                break
-              }
-            };
-            Tuple()
-          }
-        }
-    }
-    private fun choose_function1$lambda$1(x: u64,y: u64): u64 {
+    private fun __lambda__4__choose_function1(x: u64,y: u64): u64 {
         {
           let q: u64 = Sub<u64>(y, 1);
           mod3::multiply(x, Add<u64>(q, 1))
         }
     }
+    private fun __lambda__5__choose_function1(i: |(u64, u64)|u64,x: u64): u64 {
+        (i)(15, x)
+    }
 } // end 0x42::test
 
-
-// -- Model dump after env processor specification checker:
+// -- Sourcified model before bytecode pipeline
 module 0x42::mod1 {
+    friend 0x42::test;
     friend fun triple(x: u64): u64 {
-        Mul<u64>(x, 3)
+        x * 3
     }
-} // end 0x42::mod1
+}
 module 0x42::mod2 {
+    friend 0x42::test;
     friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
+        x * 2
     }
-} // end 0x42::mod2
+}
 module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
+    public fun multiply(x: u64, y: u64): u64 {
+        x * y
     }
-} // end 0x42::mod3
+}
 module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
+    public fun alt_multiply(x: u64, y: u64): u64 {
+        x * y
     }
-} // end 0x42::mod4
+}
 module 0x42::test {
-    use 0x42::mod1; // resolved as: 0x42::mod1
-    use 0x42::mod2; // resolved as: 0x42::mod2
-    use 0x42::mod3; // resolved as: 0x42::mod3
-    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
-    private fun add_mul(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(z, Add<u64>(x, y))
+    use 0x42::mod1;
+    use 0x42::mod2;
+    use 0x42::mod3;
+    use 0x42::mod4;
+    fun add_mul(x: u64, y: u64, z: u64): u64 {
+        z * (x + y)
     }
-    private fun choose_function1(key: u64,x: u64): u64 {
-        {
-          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
-            mod2::double
-          } else {
-            if Eq<u64>(key, 1) {
-              mod1::triple
-            } else {
-              if Eq<u64>(key, 2) {
-                earlybind(mod3::multiply, 4)
-              } else {
-                if Eq<u64>(key, 3) {
-                  earlybind(mod4::alt_multiply, 5)
-                } else {
-                  if Eq<u64>(key, 4) {
-                    earlybind(mod3::multiply, 6)
-                  } else {
-                    if Eq<u64>(key, 5) {
-                      earlybind(test::multiply3, 3, 2)
-                    } else {
-                      if Eq<u64>(key, 6) {
-                        earlybind(mod3::multiply, 7)
-                      } else {
-                        if Eq<u64>(key, 7) {
-                          earlybind(test::multiply3, 4, 2)
-                        } else {
-                          if Eq<u64>(key, 8) {
-                            earlybind(test::multiply3, 3, 3)
-                          } else {
-                            if Eq<u64>(key, 9) {
-                              earlybind(test::multiply3, 3, 5)
-                            } else {
-                              if Eq<u64>(key, 10) {
-                                earlybind(mod4::alt_multiply, 11)
-                              } else {
-                                if Eq<u64>(key, 11) {
-                                  {
-                                    let g: |(u64, u64)|u64 with copy+store = mod3::multiply;
-                                    earlybind(g, 11)
-                                  }
-                                } else {
-                                  if Eq<u64>(key, 12) {
-                                    {
-                                      let h: |u64|u64 with copy+store = earlybind(mod3::multiply, 12);
-                                      h
-                                    }
-                                  } else {
-                                    if Eq<u64>(key, 14) {
-                                      {
-                                        let i: |u64|u64 with copy+store = earlybind(test::multiply3, 2, 2);
-                                        i
-                                      }
-                                    } else {
-                                      {
-                                        let i: |(u64, u64)|u64 with copy+store = test::choose_function1$lambda$1;
-                                        earlybind(i, 15)
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          };
-          (f)(x)
-        }
+    fun choose_function1(key: u64, x: u64): u64 {
+        let f = if (key == 0) |arg0| mod2::double(arg0) else if (key == 1) |arg0| mod1::triple(arg0) else if (key == 2) |arg0| mod3::multiply(4, arg0) else if (key == 3) |arg0| mod4::alt_multiply(5, arg0) else if (key == 4) |arg0| mod3::multiply(6, arg0) else if (key == 5) |arg0| multiply3(3, 2, arg0) else if (key == 6) |arg0| mod3::multiply(7, arg0) else if (key == 7) |arg0| multiply3(4, 2, arg0) else if (key == 8) |arg0| multiply3(3, 3, arg0) else if (key == 9) |arg0| multiply3(3, 5, arg0) else if (key == 10) |arg0| mod4::alt_multiply(11, arg0) else if (key == 11) {
+            let g = |(arg0,arg1)| mod3::multiply(arg0, arg1);
+            |arg0| __lambda__1__choose_function1(g, arg0)
+        } else if (key == 12) {
+            let h = |arg0| mod3::multiply(12, arg0);
+            |arg0| __lambda__2__choose_function1(h, arg0)
+        } else if (key == 14) {
+            let i = |arg0| multiply3(2, 2, arg0);
+            |arg0| __lambda__3__choose_function1(i, arg0)
+        } else {
+            let i = |(arg0,arg1)| __lambda__4__choose_function1(arg0, arg1);
+            |arg0| __lambda__5__choose_function1(i, arg0)
+        };
+        f(x)
     }
-    private fun multiply3(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(Mul<u64>(x, y), z)
+    fun multiply3(x: u64, y: u64, z: u64): u64 {
+        x * y * z
     }
     public fun test_functions() {
-        {
-          let i: u64 = 0;
-          {
-            let __update_iter_flag: bool = false;
-            loop {
-              if true {
-                if __update_iter_flag {
-                  i: u64 = Add<u64>(i, 1)
-                } else {
-                  __update_iter_flag: bool = true
-                };
-                if Lt<u64>(i, 15) {
-                  {
-                    let y: u64 = test::choose_function1(i, 3);
-                    if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), 3)) {
-                      Tuple()
-                    } else {
-                      Abort(i)
-                    };
-                    Tuple()
-                  }
-                } else {
-                  break
-                };
-                Tuple()
-              } else {
-                break
-              }
-            };
-            Tuple()
-          }
-        }
+        let i = 0;
+        let __update_iter_flag = false;
+        while (true) {
+            if (__update_iter_flag) i = i + 1 else __update_iter_flag = true;
+            if (i < 15) {
+                let y = choose_function1(i, 3);
+                if (y == (i + 2) * 3) () else abort i;
+            } else break;
+        };
     }
-    private fun choose_function1$lambda$1(x: u64,y: u64): u64 {
-        {
-          let q: u64 = Sub<u64>(y, 1);
-          mod3::multiply(x, Add<u64>(q, 1))
-        }
+    fun __lambda__1__choose_function1(g: |(u64, u64)|u64, x: u64): u64 {
+        g(11, x)
     }
-} // end 0x42::test
-
-
-// -- Model dump after env processor specification rewriter:
-module 0x42::mod1 {
-    friend fun triple(x: u64): u64 {
-        Mul<u64>(x, 3)
+    fun __lambda__2__choose_function1(h: |u64|u64, x: u64): u64 {
+        h(x)
     }
-} // end 0x42::mod1
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
+    fun __lambda__3__choose_function1(i: |u64|u64, z: u64): u64 {
+        i(z)
     }
-} // end 0x42::mod2
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
+    fun __lambda__4__choose_function1(x: u64, y: u64): u64 {
+        let q = y - 1;
+        mod3::multiply(x, q + 1)
     }
-} // end 0x42::mod3
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
+    fun __lambda__5__choose_function1(i: |(u64, u64)|u64, x: u64): u64 {
+        i(15, x)
     }
-} // end 0x42::mod4
-module 0x42::test {
-    use 0x42::mod1; // resolved as: 0x42::mod1
-    use 0x42::mod2; // resolved as: 0x42::mod2
-    use 0x42::mod3; // resolved as: 0x42::mod3
-    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
-    private fun add_mul(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(z, Add<u64>(x, y))
-    }
-    private fun choose_function1(key: u64,x: u64): u64 {
-        {
-          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
-            mod2::double
-          } else {
-            if Eq<u64>(key, 1) {
-              mod1::triple
-            } else {
-              if Eq<u64>(key, 2) {
-                earlybind(mod3::multiply, 4)
-              } else {
-                if Eq<u64>(key, 3) {
-                  earlybind(mod4::alt_multiply, 5)
-                } else {
-                  if Eq<u64>(key, 4) {
-                    earlybind(mod3::multiply, 6)
-                  } else {
-                    if Eq<u64>(key, 5) {
-                      earlybind(test::multiply3, 3, 2)
-                    } else {
-                      if Eq<u64>(key, 6) {
-                        earlybind(mod3::multiply, 7)
-                      } else {
-                        if Eq<u64>(key, 7) {
-                          earlybind(test::multiply3, 4, 2)
-                        } else {
-                          if Eq<u64>(key, 8) {
-                            earlybind(test::multiply3, 3, 3)
-                          } else {
-                            if Eq<u64>(key, 9) {
-                              earlybind(test::multiply3, 3, 5)
-                            } else {
-                              if Eq<u64>(key, 10) {
-                                earlybind(mod4::alt_multiply, 11)
-                              } else {
-                                if Eq<u64>(key, 11) {
-                                  {
-                                    let g: |(u64, u64)|u64 with copy+store = mod3::multiply;
-                                    earlybind(g, 11)
-                                  }
-                                } else {
-                                  if Eq<u64>(key, 12) {
-                                    {
-                                      let h: |u64|u64 with copy+store = earlybind(mod3::multiply, 12);
-                                      h
-                                    }
-                                  } else {
-                                    if Eq<u64>(key, 14) {
-                                      {
-                                        let i: |u64|u64 with copy+store = earlybind(test::multiply3, 2, 2);
-                                        i
-                                      }
-                                    } else {
-                                      {
-                                        let i: |(u64, u64)|u64 with copy+store = test::choose_function1$lambda$1;
-                                        earlybind(i, 15)
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          };
-          (f)(x)
-        }
-    }
-    private fun multiply3(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(Mul<u64>(x, y), z)
-    }
-    public fun test_functions() {
-        {
-          let i: u64 = 0;
-          {
-            let __update_iter_flag: bool = false;
-            loop {
-              if true {
-                if __update_iter_flag {
-                  i: u64 = Add<u64>(i, 1)
-                } else {
-                  __update_iter_flag: bool = true
-                };
-                if Lt<u64>(i, 15) {
-                  {
-                    let y: u64 = test::choose_function1(i, 3);
-                    if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), 3)) {
-                      Tuple()
-                    } else {
-                      Abort(i)
-                    };
-                    Tuple()
-                  }
-                } else {
-                  break
-                };
-                Tuple()
-              } else {
-                break
-              }
-            };
-            Tuple()
-          }
-        }
-    }
-    private fun choose_function1$lambda$1(x: u64,y: u64): u64 {
-        {
-          let q: u64 = Sub<u64>(y, 1);
-          mod3::multiply(x, Add<u64>(q, 1))
-        }
-    }
-} // end 0x42::test
+}
+
+============ initial bytecode ================
+
+[variant baseline]
+public(friend) fun mod1::triple($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := infer($t0)
+  1: $t3 := 3
+  2: $t1 := *($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun mod2::double($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := infer($t0)
+  1: $t3 := 2
+  2: $t1 := *($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+public fun mod3::multiply($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+  0: $t3 := infer($t0)
+  1: $t2 := *($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun mod4::alt_multiply($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+  0: $t3 := infer($t0)
+  1: $t2 := *($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun test::add_mul($t0: u64, $t1: u64, $t2: u64): u64 {
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+  0: $t4 := infer($t2)
+  1: $t6 := infer($t0)
+  2: $t5 := +($t6, $t1)
+  3: $t3 := *($t4, $t5)
+  4: return $t3
+}
+
+
+[variant baseline]
+fun test::choose_function1($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: |u64|u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: bool
+     var $t8: u64
+     var $t9: u64
+     var $t10: bool
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: bool
+     var $t15: u64
+     var $t16: u64
+     var $t17: u64
+     var $t18: bool
+     var $t19: u64
+     var $t20: u64
+     var $t21: u64
+     var $t22: bool
+     var $t23: u64
+     var $t24: u64
+     var $t25: u64
+     var $t26: u64
+     var $t27: bool
+     var $t28: u64
+     var $t29: u64
+     var $t30: u64
+     var $t31: bool
+     var $t32: u64
+     var $t33: u64
+     var $t34: u64
+     var $t35: u64
+     var $t36: bool
+     var $t37: u64
+     var $t38: u64
+     var $t39: u64
+     var $t40: u64
+     var $t41: bool
+     var $t42: u64
+     var $t43: u64
+     var $t44: u64
+     var $t45: u64
+     var $t46: bool
+     var $t47: u64
+     var $t48: u64
+     var $t49: u64
+     var $t50: bool
+     var $t51: u64
+     var $t52: u64
+     var $t53: |(u64, u64)|u64
+     var $t54: bool
+     var $t55: u64
+     var $t56: u64
+     var $t57: |u64|u64
+     var $t58: u64
+     var $t59: bool
+     var $t60: u64
+     var $t61: u64
+     var $t62: |u64|u64
+     var $t63: u64
+     var $t64: u64
+     var $t65: |(u64, u64)|u64
+     var $t66: u64
+  0: $t5 := infer($t0)
+  1: $t6 := 0
+  2: $t4 := ==($t5, $t6)
+  3: if ($t4) goto 4 else goto 7
+  4: label L0
+  5: $t3 := closure#0 mod2::double()
+  6: goto 146
+  7: label L1
+  8: $t8 := infer($t0)
+  9: $t9 := 1
+ 10: $t7 := ==($t8, $t9)
+ 11: if ($t7) goto 12 else goto 15
+ 12: label L3
+ 13: $t3 := closure#0 mod1::triple()
+ 14: goto 145
+ 15: label L4
+ 16: $t11 := infer($t0)
+ 17: $t12 := 2
+ 18: $t10 := ==($t11, $t12)
+ 19: if ($t10) goto 20 else goto 24
+ 20: label L6
+ 21: $t13 := 4
+ 22: $t3 := closure#1 mod3::multiply($t13)
+ 23: goto 144
+ 24: label L7
+ 25: $t15 := infer($t0)
+ 26: $t16 := 3
+ 27: $t14 := ==($t15, $t16)
+ 28: if ($t14) goto 29 else goto 33
+ 29: label L9
+ 30: $t17 := 5
+ 31: $t3 := closure#1 mod4::alt_multiply($t17)
+ 32: goto 143
+ 33: label L10
+ 34: $t19 := infer($t0)
+ 35: $t20 := 4
+ 36: $t18 := ==($t19, $t20)
+ 37: if ($t18) goto 38 else goto 42
+ 38: label L12
+ 39: $t21 := 6
+ 40: $t3 := closure#1 mod3::multiply($t21)
+ 41: goto 142
+ 42: label L13
+ 43: $t23 := infer($t0)
+ 44: $t24 := 5
+ 45: $t22 := ==($t23, $t24)
+ 46: if ($t22) goto 47 else goto 52
+ 47: label L15
+ 48: $t25 := 3
+ 49: $t26 := 2
+ 50: $t3 := closure#11 test::multiply3($t25, $t26)
+ 51: goto 141
+ 52: label L16
+ 53: $t28 := infer($t0)
+ 54: $t29 := 6
+ 55: $t27 := ==($t28, $t29)
+ 56: if ($t27) goto 57 else goto 61
+ 57: label L18
+ 58: $t30 := 7
+ 59: $t3 := closure#1 mod3::multiply($t30)
+ 60: goto 140
+ 61: label L19
+ 62: $t32 := infer($t0)
+ 63: $t33 := 7
+ 64: $t31 := ==($t32, $t33)
+ 65: if ($t31) goto 66 else goto 71
+ 66: label L21
+ 67: $t34 := 4
+ 68: $t35 := 2
+ 69: $t3 := closure#11 test::multiply3($t34, $t35)
+ 70: goto 139
+ 71: label L22
+ 72: $t37 := infer($t0)
+ 73: $t38 := 8
+ 74: $t36 := ==($t37, $t38)
+ 75: if ($t36) goto 76 else goto 81
+ 76: label L24
+ 77: $t39 := 3
+ 78: $t40 := 3
+ 79: $t3 := closure#11 test::multiply3($t39, $t40)
+ 80: goto 138
+ 81: label L25
+ 82: $t42 := infer($t0)
+ 83: $t43 := 9
+ 84: $t41 := ==($t42, $t43)
+ 85: if ($t41) goto 86 else goto 91
+ 86: label L27
+ 87: $t44 := 3
+ 88: $t45 := 5
+ 89: $t3 := closure#11 test::multiply3($t44, $t45)
+ 90: goto 137
+ 91: label L28
+ 92: $t47 := infer($t0)
+ 93: $t48 := 10
+ 94: $t46 := ==($t47, $t48)
+ 95: if ($t46) goto 96 else goto 100
+ 96: label L30
+ 97: $t49 := 11
+ 98: $t3 := closure#1 mod4::alt_multiply($t49)
+ 99: goto 136
+100: label L31
+101: $t51 := infer($t0)
+102: $t52 := 11
+103: $t50 := ==($t51, $t52)
+104: if ($t50) goto 105 else goto 109
+105: label L33
+106: $t53 := closure#0 mod3::multiply()
+107: $t3 := closure#1 test::__lambda__1__choose_function1($t53)
+108: goto 135
+109: label L34
+110: $t55 := infer($t0)
+111: $t56 := 12
+112: $t54 := ==($t55, $t56)
+113: if ($t54) goto 114 else goto 119
+114: label L36
+115: $t58 := 12
+116: $t57 := closure#1 mod3::multiply($t58)
+117: $t3 := closure#1 test::__lambda__2__choose_function1($t57)
+118: goto 134
+119: label L37
+120: $t60 := infer($t0)
+121: $t61 := 14
+122: $t59 := ==($t60, $t61)
+123: if ($t59) goto 124 else goto 130
+124: label L39
+125: $t63 := 2
+126: $t64 := 2
+127: $t62 := closure#11 test::multiply3($t63, $t64)
+128: $t3 := closure#1 test::__lambda__3__choose_function1($t62)
+129: goto 133
+130: label L40
+131: $t65 := closure#0 test::__lambda__4__choose_function1()
+132: $t3 := closure#1 test::__lambda__5__choose_function1($t65)
+133: label L41
+134: label L38
+135: label L35
+136: label L32
+137: label L29
+138: label L26
+139: label L23
+140: label L20
+141: label L17
+142: label L14
+143: label L11
+144: label L8
+145: label L5
+146: label L2
+147: $t66 := infer($t1)
+148: $t2 := invoke($t66, $t3)
+149: return $t2
+}
+
+
+[variant baseline]
+fun test::multiply3($t0: u64, $t1: u64, $t2: u64): u64 {
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t5 := infer($t0)
+  1: $t4 := *($t5, $t1)
+  2: $t3 := *($t4, $t2)
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun test::test_functions() {
+     var $t0: u64
+     var $t1: bool
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: bool
+     var $t7: bool
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: bool
+     var $t14: u64
+     var $t15: u64
+     var $t16: u64
+     var $t17: u64
+     var $t18: u64
+     var $t19: u64
+  0: $t0 := 0
+  1: $t1 := false
+  2: label L0
+  3: $t2 := true
+  4: if ($t2) goto 5 else goto 43
+  5: label L2
+  6: if ($t1) goto 7 else goto 13
+  7: label L5
+  8: $t4 := infer($t0)
+  9: $t5 := 1
+ 10: $t3 := +($t4, $t5)
+ 11: $t0 := infer($t3)
+ 12: goto 16
+ 13: label L6
+ 14: $t6 := true
+ 15: $t1 := infer($t6)
+ 16: label L7
+ 17: $t8 := infer($t0)
+ 18: $t9 := 15
+ 19: $t7 := <($t8, $t9)
+ 20: if ($t7) goto 21 else goto 39
+ 21: label L8
+ 22: $t11 := infer($t0)
+ 23: $t12 := 3
+ 24: $t10 := test::choose_function1($t11, $t12)
+ 25: $t14 := infer($t10)
+ 26: $t17 := infer($t0)
+ 27: $t18 := 2
+ 28: $t16 := +($t17, $t18)
+ 29: $t19 := 3
+ 30: $t15 := *($t16, $t19)
+ 31: $t13 := ==($t14, $t15)
+ 32: if ($t13) goto 33 else goto 35
+ 33: label L11
+ 34: goto 37
+ 35: label L12
+ 36: abort($t0)
+ 37: label L13
+ 38: goto 41
+ 39: label L9
+ 40: goto 47
+ 41: label L10
+ 42: goto 45
+ 43: label L3
+ 44: goto 47
+ 45: label L4
+ 46: goto 2
+ 47: label L1
+ 48: return ()
+}
+
+
+[variant baseline]
+fun test::__lambda__1__choose_function1($t0: |(u64, u64)|u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t3 := 11
+  1: $t4 := infer($t1)
+  2: $t2 := invoke($t3, $t4, $t0)
+  3: return $t2
+}
+
+
+[variant baseline]
+fun test::__lambda__2__choose_function1($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+  0: $t3 := infer($t1)
+  1: $t2 := invoke($t3, $t0)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun test::__lambda__3__choose_function1($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+  0: $t3 := infer($t1)
+  1: $t2 := invoke($t3, $t0)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun test::__lambda__4__choose_function1($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+  0: $t4 := infer($t1)
+  1: $t5 := 1
+  2: $t3 := -($t4, $t5)
+  3: $t6 := infer($t0)
+  4: $t8 := infer($t3)
+  5: $t9 := 1
+  6: $t7 := +($t8, $t9)
+  7: $t2 := mod3::multiply($t6, $t7)
+  8: return $t2
+}
+
+
+[variant baseline]
+fun test::__lambda__5__choose_function1($t0: |(u64, u64)|u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t3 := 15
+  1: $t4 := infer($t1)
+  2: $t2 := invoke($t3, $t4, $t0)
+  3: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public(friend) fun mod1::triple($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64
+     # live vars: $t0
+  0: $t0 := move($t0)
+     # live vars: $t0
+  1: $t3 := 3
+     # live vars: $t0, $t3
+  2: $t0 := *($t0, $t3)
+     # live vars: $t0
+  3: return $t0
+}
+
+
+[variant baseline]
+public(friend) fun mod2::double($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64
+     # live vars: $t0
+  0: $t0 := move($t0)
+     # live vars: $t0
+  1: $t3 := 2
+     # live vars: $t0, $t3
+  2: $t0 := *($t0, $t3)
+     # live vars: $t0
+  3: return $t0
+}
+
+
+[variant baseline]
+public fun mod3::multiply($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t0 := move($t0)
+     # live vars: $t0, $t1
+  1: $t0 := *($t0, $t1)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+public fun mod4::alt_multiply($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t0 := move($t0)
+     # live vars: $t0, $t1
+  1: $t0 := *($t0, $t1)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun test::add_mul($t0: u64, $t1: u64, $t2: u64): u64 {
+     var $t3: u64 [unused]
+     var $t4: u64 [unused]
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t2 := move($t2)
+     # live vars: $t0, $t1, $t2
+  1: $t0 := move($t0)
+     # live vars: $t0, $t1, $t2
+  2: $t0 := +($t0, $t1)
+     # live vars: $t0, $t2
+  3: $t0 := *($t2, $t0)
+     # live vars: $t0
+  4: return $t0
+}
+
+
+[variant baseline]
+fun test::choose_function1($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: |u64|u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: bool [unused]
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     var $t10: bool [unused]
+     var $t11: u64 [unused]
+     var $t12: u64 [unused]
+     var $t13: u64 [unused]
+     var $t14: bool [unused]
+     var $t15: u64 [unused]
+     var $t16: u64 [unused]
+     var $t17: u64 [unused]
+     var $t18: bool [unused]
+     var $t19: u64 [unused]
+     var $t20: u64 [unused]
+     var $t21: u64 [unused]
+     var $t22: bool [unused]
+     var $t23: u64 [unused]
+     var $t24: u64 [unused]
+     var $t25: u64 [unused]
+     var $t26: u64 [unused]
+     var $t27: bool [unused]
+     var $t28: u64 [unused]
+     var $t29: u64 [unused]
+     var $t30: u64 [unused]
+     var $t31: bool [unused]
+     var $t32: u64 [unused]
+     var $t33: u64 [unused]
+     var $t34: u64 [unused]
+     var $t35: u64 [unused]
+     var $t36: bool [unused]
+     var $t37: u64 [unused]
+     var $t38: u64 [unused]
+     var $t39: u64 [unused]
+     var $t40: u64 [unused]
+     var $t41: bool [unused]
+     var $t42: u64 [unused]
+     var $t43: u64 [unused]
+     var $t44: u64 [unused]
+     var $t45: u64 [unused]
+     var $t46: bool [unused]
+     var $t47: u64 [unused]
+     var $t48: u64 [unused]
+     var $t49: u64 [unused]
+     var $t50: bool [unused]
+     var $t51: u64 [unused]
+     var $t52: u64 [unused]
+     var $t53: |(u64, u64)|u64
+     var $t54: bool [unused]
+     var $t55: u64 [unused]
+     var $t56: u64 [unused]
+     var $t57: |u64|u64
+     var $t58: u64 [unused]
+     var $t59: bool [unused]
+     var $t60: u64 [unused]
+     var $t61: u64 [unused]
+     var $t62: |u64|u64 [unused]
+     var $t63: u64 [unused]
+     var $t64: u64 [unused]
+     var $t65: |(u64, u64)|u64 [unused]
+     var $t66: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+  1: $t6 := 0
+     # live vars: $t0, $t1, $t5, $t6
+  2: $t4 := ==($t5, $t6)
+     # live vars: $t0, $t1, $t4
+  3: if ($t4) goto 4 else goto 10
+     # live vars: $t0, $t1
+  4: label L0
+     # live vars: $t1
+  5: $t3 := closure#0 mod2::double()
+     # live vars: $t1, $t3
+  6: label L2
+     # live vars: $t1, $t3
+  7: $t5 := move($t1)
+     # live vars: $t3, $t5
+  8: $t5 := invoke($t5, $t3)
+     # live vars: $t5
+  9: return $t5
+     # live vars: $t0, $t1
+ 10: label L1
+     # live vars: $t0, $t1
+ 11: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+ 12: $t6 := 1
+     # live vars: $t0, $t1, $t5, $t6
+ 13: $t4 := ==($t5, $t6)
+     # live vars: $t0, $t1, $t4
+ 14: if ($t4) goto 15 else goto 18
+     # live vars: $t0, $t1
+ 15: label L3
+     # live vars: $t1
+ 16: $t3 := closure#0 mod1::triple()
+     # live vars: $t1, $t3
+ 17: goto 6
+     # live vars: $t0, $t1
+ 18: label L4
+     # live vars: $t0, $t1
+ 19: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+ 20: $t6 := 2
+     # live vars: $t0, $t1, $t5, $t6
+ 21: $t4 := ==($t5, $t6)
+     # live vars: $t0, $t1, $t4
+ 22: if ($t4) goto 23 else goto 27
+     # live vars: $t0, $t1
+ 23: label L6
+     # live vars: $t1
+ 24: $t5 := 4
+     # live vars: $t1, $t5
+ 25: $t3 := closure#1 mod3::multiply($t5)
+     # live vars: $t1, $t3
+ 26: goto 6
+     # live vars: $t0, $t1
+ 27: label L7
+     # live vars: $t0, $t1
+ 28: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+ 29: $t6 := 3
+     # live vars: $t0, $t1, $t5, $t6
+ 30: $t4 := ==($t5, $t6)
+     # live vars: $t0, $t1, $t4
+ 31: if ($t4) goto 32 else goto 36
+     # live vars: $t0, $t1
+ 32: label L9
+     # live vars: $t1
+ 33: $t5 := 5
+     # live vars: $t1, $t5
+ 34: $t3 := closure#1 mod4::alt_multiply($t5)
+     # live vars: $t1, $t3
+ 35: goto 6
+     # live vars: $t0, $t1
+ 36: label L10
+     # live vars: $t0, $t1
+ 37: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+ 38: $t6 := 4
+     # live vars: $t0, $t1, $t5, $t6
+ 39: $t4 := ==($t5, $t6)
+     # live vars: $t0, $t1, $t4
+ 40: if ($t4) goto 41 else goto 45
+     # live vars: $t0, $t1
+ 41: label L12
+     # live vars: $t1
+ 42: $t5 := 6
+     # live vars: $t1, $t5
+ 43: $t3 := closure#1 mod3::multiply($t5)
+     # live vars: $t1, $t3
+ 44: goto 6
+     # live vars: $t0, $t1
+ 45: label L13
+     # live vars: $t0, $t1
+ 46: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+ 47: $t6 := 5
+     # live vars: $t0, $t1, $t5, $t6
+ 48: $t4 := ==($t5, $t6)
+     # live vars: $t0, $t1, $t4
+ 49: if ($t4) goto 50 else goto 55
+     # live vars: $t0, $t1
+ 50: label L15
+     # live vars: $t1
+ 51: $t5 := 3
+     # live vars: $t1, $t5
+ 52: $t6 := 2
+     # live vars: $t1, $t5, $t6
+ 53: $t3 := closure#11 test::multiply3($t5, $t6)
+     # live vars: $t1, $t3
+ 54: goto 6
+     # live vars: $t0, $t1
+ 55: label L16
+     # live vars: $t0, $t1
+ 56: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+ 57: $t6 := 6
+     # live vars: $t0, $t1, $t5, $t6
+ 58: $t4 := ==($t5, $t6)
+     # live vars: $t0, $t1, $t4
+ 59: if ($t4) goto 60 else goto 64
+     # live vars: $t0, $t1
+ 60: label L18
+     # live vars: $t1
+ 61: $t5 := 7
+     # live vars: $t1, $t5
+ 62: $t3 := closure#1 mod3::multiply($t5)
+     # live vars: $t1, $t3
+ 63: goto 6
+     # live vars: $t0, $t1
+ 64: label L19
+     # live vars: $t0, $t1
+ 65: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+ 66: $t6 := 7
+     # live vars: $t0, $t1, $t5, $t6
+ 67: $t4 := ==($t5, $t6)
+     # live vars: $t0, $t1, $t4
+ 68: if ($t4) goto 69 else goto 74
+     # live vars: $t0, $t1
+ 69: label L21
+     # live vars: $t1
+ 70: $t5 := 4
+     # live vars: $t1, $t5
+ 71: $t6 := 2
+     # live vars: $t1, $t5, $t6
+ 72: $t3 := closure#11 test::multiply3($t5, $t6)
+     # live vars: $t1, $t3
+ 73: goto 6
+     # live vars: $t0, $t1
+ 74: label L22
+     # live vars: $t0, $t1
+ 75: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+ 76: $t6 := 8
+     # live vars: $t0, $t1, $t5, $t6
+ 77: $t4 := ==($t5, $t6)
+     # live vars: $t0, $t1, $t4
+ 78: if ($t4) goto 79 else goto 84
+     # live vars: $t0, $t1
+ 79: label L24
+     # live vars: $t1
+ 80: $t5 := 3
+     # live vars: $t1, $t5
+ 81: $t6 := 3
+     # live vars: $t1, $t5, $t6
+ 82: $t3 := closure#11 test::multiply3($t5, $t6)
+     # live vars: $t1, $t3
+ 83: goto 6
+     # live vars: $t0, $t1
+ 84: label L25
+     # live vars: $t0, $t1
+ 85: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+ 86: $t6 := 9
+     # live vars: $t0, $t1, $t5, $t6
+ 87: $t4 := ==($t5, $t6)
+     # live vars: $t0, $t1, $t4
+ 88: if ($t4) goto 89 else goto 94
+     # live vars: $t0, $t1
+ 89: label L27
+     # live vars: $t1
+ 90: $t5 := 3
+     # live vars: $t1, $t5
+ 91: $t6 := 5
+     # live vars: $t1, $t5, $t6
+ 92: $t3 := closure#11 test::multiply3($t5, $t6)
+     # live vars: $t1, $t3
+ 93: goto 6
+     # live vars: $t0, $t1
+ 94: label L28
+     # live vars: $t0, $t1
+ 95: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+ 96: $t6 := 10
+     # live vars: $t0, $t1, $t5, $t6
+ 97: $t4 := ==($t5, $t6)
+     # live vars: $t0, $t1, $t4
+ 98: if ($t4) goto 99 else goto 103
+     # live vars: $t0, $t1
+ 99: label L30
+     # live vars: $t1
+100: $t5 := 11
+     # live vars: $t1, $t5
+101: $t3 := closure#1 mod4::alt_multiply($t5)
+     # live vars: $t1, $t3
+102: goto 6
+     # live vars: $t0, $t1
+103: label L31
+     # live vars: $t0, $t1
+104: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+105: $t6 := 11
+     # live vars: $t0, $t1, $t5, $t6
+106: $t4 := ==($t5, $t6)
+     # live vars: $t0, $t1, $t4
+107: if ($t4) goto 108 else goto 112
+     # live vars: $t0, $t1
+108: label L33
+     # live vars: $t1
+109: $t53 := closure#0 mod3::multiply()
+     # live vars: $t1, $t53
+110: $t3 := closure#1 test::__lambda__1__choose_function1($t53)
+     # live vars: $t1, $t3
+111: goto 6
+     # live vars: $t0, $t1
+112: label L34
+     # live vars: $t0, $t1
+113: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+114: $t6 := 12
+     # live vars: $t0, $t1, $t5, $t6
+115: $t4 := ==($t5, $t6)
+     # live vars: $t0, $t1, $t4
+116: if ($t4) goto 117 else goto 122
+     # live vars: $t0, $t1
+117: label L36
+     # live vars: $t1
+118: $t5 := 12
+     # live vars: $t1, $t5
+119: $t57 := closure#1 mod3::multiply($t5)
+     # live vars: $t1, $t57
+120: $t3 := closure#1 test::__lambda__2__choose_function1($t57)
+     # live vars: $t1, $t3
+121: goto 6
+     # live vars: $t0, $t1
+122: label L37
+     # live vars: $t0, $t1
+123: $t0 := move($t0)
+     # live vars: $t0, $t1
+124: $t5 := 14
+     # live vars: $t0, $t1, $t5
+125: $t4 := ==($t0, $t5)
+     # live vars: $t1, $t4
+126: if ($t4) goto 127 else goto 133
+     # live vars: $t1
+127: label L39
+     # live vars: $t1
+128: $t0 := 2
+     # live vars: $t0, $t1
+129: $t5 := 2
+     # live vars: $t0, $t1, $t5
+130: $t57 := closure#11 test::multiply3($t0, $t5)
+     # live vars: $t1, $t57
+131: $t3 := closure#1 test::__lambda__3__choose_function1($t57)
+     # live vars: $t1, $t3
+132: goto 6
+     # live vars: $t1
+133: label L40
+     # live vars: $t1
+134: $t53 := closure#0 test::__lambda__4__choose_function1()
+     # live vars: $t1, $t53
+135: $t3 := closure#1 test::__lambda__5__choose_function1($t53)
+     # live vars: $t1, $t3
+136: goto 6
+}
+
+
+[variant baseline]
+fun test::multiply3($t0: u64, $t1: u64, $t2: u64): u64 {
+     var $t3: u64 [unused]
+     var $t4: u64 [unused]
+     var $t5: u64 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t0 := move($t0)
+     # live vars: $t0, $t1, $t2
+  1: $t0 := *($t0, $t1)
+     # live vars: $t0, $t2
+  2: $t0 := *($t0, $t2)
+     # live vars: $t0
+  3: return $t0
+}
+
+
+[variant baseline]
+public fun test::test_functions() {
+     var $t0: u64
+     var $t1: bool
+     var $t2: bool
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: u64
+     var $t6: bool [unused]
+     var $t7: bool [unused]
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     var $t10: u64 [unused]
+     var $t11: u64 [unused]
+     var $t12: u64 [unused]
+     var $t13: bool [unused]
+     var $t14: u64 [unused]
+     var $t15: u64 [unused]
+     var $t16: u64 [unused]
+     var $t17: u64 [unused]
+     var $t18: u64
+     var $t19: u64 [unused]
+     # live vars:
+  0: $t0 := 0
+     # live vars: $t0
+  1: $t1 := false
+     # live vars: $t0, $t1
+  2: label L0
+     # live vars: $t0, $t1
+  3: $t2 := true
+     # live vars: $t0, $t1, $t2
+  4: if ($t2) goto 7 else goto 5
+     # live vars: $t0, $t1
+  5: label L13
+     # live vars:
+  6: goto 37
+     # live vars: $t0, $t1
+  7: label L2
+     # live vars: $t0, $t1
+  8: if ($t1) goto 9 else goto 39
+     # live vars: $t0, $t1
+  9: label L5
+     # live vars: $t0, $t1
+ 10: $t4 := move($t0)
+     # live vars: $t1, $t4
+ 11: $t5 := 1
+     # live vars: $t1, $t4, $t5
+ 12: $t4 := +($t4, $t5)
+     # live vars: $t1, $t4
+ 13: $t0 := move($t4)
+     # live vars: $t0, $t1
+ 14: label L7
+     # live vars: $t0, $t1
+ 15: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+ 16: $t5 := 15
+     # live vars: $t0, $t1, $t4, $t5
+ 17: $t2 := <($t4, $t5)
+     # live vars: $t0, $t1, $t2
+ 18: if ($t2) goto 21 else goto 19
+     # live vars: $t0, $t1
+ 19: label L14
+     # live vars:
+ 20: goto 37
+     # live vars: $t0, $t1
+ 21: label L8
+     # live vars: $t0, $t1
+ 22: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+ 23: $t5 := 3
+     # live vars: $t0, $t1, $t4, $t5
+ 24: $t4 := test::choose_function1($t4, $t5)
+     # live vars: $t0, $t1, $t4
+ 25: $t4 := move($t4)
+     # live vars: $t0, $t1, $t4
+ 26: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t4, $t5
+ 27: $t18 := 2
+     # live vars: $t0, $t1, $t4, $t5, $t18
+ 28: $t5 := +($t5, $t18)
+     # live vars: $t0, $t1, $t4, $t5
+ 29: $t18 := 3
+     # live vars: $t0, $t1, $t4, $t5, $t18
+ 30: $t5 := *($t5, $t18)
+     # live vars: $t0, $t1, $t4, $t5
+ 31: $t2 := ==($t4, $t5)
+     # live vars: $t0, $t1, $t2
+ 32: if ($t2) goto 33 else goto 35
+     # live vars: $t0, $t1
+ 33: label L15
+     # live vars: $t0, $t1
+ 34: goto 2
+     # live vars: $t0, $t1
+ 35: label L12
+     # live vars: $t0
+ 36: abort($t0)
+     # live vars:
+ 37: label L1
+     # live vars:
+ 38: return ()
+     # live vars: $t0, $t1
+ 39: label L6
+     # live vars: $t0
+ 40: $t2 := true
+     # live vars: $t0, $t2
+ 41: $t1 := move($t2)
+     # live vars: $t0, $t1
+ 42: goto 14
+}
+
+
+[variant baseline]
+fun test::__lambda__1__choose_function1($t0: |(u64, u64)|u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64
+     var $t4: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t3 := 11
+     # live vars: $t0, $t1, $t3
+  1: $t1 := move($t1)
+     # live vars: $t0, $t1, $t3
+  2: $t1 := invoke($t3, $t1, $t0)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun test::__lambda__2__choose_function1($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t1 := move($t1)
+     # live vars: $t0, $t1
+  1: $t1 := invoke($t1, $t0)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+fun test::__lambda__3__choose_function1($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t1 := move($t1)
+     # live vars: $t0, $t1
+  1: $t1 := invoke($t1, $t0)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+fun test::__lambda__4__choose_function1($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64 [unused]
+     var $t5: u64
+     var $t6: u64 [unused]
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t1 := move($t1)
+     # live vars: $t0, $t1
+  1: $t5 := 1
+     # live vars: $t0, $t1, $t5
+  2: $t1 := -($t1, $t5)
+     # live vars: $t0, $t1
+  3: $t0 := move($t0)
+     # live vars: $t0, $t1
+  4: $t1 := move($t1)
+     # live vars: $t0, $t1
+  5: $t5 := 1
+     # live vars: $t0, $t1, $t5
+  6: $t1 := +($t1, $t5)
+     # live vars: $t0, $t1
+  7: $t0 := mod3::multiply($t0, $t1)
+     # live vars: $t0
+  8: return $t0
+}
+
+
+[variant baseline]
+fun test::__lambda__5__choose_function1($t0: |(u64, u64)|u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64
+     var $t4: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t3 := 15
+     # live vars: $t0, $t1, $t3
+  1: $t1 := move($t1)
+     # live vars: $t0, $t1, $t3
+  2: $t1 := invoke($t3, $t1, $t0)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module 42.mod1 {
+
+
+public(friend) triple(x: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](x: u64)
+	1: LdU64(3)
+	2: Mul
+	3: Ret
+}
+}// Move bytecode v8
+module 42.mod2 {
+
+
+public(friend) double(x: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](x: u64)
+	1: LdU64(2)
+	2: Mul
+	3: Ret
+}
+}// Move bytecode v8
+module 42.mod3 {
+
+
+public multiply(x: u64, y: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](x: u64)
+	1: MoveLoc[1](y: u64)
+	2: Mul
+	3: Ret
+}
+}// Move bytecode v8
+module 42.mod4 {
+
+
+public alt_multiply(x: u64, y: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](x: u64)
+	1: MoveLoc[1](y: u64)
+	2: Mul
+	3: Ret
+}
+}// Move bytecode v8
+module 42.test {
+use 0000000000000000000000000000000000000000000000000000000000000042::mod2;
+use 0000000000000000000000000000000000000000000000000000000000000042::mod1;
+use 0000000000000000000000000000000000000000000000000000000000000042::mod3;
+use 0000000000000000000000000000000000000000000000000000000000000042::mod4;
 
 
 
-Diagnostics:
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:39:17
-   │
-39 │                 mod2::double
-   │                 ^^^^^^^^^^^^
 
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:41:17
-   │
-41 │                 mod1::triple
-   │                 ^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:43:17
-   │
-43 │                 move |x| mod3::multiply(4, x)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:46:17
-   │
-46 │                 move |y| alt_multiply(x, y)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:49:17
-   │
-49 │                 move |y| mod3::multiply(x, y)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:51:17
-   │
-51 │                 move |x| multiply3(3, 2, x)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:53:17
-   │
-53 │                 move |x| mod3::multiply(7, x)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:55:17
-   │
-55 │                 move |x| { multiply3(4, 2, x) }
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:57:17
-   │
-57 │                 move |x| multiply3(3, 3, x)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:61:17
-   │
-61 │                 move |z| multiply3(x + 1, y, z)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:64:17
-   │
-64 │                 move |x| alt_multiply(z, x) with copy
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:66:37
-   │
-66 │                 let g = move |x, y| mod3::multiply(x, y) with copy+drop;
-   │                                     ^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:67:17
-   │
-67 │                 move |x| g(11, x)
-   │                 ^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:69:25
-   │
-69 │                 let h = move |x| mod3::multiply(12, x) with copy;
-   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:72:25
-   │
-72 │                 let i = move |x| multiply3(2, 2, x);
-   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:75:25
-   │
-75 │                 let i = move |x, y| { let q = y - 1; 0x42::mod3::multiply(x, q + 1)  };
-   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:76:17
-   │
-76 │                 move |x| i(15, x)
-   │                 ^^^^^^^^^^^^^^^^^
-
-error: Calls to function values other than inline function parameters not yet implemented
-   ┌─ tests/lambda/storable/doable_func.move:78:9
-   │
-78 │         f(x)
-   │         ^^^^
+add_mul(x: u64, y: u64, z: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[2](z: u64)
+	1: MoveLoc[0](x: u64)
+	2: MoveLoc[1](y: u64)
+	3: Add
+	4: Mul
+	5: Ret
+}
+choose_function1(key: u64, x: u64): u64 /* def_idx: 1 */ {
+L2:	f: |u64|u64
+B0:
+	0: CopyLoc[0](key: u64)
+	1: LdU64(0)
+	2: Eq
+	3: BrFalse(10)
+B1:
+	4: PackClosure#0 mod2::double(u64): u64
+	5: StLoc[2](f: |u64|u64)
+B2:
+	6: MoveLoc[1](x: u64)
+	7: MoveLoc[2](f: |u64|u64)
+	8: CallClosure(|u64|u64)
+	9: Ret
+B3:
+	10: CopyLoc[0](key: u64)
+	11: LdU64(1)
+	12: Eq
+	13: BrFalse(17)
+B4:
+	14: PackClosure#0 mod1::triple(u64): u64
+	15: StLoc[2](f: |u64|u64)
+	16: Branch(6)
+B5:
+	17: CopyLoc[0](key: u64)
+	18: LdU64(2)
+	19: Eq
+	20: BrFalse(25)
+B6:
+	21: LdU64(4)
+	22: PackClosure#1 mod3::multiply(u64, u64): u64
+	23: StLoc[2](f: |u64|u64)
+	24: Branch(6)
+B7:
+	25: CopyLoc[0](key: u64)
+	26: LdU64(3)
+	27: Eq
+	28: BrFalse(33)
+B8:
+	29: LdU64(5)
+	30: PackClosure#1 mod4::alt_multiply(u64, u64): u64
+	31: StLoc[2](f: |u64|u64)
+	32: Branch(6)
+B9:
+	33: CopyLoc[0](key: u64)
+	34: LdU64(4)
+	35: Eq
+	36: BrFalse(41)
+B10:
+	37: LdU64(6)
+	38: PackClosure#1 mod3::multiply(u64, u64): u64
+	39: StLoc[2](f: |u64|u64)
+	40: Branch(6)
+B11:
+	41: CopyLoc[0](key: u64)
+	42: LdU64(5)
+	43: Eq
+	44: BrFalse(50)
+B12:
+	45: LdU64(3)
+	46: LdU64(2)
+	47: PackClosure#11 multiply3(u64, u64, u64): u64
+	48: StLoc[2](f: |u64|u64)
+	49: Branch(6)
+B13:
+	50: CopyLoc[0](key: u64)
+	51: LdU64(6)
+	52: Eq
+	53: BrFalse(58)
+B14:
+	54: LdU64(7)
+	55: PackClosure#1 mod3::multiply(u64, u64): u64
+	56: StLoc[2](f: |u64|u64)
+	57: Branch(6)
+B15:
+	58: CopyLoc[0](key: u64)
+	59: LdU64(7)
+	60: Eq
+	61: BrFalse(67)
+B16:
+	62: LdU64(4)
+	63: LdU64(2)
+	64: PackClosure#11 multiply3(u64, u64, u64): u64
+	65: StLoc[2](f: |u64|u64)
+	66: Branch(6)
+B17:
+	67: CopyLoc[0](key: u64)
+	68: LdU64(8)
+	69: Eq
+	70: BrFalse(76)
+B18:
+	71: LdU64(3)
+	72: LdU64(3)
+	73: PackClosure#11 multiply3(u64, u64, u64): u64
+	74: StLoc[2](f: |u64|u64)
+	75: Branch(6)
+B19:
+	76: CopyLoc[0](key: u64)
+	77: LdU64(9)
+	78: Eq
+	79: BrFalse(85)
+B20:
+	80: LdU64(3)
+	81: LdU64(5)
+	82: PackClosure#11 multiply3(u64, u64, u64): u64
+	83: StLoc[2](f: |u64|u64)
+	84: Branch(6)
+B21:
+	85: CopyLoc[0](key: u64)
+	86: LdU64(10)
+	87: Eq
+	88: BrFalse(93)
+B22:
+	89: LdU64(11)
+	90: PackClosure#1 mod4::alt_multiply(u64, u64): u64
+	91: StLoc[2](f: |u64|u64)
+	92: Branch(6)
+B23:
+	93: CopyLoc[0](key: u64)
+	94: LdU64(11)
+	95: Eq
+	96: BrFalse(101)
+B24:
+	97: PackClosure#0 mod3::multiply(u64, u64): u64
+	98: PackClosure#1 __lambda__1__choose_function1(|u64,u64|u64, u64): u64
+	99: StLoc[2](f: |u64|u64)
+	100: Branch(6)
+B25:
+	101: CopyLoc[0](key: u64)
+	102: LdU64(12)
+	103: Eq
+	104: BrFalse(110)
+B26:
+	105: LdU64(12)
+	106: PackClosure#1 mod3::multiply(u64, u64): u64
+	107: PackClosure#1 __lambda__2__choose_function1(|u64|u64, u64): u64
+	108: StLoc[2](f: |u64|u64)
+	109: Branch(6)
+B27:
+	110: MoveLoc[0](key: u64)
+	111: LdU64(14)
+	112: Eq
+	113: BrFalse(120)
+B28:
+	114: LdU64(2)
+	115: LdU64(2)
+	116: PackClosure#11 multiply3(u64, u64, u64): u64
+	117: PackClosure#1 __lambda__3__choose_function1(|u64|u64, u64): u64
+	118: StLoc[2](f: |u64|u64)
+	119: Branch(6)
+B29:
+	120: PackClosure#0 __lambda__4__choose_function1(u64, u64): u64
+	121: PackClosure#1 __lambda__5__choose_function1(|u64,u64|u64, u64): u64
+	122: StLoc[2](f: |u64|u64)
+	123: Branch(6)
+}
+multiply3(x: u64, y: u64, z: u64): u64 /* def_idx: 2 */ {
+B0:
+	0: MoveLoc[0](x: u64)
+	1: MoveLoc[1](y: u64)
+	2: Mul
+	3: MoveLoc[2](z: u64)
+	4: Mul
+	5: Ret
+}
+public test_functions() /* def_idx: 3 */ {
+L0:	i: u64
+L1:	__update_iter_flag: bool
+B0:
+	0: LdU64(0)
+	1: StLoc[0](i: u64)
+	2: LdFalse
+	3: StLoc[1](__update_iter_flag: bool)
+B1:
+	4: Branch(6)
+B2:
+	5: Branch(30)
+B3:
+	6: CopyLoc[1](__update_iter_flag: bool)
+	7: BrFalse(31)
+B4:
+	8: MoveLoc[0](i: u64)
+	9: LdU64(1)
+	10: Add
+	11: StLoc[0](i: u64)
+B5:
+	12: CopyLoc[0](i: u64)
+	13: LdU64(15)
+	14: Lt
+	15: BrTrue(17)
+B6:
+	16: Branch(30)
+B7:
+	17: CopyLoc[0](i: u64)
+	18: LdU64(3)
+	19: Call choose_function1(u64, u64): u64
+	20: CopyLoc[0](i: u64)
+	21: LdU64(2)
+	22: Add
+	23: LdU64(3)
+	24: Mul
+	25: Eq
+	26: BrFalse(28)
+B8:
+	27: Branch(4)
+B9:
+	28: MoveLoc[0](i: u64)
+	29: Abort
+B10:
+	30: Ret
+B11:
+	31: LdTrue
+	32: StLoc[1](__update_iter_flag: bool)
+	33: Branch(12)
+}
+__lambda__1__choose_function1(g: |u64,u64|u64, x: u64): u64 /* def_idx: 4 */ {
+B0:
+	0: LdU64(11)
+	1: MoveLoc[1](x: u64)
+	2: MoveLoc[0](g: |u64,u64|u64)
+	3: CallClosure(|u64,u64|u64)
+	4: Ret
+}
+__lambda__2__choose_function1(h: |u64|u64, x: u64): u64 /* def_idx: 5 */ {
+B0:
+	0: MoveLoc[1](x: u64)
+	1: MoveLoc[0](h: |u64|u64)
+	2: CallClosure(|u64|u64)
+	3: Ret
+}
+__lambda__3__choose_function1(i: |u64|u64, z: u64): u64 /* def_idx: 6 */ {
+B0:
+	0: MoveLoc[1](z: u64)
+	1: MoveLoc[0](i: |u64|u64)
+	2: CallClosure(|u64|u64)
+	3: Ret
+}
+__lambda__4__choose_function1(x: u64, y: u64): u64 /* def_idx: 7 */ {
+B0:
+	0: MoveLoc[1](y: u64)
+	1: LdU64(1)
+	2: Sub
+	3: LdU64(1)
+	4: Add
+	5: StLoc[1](y: u64)
+	6: MoveLoc[0](x: u64)
+	7: MoveLoc[1](y: u64)
+	8: Call mod3::multiply(u64, u64): u64
+	9: Ret
+}
+__lambda__5__choose_function1(i: |u64,u64|u64, x: u64): u64 /* def_idx: 8 */ {
+B0:
+	0: LdU64(15)
+	1: MoveLoc[1](x: u64)
+	2: MoveLoc[0](i: |u64,u64|u64)
+	3: CallClosure(|u64,u64|u64)
+	4: Ret
+}
+}
+============ bytecode verification succeeded ========

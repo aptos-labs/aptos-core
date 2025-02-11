@@ -1,7 +1,7 @@
 module 0xcafe::m {
 
     /// A higher order function on ints
-    fun map(x: u64, f: |u64|u64): u64 {
+    fun map(x: u64, f: |u64|u64 has drop): u64 {
         f(x)
     }
 

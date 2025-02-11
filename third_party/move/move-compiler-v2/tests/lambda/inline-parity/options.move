@@ -2,7 +2,7 @@
 module 0x42::map_opt {
     use std::option;
     /// Maps the content of an option
-    public fun map<Element, OtherElement>(t: option::Option<Element>, f: |Element|OtherElement): option::Option<OtherElement> {
+    public fun map<Element:drop, OtherElement>(t: option::Option<Element>, f: |Element|OtherElement has drop): option::Option<OtherElement> {
         if (option::is_some(&t)) {
             option::some(f(option::extract(&mut t)))
         } else {
