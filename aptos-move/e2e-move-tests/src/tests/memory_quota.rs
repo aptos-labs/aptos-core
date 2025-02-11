@@ -44,11 +44,20 @@ fn push_u128s_onto_vector() {
 */
 
 #[test]
-fn clone_large_vectors() {
+fn clone_large_vectors_with_stateful_sender() {
     let mut h = MoveHarness::new();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), Some(0));
+    clone_large_vectors(&mut h, acc);
+}
 
-    // Load the code
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
+#[test]
+fn clone_large_vectors_with_stateless_sender() {
+    let mut h = MoveHarness::new();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), None);
+    clone_large_vectors(&mut h, acc);
+}
+
+fn clone_large_vectors(h: &mut MoveHarness, acc: Account) {
     assert_success!(h.publish_package(&acc, &common::test_dir_path("memory_quota.data/clone_vec"),));
 
     let result = h.run_entry_function(
@@ -72,11 +81,21 @@ fn clone_large_vectors() {
 }
 
 #[test]
-fn add_vec_to_table() {
+fn add_vec_to_table_with_stateful_sender() {
     let mut h = MoveHarness::new();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), Some(0));
+    add_vec_to_table(&mut h, acc);
+}
 
-    // Load the code
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
+#[test]
+fn add_vec_to_table_with_stateless_sender() {
+    let mut h = MoveHarness::new();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), None);
+    add_vec_to_table(&mut h, acc);
+}
+
+#[test]
+fn add_vec_to_table(h: &mut MoveHarness, acc: Account) {
     assert_success!(h.publish_package(
         &acc,
         &common::test_dir_path("memory_quota.data/table_and_vec"),
