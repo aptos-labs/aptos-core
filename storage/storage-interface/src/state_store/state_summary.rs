@@ -17,6 +17,7 @@ use aptos_types::{proof::SparseMerkleProofExt, transaction::Version};
 use derive_more::Deref;
 use rayon::prelude::*;
 use std::collections::BTreeMap;
+use aptos_types::state_store::state_value::DbStateValue;
 
 /// The data structure through which the entire state at a given
 /// version can be summarized to a concise digest (the root hash).

@@ -2,14 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_types::{state_store::state_value::StateValue, transaction::Version};
+use aptos_types::{
+    state_store::state_value::{DbStateValue, StateValue},
+    transaction::Version,
+};
 
 #[derive(Clone, Debug)]
 pub struct StateUpdate {
     /// The version where the key got updated (incl. deletion).
     pub version: Version,
     /// `None` indicates deletion.
-    pub value: Option<StateValue>,
+    pub value: Option<DbStateValue>,
 }
 
 impl StateUpdate {
@@ -31,7 +34,7 @@ pub struct StateUpdateRef<'kv> {
     /// The version where the key got updated (incl. deletion).
     pub version: Version,
     /// `None` indicates deletion.
-    pub value: Option<&'kv StateValue>,
+    pub value: Option<&'kv DbStateValue>,
 }
 
 impl<'kv> StateUpdateRef<'kv> {
@@ -52,7 +55,10 @@ pub enum StateCacheEntry {
     /// Not indicating if the value ever existed and deleted.
     NonExistent,
     /// A creation or modification.
-    Value { version: Version, value: StateValue },
+    Value {
+        version: Version,
+        value: DbStateValue,
+    },
 }
 
 impl StateCacheEntry {
@@ -98,7 +104,7 @@ impl StateCacheEntry {
     pub fn state_value_ref_opt(&self) -> Option<&StateValue> {
         match self {
             Self::NonExistent => None,
-            Self::Value { value, .. } => Some(value),
+            Self::Value { value, .. } => value.into_state_value_opt(),
         }
     }
 
