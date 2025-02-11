@@ -33,8 +33,8 @@ module 0x42::mod3 {
         let struct1 = MyStruct1 { x: 3 };
         // let struct2 = MyStruct2 { y: 2 };
 
-        let f1 = |addr| 0x42::mod2::item_exists<MyStruct1>(addr);
-        let f2 = |addr| 0x42::mod2::item_exists<MyStruct2>(addr);
+        let f1 : |address|bool has drop+store+copy = |addr| 0x42::mod2::item_exists<MyStruct1>(addr);
+        let f2 : |address|bool has drop+store+copy = |addr| 0x42::mod2::item_exists<MyStruct2>(addr);
 
         let addr = signer::address_of(&owner);
         0x42::mod2::save_item(&owner, struct1);

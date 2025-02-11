@@ -290,9 +290,9 @@ module 0x42::test {
         }
     }
     private fun test_lambda_param(): bool {
-        test::lambda_param(closure#0test::test_lambda_param$lambda$1())
+        test::lambda_param(closure#0test::__lambda__1__test_lambda_param())
     }
-    private fun test_lambda_param$lambda$1(param$0: S2): bool {
+    private fun __lambda__1__test_lambda_param(param$0: S2): bool {
         {
           let test::S2{ 0: x, 1: _ } = param$0;
           x
@@ -453,9 +453,9 @@ module 0x42::test {
         let S7(_w,_x,_y,_z) = x;
     }
     fun test_lambda_param(): bool {
-        lambda_param(|arg0| test_lambda_param$lambda$1(arg0))
+        lambda_param(|arg0| __lambda__1__test_lambda_param(arg0))
     }
-    fun test_lambda_param$lambda$1(param$0: S2): bool {
+    fun __lambda__1__test_lambda_param(param$0: S2): bool {
         let S2(x,_) = param$0;
         x
     }
@@ -478,15 +478,3 @@ error: match not exhaustive
     │                ^
     │
     = missing `E1::C{..}`
-
-error: Calls to function values other than inline function parameters not yet implemented
-    ┌─ tests/lambda/inline-parity/dotdot_valid.move:177:9
-    │
-177 │         f(x)
-    │         ^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-    ┌─ tests/lambda/inline-parity/dotdot_valid.move:181:22
-    │
-181 │         lambda_param(|S2(x, ..)| x)
-    │                      ^^^^^^^^^^^^^

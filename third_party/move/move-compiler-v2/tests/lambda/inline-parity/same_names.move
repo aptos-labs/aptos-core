@@ -1,6 +1,6 @@
 module 0x42::a {
 
-    struct MyList { len: u64 }
+    struct MyList has drop { len: u64 }
 
     public fun len(self: &MyList): u64 {
         self.len
@@ -9,7 +9,7 @@ module 0x42::a {
 
 module 0x42::b {
 
-    struct MyOtherList { len: u64 }
+    struct MyOtherList has drop { len: u64 }
 
     public fun len(self: &MyOtherList): u64 {
         self.len

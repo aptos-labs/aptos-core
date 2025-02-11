@@ -2508,7 +2508,9 @@ fn parse_type(context: &mut Context) -> Result<Type, Box<Diagnostic>> {
                 consume_token(context.tokens, Tok::PipePipe)?;
                 vec![]
             };
-            let result = if is_start_of_type(context) {
+            let result = if is_start_of_type(context)
+                && !(context.tokens.peek() == Tok::Identifier && context.tokens.content() == "has")
+            {
                 parse_type(context)?
             } else {
                 spanned(

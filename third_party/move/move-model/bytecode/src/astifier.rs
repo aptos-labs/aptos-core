@@ -953,6 +953,10 @@ impl Generator {
                 Operation::MoveFunction(*mid, *fid),
                 srcs,
             ),
+            Closure(..) | Invoke => {
+                // TODO(#15664): implement closure opcodes for astifier
+                panic!("closure operations not supported: {:?}", oper)
+            },
             Pack(mid, sid, inst) => {
                 self.gen_call_stm(
                     ctx,
