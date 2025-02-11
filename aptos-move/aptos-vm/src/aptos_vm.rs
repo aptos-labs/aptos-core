@@ -2293,7 +2293,7 @@ impl AptosVM {
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
-        if cfg!(feature = "benchmark") && !is_gas_metering_enabled() {
+        if cfg!(feature = "bench") && !is_gas_metering_enabled() {
             let txn_metadata = TransactionMetadata::new(txn);
             let is_approved_gov_script = is_approved_gov_script(resolver, txn, &txn_metadata);
             let vm_params = &self

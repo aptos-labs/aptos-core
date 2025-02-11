@@ -7,11 +7,11 @@
 mod algebra;
 mod meter;
 mod traits;
-#[cfg(feature = "benchmark")]
+#[cfg(feature = "bench")]
 mod unmetered;
 
 pub use algebra::StandardGasAlgebra;
 pub use meter::StandardGasMeter;
 pub use traits::{AptosGasMeter, GasAlgebra};
-#[cfg(feature = "benchmark")]
+#[cfg(feature = "bench")]
 pub use unmetered::{enable_gas_metering, is_gas_metering_enabled, AptosUnmeteredGasMeter};

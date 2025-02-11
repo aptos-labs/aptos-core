@@ -25,4 +25,4 @@ once_cell = { workspace = true }
 
 [features]
 default = []
-benchmark = []
+bench = []
