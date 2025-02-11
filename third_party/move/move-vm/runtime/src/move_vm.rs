@@ -19,7 +19,6 @@ use move_core_types::{language_storage::ModuleId, metadata::Metadata, vm_status:
 use move_vm_types::resolver::MoveResolver;
 use std::{ops::Deref, sync::Arc};
 
-#[derive(Clone)]
 pub struct MoveVM {
     pub(crate) runtime: VMRuntime,
 }

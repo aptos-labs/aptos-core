@@ -6,7 +6,6 @@
 mod resolver;
 pub mod session;
 mod vm;
-mod warm_vm_cache;
 pub(crate) mod write_op_converter;
 
 pub use crate::move_vm_ext::{
@@ -21,7 +20,6 @@ use move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, vm_status::StatusCode,
 };
 pub use session::session_id::SessionId;
-pub use warm_vm_cache::flush_warm_vm_cache;
 
 pub(crate) fn resource_state_key(
     address: &AccountAddress,

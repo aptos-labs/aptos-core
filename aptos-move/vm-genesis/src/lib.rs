@@ -147,7 +147,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let genesis_runtime_builder = GenesisRuntimeBuilder::new(chain_id);
     let genesis_runtime_environment = genesis_runtime_builder.build_genesis_runtime_environment();
 
-    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment.clone());
+    let module_storage = state_view.as_aptos_code_storage(&genesis_runtime_environment);
     let resolver = state_view.as_move_resolver();
 
     let genesis_vm = genesis_runtime_builder.build_genesis_vm();
@@ -254,7 +254,7 @@ pub fn encode_genesis_change_set(
     let genesis_runtime_builder = GenesisRuntimeBuilder::new(chain_id);
     let genesis_runtime_environment = genesis_runtime_builder.build_genesis_runtime_environment();
 
-    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment.clone());
+    let module_storage = state_view.as_aptos_code_storage(&genesis_runtime_environment);
     let resolver = state_view.as_move_resolver();
 
     let genesis_vm = genesis_runtime_builder.build_genesis_vm();
@@ -898,8 +898,7 @@ fn code_to_writes_for_loader_v2_publishing(
     addr: AccountAddress,
     code: Vec<Bytes>,
 ) -> VMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
-    let module_storage =
-        genesis_state_view.as_aptos_code_storage(genesis_runtime_environment.clone());
+    let module_storage = genesis_state_view.as_aptos_code_storage(genesis_runtime_environment);
     let resolver = genesis_state_view.as_move_resolver();
 
     let module_storage_with_staged_modules =
@@ -963,7 +962,7 @@ fn publish_framework_with_loader_v2(
     // At this point we processed all packages, and the state view contains all the code. We can
     // run package initialization.
 
-    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment.clone());
+    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment);
     let resolver = state_view.as_move_resolver();
     let mut session = genesis_vm.new_genesis_session(&resolver, hash_value);
 
@@ -1000,7 +999,7 @@ fn publish_framework_with_loader_v1(
     // Here, we set the state view to be empty. Hence, publishing module bundle will always create
     // new write ops.
     let state_view = GenesisStateView::new();
-    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment.clone());
+    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment);
 
     let resolver = state_view.as_move_resolver();
     let mut session = genesis_vm.new_genesis_session(&resolver, hash_value);

@@ -25,9 +25,9 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     ambassador_impl_CodeStorage, ambassador_impl_ModuleStorage,
-    ambassador_impl_WithRuntimeEnvironment, AsUnsyncCodeStorage, BorrowedOrOwned, CodeStorage,
-    Function, Module, ModuleStorage, RuntimeEnvironment, Script, UnsyncCodeStorage,
-    UnsyncModuleStorage, WithRuntimeEnvironment,
+    ambassador_impl_WithRuntimeEnvironment, AsUnsyncCodeStorage, CodeStorage, Function, Module,
+    ModuleStorage, RuntimeEnvironment, Script, UnsyncCodeStorage, UnsyncModuleStorage,
+    WithRuntimeEnvironment,
 };
 use move_vm_types::{
     code::{ModuleBytesStorage, ModuleCode},
@@ -36,12 +36,26 @@ use move_vm_types::{
 };
 use std::{ops::Deref, sync::Arc};
 
-/// Avoids orphan rule to implement [ModuleBytesStorage] for [StateView].
-struct StateViewAdapter<'s, S> {
-    state_view: BorrowedOrOwned<'s, S>,
+struct StateViewAdapter<'ctx, S, E> {
+    environment: &'ctx E,
+    state_view: &'ctx S,
 }
 
-impl<'s, S: StateView> ModuleBytesStorage for StateViewAdapter<'s, S> {
+impl<'ctx, S, E> WithRuntimeEnvironment for StateViewAdapter<'ctx, S, E>
+where
+    S: StateView,
+    E: WithRuntimeEnvironment,
+{
+    fn runtime_environment(&self) -> &RuntimeEnvironment {
+        self.environment.runtime_environment()
+    }
+}
+
+impl<'ctx, S, E> ModuleBytesStorage for StateViewAdapter<'ctx, S, E>
+where
+    S: StateView,
+    E: WithRuntimeEnvironment,
+{
     fn fetch_module_bytes(
         &self,
         address: &AccountAddress,
@@ -54,11 +68,15 @@ impl<'s, S: StateView> ModuleBytesStorage for StateViewAdapter<'s, S> {
     }
 }
 
-impl<'s, S: StateView> Deref for StateViewAdapter<'s, S> {
+impl<'ctx, S, E> Deref for StateViewAdapter<'ctx, S, E>
+where
+    S: StateView,
+    E: WithRuntimeEnvironment,
+{
     type Target = S;
 
     fn deref(&self) -> &Self::Target {
-        &self.state_view
+        self.state_view
     }
 }
 
@@ -72,31 +90,15 @@ impl<'s, S: StateView> Deref for StateViewAdapter<'s, S> {
 )]
 #[delegate(ModuleStorage, where = "S: StateView, E: WithRuntimeEnvironment")]
 #[delegate(CodeStorage, where = "S: StateView, E: WithRuntimeEnvironment")]
-pub struct AptosCodeStorageAdapter<'s, S, E> {
-    storage: UnsyncCodeStorage<UnsyncModuleStorage<'s, StateViewAdapter<'s, S>, E>>,
+pub struct AptosCodeStorageAdapter<'ctx, S, E> {
+    storage: UnsyncCodeStorage<UnsyncModuleStorage<'ctx, StateViewAdapter<'ctx, S, E>>>,
 }
 
-impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosCodeStorageAdapter<'s, S, E> {
-    /// Creates new instance of [AptosCodeStorageAdapter] built on top of the passed state view and
-    /// the provided runtime environment.
-    fn from_borrowed(state_view: &'s S, runtime_environment: E) -> Self {
-        let adapter = StateViewAdapter {
-            state_view: BorrowedOrOwned::Borrowed(state_view),
-        };
-        let storage = adapter.into_unsync_code_storage(runtime_environment);
-        Self { storage }
-    }
-
-    /// Creates new instance of [AptosCodeStorageAdapter] capturing the passed state view and the
-    /// provided environment.
-    fn from_owned(state_view: S, runtime_environment: E) -> Self {
-        let adapter = StateViewAdapter {
-            state_view: BorrowedOrOwned::Owned(state_view),
-        };
-        let storage = adapter.into_unsync_code_storage(runtime_environment);
-        Self { storage }
-    }
-
+impl<'ctx, S, E> AptosCodeStorageAdapter<'ctx, S, E>
+where
+    S: StateView,
+    E: WithRuntimeEnvironment,
+{
     /// Drains cached verified modules from the code storage, transforming them into format used by
     /// global caches.
     pub fn into_verified_module_code_iter(
@@ -180,19 +182,24 @@ impl<'s, S: StateView, E: WithRuntimeEnvironment> BlockSynchronizationKillSwitch
 /// Allows to treat the state view as a code storage with scripts and modules. The main use case is
 /// when a transaction or a Move function has to be executed outside the long-living environment or
 /// block executor, e.g., for single transaction simulation, in Aptos debugger, etc.
-pub trait AsAptosCodeStorage<'s, S, E> {
-    fn as_aptos_code_storage(&'s self, runtime_environment: E)
-        -> AptosCodeStorageAdapter<'s, S, E>;
-
-    fn into_aptos_code_storage(self, runtime_environment: E) -> AptosCodeStorageAdapter<'s, S, E>;
+pub trait AsAptosCodeStorage<'ctx, S, E> {
+    fn as_aptos_code_storage(
+        &'ctx self,
+        environment: &'ctx E,
+    ) -> AptosCodeStorageAdapter<'ctx, S, E>;
 }
 
-impl<'s, S: StateView, E: WithRuntimeEnvironment> AsAptosCodeStorage<'s, S, E> for S {
-    fn as_aptos_code_storage(&'s self, runtime_environment: E) -> AptosCodeStorageAdapter<S, E> {
-        AptosCodeStorageAdapter::from_borrowed(self, runtime_environment)
-    }
-
-    fn into_aptos_code_storage(self, runtime_environment: E) -> AptosCodeStorageAdapter<'s, S, E> {
-        AptosCodeStorageAdapter::from_owned(self, runtime_environment)
+impl<'ctx, S, E> AsAptosCodeStorage<'ctx, S, E> for S
+where
+    S: StateView,
+    E: WithRuntimeEnvironment,
+{
+    fn as_aptos_code_storage(&'ctx self, environment: &'ctx E) -> AptosCodeStorageAdapter<S, E> {
+        let adapter = StateViewAdapter {
+            environment,
+            state_view: self,
+        };
+        let storage = adapter.into_unsync_code_storage();
+        AptosCodeStorageAdapter { storage }
     }
 }
