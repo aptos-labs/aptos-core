@@ -859,22 +859,26 @@ impl StateStore {
                 }
 
                 // TODO(aldenhu): cache changes here, should consume it.
+                // Use dummy access_time_secs = 0, since `cache` is not going to persist.
                 let old_entry = cache
                     .insert(
                         (*key).clone(),
-                        StateCacheEntry::from_state_update_ref(update),
+                        StateCacheEntry::from_state_update_ref(update, 0),
                     )
                     .unwrap_or_else(|| {
                         // n.b. all updated state items must be read and recorded in the state cache,
                         // otherwise we can't calculate the correct usage. The is_untracked() hack
                         // is to allow some db tests without real execution layer to pass.
                         assert!(ignore_state_cache_miss, "Must cache read.");
-                        StateCacheEntry::NonExistent
+                        StateCacheEntry::NonExistent {
+                            access_time_secs: 0,
+                        }
                     });
 
                 if let StateCacheEntry::Value {
                     version: old_version,
                     value: _,
+                    access_time_secs: _,
                 } = old_entry
                 {
                     // The value at `old_version` can be pruned once the pruning window hits

@@ -12,12 +12,13 @@ pub struct StateUpdate {
 }
 
 impl StateUpdate {
-    pub fn to_state_value_with_version(&self) -> StateCacheEntry {
+    pub fn to_state_value_with_version(&self, access_time_secs: u32) -> StateCacheEntry {
         use StateCacheEntry::*;
 
         match &self.value {
-            None => NonExistent,
+            None => NonExistent { access_time_secs },
             Some(value) => Value {
+                access_time_secs,
                 version: self.version,
                 value: value.clone(),
             },
@@ -44,45 +45,40 @@ impl<'kv> StateUpdateRef<'kv> {
 
 #[derive(Clone, Debug)]
 pub enum StateCacheEntry {
-    /// Not indicating if the value ever existed and deleted.
-    NonExistent,
+    /// NOT indicating whether the value never existed or deleted.
+    NonExistent { access_time_secs: u32 },
     /// A creation or modification.
-    Value { version: Version, value: StateValue },
+    Value {
+        access_time_secs: u32,
+        version: Version,
+        value: StateValue,
+    },
 }
 
 impl StateCacheEntry {
     // TODO(aldenhu): update DbReader interface to return this type directly.
-    pub fn from_tuple_opt(tuple_opt: Option<(Version, StateValue)>) -> Self {
+    pub fn from_db_tuple_opt(
+        tuple_opt: Option<(Version, StateValue)>,
+        access_time_secs: u32,
+    ) -> Self {
         match tuple_opt {
-            None => Self::NonExistent,
-            Some((version, value)) => Self::Value { version, value },
-        }
-    }
-
-    pub fn from_state_write_ref(version: Version, value_opt: Option<&StateValue>) -> Self {
-        match value_opt {
-            None => Self::NonExistent,
-            Some(value) => Self::Value {
+            None => Self::NonExistent { access_time_secs },
+            Some((version, value)) => Self::Value {
+                access_time_secs,
                 version,
-                value: value.clone(),
+                value,
             },
         }
     }
 
-    pub fn from_state_update_ref(state_update_ref: &StateUpdateRef) -> Self {
+    pub fn from_state_update_ref(state_update_ref: &StateUpdateRef, access_time_secs: u32) -> Self {
         match state_update_ref.value {
-            None => Self::NonExistent,
+            None => Self::NonExistent { access_time_secs },
             Some(value) => Self::Value {
+                access_time_secs,
                 version: state_update_ref.version,
                 value: value.clone(),
             },
-        }
-    }
-
-    pub fn as_state_value_opt(&self) -> Option<&StateValue> {
-        match self {
-            Self::NonExistent => None,
-            Self::Value { value, .. } => Some(value),
         }
     }
 
@@ -92,14 +88,14 @@ impl StateCacheEntry {
 
     pub fn state_value_ref_opt(&self) -> Option<&StateValue> {
         match self {
-            Self::NonExistent => None,
+            Self::NonExistent { .. } => None,
             Self::Value { value, .. } => Some(value),
         }
     }
 
     pub fn into_state_value_opt(self) -> Option<StateValue> {
         match self {
-            Self::NonExistent => None,
+            Self::NonExistent { .. } => None,
             Self::Value { value, .. } => Some(value),
         }
     }

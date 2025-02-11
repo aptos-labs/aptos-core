@@ -13,6 +13,7 @@ use crate::{
     DbReader,
 };
 use anyhow::Result;
+use aptos_infallible::duration_since_epoch;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{
@@ -87,6 +88,9 @@ pub struct CachedStateView {
 
     /// State values (with update versions) read across the lifetime of the state view.
     memorized: ShardedStateCache,
+
+    /// access timestamp for uncached entries
+    access_time_secs: u32,
 }
 
 impl Debug for CachedStateView {
@@ -115,6 +119,7 @@ impl CachedStateView {
             reader,
             memorized: ShardedStateCache::new_empty(state.version()),
             speculative: state.into_delta(persisted_state),
+            access_time_secs: duration_since_epoch().as_secs() as u32,
         }
     }
 
@@ -127,6 +132,7 @@ impl CachedStateView {
             reader: Arc::new(DummyDbReader),
             memorized: ShardedStateCache::new_empty(None),
             speculative: state.make_delta(state),
+            access_time_secs: 0,
         }
     }
 
@@ -172,6 +178,7 @@ impl CachedStateView {
             reader: _,
             speculative: _,
             memorized,
+            access_time_secs: _,
         } = self;
 
         memorized
@@ -184,14 +191,17 @@ impl CachedStateView {
     fn get_uncached(&self, state_key: &StateKey) -> Result<StateCacheEntry> {
         let ret = if let Some(update) = self.speculative.get_state_update(state_key) {
             // found in speculative state, can be either a new value or a deletion
-            update.to_state_value_with_version()
+            update.to_state_value_with_version(self.access_time_secs)
         } else if let Some(base_version) = self.base_version() {
-            StateCacheEntry::from_tuple_opt(
+            StateCacheEntry::from_db_tuple_opt(
                 self.reader
                     .get_state_value_with_version_by_version(state_key, base_version)?,
+                self.access_time_secs,
             )
         } else {
-            StateCacheEntry::NonExistent
+            StateCacheEntry::NonExistent {
+                access_time_secs: self.access_time_secs,
+            }
         };
 
         Ok(ret)
