@@ -143,7 +143,7 @@ yq eval -n "
   .services.healthcheck.environment.ROLE = \"healthcheck\" |
   .services.healthcheck.environment.NODE_COUNT = \"$NODE_COUNT\" |
   .services.healthcheck.environment.NETWORK_IP = \"$NETWORK_IP\" |
-  .services.healthcheck.volumes = [\"./healthcheck.sh:/usr/local/bin/healthcheck.sh\", \"./singleton_driver_test1.sh:/opt/antithesis/test/v1/quickstart/singleton_driver_test1.sh\"] |
+  .services.healthcheck.volumes = [\"./healthcheck.sh:/usr/local/bin/healthcheck.sh\"] |
   .services.healthcheck.networks.custom_network.ipv4_address = \"$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+50)}')\" |
   .networks.custom_network.driver = \"bridge\" |
   .networks.custom_network.ipam.config[0].subnet = \"$NETWORK_IP/24\" |
