@@ -11019,19 +11019,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "module-generation"
-version = "0.1.0"
-dependencies = [
- "move-binary-format",
- "move-bytecode-verifier",
- "move-core-types",
- "move-ir-to-bytecode",
- "move-ir-types",
- "move-symbol-pool",
- "rand 0.8.5",
-]
-
-[[package]]
 name = "module-publish"
 version = "0.1.0"
 dependencies = [
