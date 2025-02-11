@@ -171,10 +171,7 @@ impl ConditionKind {
 
     pub fn allowed_on_lambda_spec(&self) -> bool {
         use ConditionKind::*;
-        matches!(
-            self,
-            Requires | Ensures | FunctionInvariant // TODO(tengzhang): support LetPost and LetPre
-        )
+        matches!(self, Requires | Ensures)
     }
 
     /// Returns true if this condition is allowed on a struct.

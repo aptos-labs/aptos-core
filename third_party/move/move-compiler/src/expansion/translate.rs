@@ -2022,7 +2022,6 @@ fn spec_target(context: &mut Context, sp!(loc, pt): P::SpecBlockTarget) -> E::Sp
                 Box::new(signature)
             }),
         ),
-        PT::Lambda => ET::Lambda,
     };
     sp(loc, et)
 }

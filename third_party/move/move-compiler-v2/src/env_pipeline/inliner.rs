@@ -441,6 +441,7 @@ impl<'env> Inliner<'env> {
     }
 }
 
+/// Expression rewriter for lambda spec
 struct LambdaSpecRewriter<'env> {
     env: &'env GlobalEnv,
     result_flag: bool,
@@ -471,40 +472,25 @@ impl<'env> ExpRewriterFunctions for LambdaSpecRewriter<'env> {
     }
 
     fn rewrite_local_var(&mut self, id: NodeId, sym: Symbol) -> Option<Exp> {
-        let parse_result = |input: &str| -> Option<usize> {
-            // If the input is exactly "result", return Some(0)
-            if input == "result" {
-                return Some(1);
-            }
-
-            // Check if the input starts with "result_"
-            if let Some(num_str) = input.strip_prefix("result_") {
-                // Try to parse the remaining part as a u32
-                if let Ok(num) = num_str.parse::<usize>() {
-                    // Only return Some(num) if the number is greater than 0
-                    if num > 0 {
-                        return Some(num);
-                    }
-                }
-            }
-            // If none of the conditions are met, return None
-            None
-        };
-        if self.result_flag {
-            let val = parse_result(&sym.display(self.env.symbol_pool()).to_string());
-            if val.is_none() {
-                None
+        if !self.result_flag {
+            return None;
+        }
+        let pool = self.env.symbol_pool();
+        let input = sym.display(pool).to_string();
+        let num = if input == "result" {
+            1
+        } else if let Some(suffix) = input.strip_prefix("result_") {
+            let n = suffix.parse::<usize>().ok()?;
+            if n > 0 {
+                n
             } else {
-                let sym = self.env.symbol_pool().make(&format!(
-                    "{}_{}",
-                    LAMBDA_TEMP_RESULT,
-                    val.unwrap()
-                ));
-                Some(ExpData::LocalVar(id, sym).into())
+                return None;
             }
         } else {
-            None
-        }
+            return None;
+        };
+        let new_sym = pool.make(&format!("{}_{}", LAMBDA_TEMP_RESULT, num));
+        Some(ExpData::LocalVar(id, new_sym).into())
     }
 }
 
@@ -945,7 +931,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         body: Exp,
         pattern: Pattern,
         args: Vec<Exp>,
-        _spec_opt: Option<Exp>,
+        spec_opt: Option<Exp>,
     ) -> Exp {
         // Process Body
         let body_node_id = body.as_ref().node_id();
@@ -1027,92 +1013,91 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             Some(new_args_expr)
         };
 
-        if let Some(_spec) = _spec_opt {
-            //if !body_type.is_unit() {
-            let _ty_vec = if let Type::Tuple(tys) = body_type.clone() {
-                tys.clone()
-            } else {
-                vec![body_type.clone()]
-            };
-            let mut pat_vec = vec![];
-            let mut local_vars = vec![];
-            for (i, ty) in _ty_vec.iter().enumerate() {
-                let new_id = env.new_node(body_loc.clone(), ty.clone());
-                let sym = env
-                    .symbol_pool()
-                    .make(&format!("{}_{}", LAMBDA_TEMP_RESULT, i + 1));
-                let pat = Pattern::Var(new_id, sym);
-                pat_vec.push(pat);
-                let new_id_var = env.new_node(body_loc.clone(), ty.clone());
-                let var = ExpData::LocalVar(new_id_var, sym).into_exp();
-                local_vars.push(var);
-            }
-            let has_result = !local_vars.is_empty();
-            let tuple_pattern =
-                Pattern::Tuple(env.new_node(body_loc.clone(), body_type.clone()), pat_vec);
-            let ret_exp_opt = if !has_result {
-                None
-            } else if local_vars.len() == 1 {
-                Some(local_vars[0].clone())
-            } else {
-                let new_tuple_id = env.new_node(body_loc.clone(), body_type.clone());
-                Some(ExpData::Call(new_tuple_id, Operation::Tuple, local_vars).into_exp())
-            };
-            if let ExpData::SpecBlock(_, spec) = _spec.as_ref() {
-                let pre_conditions = spec
-                    .conditions
-                    .clone()
-                    .into_iter()
-                    .filter(|cond| matches!(cond.kind, ConditionKind::Requires))
-                    .collect_vec();
-                let post_conditions = spec
-                    .conditions
-                    .clone()
-                    .into_iter()
-                    .filter(|cond| matches!(cond.kind, ConditionKind::Ensures))
-                    .collect_vec();
-                let pre_spec = Spec {
-                    loc: None,
-                    conditions: pre_conditions,
-                    properties: BTreeMap::new(),
-                    on_impl: BTreeMap::new(),
-                    update_map: BTreeMap::new(),
+        // Rewrite and instrument spec block for lambda
+        if let Some(spec) = spec_opt {
+            if let ExpData::SpecBlock(_, spec) = spec.as_ref() {
+                let new_body_node = || env.new_node(body_loc.clone(), body_type.clone());
+
+                // generate pattern for lambda body
+                let body_ty_vec = if let Type::Tuple(tys) = body_type.clone() {
+                    tys.clone()
+                } else {
+                    vec![body_type.clone()]
                 };
-                let post_spec = Spec {
-                    loc: None,
-                    conditions: post_conditions,
-                    properties: BTreeMap::new(),
-                    on_impl: BTreeMap::new(),
-                    update_map: BTreeMap::new(),
+                let mut body_pat_vec = vec![];
+                let mut ret_vars = vec![];
+                for (i, ty) in body_ty_vec.iter().enumerate() {
+                    let new_id = env.new_node(body_loc.clone(), ty.clone());
+                    let sym = env
+                        .symbol_pool()
+                        .make(&format!("{}_{}", LAMBDA_TEMP_RESULT, i + 1));
+                    let pat = Pattern::Var(new_id, sym);
+                    body_pat_vec.push(pat);
+                    let new_id_var = env.new_node(body_loc.clone(), ty.clone());
+                    let var = ExpData::LocalVar(new_id_var, sym).into_exp();
+                    ret_vars.push(var);
+                }
+                let has_result = !ret_vars.is_empty();
+                let body_ret_pat = Pattern::Tuple(new_body_node(), body_pat_vec);
+                let ret_exp_opt = if !has_result {
+                    None
+                } else if ret_vars.len() == 1 {
+                    Some(ret_vars[0].clone())
+                } else {
+                    let new_tuple_id = new_body_node();
+                    Some(ExpData::Call(new_tuple_id, Operation::Tuple, ret_vars).into_exp())
                 };
 
+                // Partition requires and ensures into two spec blocks
+                // and rewrite them to assert
                 let mut lambda_spec_rewriter = LambdaSpecRewriter::new(env, false);
-                let new_node_id_pre = env.new_node(body_loc.clone(), body_type.clone());
-                let pre_spec = ExpData::SpecBlock(new_node_id_pre, pre_spec);
-                let pre_spec = lambda_spec_rewriter.rewrite_exp(pre_spec.into());
-                lambda_spec_rewriter.result_flag = has_result;
-                let new_node_id_post = env.new_node(body_loc.clone(), body_type.clone());
-                let post_spec = ExpData::SpecBlock(new_node_id_post, post_spec);
-                let post_spec = lambda_spec_rewriter.rewrite_exp(post_spec.into());
+                let mut spec_constructor = |cond_kind, result_flag| {
+                    let filtered_condition = spec
+                        .conditions
+                        .clone()
+                        .into_iter()
+                        .filter(|cond| cond.kind == cond_kind)
+                        .collect_vec();
+                    let spec = Spec {
+                        loc: None,
+                        conditions: filtered_condition,
+                        properties: BTreeMap::new(),
+                        on_impl: BTreeMap::new(),
+                        update_map: BTreeMap::new(),
+                    };
+                    let exp_data =
+                        ExpData::SpecBlock(env.new_node(body_loc.clone(), Type::unit()), spec);
+                    lambda_spec_rewriter.result_flag = result_flag;
+                    lambda_spec_rewriter.rewrite_exp(exp_data.into())
+                };
+
+                let pre_spec = spec_constructor(ConditionKind::Requires, false);
+                let post_spec = spec_constructor(ConditionKind::Ensures, has_result);
+
+                // instrument ensures block
                 let mut exp_with_spec = vec![post_spec];
+                // add ret value if necessary
                 if let Some(ret_exp) = ret_exp_opt {
                     exp_with_spec.push(ret_exp);
                 }
-                let new_node_id = env.new_node(body_loc.clone(), body_type.clone());
-                let new_exp = ExpData::Sequence(new_node_id, exp_with_spec).into_exp();
-                let binding_block =
-                    ExpData::Block(new_body_id, tuple_pattern, Some(body.clone()), new_exp)
-                        .into_exp();
-                let pre_seq = vec![pre_spec, binding_block];
-                let new_node_id_2 = env.new_node(body_loc, body_type.clone());
-                let pre_new_exp = ExpData::Sequence(new_node_id_2, pre_seq).into_exp();
-                let new_body =
-                    ExpData::Block(new_body_id, pattern, optional_new_args_expr, pre_new_exp)
-                        .into_exp();
+                let binding_block = ExpData::Block(
+                    new_body_node(),
+                    body_ret_pat,
+                    Some(body.clone()),
+                    ExpData::Sequence(new_body_node(), exp_with_spec).into_exp(),
+                )
+                .into_exp();
+
+                // instrument requires block
+                let new_body = ExpData::Block(
+                    new_body_id,
+                    pattern,
+                    optional_new_args_expr,
+                    ExpData::Sequence(new_body_node(), vec![pre_spec, binding_block]).into_exp(),
+                )
+                .into_exp();
                 return new_body;
-                //let (pre_conditions, post_conditions) = spec.conditions.iter().partition(||)
             }
-            //}
         }
 
         let new_body = ExpData::Block(new_body_id, pattern, optional_new_args_expr, body);

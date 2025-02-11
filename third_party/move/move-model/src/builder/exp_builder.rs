@@ -2073,7 +2073,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                     if let Some((pat, ty)) = &lambda_info {
                                         let nty: Type = subs.specialize_with_defaults(ty);
                                         lambda_info = Some((pat.clone(), nty.clone()));
-                                        //println!("nty:{}", nty.display(&self.type_display_context()));
                                     }
                                     self.translate_spec_block(&loc, locals, &block, lambda_info)
                                 } else {
@@ -2322,7 +2321,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             return Spec::default();
         };
         // This uses a builder for inlined specification blocks stored in the state.
-        // let from_lambda = block.value.target.value == EA::SpecBlockTarget_::Lambda;
         let context = SpecBlockContext::FunctionCodeV2(fun_name, locals, lambda_info.clone());
         self.parent.inline_spec_builder = Spec {
             loc: Some(loc.clone()),

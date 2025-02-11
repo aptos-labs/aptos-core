@@ -350,7 +350,6 @@ pub enum SpecBlockTarget_ {
     Module,
     Member(Name, Option<Box<FunctionSignature>>),
     Schema(Name, Vec<(Name, Vec<Ability>)>),
-    Lambda,
 }
 
 pub type SpecBlockTarget = Spanned<SpecBlockTarget_>;
@@ -1411,7 +1410,7 @@ impl AstDebug for SpecBlock_ {
 impl AstDebug for SpecBlockTarget_ {
     fn ast_debug(&self, w: &mut AstWriter) {
         match self {
-            SpecBlockTarget_::Code | SpecBlockTarget_::Lambda => {},
+            SpecBlockTarget_::Code => {},
             SpecBlockTarget_::Module => w.write("module "),
             SpecBlockTarget_::Member(name, sign_opt) => {
                 w.write(name.value);

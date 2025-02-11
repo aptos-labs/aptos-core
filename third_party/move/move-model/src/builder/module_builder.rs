@@ -134,17 +134,8 @@ impl<'a> SpecBlockContext<'a> {
         use SpecBlockContext::*;
         match self {
             FunctionCode(_, _) => false,
-            FunctionCodeV2(_, _, _) => false,
-            //TODO(tengzhang): change for lambda expression,
+            FunctionCodeV2(_, _, _) => false, // TODO(tengzhang): add support of old(..) to spec of lambda expression
             _ => true,
-        }
-    }
-
-    pub fn check_lambda(&self) -> bool {
-        use SpecBlockContext::*;
-        match self {
-            FunctionCodeV2(_, _, from_lambda) => from_lambda.is_some(),
-            _ => false,
         }
     }
 
@@ -367,7 +358,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         target: &'pa EA::SpecBlockTarget,
     ) -> Option<SpecBlockContext<'pa>> {
         match &target.value {
-            EA::SpecBlockTarget_::Code | EA::SpecBlockTarget_::Lambda => None,
+            EA::SpecBlockTarget_::Code => None,
             EA::SpecBlockTarget_::Member(name, _) => {
                 let qsym = self.qualified_by_module_from_name(name);
                 if self.parent.fun_table.contains_key(&qsym) {
@@ -1280,20 +1271,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         spec_block: &EA::SpecBlock,
         context: SpecBlockContext,
     ) {
-        assert!(self.spec_block_lets.is_empty());
-        // Sort members so that lets are processed first. This is needed so that lets included
-        // from schemas are properly renamed on name clash.
-        let let_sorted_members = spec_block.value.members.iter().sorted_by(|m1, m2| {
-            let m1_is_let = matches!(m1.value, EA::SpecBlockMember_::Let { .. });
-            let m2_is_let = matches!(m2.value, EA::SpecBlockMember_::Let { .. });
-            match (m1_is_let, m2_is_let) {
-                (true, true) | (false, false) => std::cmp::Ordering::Equal,
-                (true, false) => std::cmp::Ordering::Less,
-                (false, true) => std::cmp::Ordering::Greater,
-            }
-        });
-
-        for member in let_sorted_members {
+        for member in &spec_block.value.members {
             let loc = &self.parent.env.to_loc(&member.loc);
             match &member.value {
                 EA::SpecBlockMember_::Condition {
@@ -1323,21 +1301,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 EA::SpecBlockMember_::Update { lhs, rhs } => {
                     self.def_ana_global_var_update(loc, &context, lhs, rhs)
                 },
-                EA::SpecBlockMember_::Let {
-                    name,
-                    post_state,
-                    def,
-                } => {
-                    if context.check_lambda() {
-                        self.def_ana_let(&context, loc, *post_state, name, def)
-                    }
-                },
                 _ => {
                     self.parent.error(loc, "item not allowed");
                 },
             }
         }
-        self.spec_block_lets.clear();
     }
 
     /// Validates whether a function signature provided with a spec block target matches the
@@ -2003,7 +1971,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
                 et
             },
-            FunctionCodeV2(name, locals, _from_lambda) => {
+            FunctionCodeV2(name, locals, from_lambda) => {
                 let entry = &self
                     .parent
                     .fun_table
@@ -2020,20 +1988,16 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     et.define_local(loc, *sym, type_.clone(), None, *index)
                 }
 
-                if _from_lambda.is_some()
-                    && matches!(kind, ConditionKind::Ensures | ConditionKind::LetPost(..))
-                {
-                    let (_, ty) = _from_lambda.clone().unwrap();
+                if from_lambda.is_some() && matches!(kind, ConditionKind::Ensures) {
+                    let (_, ty) = from_lambda.clone().unwrap();
                     et.enter_scope();
                     if let Type::Tuple(ts) = &ty {
                         for (i, ty) in ts.iter().enumerate() {
                             let name: Symbol = et.symbol_pool().make(&format!("result_{}", i + 1));
-                            //let oper: Option<Operation> = Some(Operation::Result(i));
                             et.define_local(loc, name, ty.clone(), None, None);
                         }
                     } else {
                         let name = et.symbol_pool().make("result");
-                        //let oper = Some(Operation::Result(0));
                         et.define_local(loc, name, ty.clone(), None, None);
                     }
                 }
