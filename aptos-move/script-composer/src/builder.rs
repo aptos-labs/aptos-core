@@ -508,7 +508,7 @@ impl TransactionComposer {
         for (lhs_call, rhs_call) in self.calls.iter().zip(calls.iter()) {
             let fh = script.function_handle_at(lhs_call.call_idx);
             assert_eq!(
-                script.identifier_at(fh.name),
+                script.identifier_at(fh.name).as_ident_str(),
                 rhs_call.function.as_ident_str()
             );
             assert_eq!(

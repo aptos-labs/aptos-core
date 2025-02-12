@@ -312,7 +312,7 @@ impl CompiledScriptBuilder {
         module: &CompiledModule,
     ) -> PartialVMResult<FunctionHandleIndex> {
         for (idx, handle) in module.function_handles().iter().enumerate() {
-            if module.identifier_at(handle.name) == name {
+            if module.identifier_at(handle.name).as_ident_str() == name {
                 return self.import_function_by_handle(module, FunctionHandleIndex(idx as u16));
             }
         }

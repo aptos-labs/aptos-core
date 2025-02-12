@@ -5,7 +5,7 @@
 use crate::{
     config::VMConfig,
     data_cache::TransactionDataCache,
-    loader::{LegacyModuleStorage, LegacyModuleStorageAdapter, Loader},
+    loader::{LegacyModuleStorageAdapter, Loader},
     native_extensions::NativeContextExtensions,
     runtime::VMRuntime,
     session::Session,
@@ -17,7 +17,7 @@ use move_binary_format::{
 };
 use move_core_types::{language_storage::ModuleId, metadata::Metadata, vm_status::StatusCode};
 use move_vm_types::resolver::MoveResolver;
-use std::{ops::Deref, sync::Arc};
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct MoveVM {
@@ -100,7 +100,7 @@ impl MoveVM {
                     ),
                     &LegacyModuleStorageAdapter::new(self.runtime.module_storage_v1()),
                 )?;
-                Ok(module.as_ref().deref().clone())
+                Ok(module.compiled_module.clone())
             },
             Loader::V2(_) => Err(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -151,10 +151,11 @@ impl MoveVM {
     /// Currently, metadata is owned by module which is owned by the VM. In the new loader
     /// V2 design, clients can fetch metadata and apply this function directly!
     #[deprecated]
-    pub fn with_module_metadata<T, F>(&self, module: &ModuleId, f: F) -> Option<T>
+    pub fn with_module_metadata<T, F>(&self, _module: &ModuleId, _f: F) -> Option<T>
     where
         F: FnOnce(&[Metadata]) -> Option<T>,
     {
-        f(&self.runtime.module_cache.fetch_module(module)?.metadata)
+        unimplemented!()
+        // f(&self.runtime.module_cache.fetch_module(module)?.metadata)
     }
 }

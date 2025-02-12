@@ -26,6 +26,7 @@ use move_stackless_bytecode::{
     stackless_bytecode::{AttrId, Bytecode, Operation},
     stackless_bytecode_generator::StacklessBytecodeGenerator,
 };
+use move_vm_types::indices::ModuleIdx;
 use num_traits::Signed;
 use once_cell::sync::Lazy;
 use std::{
@@ -919,10 +920,10 @@ impl ResourceGroupScope {
         }
     }
 
-    pub fn are_equal_module_ids(&self, resource: &ModuleId, group: &ModuleId) -> bool {
+    pub fn are_equal_module_ids(&self, resource: &ModuleIdx, group: &ModuleIdx) -> bool {
         match self {
             ResourceGroupScope::Global => true,
-            ResourceGroupScope::Address => resource.address() == group.address(),
+            ResourceGroupScope::Address => resource.address_idx() == group.address_idx(),
             ResourceGroupScope::Module => resource == group,
         }
     }

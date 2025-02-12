@@ -3250,6 +3250,10 @@ impl CompiledModule {
     pub fn self_name(&self) -> &IdentStr {
         self.identifier_at(self.self_handle().name)
     }
+
+    pub fn self_name_identifier(&self) -> &Identifier {
+        self.identifier_at(self.self_handle().name)
+    }
 }
 
 /// Return the simplest empty module stored at 0x0 that will pass the bounds checker.

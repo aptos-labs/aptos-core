@@ -132,7 +132,10 @@ use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
     ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
-use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
+use move_vm_types::{
+    gas::{GasMeter, UnmeteredGasMeter},
+    indices::{FunctionIdx, ModuleIdx},
+};
 use num_cpus;
 use once_cell::sync::OnceCell;
 use std::{
@@ -560,8 +563,10 @@ impl AptosVM {
                 code,
                 ..
             } => {
+                let index_map = module_storage.runtime_environment().struct_name_index_map();
+                let idx = index_map.module_idx(&module.address, &module.name);
                 let info = self
-                    .extract_module_metadata(module_storage, &module)
+                    .extract_module_metadata(module_storage, &idx)
                     .and_then(|m| m.extract_abort_info(code));
                 ExecutionStatus::MoveAbort {
                     location: AbortLocation::Module(module),
@@ -883,18 +888,24 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
         entry_fn: &EntryFunction,
     ) -> Result<(), VMStatus> {
+        let idx = module_storage
+            .runtime_environment()
+            .struct_name_index_map()
+            .function_idx(
+                &entry_fn.module().address,
+                &entry_fn.module().name,
+                entry_fn.function_identifier(),
+            );
+
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
         if self.gas_feature_version() >= RELEASE_V1_10 {
-            let module_id = traversal_context
-                .referenced_module_ids
-                .alloc(entry_fn.module().clone());
             session.check_dependencies_and_charge_gas(
                 module_storage,
                 gas_meter,
                 traversal_context,
-                [(module_id.address(), module_id.name())],
+                [idx.module_idx()],
             )?;
         }
 
@@ -907,12 +918,7 @@ impl AptosVM {
             )?;
         }
 
-        let function = session.load_function(
-            module_storage,
-            entry_fn.module(),
-            entry_fn.function(),
-            entry_fn.ty_args(),
-        )?;
+        let function = session.load_function(module_storage, &idx, entry_fn.ty_args())?;
 
         // Native entry function is forbidden.
         if self
@@ -932,7 +938,14 @@ impl AptosVM {
 
         // The `has_randomness_attribute()` should have been feature-gated in 1.11...
         if function.is_friend_or_private()
-            && get_randomness_annotation(resolver, module_storage, session, entry_fn)?.is_some()
+            && get_randomness_annotation(
+                resolver,
+                module_storage,
+                session,
+                entry_fn,
+                &idx.module_idx(),
+            )?
+            .is_some()
         {
             let txn_context = session
                 .get_native_extensions()
@@ -1517,8 +1530,11 @@ impl AptosVM {
                 continue;
             }
             *new_published_modules_loaded = true;
+
+            // THIS IS UNREACHABLE!
             let init_function =
-                session.load_function(module_storage, &module.self_id(), init_func_name, &[]);
+                session.load_function(module_storage, &FunctionIdx::new(100000000), &[]);
+
             // it is ok to not have init_module function
             // init_module function should be (1) private and (2) has no return value
             // Note that for historic reasons, verification here is treated
@@ -1617,20 +1633,23 @@ impl AptosVM {
             // Charge old versions of existing modules, in case of upgrades.
             for module in modules.iter() {
                 let addr = module.self_addr();
-                let name = module.self_name();
-                let state_key = StateKey::module(addr, name);
+                let name = module.self_name_identifier();
+                let idx = module_storage
+                    .runtime_environment()
+                    .struct_name_index_map()
+                    .module_idx(addr, name);
 
                 // TODO: Allow the check of special addresses to be customized.
-                if addr.is_special() || traversal_context.visited.insert((addr, name), ()).is_some()
-                {
+                if addr.is_special() || traversal_context.visited.insert(idx, ()).is_some() {
                     continue;
                 }
 
                 let size_if_module_exists = if self.features().is_loader_v2_enabled() {
                     module_storage
-                        .fetch_module_size_in_bytes(addr, name)?
+                        .fetch_module_size_in_bytes(&idx)?
                         .map(|v| v as u64)
                 } else {
+                    let state_key = StateKey::module(addr, name);
                     resolver
                         .as_executor_view()
                         .get_module_state_value_size(&state_key)
@@ -1639,23 +1658,19 @@ impl AptosVM {
 
                 if let Some(size) = size_if_module_exists {
                     gas_meter
-                        .charge_dependency(false, addr, name, NumBytes::new(size))
-                        .map_err(|err| {
-                            err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
-                        })?;
+                        .charge_dependency(false, &idx, NumBytes::new(size))
+                        .map_err(|err| err.finish(Location::Undefined))?;
                 }
             }
 
             // Charge all modules in the bundle that is about to be published.
             for (module, blob) in modules.iter().zip(bundle.iter()) {
-                let module_id = &module.self_id();
+                let idx = module_storage
+                    .runtime_environment()
+                    .struct_name_index_map()
+                    .module_idx(module.self_addr(), module.self_name_identifier());
                 gas_meter
-                    .charge_dependency(
-                        true,
-                        module_id.address(),
-                        module_id.name(),
-                        NumBytes::new(blob.code().len() as u64),
-                    )
+                    .charge_dependency(true, &idx, NumBytes::new(blob.code().len() as u64))
                     .map_err(|err| err.finish(Location::Undefined))?;
             }
 
@@ -1665,7 +1680,13 @@ impl AptosVM {
             // been published yet.
             let module_ids_in_bundle = modules
                 .iter()
-                .map(|module| (module.self_addr(), module.self_name()))
+                .map(|module| {
+                    let idx = module_storage
+                        .runtime_environment()
+                        .struct_name_index_map()
+                        .module_idx(module.self_addr(), module.self_name_identifier());
+                    idx
+                })
                 .collect::<BTreeSet<_>>();
 
             session.execute(|session| {
@@ -1678,7 +1699,20 @@ impl AptosVM {
                         .flat_map(|module| {
                             module
                                 .immediate_dependencies_iter()
-                                .chain(module.immediate_friends_iter())
+                                .map(|(addr, name)| {
+                                    let idx = module_storage
+                                        .runtime_environment()
+                                        .struct_name_index_map()
+                                        .module_idx(addr, name);
+                                    idx
+                                })
+                                .chain(module.immediate_friends_iter().map(|(addr, name)| {
+                                    let idx = module_storage
+                                        .runtime_environment()
+                                        .struct_name_index_map()
+                                        .module_idx(addr, name);
+                                    idx
+                                }))
                         })
                         .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
                 )
@@ -2324,6 +2358,7 @@ impl AptosVM {
                 let (change_set, module_write_set) =
                     create_vm_change_set_with_module_write_set_when_delayed_field_optimization_disabled(
                         change_set.clone(),
+                        code_storage,
                     );
 
                 // validate_waypoint_change_set checks that this is true, so we only log here.
@@ -2399,7 +2434,7 @@ impl AptosVM {
             if self.features().is_loader_v2_enabled() {
                 // It is sufficient to simply get the size in order to enforce read-before-write.
                 module_storage
-                    .fetch_module_size_in_bytes(write.module_address(), write.module_name())
+                    .fetch_module_size_in_bytes(&write.id)
                     .map_err(|e| e.to_partial())?;
             } else {
                 executor_view.get_module_state_value(state_key)?;
@@ -2609,7 +2644,7 @@ impl AptosVM {
     fn extract_module_metadata(
         &self,
         module_storage: &impl AptosModuleStorage,
-        module_id: &ModuleId,
+        module_id: &ModuleIdx,
     ) -> Option<Arc<RuntimeModuleMetadataV1>> {
         if self.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
             aptos_framework::get_vm_metadata(&self.move_vm, module_storage, module_id)
@@ -2691,8 +2726,13 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         module_storage: &impl AptosModuleStorage,
     ) -> anyhow::Result<Vec<Vec<u8>>> {
-        let func = session.load_function(module_storage, &module_id, &func_name, &type_args)?;
-        let metadata = vm.extract_module_metadata(module_storage, &module_id);
+        let idx = module_storage
+            .runtime_environment()
+            .struct_name_index_map()
+            .function_idx(&module_id.address, &module_id.name, &func_name);
+
+        let func = session.load_function(module_storage, &idx, &type_args)?;
+        let metadata = vm.extract_module_metadata(module_storage, &idx.module_idx());
         let arguments = verifier::view_function::validate_view_function(
             session,
             module_storage,
@@ -3331,8 +3371,10 @@ pub(crate) fn fetch_module_metadata_for_struct_tag(
     resolver: &impl AptosMoveResolver,
     module_storage: &impl ModuleStorage,
 ) -> VMResult<Vec<Metadata>> {
+    let index_map = module_storage.runtime_environment().struct_name_index_map();
+    let idx = index_map.module_idx_from_struct_tag(struct_tag);
     if module_storage.is_enabled() {
-        module_storage.fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
+        module_storage.fetch_existing_module_metadata(&idx)
     } else {
         Ok(resolver.get_module_metadata(&struct_tag.module_id()))
     }

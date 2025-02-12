@@ -22,7 +22,7 @@ use move_binary_format::{
 use move_bytecode_verifier::{self, cyclic_dependencies, dependencies};
 use move_core_types::{
     account_address::AccountAddress,
-    gas_algebra::{NumBytes, NumTypeNodes},
+    gas_algebra::NumTypeNodes,
     identifier::IdentStr,
     language_storage::{ModuleId, StructTag, TypeTag},
     value::MoveTypeLayout,
@@ -31,10 +31,7 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::{
-        runtime_types::{AbilityInfo, StructType, Type},
-        struct_name_indexing::StructNameIndex,
-    },
+    loaded_data::runtime_types::{AbilityInfo, StructType, Type},
     sha3_256,
     value_serde::FunctionValueExtension,
 };
@@ -71,9 +68,10 @@ use move_binary_format::file_format::{
     StructVariantHandleIndex, StructVariantInstantiationIndex, TypeParameterIndex,
     VariantFieldHandleIndex, VariantFieldInstantiationIndex, VariantIndex,
 };
-use move_vm_types::loaded_data::{
-    runtime_types::{DepthFormula, StructLayout, TypeBuilder},
-    struct_name_indexing::StructNameIndexMap,
+use move_core_types::identifier::Identifier;
+use move_vm_types::{
+    indices::{FunctionIdx, IndexMapManager, ModuleIdx, StructIdx},
+    loaded_data::runtime_types::{DepthFormula, StructLayout, TypeBuilder},
 };
 pub use script::Script;
 pub(crate) use script::ScriptCache;
@@ -158,7 +156,7 @@ impl Loader {
     pub(crate) fn struct_name_index_map<'a>(
         &'a self,
         module_storage: &'a dyn ModuleStorage,
-    ) -> &StructNameIndexMap {
+    ) -> &IndexMapManager {
         match self {
             Self::V1(loader) => &loader.name_cache,
             Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
@@ -169,7 +167,7 @@ impl Loader {
         Self::V1(LoaderV1 {
             scripts: RwLock::new(ScriptCache::new()),
             type_cache: TypeTagCache::empty(),
-            name_cache: StructNameIndexMap::empty(),
+            name_cache: IndexMapManager::new(),
             natives,
             invalidated: RwLock::new(false),
             module_cache_hits: RwLock::new(BTreeSet::new()),
@@ -190,7 +188,7 @@ impl Loader {
                 if *invalidated {
                     *loader.scripts.write() = ScriptCache::new();
                     loader.type_cache.flush();
-                    loader.name_cache.flush();
+                    // loader.name_cache.flush();
                     *invalidated = false;
                 }
             },
@@ -244,37 +242,27 @@ impl Loader {
         }
     }
 
+    #[allow(clippy::needless_lifetimes)]
     pub(crate) fn check_dependencies_and_charge_gas<'a, I>(
         &self,
-        module_store: &LegacyModuleStorageAdapter,
-        data_store: &mut TransactionDataCache,
+        _module_store: &LegacyModuleStorageAdapter,
+        _data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
-        visited: &mut BTreeMap<(&'a AccountAddress, &'a IdentStr), ()>,
-        referenced_modules: &'a Arena<Arc<CompiledModule>>,
+        visited: &mut BTreeMap<ModuleIdx, ()>,
+        _referenced_modules: &'a Arena<Arc<CompiledModule>>,
         ids: I,
         module_storage: &dyn ModuleStorage,
     ) -> VMResult<()>
     where
-        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
+        I: IntoIterator<Item = ModuleIdx>,
         I::IntoIter: DoubleEndedIterator,
     {
         let _timer = VM_TIMER.timer_with_label("Loader::check_dependencies_and_charge_gas");
         match self {
-            Self::V1(loader) => loader.check_dependencies_and_charge_gas(
-                module_store,
-                data_store,
-                gas_meter,
-                visited,
-                referenced_modules,
-                ids,
-            ),
-            Self::V2(loader) => loader.check_dependencies_and_charge_gas(
-                module_storage,
-                gas_meter,
-                visited,
-                referenced_modules,
-                ids,
-            ),
+            Self::V1(_) => unimplemented!(),
+            Self::V2(loader) => {
+                loader.check_dependencies_and_charge_gas(module_storage, gas_meter, visited, ids)
+            },
         }
     }
 
@@ -294,25 +282,21 @@ impl Loader {
 
     fn load_function_without_type_args(
         &self,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
-        data_store: &mut TransactionDataCache,
-        module_store: &LegacyModuleStorageAdapter,
+        function_idx: &FunctionIdx,
+        _data_store: &mut TransactionDataCache,
+        _module_store: &LegacyModuleStorageAdapter,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<(Arc<Module>, Arc<Function>)> {
         match self {
-            Loader::V1(loader) => {
+            Loader::V1(_loader) => {
                 // Need to load the module first, before resolving it and the function.
-                loader.load_module(module_id, data_store, module_store)?;
-                module_store
-                    .resolve_module_and_function_by_name(module_id, function_name)
-                    .map_err(|err| err.finish(Location::Undefined))
+                unimplemented!()
+                // loader.load_module(module_id, data_store, module_store)?;
+                // module_store
+                //     .resolve_module_and_function_by_name(module_id, function_name)
+                //     .map_err(|err| err.finish(Location::Undefined))
             },
-            Loader::V2(_) => module_storage.fetch_function_definition(
-                module_id.address(),
-                module_id.name(),
-                function_name,
-            ),
+            Loader::V2(_) => module_storage.fetch_function_definition(function_idx),
         }
     }
 
@@ -341,25 +325,19 @@ impl Loader {
 
     pub fn fetch_struct_ty_by_idx(
         &self,
-        idx: StructNameIndex,
+        idx: &StructIdx,
         module_store: &LegacyModuleStorageAdapter,
         module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<Arc<StructType>> {
-        // Ensure we do not return a guard here (still holding the lock) because loading the struct
-        // type below can fetch struct type by index recursively.
-        let struct_name = self
-            .struct_name_index_map(module_storage)
-            .idx_to_struct_name_ref(idx)?;
-
         match self {
             Loader::V1(_) => {
+                let struct_name = self
+                    .struct_name_index_map(module_storage)
+                    .struct_id_from_idx(idx);
+
                 module_store.get_struct_type_by_identifier(&struct_name.name, &struct_name.module)
             },
-            Loader::V2(_) => module_storage.fetch_struct_ty(
-                struct_name.module.address(),
-                struct_name.module.name(),
-                struct_name.name.as_ident_str(),
-            ),
+            Loader::V2(_) => module_storage.fetch_struct_ty(idx),
         }
     }
 }
@@ -372,7 +350,7 @@ pub(crate) struct LoaderV1 {
     scripts: RwLock<ScriptCache>,
     type_cache: TypeTagCache,
     natives: NativeFunctions,
-    pub(crate) name_cache: StructNameIndexMap,
+    pub(crate) name_cache: IndexMapManager,
 
     // The below field supports a hack to workaround well-known issues with the
     // loader cache. This cache is not designed to support module upgrade or deletion.
@@ -413,7 +391,7 @@ impl Clone for LoaderV1 {
             scripts: RwLock::new(self.scripts.read().clone()),
             type_cache: self.type_cache.clone(),
             natives: self.natives.clone(),
-            name_cache: self.name_cache.clone(),
+            name_cache: IndexMapManager::new(),
             invalidated: RwLock::new(*self.invalidated.read()),
             module_cache_hits: RwLock::new(self.module_cache_hits.read().clone()),
             vm_config: self.vm_config.clone(),
@@ -436,27 +414,28 @@ impl LoaderV1 {
 
     pub(crate) fn check_script_dependencies_and_check_gas(
         &self,
-        module_store: &LegacyModuleStorageAdapter,
+        _module_store: &LegacyModuleStorageAdapter,
         data_store: &mut TransactionDataCache,
-        gas_meter: &mut impl GasMeter,
+        _gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         script_blob: &[u8],
     ) -> VMResult<()> {
         let script =
             data_store.load_compiled_script_to_cache(script_blob, sha3_256(script_blob))?;
-        let script = traversal_context.referenced_scripts.alloc(script);
+        let _script = traversal_context.referenced_scripts.alloc(script);
 
-        // TODO(Gas): Should we charge dependency gas for the script itself?
-        self.check_dependencies_and_charge_gas(
-            module_store,
-            data_store,
-            gas_meter,
-            &mut traversal_context.visited,
-            traversal_context.referenced_modules,
-            script.immediate_dependencies_iter(),
-        )?;
-
-        Ok(())
+        unimplemented!()
+        // // TODO(Gas): Should we charge dependency gas for the script itself?
+        // self.check_dependencies_and_charge_gas(
+        //     module_store,
+        //     data_store,
+        //     gas_meter,
+        //     &mut traversal_context.visited,
+        //     traversal_context.referenced_modules,
+        //     script.immediate_dependencies_iter(),
+        // )?;
+        //
+        // Ok(())
     }
 
     // Scripts are verified and dependencies are loaded.
@@ -476,20 +455,21 @@ impl LoaderV1 {
     ) -> VMResult<LoadedFunction> {
         // Retrieve or load the script.
         let hash_value = sha3_256(script_blob);
-        let mut scripts = self.scripts.write();
+        let scripts = self.scripts.write();
         let script = match scripts.get(&hash_value) {
             Some(cached) => cached,
             None => {
-                let ver_script = self.deserialize_and_verify_script(
-                    script_blob,
-                    hash_value,
-                    data_store,
-                    module_store,
-                )?;
-
-                let script = Script::new(ver_script, &self.name_cache)
-                    .map_err(|e| e.finish(Location::Script))?;
-                scripts.insert(hash_value, script)
+                unimplemented!()
+                // let ver_script = self.deserialize_and_verify_script(
+                //     script_blob,
+                //     hash_value,
+                //     data_store,
+                //     module_store,
+                // )?;
+                //
+                // let script = Script::new(ver_script, &self.name_cache)
+                //     .map_err(|e| e.finish(Location::Script))?;
+                // scripts.insert(hash_value, script)
             },
         };
 
@@ -518,6 +498,7 @@ impl LoaderV1 {
     // So when publishing modules through the dependency DAG it may happen that a different
     // thread had loaded the module after this process fetched it from storage.
     // Caching will take care of that by asking for each dependency module again under lock.
+    #[allow(dead_code)]
     fn deserialize_and_verify_script(
         &self,
         script: &[u8],
@@ -541,7 +522,10 @@ impl LoaderV1 {
             .into_iter()
             .map(|module_id| self.load_module(&module_id, data_store, module_store))
             .collect::<VMResult<Vec<_>>>()?;
-        dependencies::verify_script(&script, loaded_deps.iter().map(|m| m.as_ref().as_ref()))?;
+        dependencies::verify_script(
+            &script,
+            loaded_deps.iter().map(|m| m.compiled_module.as_ref()),
+        )?;
         Ok(script)
     }
 
@@ -557,16 +541,14 @@ impl Loader {
     // The type parameters are verified with capabilities.
     pub(crate) fn load_function_with_type_arg_inference(
         &self,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
+        function_idx: &FunctionIdx,
         expected_return_type: &Type,
         data_store: &mut TransactionDataCache,
         module_store: &LegacyModuleStorageAdapter,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<LoadedFunction> {
         let (module, function) = self.load_function_without_type_args(
-            module_id,
-            function_name,
+            function_idx,
             data_store,
             module_store,
             module_storage,
@@ -603,7 +585,7 @@ impl Loader {
         }
 
         Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
-            .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
+            .map_err(|e| e.finish(Location::Undefined))?;
 
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),
@@ -616,8 +598,7 @@ impl Loader {
     // Type parameters are checked as well after every type is loaded.
     pub(crate) fn load_function(
         &self,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
+        function_idx: &FunctionIdx,
         ty_args: &[TypeTag],
         data_store: &mut TransactionDataCache,
         module_store: &LegacyModuleStorageAdapter,
@@ -626,8 +607,7 @@ impl Loader {
         let _timer = VM_TIMER.timer_with_label("Loader::load_function");
 
         let (module, function) = self.load_function_without_type_args(
-            module_id,
-            function_name,
+            function_idx,
             data_store,
             module_store,
             module_storage,
@@ -645,8 +625,13 @@ impl Loader {
                 err
             })?;
 
-        Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
-            .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
+        Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args).map_err(|err| {
+            let module_id = module_storage
+                .runtime_environment()
+                .struct_name_index_map()
+                .module_id_from_idx(function_idx);
+            err.finish(Location::Module(module_id))
+        })?;
 
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),
@@ -770,7 +755,7 @@ impl LoaderV1 {
                     .or_else(|| {
                         module_store
                             .module_at(module_id)
-                            .map(|m| m.module.immediate_dependencies())
+                            .map(|m| m.compiled_module.immediate_dependencies())
                     })
                     .ok_or_else(|| PartialVMError::new(StatusCode::MISSING_DEPENDENCY))
             },
@@ -789,7 +774,7 @@ impl LoaderV1 {
                         .or_else(|| {
                             module_store
                                 .module_at(module_id)
-                                .map(|m| m.module.immediate_friends())
+                                .map(|m| m.compiled_module.immediate_friends())
                         })
                         .ok_or_else(|| PartialVMError::new(StatusCode::MISSING_DEPENDENCY))
                 }
@@ -833,70 +818,71 @@ impl LoaderV1 {
     /// performance.
     ///
     /// TODO: Revisit the order of traversal. Consider switching to alphabetical order.
+    #[allow(dead_code)]
     pub(crate) fn check_dependencies_and_charge_gas<'a, I>(
         &self,
-        module_store: &LegacyModuleStorageAdapter,
-        data_store: &mut TransactionDataCache,
-        gas_meter: &mut impl GasMeter,
-        visited: &mut BTreeMap<(&'a AccountAddress, &'a IdentStr), ()>,
-        referenced_modules: &'a Arena<Arc<CompiledModule>>,
-        ids: I,
+        _imodule_store: &LegacyModuleStorageAdapter,
+        _idata_store: &mut TransactionDataCache,
+        _igas_meter: &mut impl GasMeter,
+        _ivisited: &mut BTreeMap<(&'a AccountAddress, &'a Identifier), ()>,
+        _ireferenced_modules: &'a Arena<Arc<CompiledModule>>,
+        _ids: I,
     ) -> VMResult<()>
     where
-        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
+        I: IntoIterator<Item = (&'a AccountAddress, &'a Identifier)>,
         I::IntoIter: DoubleEndedIterator,
     {
         // Initialize the work list (stack) and the map of visited modules.
         //
         // TODO: Determine the reserved capacity based on the max number of dependencies allowed.
-        let mut stack = Vec::with_capacity(512);
-
-        for (addr, name) in ids.into_iter().rev() {
-            // TODO: Allow the check of special addresses to be customized.
-            if !addr.is_special() && visited.insert((addr, name), ()).is_none() {
-                stack.push((addr, name, true));
-            }
-        }
-
-        while let Some((addr, name, allow_loading_failure)) = stack.pop() {
-            // Load and deserialize the module only if it has not been cached by the loader.
-            // Otherwise, this will cause a significant regression in performance.
-            let (module, size) = match module_store.module_at_by_ref(addr, name) {
-                Some(module) => (module.module.clone(), module.size),
-                None => {
-                    let (module, size, _) = data_store.load_compiled_module_to_cache(
-                        ModuleId::new(*addr, name.to_owned()),
-                        allow_loading_failure,
-                    )?;
-                    (module, size)
-                },
-            };
-
-            // Extend the lifetime of the module to the remainder of the function body
-            // by storing it in an arena.
-            //
-            // This is needed because we need to store references derived from it in the
-            // work list.
-            let module = referenced_modules.alloc(module);
-
-            gas_meter
-                .charge_dependency(false, addr, name, NumBytes::new(size as u64))
-                .map_err(|err| {
-                    err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
-                })?;
-
-            // Explore all dependencies and friends that have been visited yet.
-            for (addr, name) in module
-                .immediate_dependencies_iter()
-                .chain(module.immediate_friends_iter())
-                .rev()
-            {
-                // TODO: Allow the check of special addresses to be customized.
-                if !addr.is_special() && visited.insert((addr, name), ()).is_none() {
-                    stack.push((addr, name, false));
-                }
-            }
-        }
+        // let mut stack = Vec::with_capacity(512);
+        //
+        // for (addr, name) in ids.into_iter().rev() {
+        //     // TODO: Allow the check of special addresses to be customized.
+        //     if !addr.is_special() && visited.insert((addr, name), ()).is_none() {
+        //         stack.push((addr, name, true));
+        //     }
+        // }
+        //
+        // while let Some((addr, name, allow_loading_failure)) = stack.pop() {
+        //     // Load and deserialize the module only if it has not been cached by the loader.
+        //     // Otherwise, this will cause a significant regression in performance.
+        //     let (module, size) = match module_store.module_at_by_ref(addr, name) {
+        //         Some(module) => (module.module.clone(), module.size),
+        //         None => {
+        //             let (module, size, _) = data_store.load_compiled_module_to_cache(
+        //                 ModuleId::new(*addr, name.to_owned()),
+        //                 allow_loading_failure,
+        //             )?;
+        //             (module, size)
+        //         },
+        //     };
+        //
+        //     // Extend the lifetime of the module to the remainder of the function body
+        //     // by storing it in an arena.
+        //     //
+        //     // This is needed because we need to store references derived from it in the
+        //     // work list.
+        //     let module = referenced_modules.alloc(module);
+        //
+        //     gas_meter
+        //         .charge_dependency(false, addr, name, NumBytes::new(size as u64))
+        //         .map_err(|err| {
+        //             err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
+        //         })?;
+        //
+        //     // Explore all dependencies and friends that have been visited yet.
+        //     for (addr, name) in module
+        //         .immediate_dependencies_iter()
+        //         .chain(module.immediate_friends_iter())
+        //         .rev()
+        //     {
+        //         // TODO: Allow the check of special addresses to be customized.
+        //         if !addr.is_special() && visited.insert((addr, name), ()).is_none() {
+        //             stack.push((addr, name, false));
+        //         }
+        //     }
+        // }
 
         Ok(())
     }
@@ -929,7 +915,7 @@ impl LoaderV1 {
 
         // verify that the transitive closure does not have cycles
         self.verify_module_cyclic_relations(
-            &module_ref,
+            &module_ref.compiled_module,
             &BTreeMap::new(),
             &BTreeSet::new(),
             module_store,
@@ -1057,7 +1043,7 @@ impl LoaderV1 {
         // once all dependencies are loaded, do the linking check
         let all_imm_deps = bundle_deps
             .into_iter()
-            .chain(cached_deps.iter().map(|m| m.as_ref().as_ref()));
+            .chain(cached_deps.iter().map(|m| m.compiled_module.as_ref()));
         let result = dependencies::verify_module(module, all_imm_deps);
 
         // if dependencies loading is not allowed to fail, the linking should not fail as well
@@ -1169,12 +1155,12 @@ enum BinaryType {
 // A Resolver is a simple and small structure allocated on the stack and used by the
 // interpreter. It's the only API known to the interpreter and it's tailored to the interpreter
 // needs.
-pub(crate) struct Resolver<'a> {
+pub struct Resolver<'a> {
     loader: &'a Loader,
     module_store: &'a LegacyModuleStorageAdapter,
     binary: BinaryType,
 
-    module_storage: &'a dyn ModuleStorage,
+    pub module_storage: &'a dyn ModuleStorage,
 }
 
 impl<'a> Resolver<'a> {
@@ -1214,8 +1200,8 @@ impl<'a> Resolver<'a> {
 
     pub(crate) fn constant_at(&self, idx: ConstantPoolIndex) -> &Constant {
         match &self.binary {
-            BinaryType::Module(module) => module.module.constant_at(idx),
-            BinaryType::Script(script) => script.script.constant_at(idx),
+            BinaryType::Module(module) => module.compiled_module.constant_at(idx),
+            BinaryType::Script(script) => script.compiled_script.constant_at(idx),
         }
     }
 
@@ -1242,12 +1228,9 @@ macro_rules! build_loaded_function {
                                 function: function.clone(),
                             }))
                         },
-                        FunctionHandle::Remote { module, name } => self
-                            .build_loaded_function_from_name_and_ty_args(
-                                module,
-                                name,
-                                verified_ty_args,
-                            ),
+                        FunctionHandle::Remote { idx } => {
+                            self.build_loaded_function_from_name_and_ty_args(idx, verified_ty_args)
+                        },
                     }
                 },
                 BinaryType::Script(script) => {
@@ -1257,12 +1240,9 @@ macro_rules! build_loaded_function {
                             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                         )
                         .with_message("Scripts never have local functions".to_string())),
-                        FunctionHandle::Remote { module, name } => self
-                            .build_loaded_function_from_name_and_ty_args(
-                                module,
-                                name,
-                                verified_ty_args,
-                            ),
+                        FunctionHandle::Remote { idx } => {
+                            self.build_loaded_function_from_name_and_ty_args(idx, verified_ty_args)
+                        },
                     }
                 },
             }
@@ -1285,28 +1265,21 @@ impl<'a> Resolver<'a> {
 
     pub(crate) fn build_loaded_function_from_name_and_ty_args(
         &self,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
+        idx: &FunctionIdx,
         verified_ty_args: Vec<Type>,
     ) -> PartialVMResult<LoadedFunction> {
         let (module, function) = match self.loader() {
-            Loader::V1(_) => self
-                .module_store
-                .resolve_module_and_function_by_name(module_id, function_name)?,
-            Loader::V2(_) => self
-                .module_storage
-                .fetch_function_definition(module_id.address(), module_id.name(), function_name)
-                .map_err(|_| {
-                    // Note: legacy loader implementation used this error, so we need to remap.
-                    PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
-                        format!(
-                            "Module or function do not exist for {}::{}::{}",
-                            module_id.address(),
-                            module_id.name(),
-                            function_name
-                        ),
-                    )
-                })?,
+            Loader::V1(_) => unimplemented!(),
+            Loader::V2(_) => {
+                self.module_storage
+                    .fetch_function_definition(idx)
+                    .map_err(|_| {
+                        // Note: legacy loader implementation used this error, so we need to remap.
+                        PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
+                            format!("Module or function do not exist for {}::{}::{}", 0, 1, 2),
+                        )
+                    })?
+            },
         };
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),
@@ -1715,7 +1688,7 @@ impl PseudoGasContext {
 impl LoaderV1 {
     fn struct_name_to_type_tag(
         &self,
-        struct_name_idx: StructNameIndex,
+        struct_name_idx: StructIdx,
         ty_args: &[Type],
         gas_context: &mut PseudoGasContext,
     ) -> PartialVMResult<StructTag> {
@@ -1732,7 +1705,7 @@ impl LoaderV1 {
             .collect::<PartialVMResult<Vec<_>>>()?;
         let struct_tag = self
             .name_cache
-            .idx_to_struct_tag(struct_name_idx, type_args)?;
+            .struct_tag_from_idx(&struct_name_idx, type_args);
 
         gas_context.charge_struct_tag(&struct_tag)?;
 
@@ -1803,12 +1776,12 @@ impl Loader {
 
     pub(crate) fn calculate_depth_of_struct(
         &self,
-        struct_name_idx: StructNameIndex,
+        struct_name_idx: &StructIdx,
         module_store: &LegacyModuleStorageAdapter,
         module_storage: &dyn ModuleStorage,
-        visited_cache: &mut HashMap<StructNameIndex, DepthFormula>,
+        visited_cache: &mut HashMap<StructIdx, DepthFormula>,
     ) -> PartialVMResult<DepthFormula> {
-        if let Some(depth_formula) = visited_cache.get(&struct_name_idx) {
+        if let Some(depth_formula) = visited_cache.get(struct_name_idx) {
             return Ok(depth_formula.clone());
         }
 
@@ -1842,18 +1815,18 @@ impl Loader {
 
         let formula = DepthFormula::normalize(formulas);
         if visited_cache
-            .insert(struct_name_idx, formula.clone())
+            .insert(*struct_name_idx, formula.clone())
             .is_some()
         {
             // Same thread has put this entry previously, which means there is a recursion.
             let struct_name = self
                 .struct_name_index_map(module_storage)
-                .idx_to_struct_name_ref(struct_name_idx)?;
+                .struct_id_from_idx(struct_name_idx);
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
                     format!(
                         "Depth formula for struct '{}' is already cached by the same thread",
-                        struct_name.as_ref(),
+                        struct_name,
                     ),
                 ),
             );
@@ -1866,7 +1839,7 @@ impl Loader {
         ty: &Type,
         module_store: &LegacyModuleStorageAdapter,
         module_storage: &dyn ModuleStorage,
-        visited_cache: &mut HashMap<StructNameIndex, DepthFormula>,
+        visited_cache: &mut HashMap<StructIdx, DepthFormula>,
     ) -> PartialVMResult<DepthFormula> {
         Ok(match ty {
             Type::Bool
@@ -1893,7 +1866,7 @@ impl Loader {
             Type::TyParam(ty_idx) => DepthFormula::type_parameter(*ty_idx),
             Type::Struct { idx, .. } => {
                 let mut struct_formula = self.calculate_depth_of_struct(
-                    *idx,
+                    idx,
                     module_store,
                     module_storage,
                     visited_cache,
@@ -1920,7 +1893,7 @@ impl Loader {
                     })
                     .collect::<PartialVMResult<BTreeMap<_, _>>>()?;
                 let struct_formula = self.calculate_depth_of_struct(
-                    *idx,
+                    idx,
                     module_store,
                     module_storage,
                     visited_cache,

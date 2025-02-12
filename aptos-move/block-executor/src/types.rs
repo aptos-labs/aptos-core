@@ -2,25 +2,26 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::transaction::BlockExecutableTransaction as Transaction;
-use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use move_vm_types::{delayed_values::delayed_field_id::DelayedFieldID, indices::ModuleIdx};
 use std::{collections::HashSet, fmt};
 
 #[derive(Eq, Hash, PartialEq, Debug)]
-pub enum InputOutputKey<K, T> {
+pub enum InputOutputKey<K, Q, T> {
     Resource(K),
+    Module(Q),
     Group(K, T),
     DelayedField(DelayedFieldID),
 }
 
 pub struct ReadWriteSummary<T: Transaction> {
-    reads: HashSet<InputOutputKey<T::Key, T::Tag>>,
-    writes: HashSet<InputOutputKey<T::Key, T::Tag>>,
+    reads: HashSet<InputOutputKey<T::Key, ModuleIdx, T::Tag>>,
+    writes: HashSet<InputOutputKey<T::Key, ModuleIdx, T::Tag>>,
 }
 
 impl<T: Transaction> ReadWriteSummary<T> {
     pub fn new(
-        reads: HashSet<InputOutputKey<T::Key, T::Tag>>,
-        writes: HashSet<InputOutputKey<T::Key, T::Tag>>,
+        reads: HashSet<InputOutputKey<T::Key, ModuleIdx, T::Tag>>,
+        writes: HashSet<InputOutputKey<T::Key, ModuleIdx, T::Tag>>,
     ) -> Self {
         Self { reads, writes }
     }
@@ -30,8 +31,9 @@ impl<T: Transaction> ReadWriteSummary<T> {
     }
 
     pub fn collapse_resource_group_conflicts(self) -> Self {
-        let collapse = |k: InputOutputKey<T::Key, T::Tag>| match k {
+        let collapse = |k: InputOutputKey<T::Key, ModuleIdx, T::Tag>| match k {
             InputOutputKey::Resource(k) => InputOutputKey::Resource(k),
+            InputOutputKey::Module(k) => InputOutputKey::Module(k),
             InputOutputKey::Group(k, _) => InputOutputKey::Resource(k),
             InputOutputKey::DelayedField(id) => InputOutputKey::DelayedField(id),
         };

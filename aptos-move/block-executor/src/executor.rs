@@ -55,10 +55,11 @@ use bytes::Bytes;
 use claims::assert_none;
 use core::panic;
 use fail::fail_point;
-use move_binary_format::CompiledModule;
-use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
-use move_vm_types::{code::ModuleCache, delayed_values::delayed_field_id::DelayedFieldID};
+use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
+use move_vm_runtime::{DeserializedModule, Module, RuntimeEnvironment, WithRuntimeEnvironment};
+use move_vm_types::{
+    code::ModuleCache, delayed_values::delayed_field_id::DelayedFieldID, indices::ModuleIdx,
+};
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
@@ -117,8 +118,8 @@ where
         executor: &E,
         base_view: &S,
         global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
+            ModuleIdx,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >,
@@ -399,8 +400,8 @@ where
         idx_to_validate: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
+            ModuleIdx,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >,
@@ -567,8 +568,8 @@ where
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         base_view: &S,
         global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
+            ModuleIdx,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >,
@@ -759,8 +760,8 @@ where
         txn_idx: TxnIndex,
         module_write_set: BTreeMap<T::Key, ModuleWrite<T::Value>>,
         global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
+            ModuleIdx,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >,
@@ -845,8 +846,8 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         base_view: &S,
         global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
+            ModuleIdx,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >,
@@ -956,8 +957,8 @@ where
         // TODO: should not need to pass base view.
         base_view: &S,
         global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
+            ModuleIdx,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >,
@@ -1218,20 +1219,20 @@ where
         txn_idx: TxnIndex,
         runtime_environment: &RuntimeEnvironment,
         global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
+            ModuleIdx,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >,
         per_block_module_cache: &impl ModuleCache<
-            Key = ModuleId,
-            Deserialized = CompiledModule,
+            Key = ModuleIdx,
+            Deserialized = DeserializedModule,
             Verified = Module,
             Extension = AptosModuleExtension,
             Version = Option<TxnIndex>,
         >,
     ) -> Result<(), PanicError> {
-        let (id, write_op) = write.unpack();
+        let (idx, write_op) = write.unpack();
 
         let state_value = write_op.as_state_value().ok_or_else(|| {
             PanicError::CodeInvariantError("Modules cannot be deleted".to_string())
@@ -1247,16 +1248,13 @@ where
             })?;
         let extension = Arc::new(AptosModuleExtension::new(state_value));
 
-        global_module_cache.mark_overridden(&id);
+        global_module_cache.mark_overridden(&idx);
         per_block_module_cache
-            .insert_deserialized_module(id.clone(), compiled_module, extension, Some(txn_idx))
+            .insert_deserialized_module(idx, compiled_module, extension, Some(txn_idx))
             .map_err(|err| {
                 let msg = format!(
                     "Failed to insert code for module {}::{} at version {} to module cache: {:?}",
-                    id.address(),
-                    id.name(),
-                    txn_idx,
-                    err
+                    0, 0, txn_idx, err
                 );
                 PanicError::CodeInvariantError(msg)
             })?;
@@ -1267,8 +1265,8 @@ where
         txn_idx: TxnIndex,
         runtime_environment: &RuntimeEnvironment,
         global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
+            ModuleIdx,
+            DeserializedModule,
             Module,
             AptosModuleExtension,
         >,

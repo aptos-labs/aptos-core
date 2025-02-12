@@ -24,13 +24,13 @@ use move_core_types::{
         AbstractMemorySize, GasQuantity, InternalGas, InternalGasPerAbstractMemoryUnit,
         InternalGasUnit, NumArgs, NumBytes, NumTypeNodes, ToUnit,
     },
-    identifier::IdentStr,
     language_storage::ModuleId,
     u256,
     vm_status::StatusCode,
 };
 use move_vm_types::{
     gas::{GasMeter, SimpleInstruction},
+    indices::ModuleIdx,
     views::{TypeView, ValueView},
 };
 use once_cell::sync::Lazy;
@@ -516,8 +516,7 @@ impl GasMeter for GasStatus {
     fn charge_dependency(
         &mut self,
         _is_new: bool,
-        _addr: &AccountAddress,
-        _name: &IdentStr,
+        _idx: &ModuleIdx,
         _size: NumBytes,
     ) -> PartialVMResult<()> {
         Ok(())

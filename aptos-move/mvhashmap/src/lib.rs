@@ -12,10 +12,11 @@ use aptos_types::{
     vm::modules::AptosModuleExtension,
     write_set::TransactionWrite,
 };
-use move_binary_format::{file_format::CompiledScript, CompiledModule};
-use move_core_types::language_storage::ModuleId;
-use move_vm_runtime::{Module, Script};
-use move_vm_types::code::{ModuleCache, ModuleCode, SyncModuleCache, SyncScriptCache};
+use move_vm_runtime::{DeserializedModule, DeserializedScript, Module, Script};
+use move_vm_types::{
+    code::{ModuleCache, ModuleCode, SyncModuleCache, SyncScriptCache},
+    indices::ModuleIdx,
+};
 use serde::Serialize;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 
@@ -46,9 +47,14 @@ pub struct MVHashMap<K, T, V: TransactionWrite, I: Clone> {
     #[deprecated]
     deprecated_modules: VersionedModules<K, V, ExecutableTestType>,
 
-    module_cache:
-        SyncModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>,
-    script_cache: SyncScriptCache<[u8; 32], CompiledScript, Script>,
+    module_cache: SyncModuleCache<
+        ModuleIdx,
+        DeserializedModule,
+        Module,
+        AptosModuleExtension,
+        Option<TxnIndex>,
+    >,
+    script_cache: SyncScriptCache<[u8; 32], DeserializedScript, Script>,
 }
 
 impl<K, T, V, I> MVHashMap<K, T, V, I>
@@ -111,8 +117,13 @@ where
     /// 2) committed modules.
     pub fn module_cache(
         &self,
-    ) -> &SyncModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>
-    {
+    ) -> &SyncModuleCache<
+        ModuleIdx,
+        DeserializedModule,
+        Module,
+        AptosModuleExtension,
+        Option<TxnIndex>,
+    > {
         &self.module_cache
     }
 
@@ -121,15 +132,15 @@ where
         &mut self,
     ) -> impl Iterator<
         Item = (
-            ModuleId,
-            Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension>>,
+            ModuleIdx,
+            Arc<ModuleCode<DeserializedModule, Module, AptosModuleExtension>>,
         ),
     > {
         self.module_cache.take_modules_iter()
     }
 
     /// Returns the script cache.
-    pub fn script_cache(&self) -> &SyncScriptCache<[u8; 32], CompiledScript, Script> {
+    pub fn script_cache(&self) -> &SyncScriptCache<[u8; 32], DeserializedScript, Script> {
         &self.script_cache
     }
 }

@@ -370,7 +370,10 @@ impl Function {
     /// Create a `Function` for function named `func_name` in module `m`.
     pub fn new_from_name(m: &CompiledModule, func_name: &IdentStr) -> Option<Self> {
         for func_defs in &m.function_defs {
-            if m.identifier_at(m.function_handle_at(func_defs.function).name) == func_name {
+            if m.identifier_at(m.function_handle_at(func_defs.function).name)
+                .as_ident_str()
+                == func_name
+            {
                 return Some(Self::new(m, func_defs).1);
             }
         }
