@@ -136,14 +136,24 @@ fn friend_remove_entry_failure(use_new_checker: bool, stateless_account: bool) {
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
 
-#[rstest(use_new_checker, case(false), case(true))]
-fn friend_remove_failure(use_new_checker: bool) {
+#[rstest(use_new_checker, stateless_account,
+    case(true, true), 
+    case(true, false),
+    case(false, true), 
+    case(false, false),
+)]
+fn friend_remove_failure(use_new_checker: bool, stateless_account: bool) {
     let result = check_upgrade("public(friend) entry fun f(){}", "", use_new_checker, stateless_account);
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
 
-#[rstest(use_new_checker, case(false), case(true))]
-fn friend_entry_change_sig_failure(use_new_checker: bool) {
+#[rstest(use_new_checker, stateless_account,
+    case(true, true), 
+    case(true, false),
+    case(false, true), 
+    case(false, false),
+)]
+fn friend_entry_change_sig_failure(use_new_checker: bool, stateless_account: bool) {
     let result = check_upgrade(
         "public(friend) entry fun f(){}",
         "public(friend) entry fun f(_s: &signer){}",

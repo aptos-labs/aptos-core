@@ -82,7 +82,7 @@ fn abort_info() -> impl Fn(TransactionStatus) {
 }
 
 fn fail(tests: Vec<(&str, Vec<Vec<u8>>, impl Fn(TransactionStatus))>, stateless_account: bool) {
-    fail_generic(vec![], tests, stateles_account)
+    fail_generic(vec![], tests, stateless_account)
 }
 
 fn fail_generic(
@@ -428,7 +428,7 @@ fn string_args_chopped(stateless_account: bool) {
             "0xcafe::test::str_vec",
             args,
             deserialization_failure(),
-        )], stateless_acount);
+        )], stateless_account);
         i /= 2;
     }
 }

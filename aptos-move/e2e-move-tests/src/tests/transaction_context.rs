@@ -313,12 +313,15 @@ fn test_transaction_context_secondary_signers_empty(stateless_account: bool) {
     assert_eq!(secondary_signers, vec![]);
 }
 
-#[test]
-fn test_transaction_context_gas_payer_as_separate_account() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn test_transaction_context_gas_payer_as_separate_account(stateless_account: bool) {
     let mut harness = new_move_harness();
 
     let alice = setup(&mut harness, stateless_account);
-    let bob = harness.new_account_with_balance_and_sequence_number(1000000, 0);
+    let bob = harness.new_account_with_balance_and_sequence_number(1000000, if stateless_account { None } else { Some(0) });
 
     let fun: MemberId =
         str::parse("0x1::transaction_context_test::store_gas_payer_from_native_txn_context")
@@ -335,13 +338,17 @@ fn test_transaction_context_gas_payer_as_separate_account() {
         ty_args,
         args,
     ));
-    let transaction = TransactionBuilder::new(alice.clone())
+    let mut transaction_builder = TransactionBuilder::new(alice.clone())
         .fee_payer(bob.clone())
         .payload(payload)
-        .sequence_number(harness.sequence_number(alice.address()))
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
-        .sign_fee_payer();
+        .upgrade_payload(harness.use_txn_payload_v2_format, harness.enable_orderless_transactions);
+    if !harness.enable_orderless_transactions {
+        transaction_builder = transaction_builder
+                .sequence_number(harness.sequence_number_opt(alice.address()).unwrap());
+    }
+    let transaction = transaction_builder.sign_fee_payer();
 
     let output = harness.run_raw(transaction);
     assert_success!(*output.status());
@@ -385,13 +392,17 @@ fn test_transaction_context_secondary_signers(alice_stateless_account: bool, bob
         ty_args,
         args,
     ));
-    let transaction = TransactionBuilder::new(alice.clone())
+    let mut transaction_builder = TransactionBuilder::new(alice.clone())
         .secondary_signers(vec![bob.clone()])
         .payload(payload)
-        .sequence_number(harness.sequence_number(alice.address()))
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
-        .sign_multi_agent();
+        .upgrade_payload(harness.use_txn_payload_v2_format, harness.enable_orderless_transactions);
+    if !harness.enable_orderless_transactions {
+        transaction_builder = transaction_builder
+                .sequence_number(harness.sequence_number_opt(alice.address()).unwrap());
+    }
+    let transaction = transaction_builder.sign_multi_agent();
 
     let output = harness.run_raw(transaction);
     assert_success!(*output.status());

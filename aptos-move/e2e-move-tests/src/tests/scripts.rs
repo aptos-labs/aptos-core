@@ -9,6 +9,7 @@ use aptos_types::{
     transaction::{Script, TransactionArgument, TransactionStatus},
 };
 use move_core_types::{language_storage::TypeTag, value::MoveValue};
+use rstest::rstest;
 
 #[rstest(alice_stateless_account, bob_stateless_account,
     case(true, true),

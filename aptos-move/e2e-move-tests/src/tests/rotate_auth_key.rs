@@ -32,7 +32,7 @@ use rstest::rstest;
 fn rotate_auth_key_ed25519_to_ed25519(stateless_account1: bool, stateless_account2: bool) {
     let mut harness = MoveHarness::new();
     let account1 = harness.new_account_with_key_pair(if stateless_account1 { None } else { Some(10) });
-    let account2 = harness.new_account_with_key_pair(if statless_account2 { None } else { Some(10) });
+    let account2 = harness.new_account_with_key_pair(if stateless_account2 { None } else { Some(10) });
 
     // assert that the payload is successfully processed (the signatures are correct)
     assert_successful_key_rotation_transaction(
@@ -92,7 +92,7 @@ fn rotate_auth_key_ed25519_to_multi_ed25519(stateless_account: bool) {
 fn rotate_auth_key_twice(stateless_account1: bool, stateless_account2: bool, stateless_account3: bool) {
     let mut harness = MoveHarness::new();
     let mut account1 = harness.new_account_with_key_pair(if stateless_account1 { None } else { Some(10) });
-    let account2 = harness.new_account_with_key_pair(if statless_account2 { None } else { Some(10) });
+    let account2 = harness.new_account_with_key_pair(if stateless_account2 { None } else { Some(10) });
 
     // assert that the payload is successfully processed (the signatures are correct)
     assert_successful_key_rotation_transaction(
@@ -110,7 +110,7 @@ fn rotate_auth_key_twice(stateless_account1: bool, stateless_account2: bool, sta
     // verify that we can still get to account1's originating address
     verify_originating_address(&mut harness, account1.auth_key(), *account1.address());
 
-    let account3 = harness.new_account_with_key_pair(if statless_account3 { None } else { Some(10) });
+    let account3 = harness.new_account_with_key_pair(if stateless_account3 { None } else { Some(10) });
     assert_successful_key_rotation_transaction(
         0,
         0,

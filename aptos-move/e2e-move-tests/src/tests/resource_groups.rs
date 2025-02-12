@@ -418,7 +418,7 @@ fn test_resource_groups_container_not_enabled(stateless_account: bool) {
 )]
 fn verify_resource_group_member_upgrades(stateless_account: bool) {
     let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), if rstest { None } else { Some(0) });
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), if stateless_account { None } else { Some(0) });
 
     // Initial code
     let source = r#"

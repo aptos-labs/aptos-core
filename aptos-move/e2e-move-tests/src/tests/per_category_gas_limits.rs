@@ -86,7 +86,10 @@ fn io_limit_reached_by_load_resource(stateless_account: bool) {
     assert_vm_status!(res, StatusCode::IO_LIMIT_REACHED);
 }
 
-#[test]
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
 #[ignore = "test needs redesign after 1.9 charging scheme change."]
 fn io_limit_reached_by_new_bytes(stateless_account: bool) {
     let (mut h, acc) = setup(stateless_account);
@@ -107,7 +110,10 @@ fn io_limit_reached_by_new_bytes(stateless_account: bool) {
     });
 }
 
-#[test]
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
 #[ignore = "test needs redesign after 1.9 charging scheme change."]
 fn storage_limit_reached_by_new_bytes(stateless_account: bool) {
     let (mut h, acc) = setup(stateless_account);
