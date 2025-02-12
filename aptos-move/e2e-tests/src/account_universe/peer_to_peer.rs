@@ -34,6 +34,8 @@ impl AUTransactionGen for P2PTransferGen {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
     ) -> (SignedTransaction, (TransactionStatus, u64)) {
         let AccountPair {
             account_1: sender,
@@ -69,7 +71,7 @@ impl AUTransactionGen for P2PTransferGen {
             (true, true, true) => {
                 // Success!
                 if !use_orderless_transactions {
-                    sender.sequence_number += 1;
+                    sender.sequence_number = sender.sequence_number.map_or(Some(1), |seq| Some(seq + 1));
                 }
                 sender.sent_events_count += 1;
                 sender.balance -= to_deduct;
@@ -85,7 +87,7 @@ impl AUTransactionGen for P2PTransferGen {
                 // in the epilogue. The transaction will be run and gas will be deducted from the
                 // sender, but no other changes will happen.
                 if !use_orderless_transactions {
-                    sender.sequence_number += 1;
+                    sender.sequence_number = sender.sequence_number.map_or(Some(1), |seq| Some(seq + 1));
                 }
                 gas_used = sender.peer_to_peer_gas_cost();
                 sender.balance -= gas_used * txn.gas_unit_price();
@@ -105,7 +107,7 @@ impl AUTransactionGen for P2PTransferGen {
                 // Enough to pass validation but not to do the transfer. The transaction will be run
                 // and gas will be deducted from the sender, but no other changes will happen.
                 if !use_orderless_transactions {
-                    sender.sequence_number += 1;
+                    sender.sequence_number = sender.sequence_number.map_or(Some(1), |seq| Some(seq + 1));
                 }
                 gas_used = sender.peer_to_peer_too_low_gas_cost();
                 sender.balance -= gas_used * txn.gas_unit_price();
