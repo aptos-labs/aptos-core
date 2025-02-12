@@ -100,7 +100,7 @@ pub fn setup_network() -> DummyNetwork {
     let listener_peers_and_metadata = PeersAndMetadata::new(&[network_id]);
     let mut listener_connection_events = listener_peers_and_metadata.subscribe();
     // Set up the listener network
-    let network_context = NetworkContext::new(role, network_id, listener_peer.peer_id());
+    let network_context = NetworkContext::new(role, network_id, listener_peer.peer_id(), true);
     let mut network_builder = NetworkBuilder::new_for_test(
         chain_id,
         seeds.clone(),
@@ -132,7 +132,7 @@ pub fn setup_network() -> DummyNetwork {
 
     let peers_and_metadata = PeersAndMetadata::new(&[network_id]);
     // Set up the dialer network
-    let network_context = NetworkContext::new(role, network_id, dialer_peer.peer_id());
+    let network_context = NetworkContext::new(role, network_id, dialer_peer.peer_id(), true);
 
     let mut network_builder = NetworkBuilder::new_for_test(
         chain_id,

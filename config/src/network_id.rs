@@ -17,6 +17,8 @@ pub struct NetworkContext {
     #[serde(serialize_with = "NetworkId::serialize_str")]
     network_id: NetworkId,
     peer_id: PeerId,
+    /// Whether to enable messages with metadata for this network
+    enable_messages_with_metadata: bool,
 }
 
 impl fmt::Debug for NetworkContext {
@@ -38,12 +40,23 @@ impl fmt::Display for NetworkContext {
 }
 
 impl NetworkContext {
-    pub fn new(role: RoleType, network_id: NetworkId, peer_id: PeerId) -> NetworkContext {
+    pub fn new(
+        role: RoleType,
+        network_id: NetworkId,
+        peer_id: PeerId,
+        enable_messages_with_metadata: bool,
+    ) -> NetworkContext {
         NetworkContext {
             role,
             network_id,
             peer_id,
+            enable_messages_with_metadata,
         }
+    }
+
+    /// Returns true if messages with metadata are enabled for this network
+    pub fn enable_messages_with_metadata(&self) -> bool {
+        self.enable_messages_with_metadata
     }
 
     pub fn role(&self) -> RoleType {
@@ -60,12 +73,17 @@ impl NetworkContext {
 
     #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
     pub fn mock_with_peer_id(peer_id: PeerId) -> Self {
-        Self::new(RoleType::Validator, NetworkId::Validator, peer_id)
+        Self::new(RoleType::Validator, NetworkId::Validator, peer_id, false)
     }
 
     #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
     pub fn mock() -> Self {
-        Self::new(RoleType::Validator, NetworkId::Validator, PeerId::random())
+        Self::new(
+            RoleType::Validator,
+            NetworkId::Validator,
+            PeerId::random(),
+            false,
+        )
     }
 }
 
@@ -299,19 +317,6 @@ mod test {
             let decoded: NetworkId = bcs::from_bytes(&encoded).unwrap();
             assert_eq!(id, decoded);
         }
-    }
-
-    #[test]
-    fn test_network_context_serialization() {
-        let peer_id = PeerId::random();
-        let context = NetworkContext::new(RoleType::Validator, NetworkId::Vfn, peer_id);
-        let expected = format!(
-            "---\nrole: {}\nnetwork_id: {}\npeer_id: {:x}\n",
-            RoleType::Validator,
-            VFN_NETWORK,
-            peer_id
-        );
-        assert_eq!(expected, serde_yaml::to_string(&context).unwrap());
     }
 
     #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]

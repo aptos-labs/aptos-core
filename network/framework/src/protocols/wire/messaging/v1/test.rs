@@ -4,9 +4,15 @@
 
 use super::*;
 use crate::{
-    protocols::stream::{InboundStreamBuffer, OutboundStream, StreamFragment, StreamHeader},
+    protocols::{
+        stream::{InboundStreamBuffer, OutboundStream, StreamFragment, StreamHeader},
+        wire::messaging::v1::metadata::{
+            MessageMetadata, MessageSendType, NetworkMessageWithMetadata, SentMessageMetadata,
+        },
+    },
     testutils::fake_socket::{ReadOnlyTestSocket, ReadWriteTestSocket},
 };
+use aptos_config::network_id::NetworkId;
 use aptos_memsocket::MemorySocket;
 use bcs::test_helpers::assert_canonical_encode_decode;
 use futures::{executor::block_on, future, sink::SinkExt, stream::StreamExt};
@@ -33,12 +39,7 @@ fn error_code() -> bcs::Result<()> {
 
 #[test]
 fn rpc_request() -> bcs::Result<()> {
-    let rpc_request = RpcRequest {
-        request_id: 25,
-        protocol_id: ProtocolId::ConsensusRpcBcs,
-        priority: 0,
-        raw_request: [0, 1, 2, 3].to_vec(),
-    };
+    let rpc_request = RpcRequest::new(ProtocolId::ConsensusRpcBcs, 25, 0, vec![0, 1, 2, 3]);
     assert_eq!(
         bcs::to_bytes(&rpc_request)?,
         // [0] -> protocol_id
@@ -53,11 +54,8 @@ fn rpc_request() -> bcs::Result<()> {
 
 #[test]
 fn stream_message() {
-    let message = NetworkMessage::DirectSendMsg(DirectSendMsg {
-        protocol_id: ProtocolId::MempoolDirectSend,
-        priority: 0,
-        raw_msg: Vec::from("hello world"),
-    });
+    let message =
+        NetworkMessage::new_direct_send(ProtocolId::MempoolDirectSend, Vec::from("hello world"));
     let stream_header = StreamHeader {
         request_id: 42,
         num_fragments: 10,
@@ -78,11 +76,10 @@ fn stream_message() {
 
 #[test]
 fn aptosnet_wire_test_vectors() {
-    let message = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
-        protocol_id: ProtocolId::MempoolDirectSend,
-        priority: 0,
-        raw_msg: Vec::from("hello world"),
-    }));
+    let message = MultiplexMessage::Message(NetworkMessage::new_direct_send(
+        ProtocolId::MempoolDirectSend,
+        Vec::from("hello world"),
+    ));
     let message_bytes = [
         // [0, 0, 0, 16] -> frame length
         // [0] -> multiplex message type
@@ -125,11 +122,10 @@ fn send_fails_when_larger_than_frame_limit() {
 
     // attempting to send an outbound message larger than your frame size will
     // return an Err
-    let message = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
-        protocol_id: ProtocolId::ConsensusRpcBcs,
-        priority: 0,
-        raw_msg: vec![0; 123],
-    }));
+    let message = MultiplexMessage::Message(NetworkMessage::new_direct_send(
+        ProtocolId::ConsensusRpcBcs,
+        vec![0; 80],
+    ));
     block_on(message_tx.send(&message)).unwrap_err();
 }
 
@@ -141,11 +137,10 @@ fn recv_fails_when_larger_than_frame_limit() {
     // receiver will reject the message b/c the frame size is > 64 bytes max
     let mut message_rx = MultiplexMessageStream::new(memsocket_rx, 64);
 
-    let message = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
-        protocol_id: ProtocolId::ConsensusRpcBcs,
-        priority: 0,
-        raw_msg: vec![0; 80],
-    }));
+    let message = MultiplexMessage::Message(NetworkMessage::new_direct_send(
+        ProtocolId::ConsensusRpcBcs,
+        vec![0; 80],
+    ));
     let f_send = message_tx.send(&message);
     let f_recv = message_rx.next();
 
@@ -160,14 +155,9 @@ fn arb_rpc_request(max_frame_size: usize) -> impl Strategy<Value = RpcRequest> {
         any::<Priority>(),
         (0..max_frame_size).prop_map(|size| vec![0u8; size]),
     )
-        .prop_map(
-            |(protocol_id, request_id, priority, raw_request)| RpcRequest {
-                protocol_id,
-                request_id,
-                priority,
-                raw_request,
-            },
-        )
+        .prop_map(|(protocol_id, request_id, priority, raw_request)| {
+            RpcRequest::new(protocol_id, request_id, priority, raw_request)
+        })
 }
 
 fn arb_rpc_response(max_frame_size: usize) -> impl Strategy<Value = RpcResponse> {
@@ -176,10 +166,8 @@ fn arb_rpc_response(max_frame_size: usize) -> impl Strategy<Value = RpcResponse>
         any::<Priority>(),
         (0..max_frame_size).prop_map(|size| vec![0u8; size]),
     )
-        .prop_map(|(request_id, priority, raw_response)| RpcResponse {
-            request_id,
-            priority,
-            raw_response,
+        .prop_map(|(request_id, priority, raw_response)| {
+            RpcResponse::new(request_id, priority, raw_response)
         })
 }
 
@@ -189,19 +177,82 @@ fn arb_direct_send_msg(max_frame_size: usize) -> impl Strategy<Value = DirectSen
         any::<Priority>(),
         (0..max_frame_size).prop_map(|size| vec![0u8; size]),
     );
-    args.prop_map(|(protocol_id, priority, raw_msg)| DirectSendMsg {
-        protocol_id,
-        priority,
-        raw_msg,
+    args.prop_map(|(protocol_id, priority, raw_msg)| {
+        DirectSendMsg::new(protocol_id, priority, raw_msg)
     })
 }
 
-fn arb_network_message(max_frame_size: usize) -> impl Strategy<Value = NetworkMessage> {
+fn arb_rpc_request_and_metadata(
+    max_frame_size: usize,
+) -> impl Strategy<Value = RpcRequestAndMetadata> {
+    (
+        any::<ProtocolId>(),
+        any::<RequestId>(),
+        any::<Priority>(),
+        (0..max_frame_size).prop_map(|size| vec![0u8; size]),
+    )
+        .prop_map(|(protocol_id, request_id, priority, raw_request)| {
+            let message_wire_metadata = MessageWireMetadata::new(
+                protocol_id,
+                priority,
+                Some(SystemTime::now()),
+                Some(SystemTime::now()),
+            );
+            RpcRequestAndMetadata::new(request_id, raw_request, message_wire_metadata)
+        })
+}
+
+fn arb_rpc_response_and_metadata(
+    max_frame_size: usize,
+) -> impl Strategy<Value = RpcResponseAndMetadata> {
+    (
+        any::<ProtocolId>(),
+        any::<RequestId>(),
+        any::<Priority>(),
+        (0..max_frame_size).prop_map(|size| vec![0u8; size]),
+    )
+        .prop_map(|(protocol_id, request_id, priority, raw_response)| {
+            let message_wire_metadata = MessageWireMetadata::new(
+                protocol_id,
+                priority,
+                Some(SystemTime::now()),
+                Some(SystemTime::now()),
+            );
+            RpcResponseAndMetadata::new(request_id, raw_response, message_wire_metadata)
+        })
+}
+
+fn arb_direct_send_and_metadata(
+    max_frame_size: usize,
+) -> impl Strategy<Value = DirectSendAndMetadata> {
+    let args = (
+        any::<ProtocolId>(),
+        any::<Priority>(),
+        (0..max_frame_size).prop_map(|size| vec![0u8; size]),
+    );
+    args.prop_map(|(protocol_id, priority, raw_msg)| {
+        let message_wire_metadata = MessageWireMetadata::new(
+            protocol_id,
+            priority,
+            Some(SystemTime::now()),
+            Some(SystemTime::now()),
+        );
+        DirectSendAndMetadata::new(raw_msg, message_wire_metadata)
+    })
+}
+
+pub fn arb_network_message(max_frame_size: usize) -> impl Strategy<Value = NetworkMessage> {
     prop_oneof![
         any::<ErrorCode>().prop_map(NetworkMessage::Error),
         arb_rpc_request(max_frame_size).prop_map(NetworkMessage::RpcRequest),
         arb_rpc_response(max_frame_size).prop_map(NetworkMessage::RpcResponse),
         arb_direct_send_msg(max_frame_size).prop_map(NetworkMessage::DirectSendMsg),
+        arb_rpc_request_and_metadata(max_frame_size)
+            .prop_map(NetworkMessage::RpcRequestAndMetadata),
+        arb_rpc_response_and_metadata(max_frame_size)
+            .prop_map(NetworkMessage::RpcResponseAndMetadata),
+        arb_direct_send_and_metadata(max_frame_size)
+            .prop_map(NetworkMessage::DirectSendAndMetadata),
     ]
     .prop_filter("larger than max frame size", move |msg| {
         bcs::serialized_size(&msg).unwrap() <= max_frame_size
@@ -212,8 +263,22 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(100))]
 
     #[test]
-    fn network_message_canonical_serialization(message in any::<MultiplexMessage>()) {
-        assert_canonical_encode_decode(message);
+    fn network_message_canonical_serialization(network_message in arb_network_message(64 * 255)) {
+        let multiplex_message = MultiplexMessage::Message(network_message);
+        assert_canonical_encode_decode(multiplex_message);
+    }
+
+    #[test]
+    fn stream_message_canonical_serialization(network_message in arb_network_message(64 * 255), stream_message in any::<StreamMessage>()) {
+        let multiplex_message = if let StreamMessage::Header(header) = &stream_message {
+            // Update the stream network message header to include a well-formed message
+            let mut header = header.clone();
+            header.message = network_message;
+            StreamMessage::Header(header)
+        } else {
+            stream_message
+        };
+        assert_canonical_encode_decode(multiplex_message);
     }
 
     /// Test that MultiplexMessageSink and MultiplexMessageStream can understand each
@@ -242,17 +307,21 @@ proptest! {
         let messages_clone = messages.clone();
         let f_stream_all = async move {
             for message in messages_clone {
-                if outbound_stream.should_stream(&message) {
-                    outbound_stream.stream_message(message).await.unwrap();
+                let sent_message_metadata = SentMessageMetadata::new(NetworkId::Validator, None, MessageSendType::DirectSend, None);
+                let message_metadata = MessageMetadata::new_sent_metadata(sent_message_metadata);
+                let message_with_metadata = NetworkMessageWithMetadata::new(message_metadata, message);
+                if outbound_stream.should_stream(&message_with_metadata) {
+                    outbound_stream.stream_message(message_with_metadata).await.unwrap();
                 } else {
-                    msg_tx.send(MultiplexMessage::Message(message)).await.unwrap();
+                    msg_tx.send(message_with_metadata.into_multiplex_message()).await.unwrap();
                 }
             }
         };
 
         let f_send_all = async {
             let mut stream = select(msg_rx, stream_rx);
-            while let Some(message) = stream.next().await {
+            while let Some(message_with_metadata) = stream.next().await {
+                let (_, message) = message_with_metadata.into_parts();
                 message_tx.send(&message).await.unwrap();
             }
             message_tx.close().await.unwrap();
@@ -272,7 +341,7 @@ proptest! {
                     match msg {
                         StreamMessage::Header(header) => inbound_stream.new_stream(header).unwrap(),
                         StreamMessage::Fragment(fragment) => {
-                            if let Some(network_msg) = inbound_stream.append_fragment(fragment).unwrap() {
+                            if let Some((_, network_msg)) = inbound_stream.append_fragment(fragment).unwrap() {
                                 recv.push(network_msg);
                             }
                         }
