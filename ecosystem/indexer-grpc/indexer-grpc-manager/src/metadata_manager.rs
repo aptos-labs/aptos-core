@@ -1,7 +1,10 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::GrpcAddress;
+use crate::{
+    config::GrpcAddress,
+    metrics::{CONNECTED_INSTANCES, KNOWN_LATEST_VERSION, TIMER},
+};
 use anyhow::{bail, Result};
 use aptos_indexer_grpc_utils::timestamp_now_proto;
 use aptos_protos::{
@@ -147,6 +150,9 @@ impl MetadataManager {
 
     pub(crate) async fn start(&self) -> Result<()> {
         loop {
+            let _timer = TIMER
+                .with_label_values(&["metadata_manager_main_loop"])
+                .start_timer();
             tokio_scoped::scope(|s| {
                 for kv in &self.grpc_managers {
                     let grpc_manager = kv.value();
@@ -205,6 +211,22 @@ impl MetadataManager {
                     }
                 }
             });
+
+            CONNECTED_INSTANCES
+                .with_label_values(&["fullnode"])
+                .set(self.fullnodes.len() as i64);
+
+            CONNECTED_INSTANCES
+                .with_label_values(&["live_data_service"])
+                .set(self.live_data_services.len() as i64);
+
+            CONNECTED_INSTANCES
+                .with_label_values(&["historical_data_service"])
+                .set(self.historical_data_services.len() as i64);
+
+            CONNECTED_INSTANCES
+                .with_label_values(&["grpc_manager"])
+                .set(self.grpc_managers.len() as i64);
 
             // TODO(grao): Remove unreachable services from the map.
 
@@ -267,6 +289,7 @@ impl MetadataManager {
     fn update_known_latest_version(&self, version: u64) {
         self.known_latest_version
             .fetch_max(version, Ordering::SeqCst);
+        KNOWN_LATEST_VERSION.set(version as i64);
     }
 
     async fn heartbeat(&self, mut client: GrpcManagerClient<Channel>) -> Result<()> {
