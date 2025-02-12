@@ -15,9 +15,7 @@ use move_compiler::{command_line::SKIP_ATTRIBUTE_CHECKS, shared::NumericalAddres
 use move_docgen::DocgenOptions;
 use move_errmapgen::ErrmapOptions;
 use move_model::{
-    metadata::{CompilerVersion, LanguageVersion},
-    model::VerificationScope,
-    options::ModelBuilderOptions,
+    metadata::LanguageVersion, model::VerificationScope, options::ModelBuilderOptions,
 };
 use move_prover_boogie_backend::{
     options,
@@ -79,8 +77,6 @@ pub struct Options {
     pub experimental_pipeline: bool,
     /// Whether to skip checking for unknown attributes
     pub skip_attribute_checks: bool,
-    /// Whether to use compiler v2 to compile Move code
-    pub compiler_v2: bool,
     /// The language version to use
     pub language_version: Option<LanguageVersion>,
     /// BEGIN OF STRUCTURED OPTIONS. DO NOT ADD VALUE FIELDS AFTER THIS
@@ -120,10 +116,6 @@ impl Default for Options {
             errmapgen: ErrmapOptions::default(),
             experimental_pipeline: false,
             skip_attribute_checks: false,
-            compiler_v2: match CompilerVersion::default() {
-                CompilerVersion::V1 => false,
-                CompilerVersion::V2_0 | CompilerVersion::V2_1 => true,
-            },
             language_version: Some(LanguageVersion::default()),
         }
     }
@@ -814,9 +806,6 @@ impl Options {
             options
                 .move_named_address_values
                 .push("Extensions=0x1".to_string())
-        }
-        if matches.get_flag("compiler-v2") {
-            options.compiler_v2 = true;
         }
         if matches.contains_id("language-version") {
             options.language_version = matches

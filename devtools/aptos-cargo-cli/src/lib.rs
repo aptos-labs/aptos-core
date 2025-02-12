@@ -25,15 +25,13 @@ const RELEVANT_FILE_PATHS_FOR_COMPILER_V2: [&str; 5] = [
     "aptos-move/move-examples",
     "third_party/move",
 ];
-const NO_MVC_BLOCK_V1_PACKAGES: [&str; 11] = [
+const NO_MVC_BLOCK_V1_PACKAGES: [&str; 9] = [
     "e2e-move-tests", // no block v1 because the meta data test requires using v1
-    "move-prover",
     "move-prover-bytecode-pipeline",
     "move-compiler",
     "move-compiler-transactional-tests",
     "move-compiler-v2-transactional-tests",
     "move-to-yul",
-    "move-vm-integration-tests",
     "move-model",
     "move-stackless-bytecode-test-utils",
     "move-stackless-bytecode",
