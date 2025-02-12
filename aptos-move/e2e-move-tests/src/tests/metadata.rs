@@ -25,9 +25,13 @@ use move_core_types::{
 };
 use move_model::metadata::{CompilationMetadata, CompilerVersion, COMPILATION_METADATA_KEY};
 use std::collections::BTreeMap;
+use rstest::rstest;
 
-#[test]
-fn test_unknown_metadata_key() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn test_unknown_metadata_key(stateless_account: bool) {
     let unknown_key = || {
         let metadata = Metadata {
             key: vec![1, 2, 3, 4, 5],
@@ -35,12 +39,15 @@ fn test_unknown_metadata_key() {
         };
         vec![metadata]
     };
-    let result = test_metadata_with_changes(unknown_key);
+    let result = test_metadata_with_changes(unknown_key, stateless_account);
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 }
 
-#[test]
-fn test_duplicate_entries() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn test_duplicate_entries(stateless_account: bool) {
     let duplicate_same_version = || {
         let metadata = Metadata {
             key: APTOS_METADATA_KEY_V1.to_vec(),
@@ -48,7 +55,7 @@ fn test_duplicate_entries() {
         };
         vec![metadata.clone(), metadata]
     };
-    let result = test_metadata_with_changes(duplicate_same_version);
+    let result = test_metadata_with_changes(duplicate_same_version, stateless_account);
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 
     let duplicate_different_version = || {
@@ -66,12 +73,15 @@ fn test_duplicate_entries() {
         vec![metadata_v1, metadata_v0]
     };
 
-    let result = test_metadata_with_changes(duplicate_different_version);
+    let result = test_metadata_with_changes(duplicate_different_version, stateless_account);
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 }
 
-#[test]
-fn test_malformed_metadata_value() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn test_malformed_metadata_value(stateless_account: bool) {
     let invalid_value = || {
         let metadata = Metadata {
             key: APTOS_METADATA_KEY.to_vec(),
@@ -79,7 +89,7 @@ fn test_malformed_metadata_value() {
         };
         vec![metadata]
     };
-    let result = test_metadata_with_changes(invalid_value);
+    let result = test_metadata_with_changes(invalid_value, stateless_account);
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 
     let v0_to_v1 = || {
@@ -89,7 +99,7 @@ fn test_malformed_metadata_value() {
         };
         vec![metadata]
     };
-    let result = test_metadata_with_changes(v0_to_v1);
+    let result = test_metadata_with_changes(v0_to_v1, stateless_account);
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 
     let v1_to_v0 = || {
@@ -102,13 +112,13 @@ fn test_malformed_metadata_value() {
         };
         vec![metadata]
     };
-    let result = test_metadata_with_changes(v1_to_v0);
+    let result = test_metadata_with_changes(v1_to_v0, stateless_account);
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 }
 
-fn test_metadata_with_changes(f: impl Fn() -> Vec<Metadata>) -> TransactionStatus {
+fn test_metadata_with_changes(f: impl Fn() -> Vec<Metadata>, stateless_account: bool) -> TransactionStatus {
     let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), if stateless_account { None } else { Some(0) });
 
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
@@ -143,8 +153,11 @@ fn test_metadata_with_changes(f: impl Fn() -> Vec<Metadata>) -> TransactionStatu
     )
 }
 
-#[test]
-fn test_duplicate_compilation_metadata_entries() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn test_duplicate_compilation_metadata_entries(stateless_account: bool) {
     let duplicate_compilation_metatdata = || Metadata {
         key: COMPILATION_METADATA_KEY.to_vec(),
         value: bcs::to_bytes(&CompilationMetadata::default()).unwrap(),
@@ -152,11 +165,13 @@ fn test_duplicate_compilation_metadata_entries() {
     let result = test_compilation_metadata_with_changes(
         duplicate_compilation_metatdata,
         CompilerVersion::V2_1,
+        stateless_account,
     );
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
     let result = test_compilation_metadata_with_changes(
         duplicate_compilation_metatdata,
         CompilerVersion::V1,
+        stateless_account,
     );
     assert_success!(result);
 }
@@ -164,9 +179,10 @@ fn test_duplicate_compilation_metadata_entries() {
 fn test_compilation_metadata_with_changes(
     f: impl Fn() -> Metadata,
     compiler_version: CompilerVersion,
+    stateless_account: bool,
 ) -> TransactionStatus {
     let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), if stateless_account { None } else { Some(0) });
 
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
@@ -209,6 +225,7 @@ fn test_compilation_metadata_internal(
     mainnet_flag: bool,
     v2_flag: bool,
     feature_enabled: bool,
+    stateless_account: bool,
 ) -> TransactionStatus {
     let mut h = MoveHarness::new();
     if feature_enabled {
@@ -216,7 +233,7 @@ fn test_compilation_metadata_internal(
     } else {
         h.enable_features(vec![], vec![FeatureFlag::REJECT_UNSTABLE_BYTECODE]);
     }
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), if stateless_account { None } else { Some(0) });
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
         "m.move",
@@ -273,6 +290,7 @@ fn test_compilation_metadata_script_internal(
     mainnet_flag: bool,
     v2_flag: bool,
     feature_enabled: bool,
+    stateless_account: bool,
 ) -> TransactionStatus {
     let mut h = MoveHarness::new();
     if feature_enabled {
@@ -285,7 +303,7 @@ fn test_compilation_metadata_script_internal(
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
         ]);
     }
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), if stateless_account { None } else { Some(0) });
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
         "m.move",
@@ -325,31 +343,37 @@ fn test_compilation_metadata_script_internal(
     }
 }
 
-#[test]
-fn test_compilation_metadata_for_script() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn test_compilation_metadata_for_script(stateless_account: bool) {
     let mut enable_check = true;
     // run compiler v2 code to mainnet
     assert_vm_status!(
-        test_compilation_metadata_script_internal(true, true, enable_check),
+        test_compilation_metadata_script_internal(true, true, enable_check, stateless_account),
         StatusCode::UNSTABLE_BYTECODE_REJECTED
     );
     // run compiler v1 code to mainnet
     assert_success!(test_compilation_metadata_script_internal(
         true,
         false,
-        enable_check
+        enable_check,
+        stateless_account,
     ));
     // run compiler v2 code to test
     assert_success!(test_compilation_metadata_script_internal(
         false,
         true,
-        enable_check
+        enable_check,
+        stateless_account,
     ));
     // run compiler v1 code to test
     assert_success!(test_compilation_metadata_script_internal(
         false,
         false,
-        enable_check
+        enable_check,
+        stateless_account,
     ));
 
     enable_check = false;
@@ -358,79 +382,91 @@ fn test_compilation_metadata_for_script() {
     assert_success!(test_compilation_metadata_script_internal(
         true,
         true,
-        enable_check
+        enable_check,
+        stateless_account,
     ),);
     // run compiler v1 code to mainnet
     assert_success!(test_compilation_metadata_script_internal(
         true,
         false,
-        enable_check
+        enable_check,
+        stateless_account,
     ));
     // run compiler v2 code to test
     // success because the feature flag is turned off
     assert_success!(test_compilation_metadata_script_internal(
         false,
         true,
-        enable_check
+        enable_check,
+        stateless_account,
     ),);
     // run compiler v1 code to test
     assert_success!(test_compilation_metadata_script_internal(
         false,
         false,
-        enable_check
+        enable_check,
+        stateless_account,
     ));
 }
 
-#[test]
-fn test_compilation_metadata() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn test_compilation_metadata(stateless_account: bool) {
     let mut enable_check = true;
     // publish compiler v2 code to mainnet
     assert_vm_status!(
-        test_compilation_metadata_internal(true, true, enable_check),
+        test_compilation_metadata_internal(true, true, enable_check, stateless_account),
         StatusCode::UNSTABLE_BYTECODE_REJECTED
     );
     // publish compiler v1 code to mainnet
     assert_success!(test_compilation_metadata_internal(
         true,
         false,
-        enable_check
+        enable_check,
+        stateless_account,
     ));
     // publish compiler v2 code to test
     assert_success!(test_compilation_metadata_internal(
         false,
         true,
-        enable_check
+        enable_check,
+        stateless_account,
     ));
     // publish compiler v1 code to test
     assert_success!(test_compilation_metadata_internal(
         false,
         false,
-        enable_check
+        enable_check,
+        stateless_account,
     ));
 
     enable_check = false;
     // publish compiler v2 code to mainnet
     // failed because the metadata cannot be recognized
     assert_vm_status!(
-        test_compilation_metadata_internal(true, true, enable_check),
+        test_compilation_metadata_internal(true, true, enable_check, stateless_account),
         CONSTRAINT_NOT_SATISFIED
     );
     // publish compiler v1 code to mainnet
     assert_success!(test_compilation_metadata_internal(
         true,
         false,
-        enable_check
+        enable_check,
+        stateless_account,
     ));
     // publish compiler v2 code to test
     // failed because the metadata cannot be recognized
     assert_vm_status!(
-        test_compilation_metadata_internal(false, true, enable_check),
+        test_compilation_metadata_internal(false, true, enable_check, stateless_account),
         CONSTRAINT_NOT_SATISFIED
     );
     // publish compiler v1 code to test
     assert_success!(test_compilation_metadata_internal(
         false,
         false,
-        enable_check
+        enable_check,
+        stateless_account,
     ));
 }
