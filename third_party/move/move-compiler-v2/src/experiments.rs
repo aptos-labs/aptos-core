@@ -114,7 +114,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::LAMBDA_LIFTING.to_string(),
             description: "Turns on or off lambda lifting".to_string(),
-            default: Given(false),
+            default: Inherited(Experiment::FUNCTION_VALUES.to_string()),
         },
         Experiment {
             name: Experiment::FUNCTION_VALUES.to_string(),
