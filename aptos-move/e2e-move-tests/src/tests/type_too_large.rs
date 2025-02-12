@@ -3,13 +3,17 @@
 
 use crate::{assert_abort, assert_success, tests::common, MoveHarness};
 use aptos_types::account_address::AccountAddress;
+use rstest::rstest;
 
-#[test]
-fn type_too_large() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn type_too_large(stateless_account: bool) {
     let mut h = MoveHarness::new();
 
     // Load the code
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), if stateless_account { None } else { Some(0) });
     assert_success!(h.publish_package(
         &acc,
         &common::test_dir_path("type_too_large.data/type_too_large"),

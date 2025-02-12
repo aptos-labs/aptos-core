@@ -4,10 +4,14 @@
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::account_address::AccountAddress;
+use rstest::rstest;
 
 /// Test whether `0x1::vector` (and not just `std::vector`) works as expected.
-#[test]
-fn vector_numeric_address() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn vector_numeric_address(stateless_account: bool) {
     let mut h = MoveHarness::new();
 
     let fx_acc = h.aptos_framework_account();
@@ -15,7 +19,7 @@ fn vector_numeric_address() {
     let move_stdlib = common::framework_dir_path("move-stdlib");
     assert_success!(h.publish_package(&fx_acc, &move_stdlib));
 
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
     let mut builder = PackageBuilder::new("Vector");
     builder.add_source(
         "test",

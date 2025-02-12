@@ -23,12 +23,15 @@ struct Token {
     mutation_events: EventHandle,
 }
 
-#[test]
-fn test_basic_token() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn test_basic_token(stateless_account: bool) {
     let mut h = MoveHarness::new();
 
     let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
-    let account = h.new_account_at(addr);
+    let account = h.new_account_at(addr, if stateless_account { None } else { Some(0) });
 
     publish_object_token_example(&mut h, addr, &account);
 
