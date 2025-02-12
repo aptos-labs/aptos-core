@@ -32,6 +32,7 @@ use move_core_types::{identifier::Identifier, language_storage::ModuleId, value:
 use rand::{rngs::StdRng, SeedableRng};
 use sha3::{Digest, Sha3_512};
 use std::path::Path;
+use rstest::rstest;
 
 #[test]
 fn test_modify_gas_schedule_check_hash() {
@@ -170,30 +171,17 @@ impl Runner {
 }
 
 /// Run with `cargo test test_gas -- --nocapture` to see output.
-#[test]
-fn test_gas_with_stateful_accounts() {
-    // Start with 100 validators.
+#[rstest(stateless_account,
+    case(true),
+    case(false)
+)]
+fn test_gas(stateless_account: bool) {
     let mut harness = MoveHarness::new_with_validators(100);
-    let account_1 = &harness.new_account_at(AccountAddress::from_hex_literal("0x121").unwrap(), Some(0));
-    let account_2 = &harness.new_account_at(AccountAddress::from_hex_literal("0x122").unwrap(), Some(0));
-    let account_3 = &harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap(), Some(0));
-    let publisher = &harness.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), Some(0));
-    test_gas(&mut h, account_1, account_2, account_3, publisher);
-}
-
-#[test]
-fn test_gas_with_stateless_accounts() {
-    // Start with 100 validators.
-    let mut harness = MoveHarness::new_with_validators(100);
-    let account_1 = &harness.new_account_at(AccountAddress::from_hex_literal("0x121").unwrap(), None);
-    let account_2 = &harness.new_account_at(AccountAddress::from_hex_literal("0x122").unwrap(), None);
-    let account_3 = &harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap(), None);
-    let publisher = &harness.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), None);
-    test_gas(&mut h, account_1, account_2, account_3, publisher);
-}
-
-
-fn test_gas(h: &mut MoveHarness, account_1: &Account, account_2: &Account, account_3: &Account, publisher: &Account) {
+    let account_1 = &harness.new_account_at(AccountAddress::from_hex_literal("0x121").unwrap(), if stateless_account { None } else { Some(0) });
+    let account_2 = &harness.new_account_at(AccountAddress::from_hex_literal("0x122").unwrap(), if stateless_account { None } else { Some(0) });
+    let account_3 = &harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap(), if stateless_account { None } else { Some(0) });
+    let publisher = &harness.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
+    
     let account_1_address = *account_1.address();
     let account_2_address = *account_2.address();
     let account_3_address = *account_3.address();

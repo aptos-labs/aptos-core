@@ -50,7 +50,7 @@ fn test_nft_dao_txn_arguments(stateless_account1: bool, stateless_account2: bool
         .map(|e| e.to_owned().into_bytes())
         .collect();
     let desc = "desc".to_owned().into_bytes();
-    let voter = h.new_account_at(AccountAddress::from_hex_literal("0xaf").unwrap(), if stateless_account1 { None } else { Some(0) });
+    let voter = h.new_account_at(AccountAddress::from_hex_literal("0xaf").unwrap(), if stateless_account2 { None } else { Some(0) });
     h.run_transaction_payload(
         &acc,
         aptos_cached_packages::aptos_token_sdk_builder::token_create_collection_script(

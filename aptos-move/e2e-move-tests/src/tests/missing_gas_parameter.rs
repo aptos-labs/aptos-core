@@ -12,7 +12,7 @@ use rstest::rstest;
 )]
 fn missing_gas_parameter(stateless_account: bool) {
     let mut h = MoveHarness::new();
-    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), if stateless_account { None } else { Some(0)});
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), if stateless_account { None } else { Some(0)});
     h.modify_gas_schedule_raw(|gas_schedule| {
         let idx = gas_schedule
             .entries
