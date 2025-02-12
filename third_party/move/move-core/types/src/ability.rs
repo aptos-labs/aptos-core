@@ -84,7 +84,7 @@ impl fmt::Display for Ability {
 /// A set of `Ability`s
 #[derive(Clone, Eq, Copy, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(
-    feature = "fuzzing",
+    any(test, feature = "fuzzing"),
     derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
 )]
 pub struct AbilitySet(u8);

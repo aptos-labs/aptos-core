@@ -8,6 +8,7 @@ use crate::{
     delayed_values::delayed_field_id::{DelayedFieldID, TryFromMoveValue, TryIntoMoveValue},
     loaded_data::runtime_types::Type,
     value_serde::ValueSerDeContext,
+    values::function_values_impl::{AbstractFunction, Closure, ClosureVisitor},
     views::{ValueView, ValueVisitor},
 };
 use itertools::Itertools;
@@ -93,6 +94,11 @@ pub(crate) enum ValueImpl {
     DelayedFieldID {
         id: DelayedFieldID,
     },
+
+    /// A closure, consisting of a function reference and captured arguments.
+    /// Notice that captured arguments cannot be referenced, hence a closure is
+    /// not a container.
+    ClosureValue(Closure),
 }
 
 /// A container is a collection of values. It is used to represent data structures like a
@@ -414,6 +420,14 @@ impl ValueImpl {
             // Native values can be copied because this is how read_ref operates,
             // and copying is an internal API.
             DelayedFieldID { id } => DelayedFieldID { id: *id },
+
+            ClosureValue(Closure(fun, captured)) => {
+                let captured = captured
+                    .iter()
+                    .map(|v| v.copy_value())
+                    .collect::<PartialVMResult<_>>()?;
+                ClosureValue(Closure(fun.clone_dyn()?, captured))
+            },
         })
     }
 }
@@ -537,6 +551,21 @@ impl ValueImpl {
                     .with_message("cannot compare delayed values".to_string()))
             },
 
+            (ClosureValue(Closure(fun1, captured1)), ClosureValue(Closure(fun2, captured2))) => {
+                if fun1.cmp_dyn(fun2.as_ref())? == Ordering::Equal
+                    && captured1.len() == captured2.len()
+                {
+                    for (v1, v2) in captured1.iter().zip(captured2.iter()) {
+                        if !v1.equals(v2)? {
+                            return Ok(false);
+                        }
+                    }
+                    true
+                } else {
+                    false
+                }
+            },
+
             (Invalid, _)
             | (U8(_), _)
             | (U16(_), _)
@@ -549,6 +578,7 @@ impl ValueImpl {
             | (Container(_), _)
             | (ContainerRef(_), _)
             | (IndexedRef(_), _)
+            | (ClosureValue(_), _)
             | (DelayedFieldID { .. }, _) => {
                 return Err(
                     PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(format!(
@@ -587,6 +617,21 @@ impl ValueImpl {
                     .with_message("cannot compare delayed values".to_string()))
             },
 
+            (ClosureValue(Closure(fun1, captured1)), ClosureValue(Closure(fun2, captured2))) => {
+                let o = fun1.cmp_dyn(fun2.as_ref())?;
+                if o == Ordering::Equal {
+                    for (v1, v2) in captured1.iter().zip(captured2.iter()) {
+                        let o = v1.compare(v2)?;
+                        if o != Ordering::Equal {
+                            return Ok(o);
+                        }
+                    }
+                    captured1.iter().len().cmp(&captured2.len())
+                } else {
+                    o
+                }
+            },
+
             (Invalid, _)
             | (U8(_), _)
             | (U16(_), _)
@@ -599,6 +644,7 @@ impl ValueImpl {
             | (Container(_), _)
             | (ContainerRef(_), _)
             | (IndexedRef(_), _)
+            | (ClosureValue(_), _)
             | (DelayedFieldID { .. }, _) => {
                 return Err(
                     PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(format!(
@@ -1410,6 +1456,7 @@ impl ContainerRef {
                     | ValueImpl::U256(_)
                     | ValueImpl::Bool(_)
                     | ValueImpl::Address(_)
+                    | ValueImpl::ClosureValue(_)
                     | ValueImpl::DelayedFieldID { .. } => ValueImpl::IndexedRef(IndexedRef {
                         idx,
                         container_ref: self.copy_value(),
@@ -1504,6 +1551,7 @@ impl Locals {
             | ValueImpl::U256(_)
             | ValueImpl::Bool(_)
             | ValueImpl::Address(_)
+            | ValueImpl::ClosureValue(_)
             | ValueImpl::DelayedFieldID { .. } => Ok(Value(ValueImpl::IndexedRef(IndexedRef {
                 idx,
                 container_ref: ContainerRef::Local(Container::Locals(Rc::clone(&self.0))),
@@ -1595,8 +1643,8 @@ impl Locals {
                             return Err(PartialVMError::new(
                                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                             )
-                            .with_message("moving container with dangling references".to_string())
-                            .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EREFERENCE_COUNTING_FAILURE));
+                                .with_message("moving container with dangling references".to_string())
+                                .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EREFERENCE_COUNTING_FAILURE));
                         }
                     }
                 }
@@ -1788,6 +1836,13 @@ impl Value {
         Self(ValueImpl::Container(Container::Vec(Rc::new(RefCell::new(
             it.into_iter().map(|v| v.0).collect(),
         )))))
+    }
+
+    pub fn closure(
+        fun: Box<dyn AbstractFunction>,
+        captured: impl IntoIterator<Item = Value>,
+    ) -> Self {
+        Self(ValueImpl::ClosureValue(Closure::pack(fun, captured)))
     }
 }
 
@@ -2537,6 +2592,8 @@ pub const INDEX_OUT_OF_BOUNDS: u64 = NFE_VECTOR_ERROR_BASE + 1;
 pub const POP_EMPTY_VEC: u64 = NFE_VECTOR_ERROR_BASE + 2;
 pub const VEC_UNPACK_PARITY_MISMATCH: u64 = NFE_VECTOR_ERROR_BASE + 3;
 
+// TODO: this check seems to be obsolete if paranoid mode is on,
+//   and should either be removed or move over to runtime_type_checks?
 fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
     match (ty, v) {
         (Type::U8, Container::VecU8(_))
@@ -2553,7 +2610,8 @@ fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
 
         (Type::Struct { .. }, Container::Vec(_))
         | (Type::Signer, Container::Vec(_))
-        | (Type::StructInstantiation { .. }, Container::Vec(_)) => Ok(()),
+        | (Type::StructInstantiation { .. }, Container::Vec(_))
+        | (Type::Function { .. }, Container::Vec(_)) => Ok(()),
 
         (Type::Reference(_), _) | (Type::MutableReference(_), _) | (Type::TyParam(_), _) => Err(
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -2571,7 +2629,8 @@ fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
         | (Type::Signer, _)
         | (Type::Vector(_), _)
         | (Type::Struct { .. }, _)
-        | (Type::StructInstantiation { .. }, _) => Err(PartialVMError::new(
+        | (Type::StructInstantiation { .. }, _)
+        | (Type::Function { .. }, _) => Err(PartialVMError::new(
             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
         )
         .with_message(format!(
@@ -2860,11 +2919,10 @@ impl Vector {
             Type::Signer
             | Type::Vector(_)
             | Type::Struct { .. }
-            | Type::StructInstantiation {
-                idx: _, ty_args: _, ..
-            } => Value(ValueImpl::Container(Container::Vec(Rc::new(RefCell::new(
-                elements.into_iter().map(|v| v.0).collect(),
-            ))))),
+            | Type::StructInstantiation { .. }
+            | Type::Function { .. } => Value(ValueImpl::Container(Container::Vec(Rc::new(
+                RefCell::new(elements.into_iter().map(|v| v.0).collect()),
+            )))),
 
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
@@ -2971,6 +3029,9 @@ pub(crate) const LEGACY_REFERENCE_SIZE: AbstractMemorySize = AbstractMemorySize:
 /// The size of a struct in bytes
 pub(crate) const LEGACY_STRUCT_SIZE: AbstractMemorySize = AbstractMemorySize::new(2);
 
+/// The size of a closure in bytes
+pub(crate) const LEGACY_CLOSURE_SIZE: AbstractMemorySize = AbstractMemorySize::new(6);
+
 impl Container {
     #[cfg(test)]
     fn legacy_size(&self) -> AbstractMemorySize {
@@ -3038,6 +3099,12 @@ impl ValueImpl {
             // Legacy size is only used by event native functions (which should not even
             // be part of move-stdlib), so we should never see any delayed values here.
             DelayedFieldID { .. } => unreachable!("Delayed values do not have legacy size!"),
+
+            ClosureValue(..) => {
+                // TODO(#15664): similarly as with delayed values, closures should not appear here,
+                //   but this needs to be verified
+                unreachable!("Closures do not have legacy size!")
+            },
         }
     }
 }
@@ -3341,6 +3408,8 @@ impl Debug for ValueImpl {
             Self::ContainerRef(r) => write!(f, "ContainerRef({:?})", r),
             Self::IndexedRef(r) => write!(f, "IndexedRef({:?})", r),
 
+            Self::ClosureValue(c) => write!(f, "Function({:?})", c),
+
             // Debug information must be deterministic, so we cannot print
             // inner fields.
             Self::DelayedFieldID { .. } => write!(f, "Delayed(?)"),
@@ -3375,6 +3444,8 @@ impl Display for ValueImpl {
 
             Self::ContainerRef(r) => write!(f, "{}", r),
             Self::IndexedRef(r) => write!(f, "{}", r),
+
+            Self::ClosureValue(c) => write!(f, "{}", c),
 
             // Display information must be deterministic, so we cannot print
             // inner fields.
@@ -3534,6 +3605,10 @@ pub mod debug {
         debug_write!(buf, "{}", x.to_hex())
     }
 
+    fn print_closure<B: Write>(buf: &mut B, c: &Closure) -> PartialVMResult<()> {
+        debug_write!(buf, "{}", c)
+    }
+
     fn print_value_impl<B: Write>(buf: &mut B, val: &ValueImpl) -> PartialVMResult<()> {
         match val {
             ValueImpl::Invalid => print_invalid(buf),
@@ -3551,6 +3626,8 @@ pub mod debug {
 
             ValueImpl::ContainerRef(r) => print_container_ref(buf, r),
             ValueImpl::IndexedRef(r) => print_indexed_ref(buf, r),
+
+            ValueImpl::ClosureValue(c) => print_closure(buf, c),
 
             ValueImpl::DelayedFieldID { .. } => print_delayed_value(buf),
         }
@@ -3721,6 +3798,14 @@ impl<'c, 'l, 'v> serde::Serialize
                 })
                 .serialize(serializer)
             },
+
+            // Functions.
+            (L::Function(fun_layout), ValueImpl::ClosureValue(clos)) => SerializationReadyValue {
+                ctx: self.ctx,
+                layout: fun_layout,
+                value: clos,
+            }
+            .serialize(serializer),
 
             // Vectors.
             (L::Vector(layout), ValueImpl::Container(c)) => {
@@ -3986,6 +4071,16 @@ impl<'d, 'c> serde::de::DeserializeSeed<'d> for DeserializationSeed<'c, &MoveTyp
                 },
             }),
 
+            // Functions
+            L::Function(fun_layout) => {
+                let seed = DeserializationSeed {
+                    ctx: self.ctx,
+                    layout: fun_layout,
+                };
+                let closure = deserializer.deserialize_seq(ClosureVisitor(seed))?;
+                Ok(Value(ValueImpl::ClosureValue(closure)))
+            },
+
             // Delayed values should always use custom deserialization.
             L::Native(kind, layout) => {
                 match &self.ctx.delayed_fields_extension {
@@ -4008,9 +4103,9 @@ impl<'d, 'c> serde::de::DeserializeSeed<'d> for DeserializationSeed<'c, &MoveTyp
                                     DelayedFieldID::try_from_move_value(layout, value, &())
                                         .map_err(|_| {
                                             D::Error::custom(format!(
-                                            "Custom deserialization failed for {:?} with layout {}",
-                                            kind, layout
-                                        ))
+                                        "Custom deserialization failed for {:?} with layout {}",
+                                        kind, layout
+                                    ))
                                         })?;
                                 id
                             },
@@ -4318,6 +4413,17 @@ impl Container {
     }
 }
 
+impl Closure {
+    fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: usize) {
+        let Self(_, captured) = self;
+        if visitor.visit_closure(depth, captured.len()) {
+            for val in captured {
+                val.visit_impl(visitor, depth + 1);
+            }
+        }
+    }
+}
+
 impl ContainerRef {
     fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: usize) {
         use ContainerRef::*;
@@ -4368,6 +4474,8 @@ impl ValueImpl {
 
             ContainerRef(r) => r.visit_impl(visitor, depth),
             IndexedRef(r) => r.visit_impl(visitor, depth),
+
+            ClosureValue(c) => c.visit_impl(visitor, depth),
 
             DelayedFieldID { id } => visitor.visit_delayed(depth, *id),
         }
@@ -4630,6 +4738,14 @@ pub mod prop {
                 .collect::<Vec<_>>()
                 .prop_map(move |vals| Value::struct_(Struct::pack(vals)))
                 .boxed(),
+
+            L::Function(_function_layout) => {
+                // TODO(#15664): not clear how to generate closure values, we'd need
+                //   some test functions for this, and generate `AbstractFunction` impls.
+                //   As we do not generate function layouts in the first place, we can bail
+                //   out here
+                unreachable!("unexpected function layout")
+            },
 
             // TODO[agg_v2](cleanup): double check what we should do here (i.e. if we should
             //  even skip these kinds of layouts, or if need to construct a delayed value)?
