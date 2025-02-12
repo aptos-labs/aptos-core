@@ -1,5 +1,0 @@
-error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
-  ┌─ tests/sources/expressions_inference_err.move:7:16
-  │
-7 │       let f = |x|x;
-  │                ^
