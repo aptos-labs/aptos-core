@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{state_store::state_value::StateValue, transaction::Version};
 
 #[derive(Clone, Debug)]
@@ -39,6 +40,10 @@ impl<'kv> StateUpdateRef<'kv> {
             version: self.version,
             value: self.value.cloned(),
         }
+    }
+
+    pub fn value_hash_opt(&self) -> Option<HashValue> {
+        self.value.as_ref().map(|val| val.hash())
     }
 }
 
