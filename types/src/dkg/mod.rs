@@ -3,7 +3,7 @@
 
 use self::real_dkg::RealDKG;
 use crate::{
-    dkg::real_dkg::rounding::DKGRoundingProfile,
+    dkg::real_dkg::{rounding::DKGRoundingProfile, rounding_v2::RoundedV2},
     on_chain_config::{OnChainConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct},
     validator_verifier::{ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct},
 };
@@ -156,10 +156,14 @@ impl OnChainConfig for DKGState {
 
 #[derive(Clone, Debug, Default)]
 pub struct RoundingSummary {
+    pub stakes: Vec<u64>,
     pub method: String,
     pub output: DKGRoundingProfile,
     pub error: Option<String>,
     pub exec_time: Duration,
+    pub rounded_v2: Option<RoundedV2>,
+    pub rounding_v2_err: Option<String>,
+    pub rounding_v2_time: Duration,
 }
 
 pub trait MayHaveRoundingSummary {
