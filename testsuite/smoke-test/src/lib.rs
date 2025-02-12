@@ -9,6 +9,8 @@ mod aptos;
 #[cfg(test)]
 mod aptos_cli;
 #[cfg(test)]
+mod account_abstraction;
+#[cfg(test)]
 mod client;
 #[cfg(test)]
 mod consensus;

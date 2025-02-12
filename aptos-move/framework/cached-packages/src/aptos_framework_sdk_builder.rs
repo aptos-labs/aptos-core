@@ -179,6 +179,20 @@ pub enum EntryFunctionCall {
         _function_name: Vec<u8>,
     },
 
+    AccountAbstractionInitialize {},
+
+    AccountAbstractionRegisterDomainWithAuthenticationFunction {
+        module_address: AccountAddress,
+        module_name: Vec<u8>,
+        function_name: Vec<u8>,
+    },
+
+    AccountAbstractionRegisterDomainWithAuthenticationFunctionTestNetworkOnly {
+        module_address: AccountAddress,
+        module_name: Vec<u8>,
+        function_name: Vec<u8>,
+    },
+
     /// Remove dispatchable authentication function that enables account abstraction via this function.
     /// Note: it is a private entry function that can only be called directly from transaction.
     AccountAbstractionRemoveAuthenticationFunction {
@@ -1278,6 +1292,27 @@ impl EntryFunctionCall {
                 _module_name,
                 _function_name,
             ),
+            AccountAbstractionInitialize {} => account_abstraction_initialize(),
+            AccountAbstractionRegisterDomainWithAuthenticationFunction {
+                module_address,
+                module_name,
+                function_name,
+            } => account_abstraction_register_domain_with_authentication_function(
+                module_address,
+                module_name,
+                function_name,
+            ),
+            AccountAbstractionRegisterDomainWithAuthenticationFunctionTestNetworkOnly {
+                module_address,
+                module_name,
+                function_name,
+            } => {
+                account_abstraction_register_domain_with_authentication_function_test_network_only(
+                    module_address,
+                    module_name,
+                    function_name,
+                )
+            },
             AccountAbstractionRemoveAuthenticationFunction {
                 module_address,
                 module_name,
@@ -2225,6 +2260,67 @@ pub fn account_abstraction_add_dispatchable_authentication_function(
             bcs::to_bytes(&_module_address).unwrap(),
             bcs::to_bytes(&_module_name).unwrap(),
             bcs::to_bytes(&_function_name).unwrap(),
+        ],
+    ))
+}
+
+pub fn account_abstraction_initialize() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account_abstraction").to_owned(),
+        ),
+        ident_str!("initialize").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn account_abstraction_register_domain_with_authentication_function(
+    module_address: AccountAddress,
+    module_name: Vec<u8>,
+    function_name: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account_abstraction").to_owned(),
+        ),
+        ident_str!("register_domain_with_authentication_function").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&module_address).unwrap(),
+            bcs::to_bytes(&module_name).unwrap(),
+            bcs::to_bytes(&function_name).unwrap(),
+        ],
+    ))
+}
+
+pub fn account_abstraction_register_domain_with_authentication_function_test_network_only(
+    module_address: AccountAddress,
+    module_name: Vec<u8>,
+    function_name: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account_abstraction").to_owned(),
+        ),
+        ident_str!("register_domain_with_authentication_function_test_network_only").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&module_address).unwrap(),
+            bcs::to_bytes(&module_name).unwrap(),
+            bcs::to_bytes(&function_name).unwrap(),
         ],
     ))
 }
@@ -5437,6 +5533,46 @@ mod decoder {
         }
     }
 
+    pub fn account_abstraction_initialize(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::AccountAbstractionInitialize {})
+        } else {
+            None
+        }
+    }
+
+    pub fn account_abstraction_register_domain_with_authentication_function(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountAbstractionRegisterDomainWithAuthenticationFunction {
+                    module_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    module_name: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    function_name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn account_abstraction_register_domain_with_authentication_function_test_network_only(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AccountAbstractionRegisterDomainWithAuthenticationFunctionTestNetworkOnly {
+            module_address : bcs::from_bytes(script.args().get(0)?).ok()?,
+            module_name : bcs::from_bytes(script.args().get(1)?).ok()?,
+            function_name : bcs::from_bytes(script.args().get(2)?).ok()?,
+        })
+        } else {
+            None
+        }
+    }
+
     pub fn account_abstraction_remove_authentication_function(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -7265,6 +7401,15 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             "account_abstraction_add_dispatchable_authentication_function".to_string(),
             Box::new(decoder::account_abstraction_add_dispatchable_authentication_function),
         );
+        map.insert(
+            "account_abstraction_initialize".to_string(),
+            Box::new(decoder::account_abstraction_initialize),
+        );
+        map.insert(
+            "account_abstraction_register_domain_with_authentication_function".to_string(),
+            Box::new(decoder::account_abstraction_register_domain_with_authentication_function),
+        );
+        map.insert("account_abstraction_register_domain_with_authentication_function_test_network_only".to_string(), Box::new(decoder::account_abstraction_register_domain_with_authentication_function_test_network_only));
         map.insert(
             "account_abstraction_remove_authentication_function".to_string(),
             Box::new(decoder::account_abstraction_remove_authentication_function),
