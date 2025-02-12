@@ -9,8 +9,8 @@
 pub mod module_view;
 
 use crate::module_view::ModuleView;
+use aptos_framework::get_resource_group_member_from_metadata;
 use aptos_types::state_store::StateView;
-use aptos_vm::data_cache::get_resource_group_member_from_metadata;
 use move_binary_format::CompiledModule;
 use move_core_types::{
     identifier::{IdentStr, Identifier},

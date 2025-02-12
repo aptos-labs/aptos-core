@@ -188,6 +188,18 @@ thread_local! {
     static V0_METADATA_CACHE: RefCell<LruCache<Vec<u8>, Option<Arc<RuntimeModuleMetadataV1>>>> = RefCell::new(LruCache::new(METADATA_CACHE_SIZE));
 }
 
+pub fn get_resource_group_member_from_metadata(
+    struct_tag: &StructTag,
+    metadata: &[Metadata],
+) -> Option<StructTag> {
+    let metadata = get_metadata(metadata)?;
+    metadata
+        .struct_attributes
+        .get(struct_tag.name.as_ident_str().as_str())?
+        .iter()
+        .find_map(|attr| attr.get_resource_group_member())
+}
+
 /// Extract metadata from the VM, upgrading V0 to V1 representation as needed
 pub fn get_metadata(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> {
     if let Some(data) = md.iter().find(|md| md.key == APTOS_METADATA_KEY_V1) {

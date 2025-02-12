@@ -7,7 +7,7 @@ use crate::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     counters::{
         self, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK, PARALLEL_EXECUTION_SECONDS,
-        RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, VM_INIT_SECONDS,
+        RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS,
         WORK_WITH_TASK_SECONDS,
     },
     errors::*,
@@ -57,7 +57,7 @@ use core::panic;
 use fail::fail_point;
 use move_binary_format::CompiledModule;
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
+use move_vm_runtime::{Module, WithRuntimeEnvironment};
 use move_vm_types::{code::ModuleCache, delayed_values::delayed_field_id::DelayedFieldID};
 use num_cpus;
 use rayon::ThreadPool;
@@ -114,7 +114,6 @@ where
         signature_verified_block: &TP,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
-        executor: &E,
         base_view: &S,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
@@ -122,7 +121,7 @@ where
             Module,
             AptosModuleExtension,
         >,
-        runtime_environment: &RuntimeEnvironment,
+        environment: &AptosEnvironment,
         parallel_state: ParallelState<T>,
     ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
@@ -132,11 +131,11 @@ where
         let sync_view = LatestView::new(
             base_view,
             global_module_cache,
-            runtime_environment,
+            environment.runtime_environment(),
             ViewState::Sync(parallel_state),
             idx_to_execute,
         );
-        let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
+        let execute_result = E::execute_transaction(environment, &sync_view, txn, idx_to_execute);
 
         let mut prev_modified_keys = last_input_output
             .modified_keys(idx_to_execute, true)
@@ -233,7 +232,7 @@ where
             }
 
             for (k, v) in output.module_write_set().into_iter() {
-                if !runtime_environment.vm_config().use_loader_v2 {
+                if !environment.vm_config().use_loader_v2 {
                     if prev_modified_keys.remove(&k).is_none() {
                         needs_suffix_validation = true;
                     }
@@ -344,7 +343,7 @@ where
             match kind {
                 Resource => versioned_cache.data().remove(&k, idx_to_execute),
                 Module => {
-                    if !runtime_environment.vm_config().use_loader_v2 {
+                    if !environment.vm_config().use_loader_v2 {
                         #[allow(deprecated)]
                         versioned_cache
                             .deprecated_modules()
@@ -383,7 +382,7 @@ where
             result,
             resource_write_set,
             group_keys_and_tags,
-            runtime_environment,
+            environment.runtime_environment(),
         ) {
             // Module R/W is an expected fallback behavior, no alert is required.
             debug!("[Execution] At txn {}, Module read & write", idx_to_execute);
@@ -435,7 +434,7 @@ where
         txn_idx: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
-        runtime_environment: &RuntimeEnvironment,
+        environment: &AptosEnvironment,
     ) {
         counters::SPECULATIVE_ABORT_COUNT.inc();
 
@@ -451,7 +450,7 @@ where
                     Module => {
                         // In V2 loader implementation, all modules writes are "estimates":
                         // they are pending and not visible until committed.
-                        if !runtime_environment.vm_config().use_loader_v2 {
+                        if !environment.vm_config().use_loader_v2 {
                             #[allow(deprecated)]
                             versioned_cache
                                 .deprecated_modules()
@@ -490,7 +489,7 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler: &Scheduler,
-        runtime_environment: &RuntimeEnvironment,
+        environment: &AptosEnvironment,
     ) -> Result<SchedulerTask, PanicError> {
         let aborted = !valid && scheduler.try_abort(txn_idx, incarnation);
 
@@ -499,7 +498,7 @@ where
                 txn_idx,
                 last_input_output,
                 versioned_cache,
-                runtime_environment,
+                environment,
             );
             scheduler.finish_abort(txn_idx, incarnation)
         } else {
@@ -572,10 +571,9 @@ where
             Module,
             AptosModuleExtension,
         >,
-        runtime_environment: &RuntimeEnvironment,
+        environment: &AptosEnvironment,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
-        executor: &E,
         block: &TP,
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
@@ -594,7 +592,7 @@ where
                     txn_idx,
                     last_input_output,
                     versioned_cache,
-                    runtime_environment,
+                    environment,
                 );
                 // We are going to skip reducing validation index here, as we
                 // are executing immediately, and will reduce it unconditionally
@@ -606,10 +604,9 @@ where
                     block,
                     last_input_output,
                     versioned_cache,
-                    executor,
                     base_view,
                     global_module_cache,
-                    runtime_environment,
+                    environment,
                     ParallelState::new(
                         versioned_cache,
                         scheduler,
@@ -620,7 +617,7 @@ where
 
                 // Publish modules before we decrease validation index so that validations observe
                 // the new module writes as well.
-                if runtime_environment.vm_config().use_loader_v2 {
+                if environment.vm_config().use_loader_v2 {
                     let module_write_set = last_input_output.module_write_set(txn_idx);
                     if !module_write_set.is_empty() {
                         executed_at_commit = true;
@@ -630,7 +627,7 @@ where
                             global_module_cache,
                             versioned_cache,
                             scheduler,
-                            runtime_environment,
+                            environment,
                         )?;
                     }
                 }
@@ -663,7 +660,7 @@ where
             // If transaction was committed without delayed fields failing, i.e., without
             // re-execution, we make the published modules visible here. As a result, we need to
             // decrease the validation index to make sure the subsequent transactions see changes.
-            if !executed_at_commit && runtime_environment.vm_config().use_loader_v2 {
+            if !executed_at_commit && environment.vm_config().use_loader_v2 {
                 let module_write_set = last_input_output.module_write_set(txn_idx);
                 if !module_write_set.is_empty() {
                     Self::publish_module_writes(
@@ -672,7 +669,7 @@ where
                         global_module_cache,
                         versioned_cache,
                         scheduler,
-                        runtime_environment,
+                        environment,
                     )?;
                     scheduler.wake_dependencies_and_decrease_validation_idx(txn_idx)?;
                 }
@@ -766,7 +763,7 @@ where
         >,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler: &Scheduler,
-        runtime_environment: &RuntimeEnvironment,
+        environment: &AptosEnvironment,
     ) -> Result<(), PanicError> {
         // Turn on the flag for module read validation.
         scheduler.validate_module_reads();
@@ -775,7 +772,7 @@ where
             Self::add_module_write_to_module_cache(
                 write,
                 txn_idx,
-                runtime_environment,
+                environment,
                 global_module_cache,
                 versioned_cache.module_cache(),
             )?;
@@ -850,7 +847,7 @@ where
             Module,
             AptosModuleExtension,
         >,
-        runtime_environment: &RuntimeEnvironment,
+        environment: &AptosEnvironment,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
     ) -> Result<(), PanicError> {
         let parallel_state = ParallelState::<T>::new(
@@ -862,7 +859,7 @@ where
         let latest_view = LatestView::new(
             base_view,
             global_module_cache,
-            runtime_environment,
+            environment.runtime_environment(),
             ViewState::Sync(parallel_state),
             txn_idx,
         );
@@ -967,15 +964,6 @@ where
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
-        // Make executor for each task. TODO: fast concurrent executor.
-        let num_txns = block.num_txns();
-        let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(environment, base_view);
-        drop(init_timer);
-
-        // Shared environment used by each executor.
-        let runtime_environment = environment.runtime_environment();
-
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::Retry;
 
@@ -990,13 +978,14 @@ where
                     last_input_output,
                     base_view,
                     global_module_cache,
-                    runtime_environment,
+                    environment,
                     final_results,
                 )?;
             }
             Ok(())
         };
 
+        let num_txns = block.num_txns();
         loop {
             if let SchedulerTask::ValidationTask(txn_idx, incarnation, _) = &scheduler_task {
                 if *incarnation as usize > num_workers.pow(2) + num_txns + 10 {
@@ -1018,10 +1007,9 @@ where
                     shared_commit_state,
                     base_view,
                     global_module_cache,
-                    runtime_environment,
+                    environment,
                     start_shared_counter,
                     shared_counter,
-                    &executor,
                     block,
                     num_workers,
                 )?;
@@ -1047,7 +1035,7 @@ where
                         last_input_output,
                         versioned_cache,
                         scheduler,
-                        runtime_environment,
+                        environment,
                     )?
                 },
                 SchedulerTask::ExecutionTask(
@@ -1061,10 +1049,9 @@ where
                         block,
                         last_input_output,
                         versioned_cache,
-                        &executor,
                         base_view,
                         global_module_cache,
-                        runtime_environment,
+                        environment,
                         ParallelState::new(
                             versioned_cache,
                             scheduler,
@@ -1216,7 +1203,7 @@ where
     fn add_module_write_to_module_cache(
         write: ModuleWrite<T::Value>,
         txn_idx: TxnIndex,
-        runtime_environment: &RuntimeEnvironment,
+        environment: &AptosEnvironment,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
             CompiledModule,
@@ -1239,7 +1226,8 @@ where
 
         // Since we have successfully serialized the module when converting into this transaction
         // write, the deserialization should never fail.
-        let compiled_module = runtime_environment
+        let compiled_module = environment
+            .runtime_environment()
             .deserialize_into_compiled_module(state_value.bytes())
             .map_err(|err| {
                 let msg = format!("Failed to construct the module from state value: {:?}", err);
@@ -1265,7 +1253,7 @@ where
 
     fn apply_output_sequential(
         txn_idx: TxnIndex,
-        runtime_environment: &RuntimeEnvironment,
+        environment: &AptosEnvironment,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
             CompiledModule,
@@ -1292,11 +1280,11 @@ where
         }
 
         for (key, write) in output.module_write_set().into_iter() {
-            if runtime_environment.vm_config().use_loader_v2 {
+            if environment.vm_config().use_loader_v2 {
                 Self::add_module_write_to_module_cache(
                     write,
                     txn_idx,
-                    runtime_environment,
+                    environment,
                     global_module_cache,
                     unsync_map.module_cache(),
                 )?;
@@ -1364,10 +1352,7 @@ where
         resource_group_bcs_fallback: bool,
     ) -> Result<BlockOutput<E::Output>, SequentialBlockExecutionError<E::Error>> {
         let num_txns = signature_verified_block.num_txns();
-        let init_timer = VM_INIT_SECONDS.start_timer();
         let environment = module_cache_manager_guard.environment();
-        let executor = E::init(environment, base_view);
-        drop(init_timer);
 
         let runtime_environment = environment.runtime_environment();
         let start_counter = gen_id_start_value(true);
@@ -1391,7 +1376,7 @@ where
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
             );
-            let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
+            let res = E::execute_transaction(environment, &latest_view, txn, idx as TxnIndex);
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Abort(err) => {
@@ -1577,7 +1562,7 @@ where
                     let resource_write_set = output.resource_write_set();
                     Self::apply_output_sequential(
                         idx as TxnIndex,
-                        runtime_environment,
+                        environment,
                         module_cache_manager_guard.module_cache(),
                         &unsync_map,
                         &output,

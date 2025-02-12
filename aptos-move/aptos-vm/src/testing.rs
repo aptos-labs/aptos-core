@@ -68,7 +68,7 @@ pub mod testing_only {
     }
 }
 
-impl AptosVM {
+impl<'env> AptosVM<'env> {
     #[cfg(any(test, feature = "testing"))]
     pub fn test_failed_transaction_cleanup(
         &self,

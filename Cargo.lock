@@ -3625,6 +3625,7 @@ name = "aptos-resource-viewer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-framework",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-environment",
@@ -4614,6 +4615,8 @@ dependencies = [
  "aptos-table-natives",
  "aptos-types",
  "aptos-vm-types",
+ "ark-bn254",
+ "ark-groth16",
  "bcs 0.1.4",
  "move-binary-format",
  "move-bytecode-verifier",

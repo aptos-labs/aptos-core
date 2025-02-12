@@ -48,7 +48,7 @@ enum ExecutionFailure {
     Unexpected(VMStatus),
 }
 
-impl AptosVM {
+impl<'env> AptosVM<'env> {
     pub(crate) fn process_dkg_result(
         &self,
         resolver: &impl AptosMoveResolver,

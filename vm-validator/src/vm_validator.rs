@@ -40,8 +40,6 @@ use std::sync::{Arc, Mutex};
 mod vm_validator_test;
 
 pub trait TransactionValidation: Send + Sync + Clone {
-    type ValidationInstance: aptos_vm::VMValidator;
-
     /// Validate a txn from client
     fn validate_transaction(&self, _txn: SignedTransaction) -> Result<VMValidatorResult>;
 
@@ -313,8 +311,6 @@ impl PooledVMValidator {
 }
 
 impl TransactionValidation for PooledVMValidator {
-    type ValidationInstance = AptosVM;
-
     fn validate_transaction(&self, txn: SignedTransaction) -> Result<VMValidatorResult> {
         let vm_validator = self.get_next_vm();
 
@@ -327,10 +323,7 @@ impl TransactionValidation for PooledVMValidator {
         let vm_validator_locked = vm_validator.lock().unwrap();
 
         use aptos_vm::VMValidator;
-        let vm = AptosVM::new(
-            &vm_validator_locked.state.environment,
-            &vm_validator_locked.state.state_view,
-        );
+        let vm = AptosVM::new(&vm_validator_locked.state.environment);
         Ok(vm.validate_transaction(
             txn,
             &vm_validator_locked.state.state_view,

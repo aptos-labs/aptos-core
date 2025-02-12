@@ -12,7 +12,7 @@ use aptos_vm_types::{
 };
 use move_core_types::vm_status::VMStatus;
 
-impl AptosVM {
+impl<'env> AptosVM<'env> {
     pub(crate) fn process_validator_transaction(
         &self,
         resolver: &impl AptosMoveResolver,

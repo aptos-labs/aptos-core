@@ -830,14 +830,6 @@ pub(crate) struct MockTask<K, E> {
     phantom_data: PhantomData<(K, E)>,
 }
 
-impl<K, E> MockTask<K, E> {
-    pub fn new() -> Self {
-        Self {
-            phantom_data: PhantomData,
-        }
-    }
-}
-
 impl<K, E> ExecutorTask for MockTask<K, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
@@ -847,12 +839,8 @@ where
     type Output = MockOutput<K, E>;
     type Txn = MockTransaction<K, E>;
 
-    fn init(_environment: &AptosEnvironment, _state_view: &impl TStateView<Key = K>) -> Self {
-        Self::new()
-    }
-
     fn execute_transaction(
-        &self,
+        _environment: &AptosEnvironment,
         view: &(impl TExecutorView<K, u32, MoveTypeLayout, ValueType>
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>
               + AptosCodeStorage

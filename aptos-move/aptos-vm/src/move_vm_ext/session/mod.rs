@@ -1,21 +1,21 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    data_cache::get_resource_group_member_from_metadata,
-    move_vm_ext::{
-        resource_state_key, write_op_converter::WriteOpConverter, AptosMoveResolver, SessionId,
-    },
+use crate::move_vm_ext::{
+    resource_state_key, write_op_converter::WriteOpConverter, AptosMoveResolver, SessionId,
 };
-use aptos_framework::natives::{
-    aggregator_natives::{AggregatorChangeSet, AggregatorChangeV1, NativeAggregatorContext},
-    code::{NativeCodeContext, PublishRequest},
-    cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},
-    event::NativeEventContext,
-    object::NativeObjectContext,
-    randomness::RandomnessContext,
-    state_storage::NativeStateStorageContext,
-    transaction_context::NativeTransactionContext,
+use aptos_framework::{
+    get_resource_group_member_from_metadata,
+    natives::{
+        aggregator_natives::{AggregatorChangeSet, AggregatorChangeV1, NativeAggregatorContext},
+        code::{NativeCodeContext, PublishRequest},
+        cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},
+        event::NativeEventContext,
+        object::NativeObjectContext,
+        randomness::RandomnessContext,
+        state_storage::NativeStateStorageContext,
+        transaction_context::NativeTransactionContext,
+    },
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{

@@ -129,7 +129,7 @@ impl AptosDebugger {
         }
 
         let env = AptosEnvironment::new(&state_view);
-        let vm = AptosVM::new(&env, &state_view);
+        let vm = AptosVM::new(&env);
         let resolver = state_view.as_move_resolver();
         let code_storage = state_view.as_aptos_code_storage(&env);
 
