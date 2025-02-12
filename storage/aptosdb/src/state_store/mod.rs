@@ -1216,11 +1216,11 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
             match (main_db_progress, progress_opt) {
                 (None, None) => (),
                 (None, Some(_)) => (),
-                (Some(main_progres), Some(indexer_progress)) => {
-                    if main_progres.key_hash > indexer_progress.key_hash {
+                (Some(main_progress), Some(indexer_progress)) => {
+                    if main_progress.key_hash > indexer_progress.key_hash {
                         bail!(
                             "Inconsistent restore progress between main db and internal indexer db. main db: {:?}, internal indexer db: {:?}",
-                            main_progres,
+                            main_progress,
                             indexer_progress,
                         );
                     }
