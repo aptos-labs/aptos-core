@@ -234,11 +234,10 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
         let idx = format!("{}", self.worker_index);
         let _timer = PER_WORKER_TIMER.timer_with(&[&idx, "block_total"]);
         // Share a VM in the same thread.
-        // TODO(ptx): maybe warm up vm like done in AptosExecutorTask
         let env = AptosEnvironment::new(&self.base_view);
         let vm = {
             let _timer = PER_WORKER_TIMER.timer_with(&[&idx, "vm_init"]);
-            AptosVM::new(&env, &self.base_view)
+            AptosVM::new(&env)
         };
 
         loop {

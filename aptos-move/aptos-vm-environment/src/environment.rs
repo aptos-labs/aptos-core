@@ -9,17 +9,26 @@ use crate::{
         get_timed_feature_override,
     },
 };
+use aptos_framework::get_resource_group_member_from_metadata;
 use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_schedule::{AptosGasParameters, MiscGasParameters, NativeGasParameters};
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{
     chain_id::ChainId,
+    keyless::Groth16VerificationKey,
     on_chain_config::{
         ConfigurationResource, Features, OnChainConfig, TimedFeatures, TimedFeaturesBuilder,
     },
-    state_store::StateView,
+    state_store::{state_key::StateKey, StateView},
 };
-use aptos_vm_types::storage::StorageGasParameters;
+use aptos_vm_types::{
+    resolver::TResourceGroupView, resource_group_adapter::ResourceGroupAdapter,
+    storage::StorageGasParameters,
+};
+use ark_bn254::Bn254;
+use ark_groth16::PreparedVerifyingKey;
+use move_binary_format::{deserializer::DeserializerConfig, CompiledModule};
+use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
 use move_vm_runtime::{config::VMConfig, RuntimeEnvironment, WithRuntimeEnvironment};
 use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
@@ -28,12 +37,16 @@ use std::sync::Arc;
 /// used by execution, gas parameters, VM configs and global caches. Note that it is the user's
 /// responsibility to make sure the environment is consistent, for now it should only be used per
 /// block of transactions because all features or configs are updated only on per-block basis.
-pub struct AptosEnvironment(Arc<Environment>);
+pub struct AptosEnvironment {
+    // Internal implementation details.
+    environment: Environment,
+}
 
 impl AptosEnvironment {
     /// Returns new execution environment based on the current state.
     pub fn new(state_view: &impl StateView) -> Self {
-        Self(Arc::new(Environment::new(state_view, false, None)))
+        let environment = Environment::new(state_view, false, None);
+        Self { environment }
     }
 
     /// Returns new execution environment based on the current state, also using the provided gas
@@ -42,69 +55,68 @@ impl AptosEnvironment {
         state_view: &impl StateView,
         gas_hook: Arc<dyn Fn(DynamicExpression) + Send + Sync>,
     ) -> Self {
-        Self(Arc::new(Environment::new(
-            state_view,
-            false,
-            Some(gas_hook),
-        )))
+        let environment = Environment::new(state_view, false, Some(gas_hook));
+        Self { environment }
     }
 
     /// Returns new execution environment based on the current state, also injecting create signer
     /// native for government proposal simulation. Should not be used for regular execution.
     pub fn new_with_injected_create_signer_for_gov_sim(state_view: &impl StateView) -> Self {
-        Self(Arc::new(Environment::new(state_view, true, None)))
+        let environment = Environment::new(state_view, true, None);
+        Self { environment }
     }
 
     /// Returns new environment but with delayed field optimization enabled. Should only be used by
     /// block executor where this optimization is needed. Note: whether the optimization will be
     /// enabled or not depends on the feature flag.
     pub fn new_with_delayed_field_optimization_enabled(state_view: &impl StateView) -> Self {
-        let env = Environment::new(state_view, false, None).try_enable_delayed_field_optimization();
-        Self(Arc::new(env))
+        let environment =
+            Environment::new(state_view, false, None).try_enable_delayed_field_optimization();
+        Self { environment }
     }
 
     /// Returns the [ChainId] used by this environment.
     #[inline]
     pub fn chain_id(&self) -> ChainId {
-        self.0.chain_id
+        self.environment.chain_id
     }
 
     /// Returns the [Features] used by this environment.
     #[inline]
     pub fn features(&self) -> &Features {
-        &self.0.features
+        &self.environment.features
     }
 
     /// Returns the [TimedFeatures] used by this environment.
     #[inline]
     pub fn timed_features(&self) -> &TimedFeatures {
-        &self.0.timed_features
+        &self.environment.timed_features
     }
 
     /// Returns the [VMConfig] used by this environment.
     #[inline]
     pub fn vm_config(&self) -> &VMConfig {
-        self.0.runtime_environment.vm_config()
+        self.environment.runtime_environment.vm_config()
     }
 
     /// Returns the gas feature used by this environment.
     #[inline]
     pub fn gas_feature_version(&self) -> u64 {
-        self.0.gas_feature_version
+        self.environment.gas_feature_version
     }
 
     /// Returns the gas parameters used by this environment, and an error if they were not found
     /// on-chain.
     #[inline]
     pub fn gas_params(&self) -> &Result<AptosGasParameters, String> {
-        &self.0.gas_params
+        &self.environment.gas_params
     }
 
     /// Returns the storage gas parameters used by this environment, and an error if they were not
     /// found on-chain.
     #[inline]
     pub fn storage_gas_params(&self) -> &Result<StorageGasParameters, String> {
-        &self.0.storage_gas_params
+        &self.environment.storage_gas_params
     }
 
     /// Returns true if create_signer native was injected for the government proposal simulation.
@@ -113,19 +125,19 @@ impl AptosEnvironment {
     #[deprecated]
     pub fn inject_create_signer_for_gov_sim(&self) -> bool {
         #[allow(deprecated)]
-        self.0.inject_create_signer_for_gov_sim
+        self.environment.inject_create_signer_for_gov_sim
     }
-}
 
-impl Clone for AptosEnvironment {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
+    /// Returns the reference to the PVK captured by the current environment, and [None] if it
+    /// did not exist on-chain.
+    pub fn pvk(&self) -> Option<&PreparedVerifyingKey<Bn254>> {
+        self.environment.pvk.as_ref()
     }
 }
 
 impl PartialEq for AptosEnvironment {
     fn eq(&self, other: &Self) -> bool {
-        self.0.hash == other.0.hash
+        self.environment.hash == other.environment.hash
     }
 }
 
@@ -133,7 +145,7 @@ impl Eq for AptosEnvironment {}
 
 impl WithRuntimeEnvironment for AptosEnvironment {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
-        &self.0.runtime_environment
+        &self.environment.runtime_environment
     }
 }
 
@@ -162,6 +174,10 @@ struct Environment {
     /// Deprecated, and will be removed in the future.
     #[deprecated]
     inject_create_signer_for_gov_sim: bool,
+
+    /// For a new chain, or even mainnet, the VK might not necessarily be set. Right this has a
+    /// lifetime of a block. Used by keyless transactions.
+    pvk: Option<PreparedVerifyingKey<Bn254>>,
 
     /// Hash of configs used in this environment. Used to be able to compare environments.
     hash: [u8; 32],
@@ -235,6 +251,14 @@ impl Environment {
         let vm_config = aptos_prod_vm_config(&features, &timed_features, ty_builder);
         let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
 
+        let pvk = fetch_pvk_and_update_hash(
+            &features,
+            &runtime_environment.vm_config().deserializer_config,
+            gas_feature_version,
+            &mut sha3_256,
+            state_view,
+        );
+
         let hash = sha3_256.finalize().into();
 
         #[allow(deprecated)]
@@ -247,6 +271,7 @@ impl Environment {
             storage_gas_params,
             runtime_environment,
             inject_create_signer_for_gov_sim,
+            pvk,
             hash,
         }
     }
@@ -267,6 +292,52 @@ fn fetch_config_and_update_hash<T: OnChainConfig>(
     let (config, bytes) = T::fetch_config_and_bytes(state_view)?;
     sha3_256.update(&bytes);
     Some(config)
+}
+
+/// Fetches a PVK (used by keyless transactions) from storage. Note that because this is stored as
+/// a resource group, we cannot just fetch the bytes from storage, but need to extract them from
+/// the group.
+fn fetch_pvk_and_update_hash(
+    features: &Features,
+    deserializer_config: &DeserializerConfig,
+    gas_feature_version: u64,
+    sha3_256: &mut Sha3_256,
+    state_view: &impl StateView,
+) -> Option<PreparedVerifyingKey<Bn254>> {
+    // FIXME: add a test for this!
+    // FIXME: how often is this updated? If ~ per epoch, we are ok!
+
+    let is_resource_groups_split_in_vm_change_set_enabled =
+        features.is_resource_groups_split_in_vm_change_set_enabled();
+    let adapter = ResourceGroupAdapter::new(
+        None,
+        state_view,
+        gas_feature_version,
+        is_resource_groups_split_in_vm_change_set_enabled,
+    );
+
+    let resource_tag = Groth16VerificationKey::struct_tag();
+    let module_state_key = StateKey::module(&resource_tag.address, &resource_tag.module);
+    let module_bytes = state_view
+        .get_state_value_bytes(&module_state_key)
+        .ok()
+        .flatten()?;
+    let compiled_module =
+        CompiledModule::deserialize_with_config(&module_bytes, deserializer_config).ok()?;
+    let resource_group_tag =
+        get_resource_group_member_from_metadata(&resource_tag, &compiled_module.metadata)?;
+    let group_state_key = StateKey::resource_group(&CORE_CODE_ADDRESS, &resource_group_tag);
+
+    let bytes = adapter
+        .get_resource_from_group(&group_state_key, &resource_tag, None)
+        .ok()
+        .flatten()?;
+    sha3_256.update(&bytes);
+
+    bcs::from_bytes::<Groth16VerificationKey>(&bytes)
+        .ok()?
+        .try_into()
+        .ok()
 }
 
 #[cfg(test)]

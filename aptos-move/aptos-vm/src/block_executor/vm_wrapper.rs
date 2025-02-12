@@ -6,11 +6,8 @@ use crate::{aptos_vm::AptosVM, block_executor::AptosTransactionOutput};
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::{
-    state_store::{StateView, StateViewId},
-    transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
-    },
+use aptos_types::transaction::{
+    signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
@@ -21,27 +18,18 @@ use aptos_vm_types::{
 use fail::fail_point;
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
-pub struct AptosExecutorTask {
-    vm: AptosVM,
-    id: StateViewId,
-}
+pub struct AptosExecutorTask;
 
 impl ExecutorTask for AptosExecutorTask {
     type Error = VMStatus;
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
-    fn init(environment: &AptosEnvironment, state_view: &impl StateView) -> Self {
-        let vm = AptosVM::new(environment, state_view);
-        let id = state_view.id();
-        Self { vm, id }
-    }
-
     // This function is called by the BlockExecutor for each transaction it intends
     // to execute (via the ExecutorTask trait). It can be as a part of sequential
     // execution, or speculatively as a part of a parallel execution.
     fn execute_transaction(
-        &self,
+        environment: &AptosEnvironment,
         view: &(impl ExecutorView
               + ResourceGroupView
               + AptosCodeStorage
@@ -53,12 +41,11 @@ impl ExecutorTask for AptosExecutorTask {
             ExecutionStatus::DelayedFieldsCodeInvariantError("fail points error".into())
         });
 
-        let log_context = AdapterLogSchema::new(self.id, txn_idx as usize);
-        let resolver = self.vm.as_move_resolver_with_group_view(view);
-        match self
-            .vm
-            .execute_single_transaction(txn, &resolver, view, &log_context)
-        {
+        let vm = AptosVM::new(environment);
+
+        let log_context = AdapterLogSchema::new(view.id(), txn_idx as usize);
+        let resolver = vm.as_move_resolver_with_group_view(view);
+        match vm.execute_single_transaction(txn, &resolver, view, &log_context) {
             Ok((vm_status, vm_output)) => {
                 if vm_output.status().is_discarded() {
                     speculative_trace!(

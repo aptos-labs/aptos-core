@@ -122,11 +122,21 @@ impl ExecutorTask for NativeVMExecutorTask {
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
-    fn init(env: &AptosEnvironment, _state_view: &impl StateView) -> Self {
-        let fa_migration_complete = env
+    // This function is called by the BlockExecutor for each transaction it intends
+    // to execute (via the ExecutorTask trait). It can be as a part of sequential
+    // execution, or speculatively as a part of a parallel execution.
+    fn execute_transaction(
+        environment: &AptosEnvironment,
+        executor_with_group_view: &(impl ExecutorView + ResourceGroupView),
+        txn: &SignatureVerifiedTransaction,
+        _txn_idx: TxnIndex,
+    ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
+        let gas_units = 4;
+
+        let fa_migration_complete = environment
             .features()
             .is_enabled(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
-        let new_accounts_default_to_fa = env
+        let new_accounts_default_to_fa = environment
             .features()
             .is_enabled(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
         assert_eq!(
@@ -134,28 +144,16 @@ impl ExecutorTask for NativeVMExecutorTask {
             "native code only works with both flags either enabled or disabled"
         );
 
-        Self {
+        let executor = Self {
             fa_migration_complete,
             db_util: DbAccessUtil::new(),
-        }
-    }
+        };
 
-    // This function is called by the BlockExecutor for each transaction it intends
-    // to execute (via the ExecutorTask trait). It can be as a part of sequential
-    // execution, or speculatively as a part of a parallel execution.
-    fn execute_transaction(
-        &self,
-        executor_with_group_view: &(impl ExecutorView + ResourceGroupView),
-        txn: &SignatureVerifiedTransaction,
-        _txn_idx: TxnIndex,
-    ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
-        let gas_units = 4;
-
-        match self.execute_transaction_impl(
+        match executor.execute_transaction_impl(
             executor_with_group_view,
             txn,
             gas_units,
-            self.fa_migration_complete,
+            executor.fa_migration_complete,
         ) {
             Ok(change_set) => ExecutionStatus::Success(AptosTransactionOutput::new(VMOutput::new(
                 change_set,

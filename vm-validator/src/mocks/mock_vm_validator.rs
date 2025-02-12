@@ -6,12 +6,9 @@ use crate::vm_validator::TransactionValidation;
 use anyhow::Result;
 use aptos_types::{
     account_address::AccountAddress,
-    state_store::StateView,
     transaction::{SignedTransaction, VMValidatorResult},
     vm_status::StatusCode,
 };
-use aptos_vm::VMValidator;
-use move_vm_runtime::ModuleStorage;
 
 pub const ACCOUNT_DNE_TEST_ADD: AccountAddress =
     AccountAddress::new([0_u8; AccountAddress::LENGTH]);
@@ -31,20 +28,7 @@ pub const INVALID_AUTH_KEY_TEST_ADD: AccountAddress =
 #[derive(Clone)]
 pub struct MockVMValidator;
 
-impl VMValidator for MockVMValidator {
-    fn validate_transaction(
-        &self,
-        _transaction: SignedTransaction,
-        _state_view: &impl StateView,
-        _module_storage: &impl ModuleStorage,
-    ) -> VMValidatorResult {
-        VMValidatorResult::new(None, 0)
-    }
-}
-
 impl TransactionValidation for MockVMValidator {
-    type ValidationInstance = MockVMValidator;
-
     fn validate_transaction(&self, txn: SignedTransaction) -> Result<VMValidatorResult> {
         let txn = match txn.check_signature() {
             Ok(txn) => txn,

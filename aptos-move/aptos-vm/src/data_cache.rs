@@ -12,6 +12,7 @@ use aptos_aggregator::{
     resolver::{TAggregatorV1View, TDelayedFieldView},
     types::{DelayedFieldValue, DelayedFieldsSpeculativeError},
 };
+use aptos_framework::get_resource_group_member_from_metadata;
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     error::{PanicError, PanicOr},
@@ -50,18 +51,6 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
-
-pub fn get_resource_group_member_from_metadata(
-    struct_tag: &StructTag,
-    metadata: &[Metadata],
-) -> Option<StructTag> {
-    let metadata = aptos_framework::get_metadata(metadata)?;
-    metadata
-        .struct_attributes
-        .get(struct_tag.name.as_ident_str().as_str())?
-        .iter()
-        .find_map(|attr| attr.get_resource_group_member())
-}
 
 /// Adapter to convert a `ExecutorView` into a `AptosMoveResolver`.
 ///

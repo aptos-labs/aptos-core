@@ -109,17 +109,17 @@ impl GenesisMoveVM {
     }
 }
 
-pub struct MoveVmExt {
+pub struct MoveVmExt<'env> {
     inner: MoveVM,
-    pub(crate) env: AptosEnvironment,
+    pub(crate) environment: &'env AptosEnvironment,
 }
 
-impl MoveVmExt {
-    pub fn new(env: &AptosEnvironment) -> Self {
-        let vm = MoveVM::new_with_runtime_environment(env.runtime_environment());
+impl<'env> MoveVmExt<'env> {
+    pub fn new(environment: &'env AptosEnvironment) -> Self {
+        let vm = MoveVM::new_with_runtime_environment(environment.runtime_environment());
         Self {
             inner: vm,
-            env: env.clone(),
+            environment,
         }
     }
 
@@ -132,15 +132,15 @@ impl MoveVmExt {
         SessionExt::new(
             session_id,
             &self.inner,
-            self.env.chain_id(),
-            self.env.features(),
+            self.environment.chain_id(),
+            self.environment.features(),
             maybe_user_transaction_context,
             resolver,
         )
     }
 }
 
-impl Deref for MoveVmExt {
+impl<'env> Deref for MoveVmExt<'env> {
     type Target = MoveVM;
 
     fn deref(&self) -> &Self::Target {

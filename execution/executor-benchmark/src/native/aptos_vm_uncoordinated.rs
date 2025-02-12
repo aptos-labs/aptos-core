@@ -42,7 +42,7 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
         // let features = Features::fetch_config(&state_view).unwrap_or_default();
 
         let env = AptosEnvironment::new(state_view);
-        let vm = AptosVM::new(&env, state_view);
+        let vm = AptosVM::new(&env);
 
         let transaction_outputs = NATIVE_EXECUTOR_POOL.install(|| {
             txn_provider
