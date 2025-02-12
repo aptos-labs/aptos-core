@@ -112,19 +112,19 @@ pub(crate) fn update_store(
 }
 
 pub fn update_in_memory_state(
-    smt: &SparseMerkleTree<StateValue>,
-    root_smt: &SparseMerkleTree<StateValue>,
+    smt: &SparseMerkleTree,
+    root_smt: &SparseMerkleTree,
     txns_to_commit: &[TransactionToCommit],
-) -> SparseMerkleTree<StateValue> {
+) -> SparseMerkleTree {
     let updates = txns_to_commit
         .iter()
         .flat_map(|txn_to_commit| txn_to_commit.write_set().state_update_refs())
         .collect::<HashMap<_, _>>()
         .into_iter()
-        .map(|(k, u)| (k.hash(), u))
-        .collect();
+        .map(|(k, u)| (k.hash(), u.map(CryptoHash::hash)))
+        .collect_vec();
     smt.freeze(root_smt)
-        .batch_update(updates, &())
+        .batch_update(updates.iter(), &())
         .unwrap()
         .unfreeze()
 }

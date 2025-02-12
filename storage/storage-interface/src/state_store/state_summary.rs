@@ -10,18 +10,13 @@ use crate::{
     DbReader,
 };
 use anyhow::Result;
-use aptos_crypto::{
-    hash::{CryptoHash, CORRUPTION_SENTINEL},
-    HashValue,
-};
+use aptos_crypto::{hash::CORRUPTION_SENTINEL, HashValue};
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
-use aptos_types::{
-    proof::SparseMerkleProofExt, state_store::state_value::StateValue, transaction::Version,
-};
+use aptos_types::{proof::SparseMerkleProofExt, transaction::Version};
 use derive_more::Deref;
-use itertools::Itertools;
 use rayon::prelude::*;
+use std::collections::BTreeMap;
 
 /// The data structure through which the entire state at a given
 /// version can be summarized to a concise digest (the root hash).
@@ -29,13 +24,13 @@ use rayon::prelude::*;
 pub struct StateSummary {
     /// The next version. If this is 0, the state is the "pre-genesis" empty state.
     next_version: Version,
-    pub global_state_summary: SparseMerkleTree<StateValue>,
+    pub global_state_summary: SparseMerkleTree,
 }
 
 impl StateSummary {
     pub fn new_at_version(
         version: Option<Version>,
-        global_state_summary: SparseMerkleTree<StateValue>,
+        global_state_summary: SparseMerkleTree,
     ) -> Self {
         Self {
             next_version: version.map_or(0, |v| v + 1),
@@ -88,19 +83,18 @@ impl StateSummary {
             .flat_map(|shard| {
                 shard
                     .iter()
-                    .sorted_by(|(k1, _u1), (k2, _u2)| {
-                        k1.crypto_hash_ref().cmp(k2.crypto_hash_ref())
-                    })
-                    .map(|(k, u)| (CryptoHash::hash(*k), u.value))
+                    // sort and dedup first to avoid unnecessary hashing of StateValue
+                    .collect::<BTreeMap<_, _>>()
+                    .iter()
+                    .map(|(k, u)| (**k, u.value_hash_opt()))
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
 
-        // TODO(aldenhu): smt leaf not carry StateValue
         let smt = self
             .global_state_summary
             .freeze(&persisted.global_state_summary)
-            .batch_update(smt_updates, persisted)?
+            .batch_update_sorted_uniq(&smt_updates, persisted)?
             .unfreeze();
 
         Ok(Self {
@@ -225,11 +219,11 @@ impl<'db> ProvableStateSummary<'db> {
 
 impl<'db> ProofRead for ProvableStateSummary<'db> {
     // TODO(aldenhu): return error
-    fn get_proof(&self, key: HashValue, root_depth: usize) -> Option<SparseMerkleProofExt> {
+    fn get_proof(&self, key: &HashValue, root_depth: usize) -> Option<SparseMerkleProofExt> {
         self.version().map(|ver| {
             let _timer = TIMER.timer_with(&["provable_state_summary__get_proof"]);
 
-            self.get_proof(&key, ver, root_depth)
+            self.get_proof(key, ver, root_depth)
                 .expect("Failed to get account state with proof by version.")
         })
     }
