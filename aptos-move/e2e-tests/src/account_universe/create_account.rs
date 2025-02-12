@@ -44,6 +44,8 @@ impl AUTransactionGen for CreateAccountGen {
 
         let txn = create_account_txn(sender.account(), &self.new_account, sender.sequence_number, use_txn_payload_v2_format, use_orderless_transactions);
 
+        // TODO[Orderless]: create_account_gas_cost() gives the gas cost for a sequence number based transaction.
+        // Need to update this for orderless transaction.
         let mut gas_used = sender.create_account_gas_cost();
         let low_balance_gas_used = sender.create_account_low_balance_gas_cost();
         let gas_price = txn.gas_unit_price();
@@ -54,6 +56,7 @@ impl AUTransactionGen for CreateAccountGen {
             gas_price,
             gas_used,
             low_balance_gas_used,
+            use_orderless_transactions,
         );
         if is_success {
             sender.event_counter_created = true;

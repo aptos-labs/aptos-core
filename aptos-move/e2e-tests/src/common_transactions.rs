@@ -27,7 +27,7 @@ pub static EMPTY_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
 // TODO[Orderless]: Need to upgrade these functions to use transaction payload v2 format
 pub fn empty_txn(
     sender: &Account,
-    seq_num: u64,
+    seq_num: Option<u64>,
     max_gas_amount: u64,
     gas_unit_price: u64,
     use_txn_payload_v2_format: bool,
@@ -36,7 +36,7 @@ pub fn empty_txn(
     let seq_num = if use_orderless_transactions {
         u64::MAX
     } else {
-        seq_num
+        seq_num.unwrap()
     };
     sender
         .transaction()
@@ -52,14 +52,14 @@ pub fn empty_txn(
 pub fn create_account_txn(
     sender: &Account,
     new_account: &Account,
-    seq_num: u64,
+    seq_num: Option<u64>,
     use_txn_payload_v2_format: bool,
     use_orderless_transactions: bool,
 ) -> SignedTransaction {
     let seq_num = if use_orderless_transactions {
         u64::MAX
     } else {
-        seq_num
+        seq_num.unwrap()
     };
     sender
         .transaction()
@@ -78,7 +78,7 @@ pub fn create_account_txn(
 pub fn peer_to_peer_txn(
     sender: &Account,
     receiver: &Account,
-    seq_num: u64,
+    seq_num: Option<u64>,
     transfer_amount: u64,
     gas_unit_price: u64,
     use_txn_payload_v2_format: bool,
@@ -88,7 +88,7 @@ pub fn peer_to_peer_txn(
     let seq_num = if use_orderless_transactions {
         u64::MAX
     } else {
-        seq_num
+        seq_num.unwrap()
     };
     sender
         .transaction()
