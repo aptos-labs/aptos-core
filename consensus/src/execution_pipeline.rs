@@ -151,9 +151,7 @@ impl ExecutionPipeline {
         } = command;
         counters::PREPARE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
         debug!("prepare_block received block {}.", block.id());
-        let input_txns = block_preparer
-            .prepare_block(&block, async { block_qc }.shared())
-            .await;
+        let input_txns = block_preparer.prepare_block(&block, block_qc).await;
         if let Err(e) = input_txns {
             result_tx
                 .send(Err(e))

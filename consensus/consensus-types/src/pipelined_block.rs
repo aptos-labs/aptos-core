@@ -469,13 +469,13 @@ impl PipelinedBlock {
     }
 
     pub fn abort_pipeline(&self) -> Option<PipelineFutures> {
-        info!(
-            "[Pipeline] Aborting pipeline for block {} {} {}",
-            self.id(),
-            self.epoch(),
-            self.round()
-        );
         if let Some(abort_handles) = self.pipeline_abort_handle.lock().take() {
+            info!(
+                "[Pipeline] Aborting pipeline for block {} {} {}",
+                self.id(),
+                self.epoch(),
+                self.round()
+            );
             for handle in abort_handles {
                 handle.abort();
             }
