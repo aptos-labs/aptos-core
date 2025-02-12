@@ -12,6 +12,7 @@ use aptos_types::{
 use move_core_types::{ident_str, language_storage::ModuleId, parser::parse_struct_tag};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use rstest::rstest;
 
 #[derive(Serialize, Deserialize)]
 struct ModuleData {
@@ -26,12 +27,15 @@ const CHLOE_COIN_STRUCT_STRING: &str =
 const EXCHANGE_FROM_FUNCTION: &str = "exchange_from_entry";
 const EXCHANGE_TO_FUNCTION: &str = "exchange_to_entry";
 
-#[test]
-fn exchange_e2e_test() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn exchange_e2e_test(stateless_account: bool) {
     let mut h = MoveHarness::new();
 
     // create an origin account and create a resource address from it
-    let origin_account = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let origin_account = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
     let resource_address = create_resource_address(*origin_account.address(), vec![].as_slice());
 
     let mut build_options = BuildOptions::default();

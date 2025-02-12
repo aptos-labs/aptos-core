@@ -5,12 +5,17 @@ use crate::{assert_success, MoveHarness};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::account_address::AccountAddress;
 use move_core_types::{u256::U256, value::MoveValue};
+use proptest::bits::bool_vec;
+use rstest::rstest;
 
-#[test]
-fn use_new_integer_types() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn use_new_integer_types(stateless_account: bool) {
     let mut h = MoveHarness::new();
 
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
     let mut builder = PackageBuilder::new("test");
     builder.add_source(
         "test",
@@ -40,11 +45,14 @@ module 0xcafe::test {
     ));
 }
 
-#[test]
-fn new_integer_types_as_txn_arguments() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn new_integer_types_as_txn_arguments(stateless_account: bool) {
     let mut h = MoveHarness::new();
 
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
     let mut builder = PackageBuilder::new("test");
     builder.add_source(
         "test",

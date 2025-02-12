@@ -14,13 +14,14 @@ use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag}
 use move_core_types::vm_status::StatusCode;
 use rstest::rstest;
 
-#[rstest(enabled, disabled,
-    case(vec![FeatureFlag::ENABLE_ENUM_TYPES], vec![]),
+#[rstest(enabled, disabled, stateless_account,
+    case(vec![FeatureFlag::ENABLE_ENUM_TYPES], vec![], true),
+    case(vec![FeatureFlag::ENABLE_ENUM_TYPES], vec![], false),
 )]
-fn enum_types(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
+fn enum_types(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>, stateless_account: bool) {
     let positive_test = !enabled.is_empty();
     let mut h = MoveHarness::new_with_features(enabled, disabled);
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap());
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap(), if stateless_account { None } else { Some(0) });
 
     let mut builder = PackageBuilder::new("Package");
     let source = r#"
@@ -44,14 +45,16 @@ fn enum_types(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
     }
 }
 
-#[rstest(enabled, disabled,
-    case(vec![], vec![FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL]),
-    case(vec![FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL], vec![]),
+#[rstest(enabled, disabled, stateless_account,
+    case(vec![], vec![FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL], true),
+    case(vec![FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL], vec![], true),
+    case(vec![], vec![FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL], false),
+    case(vec![FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL], vec![], false),
 )]
-fn resource_access_control(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
+fn resource_access_control(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>, stateless_account: bool) {
     let positive_test = !enabled.is_empty();
     let mut h = MoveHarness::new_with_features(enabled, disabled);
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap());
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap(), if stateless_account { None } else { Some(0) });
 
     let mut builder = PackageBuilder::new("Package");
     let source = r#"

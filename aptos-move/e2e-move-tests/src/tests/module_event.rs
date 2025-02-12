@@ -7,6 +7,7 @@ use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag}
 use move_core_types::{language_storage::TypeTag, vm_status::StatusCode};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use rstest::rstest;
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 struct Field {
@@ -20,22 +21,14 @@ struct MyEvent {
     bytes: Vec<u64>,
 }
 
-#[test]
-fn test_module_event_enabled_with_stateful_sender() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn test_module_event_enabled(stateless_account: bool) {
     let mut h = MoveHarness::new_with_features(vec![FeatureFlag::MODULE_EVENT], vec![]);
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), Some(0));
-    test_module_event_enabled(&mut h, account);
-}
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
 
-#[test]
-fn test_module_event_enabled_with_stateless_sender() {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::MODULE_EVENT], vec![]);
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), None);
-    test_module_event_enabled(&mut h, account);
-}
-
-#[test]
-fn test_module_event_enabled(h: &mut MoveHarness, account: Account) {
     let mut build_options = aptos_framework::BuildOptions::default();
     build_options
         .named_addresses
@@ -74,21 +67,14 @@ fn test_module_event_enabled(h: &mut MoveHarness, account: Account) {
     assert_eq!(count, 10);
 }
 
-#[test]
-fn verify_module_event_upgrades_with_stateful_sender() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn verify_module_event_upgrades(stateless_account: bool) {
     let mut h = MoveHarness::new_with_features(vec![FeatureFlag::MODULE_EVENT], vec![]);
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), Some(0));
-    verify_module_event_upgrades(&mut h, account);
-}
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), if stateless_account { None } else { Some(0) });
 
-#[test]
-fn verify_module_event_upgrades_with_stateless_sender() {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::MODULE_EVENT], vec![]);
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), None);
-    verify_module_event_upgrades(&mut h, account);
-}
-
-fn verify_module_event_upgrades(h: &mut MoveHarness, account: Account) {
     // Initial code
     let source = r#"
         module 0xf00d::M {

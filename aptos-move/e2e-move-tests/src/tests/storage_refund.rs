@@ -11,9 +11,15 @@ use aptos_types::{
 use aptos_vm::testing::{testing_only::inject_error_once, InjectedError};
 use move_core_types::account_address::AccountAddress;
 use serde::Serialize;
+use rstest::rstest;
 
-#[test]
-fn test_refunds() {
+#[rstest(mod_stateless_account, user_stateless_account,
+    case(true, true),
+    case(true, false),
+    case(false, true),
+    case(false, false),
+)]
+fn test_refunds(mod_stateless_account: bool, user_stateless_account: bool) {
     let mut h = MoveHarness::new_with_features(
         vec![
             FeatureFlag::STORAGE_SLOT_METADATA,
@@ -31,8 +37,8 @@ fn test_refunds() {
     });
     let mod_addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
     let user_addr = AccountAddress::from_hex_literal("0x100").unwrap();
-    let mod_acc = h.new_account_at(mod_addr);
-    let user_acc = h.new_account_at(user_addr);
+    let mod_acc = h.new_account_at(mod_addr, if mod_stateless_account { None } else { Some(0) });
+    let user_acc = h.new_account_at(user_addr, if user_stateless_account { None } else { Some(0) });
 
     assert_success!(h.publish_package(&mod_acc, &test_dir_path("storage_refund.data/pack")));
 

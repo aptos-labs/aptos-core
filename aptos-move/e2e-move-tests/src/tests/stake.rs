@@ -10,6 +10,7 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
 use once_cell::sync::Lazy;
 use std::collections::BTreeMap;
+use rstest::rstest;
 
 pub static PROPOSAL_SCRIPTS: Lazy<BTreeMap<String, Vec<u8>>> = Lazy::new(build_scripts);
 
@@ -35,11 +36,16 @@ fn update_stake_amount_and_assert_with_errors(
     *stake_amount = get_stake_pool(harness, &validator_address).active;
 }
 
-#[test]
-fn test_staking_end_to_end() {
+#[rstest(owner_stateless_account, operator_stateless_account,
+    case(true, true),
+    case(true, false),
+    case(false, true),
+    case(false, false),
+)]
+fn test_staking_end_to_end(owner_stateless_account: bool, operator_stateless_account: bool) {
     let mut harness = MoveHarness::new();
-    let owner = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
-    let operator = harness.new_account_at(AccountAddress::from_hex_literal("0x234").unwrap());
+    let owner = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap(), if owner_stateless_account { None } else { Some(0) });
+    let operator = harness.new_account_at(AccountAddress::from_hex_literal("0x234").unwrap(), if operator_stateless_account { None } else { Some(0) });
     let owner_address = *owner.address();
     let operator_address = *operator.address();
 
@@ -106,12 +112,22 @@ fn test_staking_end_to_end() {
     assert_eq!(stake_pool.inactive, 0);
 }
 
-#[test]
-fn test_staking_rewards() {
+// TODO[Orderless]: Revisit this test and remove unneccessary cases
+#[rstest(stateless_account1, stateless_account2, stateless_account3,
+    case(true, true, false),
+    case(true, false, false),
+    case(false, true, false),
+    case(false, false, false),
+    case(true, true, true),
+    case(true, false, true),
+    case(false, true, true),
+    case(false, false, true),
+)]
+fn test_staking_rewards(stateless_account1: bool, stateless_account2: bool, stateless_account3: bool) {
     // Genesis starts with one validator with index 0
     let mut harness = MoveHarness::new();
-    let validator_1 = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
-    let validator_2 = harness.new_account_at(AccountAddress::from_hex_literal("0x234").unwrap());
+    let validator_1 = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap(), if stateless_account1 { None } else { Some(0) });
+    let validator_2 = harness.new_account_at(AccountAddress::from_hex_literal("0x234").unwrap(), if stateless_account2 { None } else { Some(0) });
     let validator_1_address = *validator_1.address();
     let validator_2_address = *validator_2.address();
 
@@ -192,7 +208,7 @@ fn test_staking_rewards() {
 
     // Enable rewards rate decrease and change rewards config. In production it requires governance.
     let core_resources =
-        harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
+        harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap(), if stateless_account3 { None } else { Some(0) });
     let script_code = PROPOSAL_SCRIPTS
         .get("update_rewards_config")
         .expect("proposal script should be built");
@@ -307,10 +323,13 @@ fn test_staking_rewards() {
     );
 }
 
-#[test]
-fn test_staking_rewards_pending_inactive() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn test_staking_rewards_pending_inactive(stateless_account: bool) {
     let mut harness = MoveHarness::new();
-    let validator = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
+    let validator = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap(), if stateless_account { None } else { Some(0) });
     let validator_address = *validator.address();
 
     // Initialize the validator.
@@ -336,12 +355,22 @@ fn test_staking_rewards_pending_inactive() {
     );
 }
 
-#[test]
-fn test_staking_contract() {
+// TODO[Orderless]: Revisit this test and remove unneccessary cases
+#[rstest(staker_stateless_account, stateless_account1, stateless_account2,
+    case(true, true, false),
+    case(true, false, false),
+    case(false, true, false),
+    case(false, false, false),
+    case(true, true, true),
+    case(true, false, true),
+    case(false, true, true),
+    case(false, false, true),
+)]
+fn test_staking_contract(staker_stateless_account: bool, stateless_account1: bool, stateless_account2: bool) {
     let mut harness = MoveHarness::new();
-    let staker = harness.new_account_at(AccountAddress::from_hex_literal("0x11").unwrap());
-    let operator_1 = harness.new_account_at(AccountAddress::from_hex_literal("0x21").unwrap());
-    let operator_2 = harness.new_account_at(AccountAddress::from_hex_literal("0x22").unwrap());
+    let staker = harness.new_account_at(AccountAddress::from_hex_literal("0x11").unwrap(), if staker_stateless_account { None } else { Some(0) });
+    let operator_1 = harness.new_account_at(AccountAddress::from_hex_literal("0x21").unwrap(), if stateless_account1 { None } else { Some(0) });
+    let operator_2 = harness.new_account_at(AccountAddress::from_hex_literal("0x22").unwrap(), if stateless_account2 { None } else { Some(0) });
     let amount = 25_000_000;
     let staker_address = *staker.address();
     let operator_1_address = *operator_1.address();
