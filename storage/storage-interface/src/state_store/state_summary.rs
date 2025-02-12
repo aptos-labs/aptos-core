@@ -83,6 +83,7 @@ impl StateSummary {
             .flat_map(|shard| {
                 shard
                     .iter()
+                    // sort and dedup first to avoid unnecessary hashing of StateValue
                     .collect::<BTreeMap<_, _>>()
                     .iter()
                     .map(|(k, u)| (**k, u.value_hash_opt()))
@@ -93,7 +94,7 @@ impl StateSummary {
         let smt = self
             .global_state_summary
             .freeze(&persisted.global_state_summary)
-            .batch_update(smt_updates.iter(), persisted)?
+            .batch_update_sorted_uniq(&smt_updates, persisted)?
             .unfreeze();
 
         Ok(Self {

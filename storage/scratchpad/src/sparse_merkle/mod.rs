@@ -502,13 +502,25 @@ impl FrozenSparseMerkleTree {
             .into_iter()
             .collect::<Vec<_>>();
 
-        if kvs.is_empty() {
+        self.batch_update_sorted_uniq(&kvs, proof_reader)
+    }
+
+    pub fn batch_update_sorted_uniq<'a, K, V>(
+        &self,
+        sorted_unique_updates: &'a [(K, Option<V>)],
+        proof_reader: &impl ProofRead,
+    ) -> Result<Self, UpdateError>
+    where
+        K: 'a + HashValueRef + Sync,
+        V: 'a + HashValueRef + Sync,
+    {
+        if sorted_unique_updates.is_empty() {
             Ok(self.clone())
         } else {
             let current_root = self.smt.root_weak();
             let root = SubTreeUpdater::update(
                 current_root,
-                &kvs[..],
+                sorted_unique_updates,
                 proof_reader,
                 self.smt.inner.generation + 1,
             )?;

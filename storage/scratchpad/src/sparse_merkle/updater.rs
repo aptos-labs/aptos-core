@@ -6,7 +6,7 @@ use crate::{
     sparse_merkle::{
         node::{InternalNode, Node, NodeHandle, NodeInner},
         utils::{partition, swap_if},
-        UpdateError,
+        HashValueRef, UpdateError,
     },
     ProofRead,
 };
@@ -286,17 +286,21 @@ impl SubTreeInfo {
     }
 }
 
-pub struct SubTreeUpdater<'a> {
+pub struct SubTreeUpdater<'a, K, V> {
     depth: usize,
     info: SubTreeInfo,
-    updates: &'a [(&'a HashValue, Option<&'a HashValue>)],
+    updates: &'a [(K, Option<V>)],
     generation: u64,
 }
 
-impl<'a> SubTreeUpdater<'a> {
+impl<'a, K, V> SubTreeUpdater<'a, K, V>
+where
+    K: 'a + HashValueRef + Sync,
+    V: 'a + HashValueRef + Sync,
+{
     pub(crate) fn update(
         root: InMemSubTree,
-        updates: &'a [(&'a HashValue, Option<&'a HashValue>)],
+        updates: &'a [(K, Option<V>)],
         proof_reader: &'a impl ProofRead,
         generation: u64,
     ) -> Result<InMemSubTree> {
@@ -345,7 +349,7 @@ impl<'a> SubTreeUpdater<'a> {
                         InMemSubTreeInfo::Empty => match update {
                             Some(value) => {
                                 MaybeEndRecursion::End(InMemSubTreeInfo::create_leaf_with_update(
-                                    (**key_to_update, **value),
+                                    (*key_to_update.hash_ref(), *value.hash_ref()),
                                     self.generation,
                                 ))
                             },
@@ -353,15 +357,15 @@ impl<'a> SubTreeUpdater<'a> {
                         },
                         InMemSubTreeInfo::Leaf { key, .. } => match update {
                             Some(value) => MaybeEndRecursion::or(
-                                key == *key_to_update,
+                                key == key_to_update.hash_ref(),
                                 InMemSubTreeInfo::create_leaf_with_update(
-                                    (**key_to_update, **value),
+                                    (*key_to_update.hash_ref(), *value.hash_ref()),
                                     self.generation,
                                 ),
                                 self,
                             ),
                             None => {
-                                if key == *key_to_update {
+                                if key == key_to_update.hash_ref() {
                                     MaybeEndRecursion::End(InMemSubTreeInfo::Empty)
                                 } else {
                                     MaybeEndRecursion::End(self.info.materialize(self.generation))
@@ -372,15 +376,15 @@ impl<'a> SubTreeUpdater<'a> {
                     },
                     SubTreeInfo::Persisted(PersistedSubTreeInfo::Leaf { leaf }) => match update {
                         Some(value) => MaybeEndRecursion::or(
-                            leaf.key() == *key_to_update,
+                            leaf.key() == key_to_update.hash_ref(),
                             InMemSubTreeInfo::create_leaf_with_update(
-                                (**key_to_update, **value),
+                                (*key_to_update.hash_ref(), *value.hash_ref()),
                                 self.generation,
                             ),
                             self,
                         ),
                         None => {
-                            if leaf.key() == *key_to_update {
+                            if leaf.key() == key_to_update.hash_ref() {
                                 MaybeEndRecursion::End(InMemSubTreeInfo::Empty)
                             } else {
                                 MaybeEndRecursion::End(self.info.materialize(self.generation))
@@ -398,9 +402,12 @@ impl<'a> SubTreeUpdater<'a> {
         let pivot = partition(self.updates, self.depth);
         let (left_updates, right_updates) = self.updates.split_at(pivot);
         let generation = self.generation;
-        let (left_info, right_info) =
-            self.info
-                .into_children(self.updates[0].0, self.depth, proof_reader, generation)?;
+        let (left_info, right_info) = self.info.into_children(
+            self.updates[0].0.hash_ref(),
+            self.depth,
+            proof_reader,
+            generation,
+        )?;
 
         Ok((
             Self {
