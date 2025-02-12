@@ -8,24 +8,17 @@ use aptos_types::{
 };
 use move_core_types::vm_status::StatusCode::EXECUTION_LIMIT_REACHED;
 use std::time::Instant;
+use rstest::rstest;
 
 /// Run with `cargo test <test_name> -- --nocapture` to see output.
-
-#[test]
-fn empty_while_loop_test_with_stateful_sender() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn empty_while_loop(stateless_account: bool) {
     let mut h = MoveHarness::new();
-    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0x915").unwrap(), Some(0));
-    empty_while_loop(&mut h, acc);
-}
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x915").unwrap(), if stateless_account { None } else { Some(0)});
 
-#[test]
-fn empty_while_loop_test_with_stateless_sender() {
-    let mut h = MoveHarness::new();
-    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0x915").unwrap(), None);
-    empty_while_loop(&mut h, acc);
-}
-
-fn empty_while_loop(h: &mut MoveHarness, acc: Account) {
     assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("infinite_loop.data/empty_loop"),

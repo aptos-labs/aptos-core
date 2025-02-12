@@ -13,7 +13,7 @@ use rstest::rstest;
 )]
 fn lazy_natives(stateless_account: bool) {
     let mut h = MoveHarness::new();
-    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
     // Set flag to publish the package.
     h.enable_features(vec![], vec![FeatureFlag::DISALLOW_USER_NATIVES]);
     let mut builder = PackageBuilder::new("LazyNatives");
