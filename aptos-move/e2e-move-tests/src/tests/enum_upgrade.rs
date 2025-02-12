@@ -9,25 +9,18 @@ use aptos_language_e2e_tests::account::Account;
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{account_address::AccountAddress, transaction::TransactionStatus};
 use move_core_types::vm_status::StatusCode;
+use rstest::rstest;
 
-#[test]
-fn enum_upgrade_test_with_stateful_sender() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn enum_upgrade(stateless_account: bool) {
     let mut h = MoveHarness::new();
-    let stateful_acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap(), Some(0));
-    enum_upgrade(&mut h, acc);
-}
-
-#[test]
-fn enum_upgrade_test_with_stateless_sender() {
-    let mut h = MoveHarness::new();
-    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0x915").unwrap(), None);
-    enum_upgrade(&mut h, acc);
-}
-
-fn enum_upgrade(h: &mut MoveHarness, acc: Account) {
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x915").unwrap(), if stateless_account { None } else { Some(0) });
     // Initial publish
     let result = publish(
-        h,
+        &mut h,
         &acc,
         r#"
         module 0x815::m {
@@ -41,7 +34,7 @@ fn enum_upgrade(h: &mut MoveHarness, acc: Account) {
 
     // Add a compatible variant
     let result = publish(
-        h,
+        &mut h,
         &acc,
         r#"
         module 0x815::m {
@@ -56,7 +49,7 @@ fn enum_upgrade(h: &mut MoveHarness, acc: Account) {
 
     // Upgrade identity
     let result = publish(
-        h,
+        &mut h,
         &acc,
         r#"
         module 0x815::m {
@@ -71,7 +64,7 @@ fn enum_upgrade(h: &mut MoveHarness, acc: Account) {
 
     // Incompatible because of modification
     let result = publish(
-        h,
+        &mut h,
         &acc,
         r#"
         module 0x815::m {
@@ -86,7 +79,7 @@ fn enum_upgrade(h: &mut MoveHarness, acc: Account) {
 
     // Incompatible because of removal
     let result = publish(
-        h,
+        &mut h,
         &acc,
         r#"
         module 0x815::m {
@@ -100,7 +93,7 @@ fn enum_upgrade(h: &mut MoveHarness, acc: Account) {
 
     // Incompatible because of renaming
     let result = publish(
-        h,
+        &mut h,
         &acc,
         r#"
         module 0x815::m {

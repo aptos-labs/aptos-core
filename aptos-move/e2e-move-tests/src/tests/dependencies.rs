@@ -7,22 +7,17 @@ use aptos_types::{
     transaction::{ExecutionStatus, TransactionStatus},
 };
 use move_core_types::vm_status::StatusCode::DEPENDENCY_LIMIT_REACHED;
+use rstest::rstest;
 
-#[test]
-fn exceeding_max_num_dependencies_test_with_stateful_sender() {
+
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn exceeding_max_num_dependencies(stateless_account: bool) {
     let mut h = MoveHarness::new();
-    let stateful_acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), Some(0));
-    exceeding_max_num_dependencies(&mut h, stateful_acc);
-}
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
 
-#[test]
-fn exceeding_max_num_dependencies_test_with_stateless_sender() {
-    let mut h = MoveHarness::new();
-    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0xdafe").unwrap(), None);  
-    exceeding_max_num_dependencies(&mut h, stateless_acc);
-}
-
-fn exceeding_max_num_dependencies(h: &mut MoveHarness, acc: Account) {
     h.modify_gas_schedule(|gas_params| {
         gas_params.vm.txn.max_num_dependencies = 2.into();
     });
@@ -73,21 +68,13 @@ fn exceeding_max_num_dependencies(h: &mut MoveHarness, acc: Account) {
     ));
 }
 
-#[test]
-fn exceeding_max_dependency_size_test_with_stateful_sender() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn exceeding_max_dependency_size(stateless_account: bool) {
     let mut h = MoveHarness::new();
-    let stateful_acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), Some(0));
-    exceeding_max_dependency_size(&mut h, stateful_acc);
-}
-
-#[test]
-fn exceeding_max_dependency_size_test_with_stateless_sender() {
-    let mut h = MoveHarness::new();
-    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0xdafe").unwrap(), None);  
-    exceeding_max_dependency_size(&mut h, stateless_acc);
-}
-
-fn exceeding_max_dependency_size(h: &mut MoveHarness, acc: Account) {
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
     h.modify_gas_schedule(|gas_params| {
         gas_params.vm.txn.max_total_dependency_size = 260.into();
     });
