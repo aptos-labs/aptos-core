@@ -206,6 +206,7 @@ impl FeatureFlag {
             FeatureFlag::PERMISSIONED_SIGNER,
             FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
             FeatureFlag::ACCOUNT_ABSTRACTION,
+            FeatureFlag::BULLETPROOFS_BATCH_NATIVES,
         ]
     }
 }
