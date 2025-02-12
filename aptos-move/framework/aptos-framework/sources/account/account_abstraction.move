@@ -54,8 +54,51 @@ module aptos_framework::account_abstraction {
         V1 { auth_functions: OrderedMap<FunctionInfo, bool> }
     }
 
+    /// The dispatchable domain-scoped authenticator, that defines how to authenticate
     enum DomainDispatchableAuthenticator has key {
         V1 { auth_functions: BigOrderedMap<FunctionInfo, bool> }
+    }
+
+    #[view]
+    /// Return `true` if the account is an abstracted account that can be authenticated with dispatchable move authenticator.
+    public fun using_dispatchable_authenticator(addr: address): bool {
+        exists<DispatchableAuthenticator>(resource_addr(addr))
+    }
+
+    #[view]
+    /// Return the current dispatchable authenticator move function info. `None` means this authentication scheme is disabled.
+    public fun dispatchable_authenticator(addr: address): Option<vector<FunctionInfo>> acquires DispatchableAuthenticator {
+        let resource_addr = resource_addr(addr);
+        if (exists<DispatchableAuthenticator>(resource_addr)) {
+            option::some(
+                ordered_map::keys(&borrow_global<DispatchableAuthenticator>(resource_addr).auth_functions)
+            )
+        } else { option::none() }
+    }
+
+    #[view]
+    public fun domain_aa_account_address_view(
+        module_address: address,
+        module_name: String,
+        function_name: String,
+        account_identity: vector<u8>
+    ): address {
+        domain_aa_account_address(
+            function_info::new_function_info_from_address(module_address, module_name, function_name),
+            &account_identity,
+        )
+    }
+
+    /// TODO: probably worth creating some module with all these derived functions,
+    /// and do computation/caching in rust to avoid recomputation, as we do for objects.
+    public fun domain_aa_account_address(domain_func_info: FunctionInfo, account_identity: &vector<u8>): address {
+        // using bcs serialized structs here - this allows for no need for separators.
+        // Alternative would've been to create unique string, we would need to convert domain_func_info into string,
+        // then authentication_key to hex, and then we need separators as well - like ::
+        let bytes = bcs::to_bytes(&domain_func_info);
+        bytes.append(bcs::to_bytes(account_identity));
+        bytes.push_back(DOMAIN_ABSTRACTION_DERIVED_SCHEME);
+        from_bcs::to_address(hash::sha3_256(bytes))
     }
 
     /// Add dispatchable authentication function that enables account abstraction via this function.
@@ -75,6 +118,7 @@ module aptos_framework::account_abstraction {
     }
 
     /// Remove dispatchable authentication function that enables account abstraction via this function.
+    /// dispatchable function needs to verify that signing_data.authenticator() is a valid signature of signing_data.digest().
     /// Note: it is a private entry function that can only be called directly from transaction.
     entry fun remove_authentication_function(
         account: &signer,
@@ -107,14 +151,14 @@ module aptos_framework::account_abstraction {
         };
     }
 
-    entry fun initialize(aptos_framework: &signer) {
-        system_addresses::assert_aptos_framework(aptos_framework);
-        move_to(
-            aptos_framework,
-            DomainDispatchableAuthenticator::V1 { auth_functions: big_ordered_map::new_with_config(0, 0, false) }
-        );
-    }
-
+    /// Add dispatchable domain-scoped authentication function, that enables account abstraction via this function.
+    /// This means all accounts within the domain can use it to authenticate, without needing an initialization (unlike non-domain AA).
+    /// dispatchable function needs to verify two things:
+    /// - that signing_data.authenticator() is a valid signature of signing_data.digest() (just like regular AA)
+    /// - that signing_data.account_identity() is correct identity representing the authenticator
+    ///   (missing this step would allow impersonation)
+    ///
+    /// Note: it is a private entry function that can only be called directly from transaction.
     entry fun register_domain_with_authentication_function(
         aptos_framework: &signer,
         module_address: address,
@@ -140,6 +184,14 @@ module aptos_framework::account_abstraction {
         borrow_global_mut<DomainDispatchableAuthenticator>(@aptos_framework).auth_functions.add(
             function_info::new_function_info_from_address(module_address, module_name, function_name),
             true,
+        );
+    }
+
+    entry fun initialize(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        move_to(
+            aptos_framework,
+            DomainDispatchableAuthenticator::V1 { auth_functions: big_ordered_map::new_with_config(0, 0, false) }
         );
     }
 
@@ -196,38 +248,9 @@ module aptos_framework::account_abstraction {
         }
     }
 
-    #[view]
-    /// Return `true` if the account is an abstracted account that can be authenticated with dispatchable move authenticator.
-    public fun using_dispatchable_authenticator(addr: address): bool {
-        exists<DispatchableAuthenticator>(resource_addr(addr))
-    }
-
-    #[view]
-    /// Return the current dispatchable authenticator move function info. `None` means this authentication scheme is disabled.
-    public fun dispatchable_authenticator(addr: address): Option<vector<FunctionInfo>> acquires DispatchableAuthenticator {
-        let resource_addr = resource_addr(addr);
-        if (exists<DispatchableAuthenticator>(resource_addr)) {
-            option::some(
-                ordered_map::keys(&borrow_global<DispatchableAuthenticator>(resource_addr).auth_functions)
-            )
-        } else { option::none() }
-    }
-
     inline fun dispatchable_authenticator_internal(addr: address): &OrderedMap<FunctionInfo, bool> {
         assert!(using_dispatchable_authenticator(addr), error::not_found(EDISPATCHABLE_AUTHENTICATOR_IS_NOT_USED));
         &borrow_global<DispatchableAuthenticator>(resource_addr(addr)).auth_functions
-    }
-
-    /// TODO: probably worth creating some module with all these derived functions,
-    /// and do computation/caching in rust to avoid recomputation, as we do for objects.
-    public fun domain_aa_account_address(domain_func_info: FunctionInfo, account_identity: &vector<u8>): address {
-        /// using bcs serialized structs here - this allows for no need for separators.
-        /// If we want to have a strings from each, we would need to convert domain_func_info into string,
-        /// then authentication_key to hex, and then we need separators as well - like ::
-        let bytes = bcs::to_bytes(&domain_func_info);
-        bytes.append(bcs::to_bytes(account_identity));
-        bytes.push_back(DOMAIN_ABSTRACTION_DERIVED_SCHEME);
-        from_bcs::to_address(hash::sha3_256(bytes))
     }
 
     fun authenticate(
@@ -235,8 +258,6 @@ module aptos_framework::account_abstraction {
         func_info: FunctionInfo,
         signing_data: AbstractionAuthData,
     ): signer acquires DispatchableAuthenticator, DomainDispatchableAuthenticator {
-        assert!(using_dispatchable_authenticator(@aptos_framework), error::not_found(EDISPATCHABLE_AUTHENTICATOR_IS_NOT_USED));
-
         let master_signer_addr = signer::address_of(&account);
 
         if (signing_data.is_domain()) {
@@ -248,6 +269,7 @@ module aptos_framework::account_abstraction {
             // so we need to have it separate, and require authenticate function to confirm it matches.
             assert!(master_signer_addr == domain_aa_account_address(func_info, signing_data.account_identity()), error::invalid_state(EINCONSISTENT_SIGNER_ADDRESS));
         } else {
+            assert!(using_dispatchable_authenticator(@aptos_framework), error::not_found(EDISPATCHABLE_AUTHENTICATOR_IS_NOT_USED));
             let func_infos = &borrow_global<DispatchableAuthenticator>(resource_addr(master_signer_addr)).auth_functions;
             assert!(ordered_map::contains(func_infos, &func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
         };

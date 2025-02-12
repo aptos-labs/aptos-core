@@ -181,6 +181,14 @@ pub enum EntryFunctionCall {
 
     AccountAbstractionInitialize {},
 
+    /// Add dispatchable domain-scoped authentication function, that enables account abstraction via this function.
+    /// This means all accounts within the domain can use it to authenticate, without needing an initialization (unlike non-domain AA).
+    /// dispatchable function needs to verify two things:
+    /// - that signing_data.authenticator() is a valid signature of signing_data.digest() (just like regular AA)
+    /// - that signing_data.account_identity() is correct identity representing the authenticator
+    ///   (missing this step would allow impersonation)
+    ///
+    /// Note: it is a private entry function that can only be called directly from transaction.
     AccountAbstractionRegisterDomainWithAuthenticationFunction {
         module_address: AccountAddress,
         module_name: Vec<u8>,
@@ -194,6 +202,7 @@ pub enum EntryFunctionCall {
     },
 
     /// Remove dispatchable authentication function that enables account abstraction via this function.
+    /// dispatchable function needs to verify that signing_data.authenticator() is a valid signature of signing_data.digest().
     /// Note: it is a private entry function that can only be called directly from transaction.
     AccountAbstractionRemoveAuthenticationFunction {
         module_address: AccountAddress,
@@ -2279,6 +2288,14 @@ pub fn account_abstraction_initialize() -> TransactionPayload {
     ))
 }
 
+/// Add dispatchable domain-scoped authentication function, that enables account abstraction via this function.
+/// This means all accounts within the domain can use it to authenticate, without needing an initialization (unlike non-domain AA).
+/// dispatchable function needs to verify two things:
+/// - that signing_data.authenticator() is a valid signature of signing_data.digest() (just like regular AA)
+/// - that signing_data.account_identity() is correct identity representing the authenticator
+///   (missing this step would allow impersonation)
+///
+/// Note: it is a private entry function that can only be called directly from transaction.
 pub fn account_abstraction_register_domain_with_authentication_function(
     module_address: AccountAddress,
     module_name: Vec<u8>,
@@ -2326,6 +2343,7 @@ pub fn account_abstraction_register_domain_with_authentication_function_test_net
 }
 
 /// Remove dispatchable authentication function that enables account abstraction via this function.
+/// dispatchable function needs to verify that signing_data.authenticator() is a valid signature of signing_data.digest().
 /// Note: it is a private entry function that can only be called directly from transaction.
 pub fn account_abstraction_remove_authentication_function(
     module_address: AccountAddress,
