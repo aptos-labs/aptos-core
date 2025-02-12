@@ -20,6 +20,8 @@ use move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
 use rstest::rstest;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+// TODO[Orderless]: Revisit these tests to accommodate stateless accounts and orderless transactions.
+
 /// This tests the `object_code_deployment.move` module under the `aptos-framework` package.
 /// The feature `OBJECT_CODE_DEPLOYMENT` is on by default for tests.
 
@@ -52,8 +54,8 @@ impl TestContext {
             MoveHarness::new()
         };
 
-        let account = harness.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-        let sequence_number = harness.sequence_number(account.address());
+        let account = harness.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), Some(0));
+        let sequence_number = harness.sequence_number_opt(account.address()).unwrap();
         let object_address =
             create_object_code_deployment_address(*account.address(), sequence_number + 1);
         TestContext {
@@ -242,7 +244,7 @@ fn object_code_deployment_upgrade_fail_when_not_owner() {
     // We should not be able to upgrade with a different account.
     let different_account = context
         .harness
-        .new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
+        .new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), Some(0));
     let status = context.execute_object_code_action(
         &different_account,
         "object_code_deployment.data/pack_upgrade_compat",
@@ -367,7 +369,7 @@ fn freeze_code_object_fail_when_not_owner() {
 
     let different_account = context
         .harness
-        .new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
+        .new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), Some(0));
     let status =
         context.execute_object_code_action(&different_account, "", ObjectCodeAction::Freeze);
 
