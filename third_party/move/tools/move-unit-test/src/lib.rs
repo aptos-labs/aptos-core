@@ -102,12 +102,6 @@ pub struct UnitTestingConfig {
     /// Verbose mode
     #[clap(short = 'v', long = "verbose")]
     pub verbose: bool,
-
-    /// Use the EVM-based execution backend.
-    /// Does not work with --stackless.
-    #[cfg(feature = "evm-backend")]
-    #[clap(long = "evm")]
-    pub evm: bool,
 }
 
 fn format_module_id(module_id: &ModuleId) -> String {
@@ -133,9 +127,6 @@ impl Default for UnitTestingConfig {
             verbose: false,
             list: false,
             named_address_values: vec![],
-
-            #[cfg(feature = "evm-backend")]
-            evm: false,
         }
     }
 }
@@ -229,8 +220,6 @@ impl UnitTestingConfig {
             native_function_table,
             genesis_state,
             self.verbose,
-            #[cfg(feature = "evm-backend")]
-            self.evm,
         )
         .unwrap();
 
