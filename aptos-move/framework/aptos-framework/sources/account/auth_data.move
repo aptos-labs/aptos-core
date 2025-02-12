@@ -1,5 +1,7 @@
 module aptos_framework::auth_data {
-    use std::string::String;
+    use std::error;
+
+    const ENOT_DOMAIN_AUTH_DATA: u64 = 1;
 
     enum DomainAccount has copy, drop {
         V1 {
@@ -30,6 +32,7 @@ module aptos_framework::auth_data {
     }
 
     public fun account_identity(self: &AbstractionAuthData): &vector<u8> {
+        assert!(self is DomainV1, error::invalid_argument(ENOT_DOMAIN_AUTH_DATA));
         &self.account.account_identity
     }
 }

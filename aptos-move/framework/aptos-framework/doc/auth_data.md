@@ -7,13 +7,15 @@
 
 -  [Enum `DomainAccount`](#0x1_auth_data_DomainAccount)
 -  [Enum `AbstractionAuthData`](#0x1_auth_data_AbstractionAuthData)
+-  [Constants](#@Constants_0)
 -  [Function `digest`](#0x1_auth_data_digest)
 -  [Function `authenticator`](#0x1_auth_data_authenticator)
 -  [Function `is_domain`](#0x1_auth_data_is_domain)
 -  [Function `account_identity`](#0x1_auth_data_account_identity)
 
 
-<pre><code></code></pre>
+<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+</code></pre>
 
 
 
@@ -135,6 +137,20 @@
 
 </details>
 
+<a id="@Constants_0"></a>
+
+## Constants
+
+
+<a id="0x1_auth_data_ENOT_DOMAIN_AUTH_DATA"></a>
+
+
+
+<pre><code><b>const</b> <a href="auth_data.md#0x1_auth_data_ENOT_DOMAIN_AUTH_DATA">ENOT_DOMAIN_AUTH_DATA</a>: u64 = 1;
+</code></pre>
+
+
+
 <a id="0x1_auth_data_digest"></a>
 
 ## Function `digest`
@@ -223,6 +239,7 @@
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="auth_data.md#0x1_auth_data_account_identity">account_identity</a>(self: &<a href="auth_data.md#0x1_auth_data_AbstractionAuthData">AbstractionAuthData</a>): &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <b>assert</b>!(self is DomainV1, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="auth_data.md#0x1_auth_data_ENOT_DOMAIN_AUTH_DATA">ENOT_DOMAIN_AUTH_DATA</a>));
     &self.<a href="account.md#0x1_account">account</a>.account_identity
 }
 </code></pre>

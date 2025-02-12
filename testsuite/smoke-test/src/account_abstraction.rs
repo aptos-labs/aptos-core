@@ -49,20 +49,11 @@ async fn test_domain_aa() {
         function_info,
         account_key.public_key().to_bytes().to_vec(),
         Arc::new(move |x: &[u8]| {
-            let x_hex = hex::encode(x).into_bytes();
-
-            let mut authenticator = vec![];
-            authenticator.extend(bcs::to_bytes(&account_key.public_key().to_bytes().to_vec()).unwrap());
-            authenticator.extend(
-                bcs::to_bytes(
-                    &account_key.private_key()
-                        .sign_arbitrary_message(&x_hex)
-                        .to_bytes()
-                        .to_vec(),
-                )
-                .unwrap(),
-            );
-            authenticator
+            let x_hex = format!("0x{}", hex::encode(x)).into_bytes();
+            account_key.private_key()
+                .sign_arbitrary_message(&x_hex)
+                .to_bytes()
+                .to_vec()
         }),
         0,
     );
@@ -71,7 +62,7 @@ async fn test_domain_aa() {
         info.transaction_factory()
             .payload(aptos_stdlib::aptos_account_transfer(
                 account.address(),
-                1000000,
+                10000000000,
             )),
     );
     info.client().submit_and_wait(&create_txn).await.unwrap();
