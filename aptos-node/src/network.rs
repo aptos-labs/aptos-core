@@ -580,7 +580,7 @@ fn transform_network_handles_into_interfaces(
     )
 }
 
-/// Creates an application network inteface using the given
+/// Creates an application network interface using the given
 /// handles and config.
 fn create_network_interfaces<
     T: Serialize + for<'de> Deserialize<'de> + Send + Sync + Clone + 'static,
