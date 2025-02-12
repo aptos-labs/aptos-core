@@ -6,6 +6,7 @@ use aptos_types::{
     account_address::AccountAddress,
     transaction::{ExecutionStatus, TransactionStatus},
 };
+use rstest::rstest;
 
 // TODO(Gas): This test has been disabled since the particularly attack it uses can no longer
 //            be carried out due to the increase in execution costs.
@@ -43,21 +44,13 @@ fn push_u128s_onto_vector() {
 }
 */
 
-#[test]
-fn clone_large_vectors_with_stateful_sender() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn clone_large_vectors(stateless_account: bool) {
     let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), Some(0));
-    clone_large_vectors(&mut h, acc);
-}
-
-#[test]
-fn clone_large_vectors_with_stateless_sender() {
-    let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), None);
-    clone_large_vectors(&mut h, acc);
-}
-
-fn clone_large_vectors(h: &mut MoveHarness, acc: Account) {
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), if stateless_account { None } else { Some(0) });
     assert_success!(h.publish_package(&acc, &common::test_dir_path("memory_quota.data/clone_vec"),));
 
     let result = h.run_entry_function(
@@ -80,22 +73,14 @@ fn clone_large_vectors(h: &mut MoveHarness, acc: Account) {
     ));
 }
 
-#[test]
-fn add_vec_to_table_with_stateful_sender() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn add_vec_to_table(stateless_account: bool) {
     let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), Some(0));
-    add_vec_to_table(&mut h, acc);
-}
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(),  if stateless_account { None } else { Some(0) });
 
-#[test]
-fn add_vec_to_table_with_stateless_sender() {
-    let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), None);
-    add_vec_to_table(&mut h, acc);
-}
-
-#[test]
-fn add_vec_to_table(h: &mut MoveHarness, acc: Account) {
     assert_success!(h.publish_package(
         &acc,
         &common::test_dir_path("memory_quota.data/table_and_vec"),

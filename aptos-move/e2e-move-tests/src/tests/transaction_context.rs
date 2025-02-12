@@ -16,6 +16,7 @@ use move_core_types::{
     parser::parse_struct_tag,
 };
 use serde::{Deserialize, Serialize};
+use rstest::rstest;
 
 #[derive(Deserialize, Serialize, Debug)]
 struct TransactionContextStore {
@@ -33,10 +34,10 @@ struct TransactionContextStore {
     multisig_address: AccountAddress,
 }
 
-fn setup(harness: &mut MoveHarness) -> Account {
+fn setup(harness: &mut MoveHarness, stateless_account: bool) -> Account {
     let path = common::test_dir_path("transaction_context.data/pack");
 
-    let account = harness.new_account_at(AccountAddress::ONE);
+    let account = harness.new_account_at(AccountAddress::ONE, if stateless_account { None } else { Some(0) });
 
     assert_success!(harness.publish_package_cache_building(&account, &path));
 
@@ -239,55 +240,73 @@ fn new_move_harness() -> MoveHarness {
     )
 }
 
-#[test]
-fn test_transaction_context_sender() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn test_transaction_context_sender(stateless_account: bool) {
     let mut harness = new_move_harness();
-    let account = setup(&mut harness);
+    let account = setup(&mut harness, stateless_account);
 
     let addr = call_get_sender_from_native_txn_context(&mut harness, &account);
     assert_eq!(addr, AccountAddress::ONE);
 }
 
-#[test]
-fn test_transaction_context_max_gas_amount() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn test_transaction_context_max_gas_amount(stateless_account: bool) {
     let mut harness = new_move_harness();
-    let account = setup(&mut harness);
+    let account = setup(&mut harness, stateless_account);
 
     let max_gas_amount = call_get_max_gas_amount_from_native_txn_context(&mut harness, &account);
     assert_eq!(max_gas_amount, 2000000);
 }
 
-#[test]
-fn test_transaction_context_gas_unit_price() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn test_transaction_context_gas_unit_price(stateless_account: bool) {
     let mut harness = new_move_harness();
-    let account = setup(&mut harness);
+    let account = setup(&mut harness, stateless_account);
 
     let max_gas_amount = call_get_gas_unit_price_from_native_txn_context(&mut harness, &account);
     assert_eq!(max_gas_amount, 100);
 }
 
-#[test]
-fn test_transaction_context_chain_id() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn test_transaction_context_chain_id(stateless_account: bool) {
     let mut harness = new_move_harness();
-    let account = setup(&mut harness);
+    let account = setup(&mut harness, stateless_account);
 
     let chain_id = call_get_chain_id_from_native_txn_context(&mut harness, &account);
     assert_eq!(chain_id, 4);
 }
 
-#[test]
-fn test_transaction_context_gas_payer_as_sender() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn test_transaction_context_gas_payer_as_sender(stateless_account: bool) {
     let mut harness = new_move_harness();
-    let account = setup(&mut harness);
+    let account = setup(&mut harness, stateless_account);
 
     let gas_payer = call_get_gas_payer_from_native_txn_context(&mut harness, &account);
     assert_eq!(gas_payer, *account.address());
 }
 
-#[test]
-fn test_transaction_context_secondary_signers_empty() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn test_transaction_context_secondary_signers_empty(stateless_account: bool) {
     let mut harness = new_move_harness();
-    let account = setup(&mut harness);
+    let account = setup(&mut harness, stateless_account);
 
     let secondary_signers =
         call_get_secondary_signers_from_native_txn_context(&mut harness, &account);
@@ -298,7 +317,7 @@ fn test_transaction_context_secondary_signers_empty() {
 fn test_transaction_context_gas_payer_as_separate_account() {
     let mut harness = new_move_harness();
 
-    let alice = setup(&mut harness);
+    let alice = setup(&mut harness, stateless_account);
     let bob = harness.new_account_with_balance_and_sequence_number(1000000, 0);
 
     let fun: MemberId =
@@ -338,12 +357,17 @@ fn test_transaction_context_gas_payer_as_separate_account() {
     assert_eq!(gas_payer, *bob.address());
 }
 
-#[test]
-fn test_transaction_context_secondary_signers() {
+#[rstest(alice_stateless_account, bob_stateless_account,
+    case(true, true),
+    case(true, false),
+    case(false, true),
+    case(false, false),
+)]
+fn test_transaction_context_secondary_signers(alice_stateless_account: bool, bob_stateless_account: bool) {
     let mut harness = new_move_harness();
 
-    let alice = setup(&mut harness);
-    let bob = harness.new_account_with_balance_and_sequence_number(1000000, 0);
+    let alice = setup(&mut harness, alice_stateless_account);
+    let bob = harness.new_account_with_balance_and_sequence_number(1000000, if bob_stateless_account { None } else { Some(0) });
 
     let fun: MemberId = str::parse(
         "0x1::transaction_context_test::store_secondary_signers_from_native_txn_context_multi",
@@ -383,10 +407,13 @@ fn test_transaction_context_secondary_signers() {
     assert_eq!(secondary_signers, vec![*bob.address()]);
 }
 
-#[test]
-fn test_transaction_context_entry_function_payload() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn test_transaction_context_entry_function_payload(stateless_account: bool) {
     let mut harness = new_move_harness();
-    let account = setup(&mut harness);
+    let account = setup(&mut harness, stateless_account);
 
     let (account_address, module_name, function_name, type_arg_names, args) =
         call_get_entry_function_payload_from_native_txn_context(&mut harness, &account);
@@ -408,10 +435,13 @@ fn test_transaction_context_entry_function_payload() {
     ]);
 }
 
-#[test]
-fn test_transaction_context_multisig_payload() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn test_transaction_context_multisig_payload(stateless_account: bool) {
     let mut harness = new_move_harness();
-    let account = setup(&mut harness);
+    let account = setup(&mut harness, stateless_account);
 
     let multisig_transaction_payload =
         MultisigTransactionPayload::EntryFunction(EntryFunction::new(

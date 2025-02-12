@@ -21,42 +21,58 @@ use aptos_types::{
 use move_core_types::vm_status::StatusCode;
 use rstest::rstest;
 
-#[rstest(use_new_checker, case(false), case(true))]
-fn private_non_entry(use_new_checker: bool) {
-    let result = check_upgrade("fun f(){}", "fun f(u: u16){}", use_new_checker);
+#[rstest(use_new_checker, stateless_account,
+    case(true, true), 
+    case(true, false),
+    case(false, true), 
+    case(false, false),
+)]
+fn private_non_entry(use_new_checker: bool, stateless_account: bool) {
+    let result = check_upgrade("fun f(){}", "fun f(u: u16){}", use_new_checker, stateless_account);
     assert_success!(result)
 }
 
-#[rstest(use_new_checker, case(false), case(true))]
-fn remove_function(use_new_checker: bool) {
-    let result = check_upgrade("fun f(){}", "", use_new_checker);
+#[rstest(use_new_checker, stateless_account,
+    case(true, true), 
+    case(true, false),
+    case(false, true), 
+    case(false, false),
+)]
+fn remove_function(use_new_checker: bool, stateless_account: bool) {
+    let result = check_upgrade("fun f(){}", "", use_new_checker, stateless_account);
     assert_success!(result);
 
-    let result = check_upgrade("public fun f(){}", "", use_new_checker);
+    let result = check_upgrade("public fun f(){}", "", use_new_checker, stateless_account);
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 
-    let result = check_upgrade("public(friend) fun f(){}", "", use_new_checker);
+    let result = check_upgrade("public(friend) fun f(){}", "", use_new_checker, stateless_account);
     assert_success!(result);
 
-    let result = check_upgrade("entry fun f(){}", "", use_new_checker);
+    let result = check_upgrade("entry fun f(){}", "", use_new_checker, stateless_account);
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 
-    let result = check_upgrade("public entry fun f(){}", "", use_new_checker);
+    let result = check_upgrade("public entry fun f(){}", "", use_new_checker, stateless_account);
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 
-    let result = check_upgrade("public(friend) entry fun f(){}", "", use_new_checker);
+    let result = check_upgrade("public(friend) entry fun f(){}", "", use_new_checker, stateless_account);
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 }
 
-#[rstest(use_new_checker, case(false), case(true))]
-fn change_function_signature(use_new_checker: bool) {
-    let result = check_upgrade("fun f(){}", "fun f(u: u16){}", use_new_checker);
+#[rstest(use_new_checker, stateless_account,
+    case(true, true), 
+    case(true, false),
+    case(false, true), 
+    case(false, false),
+)]
+fn change_function_signature(use_new_checker: bool, stateless_account: bool) {
+    let result = check_upgrade("fun f(){}", "fun f(u: u16){}", use_new_checker, stateless_account);
     assert_success!(result);
 
     let result = check_upgrade(
         "public fun f(){}",
         "public fun f(u: u16){}",
         use_new_checker,
+        stateless_account
     );
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 
@@ -64,16 +80,18 @@ fn change_function_signature(use_new_checker: bool) {
         "public(friend) fun f(){}",
         "public(friend) fun f(u: u16){}",
         use_new_checker,
+        stateless_account
     );
     assert_success!(result);
 
-    let result = check_upgrade("entry fun f(){}", "entry fun f(u: u16){}", use_new_checker);
+    let result = check_upgrade("entry fun f(){}", "entry fun f(u: u16){}", use_new_checker, stateless_account);
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 
     let result = check_upgrade(
         "public entry fun f(){}",
         "public entry fun f(u: u16){}",
         use_new_checker,
+        stateless_account,
     );
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 
@@ -81,33 +99,46 @@ fn change_function_signature(use_new_checker: bool) {
         "public(friend) entry fun f(){}",
         "public(friend) entry fun f(u: u16){}",
         use_new_checker,
+        stateless_account,
     );
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 }
 
-#[rstest(use_new_checker, case(false), case(true))]
-fn friend_add_entry(use_new_checker: bool) {
+#[rstest(use_new_checker, stateless_account,
+    case(true, true), 
+    case(true, false),
+    case(false, true), 
+    case(false, false),
+)]
+fn friend_add_entry(use_new_checker: bool, stateless_account: bool) {
     let result = check_upgrade(
         "public(friend) fun f(){}",
         "public(friend) entry fun f(){}",
         use_new_checker,
+        stateless_account,
     );
     assert_success!(result)
 }
 
-#[rstest(use_new_checker, case(false), case(true))]
-fn friend_remove_entry_failure(use_new_checker: bool) {
+#[rstest(use_new_checker, stateless_account,
+    case(true, true), 
+    case(true, false),
+    case(false, true), 
+    case(false, false),
+)]
+fn friend_remove_entry_failure(use_new_checker: bool, stateless_account: bool) {
     let result = check_upgrade(
         "public(friend) entry fun f(){}",
         "public(friend) fun f(){}",
         use_new_checker,
+        stateless_account,
     );
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
 
 #[rstest(use_new_checker, case(false), case(true))]
 fn friend_remove_failure(use_new_checker: bool) {
-    let result = check_upgrade("public(friend) entry fun f(){}", "", use_new_checker);
+    let result = check_upgrade("public(friend) entry fun f(){}", "", use_new_checker, stateless_account);
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
 
@@ -117,11 +148,12 @@ fn friend_entry_change_sig_failure(use_new_checker: bool) {
         "public(friend) entry fun f(){}",
         "public(friend) entry fun f(_s: &signer){}",
         use_new_checker,
+        stateless_account,
     );
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
 
-fn check_upgrade(old_decls: &str, new_decls: &str, use_new_checker: bool) -> TransactionStatus {
+fn check_upgrade(old_decls: &str, new_decls: &str, use_new_checker: bool, stateless_account: bool) -> TransactionStatus {
     let (enabled, disabled) = if use_new_checker {
         (vec![FeatureFlag::USE_COMPATIBILITY_CHECKER_V2], vec![])
     } else {
@@ -129,7 +161,7 @@ fn check_upgrade(old_decls: &str, new_decls: &str, use_new_checker: bool) -> Tra
     };
     let mut builder = PackageBuilder::new("Package");
     let mut h = MoveHarness::new_with_features(enabled, disabled);
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap());
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap(), if stateless_account { None } else { Some(0) });
 
     // Publish for first time
     builder.add_source(

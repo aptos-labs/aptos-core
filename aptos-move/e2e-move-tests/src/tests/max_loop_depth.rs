@@ -11,42 +11,28 @@ struct ModuleData {
     state: Vec<u8>,
 }
 
-#[test]
-fn module_loop_depth_at_limit_test_with_stateful_sender() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn module_loop_depth_at_limit(stateless_account: bool) {
     let mut h = MoveHarness::new();
-    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), Some(0));
-    module_loop_depth_at_limit(&mut h, acc);
-}
-
-#[test]
-fn module_loop_depth_at_limit_test_with_stateless_sender() {
-    let mut h = MoveHarness::new();
-    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), None);
-    module_loop_depth_at_limit(&mut h, acc);
-}
-
-fn module_loop_depth_at_limit(h: &mut MoveHarness, acc: Account) {
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), if stateless_account { None } else { Some(0) });
+    
     assert_success!(h.publish_package(
         &acc,
         &common::test_dir_path("max_loop_depth.data/pack-good"),
     ));
 }
 
-#[test]
-fn module_loop_depth_at_limit_test_with_stateful_sender() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn module_loop_depth_just_above_limit(stateless_account: bool) {
     let mut h = MoveHarness::new();
-    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), Some(0));
-    module_loop_depth_just_above_limit(&mut h, acc);
-}
-
-#[test]
-fn module_loop_depth_at_limit_test_with_stateless_sender() {
-    let mut h = MoveHarness::new();
-    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), None);
-    module_loop_depth_just_above_limit(&mut h, acc);
-}
-
-fn module_loop_depth_just_above_limit(h: &mut MoveHarness, acc: Account) {
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), if stateless_account { None } else { Some(0) });
+    
     assert_vm_status!(
         h.publish_package(&acc, &common::test_dir_path("max_loop_depth.data/pack-bad"),),
         StatusCode::LOOP_MAX_DEPTH_REACHED
