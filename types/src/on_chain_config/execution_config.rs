@@ -49,9 +49,7 @@ impl OnChainExecutionConfig {
     }
 
     pub fn block_executor_onchain_config(&self) -> BlockExecutorConfigFromOnchain {
-        BlockExecutorConfigFromOnchain {
-            block_gas_limit_type: self.block_gas_limit_type(),
-        }
+        BlockExecutorConfigFromOnchain::new(self.block_gas_limit_type())
     }
 
     /// The type of the transaction deduper being used.
@@ -85,7 +83,7 @@ impl OnChainExecutionConfig {
 
 impl BlockGasLimitType {
     pub fn default_for_genesis() -> Self {
-        BlockGasLimitType::ComplexLimitV1 {
+        BlockGasLimitType::ComplexLimitV2 {
             effective_block_gas_limit: 30000,
             execution_gas_effective_multiplier: 1,
             io_gas_effective_multiplier: 1,
@@ -95,6 +93,7 @@ impl BlockGasLimitType {
             block_output_limit: Some(5 * 1024 * 1024),
             include_user_txn_size_in_block_output: true,
             add_block_limit_outcome_onchain: true,
+            enable_per_block_gas_limit: true,
         }
     }
 }
@@ -227,6 +226,45 @@ pub enum BlockGasLimitType {
         /// NOTE: Currently not supported.
         add_block_limit_outcome_onchain: bool,
     },
+    // TODO: This copy-pasta is nasty. Any better way to do this?
+    /// Provides two separate block limits:
+    /// 1. effective_block_gas_limit
+    /// 2. block_output_limit
+    ComplexLimitV2 {
+        /// Formula for effective block gas limit:
+        /// effective_block_gas_limit <
+        /// (execution_gas_effective_multiplier * execution_gas_used +
+        ///  io_gas_effective_multiplier * io_gas_used
+        /// ) * (1 + num conflicts in conflict_penalty_window)
+        effective_block_gas_limit: u64,
+        execution_gas_effective_multiplier: u64,
+        io_gas_effective_multiplier: u64,
+        conflict_penalty_window: u32,
+
+        /// If true we look at granular resource group conflicts (i.e. if same Tag
+        /// within a resource group has a conflict)
+        /// If false, we treat any conclicts inside of resource groups (even across
+        /// non-overlapping tags) as conflicts).
+        use_granular_resource_group_conflicts: bool,
+        /// Module publishing today fallbacks to sequential execution,
+        /// even though there is no read-write conflict.
+        /// When enabled, this flag allows us to account for that conflict.
+        /// NOTE: Currently not supported.
+        use_module_publishing_block_conflict: bool,
+
+        /// Block limit on the total (approximate) txn output size in bytes.
+        block_output_limit: Option<u64>,
+        /// When set, we include the user txn size in the approximate computation
+        /// of block output size, which is compared against the block_output_limit above.
+        include_user_txn_size_in_block_output: bool,
+
+        /// When set, we create BlockEpilogue (instead of StateCheckpint) transaction,
+        /// which contains BlockEndInfo
+        /// NOTE: Currently not supported.
+        add_block_limit_outcome_onchain: bool,
+
+        enable_per_block_gas_limit: bool,
+    },
 }
 
 impl BlockGasLimitType {
@@ -235,6 +273,10 @@ impl BlockGasLimitType {
             BlockGasLimitType::NoLimit => None,
             BlockGasLimitType::Limit(limit) => Some(*limit),
             BlockGasLimitType::ComplexLimitV1 {
+                effective_block_gas_limit,
+                ..
+            }
+            | BlockGasLimitType::ComplexLimitV2 {
                 effective_block_gas_limit,
                 ..
             } => Some(*effective_block_gas_limit),
@@ -248,6 +290,10 @@ impl BlockGasLimitType {
             BlockGasLimitType::ComplexLimitV1 {
                 execution_gas_effective_multiplier,
                 ..
+            }
+            | BlockGasLimitType::ComplexLimitV2 {
+                execution_gas_effective_multiplier,
+                ..
             } => *execution_gas_effective_multiplier,
         }
     }
@@ -257,6 +303,10 @@ impl BlockGasLimitType {
             BlockGasLimitType::NoLimit => 1,
             BlockGasLimitType::Limit(_) => 1,
             BlockGasLimitType::ComplexLimitV1 {
+                io_gas_effective_multiplier,
+                ..
+            }
+            | BlockGasLimitType::ComplexLimitV2 {
                 io_gas_effective_multiplier,
                 ..
             } => *io_gas_effective_multiplier,
@@ -269,6 +319,9 @@ impl BlockGasLimitType {
             BlockGasLimitType::Limit(_) => None,
             BlockGasLimitType::ComplexLimitV1 {
                 block_output_limit, ..
+            }
+            | BlockGasLimitType::ComplexLimitV2 {
+                block_output_limit, ..
             } => *block_output_limit,
         }
     }
@@ -278,6 +331,10 @@ impl BlockGasLimitType {
             BlockGasLimitType::NoLimit => None,
             BlockGasLimitType::Limit(_) => None,
             BlockGasLimitType::ComplexLimitV1 {
+                conflict_penalty_window,
+                ..
+            }
+            | BlockGasLimitType::ComplexLimitV2 {
                 conflict_penalty_window,
                 ..
             } => {
@@ -297,6 +354,10 @@ impl BlockGasLimitType {
             BlockGasLimitType::ComplexLimitV1 {
                 use_module_publishing_block_conflict,
                 ..
+            }
+            | BlockGasLimitType::ComplexLimitV2 {
+                use_module_publishing_block_conflict,
+                ..
             } => *use_module_publishing_block_conflict,
         }
     }
@@ -306,6 +367,10 @@ impl BlockGasLimitType {
             BlockGasLimitType::NoLimit => false,
             BlockGasLimitType::Limit(_) => false,
             BlockGasLimitType::ComplexLimitV1 {
+                include_user_txn_size_in_block_output,
+                ..
+            }
+            | BlockGasLimitType::ComplexLimitV2 {
                 include_user_txn_size_in_block_output,
                 ..
             } => *include_user_txn_size_in_block_output,
@@ -319,6 +384,10 @@ impl BlockGasLimitType {
             BlockGasLimitType::ComplexLimitV1 {
                 add_block_limit_outcome_onchain,
                 ..
+            }
+            | BlockGasLimitType::ComplexLimitV2 {
+                add_block_limit_outcome_onchain,
+                ..
             } => *add_block_limit_outcome_onchain,
         }
     }
@@ -330,7 +399,23 @@ impl BlockGasLimitType {
             BlockGasLimitType::ComplexLimitV1 {
                 use_granular_resource_group_conflicts,
                 ..
+            }
+            | BlockGasLimitType::ComplexLimitV2 {
+                use_granular_resource_group_conflicts,
+                ..
             } => *use_granular_resource_group_conflicts,
+        }
+    }
+
+    pub fn enable_per_block_gas_limit(&self) -> bool {
+        match self {
+            BlockGasLimitType::NoLimit
+            | BlockGasLimitType::Limit(_)
+            | BlockGasLimitType::ComplexLimitV1 { .. } => false,
+            BlockGasLimitType::ComplexLimitV2 {
+                enable_per_block_gas_limit,
+                ..
+            } => *enable_per_block_gas_limit,
         }
     }
 }

@@ -57,7 +57,7 @@ pub trait TPayloadManager: Send + Sync {
         &self,
         block: &Block,
         block_voters: Option<BitVec>,
-    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)>;
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>, Option<u64>)>;
 }
 
 /// A payload manager that directly returns the transactions in a block's payload.
@@ -83,13 +83,13 @@ impl TPayloadManager for DirectMempoolPayloadManager {
         &self,
         block: &Block,
         _block_signers: Option<BitVec>,
-    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>, Option<u64>)> {
         let Some(payload) = block.payload() else {
-            return Ok((Vec::new(), None));
+            return Ok((Vec::new(), None, None));
         };
 
         match payload {
-            Payload::DirectMempool(txns) => Ok((txns.clone(), None)),
+            Payload::DirectMempool(txns) => Ok((txns.clone(), None, None)),
             _ => unreachable!(
                 "DirectMempoolPayloadManager: Unacceptable payload type {}. Epoch: {}, Round: {}, Block: {}",
                 payload,
@@ -157,6 +157,44 @@ impl QuorumStorePayloadManager {
         }
         receivers
     }
+
+    async fn get_transactions_quorum_store_inline_hybrid(
+        &self,
+        block: &Block,
+        inline_batches: &[(BatchInfo, Vec<SignedTransaction>)],
+        proof_with_data: &ProofWithData,
+        max_txns_to_execute: &Option<u64>,
+        block_gas_limit_override: &Option<u64>,
+    ) -> ExecutorResult<BlockTransactionPayload> {
+        let all_transactions = {
+            let mut all_txns = process_qs_payload(
+                proof_with_data,
+                self.batch_reader.clone(),
+                block,
+                &self.ordered_authors,
+            )
+            .await?;
+            all_txns.append(
+                &mut inline_batches
+                    .iter()
+                    // TODO: Can clone be avoided here?
+                    .flat_map(|(_batch_info, txns)| txns.clone())
+                    .collect(),
+            );
+            all_txns
+        };
+        let inline_batches = inline_batches
+            .iter()
+            .map(|(batch_info, _)| batch_info.clone())
+            .collect();
+        Ok(BlockTransactionPayload::new_quorum_store_inline_hybrid(
+            all_transactions,
+            proof_with_data.proofs.clone(),
+            *max_txns_to_execute,
+            *block_gas_limit_override,
+            inline_batches,
+        ))
+    }
 }
 
 #[async_trait]
@@ -182,7 +220,8 @@ impl TPayloadManager for QuorumStorePayloadManager {
                     .iter()
                     .map(|proof| proof.info().clone())
                     .collect::<Vec<_>>(),
-                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
+                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
+                | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
                     inline_batches
                         .iter()
                         .map(|(batch_info, _)| batch_info.clone())
@@ -283,7 +322,8 @@ impl TPayloadManager for QuorumStorePayloadManager {
                     self.batch_reader.clone(),
                 );
             },
-            Payload::QuorumStoreInlineHybrid(_, proof_with_data, _) => {
+            Payload::QuorumStoreInlineHybrid(_, proof_with_data, _)
+            | Payload::QuorumStoreInlineHybridV2(_, proof_with_data, _) => {
                 request_txns_and_update_status(proof_with_data, self.batch_reader.clone());
             },
             Payload::DirectMempool(_) => {
@@ -317,7 +357,8 @@ impl TPayloadManager for QuorumStorePayloadManager {
             },
             Payload::InQuorumStore(_) => Ok(()),
             Payload::InQuorumStoreWithLimit(_) => Ok(()),
-            Payload::QuorumStoreInlineHybrid(inline_batches, proofs, _) => {
+            Payload::QuorumStoreInlineHybrid(inline_batches, proofs, _)
+            | Payload::QuorumStoreInlineHybridV2(inline_batches, proofs, _) => {
                 fn update_availability_metrics<'a>(
                     batch_reader: &Arc<dyn BatchReader>,
                     is_proof_label: &str,
@@ -389,9 +430,9 @@ impl TPayloadManager for QuorumStorePayloadManager {
         &self,
         block: &Block,
         block_signers: Option<BitVec>,
-    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>, Option<u64>)> {
         let Some(payload) = block.payload() else {
-            return Ok((Vec::new(), None));
+            return Ok((Vec::new(), None, None));
         };
 
         let transaction_payload = match payload {
@@ -427,33 +468,28 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 proof_with_data,
                 max_txns_to_execute,
             ) => {
-                let all_transactions = {
-                    let mut all_txns = process_qs_payload(
-                        proof_with_data,
-                        self.batch_reader.clone(),
-                        block,
-                        &self.ordered_authors,
-                    )
-                    .await?;
-                    all_txns.append(
-                        &mut inline_batches
-                            .iter()
-                            // TODO: Can clone be avoided here?
-                            .flat_map(|(_batch_info, txns)| txns.clone())
-                            .collect(),
-                    );
-                    all_txns
-                };
-                let inline_batches = inline_batches
-                    .iter()
-                    .map(|(batch_info, _)| batch_info.clone())
-                    .collect();
-                BlockTransactionPayload::new_quorum_store_inline_hybrid(
-                    all_transactions,
-                    proof_with_data.proofs.clone(),
-                    *max_txns_to_execute,
+                self.get_transactions_quorum_store_inline_hybrid(
+                    block,
                     inline_batches,
+                    proof_with_data,
+                    max_txns_to_execute,
+                    &None,
                 )
+                .await?
+            },
+            Payload::QuorumStoreInlineHybridV2(
+                inline_batches,
+                proof_with_data,
+                execution_limits,
+            ) => {
+                self.get_transactions_quorum_store_inline_hybrid(
+                    block,
+                    inline_batches,
+                    proof_with_data,
+                    &execution_limits.max_txns_to_execute(),
+                    &execution_limits.block_gas_limit(),
+                )
+                .await?
             },
             Payload::OptQuorumStore(opt_qs_payload) => {
                 let opt_batch_txns = process_optqs_payload(
@@ -505,6 +541,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
         Ok((
             transaction_payload.transactions(),
             transaction_payload.transaction_limit(),
+            transaction_payload.gas_limit(),
         ))
     }
 }
@@ -514,7 +551,7 @@ async fn get_transactions_for_observer(
     block: &Block,
     block_payloads: &Arc<Mutex<BTreeMap<(u64, Round), BlockPayloadStatus>>>,
     consensus_publisher: &Option<Arc<ConsensusPublisher>>,
-) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
+) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>, Option<u64>)> {
     // The data should already be available (as consensus observer will only ever
     // forward a block to the executor once the data has been received and verified).
     let block_payload = match block_payloads.lock().entry((block.epoch(), block.round())) {
@@ -555,6 +592,7 @@ async fn get_transactions_for_observer(
     Ok((
         transaction_payload.transactions(),
         transaction_payload.transaction_limit(),
+        transaction_payload.gas_limit(),
     ))
 }
 
@@ -796,7 +834,7 @@ impl TPayloadManager for ConsensusObserverPayloadManager {
         &self,
         block: &Block,
         _block_signers: Option<BitVec>,
-    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>, Option<u64>)> {
         return get_transactions_for_observer(block, &self.txns_pool, &self.consensus_publisher)
             .await;
     }
