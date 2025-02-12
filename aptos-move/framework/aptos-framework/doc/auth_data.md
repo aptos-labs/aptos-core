@@ -10,12 +10,10 @@
 -  [Function `digest`](#0x1_auth_data_digest)
 -  [Function `authenticator`](#0x1_auth_data_authenticator)
 -  [Function `is_domain`](#0x1_auth_data_is_domain)
--  [Function `domain_name`](#0x1_auth_data_domain_name)
--  [Function `account_authentication_key`](#0x1_auth_data_account_authentication_key)
+-  [Function `account_identity`](#0x1_auth_data_account_identity)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
-</code></pre>
+<pre><code></code></pre>
 
 
 
@@ -44,13 +42,7 @@
 
 <dl>
 <dt>
-<code>domain_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>account_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>account_identity: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -215,13 +207,13 @@
 
 </details>
 
-<a id="0x1_auth_data_domain_name"></a>
+<a id="0x1_auth_data_account_identity"></a>
 
-## Function `domain_name`
+## Function `account_identity`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="auth_data.md#0x1_auth_data_domain_name">domain_name</a>(self: &<a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>): &<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+<pre><code><b>public</b> <b>fun</b> <a href="auth_data.md#0x1_auth_data_account_identity">account_identity</a>(self: &<a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>): &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -230,32 +222,8 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="auth_data.md#0x1_auth_data_domain_name">domain_name</a>(self: &<a href="auth_data.md#0x1_auth_data_AbstractionAuthData">AbstractionAuthData</a>): &String {
-    &self.<a href="account.md#0x1_account">account</a>.domain_name
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_auth_data_account_authentication_key"></a>
-
-## Function `account_authentication_key`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="auth_data.md#0x1_auth_data_account_authentication_key">account_authentication_key</a>(self: &<a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>): &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="auth_data.md#0x1_auth_data_account_authentication_key">account_authentication_key</a>(self: &<a href="auth_data.md#0x1_auth_data_AbstractionAuthData">AbstractionAuthData</a>): &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    &self.<a href="account.md#0x1_account">account</a>.account_authentication_key
+<pre><code><b>public</b> <b>fun</b> <a href="auth_data.md#0x1_auth_data_account_identity">account_identity</a>(self: &<a href="auth_data.md#0x1_auth_data_AbstractionAuthData">AbstractionAuthData</a>): &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    &self.<a href="account.md#0x1_account">account</a>.account_identity
 }
 </code></pre>
 

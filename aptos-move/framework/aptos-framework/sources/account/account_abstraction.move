@@ -29,6 +29,7 @@ module aptos_framework::account_abstraction {
     const ENOT_MASTER_SIGNER: u64 = 4;
     const EINCONSISTENT_SIGNER_ADDRESS: u64 = 5;
     const EDEPRECATED_FUNCTION: u64 = 6;
+    const EDOMAIN_AA_NOT_INITIALIZED: u64 = 6;
 
     const DOMAIN_ABSTRACTION_DERIVED_SCHEME: u8 = 5;
 
@@ -106,6 +107,14 @@ module aptos_framework::account_abstraction {
         };
     }
 
+    entry fun initialize(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        move_to(
+            aptos_framework,
+            DomainDispatchableAuthenticator::V1 { auth_functions: big_ordered_map::new_with_config(0, 0, false) }
+        );
+    }
+
     entry fun register_domain_with_authentication_function(
         aptos_framework: &signer,
         module_address: address,
@@ -113,12 +122,20 @@ module aptos_framework::account_abstraction {
         function_name: String,
     ) acquires DomainDispatchableAuthenticator {
         system_addresses::assert_aptos_framework(aptos_framework);
-        if (!exists<DomainDispatchableAuthenticator>(@aptos_framework)) {
-            move_to(
-                aptos_framework,
-                DomainDispatchableAuthenticator::V1 { auth_functions: big_ordered_map::new() }
-            );
-        };
+
+        borrow_global_mut<DomainDispatchableAuthenticator>(@aptos_framework).auth_functions.add(
+            function_info::new_function_info_from_address(module_address, module_name, function_name),
+            true,
+        );
+    }
+
+    entry fun register_domain_with_authentication_function_test_network_only(
+        core_resources: &signer,
+        module_address: address,
+        module_name: String,
+        function_name: String,
+    ) acquires DomainDispatchableAuthenticator {
+        system_addresses::assert_core_resource(core_resources);
 
         borrow_global_mut<DomainDispatchableAuthenticator>(@aptos_framework).auth_functions.add(
             function_info::new_function_info_from_address(module_address, module_name, function_name),
@@ -207,7 +224,7 @@ module aptos_framework::account_abstraction {
         /// using bcs serialized structs here - this allows for no need for separators.
         /// If we want to have a strings from each, we would need to convert domain_func_info into string,
         /// then authentication_key to hex, and then we need separators as well - like ::
-        let bytes = bcs::to_bytes(domain_func_info);
+        let bytes = bcs::to_bytes(&domain_func_info);
         bytes.append(bcs::to_bytes(account_identity));
         bytes.push_back(DOMAIN_ABSTRACTION_DERIVED_SCHEME);
         from_bcs::to_address(hash::sha3_256(bytes))
@@ -223,6 +240,7 @@ module aptos_framework::account_abstraction {
         let master_signer_addr = signer::address_of(&account);
 
         if (signing_data.is_domain()) {
+            assert!(exists<DomainDispatchableAuthenticator>(@aptos_framework), error::not_found(EDOMAIN_AA_NOT_INITIALIZED));
             let func_infos = &borrow_global<DomainDispatchableAuthenticator>(@aptos_framework).auth_functions;
             assert!(func_infos.contains(&func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
 
@@ -230,7 +248,7 @@ module aptos_framework::account_abstraction {
             // so we need to have it separate, and require authenticate function to confirm it matches.
             assert!(master_signer_addr == domain_aa_account_address(func_info, signing_data.account_identity()), error::invalid_state(EINCONSISTENT_SIGNER_ADDRESS));
         } else {
-            let func_infos = &borrow_global<DispatchableAuthenticator>(resource_addr(master_signer_addr)).auth_functions
+            let func_infos = &borrow_global<DispatchableAuthenticator>(resource_addr(master_signer_addr)).auth_functions;
             assert!(ordered_map::contains(func_infos, &func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
         };
 
