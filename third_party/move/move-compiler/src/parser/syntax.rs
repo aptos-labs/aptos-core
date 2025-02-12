@@ -1939,7 +1939,7 @@ fn at_start_of_exp(context: &mut Context) -> bool {
 
 // Parse the rest of a lambda expression, after already processing any capture designator (move/copy).
 //       LambdaRest =
-//                      <LambdaBindList> <Exp> <WithAbilities>
+//                      <LambdaBindList> <Exp> <WithAbilities> [<SpecBlock>]
 fn parse_lambda(
     context: &mut Context,
     start_loc: usize,
@@ -1967,8 +1967,30 @@ fn parse_lambda(
             "Abilities on function expressions",
         );
     }
+    let spec_opt = if context.tokens.peek() == Tok::Spec {
+        let spec_start = context.tokens.start_loc();
+        let spec = parse_spec_block(vec![], context)?;
+        let spec_end = context.tokens.previous_end_loc();
+        let loc: Loc = make_loc(context.tokens.file_hash(), spec_start, spec_end);
+        require_move_version(
+            LanguageVersion::V2_2,
+            context,
+            loc,
+            "Specs on function expressions",
+        );
+        let spec_exp = Exp::new(loc, Exp_::Spec(spec));
+        Some(Box::new(spec_exp))
+    } else {
+        None
+    };
 
-    Ok(Exp_::Lambda(bindings, body, capture_kind, abilities))
+    Ok(Exp_::Lambda(
+        bindings,
+        body,
+        capture_kind,
+        abilities,
+        spec_opt,
+    ))
 }
 
 // Parse an expression:

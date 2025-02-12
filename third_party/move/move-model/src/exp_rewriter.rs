@@ -363,18 +363,32 @@ pub trait ExpRewriterFunctions {
                     exp
                 }
             },
-            Lambda(id, pat, body, capture_kind, abilities) => {
+            Lambda(id, pat, body, capture_kind, abilities, spec_opt) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat, true);
                 self.rewrite_enter_scope(new_id, new_pat.vars().iter());
                 let (body_changed, new_body) = self.internal_rewrite_exp(body);
+                let (spec_body_changed, new_spec_opt) = if let Some(spec) = spec_opt {
+                    let (spec_changed, new_spec) = self.internal_rewrite_exp(spec);
+                    (spec_changed, Some(new_spec))
+                } else {
+                    (false, spec_opt.clone())
+                };
                 self.rewrite_exit_scope(new_id);
                 if let Some(new_exp) =
                     self.rewrite_lambda(new_id, &new_pat, &new_body, *capture_kind, *abilities)
                 {
                     new_exp
-                } else if id_changed || pat_changed || body_changed {
-                    Lambda(new_id, new_pat, new_body, *capture_kind, *abilities).into_exp()
+                } else if id_changed || pat_changed || body_changed || spec_body_changed {
+                    Lambda(
+                        new_id,
+                        new_pat,
+                        new_body,
+                        *capture_kind,
+                        *abilities,
+                        new_spec_opt,
+                    )
+                    .into_exp()
                 } else {
                     exp
                 }

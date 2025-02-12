@@ -489,7 +489,7 @@ impl<'env> Generator<'env> {
                 self.emit_with(*id, |attr| Bytecode::SpecBlock(attr, spec));
             },
             // TODO(LAMBDA)
-            ExpData::Lambda(id, _, _, _, _) =>
+            ExpData::Lambda(id, _, _, _, _, _) =>
                 self.error(
                 *id,
                 if self.check_if_lambdas_enabled() {
