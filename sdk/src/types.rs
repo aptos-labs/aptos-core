@@ -205,7 +205,11 @@ impl LocalAccount {
         sequence_number: u64,
     ) -> Self {
         Self {
-            address: AuthenticationKey::domain_abstraction_address(bcs::to_bytes(&function_info).unwrap(), &account_identity).account_address(),
+            address: AuthenticationKey::domain_abstraction_address(
+                bcs::to_bytes(&function_info).unwrap(),
+                &account_identity,
+            )
+            .account_address(),
             auth: LocalAccountAuthenticator::DomainAbstraction(DomainAbstractedAccount {
                 function_info,
                 account_identity,
@@ -488,12 +492,10 @@ impl LocalAccount {
             LocalAccountAuthenticator::Abstraction(aa) => {
                 Auth::Abstraction(aa.function_info.clone(), aa.sign_func.clone())
             },
-            LocalAccountAuthenticator::DomainAbstraction(aa) => {
-                Auth::DomainAbstraction {
-                    function_info: aa.function_info.clone(),
-                    account_identity: aa.account_identity.clone(),
-                    sign_function: aa.sign_func.clone(),
-                }
+            LocalAccountAuthenticator::DomainAbstraction(aa) => Auth::DomainAbstraction {
+                function_info: aa.function_info.clone(),
+                account_identity: aa.account_identity.clone(),
+                sign_function: aa.sign_func.clone(),
             },
         }
     }

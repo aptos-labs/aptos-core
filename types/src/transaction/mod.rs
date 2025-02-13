@@ -453,7 +453,11 @@ fn gen_auth(
                 sign_function(digest.as_ref()),
             )
         },
-        Auth::DomainAbstraction { function_info, account_identity, sign_function } => {
+        Auth::DomainAbstraction {
+            function_info,
+            account_identity,
+            sign_function,
+        } => {
             let digest =
                 HashValue::sha3_256_of(signing_message(user_signed_message)?.as_slice()).to_vec();
             AccountAuthenticator::domain_abstraction(

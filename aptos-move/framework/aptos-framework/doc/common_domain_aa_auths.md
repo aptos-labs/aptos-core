@@ -50,8 +50,8 @@
 <pre><code><b>public</b> <b>fun</b> <a href="common_domain_aa_auths.md#0x1_common_domain_aa_auths_authenticate_ed25519_hex">authenticate_ed25519_hex</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, aa_auth_data: AbstractionAuthData): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
     <b>let</b> hex_digest = <a href="../../aptos-stdlib/doc/string_utils.md#0x1_string_utils_to_string">string_utils::to_string</a>(aa_auth_data.digest());
 
-    <b>let</b> public_key = new_unvalidated_public_key_from_bytes(*aa_auth_data.account_identity());
-    <b>let</b> signature = new_signature_from_bytes(*aa_auth_data.authenticator());
+    <b>let</b> public_key = new_unvalidated_public_key_from_bytes(*aa_auth_data.domain_account_identity());
+    <b>let</b> signature = new_signature_from_bytes(*aa_auth_data.domain_authenticator());
     <b>assert</b>!(
         <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_signature_verify_strict">ed25519::signature_verify_strict</a>(
             &signature,

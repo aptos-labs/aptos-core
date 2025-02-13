@@ -267,7 +267,7 @@ module aptos_framework::account_abstraction {
 
             // I don't think we can figure out a generic way to extract account_identity from signing_data.authenticator()
             // so we need to have it separate, and require authenticate function to confirm it matches.
-            assert!(master_signer_addr == domain_aa_account_address(func_info, signing_data.account_identity()), error::invalid_state(EINCONSISTENT_SIGNER_ADDRESS));
+            assert!(master_signer_addr == domain_aa_account_address(func_info, signing_data.domain_account_identity()), error::invalid_state(EINCONSISTENT_SIGNER_ADDRESS));
         } else {
             assert!(using_dispatchable_authenticator(@aptos_framework), error::not_found(EDISPATCHABLE_AUTHENTICATOR_IS_NOT_USED));
             let func_infos = &borrow_global<DispatchableAuthenticator>(resource_addr(master_signer_addr)).auth_functions;

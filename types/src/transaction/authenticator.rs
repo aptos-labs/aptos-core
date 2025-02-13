@@ -552,7 +552,7 @@ pub enum DomainAccount {
     V1 {
         #[serde(with = "serde_bytes")]
         account_identity: Vec<u8>,
-    }
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
@@ -568,8 +568,8 @@ pub enum AbstractionAuthData {
         signing_message_digest: Vec<u8>,
         #[serde(with = "serde_bytes")]
         authenticator: Vec<u8>,
-        account: DomainAccount
-    }
+        account: DomainAccount,
+    },
 }
 
 impl AbstractionAuthData {
@@ -578,11 +578,11 @@ impl AbstractionAuthData {
             Self::V1 {
                 signing_message_digest,
                 ..
-            } | Self::DomainV1 {
+            }
+            | Self::DomainV1 {
                 signing_message_digest,
                 ..
             } => signing_message_digest,
-
         }
     }
 }
