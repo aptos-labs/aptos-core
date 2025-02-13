@@ -91,7 +91,8 @@ impl RunConfig {
             .map(|v| Arc::new(Semaphore::new(v)));
 
         // Build Funder with retries
-        let funder = retry_with_backoff(|| self.funder_config.build()).await
+        let funder_config = self.funder_config.clone();
+        let funder = retry_with_backoff(|| funder_config.clone().build()).await
             .context("Failed to build Funder after multiple attempts")?;
 
         // Build basic API.
@@ -371,11 +372,10 @@ impl RunSimple {
 
 /// Retries an async operation with exponential backoff
 /// reusing the same transaction factory
-async fn retry_with_backoff<F, Fut, T, E>(f: F) -> Result<T> 
+async fn retry_with_backoff<F, Fut, T>(f: F) -> Result<T> 
 where
     F: Fn() -> Fut,
-    Fut: Future<Output = Result<T, E>>,
-    E: std::error::Error + Send + Sync + 'static,
+    Fut: Future<Output = Result<T>>,
 {
     const MAX_RETRIES: u32 = 3;
     const INITIAL_BACKOFF_MS: u64 = 100;
@@ -385,12 +385,12 @@ where
     for attempt in 0..MAX_RETRIES {
         match f().await {
             Ok(result) => return Ok(result),
-            Err(e) if attempt < MAX_RETRIES => {
+            Err(e) if attempt < MAX_RETRIES - 1 => {
                 info!("Funder build attempt {} failed, retrying in {}ms: {}", attempt + 1, backoff_ms, e);
                 tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
                 backoff_ms *= 2;
             }
-            Err(e) => return Err(anyhow::Error::new(e)),
+            Err(e) => return Err(e),
         }
     }
     unreachable!()
