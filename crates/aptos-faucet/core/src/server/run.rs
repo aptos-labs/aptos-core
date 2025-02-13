@@ -27,6 +27,7 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::BufReader, path::PathBuf, pin::Pin, str::FromStr, sync::Arc};
 use tokio::{net::TcpListener, sync::Semaphore, task::JoinSet};
+use std::time::Duration;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct HandlerConfig {
@@ -88,12 +89,9 @@ impl RunConfig {
             .max_concurrent_requests
             .map(|v| Arc::new(Semaphore::new(v)));
 
-        // Build Funder.
-        let funder = self
-            .funder_config
-            .build()
-            .await
-            .context("Failed to build Funder")?;
+        // Build Funder with retries
+        let funder = retry_with_backoff(|| self.funder_config.build()).await
+            .context("Failed to build Funder after multiple attempts")?;
 
         // Build basic API.
         let basic_api = BasicApi {
@@ -368,6 +366,33 @@ impl RunSimple {
         );
         run_config.run().await
     }
+}
+
+/// Retries an async operation with exponential backoff
+/// reusing the same transaction factory
+async fn retry_with_backoff<F, Fut, T, E>(f: F) -> Result<T> 
+where
+    F: Fn() -> Fut,
+    Fut: Future<Output = Result<T, E>>,
+    E: std::error::Error + Send + Sync + 'static,
+{
+    const MAX_RETRIES: u32 = 3;
+    const INITIAL_BACKOFF_MS: u64 = 100;
+
+    let mut backoff_ms = INITIAL_BACKOFF_MS;
+    
+    for attempt in 0..=MAX_RETRIES {
+        match f().await {
+            Ok(result) => return Ok(result),
+            Err(e) if attempt < MAX_RETRIES => {
+                info!("Funder build attempt {} failed, retrying in {}ms: {}", attempt + 1, backoff_ms, e);
+                tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
+                backoff_ms *= 2;
+            }
+            Err(e) => return Err(anyhow::Error::new(e)),
+        }
+    }
+    unreachable!()
 }
 
 // We hide these tests behind a feature flag because these are not standard unit tests,
