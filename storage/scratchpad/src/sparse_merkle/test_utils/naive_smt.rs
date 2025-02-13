@@ -122,7 +122,7 @@ pub struct NaiveSmt {
 }
 
 impl NaiveSmt {
-    pub fn new<V: CryptoHash>(leaves: &[(HashValue, &V)]) -> Self {
+    pub fn new(leaves: &[(HashValue, HashValue)]) -> Self {
         Self::default().update(
             leaves
                 .iter()
@@ -132,11 +132,11 @@ impl NaiveSmt {
         )
     }
 
-    pub fn update<V: CryptoHash>(self, updates: &[(HashValue, Option<&V>)]) -> Self {
+    pub fn update(self, updates: &[(HashValue, Option<HashValue>)]) -> Self {
         let mut leaves = self.leaves.into_iter().collect::<BTreeMap<_, _>>();
         for (key, value_option) in updates {
             if let Some(value) = value_option {
-                leaves.insert(*key, value.hash());
+                leaves.insert(*key, *value);
             } else {
                 leaves.remove(key);
             }
