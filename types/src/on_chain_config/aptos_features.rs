@@ -121,6 +121,7 @@ pub enum FeatureFlag {
     /// Enables bytecode version v8
     VM_BINARY_FORMAT_V8 = 86,
     BULLETPROOFS_BATCH_NATIVES = 87,
+    DEFAULT_ACCOUNT_RESOURCE = 88,
 }
 
 impl FeatureFlag {
@@ -206,6 +207,7 @@ impl FeatureFlag {
             FeatureFlag::PERMISSIONED_SIGNER,
             FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
             FeatureFlag::ACCOUNT_ABSTRACTION,
+            FeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
         ]
     }
 }
