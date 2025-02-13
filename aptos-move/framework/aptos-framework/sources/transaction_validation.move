@@ -164,10 +164,18 @@ module aptos_framework::transaction_validation {
 
             if (!features::transaction_simulation_enhancement_enabled() ||
                     !skip_auth_key_check(is_simulation, &txn_authentication_key)) {
-                assert!(
-                    txn_authentication_key == option::some(bcs::to_bytes(&transaction_sender)),
-                    error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
-                );
+                if (option::is_some(&txn_authentication_key)) {
+                    assert!(
+                        txn_authentication_key == option::some(bcs::to_bytes(&transaction_sender)),
+                        error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
+                    );
+                } else {
+                    // aa verifies authentication itself
+                    assert!(
+                        features::is_account_abstraction_enabled(),
+                        error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
+                    );
+                }
             }
         };
 
