@@ -11,7 +11,8 @@
 -  [Function `digest`](#0x1_auth_data_digest)
 -  [Function `authenticator`](#0x1_auth_data_authenticator)
 -  [Function `is_domain`](#0x1_auth_data_is_domain)
--  [Function `account_identity`](#0x1_auth_data_account_identity)
+-  [Function `domain_authenticator`](#0x1_auth_data_domain_authenticator)
+-  [Function `domain_account_identity`](#0x1_auth_data_domain_account_identity)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -146,7 +147,16 @@
 
 
 
-<pre><code><b>const</b> <a href="auth_data.md#0x1_auth_data_ENOT_DOMAIN_AUTH_DATA">ENOT_DOMAIN_AUTH_DATA</a>: u64 = 1;
+<pre><code><b>const</b> <a href="auth_data.md#0x1_auth_data_ENOT_DOMAIN_AUTH_DATA">ENOT_DOMAIN_AUTH_DATA</a>: u64 = 2;
+</code></pre>
+
+
+
+<a id="0x1_auth_data_ENOT_REGULAR_AUTH_DATA"></a>
+
+
+
+<pre><code><b>const</b> <a href="auth_data.md#0x1_auth_data_ENOT_REGULAR_AUTH_DATA">ENOT_REGULAR_AUTH_DATA</a>: u64 = 1;
 </code></pre>
 
 
@@ -191,6 +201,7 @@
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="auth_data.md#0x1_auth_data_authenticator">authenticator</a>(self: &<a href="auth_data.md#0x1_auth_data_AbstractionAuthData">AbstractionAuthData</a>): &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <b>assert</b>!(self is V1, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="auth_data.md#0x1_auth_data_ENOT_REGULAR_AUTH_DATA">ENOT_REGULAR_AUTH_DATA</a>));
     &self.authenticator
 }
 </code></pre>
@@ -223,13 +234,13 @@
 
 </details>
 
-<a id="0x1_auth_data_account_identity"></a>
+<a id="0x1_auth_data_domain_authenticator"></a>
 
-## Function `account_identity`
+## Function `domain_authenticator`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="auth_data.md#0x1_auth_data_account_identity">account_identity</a>(self: &<a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>): &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="auth_data.md#0x1_auth_data_domain_authenticator">domain_authenticator</a>(self: &<a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>): &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -238,7 +249,32 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="auth_data.md#0x1_auth_data_account_identity">account_identity</a>(self: &<a href="auth_data.md#0x1_auth_data_AbstractionAuthData">AbstractionAuthData</a>): &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="auth_data.md#0x1_auth_data_domain_authenticator">domain_authenticator</a>(self: &<a href="auth_data.md#0x1_auth_data_AbstractionAuthData">AbstractionAuthData</a>): &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <b>assert</b>!(self is DomainV1, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="auth_data.md#0x1_auth_data_ENOT_REGULAR_AUTH_DATA">ENOT_REGULAR_AUTH_DATA</a>));
+    &self.authenticator
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_auth_data_domain_account_identity"></a>
+
+## Function `domain_account_identity`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="auth_data.md#0x1_auth_data_domain_account_identity">domain_account_identity</a>(self: &<a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>): &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="auth_data.md#0x1_auth_data_domain_account_identity">domain_account_identity</a>(self: &<a href="auth_data.md#0x1_auth_data_AbstractionAuthData">AbstractionAuthData</a>): &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <b>assert</b>!(self is DomainV1, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="auth_data.md#0x1_auth_data_ENOT_DOMAIN_AUTH_DATA">ENOT_DOMAIN_AUTH_DATA</a>));
     &self.<a href="account.md#0x1_account">account</a>.account_identity
 }
