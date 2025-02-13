@@ -143,8 +143,8 @@ spec aptos_framework::resource_account {
         aborts_if get && !exists<Account>(source_addr);
         /// [high-level-req-4]
         aborts_if exists<Container>(source_addr) && simple_map::spec_contains_key(container.store, resource_addr);
-        aborts_if get && !(exists<Account>(resource_addr) && len(global<Account>(source_addr).authentication_key) == 32);
-        aborts_if !get && !(exists<Account>(resource_addr) && len(optional_auth_key) == 32);
+        // aborts_if get && !(exists<Account>(resource_addr) && len(global<Account>(source_addr).authentication_key) == 32);
+        // aborts_if !get && !(exists<Account>(resource_addr) && len(optional_auth_key) == 32);
 
         ensures simple_map::spec_contains_key(global<Container>(source_addr).store, resource_addr);
         ensures exists<Container>(source_addr);
@@ -160,8 +160,8 @@ spec aptos_framework::resource_account {
         let account = global<account::Account>(source_addr);
 
         aborts_if len(ZERO_AUTH_KEY) != 32;
-        include account::exists_at(resource_addr) ==> account::CreateResourceAccountAbortsIf;
-        include !account::exists_at(resource_addr) ==> account::CreateAccountAbortsIf {addr: resource_addr};
+        include account::spec_exists_at(resource_addr) ==> account::CreateResourceAccountAbortsIf;
+        include !account::spec_exists_at(resource_addr) ==> account::CreateAccountAbortsIf {addr: resource_addr};
 
         aborts_if get && !exists<account::Account>(source_addr);
         aborts_if exists<Container>(source_addr) && simple_map::spec_contains_key(container.store, resource_addr);
@@ -185,7 +185,7 @@ spec aptos_framework::resource_account {
         let container = global<Container>(source_addr);
         /// [high-level-req-7]
         aborts_if !simple_map::spec_contains_key(container.store, resource_addr);
-        aborts_if !exists<account::Account>(resource_addr);
+        //aborts_if !exists<account::Account>(resource_addr);
         /// [high-level-req-8]
         ensures simple_map::spec_contains_key(old(global<Container>(source_addr)).store, resource_addr) &&
             simple_map::spec_len(old(global<Container>(source_addr)).store) == 1 ==> !exists<Container>(source_addr);

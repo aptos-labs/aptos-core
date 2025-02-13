@@ -257,6 +257,8 @@ module aptos_framework::account {
         if (!features::is_default_account_resource_enabled()) {
             create_account_unchecked(new_address)
         } else {
+            let authentication_key = bcs::to_bytes(&new_address);
+            assert!(vector::length(&authentication_key) == 32, error::invalid_argument(EMALFORMED_AUTHENTICATION_KEY));
             create_signer(new_address)
         }
     }

@@ -401,7 +401,6 @@ spec aptos_token::token {
         royalty_points_denominator: u64;
         payee_address: address;
         aborts_if royalty_points_numerator > royalty_points_denominator;
-        aborts_if !exists<account::Account>(payee_address);
     }
 
     spec deposit_token(account: &signer, token: Token) {
