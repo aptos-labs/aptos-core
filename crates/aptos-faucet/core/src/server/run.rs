@@ -392,7 +392,6 @@ where
             Err(e) => return Err(anyhow::Error::new(e)),
         }
     }
-    unreachable!()
 }
 
 // We hide these tests behind a feature flag because these are not standard unit tests,
