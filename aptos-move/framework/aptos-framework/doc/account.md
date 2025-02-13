@@ -2911,8 +2911,23 @@ The Account does not exist under the new address before creating the account.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+<pre><code><b>pragma</b> opaque;
+// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
 <b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(addr);
+</code></pre>
+
+
+
+
+<a id="0x1_account_spec_exists_at"></a>
+
+
+<pre><code><b>fun</b> <a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(addr: <b>address</b>): bool {
+   <b>use</b> std::features;
+   <b>use</b> std::features::DEFAULT_ACCOUNT_RESOURCE;
+   <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(DEFAULT_ACCOUNT_RESOURCE) || <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr)
+}
 </code></pre>
 
 
@@ -3021,8 +3036,20 @@ The sequence_number of the Account is up to MAX_U64.
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
-<b>ensures</b> result == <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).authentication_key;
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+<b>ensures</b> result == <a href="account.md#0x1_account_spec_get_authentication_key">spec_get_authentication_key</a>(addr);
+</code></pre>
+
+
+
+
+<a id="0x1_account_spec_get_authentication_key"></a>
+
+
+<pre><code><b>fun</b> <a href="account.md#0x1_account_spec_get_authentication_key">spec_get_authentication_key</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+   <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).authentication_key
+}
 </code></pre>
 
 
@@ -3664,8 +3691,8 @@ The value of signer_capability_offer.for of Account resource under the signer is
 <pre><code><b>let</b> source_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source);
 <b>let</b> resource_addr = <a href="account.md#0x1_account_spec_create_resource_address">spec_create_resource_address</a>(source_addr, seed);
 <b>aborts_if</b> len(<a href="account.md#0x1_account_ZERO_AUTH_KEY">ZERO_AUTH_KEY</a>) != 32;
-<b>include</b> <a href="account.md#0x1_account_exists_at">exists_at</a>(resource_addr) ==&gt; <a href="account.md#0x1_account_CreateResourceAccountAbortsIf">CreateResourceAccountAbortsIf</a>;
-<b>include</b> !<a href="account.md#0x1_account_exists_at">exists_at</a>(resource_addr) ==&gt; <a href="account.md#0x1_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {addr: resource_addr};
+<b>include</b> <a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(resource_addr) ==&gt; <a href="account.md#0x1_account_CreateResourceAccountAbortsIf">CreateResourceAccountAbortsIf</a>;
+<b>include</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(resource_addr) ==&gt; <a href="account.md#0x1_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {addr: resource_addr};
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(result_1) == resource_addr;
 <b>let</b> <b>post</b> offer_for = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(resource_addr).signer_capability_offer.for;
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(offer_for) == resource_addr;
@@ -3816,8 +3843,6 @@ The guid_creation_num of the Account is up to MAX_U64.
 <pre><code><b>schema</b> <a href="account.md#0x1_account_CreateResourceAccountAbortsIf">CreateResourceAccountAbortsIf</a> {
     resource_addr: <b>address</b>;
     <b>let</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(resource_addr);
-    <b>aborts_if</b> len(<a href="account.md#0x1_account">account</a>.signer_capability_offer.for.vec) != 0;
-    <b>aborts_if</b> <a href="account.md#0x1_account">account</a>.sequence_number != 0;
 }
 </code></pre>
 

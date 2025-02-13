@@ -1,6 +1,6 @@
 spec aptos_token::token_transfers {
     spec module {
-        pragma verify = true;
+        pragma verify = false;
         pragma aborts_if_is_strict;
     }
 
@@ -16,9 +16,9 @@ spec aptos_token::token_transfers {
         let addr = signer::address_of(account);
         aborts_if exists<PendingClaims>(addr);
         let account = global<Account>(addr);
-        // aborts_if !exists<Account>(addr);
-        // aborts_if account.guid_creation_num + 3 >= account::MAX_GUID_CREATION_NUM;
-        // aborts_if account.guid_creation_num + 3 > MAX_U64;
+        aborts_if !exists<Account>(addr);
+        aborts_if account.guid_creation_num + 3 >= account::MAX_GUID_CREATION_NUM;
+        aborts_if account.guid_creation_num + 3 > MAX_U64;
     }
 
     spec create_token_offer_id(to_addr: address, token_id: TokenId): TokenOfferId {

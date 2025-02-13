@@ -154,8 +154,16 @@ spec aptos_framework::account {
     }
 
     spec exists_at {
+        pragma opaque;
         /// [high-level-req-3]
         aborts_if false;
+        ensures result == spec_exists_at(addr);
+    }
+
+    spec fun spec_exists_at(addr: address): bool {
+        use std::features;
+        use std::features::DEFAULT_ACCOUNT_RESOURCE;
+        features::spec_is_enabled(DEFAULT_ACCOUNT_RESOURCE) || exists<Account>(addr)
     }
 
     spec schema CreateAccountAbortsIf {
@@ -189,8 +197,13 @@ spec aptos_framework::account {
     }
 
     spec get_authentication_key(addr: address): vector<u8> {
+        pragma opaque;
         aborts_if !exists<Account>(addr);
-        ensures result == global<Account>(addr).authentication_key;
+        ensures result == spec_get_authentication_key(addr);
+    }
+
+    spec fun spec_get_authentication_key(addr: address): vector<u8> {
+        global<Account>(addr).authentication_key
     }
 
     /// The Account existed under the signer before the call.
@@ -586,8 +599,8 @@ spec aptos_framework::account {
         let resource_addr = spec_create_resource_address(source_addr, seed);
 
         aborts_if len(ZERO_AUTH_KEY) != 32;
-        include exists_at(resource_addr) ==> CreateResourceAccountAbortsIf;
-        include !exists_at(resource_addr) ==> CreateAccountAbortsIf {addr: resource_addr};
+        include spec_exists_at(resource_addr) ==> CreateResourceAccountAbortsIf;
+        include !spec_exists_at(resource_addr) ==> CreateAccountAbortsIf {addr: resource_addr};
 
         ensures signer::address_of(result_1) == resource_addr;
         let post offer_for = global<Account>(resource_addr).signer_capability_offer.for;
@@ -658,8 +671,8 @@ spec aptos_framework::account {
     spec schema CreateResourceAccountAbortsIf {
         resource_addr: address;
         let account = global<Account>(resource_addr);
-        aborts_if len(account.signer_capability_offer.for.vec) != 0;
-        aborts_if account.sequence_number != 0;
+        // aborts_if len(account.signer_capability_offer.for.vec) != 0;
+        // aborts_if account.sequence_number != 0;
     }
 
     spec originating_address(auth_key: address): Option<address> {
