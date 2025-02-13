@@ -471,6 +471,44 @@ impl Type {
         Ok(())
     }
 
+    pub fn paranoid_check_assignable(&self, expected_ty: &Self) -> PartialVMResult<()> {
+        let ok = match (expected_ty, self) {
+            (
+                Type::Function {
+                    args,
+                    results,
+                    abilities,
+                },
+                Type::Function {
+                    args: given_args,
+                    results: given_results,
+                    abilities: given_abilities,
+                },
+            ) => {
+                args == given_args
+                    && results == given_results
+                    && abilities.is_subset(*given_abilities)
+            },
+            (Type::Reference(ty), Type::Reference(given)) => {
+                given.paranoid_check_assignable(ty)?;
+                true
+            },
+            (Type::MutableReference(ty), Type::MutableReference(given)) => {
+                given.paranoid_check_assignable(ty)?;
+                true
+            },
+            _ => expected_ty == self,
+        };
+        if !ok {
+            let msg = format!(
+                "Expected type {}, got {} which is not assignable ",
+                expected_ty, self
+            );
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
     pub fn paranoid_check_is_vec_ty(&self, expected_elem_ty: &Self) -> PartialVMResult<()> {
         if let Self::Vector(elem_ty) = self {
             return elem_ty.paranoid_check_eq(expected_elem_ty);

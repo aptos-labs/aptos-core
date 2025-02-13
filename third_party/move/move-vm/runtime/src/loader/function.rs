@@ -330,6 +330,12 @@ impl LoadedFunction {
         self.function.is_friend_or_private()
     }
 
+    /// Returns true if the loaded function has public visibility. This is the
+    /// opposite of the above (for better readability).
+    pub fn is_public(&self) -> bool {
+        !self.function.is_friend_or_private()
+    }
+
     /// Returns true if the loaded function is an entry function.
     pub(crate) fn is_entry(&self) -> bool {
         self.function.is_entry()
