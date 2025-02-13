@@ -58,25 +58,14 @@ async fn test_domain_aa() {
         0,
     );
 
-    let create_txn = info.root_account().sign_with_transaction_builder(
-        info.transaction_factory()
-            .payload(aptos_stdlib::aptos_account_transfer(
-                account.address(),
-                10000000000,
-            )),
-    );
-    info.client().submit_and_wait(&create_txn).await.unwrap();
-
-    println!("Trying domain AA with {:?}", account);
-
     // test some transaction
     let create_txn = account.sign_aa_transaction_with_transaction_builder(
         vec![],
-        None,
+        Some(&info.root_account()),
         info.transaction_factory()
             .payload(aptos_stdlib::aptos_account_create_account(
                 AccountAddress::random(),
             )),
     );
-    info.client().submit_and_wait(&create_txn).await.unwrap();
+    info.client().submit_and_wait(&create_txn).await.expect(&format!("aa: {:?}", create_txn));
 }
