@@ -63,21 +63,24 @@ impl BlockExecutorLocalConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct BlockExecutorConfigFromOnchain {
     pub block_gas_limit_type: BlockGasLimitType,
-    pub block_gas_limit_override: Option<u64>,
+    enable_per_block_gas_limit: bool,
+    per_block_gas_limit: Option<u64>,
 }
 
 impl BlockExecutorConfigFromOnchain {
-    pub fn new(block_gas_limit_type: BlockGasLimitType) -> Self {
+    pub fn new(block_gas_limit_type: BlockGasLimitType, enable_per_block_gas_limit: bool) -> Self {
         Self {
             block_gas_limit_type,
-            block_gas_limit_override: None,
+            enable_per_block_gas_limit,
+            per_block_gas_limit: None,
         }
     }
 
     pub fn new_no_block_limit() -> Self {
         Self {
             block_gas_limit_type: BlockGasLimitType::NoLimit,
-            block_gas_limit_override: None,
+            enable_per_block_gas_limit: false,
+            per_block_gas_limit: None,
         }
     }
 
@@ -85,7 +88,8 @@ impl BlockExecutorConfigFromOnchain {
         Self {
             block_gas_limit_type: maybe_block_gas_limit
                 .map_or(BlockGasLimitType::NoLimit, BlockGasLimitType::Limit),
-            block_gas_limit_override: None,
+            enable_per_block_gas_limit: false,
+            per_block_gas_limit: None,
         }
     }
 
@@ -93,7 +97,7 @@ impl BlockExecutorConfigFromOnchain {
         Self {
             block_gas_limit_type:
                 // present, so code is exercised, but large to not limit blocks
-                BlockGasLimitType::ComplexLimitV2 {
+                BlockGasLimitType::ComplexLimitV1 {
                     effective_block_gas_limit: 1_000_000_000,
                     execution_gas_effective_multiplier: 1,
                     io_gas_effective_multiplier: 1,
@@ -103,21 +107,25 @@ impl BlockExecutorConfigFromOnchain {
                     include_user_txn_size_in_block_output: true,
                     add_block_limit_outcome_onchain: false,
                     use_granular_resource_group_conflicts: false,
-                    enable_per_block_gas_limit: true,
                 },
-            block_gas_limit_override: None,
+            enable_per_block_gas_limit: false,
+            per_block_gas_limit: None,
         }
     }
 
     pub fn with_block_gas_limit_override(self, block_gas_limit_override: Option<u64>) -> Self {
-        let block_gas_limit_override = if self.block_gas_limit_type.enable_per_block_gas_limit() {
-            block_gas_limit_override
-        } else {
-            None
-        };
         Self {
             block_gas_limit_type: self.block_gas_limit_type,
-            block_gas_limit_override,
+            enable_per_block_gas_limit: self.enable_per_block_gas_limit,
+            per_block_gas_limit: block_gas_limit_override,
+        }
+    }
+
+    pub fn block_gas_limit_override(&self) -> Option<u64> {
+        if self.enable_per_block_gas_limit {
+            self.per_block_gas_limit
+        } else {
+            None
         }
     }
 }
