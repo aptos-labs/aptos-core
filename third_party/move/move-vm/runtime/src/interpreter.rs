@@ -543,7 +543,7 @@ impl InterpreterImpl {
                     )?;
                 },
                 ExitCode::CallClosure(_sig_idx) => {
-                    // TODO(#15664): runtime check whether closure value on stack is same as sig_idx
+                    // Notice the closure is type-checked in runtime_type_checker
                     let (fun, captured) = self
                         .operand_stack
                         .pop_as::<Closure>()
@@ -584,13 +584,13 @@ impl InterpreterImpl {
                         resolver.module_storage(),
                     )?;
 
-                    // Charge gas for call.
+                    // Charge gas for call, for the parameters
                     gas_meter
                         .charge_call(
                             module_id,
                             function.name(),
                             self.operand_stack
-                                .last_n(function.param_tys().len())
+                                .last_n(function.param_tys().len() - mask.captured_count() as usize)
                                 .map_err(|e| set_err_info!(current_frame, e))?,
                             (function.local_tys().len() as u64).into(),
                         )
@@ -720,10 +720,11 @@ impl InterpreterImpl {
                     let expected_ty = loader
                         .ty_builder()
                         .create_ty_with_subst(expected_ty, ty_args)?;
-                    ty.paranoid_check_eq(&expected_ty)?;
+                    // For parameter to argument, use assignability
+                    ty.paranoid_check_assignable(&expected_ty)?;
                 } else {
                     // Directly check against the expected type to save a clone here.
-                    ty.paranoid_check_eq(expected_ty)?;
+                    ty.paranoid_check_assignable(expected_ty)?;
                 }
             }
         }
@@ -848,11 +849,12 @@ impl InterpreterImpl {
                 let expected_ty = &function.param_tys()[i];
                 if !mask.is_captured(i) {
                     let ty = self.operand_stack.pop_ty()?;
+                    // For param type to argument, use assignability
                     if !ty_args.is_empty() {
                         let expected_ty = ty_builder.create_ty_with_subst(expected_ty, ty_args)?;
-                        ty.paranoid_check_eq(&expected_ty)?;
+                        ty.paranoid_check_assignable(&expected_ty)?;
                     } else {
-                        ty.paranoid_check_eq(expected_ty)?;
+                        ty.paranoid_check_assignable(expected_ty)?;
                     }
                     arg_tys.push_front(ty);
                 } else {
@@ -1864,6 +1866,7 @@ impl Frame {
                     self.function.ty_args(),
                     resolver,
                     &mut interpreter.operand_stack,
+                    frame_cache,
                     instruction,
                 )?;
 
@@ -2324,8 +2327,6 @@ impl Frame {
                             .push(reference.test_variant(info.variant)?)?;
                     },
                     Bytecode::PackClosure(fh_idx, mask) => {
-                        // TODO(#15664): runtime checks. We should verify that the popped
-                        //   argument types match the function.
                         let function = resolver
                             .build_loaded_function_from_handle_and_ty_args(*fh_idx, vec![])?;
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
@@ -2339,7 +2340,6 @@ impl Frame {
                             .push(Value::closure(Box::new(lazy_function), captured))?
                     },
                     Bytecode::PackClosureGeneric(fi_idx, mask) => {
-                        // TODO(#15664): runtime checks
                         let ty_args = resolver.instantiate_generic_function(
                             Some(gas_meter),
                             *fi_idx,
