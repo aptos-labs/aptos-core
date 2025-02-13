@@ -5858,7 +5858,6 @@ The royalty_points_numerator should less than royalty_points_denominator.
     royalty_points_denominator: u64;
     payee_address: <b>address</b>;
     <b>aborts_if</b> royalty_points_numerator &gt; royalty_points_denominator;
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="../../aptos-framework/doc/account.md#0x1_account_Account">account::Account</a>&gt;(payee_address);
 }
 </code></pre>
 
