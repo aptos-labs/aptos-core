@@ -390,7 +390,7 @@ fn freeze_code_object_fail_when_having_mutable_dependency() {
     options
         .named_addresses
         .insert(MODULE_ADDRESS_NAME.to_string(), context.object_address);
-    let sequence_number = context.harness.sequence_number(acc.address());
+    let sequence_number = context.harness.sequence_number_opt(acc.address()).unwrap();
     context.object_address =
         create_object_code_deployment_address(*acc.address(), sequence_number + 1);
     options.named_addresses.insert(
@@ -424,7 +424,7 @@ fn freeze_code_object_succeeds_when_all_dependencies_immutable() {
     options
         .named_addresses
         .insert(MODULE_ADDRESS_NAME.to_string(), context.object_address);
-    let sequence_number = context.harness.sequence_number(acc.address());
+    let sequence_number = context.harness.sequence_number_opt(acc.address()).unwrap();
     context.object_address =
         create_object_code_deployment_address(*acc.address(), sequence_number + 1);
     options.named_addresses.insert(
