@@ -28,6 +28,7 @@ use serde::{Deserialize, Serialize};
 use std::{fs::File, io::BufReader, path::PathBuf, pin::Pin, str::FromStr, sync::Arc};
 use tokio::{net::TcpListener, sync::Semaphore, task::JoinSet};
 use std::time::Duration;
+use std::future::Future;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct HandlerConfig {
@@ -381,7 +382,7 @@ where
 
     let mut backoff_ms = INITIAL_BACKOFF_MS;
     
-    for attempt in 0..=MAX_RETRIES {
+    for attempt in 0..MAX_RETRIES {
         match f().await {
             Ok(result) => return Ok(result),
             Err(e) if attempt < MAX_RETRIES => {
@@ -392,6 +393,7 @@ where
             Err(e) => return Err(anyhow::Error::new(e)),
         }
     }
+    unreachable!()
 }
 
 // We hide these tests behind a feature flag because these are not standard unit tests,
