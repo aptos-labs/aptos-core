@@ -63,12 +63,24 @@ impl BlockExecutorLocalConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct BlockExecutorConfigFromOnchain {
     pub block_gas_limit_type: BlockGasLimitType,
+    enable_per_block_gas_limit: bool,
+    per_block_gas_limit: Option<u64>,
 }
 
 impl BlockExecutorConfigFromOnchain {
+    pub fn new(block_gas_limit_type: BlockGasLimitType, enable_per_block_gas_limit: bool) -> Self {
+        Self {
+            block_gas_limit_type,
+            enable_per_block_gas_limit,
+            per_block_gas_limit: None,
+        }
+    }
+
     pub fn new_no_block_limit() -> Self {
         Self {
             block_gas_limit_type: BlockGasLimitType::NoLimit,
+            enable_per_block_gas_limit: false,
+            per_block_gas_limit: None,
         }
     }
 
@@ -76,6 +88,8 @@ impl BlockExecutorConfigFromOnchain {
         Self {
             block_gas_limit_type: maybe_block_gas_limit
                 .map_or(BlockGasLimitType::NoLimit, BlockGasLimitType::Limit),
+            enable_per_block_gas_limit: false,
+            per_block_gas_limit: None,
         }
     }
 
@@ -94,6 +108,24 @@ impl BlockExecutorConfigFromOnchain {
                     add_block_limit_outcome_onchain: false,
                     use_granular_resource_group_conflicts: false,
                 },
+            enable_per_block_gas_limit: false,
+            per_block_gas_limit: None,
+        }
+    }
+
+    pub fn with_block_gas_limit_override(self, block_gas_limit_override: Option<u64>) -> Self {
+        Self {
+            block_gas_limit_type: self.block_gas_limit_type,
+            enable_per_block_gas_limit: self.enable_per_block_gas_limit,
+            per_block_gas_limit: block_gas_limit_override,
+        }
+    }
+
+    pub fn block_gas_limit_override(&self) -> Option<u64> {
+        if self.enable_per_block_gas_limit {
+            self.per_block_gas_limit
+        } else {
+            None
         }
     }
 }
