@@ -417,9 +417,7 @@ impl Constraint {
     pub fn propagate_over_reference(&self) -> bool {
         matches!(
             self,
-            Constraint::SomeStruct(..)
-                | Constraint::SomeReceiverFunction(..)
-                | Constraint::SomeFunctionValue(..)
+            Constraint::SomeStruct(..) | Constraint::SomeReceiverFunction(..)
         )
     }
 
