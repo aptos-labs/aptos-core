@@ -18,6 +18,9 @@ use move_core_types::{
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use std::str::FromStr;
+use rstest::rstest;
+
+// TODO[Orderless]: Support stateless accounts
 
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 struct FungibleStore {
@@ -191,23 +194,14 @@ fn test_basic_fungible_token(h: &mut MoveHarness, alice: Account, bob: Account) 
 }
 
 // A simple test to verify gas paying still work for prologue and epilogue.
-#[test]
-fn test_coin_to_fungible_asset_migration_with_stateful_sender() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn test_coin_to_fungible_asset_migration(stateless_account: bool) {
     let mut h = MoveHarness::new();
+    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
 
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), Some(0));
-    test_coin_to_fungible_asset_migration(&mut h, alice);
-}
-
-#[test]
-fn test_coin_to_fungible_asset_migration_with_stateless_sender() {
-    let mut h = MoveHarness::new();
-
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), None);
-    test_coin_to_fungible_asset_migration(&mut h, alice);
-}
-
-fn test_coin_to_fungible_asset_migration(h: &mut MovweHarness, alice: Account) {
     let alice_primary_store_addr =
         account_address::create_derived_object_address(*alice.address(), AccountAddress::TEN);
     let root = h.aptos_framework_account();
@@ -277,14 +271,14 @@ fn test_prologue_speculation() {
         ],
         vec![],
     );
-    let independent_account = harness.new_account_at(AccountAddress::random());
+    let independent_account = harness.new_account_at(AccountAddress::random(), Some(0));
 
     let sink_txn = harness.create_transaction_payload(
         &independent_account,
         aptos_account_batch_transfer(vec![AccountAddress::random(); 50], vec![10_000_000_000; 50]),
     );
 
-    let account = harness.new_account_at(AccountAddress::ONE);
+    let account = harness.new_account_at(AccountAddress::ONE, Some(0));
     let dst_1 = Account::new();
     let dst_2 = Account::new();
     let dst_3 = Account::new();

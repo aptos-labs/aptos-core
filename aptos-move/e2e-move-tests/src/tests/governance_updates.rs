@@ -12,9 +12,13 @@ use aptos_types::{
     transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
     vm_status::StatusCode,
 };
+use rstest::rstest;
 
-#[test]
-fn large_transactions() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn large_transactions(stateless_account: bool) {
     // This test validates that only small txns (less than the maximum txn size) can be kept. It
     // then evaluates the limits of the ApprovedExecutionHashes. Specifically, the hash is the code
     // is the only portion that can exceed the size limits. There's a further restriction on the
@@ -23,7 +27,7 @@ fn large_transactions() {
     // way into consensus.
     let mut h = MoveHarness::new();
 
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
+    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap(), if stateless_account { None } else { Some(0) });
     let root = h.aptos_framework_account();
     let entries = ApprovedExecutionHashes { entries: vec![] };
     h.set_resource(
@@ -72,8 +76,11 @@ fn large_transactions() {
     assert!(status.is_discarded());
 }
 
-#[test]
-fn alt_execution_limit_for_gov_proposals() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn alt_execution_limit_for_gov_proposals(stateless_account: bool) {
     // This test validates that approved governance scripts automatically get the
     // alternate (usually increased) execution limit.
     let max_gas_regular = 10;
@@ -82,7 +89,7 @@ fn alt_execution_limit_for_gov_proposals() {
     // Set up the testing environment
     let mut h = MoveHarness::new();
 
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
+    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap(), if stateless_account { None } else { Some(0) });
     let root = h.aptos_framework_account();
 
     h.modify_gas_schedule(|gas_params| {
@@ -167,12 +174,18 @@ fn run(
 ) -> TransactionStatus {
     let script = Script::new(code, vec![], vec![TransactionArgument::U8Vector(txn_arg)]);
 
-    let txn = TransactionBuilder::new(account.clone())
+    let mut txn_builder = TransactionBuilder::new(account.clone())
         .script(script)
-        .sequence_number(h.sequence_number(account.address()))
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
-        .sign();
+        .upgrade_payload(h.use_txn_payload_v2_format, h.enable_orderless_transactions);
+    
+    if !h.enable_orderless_transactions {
+        let sequence_number = h.sequence_number_opt(&account.address()).unwrap();
+        txn_builder = txn_builder.sequence_number(sequence_number);
+    }
+
+    let txn = txn_builder.sign();
 
     h.run(txn)
 }
