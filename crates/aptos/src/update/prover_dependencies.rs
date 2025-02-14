@@ -14,9 +14,10 @@ use aptos_build_info::BUILD_OS;
 use async_trait::async_trait;
 use clap::Parser;
 use move_prover_boogie_backend::options::{
-    BoogieOptions, MAX_BOOGIE_VERSION, MAX_CVC5_VERSION, MAX_Z3_VERSION, MIN_BOOGIE_VERSION,
-    MIN_CVC5_VERSION, MIN_Z3_VERSION,
+    BoogieOptions, MAX_BOOGIE_VERSION, MAX_Z3_VERSION, MIN_BOOGIE_VERSION, MIN_Z3_VERSION,
 };
+#[cfg(unix)]
+use move_prover_boogie_backend::options::{MAX_CVC5_VERSION, MIN_CVC5_VERSION};
 use std::{
     env,
     path::{Path, PathBuf},
@@ -50,8 +51,6 @@ const TARGET_CVC5_VERSION: &str = "0.0.3";
 
 #[cfg(not(target_os = "windows"))]
 const CVC5_EXE_ENV: &str = "CVC5_EXE";
-#[cfg(target_os = "windows")]
-const CVC5_EXE: &str = "cvc5.exe";
 #[cfg(not(target_os = "windows"))]
 const CVC5_EXE: &str = "cvc5";
 

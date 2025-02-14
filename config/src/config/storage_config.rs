@@ -515,7 +515,7 @@ impl ConfigOptimizer for StorageConfig {
             if (chain_id.is_testnet() || chain_id.is_mainnet())
                 && config_yaml["ensure_rlimit_nofile"].is_null()
             {
-                config.ensure_rlimit_nofile = 100_000;
+                config.ensure_rlimit_nofile = 999_999;
                 modified_config = true;
             }
         }
@@ -724,6 +724,6 @@ mod test {
         .unwrap();
         assert!(modified_config);
 
-        assert_eq!(node_config.storage.ensure_rlimit_nofile, 100_000);
+        assert_eq!(node_config.storage.ensure_rlimit_nofile, 999_999);
     }
 }
