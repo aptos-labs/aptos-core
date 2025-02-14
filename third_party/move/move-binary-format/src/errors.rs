@@ -469,6 +469,10 @@ impl PartialVMError {
         }))
     }
 
+    pub fn new_invariant_violation(msg: impl ToString) -> PartialVMError {
+        Self::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(msg.to_string())
+    }
+
     pub fn major_status(&self) -> StatusCode {
         self.0.major_status
     }

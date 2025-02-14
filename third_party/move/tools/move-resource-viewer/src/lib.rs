@@ -442,6 +442,10 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             TypeTag::U256 => FatType::U256,
             TypeTag::U128 => FatType::U128,
             TypeTag::Vector(ty) => FatType::Vector(Box::new(self.resolve_type_impl(ty, limit)?)),
+            TypeTag::Function(..) => {
+                // TODO(#15664) implement functions for fat types"
+                todo!("functions for fat types")
+            },
         })
     }
 
@@ -582,6 +586,10 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             },
             (MoveValue::Struct(s), FatType::Struct(ty)) => {
                 AnnotatedMoveValue::Struct(self.annotate_struct(s, ty.as_ref(), limit)?)
+            },
+            (MoveValue::Closure(..), _) => {
+                // TODO(#15664) implement functions for annotated move values
+                todo!("functions not implemented")
             },
             (MoveValue::U8(_), _)
             | (MoveValue::U64(_), _)

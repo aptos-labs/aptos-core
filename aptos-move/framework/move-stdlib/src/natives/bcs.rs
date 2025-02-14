@@ -193,10 +193,11 @@ fn constant_serialized_size(ty_layout: &MoveTypeLayout) -> (u64, PartialVMResult
         MoveTypeLayout::Signer => Ok(None),
         // vectors have no constant size
         MoveTypeLayout::Vector(_) => Ok(None),
-        // enums have no constant size
+        // enums and functions have no constant size
         MoveTypeLayout::Struct(
             MoveStructLayout::RuntimeVariants(_) | MoveStructLayout::WithVariants(_),
-        ) => Ok(None),
+        )
+        | MoveTypeLayout::Function(..) => Ok(None),
         MoveTypeLayout::Struct(MoveStructLayout::Runtime(fields)) => {
             let mut total = Some(0);
             for field in fields {

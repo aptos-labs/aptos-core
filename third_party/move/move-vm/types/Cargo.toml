@@ -12,6 +12,7 @@ edition = "2021"
 [dependencies]
 ambassador = { workspace = true }
 bcs = { workspace = true }
+better_any = { workspace = true }
 bytes = { workspace = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
