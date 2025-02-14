@@ -121,6 +121,7 @@ pub enum FeatureFlag {
     /// Enables bytecode version v8
     VM_BINARY_FORMAT_V8 = 86,
     BULLETPROOFS_BATCH_NATIVES = 87,
+    DOMAIN_ACCOUNT_ABSTRACTION = 88,
 }
 
 impl FeatureFlag {
@@ -207,6 +208,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
             FeatureFlag::ACCOUNT_ABSTRACTION,
             FeatureFlag::BULLETPROOFS_BATCH_NATIVES,
+            FeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION,
         ]
     }
 }
@@ -284,6 +286,10 @@ impl Features {
 
     pub fn is_account_abstraction_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ACCOUNT_ABSTRACTION)
+    }
+
+    pub fn is_domain_account_abstraction_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION)
     }
 
     pub fn is_module_event_enabled(&self) -> bool {
