@@ -67,6 +67,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
+use aptos_crypto::hash::HashValueParseError;
 
 pub const USER_AGENT: &str = concat!("aptos-cli/", env!("CARGO_PKG_VERSION"));
 const US_IN_SECS: u64 = 1_000_000;
@@ -116,6 +117,8 @@ pub enum CliError {
     SimulationError(String),
     #[error("Coverage failed with status: {0}")]
     CoverageError(String),
+    #[error("Failed to parse hash {1} with error: {0}")]
+    HashError(#[source] HashValueParseError, String),
 }
 
 impl CliError {
@@ -136,6 +139,7 @@ impl CliError {
             CliError::UnexpectedError(_) => "UnexpectedError",
             CliError::SimulationError(_) => "SimulationError",
             CliError::CoverageError(_) => "CoverageError",
+            CliError::HashError(..) => "HashError",
         }
     }
 }

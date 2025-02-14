@@ -36,7 +36,7 @@ use aptos_types::{
     transaction::{Script, TransactionPayload},
 };
 use async_trait::async_trait;
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use move_core_types::{
     ident_str, language_storage::ModuleId, parser::parse_type_tag,
     transaction_argument::TransactionArgument,
@@ -49,8 +49,11 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
+use std::fmt::Display;
+use std::str::FromStr;
 use supra_aptos::{SupraCommand, SupraCommandArguments};
 use tempfile::TempDir;
+use crate::move_tool::IncludedArtifacts::{All, Sparse};
 
 /// Tool for on-chain governance
 ///
@@ -1046,8 +1049,32 @@ pub struct GenerateUpgradeProposal {
     #[clap(long, default_value = "")]
     pub(crate) next_execution_hash: String,
 
+    /// To denote if the upgrade is done via a Single-step or a Multi-step proposal
+    #[clap(long)]
+    pub(crate) proposal_type: ProposalType,
+
+    /// Name of the smart contract proposal function. Defaults to 'main' if not supplied
+    #[clap(long, default_value = "main")]
+    pub(crate) function_name: String,
+
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug)]
+pub enum ProposalType {
+    SingleStep,
+    MultiStep,
+}
+
+impl Display for ProposalType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use ProposalType::*;
+        match self {
+            SingleStep => f.write_str("single-step"),
+            MultiStep => f.write_str("multi-step"),
+        }
+    }
 }
 
 #[async_trait]
@@ -1064,6 +1091,8 @@ impl CliCommand<()> for GenerateUpgradeProposal {
             output,
             testnet,
             next_execution_hash,
+            proposal_type,
+            function_name
         } = self;
         let package_path = move_options.get_package_path()?;
         let options = included_artifacts.build_options(
@@ -1080,21 +1109,30 @@ impl CliCommand<()> for GenerateUpgradeProposal {
         let package = BuiltPackage::build(package_path, options)?;
         let release = ReleasePackage::new(package)?;
 
-        // If we're generating a single-step proposal on testnet
-        if testnet && next_execution_hash.is_empty() {
-            release.generate_script_proposal_testnet(account, output)?;
+        if let ProposalType::SingleStep = proposal_type {
+            // If we're generating a single-step proposal on testnet
+            if testnet {
+                release.generate_script_proposal_testnet(account, output, function_name)?;
             // If we're generating a single-step proposal on mainnet
-        } else if next_execution_hash.is_empty() {
-            release.generate_script_proposal(account, output)?;
+            } else {
+                release.generate_script_proposal(account, output, function_name)?;
+            }
             // If we're generating a multi-step proposal
         } else {
-            let next_execution_hash_bytes = hex::decode(next_execution_hash)?;
+            let next_execution_hash = if !next_execution_hash.is_empty() {
+                Some(HashValue::from_str(&next_execution_hash)
+                    .map_err(|e| CliError::HashError(e, next_execution_hash))?)
+            } else {
+                None
+            };
+
             release.generate_script_proposal_multi_step(
                 account,
                 output,
-                next_execution_hash_bytes,
+                next_execution_hash,
+                function_name
             )?;
-        };
+        }
         Ok(())
     }
 }

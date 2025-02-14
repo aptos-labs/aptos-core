@@ -10,6 +10,8 @@ use move_core_types::language_storage::ModuleId;
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::PathBuf};
+use std::fmt::Display;
+use aptos_crypto::HashValue;
 
 /// A release bundle consists of a list of release packages.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -164,25 +166,28 @@ impl ReleasePackage {
         &self,
         for_address: AccountAddress,
         out: PathBuf,
+        function_name: String,
     ) -> anyhow::Result<()> {
-        self.generate_script_proposal_impl(for_address, out, false, false, Vec::new())
+        self.generate_script_proposal_impl(for_address, out, false, false, None, function_name)
     }
 
     pub fn generate_script_proposal_testnet(
         &self,
         for_address: AccountAddress,
         out: PathBuf,
+        function_name: String,
     ) -> anyhow::Result<()> {
-        self.generate_script_proposal_impl(for_address, out, true, false, Vec::new())
+        self.generate_script_proposal_impl(for_address, out, true, false, None, function_name)
     }
 
     pub fn generate_script_proposal_multi_step(
         &self,
         for_address: AccountAddress,
         out: PathBuf,
-        next_execution_hash: Vec<u8>,
+        next_execution_hash: Option<HashValue>,
+        function_name: String
     ) -> anyhow::Result<()> {
-        self.generate_script_proposal_impl(for_address, out, true, true, next_execution_hash)
+        self.generate_script_proposal_impl(for_address, out, true, true, next_execution_hash, function_name)
     }
 
     fn generate_script_proposal_impl(
@@ -191,7 +196,8 @@ impl ReleasePackage {
         out: PathBuf,
         is_testnet: bool,
         is_multi_step: bool,
-        next_execution_hash: Vec<u8>,
+        next_execution_hash: Option<HashValue>,
+        function_name: String,
     ) -> anyhow::Result<()> {
         let writer = CodeWriter::new(Loc::default());
         emitln!(
@@ -199,7 +205,11 @@ impl ReleasePackage {
             "// Upgrade proposal for package `{}`\n",
             self.metadata.name
         );
-        emitln!(writer, "// source digest: {}", self.metadata.source_digest);
+
+        // The Sha2-256 digest here is the combined hash of all the hashes of the `.move` files and
+        // the manifest file(Move.toml) in the source package.
+        // Check [move_package::resolution::digest::compile_digest]
+        emitln!(writer, "// source package's SHA2-256 digest: {}", self.metadata.source_digest);
         emitln!(writer, "script {");
         writer.indent();
         emitln!(writer, "use std::vector;");
@@ -207,7 +217,7 @@ impl ReleasePackage {
         emitln!(writer, "use supra_framework::code;\n");
 
         if is_testnet && !is_multi_step {
-            emitln!(writer, "fun main(core_resources: &signer){");
+            emitln!(writer, "fun {function_name} (core_resources: &signer) {{");
             writer.indent();
             emitln!(
                 writer,
@@ -215,7 +225,7 @@ impl ReleasePackage {
                 for_address
             );
         } else if !is_multi_step {
-            emitln!(writer, "fun main(proposal_id: u64){");
+            emitln!(writer, "fun {} (proposal_id: u64) {{", function_name);
             writer.indent();
             emitln!(
                 writer,
@@ -223,7 +233,7 @@ impl ReleasePackage {
                 for_address
             );
         } else {
-            emitln!(writer, "fun main(proposal_id: u64){");
+            emitln!(writer, "fun {} (proposal_id: u64) {{", function_name);
             writer.indent();
             Self::generate_next_execution_hash_blob(&writer, for_address, next_execution_hash);
         }
@@ -284,30 +294,26 @@ impl ReleasePackage {
     fn generate_next_execution_hash_blob(
         writer: &CodeWriter,
         for_address: AccountAddress,
-        next_execution_hash: Vec<u8>,
+        next_execution_hash: Option<HashValue>,
     ) {
-        if next_execution_hash == "vector::empty<u8>()".as_bytes() {
+        if let Some(hash) = next_execution_hash {
             emitln!(
                 writer,
-                "let framework_signer = supra_governance::resolve_multi_step_proposal(proposal_id, @{}, {});\n",
-                for_address,
-                "vector::empty<u8>()",
-            );
-        } else {
-            emitln!(
-                writer,
-                "let framework_signer = supra_governance::resolve_multi_step_proposal("
+                "let framework_signer = supra_governance::resolve_supra_multi_step_proposal("
             );
             writer.indent();
             emitln!(writer, "proposal_id,");
             emitln!(writer, "@{},", for_address);
-            emit!(writer, "vector[");
-            for b in next_execution_hash.iter() {
-                emit!(writer, "{}u8,", b);
-            }
-            emitln!(writer, "],");
+            emitln!(writer, "x\"{:x}\"", hash);
             writer.unindent();
             emitln!(writer, ");");
+        } else {
+            emitln!(
+                writer,
+                "let framework_signer = supra_governance::resolve_supra_multi_step_proposal(proposal_id, @{}, {});\n",
+                for_address,
+                "vector::empty<u8>()",
+            );
         }
     }
 }
