@@ -9,7 +9,6 @@ module aptos_framework::transaction_validation {
 
     use aptos_framework::account;
     use aptos_framework::aptos_account;
-    use aptos_framework::account_abstraction;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::chain_id;
     use aptos_framework::coin;
@@ -135,10 +134,7 @@ module aptos_framework::transaction_validation {
                     );
                 } else {
                     assert!(
-                        features::is_account_abstraction_enabled(
-                        ) && account_abstraction::using_dispatchable_authenticator(
-                            transaction_sender
-                        ),
+                        features::is_account_abstraction_enabled(),
                         error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
                     )
                 };
@@ -168,10 +164,18 @@ module aptos_framework::transaction_validation {
 
             if (!features::transaction_simulation_enhancement_enabled() ||
                     !skip_auth_key_check(is_simulation, &txn_authentication_key)) {
-                assert!(
-                    txn_authentication_key == option::some(bcs::to_bytes(&transaction_sender)),
-                    error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
-                );
+                if (option::is_some(&txn_authentication_key)) {
+                    assert!(
+                        txn_authentication_key == option::some(bcs::to_bytes(&transaction_sender)),
+                        error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
+                    );
+                } else {
+                    // aa verifies authentication itself
+                    assert!(
+                        features::is_account_abstraction_enabled(),
+                        error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
+                    );
+                }
             }
         };
 
@@ -369,10 +373,7 @@ module aptos_framework::transaction_validation {
                     );
                 } else {
                     assert!(
-                        features::is_account_abstraction_enabled(
-                        ) && account_abstraction::using_dispatchable_authenticator(
-                            secondary_address
-                        ),
+                        features::is_account_abstraction_enabled(),
                         error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
                     )
                 };
@@ -593,6 +594,7 @@ module aptos_framework::transaction_validation {
 
     fun unified_prologue(
         sender: signer,
+        // None means no need to check, i.e. either AA (where it is already checked) or simulation
         txn_sender_public_key: Option<vector<u8>>,
         txn_sequence_number: u64,
         secondary_signer_addresses: vector<address>,
@@ -621,7 +623,9 @@ module aptos_framework::transaction_validation {
     fun unified_prologue_fee_payer(
         sender: signer,
         fee_payer: signer,
+        // None means no need to check, i.e. either AA (where it is already checked) or simulation
         txn_sender_public_key: Option<vector<u8>>,
+        // None means no need to check, i.e. either AA (where it is already checked) or simulation
         fee_payer_public_key_hash: Option<vector<u8>>,
         txn_sequence_number: u64,
         secondary_signer_addresses: vector<address>,
@@ -654,9 +658,7 @@ module aptos_framework::transaction_validation {
                 );
             } else {
                 assert!(
-                    features::is_account_abstraction_enabled() && account_abstraction::using_dispatchable_authenticator(
-                        fee_payer_address
-                    ),
+                    features::is_account_abstraction_enabled(),
                     error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
                 )
             };
