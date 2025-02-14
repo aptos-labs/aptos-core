@@ -322,76 +322,90 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             Bytecode::StLoc(_) => (),
             Bytecode::MutBorrowLoc(idx) => {
                 let ty = &local_tys[*idx as usize];
-                let mut_ref_ty = ty_builder.create_ref_ty(ty, true)?;
+                let mut_ref_ty = ty_builder.create_ref_ty::<true>(ty)?;
                 operand_stack.push_ty(mut_ref_ty)?;
             },
             Bytecode::ImmBorrowLoc(idx) => {
                 let ty = &local_tys[*idx as usize];
-                let ref_ty = ty_builder.create_ref_ty(ty, false)?;
+                let ref_ty = ty_builder.create_ref_ty::<false>(ty)?;
                 operand_stack.push_ty(ref_ty)?;
             },
             Bytecode::ImmBorrowField(fh_idx) => {
                 let ty = operand_stack.pop_ty()?;
                 let expected_ty = resolver.field_handle_to_struct(*fh_idx);
-                ty.paranoid_check_ref_eq(&expected_ty, false)?;
+                ty.paranoid_check_ref_eq::<false>(&expected_ty)?;
 
                 let field_ty = resolver.get_field_ty(*fh_idx)?;
-                let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
+                let field_ref_ty = ty_builder.create_ref_ty::<false>(field_ty)?;
                 operand_stack.push_ty(field_ref_ty)?;
             },
             Bytecode::MutBorrowField(fh_idx) => {
                 let ref_ty = operand_stack.pop_ty()?;
                 let expected_inner_ty = resolver.field_handle_to_struct(*fh_idx);
-                ref_ty.paranoid_check_ref_eq(&expected_inner_ty, true)?;
+                ref_ty.paranoid_check_ref_eq::<true>(&expected_inner_ty)?;
 
                 let field_ty = resolver.get_field_ty(*fh_idx)?;
-                let field_mut_ref_ty = ty_builder.create_ref_ty(field_ty, true)?;
+                let field_mut_ref_ty = ty_builder.create_ref_ty::<true>(field_ty)?;
                 operand_stack.push_ty(field_mut_ref_ty)?;
             },
             Bytecode::ImmBorrowFieldGeneric(idx) => {
                 let struct_ty = operand_stack.pop_ty()?;
                 let ((field_ty, _), (expected_struct_ty, _)) =
                     ty_cache.get_field_type_and_struct_type(*idx, resolver, ty_args)?;
-                struct_ty.paranoid_check_ref_eq(expected_struct_ty, false)?;
+                struct_ty.paranoid_check_ref_eq::<false>(expected_struct_ty)?;
 
-                let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
+                let field_ref_ty = ty_builder.create_ref_ty::<false>(field_ty)?;
                 operand_stack.push_ty(field_ref_ty)?;
             },
             Bytecode::MutBorrowFieldGeneric(idx) => {
                 let struct_ty = operand_stack.pop_ty()?;
                 let ((field_ty, _), (expected_struct_ty, _)) =
                     ty_cache.get_field_type_and_struct_type(*idx, resolver, ty_args)?;
-                struct_ty.paranoid_check_ref_eq(expected_struct_ty, true)?;
+                struct_ty.paranoid_check_ref_eq::<true>(expected_struct_ty)?;
 
-                let field_mut_ref_ty = ty_builder.create_ref_ty(field_ty, true)?;
+                let field_mut_ref_ty = ty_builder.create_ref_ty::<true>(field_ty)?;
                 operand_stack.push_ty(field_mut_ref_ty)?;
             },
-            Bytecode::ImmBorrowVariantField(fh_idx) | Bytecode::MutBorrowVariantField(fh_idx) => {
-                let is_mut = matches!(instruction, Bytecode::MutBorrowVariantField(..));
+            Bytecode::ImmBorrowVariantField(fh_idx) => {
                 let field_info = resolver.variant_field_info_at(*fh_idx);
                 let ty = operand_stack.pop_ty()?;
                 let expected_ty = resolver.create_struct_ty(&field_info.definition_struct_type);
-                ty.paranoid_check_ref_eq(&expected_ty, is_mut)?;
+                ty.paranoid_check_ref_eq::<false>(&expected_ty)?;
                 let field_ty = &field_info.uninstantiated_field_ty;
-                let field_ref_ty = ty_builder.create_ref_ty(field_ty, is_mut)?;
+                let field_ref_ty = ty_builder.create_ref_ty::<false>(field_ty)?;
                 operand_stack.push_ty(field_ref_ty)?;
             },
-            Bytecode::ImmBorrowVariantFieldGeneric(idx)
-            | Bytecode::MutBorrowVariantFieldGeneric(idx) => {
-                let is_mut = matches!(instruction, Bytecode::MutBorrowVariantFieldGeneric(..));
+            Bytecode::MutBorrowVariantField(fh_idx) => {
+                let field_info = resolver.variant_field_info_at(*fh_idx);
+                let ty = operand_stack.pop_ty()?;
+                let expected_ty = resolver.create_struct_ty(&field_info.definition_struct_type);
+                ty.paranoid_check_ref_eq::<true>(&expected_ty)?;
+                let field_ty = &field_info.uninstantiated_field_ty;
+                let field_ref_ty = ty_builder.create_ref_ty::<true>(field_ty)?;
+                operand_stack.push_ty(field_ref_ty)?;
+            },
+            Bytecode::ImmBorrowVariantFieldGeneric(idx) => {
                 let struct_ty = operand_stack.pop_ty()?;
                 let ((field_ty, _), (expected_struct_ty, _)) =
                     ty_cache.get_variant_field_type_and_struct_type(*idx, resolver, ty_args)?;
-                struct_ty.paranoid_check_ref_eq(expected_struct_ty, is_mut)?;
-                let field_ref_ty = ty_builder.create_ref_ty(field_ty, is_mut)?;
+                struct_ty.paranoid_check_ref_eq::<false>(expected_struct_ty)?;
+                let field_ref_ty = ty_builder.create_ref_ty::<false>(field_ty)?;
+                operand_stack.push_ty(field_ref_ty)?;
+            },
+            Bytecode::MutBorrowVariantFieldGeneric(idx) => {
+                let struct_ty = operand_stack.pop_ty()?;
+                let ((field_ty, _), (expected_struct_ty, _)) =
+                    ty_cache.get_variant_field_type_and_struct_type(*idx, resolver, ty_args)?;
+                struct_ty.paranoid_check_ref_eq::<true>(expected_struct_ty)?;
+                let field_ref_ty = ty_builder.create_ref_ty::<true>(field_ty)?;
                 operand_stack.push_ty(field_ref_ty)?;
             },
             Bytecode::Pack(idx) => {
+                let struct_definition = resolver.get_struct_definition(*idx);
                 let field_count = resolver.field_count(*idx);
-                let args_ty = resolver.get_struct(*idx)?;
-                let field_tys = args_ty.fields(None)?.iter().map(|(_, ty)| ty);
-                let output_ty = resolver.get_struct_ty(*idx);
-                verify_pack(operand_stack, field_count, field_tys, output_ty)?;
+                let field_tys = struct_definition.fields(None)?.iter().map(|(_, ty)| ty);
+                let struct_ty = resolver.create_struct_ty(struct_definition);
+                verify_pack(operand_stack, field_count, field_tys, struct_ty)?;
             },
             Bytecode::PackGeneric(idx) => {
                 let field_count = resolver.field_instantiation_count(*idx);
@@ -418,9 +432,10 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Bytecode::Unpack(idx) => {
                 let struct_ty = operand_stack.pop_ty()?;
-                struct_ty.paranoid_check_eq(&resolver.get_struct_ty(*idx))?;
-                let struct_decl = resolver.get_struct(*idx)?;
-                for (_name, ty) in struct_decl.fields(None)?.iter() {
+                let struct_definition = resolver.get_struct_definition(*idx);
+                let expected_ty = resolver.create_struct_ty(struct_definition);
+                struct_ty.paranoid_check_eq(&expected_ty)?;
+                for (_name, ty) in struct_definition.fields(None)?.iter() {
                     operand_stack.push_ty(ty.clone())?;
                 }
             },
@@ -488,14 +503,14 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let info = resolver.get_struct_variant_at(*idx);
                 let expected_struct_ty = resolver.create_struct_ty(&info.definition_struct_type);
                 let actual_struct_ty = operand_stack.pop_ty()?;
-                actual_struct_ty.paranoid_check_ref_eq(&expected_struct_ty, false)?;
+                actual_struct_ty.paranoid_check_ref_eq::<false>(&expected_struct_ty)?;
                 operand_stack.push_ty(ty_builder.create_bool_ty())?;
             },
             Bytecode::TestVariantGeneric(idx) => {
                 let expected_struct_ty =
                     ty_cache.get_struct_variant_type(*idx, resolver, ty_args)?.0;
                 let actual_struct_ty = operand_stack.pop_ty()?;
-                actual_struct_ty.paranoid_check_ref_eq(expected_struct_ty, false)?;
+                actual_struct_ty.paranoid_check_ref_eq::<false>(expected_struct_ty)?;
                 operand_stack.push_ty(ty_builder.create_bool_ty())?;
             },
             Bytecode::ReadRef => {
@@ -582,7 +597,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let struct_ty = resolver.get_struct_ty(*idx);
                 struct_ty.paranoid_check_has_ability(Ability::Key)?;
 
-                let struct_mut_ref_ty = ty_builder.create_ref_ty(&struct_ty, true)?;
+                let struct_mut_ref_ty = ty_builder.create_ref_ty::<true>(&struct_ty)?;
                 operand_stack.push_ty(struct_mut_ref_ty)?;
             },
             Bytecode::ImmBorrowGlobal(idx) => {
@@ -590,7 +605,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let struct_ty = resolver.get_struct_ty(*idx);
                 struct_ty.paranoid_check_has_ability(Ability::Key)?;
 
-                let struct_ref_ty = ty_builder.create_ref_ty(&struct_ty, false)?;
+                let struct_ref_ty = ty_builder.create_ref_ty::<false>(&struct_ty)?;
                 operand_stack.push_ty(struct_ref_ty)?;
             },
             Bytecode::MutBorrowGlobalGeneric(idx) => {
@@ -598,7 +613,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let struct_ty = ty_cache.get_struct_type(*idx, resolver, ty_args)?.0;
                 struct_ty.paranoid_check_has_ability(Ability::Key)?;
 
-                let struct_mut_ref_ty = ty_builder.create_ref_ty(struct_ty, true)?;
+                let struct_mut_ref_ty = ty_builder.create_ref_ty::<true>(struct_ty)?;
                 operand_stack.push_ty(struct_mut_ref_ty)?;
             },
             Bytecode::ImmBorrowGlobalGeneric(idx) => {
@@ -606,7 +621,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let struct_ty = ty_cache.get_struct_type(*idx, resolver, ty_args)?.0;
                 struct_ty.paranoid_check_has_ability(Ability::Key)?;
 
-                let struct_ref_ty = ty_builder.create_ref_ty(struct_ty, false)?;
+                let struct_ref_ty = ty_builder.create_ref_ty::<false>(struct_ty)?;
                 operand_stack.push_ty(struct_ref_ty)?;
             },
             Bytecode::Exists(_) | Bytecode::ExistsGeneric(_) => {
