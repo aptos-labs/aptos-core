@@ -964,8 +964,8 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIter<'a> {
                     },
 
                     Function(args, result, _) => {
-                        self.stack.extend(args.iter().rev());
                         self.stack.extend(result.iter().rev());
+                        self.stack.extend(args.iter().rev());
                     },
 
                     Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Struct(_)
@@ -1003,9 +1003,9 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIterWithDepth<'a> {
 
                     Function(args, result, _) => {
                         self.stack
-                            .extend(args.iter().map(|tok| (tok, depth + 1)).rev());
-                        self.stack
                             .extend(result.iter().map(|tok| (tok, depth + 1)).rev());
+                        self.stack
+                            .extend(args.iter().map(|tok| (tok, depth + 1)).rev());
                     },
 
                     Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Struct(_)
