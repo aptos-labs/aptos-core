@@ -1939,7 +1939,7 @@ fn at_start_of_exp(context: &mut Context) -> bool {
 
 // Parse the rest of a lambda expression, after already processing any capture designator (move/copy).
 //       LambdaRest =
-//                      <LambdaBindList> <Exp> <WithAbilities>
+//                      <LambdaBindList> <Exp>
 fn parse_lambda(
     context: &mut Context,
     start_loc: usize,

@@ -20,10 +20,7 @@ use move_model::{
 
 /// Checks lambda expression abilities in all target module functions.
 pub fn check_closures(env: &GlobalEnv) {
-    for module_env in env.get_target_modules() {
-        if !module_env.is_primary_target() {
-            continue;
-        }
+    for module_env in env.get_primary_target_modules() {
         for fun_env in module_env.get_functions() {
             if let Some(def) = fun_env.get_def() {
                 def.visit_pre_order(&mut |e| {
@@ -34,7 +31,8 @@ pub fn check_closures(env: &GlobalEnv) {
 
                         let fun_env = env.get_function(mid.qualified(*fid));
                         // The function itself has all abilities except `store`, which it only
-                        // has if it is public.
+                        // has if it is public. Notice that since required_abilities is derived
+                        // from the function type of the closure, it cannot have `key` ability.
                         if required_abilities.has_ability(Ability::Store)
                             && fun_env.visibility() != Visibility::Public
                         {

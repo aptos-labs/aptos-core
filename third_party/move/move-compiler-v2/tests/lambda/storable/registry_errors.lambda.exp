@@ -62,3 +62,9 @@ error: undeclared `func`
    │
 70 │                 let Function { f: f, key: key } = &func;
    │                                                    ^^^^
+
+error: expected function of type `|u64|u64` but found `&|u64|u64 with store`
+   ┌─ tests/lambda/storable/registry_errors.move:71:22
+   │
+71 │                 Some(f(x))
+   │                      ^^^^

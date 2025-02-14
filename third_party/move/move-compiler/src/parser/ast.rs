@@ -716,7 +716,7 @@ pub enum Exp_ {
 
     // { seq }
     Block(Sequence),
-    // | x1 [: t1], ..., xn [: tn] | e [ with <abilities> ]
+    // | x1 [: t1], ..., xn [: tn] | e
     Lambda(TypedBindList, Box<Exp>, LambdaCaptureKind),
     // forall/exists x1 : e1, ..., xn [{ t1, .., tk } *] [where cond]: en.
     Quant(
