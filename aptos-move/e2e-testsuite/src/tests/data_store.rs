@@ -13,19 +13,27 @@ use claims::assert_matches;
 use move_binary_format::CompiledModule;
 use move_bytecode_verifier::verify_module;
 use move_ir_compiler::Compiler;
+use rstest::rstest;
 
-#[test]
-fn move_from_across_blocks() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn move_from_across_blocks(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_000, 11);
+    let sender = executor.create_raw_account_data(1_000_000, if stateless_account { None } else { Some(11) });
     executor.add_account_data(&sender);
 
     // publish module with add and remove resource
     let module = add_module(executor.data_store_mut(), &sender);
 
     // remove resource fails given no resource were published
-    let rem_txn = remove_resource_txn(&sender, 11, vec![module.clone()]);
+    let rem_txn = remove_resource_txn(&sender, Some(11), vec![module.clone()], use_txn_payload_v2_format, use_orderless_transactions);
     let output = executor.execute_transaction(rem_txn);
     assert_matches!(
         output.status().status(),
@@ -35,19 +43,19 @@ fn move_from_across_blocks() {
     executor.apply_write_set(output.write_set());
 
     // publish resource
-    let add_txn = add_resource_txn(&sender, 12, vec![module.clone()]);
+    let add_txn = add_resource_txn(&sender, Some(12), vec![module.clone()], use_txn_payload_v2_format, use_orderless_transactions);
     executor.execute_and_apply(add_txn);
 
     // borrow resource
-    let borrow_txn = borrow_resource_txn(&sender, 13, vec![module.clone()]);
+    let borrow_txn = borrow_resource_txn(&sender, Some(13), vec![module.clone()], use_txn_payload_v2_format, use_orderless_transactions);
     executor.execute_and_apply(borrow_txn);
 
     // remove resource
-    let rem_txn = remove_resource_txn(&sender, 14, vec![module.clone()]);
+    let rem_txn = remove_resource_txn(&sender, Some(14), vec![module.clone()], use_txn_payload_v2_format, use_orderless_transactions);
     executor.execute_and_apply(rem_txn);
 
     // remove resource fails given it was removed already
-    let rem_txn = remove_resource_txn(&sender, 15, vec![module.clone()]);
+    let rem_txn = remove_resource_txn(&sender, Some(15), vec![module.clone()], use_txn_payload_v2_format, use_orderless_transactions);
     let output = executor.execute_transaction(rem_txn);
     assert_matches!(
         output.status().status(),
@@ -57,7 +65,7 @@ fn move_from_across_blocks() {
     executor.apply_write_set(output.write_set());
 
     // borrow resource fail given it was removed
-    let borrow_txn = borrow_resource_txn(&sender, 16, vec![module.clone()]);
+    let borrow_txn = borrow_resource_txn(&sender, Some(16), vec![module.clone()], use_txn_payload_v2_format, use_orderless_transactions);
     let output = executor.execute_transaction(borrow_txn);
     assert_matches!(
         output.status().status(),
@@ -67,13 +75,13 @@ fn move_from_across_blocks() {
     executor.apply_write_set(output.write_set());
 
     // publish resource again
-    let add_txn = add_resource_txn(&sender, 17, vec![module.clone()]);
+    let add_txn = add_resource_txn(&sender, Some(17), vec![module.clone()], use_txn_payload_v2_format, use_orderless_transactions);
     executor.execute_and_apply(add_txn);
 
     // create 2 remove resource transaction over the same resource in one block
     let txns = vec![
-        Transaction::UserTransaction(remove_resource_txn(&sender, 18, vec![module.clone()])),
-        Transaction::UserTransaction(remove_resource_txn(&sender, 19, vec![module])),
+        Transaction::UserTransaction(remove_resource_txn(&sender, Some(18), vec![module.clone()], use_txn_payload_v2_format, use_orderless_transactions)),
+        Transaction::UserTransaction(remove_resource_txn(&sender, Some(19), vec![module], use_txn_payload_v2_format, use_orderless_transactions)),
     ];
     let output = executor
         .execute_transaction_block(txns)
@@ -92,18 +100,25 @@ fn move_from_across_blocks() {
     }
 }
 
-#[test]
-fn borrow_after_move() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn borrow_after_move(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_000, 11);
+    let sender = executor.create_raw_account_data(1_000_000, if stateless_account { None } else { Some(11) });
     executor.add_account_data(&sender);
 
     // publish module with add and remove resource
     let module = add_module(executor.data_store_mut(), &sender);
 
     // remove resource fails given no resource were published
-    let rem_txn = remove_resource_txn(&sender, 11, vec![module.clone()]);
+    let rem_txn = remove_resource_txn(&sender, Some(11), vec![module.clone()], use_txn_payload_v2_format, use_orderless_transactions);
     let output = executor.execute_transaction(rem_txn);
     assert_matches!(
         output.status().status(),
@@ -113,17 +128,17 @@ fn borrow_after_move() {
     executor.apply_write_set(output.write_set());
 
     // publish resource
-    let add_txn = add_resource_txn(&sender, 12, vec![module.clone()]);
+    let add_txn = add_resource_txn(&sender, Some(12), vec![module.clone()], use_txn_payload_v2_format, use_orderless_transactions);
     executor.execute_and_apply(add_txn);
 
     // borrow resource
-    let borrow_txn = borrow_resource_txn(&sender, 13, vec![module.clone()]);
+    let borrow_txn = borrow_resource_txn(&sender, Some(13), vec![module.clone()], use_txn_payload_v2_format, use_orderless_transactions);
     executor.execute_and_apply(borrow_txn);
 
     // create a remove and a borrow resource transaction over the same resource in one block
     let txns = vec![
-        Transaction::UserTransaction(remove_resource_txn(&sender, 14, vec![module.clone()])),
-        Transaction::UserTransaction(borrow_resource_txn(&sender, 15, vec![module])),
+        Transaction::UserTransaction(remove_resource_txn(&sender, Some(14), vec![module.clone()], use_txn_payload_v2_format, use_orderless_transactions)),
+        Transaction::UserTransaction(borrow_resource_txn(&sender, Some(15), vec![module], use_txn_payload_v2_format, use_orderless_transactions)),
     ];
     let output = executor
         .execute_transaction_block(txns)
@@ -142,18 +157,25 @@ fn borrow_after_move() {
     }
 }
 
-#[test]
-fn change_after_move() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn change_after_move(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_000, 11);
+    let sender = executor.create_raw_account_data(1_000_000, if stateless_account { None } else { Some(11) });
     executor.add_account_data(&sender);
 
     // publish module with add and remove resource
     let module = add_module(executor.data_store_mut(), &sender);
 
     // remove resource fails given no resource were published
-    let rem_txn = remove_resource_txn(&sender, 11, vec![module.clone()]);
+    let rem_txn = remove_resource_txn(&sender, Some(11), vec![module.clone()], use_txn_payload_v2_format, use_orderless_transactions);
     let output = executor.execute_transaction(rem_txn);
     assert_matches!(
         output.status().status(),
@@ -163,17 +185,17 @@ fn change_after_move() {
     executor.apply_write_set(output.write_set());
 
     // publish resource
-    let add_txn = add_resource_txn(&sender, 12, vec![module.clone()]);
+    let add_txn = add_resource_txn(&sender, Some(12), vec![module.clone()], use_txn_payload_v2_format, use_orderless_transactions);
     executor.execute_and_apply(add_txn);
 
     // borrow resource
-    let borrow_txn = borrow_resource_txn(&sender, 13, vec![module.clone()]);
+    let borrow_txn = borrow_resource_txn(&sender, Some(13), vec![module.clone()], use_txn_payload_v2_format, use_orderless_transactions);
     executor.execute_and_apply(borrow_txn);
 
     // create a remove and a change resource transaction over the same resource in one block
     let txns = vec![
-        Transaction::UserTransaction(remove_resource_txn(&sender, 14, vec![module.clone()])),
-        Transaction::UserTransaction(change_resource_txn(&sender, 15, vec![module.clone()])),
+        Transaction::UserTransaction(remove_resource_txn(&sender, Some(14), vec![module.clone()], use_txn_payload_v2_format, use_orderless_transactions)),
+        Transaction::UserTransaction(change_resource_txn(&sender, Some(15), vec![module.clone()], use_txn_payload_v2_format, use_orderless_transactions)),
     ];
     let output = executor
         .execute_transaction_block(txns)
@@ -192,7 +214,7 @@ fn change_after_move() {
     }
 
     // borrow resource
-    let borrow_txn = borrow_resource_txn(&sender, 16, vec![module]);
+    let borrow_txn = borrow_resource_txn(&sender, Some(16), vec![module], use_txn_payload_v2_format, use_orderless_transactions);
     let output = executor.execute_transaction(borrow_txn);
     assert_matches!(
         output.status().status(),
@@ -261,8 +283,10 @@ fn add_module(data_store: &mut FakeDataStore, sender: &AccountData) -> CompiledM
 
 fn add_resource_txn(
     sender: &AccountData,
-    seq_num: u64,
+    seq_num: Option<u64>,
     extra_deps: Vec<CompiledModule>,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> SignedTransaction {
     let program = format!(
         "
@@ -278,18 +302,26 @@ fn add_resource_txn(
     );
 
     let script = compile_script(&program, extra_deps);
+    let seq_num = if use_orderless_transactions {
+        u64::MAX
+    } else {
+        seq_num.unwrap()
+    };
     sender
         .account()
         .transaction()
         .script(script)
         .sequence_number(seq_num)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign()
 }
 
 fn remove_resource_txn(
     sender: &AccountData,
-    seq_num: u64,
+    seq_num: Option<u64>,
     extra_deps: Vec<CompiledModule>,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> SignedTransaction {
     let program = format!(
         "
@@ -305,18 +337,26 @@ fn remove_resource_txn(
     );
 
     let module = compile_script(&program, extra_deps);
+    let seq_num = if use_orderless_transactions {
+        u64::MAX
+    } else {
+        seq_num.unwrap()
+    };
     sender
         .account()
         .transaction()
         .script(module)
         .sequence_number(seq_num)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign()
 }
 
 fn borrow_resource_txn(
     sender: &AccountData,
-    seq_num: u64,
+    seq_num: Option<u64>,
     extra_deps: Vec<CompiledModule>,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> SignedTransaction {
     let program = format!(
         "
@@ -332,18 +372,26 @@ fn borrow_resource_txn(
     );
 
     let module = compile_script(&program, extra_deps);
+    let seq_num = if use_orderless_transactions {
+        u64::MAX
+    } else {
+        seq_num.unwrap()
+    };
     sender
         .account()
         .transaction()
         .script(module)
         .sequence_number(seq_num)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign()
 }
 
 fn change_resource_txn(
     sender: &AccountData,
-    seq_num: u64,
+    seq_num: Option<u64>,
     extra_deps: Vec<CompiledModule>,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> SignedTransaction {
     let program = format!(
         "
@@ -359,10 +407,16 @@ fn change_resource_txn(
     );
 
     let module = compile_script(&program, extra_deps);
+    let seq_num = if use_orderless_transactions {
+        u64::MAX
+    } else {
+        seq_num.unwrap()
+    };
     sender
         .account()
         .transaction()
         .script(module)
         .sequence_number(seq_num)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign()
 }
