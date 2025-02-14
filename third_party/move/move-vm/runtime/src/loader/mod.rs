@@ -2039,7 +2039,10 @@ fn match_return_type<'a>(
                 results: exp_results,
                 abilities: exp_abilities,
             },
-        ) if abilities == exp_abilities => {
+        ) if abilities == exp_abilities
+            && args.len() == exp_args.len()
+            && results.len() == exp_results.len() =>
+        {
             args.iter()
                 .zip(exp_args)
                 .all(|(t, e)| match_return_type(t, e, map))

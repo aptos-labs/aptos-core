@@ -272,6 +272,39 @@ pub enum MoveTypeLayout {
     Function(MoveFunctionLayout),
 }
 
+impl MoveTypeLayout {
+    /// Determines whether the layout is serialization compatible with the other layout
+    /// (that is, any value serialized with this layout can be deserialized by the other).
+    pub fn is_compatible_with(&self, other: &Self) -> bool {
+        use MoveTypeLayout::*;
+        match (self, other) {
+            (
+                Function(MoveFunctionLayout(args1, res1, ab1)),
+                Function(MoveFunctionLayout(args2, res2, ab2)),
+            ) => {
+                // Notice that (currently) the function layout is not influencing
+                // serialization, but we anyway don't want it to diverge.
+                // Notice contra-variance for arguments.
+                Self::is_compatible_with_slice(args2, args1)
+                    && Self::is_compatible_with_slice(res1, res2)
+                    && ab1.is_subset(*ab2)
+            },
+            (Vector(t1), Vector(t2)) => t1.is_compatible_with(t2),
+            (Struct(s1), Struct(s2)) => s1.is_compatible_with(s2),
+            // For all other cases, equality is used
+            (t1, t2) => t1 == t2,
+        }
+    }
+
+    pub fn is_compatible_with_slice(this: &[Self], other: &[Self]) -> bool {
+        this.len() == other.len()
+            && this
+                .iter()
+                .zip(other)
+                .all(|(t1, t2)| t1.is_compatible_with(t2))
+    }
+}
+
 impl MoveValue {
     pub fn simple_deserialize(blob: &[u8], ty: &MoveTypeLayout) -> AResult<Self> {
         Ok(bcs::from_bytes_seed(ty, blob)?)
@@ -488,6 +521,22 @@ impl MoveStructLayout {
 
     pub fn with_variants(variants: Vec<MoveVariantLayout>) -> Self {
         Self::WithVariants(variants)
+    }
+
+    /// Determines whether the layout is serialization compatible with the other layout
+    /// (that is, any value serialized with this layout can be deserialized by the other).
+    pub fn is_compatible_with(&self, other: &Self) -> bool {
+        use MoveStructLayout::*;
+        match (self, other) {
+            (RuntimeVariants(variants1), RuntimeVariants(variants2)) => {
+                variants1.len() <= variants2.len()
+                    && variants1.iter().zip(variants2).all(|(fields1, fields2)| {
+                        MoveTypeLayout::is_compatible_with_slice(fields1, fields2)
+                    })
+            },
+            // All other cases require equality
+            (s1, s2) => s1 == s2,
+        }
     }
 
     pub fn fields(&self, variant: Option<usize>) -> &[MoveTypeLayout] {
