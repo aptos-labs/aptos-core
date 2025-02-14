@@ -207,25 +207,35 @@ impl LazyLoadedFunction {
         Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)?;
 
         // Verify that the function argument types match the layouts used for deserialization.
-        let captured_arg_types = mask.extract(function.param_tys(), true);
-        let converter = StorageLayoutConverter::new(module_storage);
-        if captured_arg_types.len() != captured_layouts.len() {
-            return Err(
-                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
-                    "captured argument count does not match declared parameters".to_string(),
-                ),
-            );
-        }
-        for (ty, layout) in captured_arg_types.into_iter().zip(captured_layouts) {
-            // Note that the below call returns a runtime layout, so we can directly
-            // compare it without desugaring.
-            let ty_layout = converter.type_to_type_layout(ty)?;
-            if &ty_layout != layout {
+        // This is only done in paranoid mode. Since integrity of storage
+        // and guarantee of public function, this should not able to fail.
+        if module_storage
+            .runtime_environment()
+            .vm_config()
+            .paranoid_type_checks
+        {
+            // TODO(#15664): Determine whether we need to charge gas here.
+            let captured_arg_types = mask.extract(function.param_tys(), true);
+            let converter = StorageLayoutConverter::new(module_storage);
+            if captured_arg_types.len() != captured_layouts.len() {
                 return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                     .with_message(
-                        "stored captured argument layout does not match declared parameters"
-                            .to_string(),
+                        "captured argument count does not match declared parameters".to_string(),
                     ));
+            }
+            for (actual_arg_ty, serialized_layout) in
+                captured_arg_types.into_iter().zip(captured_layouts)
+            {
+                // Note that the below call returns a runtime layout, so we can directly
+                // compare it without desugaring.
+                let actual_arg_layout = converter.type_to_type_layout(actual_arg_ty)?;
+                if !serialized_layout.is_compatible_with(&actual_arg_layout) {
+                    return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                        .with_message(
+                            "stored captured argument layout does not match declared parameters"
+                                .to_string(),
+                        ));
+                }
             }
         }
         Ok(Rc::new(LoadedFunction {
