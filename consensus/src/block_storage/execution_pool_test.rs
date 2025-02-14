@@ -76,6 +76,7 @@ async fn create_block_tree_no_forks_inner<const N: usize>(
     let genesis_pipelined_block = block_store
         .get_block(block_store.ordered_root().id())
         .unwrap();
+    assert!(genesis_pipelined_block.block().is_genesis_block());
     assert_eq!(genesis_pipelined_block.parent_id(), HashValue::zero());
     let mut cur_node = genesis_pipelined_block.clone();
 
@@ -466,20 +467,16 @@ async fn test_window_root_no_forks() {
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), a4.block(), window_size);
 
-    // commit_root
-    //      ↓
+    // commit_root      block_window
+    //      ↓                ↓
     //              ┌──────────────────┐
     //  Genesis ──> │ A1 ──> A2 ──> A3 │ ──> A4
     //              └──────────────────┘
-    //      ↑                ↑
-    // window_root      block_window
+    //                ↑
+    //           window_root
     assert_eq!(commit_root.id(), genesis_block.id());
-    assert_eq!(block_window.first().unwrap().id(), a1.id());
+    assert_eq!(window_root.expect("Window root not found"), a1.id());
     assert_eq!(block_window.len(), 3);
-    assert_eq!(
-        window_root.expect("Window root not found"),
-        genesis_block.id()
-    );
 
     // Prune A2
     block_store.prune_tree(a2.id());
@@ -492,15 +489,11 @@ async fn test_window_root_no_forks() {
     //              ┌──────── ↓ ───────┐
     //  Genesis ──> │ A1 ──> A2 ──> A3 │ ──> A4
     //              └──────────────────┘
-    //     ↑                  ↑
-    // window_root       block_window
+    //                ↑
+    //           window_root
     assert_eq!(commit_root.id(), a2.id());
-    assert_eq!(block_window.first().unwrap().id(), a1.id());
+    assert_eq!(window_root.expect("Window root not found"), a1.id());
     assert_eq!(block_window.len(), 3);
-    assert_eq!(
-        window_root.expect("Window root not found"),
-        genesis_block.id()
-    );
 
     // ----------------------------------------------------------------------------------------- //
 
@@ -515,17 +508,16 @@ async fn test_window_root_no_forks() {
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), a4.block(), window_size);
 
-    // commit_root     window_root
-    //      ↓              ↓
+    // commit_root              block_window
+    //      ↓                       ↓
     //                            ┌────┐
     //  Genesis ──> A1 ──> A2 ──> │ A3 │ ──> A4
     //                            └────┘
     //                              ↑
-    //                         block_window
+    //                         window_root
     assert_eq!(commit_root.id(), genesis_block.id());
-    assert_eq!(block_window.first().unwrap().id(), a3.id());
+    assert_eq!(window_root.expect("Window root not found"), a3.id());
     assert_eq!(block_window.len(), 1);
-    assert_eq!(window_root.expect("Window root not found"), a2.id());
 
     // Prune A2
     block_store.prune_tree(a2.id());
@@ -533,17 +525,16 @@ async fn test_window_root_no_forks() {
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), a4.block(), window_size);
 
-    //                 commit_root
-    //                      ↓
+    //               commit_root  block_window
+    //                      ↓       ↓
     //                            ┌────┐
     //  Genesis ──> A1 ──> A2 ──> │ A3 │ ──> A4
     //                            └────┘
-    //                      ↑        ↑
-    //              window_root   block_window
+    //                              ↑
+    //                         window_root
     assert_eq!(commit_root.id(), a2.id());
-    assert_eq!(block_window.first().unwrap().id(), a3.id());
+    assert_eq!(window_root.expect("Window root not found"), a3.id());
     assert_eq!(block_window.len(), 1);
-    assert_eq!(window_root.expect("Window root not found"), a2.id());
 }
 
 #[tokio::test]
@@ -560,22 +551,18 @@ async fn test_window_root_with_forks() {
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), a3.block(), window_size);
 
-    // commit_root
-    //      ↓
+    // commit_root   block_window
+    //      ↓             ↓
     //              ┌───────────┐
     //  Genesis ──> │ A1 ──> A2 │ ──> A3
     //              └───────────┘
-    //      ↑             ↑
-    // window_root   block_window
+    //                ↑
+    //          window_root
     // NOTE: Window root calculations are done in two places: `find_window_root` and `find_root`, update
     // both if needed
     assert_eq!(commit_root.id(), genesis_block.id());
-    assert_eq!(block_window.first().unwrap().id(), a1.id());
+    assert_eq!(window_root.expect("Window root not found"), a1.id());
     assert_eq!(block_window.len(), 2);
-    assert_eq!(
-        window_root.expect("Window root not found"),
-        genesis_block.id()
-    );
 
     // Prune A1
     block_store.prune_tree(a1.id());
@@ -583,20 +570,16 @@ async fn test_window_root_with_forks() {
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), a3.block(), window_size);
 
-    //           commit_root
-    //                │
+    //   commit_root   block_window
+    //           └────┐   ↓
     //              ┌ ↓ ────────┐
     //  Genesis ──> │ A1 ──> A2 │ ──> A3
     //              └───────────┘
-    //     ↑              ↑
-    // window_root  block_window
+    //                ↑
+    //          window_root
     assert_eq!(commit_root.id(), a1.id());
-    assert_eq!(block_window.first().unwrap().id(), a1.id());
+    assert_eq!(window_root.expect("Window root not found"), a1.id());
     assert_eq!(block_window.len(), 2);
-    assert_eq!(
-        window_root.expect("Window root not found"),
-        genesis_block.id()
-    );
 
     // ----------------------------------------------------------------------------------------- //
 
@@ -616,12 +599,12 @@ async fn test_window_root_with_forks() {
     // commit_root
     //      ↓
     //  Genesis ──> B1 ──> C1
-    //               ↑
-    //          window_root
+    //                     ↑
+    //               window_root
     assert_eq!(commit_root.id(), genesis_block.id());
+    assert_eq!(window_root.unwrap(), c1.id());
     // This is zero length because OrderedBlockWindow consists of (window_size - 1) blocks
     assert_eq!(block_window.len(), 0);
-    assert_eq!(window_root.unwrap(), b1.id());
 
     // Prune B1
     block_store.prune_tree(b1.id());
@@ -632,11 +615,11 @@ async fn test_window_root_with_forks() {
     //          commit_root
     //               ↓
     //  Genesis ──> B1 ──> C1
-    //               ↑
-    //          window_root
+    //                     ↑
+    //               window_root
     assert_eq!(commit_root.id(), b1.id());
+    assert_eq!(window_root.unwrap(), c1.id());
     assert_eq!(block_window.len(), 0);
-    assert_eq!(window_root.unwrap(), b1.id());
 }
 
 /// Checks `(block in window).round > current_block.round() - window_size`
@@ -658,8 +641,8 @@ async fn test_window_root_with_non_sequential_round_forks() {
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), current_block, window_size);
 
-    // commit_root     window_root
-    //      ↓               ↓
+    // commit_root              window_root
+    //      ↓                        ↓
     //                            ┌────┐
     //  Genesis ──> A1 ──> A2 ──> │ A3 │ ──> A4
     //                            └────┘
@@ -669,9 +652,8 @@ async fn test_window_root_with_non_sequential_round_forks() {
     // (block in window).round > current_block.round() - window_size
     // 3 ≯ 9 - 6, thus block A2 is not included
     assert_eq!(commit_root.id(), genesis_block.id());
-    assert_eq!(block_window.first().unwrap().id(), a3_r6.id());
+    assert_eq!(window_root.expect("Window root not found"), a3_r6.id());
     assert_eq!(block_window.len(), 1);
-    assert_eq!(window_root.expect("Window root not found"), a2_r3.id());
 
     // expand window size to 7
     let window_size = Some(7u64);
@@ -679,20 +661,19 @@ async fn test_window_root_with_non_sequential_round_forks() {
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), current_block, window_size);
 
-    // commit_root
-    //      ↓
+    // commit_root          block_window
+    //      ↓                    ↓
     //                     ┌───────────┐
     //  Genesis ──> A1 ──> │ A2 ──> A3 │ ──> A4
     //                     └───────────┘
-    //               ↑            ↑
-    //          window_root  block_window
+    //                       ↑
+    //                  window_root
     //
     // (block in window).round > current_block.round() - window_size
     // 3 > 9 - 7, thus block A2 is included
     assert_eq!(commit_root.id(), genesis_block.id());
-    assert_eq!(block_window.first().unwrap().id(), a2_r3.id());
+    assert_eq!(window_root.expect("Window root not found"), a2_r3.id());
     assert_eq!(block_window.len(), 2);
-    assert_eq!(window_root.expect("Window root not found"), a1_r1.id());
 
     // Prune A1
     block_store.prune_tree(a1_r1.id());
@@ -703,26 +684,22 @@ async fn test_window_root_with_non_sequential_round_forks() {
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), current_block, window_size);
 
-    //            commit_root
-    //                │
+    //      commit_root  block_window
+    //            └───┐       ↓
     //              ┌ ↓ ────────────────┐
     //  Genesis ──> │ A1 ──>  A2 ──> A3 │ ──> A4
     //              └───────────────────┘
-    //     ↑                    ↑
-    // window_root         block_window
+    //                ↑
+    //          window_root
     assert_eq!(commit_root.id(), a1_r1.id());
-    assert_eq!(block_window.first().unwrap().id(), a1_r1.id());
+    assert_eq!(window_root.expect("Window root not found"), a1_r1.id());
     assert_eq!(block_window.len(), 3);
-    assert_eq!(
-        window_root.expect("Window root not found"),
-        genesis_block.id()
-    );
 
     // ----------------------------------------------------------------------------------------- //
 
     let (_, block_store, pipelined_blocks) =
         create_block_tree_with_forks_unordered_parents(window_size).await;
-    let [genesis_block, a1_r1, a2_r3, _a3_r6, a4_r9, _b1_r2, _b2_r4, _b3_r5, _c1_r7, _d1_r8] =
+    let [_genesis_block, a1_r1, a2_r3, _a3_r6, a4_r9, _b1_r2, _b2_r4, _b3_r5, _c1_r7, _d1_r8] =
         pipelined_blocks;
     let current_block = a4_r9.block();
 
@@ -732,18 +709,14 @@ async fn test_window_root_with_non_sequential_round_forks() {
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), current_block, window_size);
 
-    //                    commit_root
-    //                         │
+    //            commit_root  block_window
+    //                  └──────┐    ↓
     //              ┌───────── ↓ ───────┐
     //  Genesis ──> │ A1 ──>  A2 ──> A3 │ ──> A4
     //              └───────────────────┘
-    //     ↑                   ↑
-    // window_root        block_window
+    //                ↑
+    //          window_root
     assert_eq!(commit_root.id(), a2_r3.id());
-    assert_eq!(block_window.first().unwrap().id(), a1_r1.id());
+    assert_eq!(window_root.expect("Window root not found"), a1_r1.id());
     assert_eq!(block_window.len(), 3);
-    assert_eq!(
-        window_root.expect("Window root not found"),
-        genesis_block.id()
-    );
 }
