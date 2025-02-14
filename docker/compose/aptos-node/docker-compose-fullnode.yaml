@@ -59,6 +59,10 @@ services:
       - 8080
       # Validator metrics
       - 9101
+    ulimits:
+      nofile:
+        soft: 500000
+        hard: 1000000
 
 networks:
   shared:

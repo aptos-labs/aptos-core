@@ -68,6 +68,10 @@ services:
       - 9101
       # Disable access to rest API port 80 for validator by default
       # - 8080
+    ulimits:
+      nofile:
+        soft: 100000
+        hard: 250000
 
 networks:
   shared:
