@@ -230,6 +230,15 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [hash_keccak256_base: InternalGas, { 1.. => "hash.keccak256.base" }, 14704],
         [hash_keccak256_per_byte: InternalGasPerByte, { 1.. => "hash.keccak256.per_byte" }, 165],
 
+        [eth_trie_proof_base: InternalGas, { 12.. => "eth.trie.proof.base" }, 15000],
+        [eth_trie_proof_hash_base: InternalGasPerArg, { 12.. => "eth.trie.proof.hash.base" }, 14704],
+        [eth_trie_proof_hash_per_byte: InternalGasPerByte, { 12.. => "eth.trie.proof.hash.per_byte" }, 165],
+        [eth_trie_proof_decode_base: InternalGasPerArg, { 12.. => "eth.trie.proof.decode.base" }, 1102],
+        [eth_trie_proof_decode_per_byte: InternalGasPerByte, { 12.. => "eth.trie.proof.decode.per_byte"}, 18],
+
+        [rlp_encode_decode_base: InternalGas, { 12.. => "rlp.encode.decode.base" }, 1102],
+        [rlp_encode_decode_per_byte: InternalGasPerByte, { 12.. => "rlp.encode.decode.per_byte"}, 18],
+
         // Bulletproofs gas parameters begin.
         // Generated at time 1683148919.0628748 by `scripts/algebra-gas/update_bulletproofs_gas_params.py` with gas_per_ns=10.0.
         [bulletproofs_base: InternalGas, { 11.. => "bulletproofs.base" }, 11794651],

@@ -569,6 +569,7 @@ env_logger = "0.10.0"
 erased-serde = "0.3.13"
 ethabi = "18.0.0"
 ethnum = "1.5.0"
+eth_trie = "0.4.0"
 event-listener = "2.5.3"
 evm = { version = "0.33.1", features = ["tracing"] }
 evm-runtime = { version = "0.33.0", features = ["tracing"] }
@@ -622,6 +623,7 @@ jemalloc-sys = "0.5.4"
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
 jwt = "0.16.0"
+keccak-hash = "0.10.0"
 lazy_static = "1.4.0"
 libc = "0.2.147"
 libfuzzer-sys = "0.4.6"
@@ -711,6 +713,7 @@ reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
+rlp = "0.5.1"
 rocksdb = { version = "0.22.0", features = ["lz4"] }
 rsa = { version = "0.9.6" }
 rstack-self = { version = "0.3.0", features = ["dw"], default_features = false }

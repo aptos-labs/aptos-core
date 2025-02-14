@@ -1771,9 +1771,11 @@ dependencies = [
  "codespan-reporting",
  "curve25519-dalek-ng",
  "either",
+ "eth_trie",
  "flate2",
  "hex",
  "itertools 0.12.1",
+ "keccak-hash",
  "libsecp256k1",
  "log",
  "lru 0.7.8",
@@ -1798,6 +1800,7 @@ dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",
  "ripemd",
+ "rlp",
  "serde",
  "serde_bytes",
  "sha2 0.10.8",
@@ -7495,6 +7498,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "eth_trie"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec3aeb0284b473041df2419a28e3cdf0c64a78d2b9511af4b6e40bad3964b172"
+dependencies = [
+ "ethereum-types 0.14.1",
+ "hashbrown 0.14.3",
+ "keccak-hash",
+ "log",
+ "parking_lot 0.12.1",
+ "rlp",
+]
+
+[[package]]
 name = "ethabi"
 version = "18.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9656,6 +9673,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f6d5ed8676d904364de097082f4e7d240b571b67989ced0240f08b7f966f940"
 dependencies = [
  "cpufeatures",
+]
+
+[[package]]
+name = "keccak-hash"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b286e6b663fb926e1eeb68528e69cb70ed46c6d65871a21b2215ae8154c6d3c"
+dependencies = [
+ "primitive-types 0.12.2",
+ "tiny-keccak",
 ]
 
 [[package]]

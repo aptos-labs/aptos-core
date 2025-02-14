@@ -41,9 +41,11 @@ codespan-reporting = { workspace = true }
 # we work with version 3. Instead, we use `zkcrypto/bulleproofs` which relies on `zkcrypto/curve25519-dalek-ng`.
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
 either = { workspace = true }
+eth_trie = { workspace = true }
 flate2 = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
+keccak-hash = { workspace = true }
 libsecp256k1 = { workspace = true }
 log = { workspace = true }
 lru = { workspace = true }
@@ -67,6 +69,7 @@ once_cell = { workspace = true }
 rand = { workspace = true }
 rand_core = { workspace = true }
 ripemd = { workspace = true }
+rlp = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 sha2 = { workspace = true }
