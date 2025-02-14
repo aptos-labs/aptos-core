@@ -1,37 +1,33 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    node::{NodeRef, NodeStrongRef},
-    utils,
-};
+use crate::utils;
 use std::{
     fmt,
     fmt::{Debug, Formatter},
+    mem,
 };
 
-pub(crate) struct FlattenPerfectTree<K, V> {
-    leaves: Vec<NodeRef<K, V>>,
+pub(crate) struct FlattenPerfectTree<Leaf> {
+    leaves: Vec<Leaf>,
 }
 
-impl<K, V> FlattenPerfectTree<K, V> {
-    pub fn new_with_empty_nodes(height: usize) -> Self {
+impl<Leaf> FlattenPerfectTree<Leaf> {
+    pub fn new_with<MakeLeaf>(height: usize, make_leaf: MakeLeaf) -> Self
+    where
+        MakeLeaf: FnMut() -> Leaf,
+    {
         let num_leaves = if height == 0 { 0 } else { 1 << (height - 1) };
 
-        Self {
-            leaves: vec![NodeRef::Empty; num_leaves],
-        }
+        let mut leaves = Vec::with_capacity(num_leaves);
+        leaves.resize_with(num_leaves, make_leaf);
+
+        Self { leaves }
     }
 
-    pub fn get_ref(&self) -> FptRef<K, V> {
+    pub fn get_ref(&self) -> FptRef<Leaf> {
         FptRef {
             leaves: &self.leaves,
-        }
-    }
-
-    pub fn get_mut(&mut self) -> FptRefMut<K, V> {
-        FptRefMut {
-            leaves: &mut self.leaves,
         }
     }
 
@@ -41,19 +37,25 @@ impl<K, V> FlattenPerfectTree<K, V> {
 
         ret
     }
+
+    pub(crate) unsafe fn transmute<NewLeafType>(self) -> FlattenPerfectTree<NewLeafType> {
+        FlattenPerfectTree {
+            leaves: mem::transmute(self.leaves),
+        }
+    }
 }
 
-impl<K, V> Debug for FlattenPerfectTree<K, V> {
+impl<Leaf> Debug for FlattenPerfectTree<Leaf> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "FlattenPerfectTree({})", self.leaves.len())
     }
 }
 
-pub(crate) struct FptRef<'a, K, V> {
-    leaves: &'a [NodeRef<K, V>],
+pub(crate) struct FptRef<'a, Leaf> {
+    leaves: &'a [Leaf],
 }
 
-impl<'a, K, V> FptRef<'a, K, V> {
+impl<'a, Leaf> FptRef<'a, Leaf> {
     pub fn num_leaves(&self) -> usize {
         self.leaves.len()
     }
@@ -68,41 +70,20 @@ impl<'a, K, V> FptRef<'a, K, V> {
         self.leaves.len() == 1
     }
 
-    pub fn expect_single_node(&self, base_layer: u64) -> NodeStrongRef<K, V> {
+    pub fn expect_single_node(&self) -> &'a Leaf {
         assert!(self.is_single_node());
-        self.leaves[0].get_strong(base_layer)
+        &self.leaves[0]
     }
 
-    pub fn expect_foot(&self, foot: usize, base_layer: u64) -> NodeStrongRef<K, V> {
-        self.leaves[foot].get_strong(base_layer)
+    pub fn expect_leaf(&self, leaf_index: usize) -> &'a Leaf {
+        &self.leaves[leaf_index]
     }
 
     pub fn height(&self) -> usize {
         utils::binary_tree_height(self.leaves.len())
     }
 
-    pub fn into_feet_iter(self) -> impl Iterator<Item = &'a NodeRef<K, V>> {
+    pub fn into_leaf_iter(self) -> impl Iterator<Item = &'a Leaf> {
         self.leaves.iter()
-    }
-}
-
-pub(crate) struct FptRefMut<'a, K, V> {
-    leaves: &'a mut [NodeRef<K, V>],
-}
-
-impl<'a, K, V> FptRefMut<'a, K, V> {
-    pub fn is_single_node(&self) -> bool {
-        self.leaves.len() == 1
-    }
-
-    pub fn expect_into_single_node_mut(self) -> &'a mut NodeRef<K, V> {
-        assert!(self.is_single_node());
-        &mut self.leaves[0]
-    }
-
-    pub fn expect_into_sub_trees(self) -> (Self, Self) {
-        assert!(!self.is_single_node());
-        let (left, right) = self.leaves.split_at_mut(self.leaves.len() / 2);
-        (Self { leaves: left }, Self { leaves: right })
     }
 }
