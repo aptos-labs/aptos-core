@@ -19,7 +19,7 @@ use aptos_types::{
     aggregate_signature::AggregateSignature,
     epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::ValidatorSet,
+    on_chain_config::{ValidatorSet, DEFAULT_ENABLED_WINDOW_SIZE},
 };
 use std::{collections::HashMap, sync::Arc};
 
@@ -100,7 +100,11 @@ impl MockStorage {
         ))
     }
 
-    pub fn try_start(&self, order_vote_enabled: bool) -> Result<RecoveryData> {
+    pub fn try_start(
+        &self,
+        order_vote_enabled: bool,
+        window_size: Option<u64>,
+    ) -> Result<RecoveryData> {
         let ledger_recovery_data = self.get_ledger_recovery_data();
         let mut blocks: Vec<_> = self
             .shared_storage
@@ -131,19 +135,23 @@ impl MockStorage {
             quorum_certs,
             qc,
             order_vote_enabled,
+            window_size,
         )
     }
 
     pub fn verify_consistency(&self) -> Result<()> {
+        let order_vote_enabled = false;
+        let window_size = DEFAULT_ENABLED_WINDOW_SIZE;
         // TODO: Also test by setting order_vote_enabled to true
-        self.try_start(false).map(|_| ())
+        self.try_start(order_vote_enabled, window_size).map(|_| ())
     }
 
     pub fn start_for_testing(validator_set: ValidatorSet) -> (RecoveryData, Arc<Self>) {
         let shared_storage = Arc::new(MockSharedStorage::new(validator_set.clone()));
         let genesis_li = LedgerInfo::mock_genesis(Some(validator_set));
         let storage = Self::new_with_ledger_info(shared_storage, genesis_li);
-        let recovery_data = match storage.start(false) {
+        let window_size = DEFAULT_ENABLED_WINDOW_SIZE;
+        let recovery_data = match storage.start(false, window_size) {
             LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
             _ => panic!("Mock storage should never fail constructing recovery data"),
         };
@@ -203,8 +211,8 @@ impl PersistentLivenessStorage for MockStorage {
         self.get_ledger_recovery_data()
     }
 
-    fn start(&self, order_vote_enabled: bool) -> LivenessStorageData {
-        match self.try_start(order_vote_enabled) {
+    fn start(&self, order_vote_enabled: bool, window_size: Option<u64>) -> LivenessStorageData {
+        match self.try_start(order_vote_enabled, window_size) {
             Ok(recovery_data) => LivenessStorageData::FullRecoveryData(recovery_data),
             Err(_) => LivenessStorageData::PartialRecoveryData(self.recover_from_ledger()),
         }
@@ -251,7 +259,7 @@ impl EmptyStorage {
 
     pub fn start_for_testing() -> (RecoveryData, Arc<Self>) {
         let storage = Arc::new(EmptyStorage::new());
-        let recovery_data = match storage.start(false) {
+        let recovery_data = match storage.start(false, DEFAULT_ENABLED_WINDOW_SIZE) {
             LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
             _ => panic!("Mock storage should never fail constructing recovery data"),
         };
@@ -279,7 +287,7 @@ impl PersistentLivenessStorage for EmptyStorage {
         ))
     }
 
-    fn start(&self, order_vote_enabled: bool) -> LivenessStorageData {
+    fn start(&self, order_vote_enabled: bool, window_size: Option<u64>) -> LivenessStorageData {
         match RecoveryData::new(
             None,
             self.recover_from_ledger(),
@@ -288,6 +296,7 @@ impl PersistentLivenessStorage for EmptyStorage {
             vec![],
             None,
             order_vote_enabled,
+            window_size,
         ) {
             Ok(recovery_data) => LivenessStorageData::FullRecoveryData(recovery_data),
             Err(e) => {
