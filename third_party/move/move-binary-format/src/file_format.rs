@@ -1150,6 +1150,12 @@ impl SignatureToken {
                 SignatureToken::Function(args1, results1, abs1),
                 SignatureToken::Function(args2, results2, abs2),
             ) => args1 == args2 && results1 == results2 && abs1.is_subset(*abs2),
+            (SignatureToken::Reference(ty1), SignatureToken::Reference(ty2)) => {
+                ty1.is_assignable_from(ty2)
+            },
+            (SignatureToken::MutableReference(ty1), SignatureToken::MutableReference(ty2)) => {
+                ty1.is_assignable_from(ty2)
+            },
             _ => self == source,
         }
     }

@@ -103,7 +103,6 @@ impl LazyLoadedFunction {
         })))
     }
 
-    #[allow(unused)]
     pub(crate) fn new_resolved(
         converter: &TypeTagConverter,
         fun: Rc<LoadedFunction>,
@@ -329,6 +328,12 @@ impl LoadedFunction {
     /// Returns true if the loaded function has friend or private visibility.
     pub fn is_friend_or_private(&self) -> bool {
         self.function.is_friend_or_private()
+    }
+
+    /// Returns true if the loaded function has public visibility. This is the
+    /// opposite of the above (for better readability).
+    pub fn is_public(&self) -> bool {
+        !self.function.is_friend_or_private()
     }
 
     /// Returns true if the loaded function is an entry function.
