@@ -56,10 +56,6 @@ fn identify_function_typed_params_with_functions_in_rets(
 }
 
 /// check that function parameters/results do not have function type unless allowed.
-/// (1) is there a function type arg at the top level?  This is allowed for inline or LAMBDA_IN_PARAMS
-/// (2) is there a function type result at the top level?  This is allowed only for LAMBDA_IN_RETURNS
-/// (3) is there *any* function type with function type in an arg? This is allowed only for LAMBDA_IN_PARAMS
-/// (4) is there *any* function type with function type in a result? This is allowed only for LAMBDA_IN_RETURNS
 pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
     let options = env
         .get_extension::<Options>()

@@ -17,7 +17,7 @@
 //! vec.any(|x| x > c)
 //! ==>
 //! let c = 1;
-//! vec.any(Closure(lifted, c))
+//! vec.any(Closure(lifted, [c]))
 //! where
 //!   fun lifted(c: u64, x: u64): bool { x > c }
 //! ```
@@ -56,6 +56,9 @@ use std::{
 };
 
 /// Marker used in name of a function resulting from lambda lifting.
+/// Currently, the identifier core infra does not allow special characters in VM and
+/// elsewhere, so this can create name clashes,  On the other hand, they appear very
+/// unlikely, and cannot do harm besides a bytecode verification error.
 const LIFTED_FUN_MARKER: &str = "__lambda__";
 
 /// Returns true if this is a function resulting from lambda lifting.
@@ -358,9 +361,8 @@ impl<'a> LambdaLifter<'a> {
         }
     }
 
-    // Only allow expressions to be captured which cannot vary or abort, since we are pulling
-    // them out of the lambda expression and evaluating them in order to bind them to
-    // the closure eary.
+    // Only allow expressions to be captured which cannot abort, since we are pulling
+    // them out of the lambda expression.
     fn exp_is_capturable(exp: &Exp) -> bool {
         use ExpData::*;
         match exp.as_ref() {
