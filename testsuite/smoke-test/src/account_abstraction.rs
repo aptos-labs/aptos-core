@@ -6,10 +6,8 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::SigningKey;
 use aptos_forge::Swarm;
 use aptos_sdk::types::{AccountKey, LocalAccount};
-use aptos_types::{function_info::FunctionInfo, transaction::EntryFunction};
-use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
-};
+use aptos_types::function_info::FunctionInfo;
+use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
 use std::sync::Arc;
 
@@ -18,29 +16,31 @@ async fn test_domain_aa() {
     let swarm = SwarmBuilder::new_local(1).with_aptos().build().await;
     let mut info = swarm.aptos_public_info();
 
-    let register_txn = info.root_account().sign_with_transaction_builder(
-        info.transaction_factory()
-            .entry_function(EntryFunction::new(
-                ModuleId::new(
-                    AccountAddress::ONE,
-                    Identifier::new("account_abstraction").unwrap(),
-                ),
-                Identifier::new("register_domain_with_authentication_function_test_network_only")
-                    .unwrap(),
-                vec![],
-                vec![
-                    bcs::to_bytes(&AccountAddress::ONE).unwrap(),
-                    bcs::to_bytes(&"common_domain_aa_auths").unwrap(),
-                    bcs::to_bytes(&"authenticate_ed25519_hex").unwrap(),
-                ],
-            )),
-    );
-    info.client().submit_and_wait(&register_txn).await.unwrap();
+    // This method is in genesis now:
+    //
+    // let register_txn = info.root_account().sign_with_transaction_builder(
+    //     info.transaction_factory()
+    //         .entry_function(EntryFunction::new(
+    //             ModuleId::new(
+    //                 AccountAddress::ONE,
+    //                 Identifier::new("account_abstraction").unwrap(),
+    //             ),
+    //             Identifier::new("register_domain_with_authentication_function_test_network_only")
+    //                 .unwrap(),
+    //             vec![],
+    //             vec![
+    //                 bcs::to_bytes(&AccountAddress::ONE).unwrap(),
+    //                 bcs::to_bytes(&"domain_account_abstraction_ed25519_hex").unwrap(),
+    //                 bcs::to_bytes(&"authenticate").unwrap(),
+    //             ],
+    //         )),
+    // );
+    // info.client().submit_and_wait(&register_txn).await.unwrap();
 
     let function_info = FunctionInfo::new(
         AccountAddress::ONE,
-        "common_domain_aa_auths".to_string(),
-        "authenticate_ed25519_hex".to_string(),
+        "domain_account_abstraction_ed25519_hex".to_string(),
+        "authenticate".to_string(),
     );
 
     let account_key = AccountKey::generate(&mut thread_rng());

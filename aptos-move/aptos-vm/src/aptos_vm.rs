@@ -1967,10 +1967,13 @@ impl AptosVM {
                     function_info,
                     auth_data,
                 } => {
-                    let enabled = if let AbstractionAuthData::V1 { .. } = auth_data {
-                        self.features().is_account_abstraction_enabled()
-                    } else {
-                        self.features().is_domain_account_abstraction_enabled()
+                    let enabled = match auth_data {
+                        AbstractionAuthData::V1 { .. } => {
+                            self.features().is_account_abstraction_enabled()
+                        },
+                        AbstractionAuthData::DomainV1 { .. } => {
+                            self.features().is_domain_account_abstraction_enabled()
+                        },
                     };
                     if enabled {
                         dispatchable_authenticate(

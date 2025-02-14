@@ -1,4 +1,10 @@
-module aptos_framework::common_domain_aa_auths {
+/// Domain account abstraction using ed25519 hex for signing.
+///
+/// Authentication takes digest, converts to hex (prefixed with 0x, with lowercase letters),
+/// and then expects that to be signed.
+/// authenticator is expected to be signature: vector<u8>
+/// account_identity is raw public_key.
+module aptos_framework::domain_account_abstraction_ed25519_hex {
     use std::error;
     use aptos_std::string_utils;
     use aptos_std::ed25519::{
@@ -10,10 +16,8 @@ module aptos_framework::common_domain_aa_auths {
 
     const EINVALID_SIGNATURE: u64 = 1;
 
-    // takes digest, converts to hex (prefixed with 0x, with lowercase letters), and then expects that to be signed.
-    // authenticator is expected to be signature: vector<u8>
-    // account_identity is raw public_key.
-    public fun authenticate_ed25519_hex(account: signer, aa_auth_data: AbstractionAuthData): signer {
+    /// Authorization function for domain account abstraction.
+    public fun authenticate(account: signer, aa_auth_data: AbstractionAuthData): signer {
         let hex_digest = string_utils::to_string(aa_auth_data.digest());
 
         let public_key = new_unvalidated_public_key_from_bytes(*aa_auth_data.domain_account_identity());

@@ -9,6 +9,7 @@ module aptos_framework::transaction_validation {
 
     use aptos_framework::account;
     use aptos_framework::aptos_account;
+    use aptos_framework::account_abstraction;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::chain_id;
     use aptos_framework::coin;
@@ -98,6 +99,14 @@ module aptos_framework::transaction_validation {
         });
     }
 
+    // TODO: can be removed after features have been rolled out.
+    inline fun allow_missing_txn_authentication_key(transaction_sender: address): bool {
+        // aa verifies authentication itself
+        features::is_account_abstraction_enabled() &&
+        (features::is_domain_account_abstraction_enabled()
+            || account_abstraction::using_dispatchable_authenticator(transaction_sender))
+    }
+
     fun prologue_common(
         sender: &signer,
         gas_payer: &signer,
@@ -134,7 +143,7 @@ module aptos_framework::transaction_validation {
                     );
                 } else {
                     assert!(
-                        features::is_account_abstraction_enabled(),
+                        allow_missing_txn_authentication_key(transaction_sender),
                         error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
                     )
                 };
@@ -170,9 +179,8 @@ module aptos_framework::transaction_validation {
                         error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
                     );
                 } else {
-                    // aa verifies authentication itself
                     assert!(
-                        features::is_account_abstraction_enabled(),
+                        allow_missing_txn_authentication_key(transaction_sender),
                         error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
                     );
                 }
@@ -373,7 +381,7 @@ module aptos_framework::transaction_validation {
                     );
                 } else {
                     assert!(
-                        features::is_account_abstraction_enabled(),
+                        allow_missing_txn_authentication_key(secondary_address),
                         error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
                     )
                 };
@@ -658,7 +666,7 @@ module aptos_framework::transaction_validation {
                 );
             } else {
                 assert!(
-                    features::is_account_abstraction_enabled(),
+                    allow_missing_txn_authentication_key(fee_payer_address),
                     error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
                 )
             };
