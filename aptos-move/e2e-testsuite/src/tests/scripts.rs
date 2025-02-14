@@ -19,14 +19,22 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     vm_status::{StatusCode, StatusCode::LINKER_ERROR},
 };
+use rstest::rstest;
 
-#[test]
-fn script_code_unverifiable() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn script_code_unverifiable(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, if stateless_account { None } else { Some(10) });
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -40,6 +48,7 @@ fn script_code_unverifiable() {
         .script(Script::new(blob, vec![], vec![]))
         .sequence_number(10)
         .gas_unit_price(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
     // execute transaction
     let output = &executor.execute_transaction(txn);
@@ -60,23 +69,37 @@ fn script_code_unverifiable() {
     // Check that numbers in store are correct.
     let gas = output.gas_used();
     let balance = 1_000_000 - gas;
-    let updated_sender = executor
-        .read_account_resource(sender.account())
-        .expect("sender must exist");
     let updated_sender_balance = executor
         .read_apt_coin_store_resource(sender.account())
         .expect("sender balance must exist");
     assert_eq!(balance, updated_sender_balance.coin());
-    assert_eq!(11, updated_sender.sequence_number());
+    if stateless_account {
+        let updated_sender = executor
+            .read_account_resource(sender.account())
+            .expect("sender must exist");
+        assert_eq!(11, updated_sender.sequence_number());
+    } else {
+        assert!(executor
+                .read_account_resource(sender.account())
+                .is_none(), 
+            "sender resource shouldn't have been created with orderless transaction");
+    }
 }
 
-#[test]
-fn script_none_existing_module_dep() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn script_none_existing_module_dep(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, if stateless_account { None } else { Some(10) });
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -118,6 +141,7 @@ fn script_none_existing_module_dep() {
         .script(Script::new(blob, vec![], vec![]))
         .sequence_number(10)
         .gas_unit_price(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
 
     // execute transaction
@@ -139,23 +163,37 @@ fn script_none_existing_module_dep() {
     // Check that numbers in store are correct.
     let gas = output.gas_used();
     let balance = 1_000_000 - gas;
-    let updated_sender = executor
-        .read_account_resource(sender.account())
-        .expect("sender must exist");
     let updated_sender_balance = executor
         .read_apt_coin_store_resource(sender.account())
         .expect("sender balance must exist");
     assert_eq!(balance, updated_sender_balance.coin());
-    assert_eq!(11, updated_sender.sequence_number());
+    if stateless_account {
+        let updated_sender = executor
+            .read_account_resource(sender.account())
+            .expect("sender must exist");
+        assert_eq!(11, updated_sender.sequence_number());
+    } else {
+        assert!(executor
+                .read_account_resource(sender.account())
+                .is_none(), 
+            "sender resource shouldn't have been created with orderless transaction");
+    }
 }
 
-#[test]
-fn script_non_existing_function_dep() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn script_non_existing_function_dep(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, if stateless_account { None } else { Some(10) });
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -197,6 +235,7 @@ fn script_non_existing_function_dep() {
         .script(Script::new(blob, vec![], vec![]))
         .sequence_number(10)
         .gas_unit_price(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
 
     // execute transaction
@@ -218,23 +257,37 @@ fn script_non_existing_function_dep() {
     // Check that numbers in store are correct.
     let gas = output.gas_used();
     let balance = 1_000_000 - gas;
-    let updated_sender = executor
-        .read_account_resource(sender.account())
-        .expect("sender must exist");
     let updated_sender_balance = executor
         .read_apt_coin_store_resource(sender.account())
         .expect("sender balance must exist");
     assert_eq!(balance, updated_sender_balance.coin());
-    assert_eq!(11, updated_sender.sequence_number());
+    if stateless_account {
+        let updated_sender = executor
+            .read_account_resource(sender.account())
+            .expect("sender must exist");
+        assert_eq!(11, updated_sender.sequence_number());
+    } else {
+        assert!(executor
+                .read_account_resource(sender.account())
+                .is_none(), 
+            "sender resource shouldn't have been created with orderless transaction");
+    }
 }
 
-#[test]
-fn script_bad_sig_function_dep() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn script_bad_sig_function_dep(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, if stateless_account { None } else { Some(10) });
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -278,6 +331,7 @@ fn script_bad_sig_function_dep() {
         .script(Script::new(blob, vec![], vec![]))
         .sequence_number(10)
         .gas_unit_price(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
     // execute transaction
     let output = &executor.execute_transaction(txn);
@@ -298,23 +352,37 @@ fn script_bad_sig_function_dep() {
     // Check that numbers in store are correct.
     let gas = output.gas_used();
     let balance = 1_000_000 - gas;
-    let updated_sender = executor
-        .read_account_resource(sender.account())
-        .expect("sender must exist");
     let updated_sender_balance = executor
         .read_apt_coin_store_resource(sender.account())
         .expect("sender balance must exist");
     assert_eq!(balance, updated_sender_balance.coin());
-    assert_eq!(11, updated_sender.sequence_number());
+    if stateless_account {
+        let updated_sender = executor
+            .read_account_resource(sender.account())
+            .expect("sender must exist");
+        assert_eq!(11, updated_sender.sequence_number());
+    } else {
+        assert!(executor
+                .read_account_resource(sender.account())
+                .is_none(), 
+            "sender resource shouldn't have been created with orderless transaction");
+    }
 }
 
-#[test]
-fn script_type_argument_module_does_not_exist() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn script_type_argument_module_does_not_exist(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, if stateless_account { None } else { Some(10) });
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -349,6 +417,7 @@ fn script_type_argument_module_does_not_exist() {
         ))
         .sequence_number(10)
         .gas_unit_price(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
 
     // execute transaction
@@ -364,23 +433,37 @@ fn script_type_argument_module_does_not_exist() {
     // Check that numbers in store are correct.
     let gas = output.gas_used();
     let balance = 1_000_000 - gas;
-    let updated_sender = executor
-        .read_account_resource(sender.account())
-        .expect("sender must exist");
     let updated_sender_balance = executor
         .read_apt_coin_store_resource(sender.account())
         .expect("sender balance must exist");
     assert_eq!(balance, updated_sender_balance.coin());
-    assert_eq!(11, updated_sender.sequence_number());
+    if stateless_account {
+        let updated_sender = executor
+            .read_account_resource(sender.account())
+            .expect("sender must exist");
+        assert_eq!(11, updated_sender.sequence_number());
+    } else {
+        assert!(executor
+                .read_account_resource(sender.account())
+                .is_none(), 
+            "sender resource shouldn't have been created with orderless transaction");
+    }
 }
 
-#[test]
-fn script_nested_type_argument_module_does_not_exist() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn script_nested_type_argument_module_does_not_exist(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, if stateless_account { None } else { Some(10) });
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -417,6 +500,7 @@ fn script_nested_type_argument_module_does_not_exist() {
         ))
         .sequence_number(10)
         .gas_unit_price(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
 
     // execute transaction
@@ -432,22 +516,36 @@ fn script_nested_type_argument_module_does_not_exist() {
     // Check that numbers in store are correct.
     let gas = output.gas_used();
     let balance = 1_000_000 - gas;
-    let updated_sender = executor
-        .read_account_resource(sender.account())
-        .expect("sender must exist");
     let updated_sender_balance = executor
         .read_apt_coin_store_resource(sender.account())
         .expect("sender balance must exist");
     assert_eq!(balance, updated_sender_balance.coin());
-    assert_eq!(11, updated_sender.sequence_number());
+    if stateless_account {
+        let updated_sender = executor
+            .read_account_resource(sender.account())
+            .expect("sender must exist");
+        assert_eq!(11, updated_sender.sequence_number());
+    } else {
+        assert!(executor
+                .read_account_resource(sender.account())
+                .is_none(), 
+            "sender resource shouldn't have been created with orderless transaction");
+    }
 }
 
-#[test]
-fn forbid_script_emitting_events() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn forbid_script_emitting_events(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut executor = FakeExecutor::from_head_genesis();
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, if stateless_account { None } else { Some(10) });
     executor.add_account_data(&sender);
 
     // create an event-emitting script
@@ -494,6 +592,7 @@ fn forbid_script_emitting_events() {
         .script(Script::new(blob, vec![], vec![]))
         .sequence_number(10)
         .gas_unit_price(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
     // execute transaction
     let output = &executor.execute_transaction(txn);
@@ -513,12 +612,19 @@ fn forbid_script_emitting_events() {
     // Check that numbers in store are correct.
     let gas = output.gas_used();
     let balance = 1_000_000 - gas;
-    let updated_sender = executor
-        .read_account_resource(sender.account())
-        .expect("sender must exist");
     let updated_sender_balance = executor
         .read_apt_coin_store_resource(sender.account())
         .expect("sender balance must exist");
     assert_eq!(balance, updated_sender_balance.coin());
-    assert_eq!(11, updated_sender.sequence_number());
+    if stateless_account {
+        let updated_sender = executor
+            .read_account_resource(sender.account())
+            .expect("sender must exist");
+        assert_eq!(11, updated_sender.sequence_number());
+    } else {
+        assert!(executor
+                .read_account_resource(sender.account())
+                .is_none(), 
+            "sender resource shouldn't have been created with orderless transaction");
+    }
 }
