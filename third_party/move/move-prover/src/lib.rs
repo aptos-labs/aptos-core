@@ -65,6 +65,7 @@ pub fn create_move_prover_v2_model<W: WriteColor>(
         experiment_cache: Default::default(),
         sources: options.move_sources,
         sources_deps: vec![],
+        deps_with_same_package_sources: vec![],
         warn_deprecated: false,
         warn_of_deprecation_use_in_aptos_libs: false,
         warn_unused: false,
