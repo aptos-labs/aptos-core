@@ -182,9 +182,9 @@ pub(crate) static SAMPLE_PK: Lazy<KeylessPublicKey> = Lazy::new(|| {
 /// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
 pub(crate) static SAMPLE_PROOF: Lazy<Groth16Proof> = Lazy::new(|| {
     Groth16Proof::new(
-        G1Bytes::new_from_vec(hex::decode("3304cc0defd488d770af0439480ec24c8473b30dbcbfad9fdf99ca62256bd908").unwrap()).unwrap(),
-        G2Bytes::new_from_vec(hex::decode("2f432b9459375ed2032bcb1ff3ccc1dd5d05a752d6956d2bb003f4e3b42d0b242cf4ab4d3dc8dc700ede17bbfeaddedd42033691e3d85ff8d6621663cb2e779a").unwrap()).unwrap(),
-        G1Bytes::new_from_vec(hex::decode("d44ee2772f4b48fdb0dbd8d870d3fb4401cd3a28fbdde535e9c57bac9a263f9c").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("6130f438aeff46e7ce6364160af3edaf5c4082c5b35c17d28d992a3166bba6a6").unwrap()).unwrap(),
+        G2Bytes::new_from_vec(hex::decode("60e1eff127d509f40209c7c0bee869e1fb6748a79c7765fa3c6422a5c83751174553531ed930e54232a9d7d55dafd22d3fca085ebcad4ccea253adddb93c7c95").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("cc7e2ee1847e29ad8a0800bb406860edacb6824ef25fd7bfc358c443a81e3682").unwrap()).unwrap(),
     )
 });
 
@@ -195,9 +195,9 @@ pub(crate) static SAMPLE_PROOF: Lazy<Groth16Proof> = Lazy::new(|| {
 /// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
 pub(crate) static SAMPLE_PROOF_NO_EXTRA_FIELD: Lazy<Groth16Proof> = Lazy::new(|| {
     Groth16Proof::new(
-        G1Bytes::new_from_vec(hex::decode("bdfda383c9131ab44dd3d8efe65c59842b28e17467e2d07c4020742407c580a7").unwrap()).unwrap(),
-        G2Bytes::new_from_vec(hex::decode("d27b4c0296ec1045dd050894c635095c25ff8d89c8adf5da401b3434639c560550e3da14e5ec953769aac9d256ddc9b2a8071c021f271f0937fd5be404f2b919").unwrap()).unwrap(),
-        G1Bytes::new_from_vec(hex::decode("52a25b0b58013a77f8713105d7e0f817468bbdd25d644e9f2a9b3eabd7d4bc17").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("451c16678b59cfb3c17bdea81657c58802c2754010a3ae307d829d7703e0dfa0").unwrap()).unwrap(),
+        G2Bytes::new_from_vec(hex::decode("595b3272e31004f70ec37eb1c89c6bff332f1bd9845961777faad8c9f8c6381baaaf9d94b90782c9b3725be3ec8c9c1043ea8036e7e13d215d8e8d3fe51c8897").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("40614436e8affb99b39211f24aba135b98409d3beec4b9eb28d625305c839f9e").unwrap()).unwrap(),
     )
 });
 
