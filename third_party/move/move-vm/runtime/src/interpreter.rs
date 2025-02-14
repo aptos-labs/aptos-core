@@ -552,52 +552,86 @@ impl InterpreterImpl {
                     let lazy_function = LazyLoadedFunction::expect_this_impl(fun.as_ref())
                         .map_err(|e| set_err_info!(current_frame, e))?;
                     let mask = lazy_function.closure_mask();
-                    let function = lazy_function
+
+                    // Before trying to resolve the function, charge gas for associated
+                    // module loading.
+                    let module_id = lazy_function.with_name_and_ty_args(
+                        |module_opt, _func_name, ty_arg_tags| {
+                            let Some(module_id) = module_opt else {
+                                // TODO(#15664): currently we need the module id for gas charging
+                                //   of calls, so we can't proceed here without one. But we want
+                                //   to be able to let scripts use closures.
+                                let err = PartialVMError::new_invariant_violation(format!(
+                                    "module id required to charge gas for function `{}`",
+                                    lazy_function.to_stable_string()
+                                ));
+                                return Err(set_err_info!(current_frame, err));
+                            };
+
+                            // Charge gas for function code loading.
+                            let arena_id = traversal_context
+                                .referenced_module_ids
+                                .alloc(module_id.clone());
+                            loader.check_dependencies_and_charge_gas(
+                                resolver.module_store(),
+                                data_store,
+                                gas_meter,
+                                &mut traversal_context.visited,
+                                traversal_context.referenced_modules,
+                                [(arena_id.address(), arena_id.name())],
+                                resolver.module_storage(),
+                            )?;
+
+                            // Charge gas for code loading of modules used by type arguments.
+                            let modules_used_by_ty_args = ty_arg_tags
+                                .iter()
+                                .flat_map(|ty_tag| ty_tag.preorder_traversal_iter())
+                                .filter_map(TypeTag::struct_tag)
+                                .map(|struct_tag| {
+                                    let module_id = traversal_context
+                                        .referenced_module_ids
+                                        .alloc(struct_tag.module_id());
+                                    (module_id.address(), module_id.name())
+                                })
+                                .collect::<BTreeSet<_>>();
+                            loader.check_dependencies_and_charge_gas(
+                                resolver.module_store(),
+                                data_store,
+                                gas_meter,
+                                &mut traversal_context.visited,
+                                traversal_context.referenced_modules,
+                                modules_used_by_ty_args,
+                                resolver.module_storage(),
+                            )?;
+
+                            Ok(module_id.clone())
+                        },
+                    )?;
+
+                    // Resolve the function. This may lead to loading the code related
+                    // to this function.
+                    let callee = lazy_function
                         .with_resolved_function(module_storage, |f| Ok(f.clone()))
+                        .map_err(|e| set_err_info!(current_frame, e))?;
+
+                    // Charge gas for call and for the parameters
+                    gas_meter
+                        .charge_call(
+                            &module_id,
+                            callee.name(),
+                            self.operand_stack
+                                .last_n(callee.param_tys().len() - mask.captured_count() as usize)
+                                .map_err(|e| set_err_info!(current_frame, e))?,
+                            (callee.local_tys().len() as u64).into(),
+                        )
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     // In difference to regular calls, we skip visibility check.
                     // It is possible to call a private function of another module via
                     // a closure.
 
-                    // Charge gas for module loading. If this function has no associated
-                    // module, it stems from a script.
-                    // TODO(#15664): currently we need the module id for gas charging of calls,
-                    //   so we can't proceed here without one.
-                    let module_id = function.module_id().ok_or_else(|| {
-                        let err = PartialVMError::new_invariant_violation(format!(
-                            "module id required to charge gas for function `{}`",
-                            lazy_function.to_stable_string()
-                        ));
-                        set_err_info!(current_frame, err)
-                    })?;
-                    let arena_id = traversal_context
-                        .referenced_module_ids
-                        .alloc(module_id.clone());
-                    loader.check_dependencies_and_charge_gas(
-                        resolver.module_store(),
-                        data_store,
-                        gas_meter,
-                        &mut traversal_context.visited,
-                        traversal_context.referenced_modules,
-                        [(arena_id.address(), arena_id.name())],
-                        resolver.module_storage(),
-                    )?;
-
-                    // Charge gas for call, for the parameters
-                    gas_meter
-                        .charge_call(
-                            module_id,
-                            function.name(),
-                            self.operand_stack
-                                .last_n(function.param_tys().len() - mask.captured_count() as usize)
-                                .map_err(|e| set_err_info!(current_frame, e))?,
-                            (function.local_tys().len() as u64).into(),
-                        )
-                        .map_err(|e| set_err_info!(current_frame, e))?;
-
                     // Call function
-                    if function.is_native() {
+                    if callee.is_native() {
                         self.call_native::<RTTCheck, RTCaches>(
                             &mut current_frame,
                             &resolver,
@@ -605,7 +639,7 @@ impl InterpreterImpl {
                             gas_meter,
                             traversal_context,
                             extensions,
-                            &function,
+                            &callee,
                             mask,
                             captured.collect(),
                         )?
@@ -614,7 +648,7 @@ impl InterpreterImpl {
                             &mut current_frame,
                             gas_meter,
                             loader,
-                            function,
+                            callee,
                             frame_cache.clone(),
                             mask,
                             captured.collect(),
