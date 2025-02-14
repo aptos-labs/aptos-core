@@ -285,9 +285,8 @@ impl BlockTree {
         block: &Block,
         window_size: Option<u64>,
     ) -> Option<OrderedBlockWindow> {
-        // TODO: any other special cases that need to always have an empty window?
         // window_size is None only if execution pool is turned off
-        if block.is_nil_block() || window_size.is_none() {
+        if window_size.is_none() {
             return Some(OrderedBlockWindow::empty());
         }
 
@@ -309,46 +308,25 @@ impl BlockTree {
 
         let mut window = vec![];
         let mut current_block = block.clone();
+        assert!(!current_block.is_genesis_block());
         loop {
-            if current_block.parent_id() == HashValue::zero() {
-                info!(
-                    "Break at block: {}, for window of block: {}",
-                    current_block, block
-                );
+            // Break if my parent's block round is outside the window
+            if current_block.quorum_cert().certified_block().round() < window_start_round {
                 break;
             }
             if let Some(parent_block) = self.get_block(&current_block.parent_id()) {
                 current_block = parent_block.block().clone();
-                info!(
-                    "Visiting block: {}, for window of block: {}",
-                    current_block, block
-                );
-                // Note: This is not less than or equal to so that we exclude the current block
-                if current_block.round() < window_start_round {
-                    info!(
-                        "Break at block: {}, for window of block: {}",
-                        current_block, block
-                    );
-                    break;
-                }
                 if current_block.is_genesis_block() {
-                    info!(
-                        "Break at genesis block: {}, for window of block: {}",
-                        current_block, block
-                    );
                     break;
                 }
-                info!(
-                    "Added block: {}, for window of block: {}",
-                    current_block, block
-                );
                 window.push(parent_block);
             } else {
-                info!(
-                    "Visiting block: {} was not found, parent of block: {}, for window of block: {}",
-                    current_block.parent_id(),
-                    current_block,
-                    block
+                // TODO: this is unexpected, so better to return an error?
+                error!(
+                    "Parent block not found for block {} ({}, {}) in get_ordered_block_window",
+                    current_block.id(),
+                    current_block.epoch(),
+                    current_block.round()
                 );
                 return None;
             }
@@ -513,14 +491,16 @@ impl BlockTree {
         self.window_root_id = root_id;
     }
 
-    /// `window_root` is the parent_id of the first block in the [OrderedBlockWindow](OrderedBlockWindow)
+    /// `window_root` is the first block in the [OrderedBlockWindow](OrderedBlockWindow)
     ///
     /// ```text
+    ///                 block_window
+    ///                       ↓
     ///              ┌──────────────────┐
     ///  Genesis ──> │ A1 ──> A2 ──> A3 │ ──> A4
     ///              └──────────────────┘
-    ///      ↑                 ↑               ↑
-    /// window_root      block_window   block_to_commit
+    ///                 ↑                      ↑
+    ///            window_root          block_to_commit
     /// ```
     pub(super) fn find_window_root(
         &self,
@@ -545,10 +525,7 @@ impl BlockTree {
             .chain(std::iter::once(&block))
             .next()
             .expect("Ordered block window not found");
-        let parent_block = self
-            .get_linkable_block(&first_block.parent_id())
-            .expect("Parent block not found");
-        parent_block.id()
+        first_block.id()
     }
 
     /// Process the data returned by the prune_tree, they're separated because caller might
