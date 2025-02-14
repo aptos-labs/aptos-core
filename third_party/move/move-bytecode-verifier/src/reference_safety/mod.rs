@@ -125,6 +125,7 @@ fn call_closure(
     result_tys: Vec<SignatureToken>,
     meter: &mut impl Meter,
 ) -> PartialVMResult<()> {
+    let _closure = safe_unwrap!(verifier.stack.pop());
     let arguments = arg_tys
         .iter()
         .map(|_| Ok(safe_unwrap!(verifier.stack.pop())))

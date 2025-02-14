@@ -795,10 +795,6 @@ impl<'env> SpecTranslator<'env> {
                 let loc = self.env.get_node_loc(node_id);
                 self.error(&loc, &format!("tuple value not yet supported: {:#?}", val))
             },
-            Value::Function(_mid, _fid) => {
-                let loc = self.env.get_node_loc(node_id);
-                self.error(&loc, "Function values not yet supported") // TODO(LAMBDA)
-            },
         }
     }
 
@@ -1036,7 +1032,7 @@ impl<'env> SpecTranslator<'env> {
             | Operation::Deref
             | Operation::MoveTo
             | Operation::MoveFrom
-            | Operation::EarlyBind
+            | Operation::Closure(..)
             | Operation::Old => {
                 self.env.error(
                     &self.env.get_node_loc(node_id),

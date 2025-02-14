@@ -46,7 +46,7 @@ pub enum Type {
     Struct(ModuleId, StructId, /*type-params*/ Vec<Type>),
     TypeParameter(u16),
     Fun(
-        /* known args */ Box<Type>,
+        /*args*/ Box<Type>,
         /*result*/ Box<Type>,
         AbilitySet,
     ),
@@ -148,6 +148,15 @@ pub enum Constraint {
         /// The argument type
         Vec<Type>,
         /// The result type
+        Type,
+    ),
+    /// The type variable must be instantiated with a function value with the given argument
+    /// and result type. This is used to represent function types for which the ability set
+    /// is unknown.
+    SomeFunctionValue(
+        // The argument type. This is contra-variant.
+        Type,
+        // The result type. This is co-variant.
         Type,
     ),
     /// The type must not be reference because it is used as the type of some field or
@@ -390,6 +399,15 @@ impl Constraint {
                 Box::new(ty.clone()),
             )),
             Constraint::WithDefault(ty) => Some(ty.clone()),
+            Constraint::SomeFunctionValue(arg_type, result_type) => {
+                // For functions, if there is no requirement from the type context, default
+                // to the minimal empty ability set
+                Some(Type::function(
+                    arg_type.clone(),
+                    result_type.clone(),
+                    AbilitySet::EMPTY,
+                ))
+            },
             _ => None,
         }
     }
@@ -529,6 +547,26 @@ impl Constraint {
                         other.clone(),
                     ))
                 }
+            },
+            (
+                Constraint::SomeFunctionValue(arg1, result1),
+                Constraint::SomeFunctionValue(arg2, result2),
+            ) => {
+                subs.unify(
+                    context,
+                    Variance::NoVariance,
+                    WideningOrder::Join,
+                    arg1,
+                    arg2,
+                )?;
+                subs.unify(
+                    context,
+                    Variance::NoVariance,
+                    WideningOrder::Join,
+                    result1,
+                    result2,
+                )?;
+                Ok(true)
             },
             (Constraint::NoReference, Constraint::NoReference) => Ok(true),
             (Constraint::NoTuple, Constraint::NoTuple) => Ok(true),
@@ -688,6 +726,16 @@ impl Constraint {
                     result.display(display_context)
                 )
             },
+            Constraint::SomeFunctionValue(arg, result) => {
+                // Use display for function types with empty abilities, so
+                // we can attach an 'open' ability set, as the abilities are
+                // unknown.
+                format!(
+                    "{} has ..",
+                    Type::function(arg.clone(), result.clone(), AbilitySet::EMPTY)
+                        .display(display_context)
+                )
+            },
             Constraint::NoReference => "no-ref".to_string(),
             Constraint::NoTuple => "no-tuple".to_string(),
             Constraint::NoPhantom => "no-phantom".to_string(),
@@ -704,6 +752,10 @@ impl Constraint {
 pub enum TypeUnificationError {
     /// The two types mismatch: `TypeMismatch(actual, expected)`
     TypeMismatch(Type, Type),
+    /// Same as `TypeMismatch`, but in the context of function arguments
+    FunArgTypeMismatch(Type, Type),
+    /// Same as `TypeMismatch`, but in the context of function result types
+    FunResultTypeMismatch(Type, Type),
     /// The arity  of some construct mismatches: `ArityMismatch(for_type_args, actual, expected)`
     ArityMismatch(/*for_type_args*/ bool, usize, usize),
     /// Two types have different mutability: `MutabilityMismatch(actual, expected)`.
@@ -834,6 +886,11 @@ impl Type {
     /// Creates a unit type
     pub fn unit() -> Type {
         Type::Tuple(vec![])
+    }
+
+    /// Creates a function type
+    pub fn function(arg_ty: Type, res_ty: Type, abilities: AbilitySet) -> Self {
+        Type::Fun(Box::new(arg_ty), Box::new(res_ty), abilities)
     }
 
     /// Determines whether this is a type parameter.
@@ -1167,7 +1224,7 @@ impl Type {
                         if let Some(default_ty) = s.constraints.get(i).and_then(|constrs| {
                             constrs.iter().find_map(|(_, _, c)| c.default_type())
                         }) {
-                            default_ty
+                            default_ty.replace(params, subs, use_constr)
                         } else {
                             self.clone()
                         }
@@ -1911,6 +1968,16 @@ impl Substitution {
                         constraint_unsatisfied_error()
                     }
                 },
+                (
+                    Constraint::SomeFunctionValue(ctr_arg_ty, ctr_result_ty),
+                    Type::Fun(arg_ty, result_ty, _),
+                ) => {
+                    self.unify(context, variance, order.swap(), arg_ty, ctr_arg_ty)
+                        .map_err(TypeUnificationError::map_to_fun_arg_mismatch)?;
+                    self.unify(context, variance, order, result_ty, ctr_result_ty)
+                        .map_err(TypeUnificationError::map_to_fun_result_mismatch)?;
+                    Ok(())
+                },
                 (Constraint::HasAbilities(required_abilities, scope), ty) => self
                     .eval_ability_constraint(
                         context,
@@ -2050,10 +2117,7 @@ impl Substitution {
                     Ok(())
                 }
             },
-            Fun(_, _, abilities) => {
-                assert!(AbilitySet::FUNCTIONS.is_subset(*abilities));
-                check(*abilities)
-            },
+            Fun(_, _, abilities) => check(*abilities),
             Reference(_, _) => check(AbilitySet::REFERENCES),
             TypeDomain(_) | ResourceDomain(_, _, _) => check(AbilitySet::EMPTY),
             Error => Ok(()),
@@ -2124,13 +2188,13 @@ impl Substitution {
         self.unify_vec(
             context,
             variance,
+            // Arguments are contra-variant, hence LeftToRight
             WideningOrder::LeftToRight,
             // Pass in locations of arguments for better error messages
             Some(args_loc),
             &args,
             &receiver.arg_types,
         )?;
-        // Result is contra-variant, hence RightToLeft
         self.unify(
             context,
             variance,
@@ -2327,11 +2391,11 @@ impl Substitution {
                 return Ok(Type::Fun(
                     Box::new(
                         self.unify(context, variance, order.swap(), a1, a2)
-                            .map_err(TypeUnificationError::lift(order, t1, t2))?,
+                            .map_err(TypeUnificationError::map_to_fun_arg_mismatch)?,
                     ),
                     Box::new(
                         self.unify(context, variance, order, r1, r2)
-                            .map_err(TypeUnificationError::lift(order, t1, t2))?,
+                            .map_err(TypeUnificationError::map_to_fun_result_mismatch)?,
                     ),
                     {
                         // Widening/conversion can remove abilities, not add them.  So check that
@@ -2986,6 +3050,22 @@ impl TypeUnificationError {
         }
     }
 
+    pub fn map_to_fun_arg_mismatch(self) -> Self {
+        if let TypeUnificationError::TypeMismatch(t1, t2) = self {
+            TypeUnificationError::FunArgTypeMismatch(t1, t2)
+        } else {
+            self
+        }
+    }
+
+    pub fn map_to_fun_result_mismatch(self) -> Self {
+        if let TypeUnificationError::TypeMismatch(t1, t2) = self {
+            TypeUnificationError::FunResultTypeMismatch(t1, t2)
+        } else {
+            self
+        }
+    }
+
     /// If this error is associated with a specific location and the error
     /// is better reported at that location, return it.
     pub fn specific_loc(&self) -> Option<Loc> {
@@ -3027,6 +3107,25 @@ impl TypeUnificationError {
         match self {
             TypeUnificationError::TypeMismatch(actual, expected) => (
                 error_context.type_mismatch(display_context, actual, expected),
+                vec![],
+                vec![],
+            ),
+            TypeUnificationError::FunArgTypeMismatch(expected, actual) => (
+                // Because of contra-variance, switches actual/expected order
+                format!(
+                    "function takes arguments of type `{}` but `{}` was expected",
+                    actual.display(display_context),
+                    expected.display(display_context)
+                ),
+                vec![],
+                vec![],
+            ),
+            TypeUnificationError::FunResultTypeMismatch(actual, expected) => (
+                format!(
+                    "function returns value of type `{}` but `{}` was expected",
+                    actual.display(display_context),
+                    expected.display(display_context)
+                ),
                 vec![],
                 vec![],
             ),
@@ -3154,6 +3253,14 @@ impl TypeUnificationError {
                             "undeclared receiver function `{}` for type `{}`",
                             name.display(display_context.env.symbol_pool()),
                             ty.display(display_context)
+                        )
+                    },
+                    Constraint::SomeFunctionValue(arg_ty, result_ty) => {
+                        format!(
+                            "expected function of type `{}` but found `{}`",
+                            Type::function(arg_ty.clone(), result_ty.clone(), AbilitySet::EMPTY)
+                                .display(display_context),
+                            ty.display(display_context),
                         )
                     },
                     Constraint::NoTuple => {

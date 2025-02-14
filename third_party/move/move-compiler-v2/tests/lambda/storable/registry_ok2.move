@@ -2,14 +2,14 @@ module 0x42::test {
     use std::signer;
     use std::vector;
 
-    struct FunctionValue(|u64| u64 with store+copy) has store, copy, drop;
+    struct FunctionValue(|u64| u64 has store+copy) has store, copy, drop;
 
     struct Registry has key {
         functions: vector<FunctionEntry>
     }
 
     struct FunctionEntry has store, copy, drop {
-        f: |u64| u64 with store+copy,
+        f: |u64| u64 has store+copy,
         key: u64
     }
 
@@ -18,7 +18,7 @@ module 0x42::test {
         Some(T)
     }
 
-    fun get_function(v: &vector<FunctionEntry>, k: u64): Option<|u64| u64 with store+copy> {
+    fun get_function(v: &vector<FunctionEntry>, k: u64): Option<|u64| u64 has store+copy> {
         let x = Option::None;
         vector::for_each_ref(v, |f: &FunctionEntry| {
             if (f.key == k) {
@@ -28,7 +28,7 @@ module 0x42::test {
         x
     }
 
-    fun replace_or_add_function(v: &mut vector<FunctionEntry>, k: u64, f: |u64| u64 with store+copy): Option<|u64| u64 with store+copy> {
+    fun replace_or_add_function(v: &mut vector<FunctionEntry>, k: u64, f: |u64| u64 has store+copy): Option<|u64| u64 with store+copy> {
         let result = Option::None;
         vector::for_each_mut(v, |record: &mut FunctionEntry| {
             if (record.key == k) {
@@ -49,7 +49,7 @@ module 0x42::test {
         }
     }
 
-    fun register(owner: &signer, f: |u64| u64 with store+copy, k: u64) acquires Registry {
+    fun register(owner: &signer, f: |u64| u64 has store+copy, k: u64) acquires Registry {
         let addr = signer::address_of(owner);
         if (!exists<Registry>(addr)) {
             let new_registry = Registry {
@@ -88,12 +88,12 @@ module 0x42::test {
         x * y
     }
 
-    fun multiply_by_x(x: u64): |u64| u64 with store+copy {
-        move |y| multiply(x, y)
+    fun multiply_by_x(x: u64): |u64| u64 has store+copy {
+        |y| multiply(x, y)
     }
 
-    fun multiply_by_x2(x: u64): |u64| u64 with store+copy {
-        move |y| multiply(x, y)
+    fun multiply_by_x2(x: u64): |u64| u64 has store+copy {
+        |y| multiply(x, y)
     }
 
     #[test(a = @0x42)]

@@ -26,7 +26,7 @@ module 0x42::mod4 {
 module 0x42::mod5 {
     struct S {
         f: u64,
-        y: |u64|u64 with copy,
+        y: |u64|u64 has copy,
     }
     fun f(s: S): S {
         let x = s.y(3);
@@ -53,40 +53,40 @@ module 0x42::test {
             } else if (key == 1) {
                 mod1::triple
             } else if (key == 2) {
-                move |x| mod3::multiply(4, x)
+                |x| mod3::multiply(4, x)
             } else if (key == 3) {
                 let x = 5;
-                move |y| alt_multiply(x, y)
+                |y| alt_multiply(x, y)
             } else if (key == 4) {
                 let x = 6;
-                move |y| mod3::multiply(y, x)
+                |y| mod3::multiply(y, x)
             } else if (key == 5) {
-                move |x| multiply3(x, 3, 2)
+                |x| multiply3(x, 3, 2)
             } else if (key == 6) {
-                move |x| mod3::multiply(x, 7)
+                |x| mod3::multiply(x, 7)
             } else if (key == 7) {
-                move |x| multiply3(4, x, 2)
+                |x| multiply3(4, x, 2)
             } else if (key == 8) {
-                move |x| multiply3(3, 3, x)
+                |x| multiply3(3, 3, x)
             } else if (key == 9) {
                 let x = 2;
                 let y = 5;
-                move |z| multiply3(x, y, z)
+                |z| multiply3(x, y, z)
             } else if (key == 10) {
                 let z = 11;
-                move |x| alt_multiply(x, z) with copy
+                |x| alt_multiply(x, z)
             } else if (key == 11) {
-                let g = move |x, y| mod3::multiply(x, y) has copy+drop;
-                move |x| g(x, 11)
+                let g = |x, y| mod3::multiply(x, y);
+                |x| g(x, 11)
             } else if (key == 12) {
-                let h = move |x| mod3::multiply(x, 12) with copy;
-                move |x| { h(x) } with copy + drop
+                let h = |x| mod3::multiply(x, 12);
+                |x| { h(x) }
             } else if (key == 14) {
-                let i = move |x| multiply3(2, x, 2);
-                move |z| i(z)
+                let i = |x| multiply3(2, x, 2);
+                |z| i(z)
             } else {
-                let i = move |x, y| { let q = y - 1; 0x42::mod3::multiply(x, q + 1)  };
-                move |x| i(x, 15)
+                let i = |x, y| { let q = y - 1; 0x42::mod3::multiply(x, q + 1)  };
+                |x| i(x, 15)
             };
         f(x)
     }

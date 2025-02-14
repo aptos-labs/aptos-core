@@ -1,6 +1,6 @@
 module 0x42::m {
 
-    fun exec<T, R>(f: |T|R, x: T): R {
+    fun exec<T: copy+drop, R>(f: |T|R has copy+drop, x: T): R {
         let r = f(x);
         spec { assert r == f(x); };
         r
@@ -16,12 +16,12 @@ module 0x42::m {
 
     // Function code spec block
     fun function_code_spec_block(x: u64): u64 {
-        spec { assert exec(|y| y > 0, x); };
+        spec { assert exec(|y| y > 0, x); }; // This is lifted and leads to followup errors, need to enable in specs
         x + 1
     }
 
     // Struct spec block
-    struct S has key { f: u64 }
+    struct S has key, copy, drop { f: u64 }
     spec S { invariant exec(|x| x > 0, f); }
 
     // Global invariant

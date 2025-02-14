@@ -56,23 +56,23 @@ module 0x42::mod1 {
         let f =
             if (key == 0) {
                 let x = 3;
-                move |x| base_fun(a, x)
+                |x| base_fun(a, x)
             } else if (key == 1) {
-                move |x| base_fun2(x, a)
+                |x| base_fun2(x, a)
             } else if (key == 2) {
-                move |x| copy_fun(a_copy, x)
+                |x| copy_fun(a_copy, x)
             } else if (key == 3) {
-                move |x| copy_fun2(x, a_copy)
+                |x| copy_fun2(x, a_copy)
             } else if (key == 4) {
-                move |x| store_fun(a_store, x)
+                |x| store_fun(a_store, x)
             } else if (key == 5) {
-                move |x| store_fun2(x, a_store)
+                |x| store_fun2(x, a_store)
             } else if (key == 6) {
-                move |x| both_fun(a_both, x)
+                |x| both_fun(a_both, x)
             } else if (key == 7) {
-                move |x| both_fun2(x, a_both)
+                |x| both_fun2(x, a_both)
             } else {
-                move |x| x * 2
+                |x| x * 2
             };
         f(x)
     }
@@ -85,23 +85,23 @@ module 0x42::mod1 {
         let f =
             if (key == 0) {
                 let x = 3;
-                move |x| base_fun(a, x)
+                |x| base_fun(a, x)
             } else if (key == 1) {
-                move |x| base_fun2(x, a)
+                |x| base_fun2(x, a)
             } else if (key == 2) {
-                move |x| copy_fun(a_copy, x)
+                |x| copy_fun(a_copy, x)
             } else if (key == 3) {
-                move |x| copy_fun2(x, a_copy)
+                |x| copy_fun2(x, a_copy)
             } else if (key == 4) {
-                move |x| store_fun(a_store, x)
+                |x| store_fun(a_store, x)
             } else if (key == 5) {
-                move |x| store_fun2(x, a_store)
+                |x| store_fun2(x, a_store)
             } else if (key == 6) {
-                move |x| both_fun(a_both, x)
+                |x| both_fun(a_both, x)
             } else if (key == 7) {
-                move |x| both_fun2(x, a_both)
+                |x| both_fun2(x, a_both)
             } else {
-                move |x| x * 2 with copy
+                |x| x * 2
             };
         f
     }
@@ -116,28 +116,28 @@ module 0x42::mod1 {
         let f =
             if (key == 0) {
                 let x = 3;
-                move |x| base_fun(a, x) with copy
+                |x| base_fun(a, x)
             } else if (key == 1) {
-                move |x| base_fun2(x, a) with copy
+                |x| base_fun2(x, a)
             } else if (key == 2) {
-                move |x| copy_fun(a_copy, x) with copy
+                |x| copy_fun(a_copy, x)
             } else if (key == 3) {
-                move |x| copy_fun2(x, a_copy) with copy
+                |x| copy_fun2(x, a_copy)
             } else if (key == 4) {
-                move |x| store_fun(a_store, x) with copy
+                |x| store_fun(a_store, x)
             } else if (key == 5) {
-                move |x| store_fun2(x, a_store) with copy
+                |x| store_fun2(x, a_store)
             } else if (key == 6) {
-                move |x| both_fun(a_both, x) with copy
+                |x| both_fun(a_both, x)
             } else if (key == 7) {
-                move |x| both_fun2(x, a_both) with copy
+                |x| both_fun2(x, a_both)
             } else {
-                move |x| x * 2 with copy
+                |x| x * 2
             };
         f(x)
     }
 
-    public fun return_function_copy(key: u64, x: u64): |u64|u64 with copy {
+    public fun return_function_copy(key: u64, x: u64): |u64|u64 has copy {
         let a = S { x: 2 };
         let a_copy = Scopy { x: 2 };
         let a_store = Sstore { x: 2 };
@@ -145,23 +145,23 @@ module 0x42::mod1 {
         let f =
             if (key == 0) {
                 let x = 3;
-                move |x| base_fun(a, x) with copy
+                |x| base_fun(a, x)
             } else if (key == 1) {
-                move |x| base_fun2(x, a) with copy
+                |x| base_fun2(x, a)
             } else if (key == 2) {
-                move |x| copy_fun(a_copy, x) with copy
+                |x| copy_fun(a_copy, x)
             } else if (key == 3) {
-                move |x| copy_fun2(x, a_copy) with copy
+                |x| copy_fun2(x, a_copy)
             } else if (key == 4) {
-                move |x| store_fun(a_store, x) with copy
+                |x| store_fun(a_store, x)
             } else if (key == 5) {
-                move |x| store_fun2(x, a_store) with copy
+                |x| store_fun2(x, a_store)
             } else if (key == 6) {
-                move |x| both_fun(a_both, x) with copy
+                |x| both_fun(a_both, x)
             } else if (key == 7) {
-                move |x| both_fun2(x, a_both) with copy
+                |x| both_fun2(x, a_both)
             } else {
-                move |x| x * 2 with copy
+                |x| x * 2
             };
         f
     }
@@ -175,28 +175,28 @@ module 0x42::mod1 {
         let f =
             if (key == 0) {
                 let x = 3;
-                move |x| base_fun(a, x) with store
+                |x| base_fun(a, x)
             } else if (key == 1) {
-                move |x| base_fun2(x, a) with store
+                |x| base_fun2(x, a)
             } else if (key == 2) {
-                move |x| copy_fun(a_copy, x) with store
+                |x| copy_fun(a_copy, x)
             } else if (key == 3) {
-                move |x| copy_fun2(x, a_copy) with store
+                |x| copy_fun2(x, a_copy)
             } else if (key == 4) {
-                move |x| store_fun(a_store, x) with store
+                |x| store_fun(a_store, x)
             } else if (key == 5) {
-                move |x| store_fun2(x, a_store) with store
+                |x| store_fun2(x, a_store)
             } else if (key == 6) {
-                move |x| both_fun(a_both, x) with store
+                |x| both_fun(a_both, x)
             } else if (key == 7) {
-                move |x| both_fun2(x, a_both) with store
+                |x| both_fun2(x, a_both)
             } else {
-                move |x| x * 2 with store
+                |x| x * 2
             };
         f(x)
     }
 
-    public fun return_function_store(key: u64, x: u64): |u64|u64 with store {
+    public fun return_function_store(key: u64, x: u64): |u64|u64 has store {
         let a = S { x: 2 };
         let a_copy = Scopy { x: 2 };
         let a_store = Sstore { x: 2 };
@@ -204,23 +204,23 @@ module 0x42::mod1 {
         let f =
             if (key == 0) {
                 let x = 3;
-                move |x| base_fun(a, x) with store
+                |x| base_fun(a, x)
             } else if (key == 1) {
-                move |x| base_fun2(x, a) with store
+                |x| base_fun2(x, a)
             } else if (key == 2) {
-                move |x| copy_fun(a_copy, x) with store
+                |x| copy_fun(a_copy, x)
             } else if (key == 3) {
-                move |x| copy_fun2(x, a_copy) with store
+                |x| copy_fun2(x, a_copy)
             } else if (key == 4) {
-                move |x| store_fun(a_store, x) with store
+                |x| store_fun(a_store, x)
             } else if (key == 5) {
-                move |x| store_fun2(x, a_store) with store
+                |x| store_fun2(x, a_store)
             } else if (key == 6) {
-                move |x| both_fun(a_both, x) with store
+                |x| both_fun(a_both, x)
             } else if (key == 7) {
-                move |x| both_fun2(x, a_both) with store
+                |x| both_fun2(x, a_both)
             } else {
-                move |x| x * 2 with store
+                |x| x * 2
             };
         f
     }
@@ -235,28 +235,28 @@ module 0x42::mod1 {
         let f =
             if (key == 0) {
                 let x = 3;
-                move |x| base_fun(a, x) with store+copy
+                |x| base_fun(a, x)
             } else if (key == 1) {
-                move |x| base_fun2(x, a) with store+copy
+                |x| base_fun2(x, a)
             } else if (key == 2) {
-                move |x| copy_fun(a_copy, x) with store+copy
+                |x| copy_fun(a_copy, x)
             } else if (key == 3) {
-                move |x| copy_fun2(x, a_copy) with store+copy
+                |x| copy_fun2(x, a_copy)
             } else if (key == 4) {
-                move |x| store_fun(a_store, x) with store+copy
+                |x| store_fun(a_store, x)
             } else if (key == 5) {
-                move |x| store_fun2(x, a_store) with store+copy
+                |x| store_fun2(x, a_store)
             } else if (key == 6) {
-                move |x| both_fun(a_both, x) with store+copy
+                |x| both_fun(a_both, x)
             } else if (key == 7) {
-                move |x| both_fun2(x, a_both) with store+copy
+                |x| both_fun2(x, a_both)
             } else {
-                move |x| x * 2 with store+copy
+                |x| x * 2
             };
         f(x)
     }
 
-    public fun return_function_both(key: u64, x: u64): |u64|u64 with store+copy {
+    public fun return_function_both(key: u64, x: u64): |u64|u64 has store+copy {
         let a = S { x: 2 };
         let a_copy = Scopy { x: 2 };
         let a_store = Sstore { x: 2 };
@@ -264,23 +264,23 @@ module 0x42::mod1 {
         let f =
             if (key == 0) {
                 let x = 3;
-                move |x| base_fun(a, x) with store+copy
+                |x| base_fun(a, x)
             } else if (key == 1) {
-                move |x| base_fun2(x, a) with store+copy
+                |x| base_fun2(x, a)
             } else if (key == 2) {
-                move |x| copy_fun(a_copy, x) with store+copy
+                |x| copy_fun(a_copy, x)
             } else if (key == 3) {
-                move |x| copy_fun2(x, a_copy) with store+copy
+                |x| copy_fun2(x, a_copy)
             } else if (key == 4) {
-                move |x| store_fun(a_store, x) with store+copy
+                |x| store_fun(a_store, x)
             } else if (key == 5) {
-                move |x| store_fun2(x, a_store) with store+copy
+                |x| store_fun2(x, a_store)
             } else if (key == 6) {
-                move |x| both_fun(a_both, x) with store+copy
+                |x| both_fun(a_both, x)
             } else if (key == 7) {
-                move |x| both_fun2(x, a_both) with store+copy
+                |x| both_fun2(x, a_both)
             } else {
-                move |x| x * 2 with store+copy
+                |x| x * 2
             };
         f
     }
