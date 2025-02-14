@@ -288,7 +288,7 @@ impl BlockTree {
         // TODO: any other special cases that need to always have an empty window?
         // window_size is None only if execution pool is turned off
         if block.is_nil_block() || window_size.is_none() {
-            return Some(OrderedBlockWindow::new(vec![]));
+            return Some(OrderedBlockWindow::empty());
         }
 
         // TODO Currently we do not check to see if the `block` provided exists in the `BlockTree`
@@ -304,7 +304,7 @@ impl BlockTree {
         let window_size = (round + 1) - window_start_round;
         assert!(window_size > 0, "window_size must be greater than 0");
         if window_size == 1 {
-            return Some(OrderedBlockWindow::new(vec![]));
+            return Some(OrderedBlockWindow::empty());
         }
 
         let mut window = vec![];
@@ -476,7 +476,6 @@ impl BlockTree {
 
         while let Some(block_to_remove) = blocks_to_be_pruned.pop() {
             block_to_remove.executed_block().abort_pipeline();
-            block_to_remove.executed_block.block_window().clear();
             // Add the children to the blocks to be pruned (if any), but stop when it reaches the
             // new root
             for child_id in block_to_remove.children() {

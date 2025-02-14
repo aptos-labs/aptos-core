@@ -35,7 +35,7 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     fmt::{Debug, Display, Formatter},
-    sync::Arc,
+    sync::{Arc, Weak},
     time::{Duration, Instant},
 };
 use tokio::{
@@ -123,42 +123,47 @@ pub struct PipelineInputRx {
 /// A window of blocks that are needed for execution with the execution pool, EXCLUDING the current block
 #[derive(Clone)]
 pub struct OrderedBlockWindow {
-    blocks: Arc<Mutex<Option<Vec<Arc<PipelinedBlock>>>>>,
+    blocks: Vec<Weak<PipelinedBlock>>,
 }
 
 impl OrderedBlockWindow {
     pub fn new(blocks: Vec<Arc<PipelinedBlock>>) -> Self {
         Self {
-            blocks: Arc::new(Mutex::new(Some(blocks))),
+            blocks: blocks
+                .iter()
+                .map(Arc::downgrade)
+                .collect::<Vec<Weak<PipelinedBlock>>>(),
         }
     }
 
     pub fn empty() -> Self {
-        Self {
-            blocks: Arc::new(Mutex::new(Some(vec![]))),
-        }
+        Self { blocks: vec![] }
     }
 
-    pub fn clear(&self) {
-        *self.blocks.lock() = None;
-    }
-
+    /// The blocks stored in `OrderedBlockWindow` use [`Weak`](Weak) pointers
+    ///
+    /// if the `PipelinedBlock` still exists
+    ///      `upgraded_block` will be `Some(PipelinedBlock)`, and included in `blocks`
+    /// else it will be `None`, and not included in `blocks`
     pub fn blocks(&self) -> Vec<Block> {
-        self.blocks
-            .lock()
-            .as_ref()
-            .expect("window already cleared")
-            .iter()
-            .map(|b| b.block().clone())
-            .collect()
+        let mut blocks: Vec<Block> = vec![];
+        for block in &self.blocks {
+            let upgraded_block = block.upgrade();
+            if let Some(block) = upgraded_block {
+                blocks.push(block.block().clone())
+            }
+        }
+        blocks
     }
 
     pub fn pipelined_blocks(&self) -> Vec<Arc<PipelinedBlock>> {
-        self.blocks
-            .lock()
-            .as_ref()
-            .expect("window already cleared")
-            .clone()
+        let mut blocks: Vec<Arc<PipelinedBlock>> = Vec::new();
+        for block in &self.blocks {
+            if let Some(block) = block.upgrade() {
+                blocks.push(block);
+            }
+        }
+        blocks
     }
 }
 
@@ -369,7 +374,7 @@ impl PipelinedBlock {
     ) -> Self {
         Self {
             block,
-            block_window: OrderedBlockWindow::new(vec![]),
+            block_window: OrderedBlockWindow::empty(),
             input_transactions,
             state_compute_result,
             randomness: OnceCell::new(),
