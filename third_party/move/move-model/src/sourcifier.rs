@@ -564,7 +564,7 @@ impl<'a> ExpSourcifier<'a> {
                 }
             },
             // Following forms may require parenthesis
-            Lambda(_, pat, body, capture_kind, abilities) => {
+            Lambda(_, pat, body, capture_kind, abilities, spec_opt) => {
                 self.parenthesize(context_prio, Prio::General, || {
                     if *capture_kind != LambdaCaptureKind::Default {
                         emit!(self.wr(), "{} ", capture_kind);
@@ -576,6 +576,9 @@ impl<'a> ExpSourcifier<'a> {
                     if !abilities.is_subset(AbilitySet::FUNCTIONS) {
                         let abilities_as_str = abilities.iter().map(|a| a.to_string()).join("+");
                         emit!(self.wr(), " with {}", abilities_as_str);
+                    }
+                    if let Some(spec) = spec_opt {
+                        self.print_exp(Prio::General, true, spec);
                     }
                 });
             },
