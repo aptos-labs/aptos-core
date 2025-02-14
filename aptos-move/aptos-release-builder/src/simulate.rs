@@ -94,7 +94,7 @@ fn find_function_def_by_name<'a>(
 ) -> Option<&'a mut FunctionDefinition> {
     for (idx, func_def) in m.function_defs.iter().enumerate() {
         let func_handle = m.function_handle_at(func_def.function);
-        let func_name = m.identifier_at(func_handle.name);
+        let func_name = m.identifier_at(func_handle.name).as_ident_str();
         if name == func_name {
             return Some(&mut m.function_defs[idx]);
         }
@@ -150,8 +150,8 @@ fn find_function_handle_by_name(
     for (idx, func_handle) in m.function_handles().iter().enumerate() {
         let module_handle = m.module_handle_at(func_handle.module);
         if m.address_identifier_at(module_handle.address) == &addr
-            && m.identifier_at(module_handle.name) == module_name
-            && m.identifier_at(func_handle.name) == func_name
+            && m.identifier_at(module_handle.name).as_ident_str() == module_name
+            && m.identifier_at(func_handle.name).as_ident_str() == func_name
         {
             return Some(FunctionHandleIndex(idx as u16));
         }

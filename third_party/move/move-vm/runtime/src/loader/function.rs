@@ -19,9 +19,12 @@ use move_binary_format::{
 use move_core_types::{
     ability::AbilitySet, identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode,
 };
-use move_vm_types::loaded_data::{
-    runtime_access_specifier::AccessSpecifier,
-    runtime_types::{StructIdentifier, Type},
+use move_vm_types::{
+    indices::FunctionIdx,
+    loaded_data::{
+        runtime_access_specifier::AccessSpecifier,
+        runtime_types::{StructIdentifier, Type},
+    },
 };
 use std::{fmt::Debug, sync::Arc};
 
@@ -140,8 +143,8 @@ impl LoadedFunction {
             LoadedFunctionOwner::Script(_) => "script::main".into(),
             LoadedFunctionOwner::Module(m) => format!(
                 "0x{}::{}::{}",
-                m.self_addr().to_hex(),
-                m.self_name().as_str(),
+                m.compiled_module.self_addr().to_hex(),
+                m.compiled_module.self_name().as_str(),
                 self.function.name()
             ),
         }
@@ -179,6 +182,7 @@ impl Function {
         module: &CompiledModule,
         signature_table: &[Vec<Type>],
         struct_names: &[StructIdentifier],
+        _function_idx: FunctionIdx,
     ) -> PartialVMResult<Self> {
         let def = module.function_def_at(index);
         let handle = module.function_handle_at(def.function);
@@ -309,5 +313,5 @@ pub(crate) struct FunctionInstantiation {
 #[derive(Clone, Debug)]
 pub(crate) enum FunctionHandle {
     Local(Arc<Function>),
-    Remote { module: ModuleId, name: Identifier },
+    Remote { idx: FunctionIdx },
 }

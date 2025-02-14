@@ -26,8 +26,7 @@ macro_rules! module_linker_error {
         )
         .with_message(format!(
             "Linker Error: Module {}::{} doesn't exist",
-            $addr.to_hex(),
-            $name
+            $addr, $name
         ))
         .finish(move_binary_format::errors::Location::Undefined)
     };
@@ -43,8 +42,6 @@ macro_rules! module_cyclic_dependency_error {
             "Module {}::{} forms a cyclic dependency",
             $addr, $name
         ))
-        .finish(move_binary_format::errors::Location::Module(
-            move_core_types::language_storage::ModuleId::new(*$addr, $name.to_owned()),
-        ))
+        .finish(move_binary_format::errors::Location::Undefined)
     };
 }

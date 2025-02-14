@@ -211,7 +211,7 @@ impl Bytecode for CompiledModule {
             .filter(|def| def.is_entry)
             .find(|def| {
                 let fhandle = ModuleAccess::function_handle_at(self, def.function);
-                ModuleAccess::identifier_at(self, fhandle.name) == name
+                ModuleAccess::identifier_at(self, fhandle.name).as_ident_str() == name
             })
             .map(|def| self.new_move_function(def))
     }
@@ -221,7 +221,7 @@ impl Bytecode for CompiledModule {
             .iter()
             .find(|def| {
                 let fhandle = ModuleAccess::function_handle_at(self, def.function);
-                ModuleAccess::identifier_at(self, fhandle.name) == name
+                ModuleAccess::identifier_at(self, fhandle.name).as_ident_str() == name
             })
             .map(|def| self.new_move_function(def))
     }

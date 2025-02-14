@@ -33,7 +33,7 @@ use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     effects::{AccountChanges, Changes, Op as MoveStorageOp},
-    language_storage::{ModuleId, StructTag},
+    language_storage::StructTag,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
@@ -41,7 +41,7 @@ use move_vm_runtime::{
     move_vm::MoveVM, native_extensions::NativeContextExtensions, session::Session,
     AsFunctionValueExtension, ModuleStorage, VerifiedModuleBundle,
 };
-use move_vm_types::{value_serde::ValueSerDeContext, values::Value};
+use move_vm_types::{indices::ModuleIdx, value_serde::ValueSerDeContext, values::Value};
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
@@ -289,6 +289,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .with_message("split_and_merge_resource_groups error".to_string())
         };
+        let index_map = module_storage.runtime_environment().struct_name_index_map();
         let mut change_set_filtered = ChangeSet::new();
 
         let mut maybe_resource_group_cache = resolver.release_resource_group_cache().map(|v| {
@@ -311,8 +312,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
             for (struct_tag, blob_op) in resources {
                 let resource_group_tag = if module_storage.is_enabled() {
+                    let index = index_map.module_idx_from_struct_tag(&struct_tag);
                     let metadata = module_storage
-                        .fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
+                        .fetch_existing_module_metadata(&index)
                         .map_err(|e| e.to_partial())?;
                     get_resource_group_member_from_metadata(&struct_tag, &metadata)
                 } else {
@@ -392,14 +394,14 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let mut resource_write_set = BTreeMap::new();
         let mut resource_group_write_set = BTreeMap::new();
 
-        let mut has_modules_published_to_special_address = false;
-        let mut module_writes = BTreeMap::new();
+        let has_modules_published_to_special_address = false;
+        let module_writes = BTreeMap::new();
 
         let mut aggregator_v1_write_set = BTreeMap::new();
         let mut aggregator_v1_delta_set = BTreeMap::new();
 
         for (addr, account_changeset) in change_set.into_inner() {
-            let (modules, resources) = account_changeset.into_inner();
+            let (_modules, resources) = account_changeset.into_inner();
             for (struct_tag, blob_and_layout_op) in resources {
                 let state_key = resource_state_key(&addr, &struct_tag)?;
                 let op = woc.convert_resource(
@@ -411,16 +413,18 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 resource_write_set.insert(state_key, op);
             }
 
-            for (name, blob_op) in modules {
-                if addr.is_special() {
-                    has_modules_published_to_special_address = true;
-                }
+            // V2 LOADER DOES NOT USE THESE
 
-                let module_id = ModuleId::new(addr, name);
-                let state_key = StateKey::module_id(&module_id);
-                let op = woc.convert_module(&state_key, blob_op, false)?;
-                module_writes.insert(state_key, ModuleWrite::new(module_id, op));
-            }
+            // for (name, blob_op) in modules {
+            //     if addr.is_special() {
+            //         has_modules_published_to_special_address = true;
+            //     }
+            //
+            //     let module_id = ModuleId::new(addr, name);
+            //     let state_key = StateKey::module_id(&module_id);
+            //     let op = woc.convert_module(&state_key, blob_op, false)?;
+            //     module_writes.insert(state_key, ModuleWrite::new(module_id, op));
+            // }
         }
 
         match resource_group_change_set {
@@ -500,7 +504,7 @@ pub fn convert_modules_into_write_ops(
     resolver: &impl AptosMoveResolver,
     features: &Features,
     module_storage: &impl AptosModuleStorage,
-    verified_module_bundle: VerifiedModuleBundle<ModuleId, Bytes>,
+    verified_module_bundle: VerifiedModuleBundle<ModuleIdx, Bytes>,
 ) -> PartialVMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
     let woc = WriteOpConverter::new(resolver, features.is_storage_slot_metadata_enabled());
     woc.convert_modules_into_write_ops(module_storage, verified_module_bundle.into_iter())

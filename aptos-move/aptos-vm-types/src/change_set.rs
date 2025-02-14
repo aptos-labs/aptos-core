@@ -34,6 +34,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
+use move_vm_runtime::ModuleStorage;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use rand::Rng;
 use std::{
@@ -790,6 +791,7 @@ impl VMChangeSet {
 /// Note: does not separate out individual resource group updates.
 pub fn create_vm_change_set_with_module_write_set_when_delayed_field_optimization_disabled(
     change_set: StorageChangeSet,
+    module_storage: &impl ModuleStorage,
 ) -> (VMChangeSet, ModuleWriteSet) {
     let (write_set, events) = change_set.into_inner();
 
@@ -801,7 +803,11 @@ pub fn create_vm_change_set_with_module_write_set_when_delayed_field_optimizatio
     for (state_key, write_op) in write_set {
         if let StateKeyInner::AccessPath(ap) = state_key.inner() {
             if let Some(module_id) = ap.try_get_module_id() {
-                module_write_ops.insert(state_key, ModuleWrite::new(module_id, write_op));
+                let idx = module_storage
+                    .runtime_environment()
+                    .struct_name_index_map()
+                    .module_idx(&module_id.address, &module_id.name);
+                module_write_ops.insert(state_key, ModuleWrite::new(idx, write_op));
                 continue;
             }
         }

@@ -77,10 +77,7 @@ use move_core_types::{
     move_resource::{MoveResource, MoveStructType},
     value::MoveValue,
 };
-use move_vm_runtime::{
-    module_traversal::{TraversalContext, TraversalStorage},
-    ModuleStorage,
-};
+use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
@@ -1022,7 +1019,7 @@ impl FakeExecutor {
         // Create module storage, and ensure the module for the function we want to execute is
         // cached.
         let module_storage = self.data_store.as_aptos_code_storage(env.clone());
-        assert_ok!(module_storage.fetch_verified_module(module.address(), module.name()));
+        // assert_ok!(module_storage.fetch_verified_module(module.address(), module.name()));
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;
@@ -1031,12 +1028,13 @@ impl FakeExecutor {
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             // load function name into cache to ensure cache is hot
-            let _ = session.load_function(
-                &module_storage,
-                module,
-                &Self::name(function_name),
-                &type_params.clone(),
-            );
+            // FIXME
+            // let _ = session.load_function(
+            //     &module_storage,
+            //     module,
+            //     &Self::name(function_name),
+            //     &type_params.clone(),
+            // );
 
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);

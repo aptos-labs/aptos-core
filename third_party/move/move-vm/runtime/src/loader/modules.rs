@@ -9,11 +9,12 @@ use crate::{
         BinaryCache,
     },
     native_functions::NativeFunctions,
+    storage::environment::DeserializedModule,
 };
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
-    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    errors::{PartialVMError, PartialVMResult, VMResult},
     file_format::{
         Bytecode, CompiledModule, FieldDefinition, FieldHandleIndex, FieldInstantiationIndex,
         FunctionDefinitionIndex, SignatureIndex, StructDefinition, StructDefinitionIndex,
@@ -28,9 +29,9 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_metrics::{Timer, VM_TIMER};
-use move_vm_types::loaded_data::{
-    runtime_types::{StructIdentifier, StructLayout, StructType, Type},
-    struct_name_indexing::{StructNameIndex, StructNameIndexMap},
+use move_vm_types::{
+    indices::{FunctionIdx, IndexMapManager, ModuleIdx, StructIdx},
+    loaded_data::runtime_types::{StructIdentifier, StructLayout, StructType, Type},
 };
 use parking_lot::RwLock;
 use std::{
@@ -46,8 +47,10 @@ use std::{
 /// elsewhere as long as it implements this `ModuleStorage` trait. Doing so would allow the caller, i.e: the
 /// adapter layer, to freely decide when to drop or persist the cache as well as determining its own eviction policy.
 pub trait LegacyModuleStorage {
+    #[allow(dead_code)]
     fn store_module(&self, module_id: &ModuleId, binary: Module) -> Arc<Module>;
     fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>>;
+    #[allow(dead_code)]
     fn fetch_module_by_ref(&self, addr: &AccountAddress, name: &IdentStr) -> Option<Arc<Module>>;
 }
 
@@ -104,6 +107,7 @@ impl LegacyModuleStorageAdapter {
         self.modules.fetch_module(id)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn module_at_by_ref(
         &self,
         addr: &AccountAddress,
@@ -114,19 +118,20 @@ impl LegacyModuleStorageAdapter {
 
     pub(crate) fn insert(
         &self,
-        natives: &NativeFunctions,
-        id: ModuleId,
-        module_size: usize,
-        compiled_module: Arc<CompiledModule>,
-        struct_name_index_map: &StructNameIndexMap,
+        _natives: &NativeFunctions,
+        _id: ModuleId,
+        _module_size: usize,
+        _compiled_module: Arc<CompiledModule>,
+        _struct_name_index_map: &IndexMapManager,
     ) -> VMResult<Arc<Module>> {
-        if let Some(cached) = self.module_at(&id) {
-            return Ok(cached);
-        }
-
-        let module = Module::new(natives, module_size, compiled_module, struct_name_index_map)
-            .map_err(|e| e.finish(Location::Undefined))?;
-        Ok(self.modules.store_module(&id, module))
+        unimplemented!()
+        // if let Some(cached) = self.module_at(&id) {
+        //     return Ok(cached);
+        // }
+        //
+        // let module = Module::new(natives, module_size, compiled_module, struct_name_index_map)
+        //     .map_err(|e| e.finish(Location::Undefined))?;
+        // Ok(self.modules.store_module(&id, module))
     }
 
     pub(crate) fn has_module(&self, module_id: &ModuleId) -> bool {
@@ -137,45 +142,48 @@ impl LegacyModuleStorageAdapter {
     // Return and error if the type has not been loaded
     pub(crate) fn get_struct_type_by_identifier(
         &self,
-        struct_name: &IdentStr,
-        module_id: &ModuleId,
+        _struct_name: &IdentStr,
+        _module_id: &ModuleId,
     ) -> PartialVMResult<Arc<StructType>> {
-        self.modules
-            .fetch_module(module_id)
-            .and_then(|module| {
-                let idx = module.struct_map.get(struct_name)?;
-                Some(module.structs.get(*idx)?.definition_struct_type.clone())
-            })
-            .ok_or_else(|| {
-                PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(format!(
-                    "Cannot find {:?}::{:?} in cache",
-                    module_id, struct_name
-                ))
-            })
+        unimplemented!()
+        // self.modules
+        //     .fetch_module(module_id)
+        //     .and_then(|module| {
+        //         let idx = module.struct_map.get(struct_name)?;
+        //         Some(module.structs.get(*idx)?.definition_struct_type.clone())
+        //     })
+        //     .ok_or_else(|| {
+        //         PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(format!(
+        //             "Cannot find {:?}::{:?} in cache",
+        //             module_id, struct_name
+        //         ))
+        //     })
     }
 
     /// Given module address/name and the function name, returns the corresponding module
     /// and function if they exist in module store cache. If not, an error is returned.
+    #[allow(dead_code)]
     pub(crate) fn resolve_module_and_function_by_name(
         &self,
-        module_id: &ModuleId,
-        func_name: &IdentStr,
+        _module_id: &ModuleId,
+        _func_name: &IdentStr,
     ) -> PartialVMResult<(Arc<Module>, Arc<Function>)> {
-        let error = || {
-            PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(format!(
-                "Cannot find {:?}::{:?} in cache",
-                module_id, func_name
-            ))
-        };
-
-        let module = self.modules.fetch_module(module_id).ok_or_else(error)?;
-        let function = module
-            .function_map
-            .get(func_name)
-            .and_then(|idx| module.function_defs.get(*idx))
-            .cloned()
-            .ok_or_else(error)?;
-        Ok((module, function.clone()))
+        unimplemented!()
+        // let error = || {
+        //     PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(format!(
+        //         "Cannot find {:?}::{:?} in cache",
+        //         module_id, func_name
+        //     ))
+        // };
+        //
+        // let module = self.modules.fetch_module(module_id).ok_or_else(error)?;
+        // let function = module
+        //     .function_map
+        //     .get(func_name)
+        //     .and_then(|idx| module.function_defs.get(*idx))
+        //     .cloned()
+        //     .ok_or_else(error)?;
+        // Ok((module, function.clone()))
     }
 }
 
@@ -186,12 +194,14 @@ impl LegacyModuleStorageAdapter {
 #[derive(Clone, Debug)]
 pub struct Module {
     id: ModuleId,
+    pub module_idx: ModuleIdx,
 
     // size in bytes
+    #[allow(dead_code)]
     pub(crate) size: usize,
 
     // primitive pools
-    pub(crate) module: Arc<CompiledModule>,
+    pub(crate) module: Arc<DeserializedModule>,
 
     //
     // types as indexes into the Loader type list
@@ -223,10 +233,10 @@ pub struct Module {
 
     // function name to index into the Loader function list.
     // This allows a direct access from function name to `Function`
-    pub(crate) function_map: HashMap<Identifier, usize>,
+    pub(crate) function_map: HashMap<FunctionIdx, usize>,
     // struct name to index into the module's type list
     // This allows a direct access from struct name to `Struct`
-    pub(crate) struct_map: HashMap<Identifier, usize>,
+    pub(crate) struct_map: HashMap<StructIdx, usize>,
 
     // a map of single-token signature indices to type.
     // Single-token signatures are usually indexed by the `SignatureIndex` in bytecode. For example,
@@ -287,12 +297,15 @@ impl Module {
     pub(crate) fn new(
         natives: &NativeFunctions,
         size: usize,
-        module: Arc<CompiledModule>,
-        struct_name_index_map: &StructNameIndexMap,
+        deserialized_module: Arc<DeserializedModule>,
+        struct_name_index_map: &IndexMapManager,
     ) -> PartialVMResult<Self> {
         let _timer = VM_TIMER.timer_with_label("Module::new");
+        let module = deserialized_module.compiled_module.as_ref();
 
-        let id = module.self_id();
+        let self_module_id = module.self_id();
+        let id =
+            struct_name_index_map.module_idx(module.self_addr(), module.self_name_identifier());
 
         let mut structs = vec![];
         let mut struct_instantiations = vec![];
@@ -318,13 +331,16 @@ impl Module {
                 let struct_name = module.identifier_at(struct_handle.name);
                 let module_handle = module.module_handle_at(struct_handle.module);
                 let module_id = module.module_id_for_handle(module_handle);
+                let address = module.address_identifier_at(module_handle.address);
+                let module_name = module.identifier_at(module_handle.name);
 
-                let struct_name = StructIdentifier {
+                let struct_id = StructIdentifier {
                     module: module_id,
                     name: struct_name.to_owned(),
                 };
-                struct_idxs.push(struct_name_index_map.struct_name_to_idx(&struct_name)?);
-                struct_names.push(struct_name)
+                let idx = struct_name_index_map.struct_idx(address, module_name, struct_name);
+                struct_idxs.push(idx);
+                struct_names.push(struct_id)
             }
 
             // Build signature table
@@ -334,7 +350,7 @@ impl Module {
                         .0
                         .iter()
                         .map(|sig| {
-                            intern_type(BinaryIndexedView::Module(&module), sig, &struct_idxs)
+                            intern_type(BinaryIndexedView::Module(module), sig, &struct_idxs)
                         })
                         .collect::<PartialVMResult<Vec<_>>>()?,
                 )
@@ -342,14 +358,13 @@ impl Module {
 
             for (idx, struct_def) in module.struct_defs().iter().enumerate() {
                 let definition_struct_type =
-                    Arc::new(Self::make_struct_type(&module, struct_def, &struct_idxs)?);
+                    Arc::new(Self::make_struct_type(module, struct_def, &struct_idxs)?);
+                let struct_idx = definition_struct_type.idx;
                 structs.push(StructDef {
                     field_count: definition_struct_type.field_count(None),
                     definition_struct_type,
                 });
-                let name =
-                    module.identifier_at(module.struct_handle_at(struct_def.struct_handle).name);
-                struct_map.insert(name.to_owned(), idx);
+                struct_map.insert(struct_idx, idx);
             }
 
             for struct_inst in module.struct_instantiations() {
@@ -388,15 +403,25 @@ impl Module {
 
             for (idx, func) in module.function_defs().iter().enumerate() {
                 let findex = FunctionDefinitionIndex(idx as TableIndex);
+
+                let def = module.function_def_at(findex);
+                let handle = module.function_handle_at(def.function);
+                let function_name = module.identifier_at(handle.name);
+                let module_name = module.self_name_identifier();
+                let address = module.address();
+                let function_idx =
+                    struct_name_index_map.function_idx(address, module_name, function_name);
+
                 let function = Function::new(
                     natives,
                     findex,
-                    &module,
+                    module,
                     signature_table.as_slice(),
                     &struct_names,
+                    function_idx,
                 )?;
 
-                function_map.insert(function.name.to_owned(), idx);
+                function_map.insert(function_idx, idx);
                 function_defs.push(Arc::new(function));
 
                 if let Some(code_unit) = &func.code {
@@ -427,7 +452,7 @@ impl Module {
                                     single_signature_token_map.insert(
                                         *si,
                                         intern_type(
-                                            BinaryIndexedView::Module(&module),
+                                            BinaryIndexedView::Module(module),
                                             ty,
                                             &struct_idxs,
                                         )?,
@@ -443,10 +468,14 @@ impl Module {
             for func_handle in module.function_handles() {
                 let func_name = module.identifier_at(func_handle.name);
                 let module_handle = module.module_handle_at(func_handle.module);
-                let module_id = module.module_id_for_handle(module_handle);
-                let func_handle = if module_id == id {
+                let module_name = module.identifier_at(module_handle.name);
+                let address = module.address_identifier_at(module_handle.address);
+                let function_idx =
+                    struct_name_index_map.function_idx(address, module_name, func_name);
+
+                let func_handle = if function_idx.module_idx() == id {
                     FunctionHandle::Local(
-                        function_defs[*function_map.get(func_name).ok_or_else(|| {
+                        function_defs[*function_map.get(&function_idx).ok_or_else(|| {
                             PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(
                                 "Cannot find function in publishing module".to_string(),
                             )
@@ -454,10 +483,7 @@ impl Module {
                         .clone(),
                     )
                 } else {
-                    FunctionHandle::Remote {
-                        module: module_id,
-                        name: func_name.to_owned(),
-                    }
+                    FunctionHandle::Remote { idx: function_idx }
                 };
                 function_refs.push(func_handle);
             }
@@ -546,9 +572,10 @@ impl Module {
 
         match create() {
             Ok(_) => Ok(Self {
-                id,
+                id: self_module_id,
+                module_idx: id,
                 size,
-                module,
+                module: deserialized_module,
                 structs,
                 struct_instantiations,
                 struct_variant_infos,
@@ -571,7 +598,7 @@ impl Module {
     fn make_struct_type(
         module: &CompiledModule,
         struct_def: &StructDefinition,
-        struct_name_table: &[StructNameIndex],
+        struct_name_table: &[StructIdx],
     ) -> PartialVMResult<StructType> {
         let struct_handle = module.struct_handle_at(struct_def.struct_handle);
         let abilities = struct_handle.abilities;
@@ -618,7 +645,7 @@ impl Module {
     fn make_field(
         module: &CompiledModule,
         field: &FieldDefinition,
-        struct_name_table: &[StructNameIndex],
+        struct_name_table: &[StructIdx],
     ) -> PartialVMResult<(Identifier, Type)> {
         let ty = intern_type(
             BinaryIndexedView::Module(module),
@@ -696,7 +723,7 @@ impl Module {
 }
 
 impl Deref for Module {
-    type Target = Arc<CompiledModule>;
+    type Target = Arc<DeserializedModule>;
 
     fn deref(&self) -> &Self::Target {
         &self.module

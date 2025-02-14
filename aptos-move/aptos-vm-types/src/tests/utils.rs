@@ -21,7 +21,6 @@ use aptos_types::{
 };
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
-    ident_str,
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
     value::MoveTypeLayout,
@@ -50,7 +49,7 @@ macro_rules! as_bytes {
 
 use crate::module_write_set::{ModuleWrite, ModuleWriteSet};
 pub(crate) use as_bytes;
-use move_core_types::language_storage::ModuleId;
+use move_vm_types::indices::ModuleIdx;
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {
     StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
@@ -71,11 +70,10 @@ pub(crate) fn mock_modify(k: impl ToString, v: u128) -> (StateKey, WriteOp) {
 }
 
 pub(crate) fn mock_module_modify(k: impl ToString, v: u128) -> (StateKey, ModuleWrite<WriteOp>) {
-    let dummy_module_id = ModuleId::new(AccountAddress::ONE, ident_str!("dummy").to_owned());
     let write_op = WriteOp::legacy_modification(as_bytes!(v).into());
     (
         as_state_key!(k),
-        ModuleWrite::new(dummy_module_id, write_op),
+        ModuleWrite::new(ModuleIdx::new(0), write_op),
     )
 }
 

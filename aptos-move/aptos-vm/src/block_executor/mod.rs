@@ -42,7 +42,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
 };
-use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use move_vm_types::{delayed_values::delayed_field_id::DelayedFieldID, indices::ModuleIdx};
 use once_cell::sync::{Lazy, OnceCell};
 use std::{
     collections::{BTreeMap, HashSet},
@@ -353,7 +353,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .materialized_size()
     }
 
-    fn get_write_summary(&self) -> HashSet<InputOutputKey<StateKey, StructTag>> {
+    fn get_write_summary(&self) -> HashSet<InputOutputKey<StateKey, ModuleIdx, StructTag>> {
         let vm_output = self.vm_output.lock();
         let output = vm_output
             .as_ref()

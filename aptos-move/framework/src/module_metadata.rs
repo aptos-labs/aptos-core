@@ -20,11 +20,12 @@ use move_core_types::{
     ability::{Ability, AbilitySet},
     errmap::ErrorDescription,
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, StructTag},
+    language_storage::StructTag,
     metadata::Metadata,
 };
 use move_model::metadata::{CompilationMetadata, COMPILATION_METADATA_KEY};
 use move_vm_runtime::move_vm::MoveVM;
+use move_vm_types::indices::ModuleIdx;
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, collections::BTreeMap, env, sync::Arc};
 use thiserror::Error;
@@ -230,35 +231,29 @@ pub fn get_metadata_v0(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> 
 
 /// Extract metadata from the VM, upgrading V0 to V1 representation as needed
 pub fn get_vm_metadata(
-    vm: &MoveVM,
+    _vm: &MoveVM,
     module_storage: &impl AptosModuleStorage,
-    module_id: &ModuleId,
+    module_id: &ModuleIdx,
 ) -> Option<Arc<RuntimeModuleMetadataV1>> {
     if module_storage.is_enabled() {
-        let metadata = module_storage
-            .fetch_module_metadata(module_id.address(), module_id.name())
-            .ok()??;
+        let metadata = module_storage.fetch_module_metadata(module_id).ok()??;
         get_metadata(&metadata)
     } else {
-        #[allow(deprecated)]
-        vm.with_module_metadata(module_id, get_metadata)
+        unimplemented!()
     }
 }
 
 /// Extract metadata from the VM, legacy V0 format upgraded to V1
 pub fn get_vm_metadata_v0(
-    vm: &MoveVM,
+    _vm: &MoveVM,
     module_storage: &impl AptosModuleStorage,
-    module_id: &ModuleId,
+    module_idx: &ModuleIdx,
 ) -> Option<Arc<RuntimeModuleMetadataV1>> {
     if module_storage.is_enabled() {
-        let metadata = module_storage
-            .fetch_module_metadata(module_id.address(), module_id.name())
-            .ok()??;
+        let metadata = module_storage.fetch_module_metadata(module_idx).ok()??;
         get_metadata_v0(&metadata)
     } else {
-        #[allow(deprecated)]
-        vm.with_module_metadata(module_id, get_metadata_v0)
+        unimplemented!()
     }
 }
 
@@ -526,7 +521,7 @@ pub fn verify_module_metadata(
         .iter()
         .map(|func_def| {
             let func_handle = module.function_handle_at(func_def.function);
-            let name = module.identifier_at(func_handle.name);
+            let name = module.identifier_at(func_handle.name).as_ident_str();
             (name, (func_handle, func_def))
         })
         .collect::<BTreeMap<_, _>>();
@@ -552,7 +547,7 @@ pub fn verify_module_metadata(
         .iter()
         .map(|struct_def| {
             let struct_handle = module.struct_handle_at(struct_def.struct_handle);
-            let name = module.identifier_at(struct_handle.name);
+            let name = module.identifier_at(struct_handle.name).as_ident_str();
             (name, (struct_handle, struct_def))
         })
         .collect::<BTreeMap<_, _>>();

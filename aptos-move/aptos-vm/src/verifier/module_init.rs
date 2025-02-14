@@ -20,7 +20,10 @@ pub fn is_signer_or_signer_reference(token: &SignatureToken) -> bool {
 pub fn verify_module_init_function(module: &CompiledModule) -> PartialVMResult<()> {
     let init_func_name = ident_str!("init_module");
     let fdef_opt = module.function_defs().iter().enumerate().find(|(_, fdef)| {
-        module.identifier_at(module.function_handle_at(fdef.function).name) == init_func_name
+        module
+            .identifier_at(module.function_handle_at(fdef.function).name)
+            .as_ident_str()
+            == init_func_name
     });
     if fdef_opt.is_none() {
         return Ok(());
