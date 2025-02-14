@@ -123,18 +123,10 @@ pub struct RejectedTransactionSummary {
     pub reason: DiscardedVMStatus,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct ProofWithData {
     pub proofs: Vec<ProofOfStore>,
 }
-
-impl PartialEq for ProofWithData {
-    fn eq(&self, other: &Self) -> bool {
-        self.proofs == other.proofs
-    }
-}
-
-impl Eq for ProofWithData {}
 
 impl ProofWithData {
     pub fn new(proofs: Vec<ProofOfStore>) -> Self {
@@ -145,7 +137,6 @@ impl ProofWithData {
         Self::new(vec![])
     }
 
-    #[allow(clippy::unwrap_used)]
     pub fn extend(&mut self, other: ProofWithData) {
         self.proofs.extend(other.proofs);
     }
