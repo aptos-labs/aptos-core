@@ -7,9 +7,17 @@ use aptos_language_e2e_tests::{
     executor::FakeExecutor,
 };
 use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
+use rstest::rstest;
 
-#[test]
-fn create_account() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn create_account(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
@@ -19,7 +27,7 @@ fn create_account() {
 
     // define the arguments to the create account transaction
     let initial_amount = 0;
-    let txn = create_account_txn(&sender, &new_account, 0);
+    let txn = create_account_txn(&sender, &new_account, if stateless_account { None } else { Some(0) }, use_txn_payload_v2_format, use_orderless_transactions,);
 
     // execute transaction
     let output = executor.execute_transaction(txn);

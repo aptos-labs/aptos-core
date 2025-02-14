@@ -20,11 +20,12 @@ use aptos_types::{
     transaction::{ExecutionStatus, SignedTransaction, TransactionStatus},
     vm_status::VMStatus,
 };
+use rstest::rstest;
 
-fn txn(seq_num: u64) -> SignedTransaction {
+fn txn(seq_num: Option<u64>, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) -> SignedTransaction {
     let account = Account::new();
     let aptos_root = Account::new_aptos_root();
-    create_account_txn(&aptos_root, &account, seq_num)
+    create_account_txn(&aptos_root, &account, seq_num, use_txn_payload_v2_format, use_orderless_transactions)
 }
 
 fn execute_and_assert_success<T>(
@@ -42,13 +43,20 @@ fn execute_and_assert_success<T>(
     assert_eq!(output.len(), num_txns);
 }
 
-#[test]
-fn test_execution_strategies() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_execution_strategies(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     {
         println!("===========================================================================");
         println!("TESTING BASIC STRATEGY");
         println!("===========================================================================");
-        let big_block = (0..10).map(txn).collect();
+        let big_block = (0..10).map(|seq| txn(if stateless_account { None } else { Some(seq) }, use_txn_payload_v2_format, use_orderless_transactions)).collect();
         let mut exec = BasicExecutor::new();
         execute_and_assert_success(&mut exec, big_block, 10);
     }
@@ -57,7 +65,7 @@ fn test_execution_strategies() {
         println!("===========================================================================");
         println!("TESTING RANDOM STRATEGY");
         println!("===========================================================================");
-        let big_block = (0..10).map(txn).collect();
+        let big_block =  (0..10).map(|seq| txn(if stateless_account { None } else { Some(seq) }, use_txn_payload_v2_format, use_orderless_transactions)).collect();
         let mut exec = RandomExecutor::from_os_rng();
         execute_and_assert_success(&mut exec, big_block, 10);
     }
@@ -67,21 +75,22 @@ fn test_execution_strategies() {
         println!("TESTING GUIDED STRATEGY");
         println!("===========================================================================");
         let mut block1: Vec<_> = (0..10)
-            .map(|i| AnnotatedTransaction::Txn(Box::new(txn(i))))
+            .map(|i| AnnotatedTransaction::Txn(Box::new(txn(if stateless_account { None } else { Some(i) }, use_txn_payload_v2_format, use_orderless_transactions))))
             .collect();
         block1.push(AnnotatedTransaction::Block);
         let mut block = (0..5)
-            .map(|i| AnnotatedTransaction::Txn(Box::new(txn(i + 10))))
+            .map(|i| AnnotatedTransaction::Txn(Box::new(txn(if stateless_account { None } else { Some(i + 10) }, use_txn_payload_v2_format, use_orderless_transactions)))
+            )
             .collect();
         block1.append(&mut block);
         block1.push(AnnotatedTransaction::Block);
         let mut block: Vec<_> = (0..7)
-            .map(|i| AnnotatedTransaction::Txn(Box::new(txn(i + 15))))
+            .map(|i| AnnotatedTransaction::Txn(Box::new(txn(if stateless_account { None } else { Some(i + 15) }, use_txn_payload_v2_format, use_orderless_transactions))))
             .collect();
         block1.append(&mut block);
         block1.push(AnnotatedTransaction::Block);
         let mut block = (0..20)
-            .map(|i| AnnotatedTransaction::Txn(Box::new(txn(i + 22))))
+            .map(|i| AnnotatedTransaction::Txn(Box::new(txn(if stateless_account { None } else { Some(i + 22) }, use_txn_payload_v2_format, use_orderless_transactions))))
             .collect();
         block1.append(&mut block);
 
@@ -94,21 +103,22 @@ fn test_execution_strategies() {
         println!("TESTING COMPOSED STRATEGY 1");
         println!("===========================================================================");
         let mut block1: Vec<_> = (0..10)
-            .map(|i| AnnotatedTransaction::Txn(Box::new(txn(i))))
+            .map(|i| AnnotatedTransaction::Txn(Box::new(txn(if stateless_account { None } else { Some(i) }, use_txn_payload_v2_format, use_orderless_transactions))))
             .collect();
         block1.push(AnnotatedTransaction::Block);
         let mut block = (0..5)
-            .map(|i| AnnotatedTransaction::Txn(Box::new(txn(i + 10))))
+            .map(|i| AnnotatedTransaction::Txn(Box::new(txn(if stateless_account { None } else { Some(i + 10) }, use_txn_payload_v2_format, use_orderless_transactions)))
+            )
             .collect();
         block1.append(&mut block);
         block1.push(AnnotatedTransaction::Block);
         let mut block: Vec<_> = (0..7)
-            .map(|i| AnnotatedTransaction::Txn(Box::new(txn(i + 15))))
+            .map(|i| AnnotatedTransaction::Txn(Box::new(txn(if stateless_account { None } else { Some(i + 15) }, use_txn_payload_v2_format, use_orderless_transactions))))
             .collect();
         block1.append(&mut block);
         block1.push(AnnotatedTransaction::Block);
         let mut block = (0..20)
-            .map(|i| AnnotatedTransaction::Txn(Box::new(txn(i + 22))))
+            .map(|i| AnnotatedTransaction::Txn(Box::new(txn(if stateless_account { None } else { Some(i + 22) }, use_txn_payload_v2_format, use_orderless_transactions))))
             .collect();
         block1.append(&mut block);
 
@@ -122,7 +132,7 @@ fn test_execution_strategies() {
         println!("===========================================================================");
         println!("TESTING COMPOSED STRATEGY 2");
         println!("===========================================================================");
-        let block = (0..10).map(txn).collect();
+        let block = (0..10).map(|seq| txn(if stateless_account { None } else { Some(seq) }, use_txn_payload_v2_format, use_orderless_transactions)).collect();
 
         let mut exec = MultiExecutor::<SignedTransaction, VMStatus>::new();
         exec.add_executor(RandomExecutor::from_os_rng());
