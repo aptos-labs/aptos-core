@@ -727,6 +727,9 @@ impl Constraint {
                 )
             },
             Constraint::SomeFunctionValue(arg, result) => {
+                // Use display for function types with empty abilities, so
+                // we can attach an 'open' ability set, as the abilities are
+                // unknown.
                 format!(
                     "{} has ..",
                     Type::function(arg.clone(), result.clone(), AbilitySet::EMPTY)
@@ -3254,7 +3257,7 @@ impl TypeUnificationError {
                     },
                     Constraint::SomeFunctionValue(arg_ty, result_ty) => {
                         format!(
-                            "expected function value `{} has ..` but found `{}`",
+                            "expected function of type `{}` but found `{}`",
                             Type::function(arg_ty.clone(), result_ty.clone(), AbilitySet::EMPTY)
                                 .display(display_context),
                             ty.display(display_context),
