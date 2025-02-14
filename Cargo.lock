@@ -4452,6 +4452,7 @@ dependencies = [
  "move-vm-types",
  "num-bigint 0.3.3",
  "num-derive",
+ "num-integer",
  "num-traits",
  "once_cell",
  "p256",
