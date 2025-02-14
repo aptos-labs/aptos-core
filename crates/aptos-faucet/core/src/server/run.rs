@@ -348,6 +348,10 @@ pub struct RunSimple {
     #[clap(long, default_value_t = 8081)]
     pub listen_port: u16,
 
+    /// How long to wait for outstanding transactions
+    #[clap(long, default_value_t = 35)]
+    wait_for_outstanding_txns_secs: u64,
+
     #[clap(long)]
     do_not_delegate: bool,
 }
@@ -358,7 +362,7 @@ impl RunSimple {
             .api_connection_config
             .get_key()
             .context("Failed to load private key")?;
-        let run_config = RunConfig::build_for_cli(
+        let mut run_config = RunConfig::build_for_cli(
             self.api_connection_config.node_url.clone(),
             self.listen_address.clone(),
             self.listen_port,
@@ -366,6 +370,12 @@ impl RunSimple {
             self.do_not_delegate,
             Some(self.api_connection_config.chain_id),
         );
+
+        // Update the wait_for_outstanding_txns_secs if using MintFunder
+        if let FunderConfig::MintFunder(ref mut mint_config) = run_config.funder_config {
+            mint_config.transaction_submission_config.wait_for_outstanding_txns_secs = self.wait_for_outstanding_txns_secs;
+        }
+
         run_config.run().await
     }
 }
@@ -378,7 +388,7 @@ where
     Fut: Future<Output = Result<T>>,
 {
     const MAX_RETRIES: u32 = 3;
-    const INITIAL_BACKOFF_MS: u64 = 100;
+    const INITIAL_BACKOFF_MS: u64 = 300;
 
     let mut backoff_ms = INITIAL_BACKOFF_MS;
     
