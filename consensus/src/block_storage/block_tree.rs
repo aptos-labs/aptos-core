@@ -183,7 +183,6 @@ impl BlockTree {
     }
 
     fn remove_block(&mut self, block_id: HashValue) {
-        info!("remove_block: {}", block_id);
         // Remove the block from the store
         if let Some(block) = self.id_to_block.remove(&block_id) {
             let round = block.executed_block().round();
@@ -605,8 +604,6 @@ impl BlockTree {
         commit_decision: LedgerInfoWithSignatures,
         window_size: Option<u64>,
     ) {
-        info!("commit_callback blocks_to_commit: {:?}", blocks_to_commit);
-
         let commit_proof = finality_proof
             .create_merged_with_executed_state(commit_decision)
             .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
@@ -649,7 +646,6 @@ impl BlockTree {
         let window_root_id = self.find_window_root(block_id, window_size);
         let ids_to_remove = self.find_blocks_to_prune(window_root_id);
 
-        info!("Pruning blocks: {:?}", ids_to_remove);
         if let Err(e) = storage.prune_tree(ids_to_remove.clone().into_iter().collect()) {
             // it's fine to fail here, as long as the commit succeeds, the next restart will clean
             // up dangling blocks, and we need to prune the tree to keep the root consistent with

@@ -241,12 +241,6 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
             input_transactions,
             randomness,
         } = SerializedBlock::deserialize(deserializer)?;
-        info!(
-            "Deserialized PipelinedBlock: ({}, {}) {}",
-            block.epoch(),
-            block.round(),
-            block.id()
-        );
         let block = PipelinedBlock::new(block, input_transactions, StateComputeResult::new_dummy());
         if let Some(r) = randomness {
             block.set_randomness(r);

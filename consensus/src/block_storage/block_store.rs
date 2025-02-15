@@ -43,10 +43,7 @@ use std::collections::VecDeque;
 use std::sync::atomic::AtomicBool;
 #[cfg(any(test, feature = "fuzzing"))]
 use std::sync::atomic::Ordering;
-use std::{
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{sync::Arc, time::Duration};
 
 #[cfg(test)]
 #[path = "block_store_test.rs"]
@@ -309,13 +306,6 @@ impl BlockStore {
             .get_block(block_id_to_commit)
             .ok_or_else(|| format_err!("Committed block id not found"))?;
 
-        info!(
-            "send_for_execution for block {} with round {}, commit root round {}",
-            block_id_to_commit,
-            block_to_commit.round(),
-            self.commit_root().round()
-        );
-
         // First make sure that this commit is new.
         ensure!(
             block_to_commit.round() > self.ordered_root().round(),
@@ -436,7 +426,6 @@ impl BlockStore {
             .inner
             .read()
             .get_ordered_block_window(&block, self.window_size)?;
-        let now = Instant::now();
         for block in block_window.blocks() {
             if let Some(payload) = block.payload() {
                 self.payload_manager.prefetch_payload_data(
@@ -446,15 +435,6 @@ impl BlockStore {
                 );
             }
         }
-        info!(
-            "block_window for PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, block_window: {:?}, prefetch time: {} ms",
-            block.id(),
-            block.parent_id(),
-            block.round(),
-            block.epoch(),
-            block_window.blocks().iter().map(|b| format!("{}", b.id())).collect::<Vec<_>>(),
-            now.elapsed().as_millis()
-        );
 
         let pipelined_block = PipelinedBlock::new_ordered(block.clone(), block_window);
         self.insert_block_inner(pipelined_block).await
