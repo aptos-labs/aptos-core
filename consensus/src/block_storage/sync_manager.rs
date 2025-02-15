@@ -329,8 +329,8 @@ impl BlockStore {
                     + 1;
                 let target_block_id = highest_commit_cert.commit_info().id();
                 info!(
-                    "fast_forward_sync with NO window_size: {:?}, target_block_id: {}, num_blocks: {}",
-                    window_size, target_block_id, num_blocks
+                    "[FastForwardSync] with window_size: None, target_block_id: {}, num_blocks: {}",
+                    target_block_id, num_blocks
                 );
                 (
                     TargetBlockRetrieval::TargetBlockId(target_block_id),
@@ -350,7 +350,7 @@ impl BlockStore {
                 );
                 let num_blocks = highest_quorum_cert.certified_block().round() - target_round + 1;
                 info!(
-                    "fast_forward_sync with window_size: {:?}, target_round: {}, num_blocks: {}",
+                    "[FastForwardSync] with window_size: {}, target_round: {}, num_blocks: {}",
                     window_size, target_round, num_blocks
                 );
                 (TargetBlockRetrieval::TargetRound(target_round), num_blocks)
@@ -562,33 +562,15 @@ impl BlockStore {
             BlockRetrievalRequest::V2(req) => {
                 while (blocks.len() as u64) < req.num_blocks() {
                     if let Some(executed_block) = self.get_block(id) {
-                        info!(
-                            "Block found: {}, round: ({}, {})",
-                            executed_block.block().id(),
-                            executed_block.epoch(),
-                            executed_block.round()
-                        );
                         if !executed_block.block().is_genesis_block() {
                             blocks.push(executed_block.block().clone());
-                        } else {
-                            info!(
-                                "Skipping genesis block: ({}, {})",
-                                executed_block.epoch(),
-                                executed_block.round()
-                            );
                         }
                         if req.match_target_round(executed_block.round()) {
-                            info!(
-                                "SucceededWithTarget: {} <= {:?}",
-                                executed_block.round(),
-                                req.target_round(),
-                            );
                             status = BlockRetrievalStatus::SucceededWithTarget;
                             break;
                         }
                         id = executed_block.parent_id();
                     } else {
-                        info!("NotEnoughBlocks: {}", id);
                         status = BlockRetrievalStatus::NotEnoughBlocks;
                         break;
                     }
@@ -877,12 +859,6 @@ impl BlockRetriever {
                 },
             }
         }
-
-        info!(
-            "Retrieved {} blocks: {:?}",
-            result_blocks.len(),
-            result_blocks
-        );
 
         match target_block_retrieval_payload {
             TargetBlockRetrieval::TargetBlockId(target_block_id) => {

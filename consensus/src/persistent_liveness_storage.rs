@@ -173,7 +173,6 @@ impl LedgerRecoveryData {
         let mut curr_id = latest_commit_id;
         let mut window_start_id = HashValue::zero();
         while let Some(block) = id_to_blocks.get(&curr_id) {
-            // TODO: do we ever fetch block cross-epoch?
             if block.epoch() < epoch {
                 info!("Epoch change detected: {}, root: {}", block, commit_block);
                 window_start_id = prev_id;
@@ -421,7 +420,6 @@ impl RecoveryData {
                 (blocks_to_prune, epoch)
             },
         };
-        info!("Blocks to prune: {:?}", blocks_to_prune);
         Ok(RecoveryData {
             last_vote: match last_vote {
                 Some(v) if v.epoch() == epoch => Some(v),
