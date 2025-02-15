@@ -8,7 +8,7 @@ use crate::{
     logging::{LogEvent, LogSchema},
     persistent_liveness_storage::PersistentLivenessStorage,
 };
-use anyhow::bail;
+use anyhow::{bail, ensure};
 use aptos_consensus_types::{
     block::Block,
     pipelined_block::{OrderedBlockWindow, PipelinedBlock},
@@ -284,10 +284,10 @@ impl BlockTree {
         &self,
         block: &Block,
         window_size: Option<u64>,
-    ) -> Option<OrderedBlockWindow> {
+    ) -> anyhow::Result<OrderedBlockWindow> {
         // window_size is None only if execution pool is turned off
         if window_size.is_none() {
-            return Some(OrderedBlockWindow::empty());
+            return Ok(OrderedBlockWindow::empty());
         }
 
         // TODO Currently we do not check to see if the `block` provided exists in the `BlockTree`
@@ -301,14 +301,14 @@ impl BlockTree {
         let round = block.round();
         let window_start_round = (round + 1).saturating_sub(window_size);
         let window_size = (round + 1) - window_start_round;
-        assert!(window_size > 0, "window_size must be greater than 0");
+        ensure!(window_size > 0, "window_size must be greater than 0");
         if window_size == 1 {
-            return Some(OrderedBlockWindow::empty());
+            return Ok(OrderedBlockWindow::empty());
         }
 
         let mut window = vec![];
         let mut current_block = block.clone();
-        assert!(!current_block.is_genesis_block());
+        ensure!(!current_block.is_genesis_block());
         loop {
             // Break if my parent's block round is outside the window
             if current_block.quorum_cert().certified_block().round() < window_start_round {
@@ -321,20 +321,13 @@ impl BlockTree {
                 }
                 window.push(parent_block);
             } else {
-                // TODO: this is unexpected, so better to return an error?
-                error!(
-                    "Parent block not found for block {} ({}, {}) in get_ordered_block_window",
-                    current_block.id(),
-                    current_block.epoch(),
-                    current_block.round()
-                );
-                return None;
+                bail!("Parent block not found for block {}", current_block.id());
             }
         }
         // The window order is lower round -> higher round
         window.reverse();
-        assert!(window.len() < window_size as usize);
-        Some(OrderedBlockWindow::new(window))
+        ensure!(window.len() < window_size as usize);
+        Ok(OrderedBlockWindow::new(window))
     }
 
     pub(super) fn insert_block(
