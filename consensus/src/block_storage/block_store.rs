@@ -185,6 +185,7 @@ impl BlockStore {
             root.commit_cert,
         );
         let root_block_id = root_block.id();
+        let root_block_round = root_block.round();
 
         //verify root is correct
         assert!(
@@ -270,9 +271,21 @@ impl BlockStore {
         };
 
         for block in blocks {
-            block_store.insert_block(block).await.unwrap_or_else(|e| {
-                panic!("[BlockStore] failed to insert block during build {:?}", e)
-            });
+            if block.round() <= root_block_round {
+                block_store
+                    .insert_committed_block(block)
+                    .await
+                    .unwrap_or_else(|e| {
+                        panic!(
+                            "[BlockStore] failed to insert committed block during build {:?}",
+                            e
+                        )
+                    });
+            } else {
+                block_store.insert_block(block).await.unwrap_or_else(|e| {
+                    panic!("[BlockStore] failed to insert block during build {:?}", e)
+                });
+            }
         }
         for qc in quorum_certs {
             block_store
@@ -397,6 +410,56 @@ impl BlockStore {
         self.try_send_for_execution().await;
     }
 
+    pub async fn insert_committed_block(
+        &self,
+        block: Block,
+    ) -> anyhow::Result<Arc<PipelinedBlock>> {
+        ensure!(
+            self.get_block(block.id()).is_none(),
+            "Recovered block already exists"
+        );
+
+        let pipelined_block = PipelinedBlock::new_ordered(block, OrderedBlockWindow::empty());
+        self.insert_block_inner(pipelined_block).await
+    }
+
+    pub async fn insert_block(&self, block: Block) -> anyhow::Result<Arc<PipelinedBlock>> {
+        if let Some(existing_block) = self.get_block(block.id()) {
+            return Ok(existing_block);
+        }
+        ensure!(
+            self.inner.read().commit_root().round() < block.round(),
+            "Block with old round"
+        );
+
+        let block_window = self
+            .inner
+            .read()
+            .get_ordered_block_window(&block, self.window_size)?;
+        let now = Instant::now();
+        for block in block_window.blocks() {
+            if let Some(payload) = block.payload() {
+                self.payload_manager.prefetch_payload_data(
+                    payload,
+                    block.author().expect("Payload block must have author"),
+                    block.timestamp_usecs(),
+                );
+            }
+        }
+        info!(
+            "block_window for PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, block_window: {:?}, prefetch time: {} ms",
+            block.id(),
+            block.parent_id(),
+            block.round(),
+            block.epoch(),
+            block_window.blocks().iter().map(|b| format!("{}", b.id())).collect::<Vec<_>>(),
+            now.elapsed().as_millis()
+        );
+
+        let pipelined_block = PipelinedBlock::new_ordered(block.clone(), block_window);
+        self.insert_block_inner(pipelined_block).await
+    }
+
     /// Insert a block if it passes all validation tests.
     /// Returns the Arc to the block kept in the block store after persisting it to storage
     ///
@@ -405,71 +468,32 @@ impl BlockStore {
     /// Duplicate inserts will return the previously inserted block (
     /// note that it is considered a valid non-error case, for example, it can happen if a validator
     /// receives a certificate for a block that is currently being added).
-    pub async fn insert_block(&self, block: Block) -> anyhow::Result<Arc<PipelinedBlock>> {
-        if let Some(existing_block) = self.get_block(block.id()) {
-            return Ok(existing_block);
-        }
-        ensure!(
-            self.inner.read().window_root().round() < block.round(),
-            "Block with old round"
-        );
-
-        if let Some(payload) = block.payload() {
+    pub async fn insert_block_inner(
+        &self,
+        pipelined_block: PipelinedBlock,
+    ) -> anyhow::Result<Arc<PipelinedBlock>> {
+        if let Some(payload) = pipelined_block.payload() {
             self.payload_manager.prefetch_payload_data(
                 payload,
-                block.author().expect("Payload block must have author"),
-                block.timestamp_usecs(),
+                pipelined_block
+                    .block()
+                    .author()
+                    .expect("Payload block must have author"),
+                pipelined_block.timestamp_usecs(),
             );
         }
-
-        let pipelined_block = if let Some(block_window) = self
-            .inner
-            .read()
-            .get_ordered_block_window(&block, self.window_size)
-        {
-            let now = Instant::now();
-            for block in block_window.blocks() {
-                if let Some(payload) = block.payload() {
-                    self.payload_manager.prefetch_payload_data(
-                        payload,
-                        block.author().expect("Payload block must have author"),
-                        block.timestamp_usecs(),
-                    );
-                }
-            }
-            info!(
-                "block_window for PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, block_window: {:?}, prefetch time: {} ms",
-                block.id(),
-                block.parent_id(),
-                block.round(),
-                block.epoch(),
-                block_window.blocks().iter().map(|b| format!("{}", b.id())).collect::<Vec<_>>(),
-                now.elapsed().as_millis()
-            );
-            PipelinedBlock::new_ordered(block.clone(), block_window)
-        } else {
-            info!(
-                "no block_window for PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}",
-                block.id(),
-                block.parent_id(),
-                block.round(),
-                block.epoch(),
-            );
-            // TODO: assert that this is an older block than commit root
-            PipelinedBlock::new_ordered(block.clone(), OrderedBlockWindow::empty())
-        };
 
         // build pipeline
         if let Some(pipeline_builder) = &self.pipeline_builder {
             let parent_block = self
-                .get_block(block.parent_id())
+                .get_block(pipelined_block.parent_id())
                 .ok_or_else(|| anyhow::anyhow!("Parent block not found"))?;
 
             // need weak pointer to break the cycle between block tree -> pipeline block -> callback
             let block_tree = Arc::downgrade(&self.inner);
             let storage = self.storage.clone();
-            let id = block.id();
-            let round = block.round();
+            let id = pipelined_block.id();
+            let round = pipelined_block.round();
             let window_size = self.window_size;
             let callback = Box::new(move |commit_decision: LedgerInfoWithSignatures| {
                 if let Some(tree) = block_tree.upgrade() {
@@ -492,16 +516,20 @@ impl BlockStore {
         }
 
         // ensure local time past the block time
-        let block_time = Duration::from_micros(block.timestamp_usecs());
+        let block_time = Duration::from_micros(pipelined_block.timestamp_usecs());
         let current_timestamp = self.time_service.get_current_timestamp();
         if let Some(t) = block_time.checked_sub(current_timestamp) {
             if t > Duration::from_secs(1) {
-                warn!("Long wait time {}ms for block {}", t.as_millis(), block);
+                warn!(
+                    "Long wait time {}ms for block {}",
+                    t.as_millis(),
+                    pipelined_block
+                );
             }
             self.time_service.wait_until(block_time).await;
         }
         self.storage
-            .save_tree(vec![block.clone()], vec![])
+            .save_tree(vec![pipelined_block.block().clone()], vec![])
             .context("Insert block failed when saving block")?;
         self.inner.write().insert_block(pipelined_block)
     }
