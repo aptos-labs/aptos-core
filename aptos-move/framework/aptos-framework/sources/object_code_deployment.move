@@ -28,6 +28,12 @@
 /// 4. Emits 'Freeze' event with the address of the object with the frozen code.
 /// Note: There is no unfreeze function as this gives no benefit if the user can freeze/unfreeze modules at will.
 ///       Once modules are marked as immutable, they cannot be made mutable again.
+///
+/// AuthRef flow:
+/// 1. In the init_module function of a package published under an object, generate an AuthRef using generate_auth_ref
+/// 2. Store the AuthRef in the module's state
+/// 3. Use generate_signer_for_auth with the stored AuthRef whenever the object's signer is needed
+/// Note: This enables proper management of funds sent to the object's primary fungible store
 module aptos_framework::object_code_deployment {
     use std::bcs;
     use std::error;
@@ -49,6 +55,8 @@ module aptos_framework::object_code_deployment {
     const ECODE_OBJECT_DOES_NOT_EXIST: u64 = 3;
     /// Current permissioned signer cannot deploy object code.
     const ENO_CODE_PERMISSION: u64 = 4;
+    /// No ManagingRefs resource found at object address
+    const ENO_MANAGING_REFS: u64 = 5;
 
     const OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR: vector<u8> = b"aptos_framework::object_code_deployment";
 
@@ -57,6 +65,11 @@ module aptos_framework::object_code_deployment {
     struct ManagingRefs has key {
         /// We need to keep the extend ref to be able to generate the signer to upgrade existing code.
         extend_ref: ExtendRef,
+    }
+
+    /// Authorization reference for an object that has code published to it
+    struct AuthRef has store {
+        object_address: address
     }
 
     #[event]
@@ -147,5 +160,37 @@ module aptos_framework::object_code_deployment {
         code::freeze_code_object(publisher, code_object);
 
         event::emit(Freeze { object_address: object::object_address(&code_object), });
+    }
+
+    /// Creates an AuthRef for a code publishing object. This can only be called by the object signer
+    /// which would the code signer if its being published under an object during init_module and
+    /// requires that ManagingRefs exists at the object's address which would be the case if init_module executes after the publish fun
+    public fun generate_auth_ref(code_signer: &signer): AuthRef {
+        let code_object_address = signer::address_of(code_signer);
+        assert!(
+            exists<ManagingRefs>(code_object_address),
+            error::not_found(ENO_MANAGING_REFS)
+        );
+        AuthRef { object_address: code_object_address }
+    }
+
+    /// Generates a signer for the code publishing object using the provided AuthRef.
+    /// This can be used to access the object's primary fungible store or perform other privileged operations.
+    public fun generate_signer_for_auth(auth_ref: &AuthRef): signer acquires ManagingRefs {
+        let extend_ref = &borrow_global<ManagingRefs>(auth_ref.object_address).extend_ref;
+        object::generate_signer_for_extending(extend_ref)
+    }
+
+    #[test_only]
+    struct TestAuthRef has key {
+        auth_ref: AuthRef
+    }
+
+    #[test(publisher = @0x123)]
+    #[expected_failure(abort_code = 393221, location = Self)]
+    fun test_auth_ref_no_managing_refs(publisher: &signer) {
+        assert!(error::not_found(ENO_MANAGING_REFS) == 393221, 1);
+        let auth_ref = generate_auth_ref(publisher);
+        move_to(publisher, TestAuthRef { auth_ref });
     }
 }
