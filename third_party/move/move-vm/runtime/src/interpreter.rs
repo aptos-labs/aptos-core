@@ -614,14 +614,21 @@ impl InterpreterImpl {
                         .with_resolved_function(module_storage, |f| Ok(f.clone()))
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
-                    // Charge gas for call and for the parameters
+                    // Charge gas for call and for the parameters. The current APIs
+                    // require an ExactSizeIterator to be passed for charge_call, so
+                    // some acrobatics is needed (sigh).
+                    let captured_vec = captured.collect::<Vec<_>>();
+                    let arguments: Vec<&Value> = self
+                        .operand_stack
+                        .last_n(callee.param_tys().len() - mask.captured_count() as usize)
+                        .map_err(|e| set_err_info!(current_frame, e))?
+                        .chain(captured_vec.iter())
+                        .collect();
                     gas_meter
                         .charge_call(
                             &module_id,
                             callee.name(),
-                            self.operand_stack
-                                .last_n(callee.param_tys().len() - mask.captured_count() as usize)
-                                .map_err(|e| set_err_info!(current_frame, e))?,
+                            arguments.into_iter(),
                             (callee.local_tys().len() as u64).into(),
                         )
                         .map_err(|e| set_err_info!(current_frame, e))?;
@@ -641,7 +648,7 @@ impl InterpreterImpl {
                             extensions,
                             &callee,
                             mask,
-                            captured.collect(),
+                            captured_vec,
                         )?
                     } else {
                         self.set_new_call_frame::<RTTCheck, RTCaches>(
@@ -651,7 +658,7 @@ impl InterpreterImpl {
                             callee,
                             frame_cache.clone(),
                             mask,
-                            captured.collect(),
+                            captured_vec,
                         )?
                     }
                 },
