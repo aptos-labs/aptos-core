@@ -144,7 +144,7 @@
           "data": {
             "key": "{\"collection\":\"APass\",\"creator\":\"0xb731146f64e49695f67ec7d7cd11b58a94194c897a5c2a1fea6e00d36e220926\",\"name\":\"kusama\"}",
             "keyType": "0x3::token::TokenDataId",
-            "value": "{\"default_properties\":{\"map\":{\"data\":[{\"key\":\"TOKEN_PROPERTY_MUTABLE\",\"value\":{\"type\":\"bool\",\"value\":\"0x01\"}},{\"key\":\"TOKEN_BURNABLE_BY_OWNER\",\"value\":{\"type\":\"bool\",\"value\":\"0x01\"}}]}},\"description\":\"APass Name\",\"largest_property_version\":\"0\",\"maximum\":\"1\",\"mutability_config\":{\"description\":true,\"maximum\":true,\"properties\":true,\"royalty\":true,\"uri\":true},\"name\":\"kusama\",\"royalty\":{\"payee_address\":\"0x777821c78442e17d82c3d7a371f42de7189e4248e529fe6eee6bca40ddbb\",\"royalty_points_denominator\":\"0\",\"royalty_points_numerator\":\"0\"},\"supply\":\"1\",\"uri\":\"https://aptpp.com/namepic/main/kusama\"}",
+            "value": "{\"default_properties\":{\"map\":{\"data\":[{\"key\":\"TOKEN_PROPERTY_MUTABLE\",\"value\":{\"type\":\"bool\",\"value\":\"0x01\"}},{\"key\":\"TOKEN_BURNABLE_BY_OWNER\",\"value\":{\"type\":\"bool\",\"value\":\"0x01\"}}]}},\"description\":\"APass Name\",\"largest_property_version\":\"0\",\"maximum\":\"1\",\"mutability_config\":{\"description\":true,\"maximum\":true,\"properties\":true,\"royalty\":true,\"uri\":true},\"name\":\"kusama\",\"royalty\":{\"payee_address\":\"0x777821c78442e17d82c3d7a371f42de7189e4248e529fe6eee6bca40ddbb\",\"royalty_points_denominator\":\"0\",\"royalty_points_numerator\":\"0\"},\"supply\":\"1\",\"uri\":\"https://https://ww1.aptpp.com/?subid1=51e8ee2f-ecab-11ef-b7d0-effc372b694d"}",
             "valueType": "0x3::token::TokenData"
           }
         }
