@@ -41,7 +41,7 @@ pub struct Closure(
 );
 
 /// The representation of a function in storage.
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct SerializedFunctionData {
     pub module_id: ModuleId,
     pub fun_id: Identifier,
@@ -123,7 +123,7 @@ impl<'c, 'l, 'v> serde::Serialize
         let data = fun_ext
             .get_serialization_data(fun.as_ref())
             .map_err(S::Error::custom)?;
-        let mut seq = serializer.serialize_seq(Some(4 + captured.len()))?;
+        let mut seq = serializer.serialize_seq(Some(4 + captured.len() * 2))?;
         seq.serialize_element(&data.module_id)?;
         seq.serialize_element(&data.fun_id)?;
         seq.serialize_element(&data.ty_args)?;
@@ -162,7 +162,7 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for ClosureVisitor<'c, 'l> {
             .map_err(A::Error::custom)?;
         let module_id = read_required_value::<_, ModuleId>(&mut seq)?;
         let fun_id = read_required_value::<_, Identifier>(&mut seq)?;
-        let fun_inst = read_required_value::<_, Vec<TypeTag>>(&mut seq)?;
+        let ty_args = read_required_value::<_, Vec<TypeTag>>(&mut seq)?;
         let mask = read_required_value::<_, ClosureMask>(&mut seq)?;
         let mut captured_layouts = vec![];
         let mut captured = vec![];
@@ -187,7 +187,7 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for ClosureVisitor<'c, 'l> {
             .create_from_serialization_data(SerializedFunctionData {
                 module_id,
                 fun_id,
-                ty_args: fun_inst,
+                ty_args,
                 mask,
                 captured_layouts,
             })

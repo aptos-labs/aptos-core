@@ -9,6 +9,8 @@ use crate::{
         Value,
     },
 };
+#[cfg(test)]
+use mockall::automock;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     identifier::IdentStr,
@@ -19,6 +21,7 @@ use move_core_types::{
 use std::cell::RefCell;
 
 /// An extension to (de)serialize information about function values.
+#[cfg_attr(test, automock)]
 pub trait FunctionValueExtension {
     /// Given the module's id and the function name, returns the parameter types of the
     /// corresponding function, instantiated with the provided set of type tags.
@@ -204,6 +207,20 @@ impl<'a> ValueSerDeContext<'a> {
     pub fn deserialize(self, bytes: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
         let seed = DeserializationSeed { ctx: &self, layout };
         bcs::from_bytes_seed(seed, bytes).ok()
+    }
+
+    /// Deserializes the bytes using the provided layout into a Move [Value], returning
+    /// the proper underlying error on failure.
+    pub fn deserialize_or_err(
+        self,
+        bytes: &[u8],
+        layout: &MoveTypeLayout,
+    ) -> PartialVMResult<Value> {
+        let seed = DeserializationSeed { ctx: &self, layout };
+        bcs::from_bytes_seed(seed, bytes).map_err(|e| {
+            PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
+                .with_message(format!("deserializer error: {}", e))
+        })
     }
 }
 

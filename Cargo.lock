@@ -11667,6 +11667,7 @@ dependencies = [
  "derivative",
  "hashbrown 0.14.3",
  "itertools 0.13.0",
+ "mockall",
  "move-binary-format",
  "move-core-types",
  "parking_lot 0.12.1",
