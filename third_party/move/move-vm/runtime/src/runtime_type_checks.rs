@@ -203,8 +203,8 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 // calls.
                 let (expected_ty, _) =
                     ty_cache.get_signature_index_type(*sig_idx, resolver, ty_args)?;
-                let given_type = operand_stack.pop_ty()?;
-                given_type.paranoid_check_assignable(expected_ty)?;
+                let given_ty = operand_stack.pop_ty()?;
+                given_ty.paranoid_check_assignable(expected_ty)?;
             },
             Bytecode::Branch(_) => (),
             Bytecode::Ret => {
@@ -219,10 +219,10 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             // StLoc needs to check before execution as we need to check the drop ability of values.
             Bytecode::StLoc(idx) => {
-                let expected_ty = local_tys[*idx as usize].clone();
+                let expected_ty = &local_tys[*idx as usize];
                 let val_ty = operand_stack.pop_ty()?;
                 // For store, use assignability
-                val_ty.paranoid_check_assignable(&expected_ty)?;
+                val_ty.paranoid_check_assignable(expected_ty)?;
                 if !locals.is_invalid(*idx as usize)? {
                     expected_ty.paranoid_check_has_ability(Ability::Drop)?;
                 }
@@ -776,7 +776,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Bytecode::VecPushBack(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
-                // For vector elements use assignability
+                // For pushing an element to a vector, use assignability
                 operand_stack.pop_ty()?.paranoid_check_assignable(ty)?;
                 operand_stack
                     .pop_ty()?
