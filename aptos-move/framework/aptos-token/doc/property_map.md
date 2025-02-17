@@ -926,8 +926,8 @@ create a property value from generic type data
 <pre><code><b>pragma</b> aborts_if_is_partial;
 <b>let</b> length = len(keys);
 <b>aborts_if</b> !(<a href="property_map.md#0x3_property_map_length">length</a> &lt;= <a href="property_map.md#0x3_property_map_MAX_PROPERTY_MAP_SIZE">MAX_PROPERTY_MAP_SIZE</a>);
-<b>aborts_if</b> !(length == values.<a href="property_map.md#0x3_property_map_length">length</a>());
-<b>aborts_if</b> !(length == types.<a href="property_map.md#0x3_property_map_length">length</a>());
+<b>aborts_if</b> !(length == len(values));
+<b>aborts_if</b> !(length == len(types));
 </code></pre>
 
 
@@ -944,7 +944,7 @@ create a property value from generic type data
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
-<b>let</b> length = keys.<a href="property_map.md#0x3_property_map_length">length</a>();
+<b>let</b> length = len(keys);
 <b>aborts_if</b> !(<a href="property_map.md#0x3_property_map_length">length</a> &lt;= <a href="property_map.md#0x3_property_map_MAX_PROPERTY_MAP_SIZE">MAX_PROPERTY_MAP_SIZE</a>);
 <b>aborts_if</b> !(length == len(values));
 </code></pre>
@@ -994,7 +994,7 @@ create a property value from generic type data
 
 
 
-<pre><code><b>aborts_if</b> !(key.<a href="property_map.md#0x3_property_map_length">length</a>() &lt;= <a href="property_map.md#0x3_property_map_MAX_PROPERTY_NAME_LENGTH">MAX_PROPERTY_NAME_LENGTH</a>);
+<pre><code><b>aborts_if</b> !(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(key) &lt;= <a href="property_map.md#0x3_property_map_MAX_PROPERTY_NAME_LENGTH">MAX_PROPERTY_NAME_LENGTH</a>);
 <b>aborts_if</b> !(!<a href="../../aptos-framework/../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(map.map, key));
 <b>aborts_if</b> !(<a href="../../aptos-framework/../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_len">simple_map::spec_len</a>(map.map) &lt; <a href="property_map.md#0x3_property_map_MAX_PROPERTY_MAP_SIZE">MAX_PROPERTY_MAP_SIZE</a>);
 </code></pre>
