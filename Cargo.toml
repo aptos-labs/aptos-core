@@ -468,6 +468,8 @@ ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
 
 aptos-moving-average = { git = "https://github.com/movementlabsxyz/aptos-indexer-processors", rev = "77a36245400250e7d8a854360194288d078681bc" }
+processor = { git = "https://github.com/movementlabsxyz/aptos-indexer-processors", rev = "77a36245400250e7d8a854360194288d078681bc", default-features = false }
+server-framework = { git = "https://github.com/movementlabsxyz/aptos-indexer-processors", rev = "77a36245400250e7d8a854360194288d078681bc", default-features = false }
 
 assert_approx_eq = "1.1.0"
 assert_unordered = "0.3.5"
