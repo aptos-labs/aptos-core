@@ -677,10 +677,10 @@ module std::features {
             move_to<Features>(framework, Features { features: vector[] })
         };
         let features = &mut borrow_global_mut<Features>(@std).features;
-        vector::for_each_ref(&enable, |feature| {
+        enable.for_each_ref(|feature| {
             set(features, *feature, true);
         });
-        vector::for_each_ref(&disable, |feature| {
+        disable.for_each_ref(|feature| {
             set(features, *feature, false);
         });
     }
@@ -738,28 +738,28 @@ module std::features {
     fun set(features: &mut vector<u8>, feature: u64, include: bool) {
         let byte_index = feature / 8;
         let bit_mask = 1 << ((feature % 8) as u8);
-        while (vector::length(features) <= byte_index) {
-            vector::push_back(features, 0)
+        while (features.length() <= byte_index) {
+            features.push_back(0)
         };
-        let entry = vector::borrow_mut(features, byte_index);
+        let entry = features.borrow_mut(byte_index);
         if (include)
-            *entry = *entry | bit_mask
+            *entry |= bit_mask
         else
-            *entry = *entry & (0xff ^ bit_mask)
+            *entry &= (0xff ^ bit_mask)
     }
 
     /// Helper to check whether a feature flag is enabled.
     fun contains(features: &vector<u8>, feature: u64): bool {
         let byte_index = feature / 8;
         let bit_mask = 1 << ((feature % 8) as u8);
-        byte_index < vector::length(features) && (*vector::borrow(features, byte_index) & bit_mask) != 0
+        byte_index < features.length() && (features[byte_index] & bit_mask) != 0
     }
 
     fun apply_diff(features: &mut vector<u8>, enable: vector<u64>, disable: vector<u64>) {
-        vector::for_each(enable, |feature| {
+        enable.for_each(|feature| {
             set(features, feature, true);
         });
-        vector::for_each(disable, |feature| {
+        disable.for_each(|feature| {
             set(features, feature, false);
         });
     }
