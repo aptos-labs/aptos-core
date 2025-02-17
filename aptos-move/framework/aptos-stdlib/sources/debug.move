@@ -50,7 +50,7 @@ module aptos_std::debug {
 
     #[test_only]
     fun assert_equal<T>(x: &T, expected: vector<u8>) {
-        if (std::string::bytes(&format(x)) != &expected) {
+        if (format(x).bytes() != &expected) {
             print(&format(x));
             print(&std::string::utf8(expected));
             assert!(false, 1);
@@ -59,7 +59,7 @@ module aptos_std::debug {
 
     #[test_only]
     fun assert_string_equal(x: vector<u8>, expected: vector<u8>) {
-        assert!(std::string::bytes(&format(&std::string::utf8(x))) == &expected, 1);
+        assert!(format(&std::string::utf8(x)).bytes() == &expected, 1);
     }
 
     #[test]
@@ -68,9 +68,9 @@ module aptos_std::debug {
         assert_equal(&x, b"42");
 
         let v = vector::empty();
-        vector::push_back(&mut v, 100);
-        vector::push_back(&mut v, 200);
-        vector::push_back(&mut v, 300);
+        v.push_back(100);
+        v.push_back(200);
+        v.push_back(300);
         assert_equal(&v, b"[ 100, 200, 300 ]");
 
         let foo = Foo {};
