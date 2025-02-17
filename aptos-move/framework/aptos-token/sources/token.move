@@ -1857,7 +1857,7 @@ module aptos_token::token {
         let creator_addr = token_data_id.creator;
         assert!(signer::address_of(creator) == creator_addr, error::permission_denied(ENO_MUTATE_CAPABILITY));
         assert!(exists<Collections>(creator_addr), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
-        let all_token_data = &mut borrow_global_mut<Collections>(creator_addr).token_data;
+        let all_token_data = &borrow_global<Collections>(creator_addr).token_data;
         assert!(all_token_data.contains(token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
     }
 
@@ -1866,7 +1866,7 @@ module aptos_token::token {
             let key: &String = key;
             let length = key.length();
             if (length >= 6) {
-                let prefix = (*key).sub_string(0, 6);
+                let prefix = key.sub_string(0, 6);
                 assert!(prefix != string::utf8(b"TOKEN_"), error::permission_denied(EPROPERTY_RESERVED_BY_STANDARD));
             };
         });

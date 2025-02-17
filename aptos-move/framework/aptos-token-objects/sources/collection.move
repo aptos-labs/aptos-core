@@ -610,13 +610,13 @@ module aptos_token_objects::collection {
         check_collection_exists(collection_address);
 
         if (exists<ConcurrentSupply>(collection_address)) {
-            let supply = borrow_global_mut<ConcurrentSupply>(collection_address);
+            let supply = borrow_global<ConcurrentSupply>(collection_address);
             option::some(aggregator_v2::read(&supply.current_supply))
         } else if (exists<FixedSupply>(collection_address)) {
-            let supply = borrow_global_mut<FixedSupply>(collection_address);
+            let supply = borrow_global<FixedSupply>(collection_address);
             option::some(supply.current_supply)
         } else if (exists<UnlimitedSupply>(collection_address)) {
-            let supply = borrow_global_mut<UnlimitedSupply>(collection_address);
+            let supply = borrow_global<UnlimitedSupply>(collection_address);
             option::some(supply.current_supply)
         } else {
             option::none()
