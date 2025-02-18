@@ -117,7 +117,6 @@ module message_board::cap_based_mb {
 #[test_only]
 module message_board::MessageBoardCapTests {
     use std::unit_test;
-    use std::vector;
     use std::signer;
     use message_board::cap_based_mb;
 
@@ -163,7 +162,7 @@ module message_board::MessageBoardCapTests {
     #[test_only]
     fun create_two_signers(): (signer, signer) {
         let signers = &mut unit_test::create_signers_for_testing(2);
-        let (alice, bob) = (vector::pop_back(signers), vector::pop_back(signers));
+        let (alice, bob) = (signers.pop_back(), signers.pop_back());
         aptos_framework::account::create_account_for_test(signer::address_of(&alice));
         aptos_framework::account::create_account_for_test(signer::address_of(&bob));
         (alice, bob)

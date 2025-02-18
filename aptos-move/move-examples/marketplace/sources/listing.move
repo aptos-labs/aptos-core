@@ -7,7 +7,6 @@
 /// * Logic for cleanup
 module marketplace::listing {
     use std::error;
-    use std::option;
     use std::signer;
     use std::string::String;
 
@@ -141,7 +140,7 @@ module marketplace::listing {
                 token,
                 delete_ref,
                 transfer_ref: _,
-            } = move_from(object_addr);
+            } = move_from<TokenV1Container>(object_addr);
             tokenv1::direct_deposit_with_opt_in(recipient, token);
             object::delete(delete_ref);
         } else if (signer::address_of(closer) == recipient) {
@@ -149,7 +148,7 @@ module marketplace::listing {
                 token,
                 delete_ref,
                 transfer_ref: _,
-            } = move_from(object_addr);
+            } = move_from<TokenV1Container>(object_addr);
             tokenv1::deposit_token(closer, token);
             object::delete(delete_ref);
         } else {
@@ -175,7 +174,7 @@ module marketplace::listing {
             token,
             delete_ref,
             transfer_ref: _,
-        } = move_from(object_addr);
+        } = move_from<TokenV1Container>(object_addr);
         object::delete(delete_ref);
         tokenv1::deposit_token(owner, token);
     }
@@ -259,8 +258,8 @@ module marketplace::listing {
             (payee_address, royalty_amount)
         } else {
             let royalty = tokenv2::royalty(listing.object);
-            if (option::is_some(&royalty)) {
-                let royalty = option::destroy_some(royalty);
+            if (royalty.is_some()) {
+                let royalty = royalty.destroy_some();
                 let payee_address = royalty::payee_address(&royalty);
                 let numerator = royalty::numerator(&royalty);
                 let denominator = royalty::denominator(&royalty);

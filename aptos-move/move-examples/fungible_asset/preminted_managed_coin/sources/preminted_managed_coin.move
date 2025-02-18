@@ -47,9 +47,6 @@ module example_addr::preminted_managed_coin {
         object::address_to_object<Metadata>(metadata_address)
     }
 
-    #[test_only]
-    use std::option;
-
     #[test(creator = @example_addr)]
     #[expected_failure(abort_code = 0x60004, location = example_addr::managed_fungible_asset)]
     fun test_basic_flow(creator: &signer) {
@@ -57,7 +54,7 @@ module example_addr::preminted_managed_coin {
         let creator_address = signer::address_of(creator);
         let metadata = get_metadata();
 
-        assert!(option::destroy_some(fungible_asset::supply(metadata)) == (PRE_MINTED_TOTAL_SUPPLY as u128), 1);
+        assert!(fungible_asset::supply(metadata).destroy_some() == (PRE_MINTED_TOTAL_SUPPLY as u128), 1);
         managed_fungible_asset::mint_to_primary_stores(creator, metadata, vector[creator_address], vector[100]);
     }
 }

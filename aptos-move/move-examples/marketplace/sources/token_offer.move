@@ -333,8 +333,8 @@ module token_offer {
         // Pay fees
 
         let royalty = tokenv2::royalty(token);
-        let (royalty_payee, royalty_denominator, royalty_numerator) = if (option::is_some(&royalty)) {
-            let royalty = option::destroy_some(royalty);
+        let (royalty_payee, royalty_denominator, royalty_numerator) = if (royalty.is_some()) {
+            let royalty = royalty.destroy_some();
             let payee_address = royalty::payee_address(&royalty);
             let denominator = royalty::denominator(&royalty);
             let numerator = royalty::numerator(&royalty);
@@ -412,7 +412,7 @@ module token_offer {
         token_offer: Object<TokenOffer>,
     ) acquires CoinOffer, TokenOffer, TokenOfferTokenV1, TokenOfferTokenV2 {
         let token_offer_addr = object::object_address(&token_offer);
-        let CoinOffer<CoinType> { coins } = move_from(token_offer_addr);
+        let CoinOffer<CoinType> { coins } = move_from<CoinOffer<CoinType>>(token_offer_addr);
         aptos_account::deposit_coins(object::owner(token_offer), coins);
 
         let TokenOffer {
@@ -420,7 +420,7 @@ module token_offer {
             item_price: _,
             expiration_time: _,
             delete_ref,
-        } = move_from(token_offer_addr);
+        } = move_from<TokenOffer>(token_offer_addr);
         object::delete(delete_ref);
 
         if (exists<TokenOfferTokenV2>(token_offer_addr)) {
@@ -629,7 +629,7 @@ module token_offer_tests {
             token_name,
             property_version,
         );
-        listing::extract_tokenv1(purchaser, option::destroy_some(token_container));
+        listing::extract_tokenv1(purchaser, token_container.destroy_some());
         assert!(tokenv1::balance_of(purchaser_addr, token_id) == 1, 0);
         assert!(!token_offer::exists_at(token_offer), 0);
     }

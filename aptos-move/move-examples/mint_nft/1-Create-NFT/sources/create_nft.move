@@ -66,7 +66,6 @@ module mint_nft::create_nft {
     use std::error;
     use std::signer;
     use std::string::{Self, String};
-    use std::vector;
 
     use aptos_token::token;
     use aptos_token::token::TokenDataId;

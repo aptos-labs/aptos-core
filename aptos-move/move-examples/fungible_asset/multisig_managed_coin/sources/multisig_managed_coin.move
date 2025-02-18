@@ -3,7 +3,7 @@ module example_addr::multisig_managed_coin {
     use aptos_framework::object;
     use aptos_framework::object::ObjectCore;
     use std::signer;
-    use std::string::{Self, String};
+    use std::string::{String};
     use example_addr::managed_fungible_asset;
 
     public entry fun initialize(
@@ -32,7 +32,7 @@ module example_addr::multisig_managed_coin {
 
         // The ideal way is to get the multisig account signer but it is unavailable right now. So the pattern is to
         // create the metadata object by creator and transfer it to multisig account.
-        let constructor_ref = &object::create_named_object(creator, *string::bytes(&symbol));
+        let constructor_ref = &object::create_named_object(creator, *symbol.bytes());
         object::transfer(creator, object::object_from_constructor_ref<ObjectCore>(constructor_ref), multisig_address);
 
         // Customize those arguments as needed.

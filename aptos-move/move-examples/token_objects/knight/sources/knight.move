@@ -98,7 +98,7 @@ module knight::knight {
         // Creates the knight token, and get the constructor ref of the token. The constructor ref
         // is used to generate the refs of the token.
         let uri = base_uri;
-        string::append(&mut uri, string::utf8(CONDITION_HUNGRY));
+        uri.append(string::utf8(CONDITION_HUNGRY));
         let constructor_ref = token::create_named_token(
             creator,
             collection,
@@ -203,7 +203,7 @@ module knight::knight {
 
         // Updates the token URI based on the new condition.
         let uri = knight.base_uri;
-        string::append(&mut uri, string::utf8(new_condition));
+        uri.append(string::utf8(new_condition));
         token::set_uri(&knight.mutator_ref, uri);
     }
 

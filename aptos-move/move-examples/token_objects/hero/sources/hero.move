@@ -169,26 +169,26 @@ module hero::hero {
 
     public fun hero_equip_weapon(owner: &signer, hero: Object<Hero>, weapon: Object<Weapon>) acquires Hero {
         let hero_obj = borrow_global_mut<Hero>(object::object_address(&hero));
-        option::fill(&mut hero_obj.weapon, weapon);
+        hero_obj.weapon.fill(weapon);
         object::transfer_to_object(owner, weapon, hero);
     }
 
     public fun hero_unequip_weapon(owner: &signer, hero: Object<Hero>, weapon: Object<Weapon>) acquires Hero {
         let hero_obj = borrow_global_mut<Hero>(object::object_address(&hero));
-        let stored_weapon = option::extract(&mut hero_obj.weapon);
+        let stored_weapon = hero_obj.weapon.extract();
         assert!(stored_weapon == weapon, error::not_found(EINVALID_WEAPON_UNEQUIP));
         object::transfer(owner, weapon, signer::address_of(owner));
     }
 
     public fun weapon_equip_gem(owner: &signer, weapon: Object<Weapon>, gem: Object<Gem>) acquires Weapon {
         let weapon_obj = borrow_global_mut<Weapon>(object::object_address(&weapon));
-        option::fill(&mut weapon_obj.gem, gem);
+        weapon_obj.gem.fill(gem);
         object::transfer_to_object(owner, gem, weapon);
     }
 
     public fun weapon_unequip_gem(owner: &signer, weapon: Object<Weapon>, gem: Object<Gem>) acquires Weapon {
         let weapon_obj = borrow_global_mut<Weapon>(object::object_address(&weapon));
-        let stored_gem = option::extract(&mut weapon_obj.gem);
+        let stored_gem = weapon_obj.gem.extract();
         assert!(stored_gem == gem, error::not_found(EINVALID_GEM_UNEQUIP));
         object::transfer(owner, gem, signer::address_of(owner));
     }

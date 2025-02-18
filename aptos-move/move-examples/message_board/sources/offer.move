@@ -40,7 +40,7 @@ module message_board::offer {
     /// placing the offer under the signer's address
     aborts_if exists<Offer<Offered>>(signer::address_of(account));
     ensures exists<Offer<Offered>>(signer::address_of(account));
-    ensures global<Offer<Offered>>(signer::address_of(account)) == Offer<Offered> { offered: offered, for: for };
+    ensures global<Offer<Offered>>(signer::address_of(account)) == Offer<Offered> { offered, for };
   }
 
   /// Claim the value of type `Offered` published at `offer_address`.
@@ -49,9 +49,9 @@ module message_board::offer {
   /// Also fails if there is no `Offer<Offered>` published.
   public fun redeem<Offered: store>(account: &signer, offer_address: address): Offered acquires Offer {
     assert!(exists<Offer<Offered>>(offer_address), error::not_found(EOFFER_DOES_NOT_EXIST));
-    let Offer<Offered> { offered, for } = move_from<Offer<Offered>>(offer_address);
+    let Offer<Offered> { offered, for: for_addr } = move_from<Offer<Offered>>(offer_address);
     let sender = signer::address_of(account);
-    assert!(sender == for || sender == offer_address, error::invalid_argument(EOFFER_DNE_FOR_ACCOUNT));
+    assert!(sender == for_addr || sender == offer_address, error::invalid_argument(EOFFER_DNE_FOR_ACCOUNT));
     offered
   }
   spec redeem {

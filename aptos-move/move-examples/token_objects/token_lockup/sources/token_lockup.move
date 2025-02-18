@@ -93,7 +93,7 @@ module token_lockup::token_lockup {
       object::transfer_with_ref(linear_transfer_ref, to);
 
       // update the lockup config to reflect the latest transfer time
-      *&mut lockup_config.last_transfer = now;
+      lockup_config.last_transfer = now;
    }
 
    #[view]

@@ -91,19 +91,19 @@ module swap::coin_wrapper {
     /// call has been made for that CoinType.
     public fun is_supported<CoinType>(): bool acquires WrapperAccount {
         let coin_type = type_info::type_name<CoinType>();
-        smart_table::contains(&wrapper_account().coin_to_fungible_asset, coin_type)
+        wrapper_account().coin_to_fungible_asset.contains(coin_type)
     }
 
     #[view]
     /// Return true if the given fungible asset is a wrapper fungible asset.
     public fun is_wrapper(metadata: Object<Metadata>): bool acquires WrapperAccount {
-        smart_table::contains(&wrapper_account().fungible_asset_to_coin, metadata)
+        wrapper_account().fungible_asset_to_coin.contains(metadata)
     }
 
     #[view]
     /// Return the original CoinType for a specific wrapper fungible asset. This errors out if there's no such wrapper.
     public fun get_coin_type(metadata: Object<Metadata>): String acquires WrapperAccount {
-        *smart_table::borrow(&wrapper_account().fungible_asset_to_coin, metadata)
+        *wrapper_account().fungible_asset_to_coin.borrow(metadata)
     }
 
     #[view]
@@ -132,7 +132,7 @@ module swap::coin_wrapper {
         // This will create "@0x123"
         let fa_address_str = string_utils::to_string(&fa_address);
         // We want to strip the prefix "@"
-        string::sub_string(&fa_address_str, 1, string::length(&fa_address_str))
+        fa_address_str.sub_string(1, fa_address_str.length())
     }
 
     /// Wrap the given coins into fungible asset. This will also create the fungible asset wrapper if it doesn't exist
@@ -165,8 +165,8 @@ module swap::coin_wrapper {
         let wrapper_account = mut_wrapper_account();
         let coin_to_fungible_asset = &mut wrapper_account.coin_to_fungible_asset;
         let wrapper_signer = &account::create_signer_with_capability(&wrapper_account.signer_cap);
-        if (!smart_table::contains(coin_to_fungible_asset, coin_type)) {
-            let metadata_constructor_ref = &object::create_named_object(wrapper_signer, *string::bytes(&coin_type));
+        if (!coin_to_fungible_asset.contains(coin_type)) {
+            let metadata_constructor_ref = &object::create_named_object(wrapper_signer, *coin_type.bytes());
             primary_fungible_store::create_primary_store_enabled_fungible_asset(
                 metadata_constructor_ref,
                 option::none(),
@@ -180,19 +180,19 @@ module swap::coin_wrapper {
             let mint_ref = fungible_asset::generate_mint_ref(metadata_constructor_ref);
             let burn_ref = fungible_asset::generate_burn_ref(metadata_constructor_ref);
             let metadata = object::object_from_constructor_ref<Metadata>(metadata_constructor_ref);
-            smart_table::add(coin_to_fungible_asset, coin_type, FungibleAssetData {
+            coin_to_fungible_asset.add(coin_type, FungibleAssetData {
                 metadata,
                 mint_ref,
                 burn_ref,
             });
-            smart_table::add(&mut wrapper_account.fungible_asset_to_coin, metadata, coin_type);
+            wrapper_account.fungible_asset_to_coin.add(metadata, coin_type);
         };
-        smart_table::borrow(coin_to_fungible_asset, coin_type).metadata
+        coin_to_fungible_asset.borrow(coin_type).metadata
     }
 
     inline fun fungible_asset_data<CoinType>(): &FungibleAssetData acquires WrapperAccount {
         let coin_type = type_info::type_name<CoinType>();
-        smart_table::borrow(&wrapper_account().coin_to_fungible_asset, coin_type)
+        wrapper_account().coin_to_fungible_asset.borrow(coin_type)
     }
 
     inline fun wrapper_account(): &WrapperAccount acquires WrapperAccount {

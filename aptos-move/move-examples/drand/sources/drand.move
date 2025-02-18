@@ -24,8 +24,7 @@
 
 module drand::drand {
     use std::hash::{sha3_256, sha2_256};
-    use std::option::{Self, Option, extract};
-    use std::vector;
+    use std::option::{Self, Option};
     use std::error;
     use aptos_std::crypto_algebra::{eq, pairing, one, deserialize, hash_to, from_u64, serialize};
     use aptos_std::bls12381_algebra::{G1, G2, Gt, FormatG2Compr, FormatG1Compr, HashG1XmdSha256SswuRo, Fr, FormatFrMsb};
@@ -58,8 +57,8 @@ module drand::drand {
         signature: vector<u8>,
         round: u64): Option<Randomness>
     {
-        let pk = extract(&mut deserialize<G2, FormatG2Compr>(&DRAND_PUBKEY));
-        let sig = extract(&mut deserialize<G1, FormatG1Compr>(&signature));
+        let pk = deserialize<G2, FormatG2Compr>(&DRAND_PUBKEY).extract();
+        let sig = deserialize<G1, FormatG1Compr>(&signature).extract();
         let msg_hash = hash_to<G1, HashG1XmdSha256SswuRo>(&DRAND_DST, &round_number_to_bytes(round));
         assert!(eq(&pairing<G1, G2, Gt>(&msg_hash, &pk), &pairing<G1, G2, Gt>(&sig, &one<G2>())), 1);
         option::some(Randomness {
@@ -71,7 +70,7 @@ module drand::drand {
     /// (Technically, there is a small, computationally-indistinguishable bias in the number.)
     /// Note: This is a one-shot API that consumes the `randomness`.
     public fun random_number(randomness: Randomness, max: u64): u64 {
-        assert!(vector::length(&randomness.bytes) >= 8, error::invalid_argument(E_INCORRECT_RANDOMNESS));
+        assert!(randomness.bytes.length() >= 8, error::invalid_argument(E_INCORRECT_RANDOMNESS));
 
         let entropy = sha3_256(randomness.bytes);
 
@@ -81,10 +80,10 @@ module drand::drand {
         let max_256 = (max as u256);
 
         // Ugh, we have to manually deserialize this into a u128
-        while (!vector::is_empty(&entropy)) {
-            let byte = vector::pop_back(&mut entropy);
-            num = num << 8;
-            num = num + (byte as u256);
+        while (!entropy.is_empty()) {
+            let byte = entropy.pop_back();
+            num <<= 8;
+            num += (byte as u256);
         };
 
         ((num % max_256) as u64)
@@ -131,6 +130,6 @@ module drand::drand {
     ///  - https://github.com/drand/drand/blob/v1.2.1/chain/store.go#L39-L44
     fun round_number_to_bytes(round: u64): vector<u8> {
         let buf = serialize<Fr, FormatFrMsb>(&from_u64<Fr>(round));
-        sha2_256(std::vector::trim(&mut buf, 24))
+        sha2_256(buf.trim(24))
     }
 }

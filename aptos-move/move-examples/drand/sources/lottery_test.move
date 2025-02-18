@@ -51,22 +51,30 @@ module drand::lottery_test {
         // We simulate different runs of the lottery to demonstrate the uniformity of the outcomes
         let vec_signed_bytes = vector::empty<vector<u8>>();
         // curl https://api3.drand.sh/dbd506d6ef76e5f386f41c651dcb808c5bcbd75471cc4eafa3f4df7ad4e4c493/public/202
-        vector::push_back(&mut vec_signed_bytes, x"a438d55a0a3aeff6c6b78ad40c2dfb55dae5154d86eeb8163138f2bf96294f90841e75ad952bf8101630da7bb527da21"); // u1 wins.
+        vec_signed_bytes.push_back(
+            x"a438d55a0a3aeff6c6b78ad40c2dfb55dae5154d86eeb8163138f2bf96294f90841e75ad952bf8101630da7bb527da21"
+        ); // u1 wins.
         // curl https://api3.drand.sh/dbd506d6ef76e5f386f41c651dcb808c5bcbd75471cc4eafa3f4df7ad4e4c493/public/602
-        vector::push_back(&mut vec_signed_bytes, x"b0e64fd43f49f3cf20135e7133112c0ae461e6a7b2961ef474f716648a9ab5b67f606af2980944344de131ab970ccb5d"); // u1 wins.
+        vec_signed_bytes.push_back(
+            x"b0e64fd43f49f3cf20135e7133112c0ae461e6a7b2961ef474f716648a9ab5b67f606af2980944344de131ab970ccb5d"
+        ); // u1 wins.
         // curl https://api3.drand.sh/dbd506d6ef76e5f386f41c651dcb808c5bcbd75471cc4eafa3f4df7ad4e4c493/public/1002
-        vector::push_back(&mut vec_signed_bytes, x"8a9b54d4790bcc1e0b8b3e452102bfc091d23ede4b488cb81580f37a52762a283ed8c8dd844f0a112fda3d768ec3f9a2"); // u4 wins.
+        vec_signed_bytes.push_back(
+            x"8a9b54d4790bcc1e0b8b3e452102bfc091d23ede4b488cb81580f37a52762a283ed8c8dd844f0a112fda3d768ec3f9a2"
+        ); // u4 wins.
         // curl https://api3.drand.sh/dbd506d6ef76e5f386f41c651dcb808c5bcbd75471cc4eafa3f4df7ad4e4c493/public/1402
-        vector::push_back(&mut vec_signed_bytes, x"8eaca04732b0de0c2a385f0ccaab9504592fcae7ca621bef58302d4ef0bd2ce3dd9c90153688dedd47efdbeb4d9ecde5"); // u3 wins.
+        vec_signed_bytes.push_back(
+            x"8eaca04732b0de0c2a385f0ccaab9504592fcae7ca621bef58302d4ef0bd2ce3dd9c90153688dedd47efdbeb4d9ecde5"
+        ); // u3 wins.
 
         let lottery_start_time_secs = 1677685200; // the time that the 1st drand epoch started
         let lottery_duration = lottery::get_minimum_lottery_duration_in_secs();
 
         // We pop_back, so we reverse the vector to simulate pop_front
-        vector::reverse(&mut vec_signed_bytes);
+        vec_signed_bytes.reverse();
 
-        while(!vector::is_empty(&vec_signed_bytes)) {
-            let signed_bytes = vector::pop_back(&mut vec_signed_bytes);
+        while(!vec_signed_bytes.is_empty()) {
+            let signed_bytes = vec_signed_bytes.pop_back();
 
             // Create fake coins for users participating in lottery & initialize aptos_framework
             give_coins(&mint_cap, &u1);
@@ -85,7 +93,7 @@ module drand::lottery_test {
 
             // Shift the next lottery's start time a little (otherwise, timestamp::update_global_time_for_test fails
             // when resetting the time back to the past).
-            lottery_start_time_secs = lottery_start_time_secs + 2 * lottery_duration;
+            lottery_start_time_secs += 2 * lottery_duration;
         };
 
         // Clean up

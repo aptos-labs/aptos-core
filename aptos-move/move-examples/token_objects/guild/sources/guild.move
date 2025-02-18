@@ -92,7 +92,7 @@ module guild::guild {
     public entry fun whitelist_guild_master(admin: &signer, guild_master: address) acquires Config {
         assert!(signer::address_of(admin) == guild_collection_manager_owner(), ENOT_ADMIN);
         let config = borrow_global_mut<Config>(@guild);
-        smart_vector::push_back(&mut config.whitelist, guild_master);
+        config.whitelist.push_back(guild_master);
     }
 
     /// Mints a guild token, and creates a new associated member collection.
@@ -257,11 +257,11 @@ module guild::guild {
 
     inline fun is_whitelisted(guild_master: address): bool {
         let whitelist = &borrow_global<Config>(@guild).whitelist;
-        smart_vector::contains(whitelist, &guild_master)
+        whitelist.contains(&guild_master)
     }
 
     #[test(admin = @guild, guild_master = @0x456, user = @0x789)]
-    public fun test_guild(admin: &signer, guild_master: &signer, user: address) acquires GuildToken, MemberToken, Config, Config {
+    public fun test_guild(admin: &signer, guild_master: &signer, user: address) acquires GuildToken, MemberToken, Config {
         // This test assumes that the creator's address is equal to @token_objects.
         assert!(signer::address_of(admin) == @guild, 0);
 

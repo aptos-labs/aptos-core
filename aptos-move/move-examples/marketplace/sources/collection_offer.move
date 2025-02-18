@@ -341,8 +341,8 @@ module collection_offer {
         // Pay fees
 
         let royalty = tokenv2::royalty(token);
-        let (royalty_payee, royalty_denominator, royalty_numerator) = if (option::is_some(&royalty)) {
-            let royalty = option::destroy_some(royalty);
+        let (royalty_payee, royalty_denominator, royalty_numerator) = if (royalty.is_some()) {
+            let royalty = royalty.destroy_some();
             let payee_address = royalty::payee_address(&royalty);
             let denominator = royalty::denominator(&royalty);
             let numerator = royalty::numerator(&royalty);
@@ -415,7 +415,7 @@ module collection_offer {
             token_metadata,
         );
 
-        collection_offer_obj.remaining = collection_offer_obj.remaining - 1;
+        collection_offer_obj.remaining -= 1;
         if (collection_offer_obj.remaining == 0) {
             cleanup<CoinType>(object::address_to_object(collection_offer_addr));
         };
@@ -427,7 +427,7 @@ module collection_offer {
         collection_offer: Object<CollectionOffer>,
     ) acquires CoinOffer, CollectionOffer, CollectionOfferTokenV1, CollectionOfferTokenV2 {
         let collection_offer_addr = object::object_address(&collection_offer);
-        let CoinOffer<CoinType> { coins } = move_from(collection_offer_addr);
+        let CoinOffer<CoinType> { coins } = move_from<CoinOffer<CoinType>>(collection_offer_addr);
         aptos_account::deposit_coins(object::owner(collection_offer), coins);
 
         let CollectionOffer {
@@ -436,7 +436,7 @@ module collection_offer {
             remaining: _,
             expiration_time: _,
             delete_ref,
-        } = move_from(collection_offer_addr);
+        } = move_from<CollectionOffer>(collection_offer_addr);
         object::delete(delete_ref);
 
         if (exists<CollectionOfferTokenV2>(collection_offer_addr)) {
@@ -696,7 +696,7 @@ module collection_offer_tests {
             token_name,
             property_version,
         );
-        listing::extract_tokenv1(purchaser, option::destroy_some(token_container));
+        listing::extract_tokenv1(purchaser, token_container.destroy_some());
         assert!(tokenv1::balance_of(purchaser_addr, token_id) == 1, 0);
         assert!(!collection_offer::exists_at(collection_offer), 0);
     }

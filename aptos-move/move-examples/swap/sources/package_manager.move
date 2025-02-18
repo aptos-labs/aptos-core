@@ -35,16 +35,16 @@ module swap::package_manager {
     /// Can be called by friended modules to keep track of a system address.
     public(friend) fun add_address(name: String, object: address) acquires PermissionConfig {
         let addresses = &mut borrow_global_mut<PermissionConfig>(@swap).addresses;
-        smart_table::add(addresses, name, object);
+        addresses.add(name, object);
     }
 
     public fun address_exists(name: String): bool acquires PermissionConfig {
-        smart_table::contains(&safe_permission_config().addresses, name)
+        safe_permission_config().addresses.contains(name)
     }
 
     public fun get_address(name: String): address acquires PermissionConfig {
         let addresses = &borrow_global<PermissionConfig>(@swap).addresses;
-        *smart_table::borrow(addresses, name)
+        *addresses.borrow(name)
     }
 
     inline fun safe_permission_config(): &PermissionConfig acquires PermissionConfig {

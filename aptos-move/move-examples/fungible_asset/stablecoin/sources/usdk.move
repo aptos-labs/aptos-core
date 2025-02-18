@@ -10,7 +10,6 @@ module stablecoin::usdk {
     use std::option;
     use std::signer;
     use std::string::{Self, utf8};
-    use std::vector;
     use aptos_framework::chain_id;
 
     /// Caller is not authorized to make this call
@@ -174,7 +173,7 @@ module stablecoin::usdk {
 
         let expected_message = Approval {
             owner: from,
-            to: to,
+            to,
             nonce: account::get_sequence_number(from),
             chain_id: chain_id::get(),
             spender: signer::address_of(spender),
@@ -310,14 +309,14 @@ module stablecoin::usdk {
         assert_not_paused();
         let roles = borrow_global_mut<Roles>(usdk_address());
         assert!(signer::address_of(admin) == roles.master_minter, EUNAUTHORIZED);
-        assert!(!vector::contains(&roles.minters, &minter), EALREADY_MINTER);
-        vector::push_back(&mut roles.minters, minter);
+        assert!(!roles.minters.contains(&minter), EALREADY_MINTER);
+        roles.minters.push_back(minter);
     }
 
     fun assert_is_minter(minter: &signer) acquires Roles {
         let roles = borrow_global<Roles>(usdk_address());
         let minter_addr = signer::address_of(minter);
-        assert!(minter_addr == roles.master_minter || vector::contains(&roles.minters, &minter_addr), EUNAUTHORIZED);
+        assert!(minter_addr == roles.master_minter || roles.minters.contains(&minter_addr), EUNAUTHORIZED);
     }
 
     fun assert_not_paused() acquires State {

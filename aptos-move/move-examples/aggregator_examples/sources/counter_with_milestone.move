@@ -58,7 +58,7 @@ module aggregator_examples::counter_with_milestone {
 
         if (aggregator_v2::is_at_least(&milestone_counter.count, milestone_counter.next_milestone) && !aggregator_v2::is_at_least(&milestone_counter.count, milestone_counter.next_milestone + 1)) {
             event::emit(MilestoneReached { milestone: milestone_counter.next_milestone});
-            milestone_counter.next_milestone = milestone_counter.next_milestone + milestone_counter.milestone_every;
+            milestone_counter.next_milestone += milestone_counter.milestone_every;
         }
     }
 }

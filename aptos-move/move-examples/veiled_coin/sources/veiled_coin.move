@@ -269,7 +269,7 @@ module veiled_coin::veiled_coin {
     /// Importantly, the user's wallet must retain their corresponding secret key.
     public entry fun register<CoinType>(user: &signer, pk: vector<u8>) {
         let pk = elgamal::new_pubkey_from_bytes(pk);
-        register_internal<CoinType>(user, std::option::extract(&mut pk));
+        register_internal<CoinType>(user, pk.extract());
     }
 
     /// Sends a *public* `amount` of normal coins from `sender` to the `recipient`'s veiled balance.
@@ -311,16 +311,16 @@ module veiled_coin::veiled_coin {
     {
         // Deserialize all the proofs into their proper Move structs
         let comm_new_balance = pedersen::new_commitment_from_bytes(comm_new_balance);
-        assert!(std::option::is_some(&comm_new_balance), error::invalid_argument(EDESERIALIZATION_FAILED));
+        assert!(comm_new_balance.is_some(), error::invalid_argument(EDESERIALIZATION_FAILED));
 
         let sigma_proof = sigma_protos::deserialize_withdrawal_subproof(withdraw_subproof);
-        assert!(std::option::is_some(&sigma_proof), error::invalid_argument(EDESERIALIZATION_FAILED));
+        assert!(sigma_proof.is_some(), error::invalid_argument(EDESERIALIZATION_FAILED));
 
-        let comm_new_balance = std::option::extract(&mut comm_new_balance);
+        let comm_new_balance = comm_new_balance.extract();
         let zkrp_new_balance = bulletproofs::range_proof_from_bytes(zkrp_new_balance);
 
         let withdrawal_proof = WithdrawalProof {
-            sigma_proof: std::option::extract(&mut sigma_proof),
+            sigma_proof: sigma_proof.extract(),
             zkrp_new_balance,
         };
 
@@ -374,34 +374,34 @@ module veiled_coin::veiled_coin {
     {
         // Deserialize everything into their proper Move structs
         let veiled_withdraw_amount = elgamal::new_ciphertext_from_bytes(withdraw_ct);
-        assert!(std::option::is_some(&veiled_withdraw_amount), error::invalid_argument(EDESERIALIZATION_FAILED));
+        assert!(veiled_withdraw_amount.is_some(), error::invalid_argument(EDESERIALIZATION_FAILED));
 
         let veiled_deposit_amount = elgamal::new_ciphertext_from_bytes(deposit_ct);
-        assert!(std::option::is_some(&veiled_deposit_amount), error::invalid_argument(EDESERIALIZATION_FAILED));
+        assert!(veiled_deposit_amount.is_some(), error::invalid_argument(EDESERIALIZATION_FAILED));
 
         let comm_new_balance = pedersen::new_commitment_from_bytes(comm_new_balance);
-        assert!(std::option::is_some(&comm_new_balance), error::invalid_argument(EDESERIALIZATION_FAILED));
+        assert!(comm_new_balance.is_some(), error::invalid_argument(EDESERIALIZATION_FAILED));
 
         let comm_amount = pedersen::new_commitment_from_bytes(comm_amount);
-        assert!(std::option::is_some(&comm_amount), error::invalid_argument(EDESERIALIZATION_FAILED));
+        assert!(comm_amount.is_some(), error::invalid_argument(EDESERIALIZATION_FAILED));
 
         let transfer_subproof = sigma_protos::deserialize_transfer_subproof(transfer_subproof);
-        assert!(std::option::is_some(&transfer_subproof), error::invalid_argument(EDESERIALIZATION_FAILED));
+        assert!(transfer_subproof.is_some(), error::invalid_argument(EDESERIALIZATION_FAILED));
 
         let transfer_proof = TransferProof {
             zkrp_new_balance: bulletproofs::range_proof_from_bytes(zkrp_new_balance),
             zkrp_amount: bulletproofs::range_proof_from_bytes(zkrp_amount),
-            sigma_proof: std::option::extract(&mut transfer_subproof)
+            sigma_proof: transfer_subproof.extract()
         };
 
         // Do the actual work
         fully_veiled_transfer_internal<CoinType>(
             sender,
             recipient,
-            std::option::extract(&mut veiled_withdraw_amount),
-            std::option::extract(&mut veiled_deposit_amount),
-            std::option::extract(&mut comm_new_balance),
-            std::option::extract(&mut comm_amount),
+            veiled_withdraw_amount.extract(),
+            veiled_deposit_amount.extract(),
+            comm_new_balance.extract(),
+            comm_amount.extract(),
             &transfer_proof,
         )
     }
@@ -419,7 +419,7 @@ module veiled_coin::veiled_coin {
         amount >> NUM_MOST_SIGNIFICANT_BITS_REMOVED;
 
         // Removes the other `32 - NUM_MOST_SIGNIFICANT_BITS_REMOVED` least significant bits.
-        amount = amount >> NUM_LEAST_SIGNIFICANT_BITS_REMOVED;
+        amount >>= NUM_LEAST_SIGNIFICANT_BITS_REMOVED;
 
         // We are now left with a 32-bit value
         (amount as u32)
@@ -695,11 +695,11 @@ module veiled_coin::veiled_coin {
         );
 
         // Checks that the transferred amount is in range (when this amount did not originate from a public amount); i.e., range condition (2)
-        if (std::option::is_some(zkrp_amount)) {
+        if (zkrp_amount.is_some()) {
             assert!(
                 bulletproofs::verify_range_proof_pedersen(
-                    std::option::borrow(comm_amount),
-                    std::option::borrow(zkrp_amount),
+                    comm_amount.borrow(),
+                    zkrp_amount.borrow(),
                     MAX_BITS_IN_VEILED_COIN_VALUE, VEILED_COIN_BULLETPROOFS_DST
                 ),
                 error::out_of_range(ERANGE_PROOF_VERIFICATION_FAILED)
