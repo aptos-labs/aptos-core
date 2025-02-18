@@ -174,10 +174,12 @@ module supra_framework::reconfiguration {
         reconfiguration_state::on_reconfig_finish();
     }
 
+    #[view]
     public fun last_reconfiguration_time(): u64 acquires Configuration {
         borrow_global<Configuration>(@supra_framework).last_reconfiguration_time
     }
 
+    #[view]
     public fun current_epoch(): u64 acquires Configuration {
         borrow_global<Configuration>(@supra_framework).epoch
     }
