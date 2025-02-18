@@ -172,7 +172,7 @@ module aptos_framework::genesis {
 
     fun create_accounts(aptos_framework: &signer, accounts: vector<AccountMap>) {
         let unique_accounts = vector::empty();
-        vector::for_each_ref(&accounts, |account_map| {
+        accounts.for_each_ref(|account_map| {
             let account_map: &AccountMap = account_map;
             assert!(
                 !vector::contains(&unique_accounts, &account_map.account_address),
@@ -208,7 +208,7 @@ module aptos_framework::genesis {
     ) {
         let unique_accounts = vector::empty();
 
-        vector::for_each_ref(&employees, |employee_group| {
+        employees.for_each_ref(|employee_group| {
             let j = 0;
             let employee_group: &EmployeeAccountMap = employee_group;
             let num_employees_in_group = vector::length(&employee_group.accounts);
@@ -218,17 +218,17 @@ module aptos_framework::genesis {
             while (j < num_employees_in_group) {
                 let account = vector::borrow(&employee_group.accounts, j);
                 assert!(
-                    !vector::contains(&unique_accounts, account),
+                    !unique_accounts.contains(account),
                     error::already_exists(EDUPLICATE_ACCOUNT),
                 );
-                vector::push_back(&mut unique_accounts, *account);
+                unique_accounts.push_back(*account);
 
                 let employee = create_signer(*account);
                 let total = coin::balance<AptosCoin>(*account);
                 let coins = coin::withdraw<AptosCoin>(&employee, total);
-                simple_map::add(&mut buy_ins, *account, coins);
+                buy_ins.add(*account, coins);
 
-                j = j + 1;
+                j += 1;
             };
 
             let j = 0;

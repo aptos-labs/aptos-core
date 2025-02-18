@@ -77,7 +77,7 @@ module aptos_std::ordered_map {
     /// Aborts with EKEY_ALREADY_EXISTS if duplicate keys are passed in.
     public fun new_from<K, V>(keys: vector<K>, values: vector<V>): OrderedMap<K, V> {
         let map = new();
-        add_all(&mut map, keys, values);
+        map.add_all(keys, values);
         map
     }
 
@@ -170,7 +170,7 @@ module aptos_std::ordered_map {
     /// Aborts with EKEY_ALREADY_EXISTS if key already exist, or duplicate keys are passed in.
     public fun add_all<K, V>(self: &mut OrderedMap<K, V>, keys: vector<K>, values: vector<V>) {
         // TODO: Can be optimized, by sorting keys and values, and then creating map.
-        vector::zip(keys, values, |key, value| {
+        keys.zip(values, |key, value| {
             self.add(key, value);
         });
     }
@@ -179,7 +179,7 @@ module aptos_std::ordered_map {
     /// or if duplicate keys are passed in.
     public fun upsert_all<K: drop, V: drop>(self: &mut OrderedMap<K, V>, keys: vector<K>, values: vector<V>) {
         // TODO: Can be optimized, by sorting keys and values, and then creating map.
-        vector::zip(keys, values, |key, value| {
+        keys.zip(values, |key, value| {
             self.upsert(key, value);
         });
     }
@@ -238,7 +238,7 @@ module aptos_std::ordered_map {
                     self.entries.append(other_entries);
                     break;
                 } else {
-                    cur_i = cur_i - 1;
+                    cur_i -= 1;
                 };
             } else {
                 // is_lt or is_eq
@@ -252,7 +252,7 @@ module aptos_std::ordered_map {
                     other_entries.destroy_empty();
                     break;
                 } else {
-                    other_i = other_i - 1;
+                    other_i -= 1;
                 };
             };
         };
@@ -507,7 +507,7 @@ module aptos_std::ordered_map {
 
     /// Return all keys in the map. This requires keys to be copyable.
     public fun keys<K: copy, V>(self: &OrderedMap<K, V>): vector<K> {
-        vector::map_ref(&self.entries, |e| {
+        self.entries.map_ref(|e| {
             let e: &Entry<K, V> = e;
             e.key
         })
@@ -515,7 +515,7 @@ module aptos_std::ordered_map {
 
     /// Return all values in the map. This requires values to be copyable.
     public fun values<K, V: copy>(self: &OrderedMap<K, V>): vector<V> {
-        vector::map_ref(&self.entries, |e| {
+        self.entries.map_ref(|e| {
             let e: &Entry<K, V> = e;
             e.value
         })
@@ -527,10 +527,10 @@ module aptos_std::ordered_map {
         let keys: vector<K> = vector::empty();
         let values: vector<V> = vector::empty();
         let OrderedMap::SortedVectorMap { entries } = self;
-        vector::for_each(entries, |e| {
+        entries.for_each(|e| {
             let Entry { key, value } = e;
-            vector::push_back(&mut keys, key);
-            vector::push_back(&mut values, value);
+            keys.push_back(key);
+            values.push_back(value);
         });
         (keys, values)
     }
@@ -542,9 +542,9 @@ module aptos_std::ordered_map {
         dk: |K|,
         dv: |V|
     ) {
-        let (keys, values) = to_vec_pair(self);
-        vector::destroy(keys, |_k| dk(_k));
-        vector::destroy(values, |_v| dv(_v));
+        let (keys, values) = self.to_vec_pair();
+        keys.destroy(|_k| dk(_k));
+        values.destroy(|_v| dv(_v));
     }
 
     /// Apply the function to a reference of each key-value pair in the table.
@@ -584,7 +584,7 @@ module aptos_std::ordered_map {
 
     inline fun new_iter(index: u64): IteratorPtr {
         IteratorPtr::Position {
-            index: index,
+            index,
         }
     }
 
@@ -632,7 +632,7 @@ module aptos_std::ordered_map {
         let i = 1;
         while (i < len) {
             assert!(cmp::compare(&self.entries.borrow(i).key, &self.entries.borrow(i - 1).key).is_gt(), 1);
-            i = i + 1;
+            i += 1;
         };
     }
 
@@ -642,7 +642,7 @@ module aptos_std::ordered_map {
         let num_elements = 0;
         let it = self.new_begin_iter();
         while (!it.iter_is_end(self)) {
-            num_elements = num_elements + 1;
+            num_elements += 1;
             it = it.iter_next(self);
         };
         assert!(num_elements == expected_num_elements, 2);
@@ -651,7 +651,7 @@ module aptos_std::ordered_map {
         let it = self.new_end_iter();
         while (!it.iter_is_begin(self)) {
             it = it.iter_prev(self);
-            num_elements = num_elements + 1;
+            num_elements += 1;
         };
         assert!(num_elements == expected_num_elements, 3);
     }
@@ -690,31 +690,31 @@ module aptos_std::ordered_map {
     public fun test_add_remove_many() {
         let map = new<u64, u64>();
 
-        assert!(length(&map) == 0, 0);
-        assert!(!contains(&map, &3), 1);
-        add(&mut map, 3, 1);
-        assert!(length(&map) == 1, 2);
-        assert!(contains(&map, &3), 3);
-        assert!(borrow(&map, &3) == &1, 4);
-        *borrow_mut(&mut map, &3) = 2;
-        assert!(borrow(&map, &3) == &2, 5);
+        assert!(map.length() == 0, 0);
+        assert!(!map.contains(&3), 1);
+        map.add(3, 1);
+        assert!(map.length() == 1, 2);
+        assert!(map.contains(&3), 3);
+        assert!(map.borrow(&3) == &1, 4);
+        *map.borrow_mut(&3) = 2;
+        assert!(map.borrow(&3) == &2, 5);
 
-        assert!(!contains(&map, &2), 6);
-        add(&mut map, 2, 5);
-        assert!(length(&map) == 2, 7);
-        assert!(contains(&map, &2), 8);
-        assert!(borrow(&map, &2) == &5, 9);
-        *borrow_mut(&mut map, &2) = 9;
-        assert!(borrow(&map, &2) == &9, 10);
+        assert!(!map.contains(&2), 6);
+        map.add(2, 5);
+        assert!(map.length() == 2, 7);
+        assert!(map.contains(&2), 8);
+        assert!(map.borrow(&2) == &5, 9);
+        *map.borrow_mut(&2) = 9;
+        assert!(map.borrow(&2) == &9, 10);
 
-        remove(&mut map, &2);
-        assert!(length(&map) == 1, 11);
-        assert!(!contains(&map, &2), 12);
-        assert!(borrow(&map, &3) == &2, 13);
+        map.remove(&2);
+        assert!(map.length() == 1, 11);
+        assert!(!map.contains(&2), 12);
+        assert!(map.borrow(&3) == &2, 13);
 
-        remove(&mut map, &3);
-        assert!(length(&map) == 0, 14);
-        assert!(!contains(&map, &3), 15);
+        map.remove(&3);
+        assert!(map.length() == 0, 14);
+        assert!(!map.contains(&3), 15);
 
         destroy_empty(map);
     }

@@ -1,7 +1,6 @@
 module aptos_framework::staking_proxy {
     use std::error;
     use std::signer;
-    use std::vector;
 
     use aptos_framework::permissioned_signer;
     use aptos_framework::stake;
@@ -42,7 +41,7 @@ module aptos_framework::staking_proxy {
         check_stake_proxy_permission(owner);
         let owner_address = signer::address_of(owner);
         let vesting_contracts = &vesting::vesting_contracts(owner_address);
-        vector::for_each_ref(vesting_contracts, |vesting_contract| {
+        vesting_contracts.for_each_ref(|vesting_contract| {
             let vesting_contract = *vesting_contract;
             if (vesting::operator(vesting_contract) == old_operator) {
                 let current_commission_percentage = vesting::operator_commission_percentage(vesting_contract);
@@ -72,7 +71,7 @@ module aptos_framework::staking_proxy {
         check_stake_proxy_permission(owner);
         let owner_address = signer::address_of(owner);
         let vesting_contracts = &vesting::vesting_contracts(owner_address);
-        vector::for_each_ref(vesting_contracts, |vesting_contract| {
+        vesting_contracts.for_each_ref(|vesting_contract| {
             let vesting_contract = *vesting_contract;
             if (vesting::operator(vesting_contract) == operator) {
                 vesting::update_voter(owner, vesting_contract, new_voter);

@@ -63,11 +63,12 @@
 module aptos_framework::resource_account {
     use std::error;
     use std::signer;
-    use std::vector;
     use aptos_framework::account;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin;
     use aptos_std::simple_map::{Self, SimpleMap};
+    #[test_only]
+    use std::vector;
 
     /// Container resource not found in account
     const ECONTAINER_NOT_PUBLISHED: u64 = 1;
@@ -150,9 +151,9 @@ module aptos_framework::resource_account {
 
         let container = borrow_global_mut<Container>(origin_addr);
         let resource_addr = signer::address_of(&resource);
-        simple_map::add(&mut container.store, resource_addr, resource_signer_cap);
+        container.store.add(resource_addr, resource_signer_cap);
 
-        let auth_key = if (vector::is_empty(&optional_auth_key)) {
+        let auth_key = if (optional_auth_key.is_empty()) {
             account::get_authentication_key(origin_addr)
         } else {
             optional_auth_key
@@ -173,17 +174,17 @@ module aptos_framework::resource_account {
         let (resource_signer_cap, empty_container) = {
             let container = borrow_global_mut<Container>(source_addr);
             assert!(
-                simple_map::contains_key(&container.store, &resource_addr),
+                container.store.contains_key(&resource_addr),
                 error::invalid_argument(EUNAUTHORIZED_NOT_OWNER)
             );
-            let (_resource_addr, signer_cap) = simple_map::remove(&mut container.store, &resource_addr);
-            (signer_cap, simple_map::length(&container.store) == 0)
+            let (_resource_addr, signer_cap) = container.store.remove(&resource_addr);
+            (signer_cap, container.store.length() == 0)
         };
 
         if (empty_container) {
-            let container = move_from(source_addr);
+            let container = move_from<Container>(source_addr);
             let Container { store } = container;
-            simple_map::destroy_empty(store);
+            store.destroy_empty();
         };
 
         account::rotate_authentication_key_internal(resource, ZERO_AUTH_KEY);
@@ -201,7 +202,7 @@ module aptos_framework::resource_account {
         let container = borrow_global<Container>(user_addr);
 
         let resource_addr = aptos_framework::account::create_resource_address(&user_addr, seed);
-        let resource_cap = simple_map::borrow(&container.store, &resource_addr);
+        let resource_cap = container.store.borrow(&resource_addr);
 
         let resource = account::create_signer_with_capability(resource_cap);
         let _resource_cap = retrieve_resource_account_cap(&resource, user_addr);
@@ -222,7 +223,7 @@ module aptos_framework::resource_account {
         let container = borrow_global<Container>(user_addr);
 
         let resource_addr = account::create_resource_address(&user_addr, seed);
-        let resource_cap = simple_map::borrow(&container.store, &resource_addr);
+        let resource_cap = container.store.borrow(&resource_addr);
 
         let resource = account::create_signer_with_capability(resource_cap);
         let _resource_cap = retrieve_resource_account_cap(&resource, user_addr);

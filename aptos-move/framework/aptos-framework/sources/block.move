@@ -261,10 +261,10 @@ module aptos_framework::block {
         if (exists<CommitHistory>(@aptos_framework)) {
             let commit_history_ref = borrow_global_mut<CommitHistory>(@aptos_framework);
             let idx = commit_history_ref.next_idx;
-            if (table_with_length::contains(&commit_history_ref.table, idx)) {
-                table_with_length::remove(&mut commit_history_ref.table, idx);
+            if (commit_history_ref.table.contains(idx)) {
+                commit_history_ref.table.remove(idx);
             };
-            table_with_length::add(&mut commit_history_ref.table, idx, copy new_block_event);
+            commit_history_ref.table.add(idx, copy new_block_event);
             spec {
                 assume idx + 1 <= MAX_U32;
             };

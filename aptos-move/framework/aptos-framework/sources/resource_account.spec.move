@@ -126,7 +126,7 @@ spec aptos_framework::resource_account {
         /// [high-level-req-2]
         ensures exists<Container>(signer::address_of(origin));
         /// [high-level-req-5]
-        ensures vector::length(optional_auth_key) != 0 ==>
+        ensures optional_auth_key.length() != 0 ==>
             global<aptos_framework::account::Account>(resource_addr).authentication_key == optional_auth_key;
     }
 

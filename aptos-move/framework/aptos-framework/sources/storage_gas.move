@@ -151,6 +151,7 @@ module aptos_framework::storage_gas {
     use aptos_framework::system_addresses;
     use std::error;
     use aptos_framework::state_storage;
+    #[test_only]
     use std::vector;
 
     friend aptos_framework::gas_schedule;
@@ -428,7 +429,7 @@ module aptos_framework::storage_gas {
     }
 
     fun validate_points(points: &vector<Point>) {
-        let len = vector::length(points);
+        let len = points.length();
         spec {
             assume len < MAX_U64;
         };
@@ -443,26 +444,30 @@ module aptos_framework::storage_gas {
             };
             i <= len
         }) {
-            let cur = if (i == 0) { &Point { x: 0, y: 0 } } else { vector::borrow(points, i - 1) };
-            let next = if (i == len) { &Point { x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION } } else { vector::borrow(points, i) };
+            let cur = if (i == 0) { &Point { x: 0, y: 0 } } else { points.borrow(i - 1) };
+            let next = if (i == len) { &Point { x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION } } else {
+                points.borrow(
+                    i
+                )
+            };
             assert!(cur.x < next.x && cur.y <= next.y, error::invalid_argument(EINVALID_MONOTONICALLY_NON_DECREASING_CURVE));
-            i = i + 1;
+            i += 1;
         }
     }
 
     fun calculate_gas(max_usage: u64, current_usage: u64, curve: &GasCurve): u64 {
         let capped_current_usage = if (current_usage > max_usage) max_usage else current_usage;
         let points = &curve.points;
-        let num_points = vector::length(points);
+        let num_points = points.length();
         let current_usage_bps = capped_current_usage * BASIS_POINT_DENOMINATION / max_usage;
 
         // Check the corner case that current_usage_bps drops before the first point.
         let (left, right) = if (num_points == 0) {
             (&Point { x: 0, y: 0 }, &Point { x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION })
-        } else if (current_usage_bps < vector::borrow(points, 0).x) {
-            (&Point { x: 0, y: 0 }, vector::borrow(points, 0))
-        } else if (vector::borrow(points, num_points - 1).x <= current_usage_bps) {
-            (vector::borrow(points, num_points - 1), &Point { x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION })
+        } else if (current_usage_bps < points.borrow(0).x) {
+            (&Point { x: 0, y: 0 }, points.borrow(0))
+        } else if (points.borrow(num_points - 1).x <= current_usage_bps) {
+            (points.borrow(num_points - 1), &Point { x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION })
         } else {
             let (i, j) = (0, num_points - 2);
             while ({
@@ -475,7 +480,7 @@ module aptos_framework::storage_gas {
                 i < j
             }) {
                 let mid = j - (j - i) / 2;
-                if (current_usage_bps < vector::borrow(points, mid).x) {
+                if (current_usage_bps < points.borrow(mid).x) {
                     spec {
                         // j is strictly decreasing.
                         assert mid - 1 < j;
@@ -489,7 +494,7 @@ module aptos_framework::storage_gas {
                     i = mid;
                 };
             };
-            (vector::borrow(points, i), vector::borrow(points, i + 1))
+            (points.borrow(i), points.borrow(i + 1))
         };
         let y_interpolated = interpolate(left.x, right.x, left.y, right.y, current_usage_bps);
         interpolate(0, BASIS_POINT_DENOMINATION, curve.min_gas, curve.max_gas, y_interpolated)
@@ -563,10 +568,10 @@ module aptos_framework::storage_gas {
                 let new_standard_curve_gas = calculate_gas(target, i, &standard_curve);
                 assert!(new_standard_curve_gas >= old_standard_curve_gas, 0);
                 old_standard_curve_gas = new_standard_curve_gas;
-                i = i + 3;
+                i += 3;
             };
             assert!(old_standard_curve_gas == 1000, 0);
-            target = target + BASIS_POINT_DENOMINATION;
+            target += BASIS_POINT_DENOMINATION;
         }
     }
 

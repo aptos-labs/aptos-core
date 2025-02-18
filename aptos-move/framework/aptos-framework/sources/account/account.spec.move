@@ -199,7 +199,7 @@ spec aptos_framework::account {
         /// [high-level-req-10]
         let post account_resource = global<Account>(addr);
         aborts_if !exists<Account>(addr);
-        aborts_if vector::length(new_auth_key) != 32;
+        aborts_if new_auth_key.length() != 32;
         modifies global<Account>(addr);
         ensures account_resource.authentication_key == new_auth_key;
     }
@@ -209,7 +209,7 @@ spec aptos_framework::account {
         /// [high-level-req-10]
         let post account_resource = global<Account>(addr);
         aborts_if !exists<Account>(addr);
-        aborts_if vector::length(new_auth_key) != 32;
+        aborts_if new_auth_key.length() != 32;
         modifies global<Account>(addr);
         ensures account_resource.authentication_key == new_auth_key;
     }
@@ -518,7 +518,7 @@ spec aptos_framework::account {
         /// [high-level-req-7.4]
         aborts_if !exists<Account>(signer::address_of(account));
         let account_resource = global<Account>(signer::address_of(account));
-        aborts_if !option::is_some(account_resource.signer_capability_offer.for);
+        aborts_if !account_resource.signer_capability_offer.for.is_some();
     }
 
     spec revoke_rotation_capability(account: &signer, to_be_revoked_address: address) {
@@ -539,7 +539,7 @@ spec aptos_framework::account {
         aborts_if !exists<Account>(addr);
         let account_resource = global<Account>(addr);
         /// [high-level-req-7.3]
-        aborts_if !option::is_some(account_resource.rotation_capability_offer.for);
+        aborts_if !account_resource.rotation_capability_offer.for.is_some();
         let post offer_for = global<Account>(addr).rotation_capability_offer.for;
         ensures !option::spec_is_some(offer_for);
     }

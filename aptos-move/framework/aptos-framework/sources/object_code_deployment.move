@@ -108,8 +108,8 @@ module aptos_framework::object_code_deployment {
     inline fun object_seed(publisher: address): vector<u8> {
         let sequence_number = account::get_sequence_number(publisher) + 1;
         let seeds = vector[];
-        vector::append(&mut seeds, bcs::to_bytes(&OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR));
-        vector::append(&mut seeds, bcs::to_bytes(&sequence_number));
+        seeds.append(bcs::to_bytes(&OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR));
+        seeds.append(bcs::to_bytes(&sequence_number));
         seeds
     }
 

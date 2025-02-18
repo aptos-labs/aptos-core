@@ -49,7 +49,7 @@ module aptos_framework::config_buffer {
     public fun does_exist<T: store>(): bool acquires PendingConfigs {
         if (exists<PendingConfigs>(@aptos_framework)) {
             let config = borrow_global<PendingConfigs>(@aptos_framework);
-            simple_map::contains_key(&config.configs, &type_info::type_name<T>())
+            config.configs.contains_key(&type_info::type_name<T>())
         } else {
             false
         }
@@ -62,7 +62,7 @@ module aptos_framework::config_buffer {
         let configs = borrow_global_mut<PendingConfigs>(@aptos_framework);
         let key = type_info::type_name<T>();
         let value = any::pack(config);
-        simple_map::upsert(&mut configs.configs, key, value);
+        configs.configs.upsert(key, value);
     }
 
     /// Take the buffered config `T` out (buffer cleared). Abort if the buffer is empty.
@@ -72,8 +72,8 @@ module aptos_framework::config_buffer {
     public fun extract<T: store>(): T acquires PendingConfigs {
         let configs = borrow_global_mut<PendingConfigs>(@aptos_framework);
         let key = type_info::type_name<T>();
-        let (_, value_packed) = simple_map::remove(&mut configs.configs, &key);
-        any::unpack(value_packed)
+        let (_, value_packed) = configs.configs.remove(&key);
+        value_packed.unpack()
     }
 
     #[test_only]

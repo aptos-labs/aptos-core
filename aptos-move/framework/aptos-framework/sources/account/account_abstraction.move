@@ -124,16 +124,16 @@ module aptos_framework::account_abstraction {
         let current_map = &mut borrow_global_mut<DispatchableAuthenticator>(resource_addr).auth_functions;
         if (is_add) {
             assert!(
-                !ordered_map::contains(current_map, &auth_function),
+                !current_map.contains(&auth_function),
                 error::already_exists(EFUNCTION_INFO_EXISTENCE)
             );
-            ordered_map::add(current_map, auth_function, true);
+            current_map.add(auth_function, true);
         } else {
             assert!(
-                ordered_map::contains(current_map, &auth_function),
+                current_map.contains(&auth_function),
                 error::not_found(EFUNCTION_INFO_EXISTENCE)
             );
-            ordered_map::remove(current_map, &auth_function);
+            current_map.remove(&auth_function);
         };
         event::emit(
             UpdateDispatchableAuthenticator {
@@ -142,7 +142,7 @@ module aptos_framework::account_abstraction {
                 auth_function,
             }
         );
-        if (ordered_map::length(current_map) == 0) {
+        if (current_map.length() == 0) {
                 remove_authenticator(account);
         }
     }
@@ -159,7 +159,7 @@ module aptos_framework::account_abstraction {
         let resource_addr = resource_addr(addr);
         if (exists<DispatchableAuthenticator>(resource_addr)) {
             option::some(
-                ordered_map::keys(&borrow_global<DispatchableAuthenticator>(resource_addr).auth_functions)
+                borrow_global<DispatchableAuthenticator>(resource_addr).auth_functions.keys()
             )
         } else { option::none() }
     }
@@ -176,7 +176,7 @@ module aptos_framework::account_abstraction {
     ): signer acquires DispatchableAuthenticator {
         let master_signer_addr = signer::address_of(&account);
         let func_infos = dispatchable_authenticator_internal(master_signer_addr);
-        assert!(ordered_map::contains(func_infos, &func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
+        assert!(func_infos.contains(&func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
         function_info::load_module_from_function(&func_info);
         let returned_signer = dispatchable_authenticate(account, signing_data, &func_info);
         // Returned signer MUST represent the same account address. Otherwise, it may break the invariant of Aptos blockchain!

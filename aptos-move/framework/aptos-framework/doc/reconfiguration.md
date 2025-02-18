@@ -404,7 +404,7 @@ Signal validators to start using new configuration. Must be called from friend c
     <b>spec</b> {
         <b>assume</b> config_ref.epoch + 1 &lt;= MAX_U64;
     };
-    config_ref.epoch = config_ref.epoch + 1;
+    config_ref.epoch += 1;
 
     <b>if</b> (std::features::module_event_migration_enabled()) {
         <a href="event.md#0x1_event_emit">event::emit</a>(

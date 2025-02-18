@@ -79,7 +79,7 @@ spec aptos_framework::managed_coin {
         // Ensure the amount won't be overflow.
         aborts_if amount == 0;
         aborts_if !exists<coin::CoinInfo<CoinType>>(addr);
-        include coin::CoinSubAbortsIf<CoinType> { amount:amount };
+        include coin::CoinSubAbortsIf<CoinType> { amount };
 
         // Ensure that the global 'supply' decreases by 'amount'.
         ensures coin::supply<CoinType> == old(coin::supply<CoinType>) - amount;

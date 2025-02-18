@@ -159,7 +159,7 @@ module aptos_framework::code {
         if (!exists<PackageRegistry>(addr)) {
             move_to(package_owner, PackageRegistry { packages: vector[metadata] })
         } else {
-            vector::push_back(&mut borrow_global_mut<PackageRegistry>(addr).packages, metadata)
+            borrow_global_mut<PackageRegistry>(addr).packages.push_back(metadata)
         }
     }
 
@@ -186,11 +186,10 @@ module aptos_framework::code {
         // the package need to be an immutable variable
         let module_names = get_module_names(&pack);
         let package_immutable = &borrow_global<PackageRegistry>(addr).packages;
-        let len = vector::length(package_immutable);
+        let len = package_immutable.length();
         let index = len;
         let upgrade_number = 0;
-        vector::enumerate_ref(package_immutable
-        , |i, old| {
+        package_immutable.enumerate_ref(|i, old| {
             let old: &PackageMetadata = old;
             if (old.name == pack.name) {
                 upgrade_number = old.upgrade_number + 1;
@@ -208,9 +207,9 @@ module aptos_framework::code {
         // Update registry
         let policy = pack.upgrade_policy;
         if (index < len) {
-            *vector::borrow_mut(packages, index) = pack
+            *packages.borrow_mut(index) = pack
         } else {
-            vector::push_back(packages, pack)
+            packages.push_back(pack)
         };
 
         event::emit(PublishPackage {
@@ -237,7 +236,7 @@ module aptos_framework::code {
         );
 
         let registry = borrow_global_mut<PackageRegistry>(code_object_addr);
-        vector::for_each_mut(&mut registry.packages, |pack| {
+        registry.packages.for_each_mut(|pack| {
             let package: &mut PackageMetadata = pack;
             package.upgrade_policy = upgrade_policy_immutable();
         });
@@ -246,7 +245,7 @@ module aptos_framework::code {
         // needs to borrow PackageRegistry from the dependency packages.
         // This would increase the amount of gas used, but this is a rare operation and it's rare to have many packages
         // in a single code object.
-        vector::for_each(registry.packages, |pack| {
+        registry.packages.for_each(|pack| {
             check_dependencies(code_object_addr, &pack);
         });
     }
@@ -270,9 +269,9 @@ module aptos_framework::code {
             error::invalid_argument(EUPGRADE_WEAKER_POLICY));
         let old_modules = get_module_names(old_pack);
 
-        vector::for_each_ref(&old_modules, |old_module| {
+        old_modules.for_each_ref(|old_module| {
             assert!(
-                vector::contains(new_modules, old_module),
+                new_modules.contains(old_module),
                 EMODULE_MISSING
             );
         });
@@ -281,13 +280,13 @@ module aptos_framework::code {
     /// Checks whether a new package with given names can co-exist with old package.
     fun check_coexistence(old_pack: &PackageMetadata, new_modules: &vector<String>) {
         // The modules introduced by each package must not overlap with `names`.
-        vector::for_each_ref(&old_pack.modules, |old_mod| {
+        old_pack.modules.for_each_ref(|old_mod| {
             let old_mod: &ModuleMetadata = old_mod;
             let j = 0;
-            while (j < vector::length(new_modules)) {
-                let name = vector::borrow(new_modules, j);
+            while (j < new_modules.length()) {
+                let name = new_modules.borrow(j);
                 assert!(&old_mod.name != name, error::already_exists(EMODULE_NAME_CLASH));
-                j = j + 1;
+                j += 1;
             };
         });
     }
@@ -299,17 +298,17 @@ module aptos_framework::code {
     acquires PackageRegistry {
         let allowed_module_deps = vector::empty();
         let deps = &pack.deps;
-        vector::for_each_ref(deps, |dep| {
+        deps.for_each_ref(|dep| {
             let dep: &PackageDep = dep;
             assert!(exists<PackageRegistry>(dep.account), error::not_found(EPACKAGE_DEP_MISSING));
             if (is_policy_exempted_address(dep.account)) {
                 // Allow all modules from this address, by using "" as a wildcard in the AllowedDep
                 let account: address = dep.account;
                 let module_name = string::utf8(b"");
-                vector::push_back(&mut allowed_module_deps, AllowedDep { account, module_name });
+                allowed_module_deps.push_back(AllowedDep { account, module_name });
             } else {
                 let registry = borrow_global<PackageRegistry>(dep.account);
-                let found = vector::any(&registry.packages, |dep_pack| {
+                let found = registry.packages.any(|dep_pack| {
                     let dep_pack: &PackageMetadata = dep_pack;
                     if (dep_pack.name == dep.package_name) {
                         // Check policy
@@ -326,11 +325,11 @@ module aptos_framework::code {
                         // Add allowed deps
                         let account = dep.account;
                         let k = 0;
-                        let r = vector::length(&dep_pack.modules);
+                        let r = dep_pack.modules.length();
                         while (k < r) {
-                            let module_name = vector::borrow(&dep_pack.modules, k).name;
-                            vector::push_back(&mut allowed_module_deps, AllowedDep { account, module_name });
-                            k = k + 1;
+                            let module_name = dep_pack.modules.borrow(k).name;
+                            allowed_module_deps.push_back(AllowedDep { account, module_name });
+                            k += 1;
                         };
                         true
                     } else {
@@ -354,9 +353,9 @@ module aptos_framework::code {
     /// Get the names of the modules in a package.
     fun get_module_names(pack: &PackageMetadata): vector<String> {
         let module_names = vector::empty();
-        vector::for_each_ref(&pack.modules, |pack_module| {
+        pack.modules.for_each_ref(|pack_module| {
             let pack_module: &ModuleMetadata = pack_module;
-            vector::push_back(&mut module_names, pack_module.name);
+            module_names.push_back(pack_module.name);
         });
         module_names
     }

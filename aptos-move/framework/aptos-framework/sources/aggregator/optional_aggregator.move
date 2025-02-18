@@ -41,13 +41,13 @@ module aptos_framework::optional_aggregator {
             value <= (integer.limit - integer.value),
             error::out_of_range(EAGGREGATOR_OVERFLOW)
         );
-        integer.value = integer.value + value;
+        integer.value += value;
     }
 
     /// Subtracts `value` from integer. Aborts on going below zero.
     fun sub_integer(integer: &mut Integer, value: u128) {
         assert!(value <= integer.value, error::out_of_range(EAGGREGATOR_UNDERFLOW));
-        integer.value = integer.value - value;
+        integer.value -= value;
     }
 
     /// Returns an overflow limit of integer.
@@ -105,57 +105,57 @@ module aptos_framework::optional_aggregator {
     /// Destroys parallelizable optional aggregator and returns its limit.
     fun destroy_optional_aggregator(optional_aggregator: OptionalAggregator): u128 {
         let OptionalAggregator { aggregator, integer } = optional_aggregator;
-        let limit = aggregator::limit(option::borrow(&aggregator));
-        aggregator::destroy(option::destroy_some(aggregator));
-        option::destroy_none(integer);
+        let limit = aggregator::limit(aggregator.borrow());
+        aggregator::destroy(aggregator.destroy_some());
+        integer.destroy_none();
         limit
     }
 
     /// Destroys non-parallelizable optional aggregator and returns its limit.
     fun destroy_optional_integer(optional_aggregator: OptionalAggregator): u128 {
         let OptionalAggregator { aggregator, integer } = optional_aggregator;
-        let limit = limit(option::borrow(&integer));
-        destroy_integer(option::destroy_some(integer));
-        option::destroy_none(aggregator);
+        let limit = limit(integer.borrow());
+        destroy_integer(integer.destroy_some());
+        aggregator.destroy_none();
         limit
     }
 
     /// Adds `value` to optional aggregator, aborting on exceeding the `limit`.
     public fun add(optional_aggregator: &mut OptionalAggregator, value: u128) {
-        if (option::is_some(&optional_aggregator.aggregator)) {
-            let aggregator = option::borrow_mut(&mut optional_aggregator.aggregator);
+        if (optional_aggregator.aggregator.is_some()) {
+            let aggregator = optional_aggregator.aggregator.borrow_mut();
             aggregator::add(aggregator, value);
         } else {
-            let integer = option::borrow_mut(&mut optional_aggregator.integer);
+            let integer = optional_aggregator.integer.borrow_mut();
             add_integer(integer, value);
         }
     }
 
     /// Subtracts `value` from optional aggregator, aborting on going below zero.
     public fun sub(optional_aggregator: &mut OptionalAggregator, value: u128) {
-        if (option::is_some(&optional_aggregator.aggregator)) {
-            let aggregator = option::borrow_mut(&mut optional_aggregator.aggregator);
+        if (optional_aggregator.aggregator.is_some()) {
+            let aggregator = optional_aggregator.aggregator.borrow_mut();
             aggregator::sub(aggregator, value);
         } else {
-            let integer = option::borrow_mut(&mut optional_aggregator.integer);
+            let integer = optional_aggregator.integer.borrow_mut();
             sub_integer(integer, value);
         }
     }
 
     /// Returns the value stored in optional aggregator.
     public fun read(optional_aggregator: &OptionalAggregator): u128 {
-        if (option::is_some(&optional_aggregator.aggregator)) {
-            let aggregator = option::borrow(&optional_aggregator.aggregator);
+        if (optional_aggregator.aggregator.is_some()) {
+            let aggregator = optional_aggregator.aggregator.borrow();
             aggregator::read(aggregator)
         } else {
-            let integer = option::borrow(&optional_aggregator.integer);
+            let integer = optional_aggregator.integer.borrow();
             read_integer(integer)
         }
     }
 
     /// Returns true if optional aggregator uses parallelizable implementation.
     public fun is_parallelizable(optional_aggregator: &OptionalAggregator): bool {
-        option::is_some(&optional_aggregator.aggregator)
+        optional_aggregator.aggregator.is_some()
     }
 
     #[test(account = @aptos_framework)]

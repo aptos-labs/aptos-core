@@ -172,7 +172,7 @@ Emit an event with payload <code>msg</code> by using <code>handle_ref</code>'s k
     <b>spec</b> {
         <b>assume</b> handle_ref.counter + 1 &lt;= MAX_U64;
     };
-    handle_ref.counter = handle_ref.counter + 1;
+    handle_ref.counter += 1;
 }
 </code></pre>
 
