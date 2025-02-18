@@ -4,13 +4,14 @@ module aptos_std::eth_trie {
 
     /// Public wrapper function that calls the native and returns a bool.
     /// Returns true if the inclusion proof is valid i.e. the value exists in the tree
+    /// Also returns the value corresponding to the key
     public fun verify_eth_trie_inclusion_proof(
         root: vector<u8>,
         key: vector<u8>,
         proof: vector<vector<u8>>
-    ): bool {
+    ): (bool, vector<u8>) {
         let (proof_is_valid, value) = native_verify_proof_eth_trie(root, key, proof);
-        proof_is_valid && !vector::is_empty(&value)
+        (proof_is_valid && !vector::is_empty(&value), value)
     }
 
     /// Public wrapper function that calls the native and returns a bool.
@@ -86,9 +87,13 @@ module aptos_std::eth_trie {
         vector::push_back(&mut proof, node1);
         vector::push_back(&mut proof, node2);
 
-        let flag = verify_eth_trie_inclusion_proof(root, key, proof);
+        let (flag, value) = verify_eth_trie_inclusion_proof(root, key, proof);
         // Expect true since "doe" exists.
         assert!(flag, 1);
+
+        // Also check the value
+        let expected_val = b"reindeer";
+        assert!(value == expected_val, 2);
     }
 
     #[test]
@@ -153,7 +158,7 @@ module aptos_std::eth_trie {
         let proof: vector<vector<u8>> = vector::empty();
 
         // Since the proof is empty, both inclusion and exclusion proof verification should return false
-        let flag_inclusion = verify_eth_trie_inclusion_proof(root, key, proof);
+        let (flag_inclusion, _value) = verify_eth_trie_inclusion_proof(root, key, proof);
         assert!(!flag_inclusion, 1);
         let flag_exclusion = verify_eth_trie_exclusion_proof(root, key, proof);
         assert!(!flag_exclusion, 1);
@@ -172,7 +177,7 @@ module aptos_std::eth_trie {
         let proof: vector<vector<u8>> = vector[ b"aaa",  b"ccc"];
 
         // Since the proof is invalid, both inclusion and exclusion proof verification should return false
-        let flag_inclusion = verify_eth_trie_inclusion_proof(root, key, proof);
+        let (flag_inclusion, _value) = verify_eth_trie_inclusion_proof(root, key, proof);
         assert!(!flag_inclusion, 1);
         let flag_exclusion = verify_eth_trie_exclusion_proof(root, key, proof);
         assert!(!flag_exclusion, 1);
@@ -199,10 +204,13 @@ module aptos_std::eth_trie {
             };
 
             // Now call verify_proof
-            let flag = verify_eth_trie_inclusion_proof(root, *key, proof);
+            let (flag, value) = verify_eth_trie_inclusion_proof(root, *key, proof);
             // Because we inserted key=val in the Rust code, the proof should be correct
             // and we expect `flag == true`.
             assert!(flag, 1);
+
+            // Also check the value
+            assert!(value == *key, 2);
 
             i = i + 1;
         };

@@ -449,7 +449,8 @@ Signal validators to start using new configuration. Must be called from friend c
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">last_reconfiguration_time</a>(): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">last_reconfiguration_time</a>(): u64
 </code></pre>
 
 
@@ -473,7 +474,8 @@ Signal validators to start using new configuration. Must be called from friend c
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">current_epoch</a>(): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">current_epoch</a>(): u64
 </code></pre>
 
 
@@ -747,7 +749,8 @@ Make sure the caller is admin and check the resource DisableReconfiguration.
 ### Function `last_reconfiguration_time`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">last_reconfiguration_time</a>(): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">last_reconfiguration_time</a>(): u64
 </code></pre>
 
 
@@ -764,7 +767,8 @@ Make sure the caller is admin and check the resource DisableReconfiguration.
 ### Function `current_epoch`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">current_epoch</a>(): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">current_epoch</a>(): u64
 </code></pre>
 
 
