@@ -33,7 +33,6 @@ module aptos_framework::object_code_deployment {
     use std::error;
     use std::features;
     use std::signer;
-    use std::vector;
     use aptos_framework::account;
     use aptos_framework::code;
     use aptos_framework::code::PackageRegistry;
