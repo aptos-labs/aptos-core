@@ -25,6 +25,7 @@ use crate::{
         ReceiverFunctionInstance, ReferenceKind, Substitution, Type, TypeDisplayContext,
         TypeUnificationError, UnificationContext, Variance, WideningOrder, BOOL_TYPE,
     },
+    well_known::{BORROW_MUT_NAME, BORROW_NAME},
     FunId,
 };
 use codespan_reporting::diagnostic::Severity;
@@ -3825,23 +3826,46 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         if *self.had_errors.borrow() {
             return self.new_error_exp();
         }
+        let instantiated_inner = self.subs.specialize(&inner_ty);
+        let node_id = self.env().new_node(
+            loc.clone(),
+            Type::Reference(
+                ReferenceKind::from_is_mut(mutable),
+                Box::new(instantiated_inner.clone()),
+            ),
+        );
+        self.set_node_instantiation(node_id, vec![inner_ty.clone()]);
         if let (Some(mid), Some(fid)) = self.get_vector_borrow(mutable) {
-            let instantiated_inner = self.subs.specialize(&inner_ty);
-            let node_id = self.env().new_node(
-                loc.clone(),
-                Type::Reference(
-                    ReferenceKind::from_is_mut(mutable),
-                    Box::new(instantiated_inner.clone()),
-                ),
-            );
-            self.set_node_instantiation(node_id, vec![inner_ty.clone()]);
             let call = ExpData::Call(node_id, Operation::MoveFunction(mid, fid), vec![
                 vec_exp_e.into_exp(),
                 idx_exp_e.clone().into_exp(),
             ]);
             return call;
+        } else {
+            // To use index notation in vector module
+            let borrow_fun_name = if mutable {
+                BORROW_MUT_NAME
+            } else {
+                BORROW_NAME
+            };
+            if let Some(borrow_symbol) = self
+                .parent
+                .parent
+                .vector_receiver_functions
+                .get(&self.env().symbol_pool.make(borrow_fun_name))
+            {
+                if let Some(borrow_fun_entry) = self.parent.parent.fun_table.get(borrow_symbol) {
+                    let mid = borrow_fun_entry.module_id;
+                    let fid = borrow_fun_entry.fun_id;
+                    return ExpData::Call(node_id, Operation::MoveFunction(mid, fid), vec![
+                        vec_exp_e.into_exp(),
+                        idx_exp_e.clone().into_exp(),
+                    ]);
+                }
+            }
         }
-        ExpData::Invalid(self.env().new_node_id())
+        self.error(loc, "cannot find vector module");
+        self.new_error_exp()
     }
 
     /// Try to translate a resource or vector Index expression
