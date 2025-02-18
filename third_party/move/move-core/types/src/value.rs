@@ -525,6 +525,8 @@ impl MoveStructLayout {
 
     /// Determines whether the layout is serialization compatible with the other layout
     /// (that is, any value serialized with this layout can be deserialized by the other).
+    /// This only will consider runtime variants, decorated variants are only compatible
+    /// if equal.
     pub fn is_compatible_with(&self, other: &Self) -> bool {
         use MoveStructLayout::*;
         match (self, other) {
@@ -533,6 +535,13 @@ impl MoveStructLayout {
                     && variants1.iter().zip(variants2).all(|(fields1, fields2)| {
                         MoveTypeLayout::is_compatible_with_slice(fields1, fields2)
                     })
+            },
+            (Runtime(fields1), Runtime(fields2)) => {
+                fields1.len() == fields2.len()
+                    && fields1
+                        .iter()
+                        .zip(fields2)
+                        .all(|(t1, t2)| t1.is_compatible_with(t2))
             },
             // All other cases require equality
             (s1, s2) => s1 == s2,
