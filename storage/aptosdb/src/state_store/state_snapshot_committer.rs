@@ -14,7 +14,6 @@ use crate::{
     versioned_node_cache::VersionedNodeCache,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
-use aptos_infallible::Mutex;
 use aptos_logger::trace;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
@@ -48,7 +47,7 @@ impl StateSnapshotCommitter {
         state_db: Arc<StateDb>,
         state_snapshot_commit_receiver: Receiver<CommitMessage<StateWithSummary>>,
         last_snapshot: StateWithSummary,
-        persisted_state: Arc<Mutex<PersistedState>>,
+        persisted_state: PersistedState,
     ) -> Self {
         // Note: This is to ensure we cache nodes in memory from previous batches before they get committed to DB.
         const_assert!(
@@ -64,7 +63,7 @@ impl StateSnapshotCommitter {
                 let committer = StateMerkleBatchCommitter::new(
                     arc_state_db,
                     state_merkle_batch_commit_receiver,
-                    persisted_state,
+                    persisted_state.clone(),
                 );
                 committer.run();
             })

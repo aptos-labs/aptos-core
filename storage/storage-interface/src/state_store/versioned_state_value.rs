@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metrics::COUNTER;
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_metrics_core::IntCounterHelper;
 use aptos_types::{
     state_store::{
         state_key::StateKey,
@@ -19,18 +21,6 @@ pub struct DbStateUpdate {
 }
 
 impl DbStateUpdate {
-    pub fn to_state_value_with_version(&self) -> MemorizedStateRead {
-        use MemorizedStateRead::*;
-
-        match &self.value {
-            None => NonExistent,
-            Some(value) => Value {
-                version: self.version,
-                value: value.clone(),
-            },
-        }
-    }
-
     pub fn to_jmt_update_opt(
         &self,
         key: StateKey,
@@ -59,6 +49,10 @@ impl DbStateUpdate {
                 }
             },
         }
+    }
+
+    pub fn expect_non_delete(&self) -> &DbStateValue {
+        self.value.as_ref().expect("Unexpected deletion.")
     }
 }
 
@@ -110,6 +104,26 @@ impl MemorizedStateRead {
         }
     }
 
+    pub fn from_speculative_state(db_update: DbStateUpdate) -> Self {
+        match db_update.value {
+            None => Self::NonExistent,
+            Some(value) => Self::Value {
+                version: db_update.version,
+                value,
+            },
+        }
+    }
+
+    pub fn from_hot_state_hit(db_update: DbStateUpdate) -> Self {
+        match db_update.value {
+            None => unreachable!("Hot state doesn't have None value."),
+            Some(value) => Self::Value {
+                version: db_update.version,
+                value,
+            },
+        }
+    }
+
     /// TODO(aldenhu): Remove. Use only in a context where the access time doesn't matter
     pub fn dummy_from_state_update_ref(state_update_ref: &StateUpdateRef) -> Self {
         match state_update_ref.value {
@@ -139,25 +153,35 @@ impl MemorizedStateRead {
         }
     }
 
-    pub fn to_db_state_update_opt(&self, access_time_secs: u32) -> Option<DbStateUpdate> {
-        const READ_CACHE_REFRESH_INTERVAL: u32 = 60;
+    pub fn to_hot_state_refresh(&self, access_time_secs: u32) -> Option<DbStateUpdate> {
+        const READ_CACHE_REFRESH_INTERVAL: u32 = 600;
 
         match self {
-            MemorizedStateRead::NonExistent => Some(DbStateUpdate {
-                // Dummy creation version
-                version: 0,
-                value: Some(DbStateValue::new_hot_non_existent(access_time_secs)),
-            }),
+            MemorizedStateRead::NonExistent => {
+                COUNTER.inc_with(&["memorized_read_new_hot_non_existent"]);
+                Some(DbStateUpdate {
+                    // Dummy creation version
+                    version: 0,
+                    value: Some(DbStateValue::new_hot_non_existent(access_time_secs)),
+                })
+            },
             MemorizedStateRead::Value { version, value } => {
-                if value.access_time_secs() + READ_CACHE_REFRESH_INTERVAL < access_time_secs {
+                let old_ts = value.access_time_secs();
+                if old_ts + READ_CACHE_REFRESH_INTERVAL < access_time_secs {
+                    if old_ts == 0 {
+                        COUNTER.inc_with(&["memorized_read_new_hot"]);
+                    } else {
+                        COUNTER.inc_with(&["memorized_read_refreshed_hot"]);
+                    }
                     Some(DbStateUpdate {
                         version: *version,
                         value: Some(value.clone()),
                     })
                 } else {
+                    COUNTER.inc_with(&["memorized_read_still_hot"]);
                     None
-                }
-            },
-        }
+                } // end if-else
+            }, // end ::Value
+        } // end match
     }
 }
