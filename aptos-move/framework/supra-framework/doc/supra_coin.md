@@ -265,7 +265,7 @@ Can only called during genesis to initialize the Supra coin.
 
 ## Function `destroy_mint_cap`
 
-Only called during genesis to destroy the aptos framework account's mint capability once all initial validators
+Only called during genesis to destroy the supra framework account's mint capability once all initial validators
 and accounts have been initialized during genesis.
 
 
@@ -293,7 +293,7 @@ and accounts have been initialized during genesis.
 
 ## Function `configure_accounts_for_test`
 
-Can only be called during genesis for tests to grant mint capability to aptos framework and core resources
+Can only be called during genesis for tests to grant mint capability to supra framework and core resources
 accounts.
 Expects account and SUPRA store to be registered before calling.
 

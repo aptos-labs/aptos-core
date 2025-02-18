@@ -2224,13 +2224,13 @@ Collects a specified amount of coin form an account into aggregatable coin.
         account_addr,
         amount
     );
-    <b>let</b> <a href="coin.md#0x1_coin">coin</a> = <b>if</b> (coin_amount_to_collect &gt; 0) {
+    <b>let</b> <a href="coin.md#0x1_coin">coin</a> = <b>if</b> (coin_amount_to_collect != 0) {
         <b>let</b> coin_store = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
         <a href="coin.md#0x1_coin_extract">extract</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, coin_amount_to_collect)
     } <b>else</b> {
         <a href="coin.md#0x1_coin_zero">zero</a>()
     };
-    <b>if</b> (fa_amount_to_collect &gt; 0) {
+    <b>if</b> (fa_amount_to_collect != 0) {
         <b>let</b> store_addr = <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_fungible_store::primary_store_address</a>(
             account_addr,
             <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(<a href="coin.md#0x1_coin_paired_metadata">paired_metadata</a>&lt;CoinType&gt;())
@@ -2837,12 +2837,12 @@ Note: This bypasses CoinStore::frozen -- coins within a frozen CoinStore can be 
         account_addr,
         amount
     );
-    <b>if</b> (coin_amount_to_burn &gt; 0) {
+    <b>if</b> (coin_amount_to_burn != 0) {
         <b>let</b> coin_store = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
         <b>let</b> coin_to_burn = <a href="coin.md#0x1_coin_extract">extract</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, coin_amount_to_burn);
         <a href="coin.md#0x1_coin_burn">burn</a>(coin_to_burn, burn_cap);
     };
-    <b>if</b> (fa_amount_to_burn &gt; 0) {
+    <b>if</b> (fa_amount_to_burn != 0) {
         <a href="fungible_asset.md#0x1_fungible_asset_burn_from">fungible_asset::burn_from</a>(
             <a href="coin.md#0x1_coin_borrow_paired_burn_ref">borrow_paired_burn_ref</a>(burn_cap),
             <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_fungible_store::primary_store</a>(account_addr, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(<a href="coin.md#0x1_coin_paired_metadata">paired_metadata</a>&lt;CoinType&gt;())),
@@ -3581,7 +3581,7 @@ Withdraw specified <code>amount</code> of coin <code>CoinType</code> from the si
         account_addr,
         amount
     );
-    <b>let</b> withdrawn_coin = <b>if</b> (coin_amount_to_withdraw &gt; 0) {
+    <b>let</b> withdrawn_coin = <b>if</b> (coin_amount_to_withdraw != 0) {
         <b>let</b> coin_store = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
         <b>assert</b>!(
             !coin_store.frozen,
@@ -3602,7 +3602,7 @@ Withdraw specified <code>amount</code> of coin <code>CoinType</code> from the si
     } <b>else</b> {
         <a href="coin.md#0x1_coin_zero">zero</a>()
     };
-    <b>if</b> (fa_amount_to_withdraw &gt; 0) {
+    <b>if</b> (fa_amount_to_withdraw != 0) {
         <b>let</b> fa = <a href="primary_fungible_store.md#0x1_primary_fungible_store_withdraw">primary_fungible_store::withdraw</a>(
             <a href="account.md#0x1_account">account</a>,
             <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(<a href="coin.md#0x1_coin_paired_metadata">paired_metadata</a>&lt;CoinType&gt;()),
@@ -4150,7 +4150,7 @@ Can only be updated by <code>@supra_framework</code>.
 
 
 
-<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a> { <a href="account.md#0x1_account">account</a>: supra_framework };
+<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotSupraFramework">system_addresses::AbortsIfNotSupraFramework</a> { <a href="account.md#0x1_account">account</a>: supra_framework };
 <b>include</b> <a href="aggregator_factory.md#0x1_aggregator_factory_CreateAggregatorInternalAbortsIf">aggregator_factory::CreateAggregatorInternalAbortsIf</a>;
 </code></pre>
 

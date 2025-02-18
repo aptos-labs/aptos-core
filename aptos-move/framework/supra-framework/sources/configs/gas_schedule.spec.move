@@ -11,7 +11,7 @@ spec supra_framework::gas_schedule {
     /// Requirement: Only the Supra framework account should be allowed to update the gas schedule resource.
     /// Criticality: Critical
     /// Implementation: The gas_schedule::set_gas_schedule function calls the assert_supra_framework function to ensure
-    /// that the signer is the aptos framework account.
+    /// that the signer is the supra framework account.
     /// Enforcement: Formally verified via [high-level-req-2](set_gas_schedule).
     ///
     /// No.: 3
@@ -39,7 +39,7 @@ spec supra_framework::gas_schedule {
 
         let addr = signer::address_of(supra_framework);
         /// [high-level-req-1]
-        include system_addresses::AbortsIfNotAptosFramework{ account: supra_framework };
+        include system_addresses::AbortsIfNotSupraFramework{ account: supra_framework };
         /// [high-level-req-3.3]
         aborts_if len(gas_schedule_blob) == 0;
         aborts_if exists<GasScheduleV2>(addr);
@@ -65,7 +65,7 @@ spec supra_framework::gas_schedule {
         include staking_config::StakingRewardsConfigRequirement;
 
         /// [high-level-req-2]
-        include system_addresses::AbortsIfNotAptosFramework{ account: supra_framework };
+        include system_addresses::AbortsIfNotSupraFramework{ account: supra_framework };
         /// [high-level-req-3.2]
         aborts_if len(gas_schedule_blob) == 0;
         let new_gas_schedule = util::spec_from_bytes<GasScheduleV2>(gas_schedule_blob);
@@ -87,7 +87,7 @@ spec supra_framework::gas_schedule {
         pragma verify_duration_estimate = 600;
         requires exists<stake::ValidatorFees>(@supra_framework);
         requires exists<CoinInfo<SupraCoin>>(@supra_framework);
-        include system_addresses::AbortsIfNotAptosFramework{ account: supra_framework };
+        include system_addresses::AbortsIfNotSupraFramework{ account: supra_framework };
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include staking_config::StakingRewardsConfigRequirement;
         aborts_if !exists<StorageGasConfig>(@supra_framework);
@@ -97,7 +97,7 @@ spec supra_framework::gas_schedule {
     spec set_for_next_epoch(supra_framework: &signer, gas_schedule_blob: vector<u8>) {
         use supra_framework::util;
 
-        include system_addresses::AbortsIfNotAptosFramework{ account: supra_framework };
+        include system_addresses::AbortsIfNotSupraFramework{ account: supra_framework };
         include config_buffer::SetForNextEpochAbortsIf {
             account: supra_framework,
             config: gas_schedule_blob
@@ -113,7 +113,7 @@ spec supra_framework::gas_schedule {
         use std::features;
         use supra_framework::util;
 
-        include system_addresses::AbortsIfNotAptosFramework{ account: supra_framework };
+        include system_addresses::AbortsIfNotSupraFramework{ account: supra_framework };
         include config_buffer::SetForNextEpochAbortsIf {
             account: supra_framework,
             config: new_gas_schedule_blob
@@ -131,12 +131,12 @@ spec supra_framework::gas_schedule {
     }
 
     spec set_storage_gas_config(supra_framework: &signer, config: storage_gas::StorageGasConfig) {
-        include system_addresses::AbortsIfNotAptosFramework{ account: supra_framework };
+        include system_addresses::AbortsIfNotSupraFramework{ account: supra_framework };
         aborts_if !exists<storage_gas::StorageGasConfig>(@supra_framework);
     }
 
     spec set_storage_gas_config_for_next_epoch(supra_framework: &signer, config: storage_gas::StorageGasConfig) {
-        include system_addresses::AbortsIfNotAptosFramework{ account: supra_framework };
+        include system_addresses::AbortsIfNotSupraFramework{ account: supra_framework };
         aborts_if !exists<storage_gas::StorageGasConfig>(@supra_framework);
     }
 }

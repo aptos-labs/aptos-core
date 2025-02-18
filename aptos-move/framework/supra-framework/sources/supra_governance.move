@@ -4,7 +4,7 @@
 /// the stake pool's lockup needs to be at least as long as the proposal's duration.
 ///
 /// It provides the following flow:
-/// 1. Proposers can create a proposal by calling AptosGovernance::create_proposal. The proposer's backing stake pool
+/// 1. Proposers can create a proposal by calling SupraGovernance::create_proposal. The proposer's backing stake pool
 /// needs to have the minimum proposer stake required. Off-chain components can subscribe to CreateProposalEvent to
 /// track proposal creation and proposal ids.
 /// 2. Voters can vote on a proposal. Their voting power is derived from the backing stake pool. A stake pool can vote
@@ -179,7 +179,7 @@ module supra_framework::supra_governance {
     }
 
     /// Update the governance configurations. This can only be called as part of resolving a proposal in this same
-    /// AptosGovernance.
+    /// SupraGovernance.
     public fun update_supra_governance_config(
         supra_framework: &signer,
         voting_duration_secs: u64,

@@ -11,7 +11,7 @@ On-chain governance of the Supra network also uses Voting.
 
 The voting flow:
 1. The Voting module can be deployed at a known address (e.g. 0x1 for Supra on-chain governance)
-2. The governance module, e.g. AptosGovernance, can be deployed later and define a GovernanceProposal resource type
+2. The governance module, e.g. SupraGovernance, can be deployed later and define a GovernanceProposal resource type
 that can also contain other information such as Capability resource for authorization.
 3. The governance module's owner can then register the ProposalType with Voting. This also hosts the proposal list
 (forum) on the calling account.
@@ -934,7 +934,7 @@ resolve this proposal.
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="voting.md#0x1_voting_EINVALID_MIN_VOTE_THRESHOLD">EINVALID_MIN_VOTE_THRESHOLD</a>),
         );
     };
-    // Make sure the execution <b>script</b>'s <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> is not empty.
+    // Make sure the execution <b>script</b>'s <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a> is not empty.
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&execution_hash) != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="voting.md#0x1_voting_EPROPOSAL_EMPTY_EXECUTION_HASH">EPROPOSAL_EMPTY_EXECUTION_HASH</a>));
 
     <b>let</b> voting_forum = <b>borrow_global_mut</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
@@ -1266,7 +1266,7 @@ there are more yes votes than no. If either of these conditions is not met, this
         };
     } <b>else</b> {
         // If the current step is not the last step,
-        // <b>update</b> the proposal's execution <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> on-chain <b>to</b> the execution <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> of the next step.
+        // <b>update</b> the proposal's execution <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a> on-chain <b>to</b> the execution <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a> of the next step.
         proposal.execution_hash = next_execution_hash;
     };
 

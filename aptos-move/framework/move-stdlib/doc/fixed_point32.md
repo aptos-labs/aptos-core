@@ -10,6 +10,7 @@ a 32-bit fractional part.
 -  [Struct `FixedPoint32`](#0x1_fixed_point32_FixedPoint32)
 -  [Constants](#@Constants_0)
 -  [Function `multiply_u64`](#0x1_fixed_point32_multiply_u64)
+-  [Function `multiply_u64_return_fixpoint32`](#0x1_fixed_point32_multiply_u64_return_fixpoint32)
 -  [Function `divide_u64`](#0x1_fixed_point32_divide_u64)
 -  [Function `create_from_rational`](#0x1_fixed_point32_create_from_rational)
 -  [Function `create_from_raw_value`](#0x1_fixed_point32_create_from_raw_value)
@@ -167,6 +168,36 @@ overflows.
     // Check whether the value is too large.
     <b>assert</b>!(product &lt;= <a href="fixed_point32.md#0x1_fixed_point32_MAX_U64">MAX_U64</a>, <a href="fixed_point32.md#0x1_fixed_point32_EMULTIPLICATION">EMULTIPLICATION</a>);
     (product <b>as</b> u64)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fixed_point32_multiply_u64_return_fixpoint32"></a>
+
+## Function `multiply_u64_return_fixpoint32`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_multiply_u64_return_fixpoint32">multiply_u64_return_fixpoint32</a>(val: u64, multiplier: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_multiply_u64_return_fixpoint32">multiply_u64_return_fixpoint32</a>(val: u64, multiplier: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> {
+    // The product of two 64 bit values <b>has</b> 128 bits, so perform the
+    // multiplication <b>with</b> u128 types and keep the full 128 bit product
+    // <b>to</b> avoid losing accuracy.
+    <b>let</b> unscaled_product = (val <b>as</b> u128) * (multiplier.value <b>as</b> u128);
+    // Check whether the value is too large.
+    <b>assert</b>!(unscaled_product &lt;= <a href="fixed_point32.md#0x1_fixed_point32_MAX_U64">MAX_U64</a>, <a href="fixed_point32.md#0x1_fixed_point32_EMULTIPLICATION">EMULTIPLICATION</a>);
+    <a href="fixed_point32.md#0x1_fixed_point32_create_from_raw_value">create_from_raw_value</a>((unscaled_product <b>as</b> u64))
 }
 </code></pre>
 

@@ -14,7 +14,7 @@ spec supra_framework::aggregator_factory {
     /// Requirement: To create a new aggregator instance, the aggregator factory must already be initialized and exist
     /// under the Supra account.
     /// Criticality: High
-    /// Implementation: The create_aggregator_internal function asserts that AggregatorFactory exists for the Aptos
+    /// Implementation: The create_aggregator_internal function asserts that AggregatorFactory exists for the Supra
     /// account.
     /// Enforcement: Formally verified via [high-level-req-2](CreateAggregatorInternalAbortsIf).
     ///

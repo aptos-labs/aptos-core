@@ -13,7 +13,7 @@ spec supra_framework::genesis {
     /// Enforcement: Formally verified via [high-level-req-1](initialize).
     ///
     /// No.: 2
-    /// Requirement: Addresses ranging from 0x0 - 0xa should be reserved for the framework and part of aptos governance.
+    /// Requirement: Addresses ranging from 0x0 - 0xa should be reserved for the framework and part of supra governance.
     /// Criticality: Critical
     /// Implementation: The function genesis::initialize calls account::create_framework_reserved_account for addresses
     /// 0x0, 0x2, 0x3, 0x4, ..., 0xa which creates an account and authentication_key for them. This should be formally
@@ -51,7 +51,7 @@ spec supra_framework::genesis {
         pragma aborts_if_is_partial;
         include InitalizeRequires;
 
-        // property 2: Addresses ranging from 0x0 - 0xa should be reserved for the framework and part of aptos governance.
+        // property 2: Addresses ranging from 0x0 - 0xa should be reserved for the framework and part of supra governance.
         // 0x1's pre and post conditions are written in requires schema and the following group of ensures.
         /// [high-level-req-2]
         aborts_if exists<account::Account>(@0x0);
@@ -100,7 +100,7 @@ spec supra_framework::genesis {
     }
 
     spec initialize_supra_coin {
-        // property 3: The Supra coin should be initialized during genesis and only the Aptos framework account should
+        // property 3: The Supra coin should be initialized during genesis and only the Supra framework account should
         // own the mint and burn capabilities for the SUPRA token.
         /// [high-level-req-3]
         requires !exists<stake::SupraCoinCapabilities>(@supra_framework);

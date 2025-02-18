@@ -1182,7 +1182,6 @@ impl CliTestFramework {
         is_multi_step: bool,
     ) -> CliTypedResult<ProposalSubmissionSummary> {
         SubmitProposal {
-            pool_address_args: PoolAddressArgs { pool_address },
             args: SubmitProposalArgs {
                 #[cfg(feature = "no-upload-proposal")]
                 metadata_path: None,

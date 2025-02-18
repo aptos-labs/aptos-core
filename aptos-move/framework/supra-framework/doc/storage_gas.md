@@ -774,7 +774,7 @@ Which means that the price above <code>min_gas</code> is approximately
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="storage_gas.md#0x1_storage_gas_new_usage_gas_config">new_usage_gas_config</a>(target_usage: u64, read_curve: <a href="storage_gas.md#0x1_storage_gas_GasCurve">GasCurve</a>, create_curve: <a href="storage_gas.md#0x1_storage_gas_GasCurve">GasCurve</a>, write_curve: <a href="storage_gas.md#0x1_storage_gas_GasCurve">GasCurve</a>): <a href="storage_gas.md#0x1_storage_gas_UsageGasConfig">UsageGasConfig</a> {
-    <b>assert</b>!(target_usage &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="storage_gas.md#0x1_storage_gas_EZERO_TARGET_USAGE">EZERO_TARGET_USAGE</a>));
+    <b>assert</b>!(target_usage != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="storage_gas.md#0x1_storage_gas_EZERO_TARGET_USAGE">EZERO_TARGET_USAGE</a>));
     <b>assert</b>!(target_usage &lt;= <a href="storage_gas.md#0x1_storage_gas_MAX_U64">MAX_U64</a> / <a href="storage_gas.md#0x1_storage_gas_BASIS_POINT_DENOMINATION">BASIS_POINT_DENOMINATION</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="storage_gas.md#0x1_storage_gas_ETARGET_USAGE_TOO_BIG">ETARGET_USAGE_TOO_BIG</a>));
     <a href="storage_gas.md#0x1_storage_gas_UsageGasConfig">UsageGasConfig</a> {
         target_usage,
@@ -1524,7 +1524,7 @@ A non decreasing curve must ensure that next is greater than cur.
 Signer address must be @supra_framework and StorageGasConfig exists.
 
 
-<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: supra_framework };
+<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotSupraFramework">system_addresses::AbortsIfNotSupraFramework</a>{ <a href="account.md#0x1_account">account</a>: supra_framework };
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">StorageGasConfig</a>&gt;(@supra_framework);
 </code></pre>
 
@@ -1544,7 +1544,7 @@ Address @supra_framework does not exist StorageGasConfig and StorageGas before t
 and exists after the function is executed.
 
 
-<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: supra_framework };
+<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotSupraFramework">system_addresses::AbortsIfNotSupraFramework</a>{ <a href="account.md#0x1_account">account</a>: supra_framework };
 <b>pragma</b> verify_duration_estimate = 120;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">StorageGasConfig</a>&gt;(@supra_framework);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGas">StorageGas</a>&gt;(@supra_framework);

@@ -1,5 +1,5 @@
-/// Defines feature flags for Aptos. Those are used in Aptos specific implementations of features in
-/// the Move stdlib, the Aptos stdlib, and the Aptos framework.
+/// Defines feature flags for Supra. Those are used in Supra specific implementations of features in
+/// the Move stdlib, the Supra stdlib, and the Supra framework.
 ///
 /// ============================================================================================
 /// Feature Flag Definitions

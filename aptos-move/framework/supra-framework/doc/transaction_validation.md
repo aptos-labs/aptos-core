@@ -300,7 +300,7 @@ Only called during genesis to initialize system resources for this module.
         transaction_sender == gas_payer
             || <a href="account.md#0x1_account_exists_at">account::exists_at</a>(transaction_sender)
             || !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_sponsored_automatic_account_creation_enabled">features::sponsored_automatic_account_creation_enabled</a>()
-            || txn_sequence_number &gt; 0
+            || txn_sequence_number != 0
     ) {
         <b>assert</b>!(<a href="account.md#0x1_account_exists_at">account::exists_at</a>(transaction_sender), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EACCOUNT_DOES_NOT_EXIST">PROLOGUE_EACCOUNT_DOES_NOT_EXIST</a>));
         <b>assert</b>!(

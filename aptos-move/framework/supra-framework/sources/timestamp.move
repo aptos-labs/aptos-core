@@ -21,7 +21,7 @@ module supra_framework::timestamp {
     /// An invalid timestamp was provided
     const EINVALID_TIMESTAMP: u64 = 2;
 
-    /// Marks that time has started. This can only be called from genesis and with the aptos framework account.
+    /// Marks that time has started. This can only be called from genesis and with the supra framework account.
     public(friend) fun set_time_has_started(supra_framework: &signer, start_time_in_microseconds: u64) {
         system_addresses::assert_supra_framework(supra_framework);
         let timer = CurrentTimeMicroseconds { microseconds: start_time_in_microseconds };

@@ -25,8 +25,7 @@ use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     on_chain_config::{
-        Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
-        OnChainJWKConsensusConfig, OnChainRandomnessConfig,
+        Features, GasScheduleV2, OnChainConsensusConfig, OnChainEvmConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig
     },
     transaction::Transaction,
     waypoint::Waypoint,
@@ -169,6 +168,7 @@ impl GenesisInfo {
             &self.execution_config,
             &self.gas_schedule,
             b"test".to_vec(),
+            &OnChainEvmConfig::default_for_test(),
         )
     }
 

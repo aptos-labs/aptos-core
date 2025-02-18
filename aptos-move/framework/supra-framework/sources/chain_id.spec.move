@@ -9,7 +9,7 @@ spec supra_framework::chain_id {
     /// Enforcement: Formally verified via [high-level-req-1](initialize).
     ///
     /// No.: 2
-    /// Requirement: The chain id can only be fetched if the chain id resource exists under the Aptos
+    /// Requirement: The chain id can only be fetched if the chain id resource exists under the Supra
     /// framework account.
     /// Criticality: Low
     /// Implementation: The chain_id::get function fetches the chain id by borrowing the ChainId

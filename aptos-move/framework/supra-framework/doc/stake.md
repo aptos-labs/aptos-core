@@ -2462,7 +2462,7 @@ to set later.
         validator_index: 0,
     });
 
-    <b>if</b> (initial_stake_amount &gt; 0) {
+    <b>if</b> (initial_stake_amount != 0) {
         <a href="stake.md#0x1_stake_add_stake">add_stake</a>(owner, initial_stake_amount);
     };
 
@@ -3576,7 +3576,7 @@ Can only be called by the operator of the validator/staking pool.
         <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&maybe_active_index), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="stake.md#0x1_stake_ENOT_VALIDATOR">ENOT_VALIDATOR</a>));
         <b>let</b> validator_info = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_swap_remove">vector::swap_remove</a>(
             &<b>mut</b> validator_set.active_validators, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> maybe_active_index));
-        <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&validator_set.active_validators) &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="stake.md#0x1_stake_ELAST_VALIDATOR">ELAST_VALIDATOR</a>));
+        <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&validator_set.active_validators) != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="stake.md#0x1_stake_ELAST_VALIDATOR">ELAST_VALIDATOR</a>));
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> validator_set.pending_inactive, validator_info);
 
         <b>if</b> (std::features::module_event_migration_enabled()) {
@@ -3928,7 +3928,7 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
         <b>let</b> cur_pending_active = <a href="coin.md#0x1_coin_value">coin::value</a>(&stake_pool.pending_active);
         <b>let</b> cur_pending_inactive = <a href="coin.md#0x1_coin_value">coin::value</a>(&stake_pool.pending_inactive);
 
-        <b>let</b> cur_reward = <b>if</b> (candidate_in_current_validator_set && cur_active &gt; 0) {
+        <b>let</b> cur_reward = <b>if</b> (candidate_in_current_validator_set && cur_active != 0) {
             <b>spec</b> {
                 <b>assert</b> candidate.config.validator_index &lt; len(validator_perf.validators);
             };
@@ -4269,7 +4269,7 @@ Calculate the rewards amount.
     // We do multiplication in u128 before division <b>to</b> avoid the overflow and minimize the rounding <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a>.
     <b>let</b> rewards_numerator = (stake_amount <b>as</b> u128) * (rewards_rate <b>as</b> u128) * (num_successful_proposals <b>as</b> u128);
     <b>let</b> rewards_denominator = (rewards_rate_denominator <b>as</b> u128) * (num_total_proposals <b>as</b> u128);
-    <b>if</b> (rewards_denominator &gt; 0) {
+    <b>if</b> (rewards_denominator != 0) {
         ((rewards_numerator / rewards_denominator) <b>as</b> u64)
     } <b>else</b> {
         0
@@ -4305,7 +4305,7 @@ Mint rewards corresponding to current epoch's <code><a href="stake.md#0x1_stake"
     rewards_rate_denominator: u64,
 ): u64 <b>acquires</b> <a href="stake.md#0x1_stake_SupraCoinCapabilities">SupraCoinCapabilities</a> {
     <b>let</b> stake_amount = <a href="coin.md#0x1_coin_value">coin::value</a>(<a href="stake.md#0x1_stake">stake</a>);
-    <b>let</b> rewards_amount = <b>if</b> (stake_amount &gt; 0) {
+    <b>let</b> rewards_amount = <b>if</b> (stake_amount != 0) {
         <a href="stake.md#0x1_stake_calculate_rewards_amount">calculate_rewards_amount</a>(
             stake_amount,
             num_successful_proposals,
@@ -4316,7 +4316,7 @@ Mint rewards corresponding to current epoch's <code><a href="stake.md#0x1_stake"
     } <b>else</b> {
         0
     };
-    <b>if</b> (rewards_amount &gt; 0) {
+    <b>if</b> (rewards_amount != 0) {
         <b>let</b> mint_cap = &<b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_SupraCoinCapabilities">SupraCoinCapabilities</a>&gt;(@supra_framework).mint_cap;
         <b>let</b> rewards = <a href="coin.md#0x1_coin_mint">coin::mint</a>(rewards_amount, mint_cap);
         <a href="coin.md#0x1_coin_merge">coin::merge</a>(<a href="stake.md#0x1_stake">stake</a>, rewards);
@@ -4474,7 +4474,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
     validator_set.total_joining_power = validator_set.total_joining_power + (increase_amount <b>as</b> u128);
 
     // Only validator <a href="voting.md#0x1_voting">voting</a> power increase <b>if</b> the current validator set's <a href="voting.md#0x1_voting">voting</a> power &gt; 0.
-    <b>if</b> (validator_set.total_voting_power &gt; 0) {
+    <b>if</b> (validator_set.total_voting_power != 0) {
         <b>assert</b>!(
             validator_set.total_joining_power &lt;= validator_set.total_voting_power * voting_power_increase_limit / 100,
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="stake.md#0x1_stake_EVOTING_POWER_INCREASE_EXCEEDS_LIMIT">EVOTING_POWER_INCREASE_EXCEEDS_LIMIT</a>),
@@ -5491,7 +5491,6 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
-<b>pragma</b> disable_invariants_in_body;
 <b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">ResourceRequirement</a>;
 <b>include</b> <a href="stake.md#0x1_stake_GetReconfigStartTimeRequirement">GetReconfigStartTimeRequirement</a>;
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
