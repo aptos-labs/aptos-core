@@ -7,7 +7,7 @@ use crate::{
     metrics::OTHER_TIMERS_SECONDS,
     state_store::{
         buffered_state::CommitMessage,
-        persisted_state::PersistedState,
+        persisted_state::PersistedStateSummary,
         state_merkle_batch_committer::{StateMerkleBatch, StateMerkleBatchCommitter},
         StateDb,
     },
@@ -48,7 +48,7 @@ impl StateSnapshotCommitter {
         state_db: Arc<StateDb>,
         state_snapshot_commit_receiver: Receiver<CommitMessage<StateWithSummary>>,
         last_snapshot: StateWithSummary,
-        persisted_state: Arc<Mutex<PersistedState>>,
+        persisted_state: Arc<Mutex<PersistedStateSummary>>,
     ) -> Self {
         // Note: This is to ensure we cache nodes in memory from previous batches before they get committed to DB.
         const_assert!(

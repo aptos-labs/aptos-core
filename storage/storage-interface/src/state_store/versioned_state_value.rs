@@ -19,18 +19,6 @@ pub struct DbStateUpdate {
 }
 
 impl DbStateUpdate {
-    pub fn to_state_value_with_version(&self) -> MemorizedStateRead {
-        use MemorizedStateRead::*;
-
-        match &self.value {
-            None => NonExistent,
-            Some(value) => Value {
-                version: self.version,
-                value: value.clone(),
-            },
-        }
-    }
-
     pub fn to_jmt_update_opt(
         &self,
         key: StateKey,
@@ -59,6 +47,10 @@ impl DbStateUpdate {
                 }
             },
         }
+    }
+
+    pub fn expect_non_delete(&self) -> &DbStateValue {
+        self.value.as_ref().expect("Unexpected deletion.")
     }
 }
 
@@ -110,6 +102,26 @@ impl MemorizedStateRead {
         }
     }
 
+    pub fn from_speculative_state(db_update: DbStateUpdate) -> Self {
+        match db_update.value {
+            None => Self::NonExistent,
+            Some(value) => Self::Value {
+                version: db_update.version,
+                value,
+            },
+        }
+    }
+
+    pub fn from_hot_state_hit(db_update: DbStateUpdate) -> Self {
+        match db_update.value {
+            None => unreachable!("Hot state doesn't have None value."),
+            Some(value) => Self::Value {
+                version: db_update.version,
+                value,
+            },
+        }
+    }
+
     /// TODO(aldenhu): Remove. Use only in a context where the access time doesn't matter
     pub fn dummy_from_state_update_ref(state_update_ref: &StateUpdateRef) -> Self {
         match state_update_ref.value {
@@ -139,7 +151,7 @@ impl MemorizedStateRead {
         }
     }
 
-    pub fn to_db_state_update_opt(&self, access_time_secs: u32) -> Option<DbStateUpdate> {
+    pub fn to_read_cache_update_opt(&self, access_time_secs: u32) -> Option<DbStateUpdate> {
         const READ_CACHE_REFRESH_INTERVAL: u32 = 60;
 
         match self {

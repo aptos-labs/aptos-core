@@ -7,11 +7,11 @@ use aptos_scratchpad::SUBTREE_DROPPER;
 use aptos_storage_interface::state_store::state_with_summary::StateWithSummary;
 use std::ops::Deref;
 
-pub struct PersistedState {
+pub struct PersistedStateSummary {
     persisted: StateWithSummary,
 }
 
-impl PersistedState {
+impl PersistedStateSummary {
     const MAX_PENDING_DROPS: usize = 8;
 
     pub fn new_dummy() -> Self {
@@ -35,7 +35,7 @@ impl PersistedState {
     }
 }
 
-impl Deref for PersistedState {
+impl Deref for PersistedStateSummary {
     type Target = StateWithSummary;
 
     fn deref(&self) -> &Self::Target {

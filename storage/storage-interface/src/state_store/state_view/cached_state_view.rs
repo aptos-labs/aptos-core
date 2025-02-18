@@ -7,7 +7,10 @@ use crate::{
         state::State,
         state_delta::StateDelta,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
-        state_view::db_state_view::DbStateView,
+        state_view::{
+            db_state_view::DbStateView,
+            hot_state_view::{EmptyHotState, HotStateView},
+        },
         versioned_state_value::MemorizedStateRead,
     },
     DbReader,
@@ -78,12 +81,15 @@ pub struct CachedStateView {
     /// For logging and debugging purpose, identifies what this view is for.
     id: StateViewId,
 
-    /// The persisted state is readable from the persist storage, at the version of
-    /// `self.speculative.base_version()`
-    reader: Arc<dyn DbReader>,
-
-    /// The in-memory state on top of known persisted state
+    /// The in-memory state on top of known persisted state.
     speculative: StateDelta,
+
+    /// Persisted hot state. To be fetched if a key isn't in `speculative`.
+    hot: Arc<dyn HotStateView>,
+
+    /// Persisted base state. To be fetched if a key isn't in either `speculative` or `hot_state`.
+    /// `self.speculative.base_version()` is targeted in db fetches.
+    cold: Arc<dyn DbReader>,
 
     /// State values (with update versions) read across the lifetime of the state view.
     memorized: ShardedStateCache,
@@ -100,21 +106,30 @@ impl CachedStateView {
     /// speculative state represented by `speculative_state`. The persistent state view is the
     /// latest one preceding `next_version`
     pub fn new(id: StateViewId, reader: Arc<dyn DbReader>, state: State) -> StateViewResult<Self> {
-        let persisted_state = reader.get_persisted_state()?;
-        Ok(Self::new_impl(id, reader, persisted_state, state))
+        let (hot_state, persisted_state) = reader.get_persisted_state()?;
+        Ok(Self::new_impl(
+            id,
+            reader,
+            hot_state,
+            persisted_state,
+            state,
+        ))
     }
 
     pub fn new_impl(
         id: StateViewId,
         reader: Arc<dyn DbReader>,
+        hot_state: Arc<dyn HotStateView>,
         persisted_state: State,
         state: State,
     ) -> Self {
+        let version = state.version();
         Self {
             id,
-            reader,
-            memorized: ShardedStateCache::new_empty(state.version()),
             speculative: state.into_delta(persisted_state),
+            hot: hot_state,
+            cold: reader,
+            memorized: ShardedStateCache::new_empty(version),
         }
     }
 
@@ -124,9 +139,10 @@ impl CachedStateView {
 
         Self {
             id: StateViewId::Miscellaneous,
-            reader: Arc::new(DummyDbReader),
-            memorized: ShardedStateCache::new_empty(None),
             speculative: state.make_delta(state),
+            hot: Arc::new(EmptyHotState),
+            cold: Arc::new(DummyDbReader),
+            memorized: ShardedStateCache::new_empty(None),
         }
     }
 
@@ -169,8 +185,9 @@ impl CachedStateView {
     pub fn into_memorized_reads(self) -> ShardedStateCache {
         let Self {
             id: _,
-            reader: _,
             speculative: _,
+            hot: _,
+            cold: _,
             memorized,
         } = self;
 
@@ -181,13 +198,14 @@ impl CachedStateView {
         self.speculative.base_version()
     }
 
-    fn get_uncached(&self, state_key: &StateKey) -> Result<MemorizedStateRead> {
+    fn get_unmemorized(&self, state_key: &StateKey) -> Result<MemorizedStateRead> {
         let ret = if let Some(update) = self.speculative.get_state_update(state_key) {
-            // found in speculative state, can be either a new value or a deletion
-            update.to_state_value_with_version()
+            MemorizedStateRead::from_speculative_state(update)
+        } else if let Some(update) = self.hot.get_state_update(state_key)? {
+            MemorizedStateRead::from_hot_state_hit(update)
         } else if let Some(base_version) = self.base_version() {
             MemorizedStateRead::from_db_get(
-                self.reader
+                self.cold
                     .get_state_value_with_version_by_version(state_key, base_version)?,
             )
         } else {
@@ -223,13 +241,13 @@ impl TStateView for CachedStateView {
 
     fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
         let _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
-        // First check if the cache has the state value.
+        // First check if requested key is already memorized.
         if let Some(value_with_version_opt) = self.memorized.get_cloned(state_key) {
             return Ok(value_with_version_opt.into_state_value_opt());
         }
 
         // TODO(aldenhu): reduce duplicated gets
-        let value_with_version_opt = self.get_uncached(state_key)?;
+        let value_with_version_opt = self.get_unmemorized(state_key)?;
 
         // Update the cache if still empty
         let new_value_with_version_opt = self

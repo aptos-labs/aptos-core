@@ -6,7 +6,8 @@
 use crate::{
     metrics::{LATEST_CHECKPOINT_VERSION, OTHER_TIMERS_SECONDS},
     state_store::{
-        persisted_state::PersistedState, state_snapshot_committer::StateSnapshotCommitter, StateDb,
+        hot_state::HotState, persisted_state::PersistedStateSummary,
+        state_snapshot_committer::StateSnapshotCommitter, StateDb,
     },
 };
 use aptos_infallible::Mutex;
@@ -42,6 +43,8 @@ pub struct BufferedState {
     estimated_items: usize,
     /// The target number of items in the buffer between commits.
     target_items: usize,
+    /// hot state (value only)
+    hot_state: Arc<HotState>,
     join_handle: Option<JoinHandle<()>>,
 }
 
@@ -57,7 +60,8 @@ impl BufferedState {
         last_snapshot: StateWithSummary,
         target_items: usize,
         out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
-        out_persisted_state: Arc<Mutex<PersistedState>>,
+        out_persisted_state: Arc<Mutex<PersistedStateSummary>>,
+        out_hot_state: Arc<HotState>,
     ) -> Self {
         let (state_commit_sender, state_commit_receiver) =
             mpsc::sync_channel(ASYNC_COMMIT_CHANNEL_BUFFER_SIZE as usize);
@@ -65,6 +69,8 @@ impl BufferedState {
         *out_current_state.lock() =
             LedgerStateWithSummary::new_at_checkpoint(last_snapshot.clone());
         out_persisted_state.lock().set(last_snapshot.clone());
+        out_hot_state.set_commited(last_snapshot.state().clone());
+
         let persisted_state_clone = out_persisted_state.clone();
         let last_snapshot_clone = last_snapshot.clone();
         // Create a new thread with receiver subscribing to state commit changes
@@ -87,6 +93,7 @@ impl BufferedState {
             state_commit_sender,
             estimated_items: 0,
             target_items,
+            hot_state: out_hot_state,
             // The join handle of the async state commit thread for graceful drop.
             join_handle: Some(join_handle),
         }
@@ -171,7 +178,9 @@ impl BufferedState {
         // buffer size a tad more realistic.
         let checkpoint_to_commit_opt =
             (old_state.next_version() < last_checkpoint.next_version()).then_some(last_checkpoint);
+        let latest_state = new_state.state().clone();
         *self.current_state_locked() = new_state;
+        self.hot_state.enqueue_commit(latest_state);
         self.maybe_commit(checkpoint_to_commit_opt, sync_commit);
         Self::report_last_checkpoint_version(version);
         Ok(())

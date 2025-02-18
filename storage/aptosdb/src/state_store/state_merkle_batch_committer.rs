@@ -7,7 +7,7 @@ use crate::{
     metrics::{LATEST_SNAPSHOT_VERSION, OTHER_TIMERS_SECONDS},
     pruner::PrunerManager,
     schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    state_store::{buffered_state::CommitMessage, persisted_state::PersistedState, StateDb},
+    state_store::{buffered_state::CommitMessage, persisted_state::PersistedStateSummary, StateDb},
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_infallible::Mutex;
@@ -27,14 +27,14 @@ pub struct StateMerkleBatch {
 pub(crate) struct StateMerkleBatchCommitter {
     state_db: Arc<StateDb>,
     state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleBatch>>,
-    persisted_state: Arc<Mutex<PersistedState>>,
+    persisted_state: Arc<Mutex<PersistedStateSummary>>,
 }
 
 impl StateMerkleBatchCommitter {
     pub fn new(
         state_db: Arc<StateDb>,
         state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleBatch>>,
-        persisted_state: Arc<Mutex<PersistedState>>,
+        persisted_state: Arc<Mutex<PersistedStateSummary>>,
     ) -> Self {
         Self {
             state_db,

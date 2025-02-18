@@ -6,7 +6,10 @@ use crate::{
     state_store::{
         state_delta::StateDelta,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
-        state_view::cached_state_view::{CachedStateView, ShardedStateCache, StateCacheShard},
+        state_view::{
+            cached_state_view::{CachedStateView, ShardedStateCache, StateCacheShard},
+            hot_state_view::EmptyHotState,
+        },
         versioned_state_value::{DbStateUpdate, StateUpdateRef},
         NUM_STATE_SHARDS,
     },
@@ -115,7 +118,7 @@ impl State {
                         .iter()
                         .filter_map(|entry| {
                             let (key, read) = entry.pair();
-                            read.to_db_state_update_opt(access_time_secs)
+                            read.to_read_cache_update_opt(access_time_secs)
                                 .map(|upd_opt| (key.clone(), upd_opt))
                         })
                         .collect_vec(),
@@ -303,6 +306,7 @@ impl LedgerState {
         let state_view = CachedStateView::new_impl(
             StateViewId::Miscellaneous,
             reader,
+            Arc::new(EmptyHotState),
             persisted_snapshot.clone(),
             self.latest().clone(),
         );
