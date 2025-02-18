@@ -2213,7 +2213,7 @@ impl ValueShape {
         let mut values = BTreeSet::new();
         for (_, shape) in &pattern_shapes {
             for partial_value in shape.possible_values(env) {
-                Self::join_value_shape(&mut values, partial_value)
+                values = Self::join_value_shape(values, partial_value);
             }
         }
         // Now go over all patterns in sequence and incrementally remove matched
@@ -2329,6 +2329,7 @@ impl ValueShape {
             for (s1, s2) in shapes1.iter().zip(shapes2) {
                 if let Some(s) = s1.try_join(s2) {
                     result.push(s);
+                } else {
                     break;
                 }
             }
@@ -2353,16 +2354,21 @@ impl ValueShape {
 
     /// Given a list of value shapes, join a new one. This attempts specializing existing shapes
     /// via the join operator in order to keep the list minimal.
-    fn join_value_shape(set: &mut BTreeSet<ValueShape>, value: ValueShape) {
-        for v in set.iter() {
+    fn join_value_shape(set: BTreeSet<ValueShape>, value: ValueShape) -> BTreeSet<ValueShape> {
+        let mut new_set = BTreeSet::new();
+        let mut joined = false;
+        for v in set.into_iter() {
             if let Some(unified) = v.try_join(&value) {
-                let v = v.clone(); // to free set
-                set.remove(&v);
-                set.insert(unified);
-                return;
+                new_set.insert(unified);
+                joined = true;
+            } else {
+                new_set.insert(v);
             }
         }
-        set.insert(value);
+        if !joined {
+            new_set.insert(value);
+        }
+        new_set
     }
 
     /// Checks whether one shape is instance of another. It holds that
