@@ -685,19 +685,28 @@ impl BlockRetriever {
                     .boxed(),
                 )
             }
-            // TLDR: We cannot use this until BlockRetrievalRequestV2 is available in the next release
-            // For more info, see bail!() in tokio::select! below
-            //
-            // TODO @bchocho @hariria to fix after the release
-            // let request = BlockRetrievalRequest::new_with_target_round(
-            //     block_id,
-            //     retrieve_batch_size,
-            //     target_round,
-            // );
-            let request = BlockRetrievalRequest::V1(BlockRetrievalRequestV1::new(
-                block_id,
-                retrieve_batch_size,
-            ));
+            let request = match target_block_retrieval_payload {
+                TargetBlockRetrieval::TargetBlockId(target_block_id) => {
+                    BlockRetrievalRequest::V1(BlockRetrievalRequestV1::new_with_target_block_id(
+                        block_id,
+                        retrieve_batch_size,
+                        target_block_id,
+                    ))
+                },
+                TargetBlockRetrieval::TargetRound(_) => {
+                    // TLDR: We cannot use this until BlockRetrievalRequestV2 is available in the next release
+                    // For more info, see bail!() in tokio::select! below
+                    //
+                    // TODO @bchocho @hariria to fix after the release
+                    // let request = BlockRetrievalRequest::new_with_target_round(
+                    //     block_id,
+                    //     retrieve_batch_size,
+                    //     target_round,
+                    // );
+                    bail!("Unexpected target round request")
+                },
+            };
+
             loop {
                 tokio::select! {
                     _ = interval.tick() => {
