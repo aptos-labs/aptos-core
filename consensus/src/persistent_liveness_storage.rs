@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{consensusdb::ConsensusDB, epoch_manager::LivenessStorageData, error::DbError};
-use anyhow::{format_err, Context, Result};
+use anyhow::{ensure, format_err, Context, Result};
 use aptos_config::config::NodeConfig;
 use aptos_consensus_types::{
     block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
@@ -163,35 +163,24 @@ impl LedgerRecoveryData {
             .round()
             .saturating_add(1)
             .saturating_sub(window_size);
-        let epoch = blocks[latest_commit_idx].epoch();
         let mut id_to_blocks = HashMap::new();
         blocks.iter().for_each(|block| {
             id_to_blocks.insert(block.id(), block);
         });
 
-        let mut prev_id = HashValue::zero();
         let mut curr_id = latest_commit_id;
         let mut window_start_id = HashValue::zero();
         while let Some(block) = id_to_blocks.get(&curr_id) {
-            if block.epoch() < epoch {
-                info!("Epoch change detected: {}, root: {}", block, commit_block);
-                window_start_id = prev_id;
-                break;
-            }
-            if block.round() < window_start_round {
-                info!("Found window block: {}, root: {}", block, commit_block);
+            if block.quorum_cert().certified_block().round() < window_start_round {
                 window_start_id = curr_id;
                 break;
             }
 
             window_start_id = curr_id;
-            prev_id = curr_id;
             curr_id = block.parent_id();
         }
-        // TODO: panic or bail?
-        assert_ne!(
-            window_start_id,
-            HashValue::zero(),
+        ensure!(
+            window_start_id != HashValue::zero(),
             "Window start block not found"
         );
 
