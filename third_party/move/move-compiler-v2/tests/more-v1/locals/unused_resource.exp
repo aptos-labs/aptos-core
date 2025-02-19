@@ -14,31 +14,31 @@ warning: Unused local variable `r`. Consider removing or prefixing with an under
 
 
 Diagnostics:
-warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+warning: Unused assignment/binding to `r`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_r`), or binding to `_`
   ┌─ tests/more-v1/locals/unused_resource.move:5:17
   │
 5 │         let r = R{};
   │                 ^^^
 
-warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+warning: Unused assignment/binding to `r`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_r`), or binding to `_`
    ┌─ tests/more-v1/locals/unused_resource.move:15:21
    │
 15 │         if (cond) { r = R{}; };
    │                     ^^^^^^^
 
-warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+warning: Unused assignment/binding to `r`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_r`), or binding to `_`
    ┌─ tests/more-v1/locals/unused_resource.move:20:29
    │
 20 │         if (cond) {} else { r = R{}; };
    │                             ^^^^^^^
 
-warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+warning: Unused assignment/binding to `r`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_r`), or binding to `_`
    ┌─ tests/more-v1/locals/unused_resource.move:25:24
    │
 25 │         while (cond) { r = R{} };
    │                        ^^^^^^^
 
-warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+warning: Unused assignment/binding to `r`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_r`), or binding to `_`
    ┌─ tests/more-v1/locals/unused_resource.move:29:24
    │
 29 │         loop { let r = R{}; }
