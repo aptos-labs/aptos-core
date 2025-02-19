@@ -1,34 +1,64 @@
 
 Diagnostics:
-error: Invalid expression in `const`. Operator `<<` result value out of range for `u8`
+error: Invalid expression in `const`. Operand on the right is too large for `<<`, should be less than `8`
   ┌─ tests/folding/unfoldable_constants_blocks.move:4:9
   │
 4 │         (1: u8) << 8;
   │         ^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Operator `<<` result value out of range for `u64`
+error: Invalid expression in `const`. Operand on the right is too large for `<<`, should be less than `64`
   ┌─ tests/folding/unfoldable_constants_blocks.move:5:9
   │
 5 │         (1: u64) << 64;
   │         ^^^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Operator `<<` result value out of range for `u128`
+error: Invalid expression in `const`. Operand on the right is too large for `<<`, should be less than `128`
   ┌─ tests/folding/unfoldable_constants_blocks.move:6:9
   │
 6 │         (1: u128) << 128;
   │         ^^^^^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Operator `<<` result value out of range for `u16`
+error: Invalid expression in `const`. Operand on the right is too large for `<<`, should be less than `16`
   ┌─ tests/folding/unfoldable_constants_blocks.move:7:9
   │
 7 │         (1: u16) << 16;
   │         ^^^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Operator `<<` result value out of range for `u32`
+error: Invalid expression in `const`. Operand on the right is too large for `<<`, should be less than `32`
   ┌─ tests/folding/unfoldable_constants_blocks.move:8:9
   │
 8 │         (1: u32) << 32;
   │         ^^^^^^^^^^^^^^
+
+error: Invalid expression in `const`. Operand on the right is too large for `>>`, should be less than `8`
+   ┌─ tests/folding/unfoldable_constants_blocks.move:10:9
+   │
+10 │         (0: u8) >> 8;
+   │         ^^^^^^^^^^^^
+
+error: Invalid expression in `const`. Operand on the right is too large for `>>`, should be less than `64`
+   ┌─ tests/folding/unfoldable_constants_blocks.move:11:9
+   │
+11 │         (0: u64) >> 64;
+   │         ^^^^^^^^^^^^^^
+
+error: Invalid expression in `const`. Operand on the right is too large for `>>`, should be less than `128`
+   ┌─ tests/folding/unfoldable_constants_blocks.move:12:9
+   │
+12 │         (0: u128) >> 128;
+   │         ^^^^^^^^^^^^^^^^
+
+error: Invalid expression in `const`. Operand on the right is too large for `>>`, should be less than `16`
+   ┌─ tests/folding/unfoldable_constants_blocks.move:13:9
+   │
+13 │         (0: u16) >> 16;
+   │         ^^^^^^^^^^^^^^
+
+error: Invalid expression in `const`. Operand on the right is too large for `>>`, should be less than `32`
+   ┌─ tests/folding/unfoldable_constants_blocks.move:14:9
+   │
+14 │         (0: u32) >> 32;
+   │         ^^^^^^^^^^^^^^
 
 error: Invalid expression in `const`. Operator `/` result value out of range for `u8`
    ┌─ tests/folding/unfoldable_constants_blocks.move:16:9
