@@ -92,6 +92,7 @@ pub fn verify_pack_closure(
     // Verify that captured arguments are assignable against types in the function
     // signature.
     let expected_capture_tys = mask.extract(func.param_tys(), true);
+
     let given_capture_tys = operand_stack.popn_tys(expected_capture_tys.len() as u16)?;
     for (expected, given) in expected_capture_tys
         .into_iter()
@@ -107,12 +108,12 @@ pub fn verify_pack_closure(
     let args = mask
         .extract(func.param_tys(), false)
         .into_iter()
-        .map(|curried| with_instantiation(resolver, func, curried, |curried| Ok(curried.clone())))
+        .map(|curried| with_owned_instantiation(resolver, func, curried, Ok))
         .collect::<PartialVMResult<Vec<_>>>()?;
     let results = func
         .return_tys()
         .iter()
-        .map(|ret| with_instantiation(resolver, func, ret, |ret| Ok(ret.clone())))
+        .map(|ret| with_owned_instantiation(resolver, func, ret, Ok))
         .collect::<PartialVMResult<Vec<_>>>()?;
     operand_stack.push_ty(Type::Function {
         args,
@@ -134,6 +135,24 @@ fn with_instantiation<R>(
     } else {
         action(
             &resolver
+                .loader()
+                .ty_builder()
+                .create_ty_with_subst(ty, func.ty_args())?,
+        )
+    }
+}
+
+fn with_owned_instantiation<R>(
+    resolver: &Resolver,
+    func: &LoadedFunction,
+    ty: &Type,
+    action: impl FnOnce(Type) -> PartialVMResult<R>,
+) -> PartialVMResult<R> {
+    if func.ty_args().is_empty() {
+        action(ty.clone())
+    } else {
+        action(
+            resolver
                 .loader()
                 .ty_builder()
                 .create_ty_with_subst(ty, func.ty_args())?,
