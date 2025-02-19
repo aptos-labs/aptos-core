@@ -178,8 +178,6 @@ impl AptosNodeArgs {
                 )
             });
 
-            ensure_max_open_files_limit(config.storage.ensure_rlimit_nofile);
-
             // Start the node
             start(config, None, true).expect("Node should start correctly");
         };
@@ -239,6 +237,12 @@ pub fn start_and_report_ports(
 
     // Instantiate the global logger
     let (remote_log_receiver, logger_filter_update) = logger::create_logger(&config, log_file);
+
+    // Ensure `ulimit -n`.
+    ensure_max_open_files_limit(
+        config.storage.ensure_rlimit_nofile,
+        config.storage.assert_rlimit_nofile,
+    );
 
     assert!(
         !cfg!(feature = "testing") && !cfg!(feature = "fuzzing"),
