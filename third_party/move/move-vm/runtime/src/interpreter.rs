@@ -617,6 +617,8 @@ impl InterpreterImpl {
                     // Charge gas for call and for the parameters. The current APIs
                     // require an ExactSizeIterator to be passed for charge_call, so
                     // some acrobatics is needed (sigh).
+                    // TODO: perhaps refactor and just pass count of arguments, because
+                    //   that is the only thing used for now.
                     let captured_vec = captured.collect::<Vec<_>>();
                     let arguments: Vec<&Value> = self
                         .operand_stack
