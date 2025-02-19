@@ -683,7 +683,7 @@ impl From<TypeTag> for MoveType {
             TypeTag::Struct(v) => MoveType::Struct((*v).into()),
             TypeTag::Function(..) => {
                 // TODO(#15664): determine whether functions and closures need to be supported
-                panic!("functions not supported by API types")
+                MoveType::Unparsable("Function types are not supported".to_string())
             },
         }
     }
