@@ -731,4 +731,43 @@ fn test_module() {
         .unwrap();
 
     run_txn(builder, &mut h);
+
+    // Test functions with multiple generics.
+    let mut builder = TransactionComposer::single_signer();
+    load_module(&mut builder, &h, "0x1::batched_execution");
+    let return1 = builder
+        .add_batched_call(
+            "0x1::batched_execution".to_string(),
+            "create_generic_non_droppable_value".to_string(),
+            vec!["0x1::batched_execution::Foo".to_string()],
+            vec![CallArgument::new_bytes(
+                MoveValue::U8(10).simple_serialize().unwrap(),
+            )],
+        )
+        .unwrap();
+
+    let return2 = builder
+        .add_batched_call(
+            "0x1::batched_execution".to_string(),
+            "create_generic_non_droppable_value".to_string(),
+            vec!["0x1::batched_execution::Bar".to_string()],
+            vec![CallArgument::new_bytes(
+                MoveValue::U8(20).simple_serialize().unwrap(),
+            )],
+        )
+        .unwrap();
+
+    builder
+        .add_batched_call(
+            "0x1::batched_execution".to_string(),
+            "multiple_generics".to_string(),
+            vec![
+                "0x1::batched_execution::Foo".to_string(),
+                "0x1::batched_execution::Bar".to_string(),
+            ],
+            vec![return1[0].clone(), return2[0].clone()],
+        )
+        .unwrap();
+
+    run_txn(builder, &mut h);
 }

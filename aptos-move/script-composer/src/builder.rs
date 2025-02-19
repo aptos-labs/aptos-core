@@ -482,22 +482,43 @@ impl TransactionComposer {
         }
     }
 
+    fn modules_in_type_tag_impl(tag: &TypeTag, modules: &mut Vec<ModuleId>) {
+        match tag {
+            TypeTag::Vector(ty) => Self::modules_in_type_tag_impl(ty, modules),
+            TypeTag::Struct(s) => {
+                modules.push(s.module_id());
+                for ty_arg in &s.type_args {
+                    Self::modules_in_type_tag_impl(ty_arg, modules);
+                }
+            },
+            TypeTag::Address
+            | TypeTag::Bool
+            | TypeTag::Signer
+            | TypeTag::U128
+            | TypeTag::U8
+            | TypeTag::U16
+            | TypeTag::U32
+            | TypeTag::U64
+            | TypeTag::U256 => (),
+        }
+    }
+
+    fn modules_in_type_tag(tag: &TypeTag) -> Vec<ModuleId> {
+        let mut modules = vec![];
+        Self::modules_in_type_tag_impl(tag, &mut modules);
+        modules
+    }
+
     async fn load_type_tag_impl(
         &mut self,
         api_url: &str,
         type_tag: &TypeTag,
     ) -> anyhow::Result<()> {
-        match type_tag {
-            TypeTag::Struct(s) => {
-                self.load_module_impl(api_url, s.module_id()).await?;
-                for ty in s.type_args.iter() {
-                    Box::pin(self.load_type_tag_impl(api_url, ty)).await?;
-                }
-                Ok(())
-            },
-            TypeTag::Vector(v) => Box::pin(self.load_type_tag_impl(api_url, v)).await,
-            _ => Ok(()),
+        let modules = Self::modules_in_type_tag(type_tag);
+        for module in modules {
+            self.load_module_impl(api_url, module).await?;
         }
+        Ok(())
     }
 
     #[cfg(test)]
