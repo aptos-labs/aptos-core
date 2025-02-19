@@ -706,8 +706,9 @@ impl From<&TypeTag> for MoveType {
             },
             TypeTag::Struct(v) => MoveType::Struct((&**v).into()),
             TypeTag::Function(..) => {
-                // TODO(#15664): determine whether functions and closures need to be supported
-                panic!("functions not supported by API types")
+                // TODO(#15664): construct an API type here, for now we are returning a
+                //   dummy value so this cannot crash
+                MoveType::Bool
             },
         }
     }
