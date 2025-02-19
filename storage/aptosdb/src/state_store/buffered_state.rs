@@ -6,8 +6,7 @@
 use crate::{
     metrics::{LATEST_CHECKPOINT_VERSION, OTHER_TIMERS_SECONDS},
     state_store::{
-        hot_state::HotState, persisted_state::PersistedStateSummary,
-        state_snapshot_committer::StateSnapshotCommitter, StateDb,
+        persisted_state::PersistedState, state_snapshot_committer::StateSnapshotCommitter, StateDb,
     },
 };
 use aptos_infallible::Mutex;
@@ -43,8 +42,6 @@ pub struct BufferedState {
     estimated_items: usize,
     /// The target number of items in the buffer between commits.
     target_items: usize,
-    /// hot state (value only)
-    hot_state: Arc<HotState>,
     join_handle: Option<JoinHandle<()>>,
 }
 
@@ -60,16 +57,14 @@ impl BufferedState {
         last_snapshot: StateWithSummary,
         target_items: usize,
         out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
-        out_persisted_state: Arc<Mutex<PersistedStateSummary>>,
-        out_hot_state: Arc<HotState>,
+        out_persisted_state: PersistedState,
     ) -> Self {
         let (state_commit_sender, state_commit_receiver) =
             mpsc::sync_channel(ASYNC_COMMIT_CHANNEL_BUFFER_SIZE as usize);
         let arc_state_db = Arc::clone(state_db);
         *out_current_state.lock() =
             LedgerStateWithSummary::new_at_checkpoint(last_snapshot.clone());
-        out_persisted_state.lock().set(last_snapshot.clone());
-        out_hot_state.set_commited(last_snapshot.state().clone());
+        out_persisted_state.reset(last_snapshot.clone());
 
         let persisted_state_clone = out_persisted_state.clone();
         let last_snapshot_clone = last_snapshot.clone();
@@ -93,7 +88,6 @@ impl BufferedState {
             state_commit_sender,
             estimated_items: 0,
             target_items,
-            hot_state: out_hot_state,
             // The join handle of the async state commit thread for graceful drop.
             join_handle: Some(join_handle),
         }
@@ -178,9 +172,7 @@ impl BufferedState {
         // buffer size a tad more realistic.
         let checkpoint_to_commit_opt =
             (old_state.next_version() < last_checkpoint.next_version()).then_some(last_checkpoint);
-        let latest_state = new_state.state().clone();
         *self.current_state_locked() = new_state;
-        self.hot_state.enqueue_commit(latest_state);
         self.maybe_commit(checkpoint_to_commit_opt, sync_commit);
         Self::report_last_checkpoint_version(version);
         Ok(())

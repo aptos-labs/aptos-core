@@ -8,7 +8,7 @@ use crate::{
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
         state_view::{
             cached_state_view::{CachedStateView, ShardedStateCache, StateCacheShard},
-            hot_state_view::EmptyHotState,
+            hot_state_view::HotStateView,
         },
         versioned_state_value::{DbStateUpdate, StateUpdateRef},
         NUM_STATE_SHARDS,
@@ -300,13 +300,14 @@ impl LedgerState {
     pub fn update_with_db_reader(
         &self,
         persisted_snapshot: &State,
+        hot_state: Arc<dyn HotStateView>,
         updates: &StateUpdateRefs,
         reader: Arc<dyn DbReader>,
     ) -> Result<(LedgerState, ShardedStateCache)> {
         let state_view = CachedStateView::new_impl(
             StateViewId::Miscellaneous,
             reader,
-            Arc::new(EmptyHotState),
+            hot_state,
             persisted_snapshot.clone(),
             self.latest().clone(),
         );

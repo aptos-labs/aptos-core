@@ -21,9 +21,7 @@ use crate::{
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
     state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode, StateValueWriter},
-    state_store::{
-        buffered_state::BufferedState, hot_state::HotState, persisted_state::PersistedStateSummary,
-    },
+    state_store::{buffered_state::BufferedState, persisted_state::PersistedState},
     utils::{
         iterators::PrefixedStateValueIterator,
         truncation_helper::{
@@ -122,8 +120,7 @@ pub(crate) struct StateStore {
     /// On read, we don't need to lock the `buffered_state` to get the latest state.
     current_state: Arc<Mutex<LedgerStateWithSummary>>,
     /// Tracks a persisted smt, any state older than that is guaranteed to be found in RocksDB
-    persisted_state_summary: Arc<Mutex<PersistedStateSummary>>,
-    hot_state: Arc<HotState>,
+    persisted_state: PersistedState,
     buffered_state_target_items: usize,
     internal_indexer_db: Option<InternalIndexerDB>,
 }
@@ -223,11 +220,11 @@ impl DbReader for StateDb {
 
 impl DbReader for StateStore {
     fn get_persisted_state(&self) -> Result<(Arc<dyn HotStateView>, State)> {
-        Ok(self.hot_state.get_committed())
+        Ok(self.persisted_state.get_state())
     }
 
     fn get_persisted_state_summary(&self) -> Result<StateSummary> {
-        Ok(self.persisted_state_summary_locked().summary().clone())
+        Ok(self.persisted_state.get_state_summary())
     }
 
     /// Returns the latest state snapshot strictly before `next_version` if any.
@@ -333,16 +330,14 @@ impl StateStore {
             skip_usage,
         });
         let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_dummy()));
-        let persisted_state_summary = Arc::new(Mutex::new(PersistedStateSummary::new_dummy()));
-        let hot_state = Arc::new(HotState::new(current_state.lock().state().clone()));
+        let persisted_state = PersistedState::new_dummy();
         let buffered_state = if empty_buffered_state_for_restore {
             BufferedState::new_at_snapshot(
                 &state_db,
                 StateWithSummary::new_empty(),
                 buffered_state_target_items,
                 current_state.clone(),
-                persisted_state_summary.clone(),
-                hot_state.clone(),
+                persisted_state.clone(),
             )
         } else {
             Self::create_buffered_state_from_latest_snapshot(
@@ -351,8 +346,7 @@ impl StateStore {
                 hack_for_tests,
                 /*check_max_versions_after_snapshot=*/ true,
                 current_state.clone(),
-                persisted_state_summary.clone(),
-                hot_state.clone(),
+                persisted_state.clone(),
             )
             .expect("buffered state creation failed.")
         };
@@ -362,8 +356,7 @@ impl StateStore {
             buffered_state: Mutex::new(buffered_state),
             buffered_state_target_items,
             current_state,
-            persisted_state_summary,
-            hot_state,
+            persisted_state,
             internal_indexer_db,
         }
     }
@@ -494,8 +487,7 @@ impl StateStore {
             skip_usage: false,
         });
         let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_dummy()));
-        let persisted_state = Arc::new(Mutex::new(PersistedStateSummary::new_dummy()));
-        let hot_state = Arc::new(HotState::new(current_state.lock().state().clone()));
+        let persisted_state = PersistedState::new_dummy();
         let _ = Self::create_buffered_state_from_latest_snapshot(
             &state_db,
             0,
@@ -503,7 +495,6 @@ impl StateStore {
             /*check_max_versions_after_snapshot=*/ false,
             current_state.clone(),
             persisted_state,
-            hot_state,
         )?;
         let base_version = current_state.lock().version();
         Ok(base_version)
@@ -515,8 +506,7 @@ impl StateStore {
         hack_for_tests: bool,
         check_max_versions_after_snapshot: bool,
         out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
-        out_persisted_state: Arc<Mutex<PersistedStateSummary>>,
-        out_hot_state: Arc<HotState>,
+        out_persisted_state: PersistedState,
     ) -> Result<BufferedState> {
         let num_transactions = state_db
             .ledger_db
@@ -553,8 +543,7 @@ impl StateStore {
             state.clone(),
             buffered_state_target_items,
             out_current_state.clone(),
-            out_persisted_state,
-            out_hot_state,
+            out_persisted_state.clone(),
         );
 
         // In some backup-restore tests we hope to open the db without consistency check.
@@ -608,13 +597,16 @@ impl StateStore {
                 last_checkpoint_index,
             );
             let current_state = out_current_state.lock().clone();
+            let (hot_state, state) = out_persisted_state.get_state();
             let (new_state, _state_reads) = current_state.ledger_state().update_with_db_reader(
                 &state,
+                hot_state,
                 &state_update_refs,
                 state_db.clone(),
             )?;
+            let state_summary = out_persisted_state.get_state_summary();
             let new_state_summary = current_state.ledger_state_summary().update(
-                &ProvableStateSummary::new(state.summary().clone(), state_db.as_ref()),
+                &ProvableStateSummary::new(state_summary, state_db.as_ref()),
                 &state_update_refs,
             )?;
             let updated =
@@ -646,8 +638,7 @@ impl StateStore {
             false,
             true,
             self.current_state.clone(),
-            self.persisted_state_summary.clone(),
-            self.hot_state.clone(),
+            self.persisted_state.clone(),
         )
         .expect("buffered state creation failed.");
     }
@@ -658,10 +649,6 @@ impl StateStore {
 
     pub fn current_state_locked(&self) -> MutexGuard<LedgerStateWithSummary> {
         self.current_state.lock()
-    }
-
-    pub fn persisted_state_summary_locked(&self) -> MutexGuard<PersistedStateSummary> {
-        self.persisted_state_summary.lock()
     }
 
     /// Returns the key, value pairs for a particular state key prefix at desired version. This
@@ -702,9 +689,13 @@ impl StateStore {
         sharded_state_kv_batches: &mut ShardedStateKvSchemaBatch,
     ) -> Result<LedgerState> {
         let current = self.current_state_locked().ledger_state();
-        let persisted = self.persisted_state_summary_locked().state().clone();
-        let (new_state, reads) =
-            current.update_with_db_reader(&persisted, state_update_refs, self.state_db.clone())?;
+        let (hot_state, persisted) = self.get_persisted_state()?;
+        let (new_state, reads) = current.update_with_db_reader(
+            &persisted,
+            hot_state,
+            state_update_refs,
+            self.state_db.clone(),
+        )?;
 
         self.put_state_updates(
             &new_state,
@@ -1128,8 +1119,7 @@ impl StateStore {
             last_checkpoint.clone(),
         );
 
-        self.persisted_state_summary_locked()
-            .set(last_checkpoint.clone());
+        self.persisted_state.reset(last_checkpoint.clone());
         *self.current_state_locked() = current;
         self.buffered_state
             .lock()
@@ -1325,7 +1315,7 @@ mod test_only {
                 .unwrap();
 
             let current = self.current_state_locked().ledger_state_summary();
-            let persisted = self.persisted_state_summary_locked().summary().clone();
+            let persisted = self.persisted_state.get_state_summary();
 
             let new_state_summary = current
                 .update(

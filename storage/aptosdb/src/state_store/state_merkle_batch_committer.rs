@@ -7,10 +7,9 @@ use crate::{
     metrics::{LATEST_SNAPSHOT_VERSION, OTHER_TIMERS_SECONDS},
     pruner::PrunerManager,
     schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    state_store::{buffered_state::CommitMessage, persisted_state::PersistedStateSummary, StateDb},
+    state_store::{buffered_state::CommitMessage, persisted_state::PersistedState, StateDb},
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_logger::{info, trace};
 use aptos_metrics_core::TimerHelper;
@@ -27,14 +26,14 @@ pub struct StateMerkleBatch {
 pub(crate) struct StateMerkleBatchCommitter {
     state_db: Arc<StateDb>,
     state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleBatch>>,
-    persisted_state: Arc<Mutex<PersistedStateSummary>>,
+    persisted_state: PersistedState,
 }
 
 impl StateMerkleBatchCommitter {
     pub fn new(
         state_db: Arc<StateDb>,
         state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleBatch>>,
-        persisted_state: Arc<Mutex<PersistedStateSummary>>,
+        persisted_state: PersistedState,
     ) -> Self {
         Self {
             state_db,
@@ -54,6 +53,7 @@ impl StateMerkleBatchCommitter {
                         snapshot,
                     } = state_merkle_batch;
 
+                    let base_version = self.persisted_state.get_state_summary().version();
                     let current_version = snapshot
                         .version()
                         .expect("Current version should not be None");
@@ -74,9 +74,10 @@ impl StateMerkleBatchCommitter {
                                 cache.maybe_evict_version(self.state_db.state_merkle_db.lru_cache())
                             });
                     }
+
                     info!(
                         version = current_version,
-                        base_version = self.persisted_state.lock().version(),
+                        base_version = base_version,
                         root_hash = snapshot.summary().root_hash(),
                         "State snapshot committed."
                     );
@@ -94,7 +95,7 @@ impl StateMerkleBatchCommitter {
                         .summary()
                         .global_state_summary
                         .log_generation("buffered_state_commit");
-                    self.persisted_state.lock().set(snapshot);
+                    self.persisted_state.set(snapshot);
                 },
                 CommitMessage::Sync(finish_sender) => finish_sender.send(()).unwrap(),
                 CommitMessage::Exit => {
