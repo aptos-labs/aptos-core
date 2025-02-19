@@ -519,8 +519,20 @@ impl<'r, 'l> Session<'r, 'l> {
                     .idx_to_struct_name(*idx)?;
                 Some((struct_identifier.module, struct_identifier.name))
             },
-            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | TyParam(_)
-            | Vector(_) | Reference(_) | MutableReference(_) => None,
+            Bool
+            | U8
+            | U16
+            | U32
+            | U64
+            | U128
+            | U256
+            | Address
+            | Signer
+            | TyParam(_)
+            | Vector(_)
+            | Reference(_)
+            | MutableReference(_)
+            | Function { .. } => None,
         })
     }
 
