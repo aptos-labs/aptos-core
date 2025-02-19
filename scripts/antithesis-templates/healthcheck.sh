@@ -26,7 +26,10 @@ while true; do
     fi
   done
 
-  if [ ${#HEALTHY_NODES[@]} -eq "$NODE_COUNT" ]; then
+  /usr/local/bin/aptos init --profile test1 --rest-url "${NODE_URL}" --faucet-url "http://$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+30)}'):8081" --network custom --assume-yes
+  FOUNDING_SUCCESS=$?
+
+  if [ $FOUNDING_SUCCESS -eq 0 ] && [ ${#HEALTHY_NODES[@]} -eq "$NODE_COUNT" ]; then
     echo "All nodes are healthy!"
     #JSONL message to sdk.jsonl
     echo '{"antithesis_setup": { "status": "complete", "details": null }}' >> "$ANTITHESIS_OUTPUT_DIR/sdk.jsonl"
@@ -35,4 +38,3 @@ while true; do
   
   sleep 5
 done
-

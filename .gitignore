@@ -136,5 +136,5 @@ ecosystem/indexer-grpc/indexer-transaction-generator/*.yaml
 *.bytecode
 !third_party/move/move-prover/tests/xsources/design/*.bytecode
 
-# Anthitesis generated files
-genesis_anthitesis/
+# Antithesis generated files
+genesis_antithesis/

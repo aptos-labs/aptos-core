@@ -5,7 +5,7 @@ set -e
 
 # Default variables
 LAYOUT_FILE="layout.yaml"
-GENESIS_DIR="genesis_anthitesis"
+GENESIS_DIR="genesis_antithesis"
 CHAIN_ID=8
 ROOT_KEY=""
 NETWORK_IP="127.0.0.0"
@@ -51,8 +51,8 @@ if [ -d "$GENESIS_DIR" ]; then
     rm -rf $GENESIS_DIR
     echo "Cleaning up docker images and containers..."
     # for type in validator_ fullnode_ build faucet; do
-    #     docker container ls -a | grep "genesis_anthitesis-${type}" | awk '{print $1}' | xargs -r docker rm
-    #     docker image ls | grep "genesis_anthitesis-${type}" | awk '{print $3}' | xargs -r docker rmi
+    #     docker container ls -a | grep "genesis_antithesis-${type}" | awk '{print $1}' | xargs -r docker rm
+    #     docker image ls | grep "genesis_antithesis-${type}" | awk '{print $3}' | xargs -r docker rmi
     # done
 fi
 mkdir -p $GENESIS_DIR
@@ -70,8 +70,8 @@ fi
 # Build the Aptos framework, node, genesis and all the configs and identities
 echo "Building Aptos framework, node and genesis, it may take a while..."
 docker build \
-    -t genesis_anthitesis-build \
-    -f scripts/anthitesis-templates/Dockerfile-build \
+    -t genesis_antithesis-build \
+    -f scripts/antithesis-templates/Dockerfile-build \
     --build-arg APTOS_BRANCH="$APTOS_BRANCH" \
     --build-arg NODE_COUNT="$NODE_COUNT" \
     --build-arg NETWORK_IP="$NETWORK_IP" \
@@ -81,17 +81,19 @@ docker build \
     --build-arg GENESIS_DIR=$GENESIS_DIR \
     --build-arg LAYOUT_FILE=$LAYOUT_FILE \
     .
-docker create --name genesis_anthitesis-builder genesis_anthitesis-build
-docker cp genesis_anthitesis-builder:/aptos-core/$GENESIS_DIR/. $GENESIS_DIR/
-docker rm -f genesis_anthitesis-builder
+docker create --name genesis_antithesis-builder genesis_antithesis-build
+docker cp genesis_antithesis-builder:/aptos-core/$GENESIS_DIR/. $GENESIS_DIR/
+docker rm -f genesis_antithesis-builder
 echo "Genesis blob and waypoint generated in $GENESIS_DIR."
 
 # Entrypoint and Dockerfile copy
-cp scripts/anthitesis-templates/entrypoint.sh $GENESIS_DIR/entrypoint.sh
-cp scripts/anthitesis-templates/healthcheck.sh $GENESIS_DIR/healthcheck.sh
-awk -v ip="$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+30)}')" '{gsub("<FAUCET_IP>", ip); print}' scripts/anthitesis-templates/singleton_driver_test1.sh > $GENESIS_DIR/singleton_driver_test1.sh
-cp scripts/anthitesis-templates/Dockerfile $GENESIS_DIR/Dockerfile
-cp scripts/anthitesis-templates/Dockerfile-config $GENESIS_DIR/Dockerfile-config
+cp scripts/antithesis-templates/entrypoint.sh $GENESIS_DIR/entrypoint.sh
+cp scripts/antithesis-templates/healthcheck.sh $GENESIS_DIR/healthcheck.sh
+cp -r scripts/antithesis-templates/antithesis-tests $GENESIS_DIR/antithesis-tests
+#awk -v ip="$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+30)}')" '{gsub("<FAUCET_IP>", ip); print}' scripts/antithesis-templates/singleton_driver_test1.sh > $GENESIS_DIR/singleton_driver_test1.sh
+cp scripts/antithesis-templates/Dockerfile-node $GENESIS_DIR/Dockerfile-node
+cp scripts/antithesis-templates/Dockerfile-config $GENESIS_DIR/Dockerfile-config
+cp scripts/antithesis-templates/Dockerfile-client $GENESIS_DIR/Dockerfile-client
 
 # Generate docker-compose.yaml using yq
 SERVICES=""
@@ -136,21 +138,36 @@ yq eval -n "
   .services.faucet.volumes = [\"./mint.key:/opt/aptos/etc/mint.key\"] |
   .services.faucet.networks.custom_network.ipv4_address = \"$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+30)}')\" |
   .services.faucet.restart = \"unless-stopped\" |
-  .services.faucet.expose = [8080] |
+  .services.faucet.expose = [8081] |
   .services.healthcheck.image = \"aptos-node:latest\" |
   .services.healthcheck.container_name = \"healthcheck\" |
   .services.healthcheck.hostname = \"healthcheck\" |
   .services.healthcheck.environment.ROLE = \"healthcheck\" |
   .services.healthcheck.environment.NODE_COUNT = \"$NODE_COUNT\" |
   .services.healthcheck.environment.NETWORK_IP = \"$NETWORK_IP\" |
+  .services.healthcheck.environment.NODE_URL = \"http://$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+11)}'):8080\" |
   .services.healthcheck.volumes = [\"./healthcheck.sh:/usr/local/bin/healthcheck.sh\"] |
   .services.healthcheck.networks.custom_network.ipv4_address = \"$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+50)}')\" |
+  .services.client.image = \"aptos-client:latest\" |
+  .services.client.container_name = \"client\" |
+  .services.client.hostname = \"client\" |
+  .services.client.environment.FAUCET_URL = \"http://$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+30)}'):8081\" |
+  .services.client.environment.FULLNODE_URL = \"http://$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+11)}'):8080\" |
+  .services.client.environment.APTOS_NETWORK = \"custom\" |
+  .services.client.environment.NETWORK_IP = \"$NETWORK_IP\" |
+  .services.client.environment.CHAIN_ID = \"$CHAIN_ID\" |
+  .services.client.networks.custom_network.ipv4_address = \"$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+60)}')\" |
+  .services.client.restart = \"unless-stopped\" |
   .networks.custom_network.driver = \"bridge\" |
   .networks.custom_network.ipam.config[0].subnet = \"$NETWORK_IP/24\" |
   $SERVICES
 " > "$GENESIS_DIR/docker-compose.yml"
 
-wget https://storage.googleapis.com/anthithesis/libvoidstar.so -O $GENESIS_DIR/libvoidstar.so
+wget https://storage.googleapis.com/antithesis-aptos/libvoidstar.so -O $GENESIS_DIR/libvoidstar.so
 
-echo "Enter $GENESIS_DIR and run docker build -t aptos-node:latest . && docker compose up --force-recreate"
-echo "If you want to upload on the infra run: docker build -f Dockerfile-config -t config:latest ." 
+echo "Enter $GENESIS_DIR and run:"
+echo "docker build -f Dockerfile-node -t aptos-node:latest ."
+echo "docker build -f Dockerfile-config -t config:latest ."
+echo "docker build -f Dockerfile-client -t aptos-client:latest ."
+echo "If you want to test locally run: docker compose up --force-recreate"
+echo "Then push images to antithesis infra"

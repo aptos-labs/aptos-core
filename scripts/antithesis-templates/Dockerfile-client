@@ -1,0 +1,19 @@
+# podman build -t nodejs:test .
+FROM docker.io/node:22-bookworm
+
+ENV NETWORK_IP="127.0.0.1"
+ENV FAUCET_URL="none"
+ENV FULLNODE_URL="none"
+ENV CHAIN_ID="1"
+ENV APTOS_NETWORK="none"
+
+RUN npm install -g pnpm
+
+COPY ./libvoidstar.so /usr/lib/libvoidstar.so
+
+# TODO: Once test client is in a public repo git clone it and install dependencies. We also need anthesis-ts-sdk to be published on NPM.
+COPY ./antithesis-ts-test.tar /antithesis-ts-test.tar
+RUN tar -xf /antithesis-ts-test.tar -C /usr/local/opt/
+
+COPY ./antithesis-tests/ /opt/antithesis/test/v1/
+RUN chmod +x /**/*.sh

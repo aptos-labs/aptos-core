@@ -28,12 +28,15 @@ RUN apt update && apt install -y \
     yq
 
 # Get instrumentation library
-RUN wget https://storage.googleapis.com/anthithesis/libvoidstar.so -O /usr/lib/libvoidstar.so
+RUN wget https://storage.googleapis.com/antithesis-aptos/libvoidstar.so -O /usr/lib/libvoidstar.so
+
+# Get test client
+# TODO: Once test client is in a public repo git clone it and install dependencies. We also need anthesis-ts-sdk to be published on NPM.
 
 # Clone Aptos repository
 RUN git clone --single-branch -b $APTOS_BRANCH --depth=1 https://github.com/aptos-labs/aptos-core.git
 WORKDIR /aptos-core
-COPY ./scripts/anthitesis-templates/gen.sh gen.sh
+COPY ./scripts/antithesis-templates/gen.sh gen.sh
 RUN chmod +x gen.sh
 
 # Build the aptos-node binary
