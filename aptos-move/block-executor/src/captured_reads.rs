@@ -18,7 +18,6 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     error::{code_invariant_error, PanicError, PanicOr},
-    executable::ModulePath,
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
     write_set::TransactionWrite,
@@ -27,7 +26,7 @@ use aptos_vm_types::resolver::ResourceGroupSize;
 use derivative::Derivative;
 use move_core_types::value::MoveTypeLayout;
 use move_vm_types::{
-    code::{ModuleCode, SyncModuleCache, WithAddress, WithName, WithSize},
+    code::{ModuleCode, SyncModuleCache, WithSize},
     delayed_values::delayed_field_id::DelayedFieldID,
 };
 use std::{
@@ -777,10 +776,10 @@ where
 impl<T, K, DC, VC, S> CapturedReads<T, K, DC, VC, S>
 where
     T: Transaction,
-    K: Hash + Eq + Ord + Clone + WithAddress + WithName,
+    K: Hash + Eq + Ord + Clone,
     VC: Deref<Target = Arc<DC>>,
 {
-    pub(crate) fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
+    pub(crate) fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, K, T::Tag>> {
         let mut ret = HashSet::new();
         for (key, read) in &self.data_reads {
             if let DataRead::Versioned(_, _, _) = read {
@@ -802,8 +801,7 @@ where
             ret.insert(InputOutputKey::Resource(key.clone()));
         }
         for key in self.module_reads.keys() {
-            let key = T::Key::from_address_and_module_name(key.address(), key.name());
-            ret.insert(InputOutputKey::Resource(key));
+            ret.insert(InputOutputKey::Module(key.clone()));
         }
 
         for (key, read) in &self.delayed_field_reads {
@@ -831,14 +829,14 @@ pub(crate) struct UnsyncReadSet<T: Transaction, K> {
 impl<T, K> UnsyncReadSet<T, K>
 where
     T: Transaction,
-    K: Hash + Eq + Ord + Clone + WithAddress + WithName,
+    K: Hash + Eq + Ord + Clone,
 {
     /// Captures the module read for sequential execution.
     pub(crate) fn capture_module_read(&mut self, key: K) {
         self.module_reads.insert(key);
     }
 
-    pub(crate) fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
+    pub(crate) fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, K, T::Tag>> {
         let mut ret = HashSet::new();
         for key in &self.resource_reads {
             ret.insert(InputOutputKey::Resource(key.clone()));
@@ -856,8 +854,7 @@ where
             ret.insert(InputOutputKey::Resource(key.clone()));
         }
         for key in &self.module_reads {
-            let key = T::Key::from_address_and_module_name(key.address(), key.name());
-            ret.insert(InputOutputKey::Resource(key));
+            ret.insert(InputOutputKey::Module(key.clone()));
         }
 
         for key in &self.delayed_field_reads {

@@ -85,8 +85,8 @@ impl<'a> CompiledDependencyView<'a> {
 
         for shandle in dep.struct_handles() {
             let mhandle = dep.module_handle_at(shandle.module);
-            let mname = dep.identifier_at(mhandle.name);
-            let sname = dep.identifier_at(shandle.name);
+            let mname = dep.identifier_at(mhandle.name).as_ident_str();
+            let sname = dep.identifier_at(shandle.name).as_ident_str();
             // get_or_add_item gets the proper struct handle index, as `dep.struct_handles()` is
             // properly ordered
             get_or_add_item(&mut structs, (mname, sname))?;
@@ -100,7 +100,7 @@ impl<'a> CompiledDependencyView<'a> {
             .enumerate()
             .filter(|(_idx, fhandle)| fhandle.module == self_handle);
         for (idx, fhandle) in defined_function_handles {
-            let fname = dep.identifier_at(fhandle.name);
+            let fname = dep.identifier_at(fhandle.name).as_ident_str();
             functions.insert(fname, idx as u16);
         }
 

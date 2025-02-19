@@ -71,7 +71,7 @@ pub(crate) fn find_struct<'a>(
 ) -> PartialVMResult<(&'a CompiledModule, StructHandleIndex)> {
     if let Some(module) = map.get(module_id) {
         for (idx, handle) in module.struct_handles().iter().enumerate() {
-            if module.identifier_at(handle.name) == struct_name {
+            if module.identifier_at(handle.name).as_ident_str() == struct_name {
                 return Ok((module, StructHandleIndex::new(idx as TableIndex)));
             }
         }

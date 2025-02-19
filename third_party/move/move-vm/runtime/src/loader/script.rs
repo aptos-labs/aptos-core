@@ -2,18 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{intern_type, BinaryCache, Function, FunctionHandle, FunctionInstantiation};
-use crate::loader::ScriptHash;
+use crate::{loader::ScriptHash, storage::environment::DeserializedScript};
 use move_binary_format::{
     access::ScriptAccess,
     binary_views::BinaryIndexedView,
     errors::{PartialVMError, PartialVMResult},
-    file_format::{Bytecode, CompiledScript, FunctionDefinitionIndex, Signature, SignatureIndex},
+    file_format::{Bytecode, FunctionDefinitionIndex, Signature, SignatureIndex},
 };
-use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
-use move_vm_types::loaded_data::{
-    runtime_access_specifier::AccessSpecifier,
-    runtime_types::{StructIdentifier, Type},
-    struct_name_indexing::StructNameIndexMap,
+use move_core_types::{identifier::Identifier, vm_status::StatusCode};
+use move_vm_types::{
+    indices::IndexMapManager,
+    loaded_data::{runtime_access_specifier::AccessSpecifier, runtime_types::Type},
 };
 use std::{collections::BTreeMap, ops::Deref, sync::Arc};
 
@@ -24,7 +23,7 @@ use std::{collections::BTreeMap, ops::Deref, sync::Arc};
 #[derive(Clone, Debug)]
 pub struct Script {
     // primitive pools
-    pub(crate) script: Arc<CompiledScript>,
+    pub(crate) script: Arc<DeserializedScript>,
 
     // functions as indexes into the Loader function list
     pub(crate) function_refs: Vec<FunctionHandle>,
@@ -40,33 +39,30 @@ pub struct Script {
 
 impl Script {
     pub(crate) fn new(
-        script: Arc<CompiledScript>,
-        struct_name_index_map: &StructNameIndexMap,
+        deserialized_script: Arc<DeserializedScript>,
+        struct_name_index_map: &IndexMapManager,
     ) -> PartialVMResult<Self> {
+        let script = deserialized_script.compiled_script.as_ref();
         let mut struct_names = vec![];
         for struct_handle in script.struct_handles() {
             let struct_name = script.identifier_at(struct_handle.name);
             let module_handle = script.module_handle_at(struct_handle.module);
-            let module_id = script.module_id_for_handle(module_handle);
-            let struct_name = StructIdentifier {
-                module: module_id,
-                name: struct_name.to_owned(),
-            };
-            struct_names.push(struct_name_index_map.struct_name_to_idx(&struct_name)?);
+            let address = script.address_identifier_at(module_handle.address);
+            let module_name = script.identifier_at(module_handle.name);
+
+            let idx = struct_name_index_map.struct_idx(address, module_name, struct_name);
+            struct_names.push(idx);
         }
 
         let mut function_refs = vec![];
         for func_handle in script.function_handles().iter() {
             let func_name = script.identifier_at(func_handle.name);
             let module_handle = script.module_handle_at(func_handle.module);
-            let module_id = ModuleId::new(
-                *script.address_identifier_at(module_handle.address),
-                script.identifier_at(module_handle.name).to_owned(),
-            );
-            function_refs.push(FunctionHandle::Remote {
-                module: module_id,
-                name: func_name.to_owned(),
-            });
+            let module_name = script.identifier_at(module_handle.name);
+            let address = script.address_identifier_at(module_handle.address);
+            let function_idx = struct_name_index_map.function_idx(address, module_name, func_name);
+
+            function_refs.push(FunctionHandle::Remote { idx: function_idx });
         }
 
         let mut function_instantiations = vec![];
@@ -75,7 +71,7 @@ impl Script {
             let mut instantiation = vec![];
             for ty in &script.signature_at(func_inst.type_parameters).0 {
                 instantiation.push(intern_type(
-                    BinaryIndexedView::Script(&script),
+                    BinaryIndexedView::Script(script),
                     ty,
                     &struct_names,
                 )?);
@@ -92,7 +88,7 @@ impl Script {
         let param_tys = parameters
             .0
             .iter()
-            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
+            .map(|tok| intern_type(BinaryIndexedView::Script(script), tok, &struct_names))
             .collect::<PartialVMResult<Vec<_>>>()?;
         let locals = Signature(
             parameters
@@ -105,7 +101,7 @@ impl Script {
         let local_tys = locals
             .0
             .iter()
-            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
+            .map(|tok| intern_type(BinaryIndexedView::Script(script), tok, &struct_names))
             .collect::<PartialVMResult<Vec<_>>>()?;
         let ty_param_abilities = script.type_parameters.clone();
         // TODO: main does not have a name. Revisit.
@@ -155,7 +151,7 @@ impl Script {
                         };
                         single_signature_token_map.insert(
                             *si,
-                            intern_type(BinaryIndexedView::Script(&script), ty, &struct_names)?,
+                            intern_type(BinaryIndexedView::Script(script), ty, &struct_names)?,
                         );
                     }
                 },
@@ -164,7 +160,7 @@ impl Script {
         }
 
         Ok(Self {
-            script,
+            script: deserialized_script,
             function_refs,
             function_instantiations,
             main,
@@ -194,7 +190,7 @@ impl Script {
 }
 
 impl Deref for Script {
-    type Target = Arc<CompiledScript>;
+    type Target = Arc<DeserializedScript>;
 
     fn deref(&self) -> &Self::Target {
         &self.script
@@ -220,6 +216,7 @@ impl ScriptCache {
         self.scripts.get(hash).cloned()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn insert(&mut self, hash: ScriptHash, script: Script) -> Arc<Script> {
         match self.get(&hash) {
             Some(cached) => cached,

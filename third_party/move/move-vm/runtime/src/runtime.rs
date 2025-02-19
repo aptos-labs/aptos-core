@@ -147,10 +147,10 @@ impl VMRuntime {
             #[allow(deprecated)]
             if data_store.exists_module(&module_id)? && compat.need_check_compat() {
                 let old_module_ref = loader.load_module(&module_id, data_store, module_store)?;
-                let old_module = old_module_ref.as_ref().as_ref();
+                let old_module = old_module_ref.compiled_module.as_ref();
                 if loader.vm_config().use_compatibility_checker_v2 {
                     compat
-                        .check(old_module_ref.as_ref().as_ref(), module)
+                        .check(old_module_ref.compiled_module.as_ref(), module)
                         .map_err(|e| e.finish(Location::Undefined))?
                 } else {
                     #[allow(deprecated)]

@@ -77,6 +77,7 @@ fn expect_modules(
     })
 }
 
+#[allow(dead_code)]
 pub fn compile_modules_in_file(path: &Path) -> Result<Vec<CompiledModule>> {
     let units = compile_source_unit_v2("", Some(path.to_path_buf()), BTreeMap::new(), vec![])?;
     expect_modules(units).collect()

@@ -109,7 +109,7 @@ pub trait ModuleAccess: Sync {
         &self.as_module().signatures[idx.into_index()]
     }
 
-    fn identifier_at(&self, idx: IdentifierIndex) -> &IdentStr {
+    fn identifier_at(&self, idx: IdentifierIndex) -> &Identifier {
         &self.as_module().identifiers[idx.into_index()]
     }
 
@@ -241,7 +241,7 @@ pub trait ModuleAccess: Sync {
     /// copies of module ids on the heap.
     fn immediate_dependencies_iter(
         &self,
-    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
+    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &Identifier)> {
         self.module_handles()
             .iter()
             .filter(|&handle| handle != self.self_handle())
@@ -258,7 +258,7 @@ pub trait ModuleAccess: Sync {
     /// copies of module ids on the heap.
     fn immediate_friends_iter(
         &self,
-    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
+    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &Identifier)> {
         self.friend_decls().iter().map(|handle| {
             let addr = self.address_identifier_at(handle.address);
             let name = self.identifier_at(handle.name);
@@ -273,7 +273,7 @@ pub trait ModuleAccess: Sync {
     fn find_struct_def_by_name(&self, name: &IdentStr) -> Option<&StructDefinition> {
         self.struct_defs().iter().find(|def| {
             let handle = self.struct_handle_at(def.struct_handle);
-            name == self.identifier_at(handle.name)
+            name == self.identifier_at(handle.name).as_ident_str()
         })
     }
 }
@@ -301,7 +301,7 @@ pub trait ScriptAccess: Sync {
         &self.as_script().signatures[idx.into_index()]
     }
 
-    fn identifier_at(&self, idx: IdentifierIndex) -> &IdentStr {
+    fn identifier_at(&self, idx: IdentifierIndex) -> &Identifier {
         &self.as_script().identifiers[idx.into_index()]
     }
 
@@ -375,7 +375,7 @@ pub trait ScriptAccess: Sync {
     /// copies of module ids on the heap.
     fn immediate_dependencies_iter(
         &self,
-    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
+    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &Identifier)> {
         self.module_handles().iter().map(|handle| {
             let addr = self.address_identifier_at(handle.address);
             let name = self.identifier_at(handle.name);

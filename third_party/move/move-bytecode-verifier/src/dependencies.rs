@@ -527,7 +527,9 @@ fn compare_structs(
     let def_struct_handle = def_module.struct_handle_at(idx2);
     let def_module_handle = def_module.module_handle_at(def_struct_handle.module);
     let def_module_id = def_module.module_id_for_handle(def_module_handle);
-    let def_struct_name = def_module.identifier_at(def_struct_handle.name);
+    let def_struct_name = def_module
+        .identifier_at(def_struct_handle.name)
+        .as_ident_str();
 
     if module_id != def_module_id || struct_name != def_struct_name {
         Err(PartialVMError::new(StatusCode::TYPE_MISMATCH))

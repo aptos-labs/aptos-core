@@ -13,9 +13,8 @@ use move_binary_format::{
     },
     CompiledModule,
 };
-use move_core_types::{
-    account_address::AccountAddress, language_storage::ModuleId, vm_status::StatusCode,
-};
+use move_core_types::{account_address::AccountAddress, vm_status::StatusCode};
+use move_vm_types::indices::ModuleIdx;
 use std::collections::HashSet;
 
 const EVENT_MODULE_NAME: &str = "event";
@@ -39,7 +38,10 @@ pub(crate) fn validate_module_events(
     module_storage: &impl AptosModuleStorage,
     modules: &[CompiledModule],
 ) -> VMResult<()> {
+    let index_map = module_storage.runtime_environment().struct_name_index_map();
     for module in modules {
+        let module_id = index_map.module_idx(module.self_addr(), module.self_name_identifier());
+
         let mut new_event_structs =
             if let Some(metadata) = aptos_framework::get_metadata_from_compiled_module(module) {
                 extract_event_metadata(&metadata)?
@@ -51,7 +53,7 @@ pub(crate) fn validate_module_events(
         validate_emit_calls(&new_event_structs, module)?;
 
         let original_event_structs =
-            extract_event_metadata_from_module(session, module_storage, &module.self_id())?;
+            extract_event_metadata_from_module(session, module_storage, &module_id)?;
 
         for member in original_event_structs {
             // Fail if we see a removal of an event attribute.
@@ -119,14 +121,14 @@ pub(crate) fn validate_emit_calls(
 
 /// Given a module id extract all event metadata
 pub(crate) fn extract_event_metadata_from_module(
-    session: &mut SessionExt,
+    _session: &mut SessionExt,
     module_storage: &impl AptosModuleStorage,
-    module_id: &ModuleId,
+    module_id: &ModuleIdx,
 ) -> VMResult<HashSet<String>> {
     if module_storage.is_enabled() {
         // TODO(loader_v2): We can optimize metadata calls as well.
         let metadata = module_storage
-            .fetch_deserialized_module(module_id.address(), module_id.name())?
+            .fetch_deserialized_module(module_id)?
             .map(|module| aptos_framework::get_metadata_from_compiled_module(module.as_ref()));
         if let Some(Some(metadata)) = metadata {
             extract_event_metadata(&metadata)
@@ -134,22 +136,23 @@ pub(crate) fn extract_event_metadata_from_module(
             Ok(HashSet::new())
         }
     } else {
-        #[allow(deprecated)]
-        let metadata = session
-            .fetch_module_from_data_store(module_id)
-            .map(|module| {
-                CompiledModule::deserialize_with_config(
-                    &module,
-                    &session.get_vm_config().deserializer_config,
-                )
-                .map(|module| aptos_framework::get_metadata_from_compiled_module(&module))
-            });
-
-        if let Ok(Ok(Some(metadata))) = metadata {
-            extract_event_metadata(&metadata)
-        } else {
-            Ok(HashSet::new())
-        }
+        unimplemented!()
+        // #[allow(deprecated)]
+        // let metadata = session
+        //     .fetch_module_from_data_store(module_id)
+        //     .map(|module| {
+        //         CompiledModule::deserialize_with_config(
+        //             &module,
+        //             &session.get_vm_config().deserializer_config,
+        //         )
+        //         .map(|module| aptos_framework::get_metadata_from_compiled_module(&module))
+        //     });
+        //
+        // if let Ok(Ok(Some(metadata))) = metadata {
+        //     extract_event_metadata(&metadata)
+        // } else {
+        //     Ok(HashSet::new())
+        // }
     }
 }
 

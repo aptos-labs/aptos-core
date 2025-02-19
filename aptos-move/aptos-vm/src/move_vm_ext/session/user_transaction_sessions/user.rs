@@ -96,15 +96,24 @@ impl<'r, 'l> UserSession<'r, 'l> {
 
         let init_func_name = ident_str!("init_module");
         for module in modules {
+            let idx = module_storage
+                .runtime_environment()
+                .struct_name_index_map()
+                .function_idx(
+                    module.self_addr(),
+                    module.self_name_identifier(),
+                    &init_func_name.to_owned(),
+                );
+
             // Check if module existed previously. If not, we do not run initialization.
-            if module_storage.check_module_exists(module.self_addr(), module.self_name())? {
+            if module_storage.check_module_exists(&idx.module_idx())? {
                 continue;
             }
 
             self.session.execute(|session| {
                 let module_id = module.self_id();
                 let init_function_exists = session
-                    .load_function(&staging_module_storage, &module_id, init_func_name, &[])
+                    .load_function(&staging_module_storage, &idx, &[])
                     .is_ok();
 
                 if init_function_exists {
