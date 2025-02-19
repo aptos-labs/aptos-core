@@ -3,6 +3,7 @@
 
 use anyhow::anyhow;
 use aptos_config::config::{NodeConfig, DEFAULT_EXECUTION_CONCURRENCY_LEVEL};
+#[cfg(unix)]
 use aptos_logger::prelude::*;
 use aptos_storage_interface::{
     state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReaderWriter,
@@ -77,43 +78,49 @@ pub fn ensure_max_open_files_limit(required: u64) {
         return;
     }
 
-    if !rlimit::Resource::NOFILE.is_supported() {
-        warn!(
-            required = required,
-            "rlimit setting not supported on this platform. Won't ensure."
-        );
-        return;
-    }
-
-    let (soft, mut hard) = match rlimit::Resource::NOFILE.get() {
-        Ok((soft, hard)) => (soft, hard),
-        Err(err) => {
+    // Only works on Unix environments
+    #[cfg(unix)]
+    {
+        if !rlimit::Resource::NOFILE.is_supported() {
             warn!(
-                error = ?err,
                 required = required,
-                "Failed getting RLIMIT_NOFILE. Won't ensure."
+                "rlimit setting not supported on this platform. Won't ensure."
             );
             return;
-        },
-    };
+        }
 
-    if soft >= required {
-        return;
+        let (soft, mut hard) = match rlimit::Resource::NOFILE.get() {
+            Ok((soft, hard)) => (soft, hard),
+            Err(err) => {
+                warn!(
+                    error = ?err,
+                    required = required,
+                    "Failed getting RLIMIT_NOFILE. Won't ensure."
+                );
+                return;
+            },
+        };
+
+        if soft >= required {
+            return;
+        }
+
+        if required > hard {
+            warn!(
+                hard_limit = hard,
+                required = required,
+                "System RLIMIT_NOFILE hard limit too small."
+            );
+            // Not panicking right away -- user can be root
+            hard = required;
+        }
+
+        rlimit::Resource::NOFILE
+            .set(required, hard)
+            .unwrap_or_else(|err| {
+                panic!("RLIMIT_NOFILE soft limit is {soft}, configured requirement is {required}, and \
+                    failed to raise to it. Please make sure that `limit -n` shows a number larger than \
+                    {required} before starting the node. Error: {err}.")
+            });
     }
-
-    if required > hard {
-        warn!(
-            hard_limit = hard,
-            required = required,
-            "System RLIMIT_NOFILE hard limit too small."
-        );
-        // Not panicking right away -- user can be root
-        hard = required;
-    }
-
-    rlimit::Resource::NOFILE
-        .set(required, hard)
-        .unwrap_or_else(|err| {
-            panic!("Failed raising RLIMIT_NOFILE soft limit to {required}. Error: {err}")
-        });
 }
