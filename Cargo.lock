@@ -3308,6 +3308,7 @@ dependencies = [
  "once_cell",
  "procfs",
  "prometheus",
+ "rlimit",
  "sysinfo",
 ]
 
