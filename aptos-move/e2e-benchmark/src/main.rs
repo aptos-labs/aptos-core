@@ -10,7 +10,7 @@ use aptos_transaction_generator_lib::{
     publishing::publish_util::{Package, PackageHandler},
 };
 use aptos_transaction_workloads_lib::{EntryPoints, LoopType, MapType};
-use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
+use aptos_types::{account_address::AccountAddress, transaction::TransactionPayloadWrapper};
 use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;
 use std::{collections::HashMap, fs, process::exit};
@@ -23,7 +23,7 @@ pub fn execute_txn(
     executor: &mut FakeExecutor,
     account: &Account,
     sequence_number: u64,
-    payload: TransactionPayload,
+    payload: TransactionPayloadWrapper,
 ) {
     let sign_tx = account
         .transaction()

@@ -10,7 +10,7 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_sdk::types::APTOS_COIN_TYPE_STR;
 use aptos_types::{
     account_config::{primary_apt_store, ObjectCoreResource},
-    transaction::{EntryFunction, TransactionPayload},
+    transaction::{EntryFunction, TransactionPayloadWrapper},
     AptosCoinType, CoinType,
 };
 use move_core_types::{
@@ -220,8 +220,9 @@ async fn test_get_account_balance() {
         .await;
     assert_eq!(coin_balance_after, fa_balance);
     // upgrade to concurrent store
+    // TODO[Orderless]: Change this payload v2 format
     let txn = root_account.sign_with_transaction_builder(context.transaction_factory().payload(
-        TransactionPayload::EntryFunction(EntryFunction::new(
+        TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
             ModuleId::new(
                 AccountAddress::TEN,
                 Identifier::new("fungible_asset").unwrap(),

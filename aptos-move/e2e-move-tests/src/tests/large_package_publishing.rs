@@ -16,7 +16,7 @@ use aptos_framework::{
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
     object_address::create_object_code_deployment_address,
-    transaction::{AbortInfo, TransactionPayload, TransactionStatus},
+    transaction::{AbortInfo, TransactionPayloadWrapper, TransactionStatus},
 };
 use move_core_types::{
     account_address::AccountAddress, parser::parse_struct_tag, vm_status::StatusCode,
@@ -130,7 +130,7 @@ impl LargePackageTestContext {
         options: Option<BuildOptions>,
         mut patch_metadata: impl FnMut(&mut PackageMetadata),
         publish_type: PublishType,
-    ) -> Vec<TransactionPayload> {
+    ) -> Vec<TransactionPayloadWrapper> {
         let package = BuiltPackage::build(path.to_owned(), options.unwrap())
             .expect("package build must succeed");
         let package_code = package.extract_code();

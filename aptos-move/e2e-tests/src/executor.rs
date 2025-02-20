@@ -45,9 +45,7 @@ use aptos_types::{
     transaction::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
-        },
-        BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
-        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
+        }, BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionExecutable, TransactionOutput, TransactionPayloadInner, TransactionPayloadWrapper, TransactionStatus, VMValidatorResult, ViewFunctionOutput
     },
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -836,18 +834,39 @@ impl FakeExecutor {
             &log_context,
             |gas_meter| {
                 let gas_profiler = match txn.payload() {
-                    TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
-                    TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
+                    TransactionPayloadWrapper::Script(_) => GasProfiler::new_script(gas_meter),
+                    TransactionPayloadWrapper::EntryFunction(entry_func) => GasProfiler::new_function(
                         gas_meter,
                         entry_func.module().clone(),
                         entry_func.function().to_owned(),
                         entry_func.ty_args().to_vec(),
                     ),
-                    TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
+                    TransactionPayloadWrapper::Multisig(..) => unimplemented!("not supported yet"),
 
                     // Deprecated.
-                    TransactionPayload::ModuleBundle(..) => {
+                    TransactionPayloadWrapper::ModuleBundle(..) => {
                         unreachable!("Module bundle payload has been removed")
+                    },
+                    TransactionPayloadWrapper::Payload(TransactionPayloadInner::V1 {
+                        executable,
+                        extra_config
+                    }) => {
+                        if extra_config.is_multisig() {
+                            unimplemented!("not supported yet")
+                        } else {
+                            match executable {
+                                TransactionExecutable::EntryFunction(entry_func) => {
+                                    GasProfiler::new_function(
+                                        gas_meter,
+                                        entry_func.module().clone(),
+                                        entry_func.function().to_owned(),
+                                        entry_func.ty_args().to_vec(),
+                                    )
+                                },
+                                TransactionExecutable::Script(_) =>  GasProfiler::new_script(gas_meter),
+                                TransactionExecutable::Empty => unimplemented!("not supported yet"),
+                            }
+                        }
                     },
                 };
                 gas_profiler

@@ -139,6 +139,8 @@ pub enum FeatureFlag {
     AccountAbstraction,
     VMBinaryFormatV8,
     BulletproofsBatchNatives,
+    TransactionPayloadV2,
+    OrderlessTransactions,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -369,6 +371,8 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::PermissionedSigner => AptosFeatureFlag::PERMISSIONED_SIGNER,
             FeatureFlag::AccountAbstraction => AptosFeatureFlag::ACCOUNT_ABSTRACTION,
             FeatureFlag::BulletproofsBatchNatives => AptosFeatureFlag::BULLETPROOFS_BATCH_NATIVES,
+            FeatureFlag::TransactionPayloadV2 => AptosFeatureFlag::TRANSACTION_PAYLOAD_V2,
+            FeatureFlag::OrderlessTransactions => AptosFeatureFlag::ORDERLESS_TRANSACTIONS,
         }
     }
 }
@@ -526,6 +530,8 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::PERMISSIONED_SIGNER => FeatureFlag::PermissionedSigner,
             AptosFeatureFlag::ACCOUNT_ABSTRACTION => FeatureFlag::AccountAbstraction,
             AptosFeatureFlag::BULLETPROOFS_BATCH_NATIVES => FeatureFlag::BulletproofsBatchNatives,
+            AptosFeatureFlag::TRANSACTION_PAYLOAD_V2 => FeatureFlag::TransactionPayloadV2,
+            AptosFeatureFlag::ORDERLESS_TRANSACTIONS => FeatureFlag::OrderlessTransactions,
         }
     }
 }

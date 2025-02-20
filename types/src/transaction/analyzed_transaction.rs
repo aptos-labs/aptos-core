@@ -8,7 +8,7 @@ use crate::{
     state_store::{state_key::StateKey, table::TableHandle},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
-        TransactionPayload,
+        TransactionPayloadWrapper,
     },
     AptosCoinType, CoinType,
 };
@@ -245,7 +245,7 @@ impl AnalyzedTransactionProvider for Transaction {
     fn get_read_write_hints(&self) -> (Vec<StorageLocation>, Vec<StorageLocation>) {
         match self {
             Transaction::UserTransaction(signed_txn) => match signed_txn.payload() {
-                TransactionPayload::EntryFunction(func) => {
+                TransactionPayloadWrapper::EntryFunction(func) => {
                     match (
                         *func.module().address(),
                         func.module().name().as_str(),

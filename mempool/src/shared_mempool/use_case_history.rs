@@ -119,11 +119,11 @@ impl PartialOrd for UseCaseByCount {
 
 #[test]
 fn test_use_case_history() {
-    use aptos_types::account_address::AccountAddress;
+    use aptos_types::{account_address::AccountAddress, transaction::ReplayProtector};
     let ct = |use_case: UseCaseKey| -> CommittedTransaction {
         CommittedTransaction {
             sender: AccountAddress::ONE,
-            sequence_number: 0,
+            replay_protector: ReplayProtector::SequenceNumber(0),
             use_case,
         }
     };

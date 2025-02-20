@@ -12,7 +12,7 @@ use crate::{
     types::{
         account_address::AccountAddress,
         chain_id::ChainId,
-        transaction::{EntryFunction, TransactionPayload},
+        transaction::{EntryFunction, TransactionPayloadWrapper},
         LocalAccount,
     },
 };
@@ -69,8 +69,9 @@ impl<'a> CoinClient<'a> {
             .context("Failed to get chain ID")?
             .inner()
             .chain_id;
+        // TODO[Orderless]: Change this payload v2 format.
         let transaction_builder = TransactionBuilder::new(
-            TransactionPayload::EntryFunction(EntryFunction::new(
+            TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
                 ModuleId::new(
                     AccountAddress::ONE,
                     Identifier::new("aptos_account").unwrap(),

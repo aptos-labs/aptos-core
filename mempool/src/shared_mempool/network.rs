@@ -435,120 +435,128 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         }
         let retry_message_id = state.broadcast_info.retry_messages.iter().next_back();
 
-        let (message_id, transactions, metric_label) =
-            match std::cmp::max(expired_message_id, retry_message_id) {
-                Some(message_id) => {
-                    let metric_label = if Some(message_id) == expired_message_id {
-                        Some(counters::EXPIRED_BROADCAST_LABEL)
-                    } else {
-                        Some(counters::RETRY_BROADCAST_LABEL)
-                    };
+        let (message_id, transactions, metric_label) = match std::cmp::max(
+            expired_message_id,
+            retry_message_id,
+        ) {
+            Some(message_id) => {
+                let metric_label = if Some(message_id) == expired_message_id {
+                    Some(counters::EXPIRED_BROADCAST_LABEL)
+                } else {
+                    Some(counters::RETRY_BROADCAST_LABEL)
+                };
 
-                    let txns = message_id
-                        .decode()
-                        .into_iter()
-                        .flat_map(|(sender_bucket, start_end_pairs)| {
-                            if self.node_type.is_validator() {
-                                mempool
-                                    .timeline_range(sender_bucket, start_end_pairs)
-                                    .into_iter()
-                                    .map(|(txn, ready_time)| {
-                                        (txn, ready_time, BroadcastPeerPriority::Primary)
-                                    })
-                                    .collect::<Vec<_>>()
-                            } else {
-                                self.prioritized_peers_state
-                                    .get_sender_bucket_priority_for_peer(&peer, sender_bucket)
-                                    .map_or_else(Vec::new, |priority| {
-                                        mempool
-                                            .timeline_range(sender_bucket, start_end_pairs)
-                                            .into_iter()
-                                            .map(|(txn, ready_time)| {
-                                                (txn, ready_time, priority.clone())
-                                            })
-                                            .collect::<Vec<_>>()
-                                    })
-                            }
-                        })
-                        .collect::<Vec<_>>();
-                    (message_id.clone(), txns, metric_label)
-                },
-                None => {
-                    // Fresh broadcast
-
-                    // If the peer doesn't have any sender_buckets assigned, let's not broadcast to the peer
-                    let mut sender_buckets: Vec<(MempoolSenderBucket, BroadcastPeerPriority)> =
+                let txns = message_id
+                    .decode()
+                    .into_iter()
+                    .flat_map(|(sender_bucket, start_end_pairs)| {
                         if self.node_type.is_validator() {
-                            (0..self.mempool_config.num_sender_buckets)
-                                .map(|sender_bucket| {
-                                    (sender_bucket, BroadcastPeerPriority::Primary)
+                            mempool
+                                .timeline_range(sender_bucket, start_end_pairs)
+                                .into_iter()
+                                .map(|(txn, ready_time)| {
+                                    (txn, ready_time, BroadcastPeerPriority::Primary)
                                 })
-                                .collect()
+                                .collect::<Vec<_>>()
                         } else {
                             self.prioritized_peers_state
-                                .get_sender_buckets_for_peer(&peer)
-                                .ok_or_else(|| {
-                                    BroadcastError::PeerNotPrioritized(
-                                        peer,
-                                        self.prioritized_peers_state.get_peer_priority(&peer),
-                                    )
-                                })?
-                                .clone()
-                                .into_iter()
-                                .collect()
-                        };
-                    // Sort sender_buckets based on priority. Primary peer should be first.
-                    sender_buckets.sort_by(|(_, priority_a), (_, priority_b)| {
-                        if priority_a == priority_b {
-                            std::cmp::Ordering::Equal
-                        } else if *priority_a == BroadcastPeerPriority::Primary {
-                            std::cmp::Ordering::Less
-                        } else {
-                            std::cmp::Ordering::Greater
+                                .get_sender_bucket_priority_for_peer(&peer, sender_bucket)
+                                .map_or_else(Vec::new, |priority| {
+                                    mempool
+                                        .timeline_range(sender_bucket, start_end_pairs)
+                                        .into_iter()
+                                        .map(|(txn, ready_time)| {
+                                            (txn, ready_time, priority.clone())
+                                        })
+                                        .collect::<Vec<_>>()
+                                })
                         }
-                    });
+                    })
+                    .collect::<Vec<_>>();
+                info!(
+                    "Rebroadcasting message_id: {:?} to peer {:?}",
+                    message_id, peer
+                );
+                (message_id.clone(), txns, metric_label)
+            },
+            None => {
+                // Fresh broadcast
 
-                    let max_txns = self.mempool_config.shared_mempool_batch_size;
-                    let mut output_txns = vec![];
-                    let mut output_updates = vec![];
-                    for (sender_bucket, peer_priority) in sender_buckets {
-                        let before = match peer_priority {
-                            BroadcastPeerPriority::Primary => None,
-                            BroadcastPeerPriority::Failover => Some(
-                                Instant::now()
-                                    - Duration::from_millis(
-                                        self.mempool_config.shared_mempool_failover_delay_ms,
-                                    ),
-                            ),
-                        };
-                        if max_txns > 0 {
-                            let old_timeline_id = state.timelines.get(&sender_bucket).unwrap();
-                            let (txns, new_timeline_id) = mempool.read_timeline(
-                                sender_bucket,
-                                old_timeline_id,
-                                max_txns,
-                                before,
-                                peer_priority.clone(),
-                            );
-                            output_txns.extend(
-                                txns.into_iter()
-                                    .map(|(txn, ready_time)| {
-                                        (txn, ready_time, peer_priority.clone())
-                                    })
-                                    .collect::<Vec<_>>(),
-                            );
-                            output_updates
-                                .push((sender_bucket, (old_timeline_id.clone(), new_timeline_id)));
-                        }
+                // If the peer doesn't have any sender_buckets assigned, let's not broadcast to the peer
+                let mut sender_buckets: Vec<(MempoolSenderBucket, BroadcastPeerPriority)> =
+                    if self.node_type.is_validator() {
+                        // vec![]
+                        (0..self.mempool_config.num_sender_buckets)
+                            .map(|sender_bucket| (sender_bucket, BroadcastPeerPriority::Primary))
+                            .collect()
+                    } else {
+                        self.prioritized_peers_state
+                            .get_sender_buckets_for_peer(&peer)
+                            .ok_or_else(|| {
+                                BroadcastError::PeerNotPrioritized(
+                                    peer,
+                                    self.prioritized_peers_state.get_peer_priority(&peer),
+                                )
+                            })?
+                            .clone()
+                            .into_iter()
+                            .collect()
+                    };
+                // Sort sender_buckets based on priority. Primary peer should be first.
+                sender_buckets.sort_by(|(_, priority_a), (_, priority_b)| {
+                    if priority_a == priority_b {
+                        std::cmp::Ordering::Equal
+                    } else if *priority_a == BroadcastPeerPriority::Primary {
+                        std::cmp::Ordering::Less
+                    } else {
+                        std::cmp::Ordering::Greater
                     }
-
-                    (
-                        MempoolMessageId::from_timeline_ids(output_updates),
-                        output_txns,
-                        None,
-                    )
-                },
-            };
+                });
+                info!(
+                    "Broadcasting buckets {:?} to peer {:?}",
+                    sender_buckets, peer
+                );
+                let max_txns = self.mempool_config.shared_mempool_batch_size;
+                let mut output_txns = vec![];
+                let mut output_updates = vec![];
+                for (sender_bucket, peer_priority) in sender_buckets {
+                    let before = match peer_priority {
+                        BroadcastPeerPriority::Primary => None,
+                        BroadcastPeerPriority::Failover => Some(
+                            Instant::now()
+                                - Duration::from_millis(
+                                    self.mempool_config.shared_mempool_failover_delay_ms,
+                                ),
+                        ),
+                    };
+                    if max_txns > 0 {
+                        let old_timeline_id = state.timelines.get(&sender_bucket).unwrap();
+                        let (txns, new_timeline_id) = mempool.read_timeline(
+                            sender_bucket,
+                            old_timeline_id,
+                            max_txns,
+                            before,
+                            peer_priority.clone(),
+                        );
+                        output_txns.extend(
+                            txns.into_iter()
+                                .map(|(txn, ready_time)| (txn, ready_time, peer_priority.clone()))
+                                .collect::<Vec<_>>(),
+                        );
+                        output_updates
+                            .push((sender_bucket, (old_timeline_id.clone(), new_timeline_id)));
+                    }
+                }
+                for (txn, _, peer_priority) in &output_txns {
+                    info!("Broadcasting txn: (address: {:?}, replay_protector: {:?}) to peer {:?} with peer_priority {:?}", txn.sender(), txn.replay_protector(), peer, peer_priority);
+                }
+                (
+                    MempoolMessageId::from_timeline_ids(output_updates),
+                    output_txns,
+                    None,
+                )
+            },
+        };
 
         if transactions.is_empty() {
             return Err(BroadcastError::NoTransactions(peer));

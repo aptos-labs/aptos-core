@@ -17,7 +17,7 @@
 #![allow(clippy::get_first)]
 use aptos_types::{
     account_address::AccountAddress,
-    transaction::{EntryFunction, TransactionPayload},
+    transaction::{EntryFunction, TransactionPayloadWrapper},
 };
 use move_core_types::{
     ident_str,
@@ -29,8 +29,8 @@ type Bytes = Vec<u8>;
 /// Structured representation of a call into a known Move entry function.
 /// ```ignore
 /// impl EntryFunctionCall {
-///     pub fn encode(self) -> TransactionPayload { .. }
-///     pub fn decode(&TransactionPayload) -> Option<EntryFunctionCall> { .. }
+///     pub fn encode(self) -> TransactionPayloadWrapper { .. }
+///     pub fn decode(&TransactionPayloadWrapper) -> Option<EntryFunctionCall> { .. }
 /// }
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -81,8 +81,8 @@ pub enum EntryFunctionCall {
 }
 
 impl EntryFunctionCall {
-    /// Build an Aptos `TransactionPayload` from a structured object `EntryFunctionCall`.
-    pub fn encode(self) -> TransactionPayload {
+    /// Build an Aptos `TransactionPayloadWrapper` from a structured object `EntryFunctionCall`.
+    pub fn encode(self) -> TransactionPayloadWrapper {
         use EntryFunctionCall::*;
         match self {
             AptosTokenCreateCollection {
@@ -157,9 +157,9 @@ impl EntryFunctionCall {
         }
     }
 
-    /// Try to recognize an Aptos `TransactionPayload` and convert it into a structured object `EntryFunctionCall`.
-    pub fn decode(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    /// Try to recognize an Aptos `TransactionPayloadWrapper` and convert it into a structured object `EntryFunctionCall`.
+    pub fn decode(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             match SCRIPT_FUNCTION_DECODER_MAP.get(&format!(
                 "{}_{}",
                 script.module().name(),
@@ -191,8 +191,8 @@ pub fn aptos_token_create_collection(
     tokens_freezable_by_creator: bool,
     royalty_numerator: u64,
     royalty_denominator: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -231,8 +231,8 @@ pub fn aptos_token_mint(
     property_keys: Vec<Vec<u8>>,
     property_types: Vec<Vec<u8>>,
     property_values: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -264,8 +264,8 @@ pub fn aptos_token_mint_soul_bound(
     property_types: Vec<Vec<u8>>,
     property_values: Vec<Vec<u8>>,
     soul_bound_to: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -290,9 +290,9 @@ pub fn aptos_token_mint_soul_bound(
 mod decoder {
     use super::*;
     pub fn aptos_token_create_collection(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosTokenCreateCollection {
                 description: bcs::from_bytes(script.args().get(0)?).ok()?,
                 max_supply: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -315,8 +315,8 @@ mod decoder {
         }
     }
 
-    pub fn aptos_token_mint(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn aptos_token_mint(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosTokenMint {
                 collection: bcs::from_bytes(script.args().get(0)?).ok()?,
                 description: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -331,8 +331,10 @@ mod decoder {
         }
     }
 
-    pub fn aptos_token_mint_soul_bound(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn aptos_token_mint_soul_bound(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosTokenMintSoulBound {
                 collection: bcs::from_bytes(script.args().get(0)?).ok()?,
                 description: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -352,7 +354,7 @@ mod decoder {
 type EntryFunctionDecoderMap = std::collections::HashMap<
     String,
     Box<
-        dyn Fn(&TransactionPayload) -> Option<EntryFunctionCall>
+        dyn Fn(&TransactionPayloadWrapper) -> Option<EntryFunctionCall>
             + std::marker::Sync
             + std::marker::Send,
     >,

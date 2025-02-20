@@ -6,7 +6,7 @@ use crate::{
     move_types::account_address::AccountAddress,
     types::{
         chain_id::ChainId,
-        transaction::{authenticator::AuthenticationKey, RawTransaction, TransactionPayload},
+        transaction::{authenticator::AuthenticationKey, RawTransaction, TransactionPayloadWrapper},
     },
 };
 pub use aptos_cached_packages::aptos_stdlib;
@@ -20,7 +20,7 @@ use aptos_types::{
 pub struct TransactionBuilder {
     sender: Option<AccountAddress>,
     sequence_number: Option<u64>,
-    payload: TransactionPayload,
+    payload: TransactionPayloadWrapper,
     max_gas_amount: u64,
     gas_unit_price: u64,
     expiration_timestamp_secs: u64,
@@ -29,7 +29,7 @@ pub struct TransactionBuilder {
 
 impl TransactionBuilder {
     pub fn new(
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
         expiration_timestamp_secs: u64,
         chain_id: ChainId,
     ) -> Self {
@@ -144,12 +144,12 @@ impl TransactionFactory {
         self.chain_id
     }
 
-    pub fn payload(&self, payload: TransactionPayload) -> TransactionBuilder {
+    pub fn payload(&self, payload: TransactionPayloadWrapper) -> TransactionBuilder {
         self.transaction_builder(payload)
     }
 
     pub fn entry_function(&self, func: EntryFunction) -> TransactionBuilder {
-        self.payload(TransactionPayload::EntryFunction(func))
+        self.payload(TransactionPayloadWrapper::EntryFunction(func))
     }
 
     pub fn create_user_account(&self, public_key: &Ed25519PublicKey) -> TransactionBuilder {
@@ -228,7 +228,7 @@ impl TransactionFactory {
                 owners,
                 signatures_required,
                 vec![],
-                vec![],
+            vec![],
             ),
         )
     }
@@ -286,10 +286,10 @@ impl TransactionFactory {
     //
 
     pub fn script(&self, script: Script) -> TransactionBuilder {
-        self.payload(TransactionPayload::Script(script))
+        self.payload(TransactionPayloadWrapper::Script(script))
     }
 
-    fn transaction_builder(&self, payload: TransactionPayload) -> TransactionBuilder {
+    fn transaction_builder(&self, payload: TransactionPayloadWrapper) -> TransactionBuilder {
         TransactionBuilder {
             sender: None,
             sequence_number: None,

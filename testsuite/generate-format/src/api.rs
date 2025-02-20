@@ -103,7 +103,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<BlockEpiloguePayload>(&samples)?;
     tracer.trace_type::<transaction::Transaction>(&samples)?;
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
-    tracer.trace_type::<transaction::TransactionPayload>(&samples)?;
+    tracer.trace_type::<transaction::TransactionPayloadWrapper>(&samples)?;
     tracer.trace_type::<transaction::WriteSetPayload>(&samples)?;
     tracer.trace_type::<transaction::BlockEpiloguePayload>(&samples)?;
     tracer.trace_type::<StateKey>(&samples)?;

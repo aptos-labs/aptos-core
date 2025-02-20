@@ -14,7 +14,7 @@ use aptos_types::{
     account_address, account_config,
     chain_id::ChainId,
     test_helpers::transaction_test_helpers,
-    transaction::{Script, TransactionPayload},
+    transaction::{Script, TransactionPayloadWrapper},
     vm_status::StatusCode,
 };
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
@@ -125,7 +125,7 @@ fn test_validate_known_script_too_large_args() {
         1,
         &aptos_vm_genesis::GENESIS_KEYPAIR.0,
         aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
-        Some(TransactionPayload::Script(Script::new(
+        Some(TransactionPayloadWrapper::Script(Script::new(
             vec![42; MAX_TRANSACTION_SIZE_IN_BYTES as usize],
             vec![],
             vec![],
@@ -186,7 +186,7 @@ fn test_validate_max_gas_units_below_min() {
         1,
         &aptos_vm_genesis::GENESIS_KEYPAIR.0,
         aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
-        Some(TransactionPayload::Script(Script::new(
+        Some(TransactionPayloadWrapper::Script(Script::new(
             vec![42; u64::from(txn_bytes) as usize],
             vec![],
             vec![],

@@ -12,7 +12,7 @@ use aptos_types::{
     account_config::CoinStoreResource,
     move_utils::MemberId,
     on_chain_config::FeatureFlag,
-    transaction::{EntryFunction, ExecutionStatus, Script, TransactionPayload, TransactionStatus},
+    transaction::{EntryFunction, ExecutionStatus, Script, TransactionPayloadWrapper, TransactionStatus},
     AptosCoinType,
 };
 use aptos_vm_types::storage::StorageGasParameters;
@@ -273,7 +273,7 @@ fn test_account_not_exist_out_of_gas_with_fee_payer() {
         member_id,
     } = str::parse("0xbeef::test::run").unwrap();
     let payload =
-        TransactionPayload::EntryFunction(EntryFunction::new(module_id, member_id, vec![], vec![]));
+        TransactionPayloadWrapper::EntryFunction(EntryFunction::new(module_id, member_id, vec![], vec![]));
     let transaction = TransactionBuilder::new(alice.clone())
         .fee_payer(beef.clone())
         .payload(payload)
@@ -316,7 +316,7 @@ fn test_account_not_exist_move_abort_with_fee_payer_out_of_gas() {
     } = str::parse("0xcafe::test::init_collection_of_1000").unwrap();
 
     let payload =
-        TransactionPayload::EntryFunction(EntryFunction::new(module_id, member_id, vec![], vec![]));
+        TransactionPayloadWrapper::EntryFunction(EntryFunction::new(module_id, member_id, vec![], vec![]));
     let transaction = TransactionBuilder::new(alice.clone())
         .fee_payer(cafe.clone())
         .payload(payload.clone())

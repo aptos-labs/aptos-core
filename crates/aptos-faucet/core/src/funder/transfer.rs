@@ -21,7 +21,7 @@ use aptos_sdk::{
     types::{
         account_address::AccountAddress,
         chain_id::ChainId,
-        transaction::{authenticator::AuthenticationKey, SignedTransaction, TransactionPayload},
+        transaction::{authenticator::AuthenticationKey, SignedTransaction, TransactionPayloadWrapper},
         LocalAccount,
     },
 };
@@ -170,7 +170,7 @@ impl TransferFunder {
     async fn execute_transaction(
         &self,
         client: &Client,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
         // Only used for logging.
         receiver_address: &AccountAddress,
     ) -> Result<SignedTransaction, AptosTapError> {
