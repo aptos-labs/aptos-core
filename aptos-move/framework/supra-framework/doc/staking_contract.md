@@ -1686,7 +1686,7 @@ Staker can call this function to create a simple staking contract with a specifi
     contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ): <b>address</b> <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
     <b>assert</b>!(
-        <a href="staking_contract.md#0x1_staking_contract_commission_percentage">commission_percentage</a> &lt;= 100,
+        commission_percentage &gt;= 0 && <a href="staking_contract.md#0x1_staking_contract_commission_percentage">commission_percentage</a> &lt;= 100,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_contract.md#0x1_staking_contract_EINVALID_COMMISSION_PERCENTAGE">EINVALID_COMMISSION_PERCENTAGE</a>),
     );
     // The amount should be at least the min_stake_required, so the <a href="stake.md#0x1_stake">stake</a> pool will be eligible <b>to</b> join the
@@ -1889,7 +1889,7 @@ TODO: fix the typo in function name. commision -> commission
     new_commission_percentage: u64
 ) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>, <a href="staking_contract.md#0x1_staking_contract_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="staking_contract.md#0x1_staking_contract_StakingGroupUpdateCommissionEvent">StakingGroupUpdateCommissionEvent</a> {
     <b>assert</b>!(
-        new_commission_percentage &lt;= 100,
+        new_commission_percentage &gt;= 0 && new_commission_percentage &lt;= 100,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_contract.md#0x1_staking_contract_EINVALID_COMMISSION_PERCENTAGE">EINVALID_COMMISSION_PERCENTAGE</a>),
     );
 
@@ -2358,7 +2358,7 @@ Distribute all unlocked (inactive) funds according to distribution shares.
         distribution_pool, distribution_amount, operator, <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage);
 
     // Buy all recipients out of the distribution pool.
-    <b>while</b> (<a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shareholders_count">pool_u64::shareholders_count</a>(distribution_pool) != 0) {
+    <b>while</b> (<a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shareholders_count">pool_u64::shareholders_count</a>(distribution_pool) &gt; 0) {
         <b>let</b> recipients = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shareholders">pool_u64::shareholders</a>(distribution_pool);
         <b>let</b> recipient = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&<b>mut</b> recipients, 0);
         <b>let</b> current_shares = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shares">pool_u64::shares</a>(distribution_pool, recipient);
@@ -2379,7 +2379,7 @@ Distribute all unlocked (inactive) funds according to distribution shares.
     };
 
     // In case there's <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> dust left, send them all <b>to</b> the staker.
-    <b>if</b> (<a href="coin.md#0x1_coin_value">coin::value</a>(&coins) != 0) {
+    <b>if</b> (<a href="coin.md#0x1_coin_value">coin::value</a>(&coins) &gt; 0) {
         <a href="supra_account.md#0x1_supra_account_deposit_coins">supra_account::deposit_coins</a>(staker, coins);
         <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_update_total_coins">pool_u64::update_total_coins</a>(distribution_pool, 0);
     } <b>else</b> {

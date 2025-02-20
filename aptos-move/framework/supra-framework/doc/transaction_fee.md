@@ -460,7 +460,7 @@ Burns a specified fraction of the coin.
         <b>assume</b> burn_percentage * collected_amount &lt;= MAX_U64;
     };
     <b>let</b> amount_to_burn = (burn_percentage <b>as</b> u64) * collected_amount / 100;
-    <b>if</b> (amount_to_burn != 0) {
+    <b>if</b> (amount_to_burn &gt; 0) {
         <b>let</b> coin_to_burn = <a href="coin.md#0x1_coin_extract">coin::extract</a>(<a href="coin.md#0x1_coin">coin</a>, amount_to_burn);
         <a href="coin.md#0x1_coin_burn">coin::burn</a>(
             coin_to_burn,
@@ -917,7 +917,7 @@ Only called during genesis.
 // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
 <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_supra_framework_address">system_addresses::is_supra_framework_address</a>(aptos_addr);
 <b>aborts_if</b> <b>exists</b>&lt;ValidatorFees&gt;(aptos_addr);
-<b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotSupraFramework">system_addresses::AbortsIfNotSupraFramework</a> { <a href="account.md#0x1_account">account</a>: supra_framework };
+<b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a> { <a href="account.md#0x1_account">account</a>: supra_framework };
 <b>include</b> <a href="aggregator_factory.md#0x1_aggregator_factory_CreateAggregatorInternalAbortsIf">aggregator_factory::CreateAggregatorInternalAbortsIf</a>;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(aptos_addr);
 <b>ensures</b> <b>exists</b>&lt;ValidatorFees&gt;(aptos_addr);

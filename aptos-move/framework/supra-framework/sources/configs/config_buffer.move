@@ -18,7 +18,6 @@ module supra_framework::config_buffer {
     use aptos_std::type_info;
     use supra_framework::system_addresses;
 
-    friend supra_framework::evm_config;
     friend supra_framework::consensus_config;
     friend supra_framework::execution_config;
     friend supra_framework::supra_config;

@@ -26,7 +26,6 @@ mod aptos_version;
 mod chain_id;
 mod commit_history;
 mod consensus_config;
-mod evm_config;
 mod execution_config;
 mod gas_schedule;
 mod jwk_consensus_config;
@@ -64,7 +63,6 @@ pub use self::{
     timestamp::CurrentTimeMicroseconds,
     transaction_fee::TransactionFeeBurnCap,
     validator_set::{ConsensusScheme, ValidatorSet},
-    evm_config::OnChainEvmConfig,
 };
 
 /// To register an on-chain config in Rust:

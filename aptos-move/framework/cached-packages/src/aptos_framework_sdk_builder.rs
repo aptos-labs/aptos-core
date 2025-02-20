@@ -550,33 +550,6 @@ pub enum EntryFunctionCall {
         stakes: Vec<u64>,
     },
 
-    /// Initialize a delegation pool without actual coin but withdraw from the owner's account.
-    PboDelegationPoolInitializeDelegationPoolWithAmount {
-        multisig_admin: AccountAddress,
-        amount: u64,
-        operator_commission_percentage: u64,
-        delegation_pool_creation_seed: Vec<u8>,
-        delegator_address: Vec<AccountAddress>,
-        principle_stake: Vec<u64>,
-        unlock_numerators: Vec<u64>,
-        unlock_denominator: u64,
-        unlock_start_time: u64,
-        unlock_duration: u64,
-    },
-
-    /// Initialize a delegation pool without actual coin but withdraw from the owner's account.
-    PboDelegationPoolInitializeDelegationPoolWithAmountWithoutMultisigAdmin {
-        amount: u64,
-        operator_commission_percentage: u64,
-        delegation_pool_creation_seed: Vec<u8>,
-        delegator_address: Vec<AccountAddress>,
-        principle_stake: Vec<u64>,
-        unlock_numerators: Vec<u64>,
-        unlock_denominator: u64,
-        unlock_start_time: u64,
-        unlock_duration: u64,
-    },
-
     /// Updates the `principle_stake` of each `delegator` in `delegators` according to the amount specified
     /// at the corresponding index of `new_principle_stakes`. Also ensures that the `delegator`'s `active` stake
     /// is as close to the specified amount as possible. The locked amount is subject to the vesting schedule
@@ -647,20 +620,6 @@ pub enum EntryFunctionCall {
     /// Allows an owner to update the commission percentage for the operator of the underlying stake pool.
     PboDelegationPoolUpdateCommissionPercentage {
         new_commission_percentage: u64,
-    },
-
-    /// Pre-condition: `cumulative_unlocked_fraction` should be zero, which would indicate that even
-    /// though there are principle stake holders, none of those have yet called `unlock` on the pool
-    /// thus it is ``safe'' to change the schedule
-    /// This is a temporary measure to allow Supra Foundation to change the schedule for those pools
-    /// there were initialized with ``dummy/default'' schedule. This method must be disabled
-    /// before external validators are allowed to join the validator set.
-    PboDelegationPoolUpdateUnlockingSchedule {
-        pool_address: AccountAddress,
-        unlock_numerators: Vec<u64>,
-        unlock_denominator: u64,
-        unlock_start_time: u64,
-        unlock_duration: u64,
     },
 
     /// Withdraw `amount` of owned inactive stake from the delegation pool at `pool_address`.
@@ -1571,50 +1530,6 @@ impl EntryFunctionCall {
                 delegators,
                 stakes,
             } => pbo_delegation_pool_fund_delegators_with_stake(pool_address, delegators, stakes),
-            PboDelegationPoolInitializeDelegationPoolWithAmount {
-                multisig_admin,
-                amount,
-                operator_commission_percentage,
-                delegation_pool_creation_seed,
-                delegator_address,
-                principle_stake,
-                unlock_numerators,
-                unlock_denominator,
-                unlock_start_time,
-                unlock_duration,
-            } => pbo_delegation_pool_initialize_delegation_pool_with_amount(
-                multisig_admin,
-                amount,
-                operator_commission_percentage,
-                delegation_pool_creation_seed,
-                delegator_address,
-                principle_stake,
-                unlock_numerators,
-                unlock_denominator,
-                unlock_start_time,
-                unlock_duration,
-            ),
-            PboDelegationPoolInitializeDelegationPoolWithAmountWithoutMultisigAdmin {
-                amount,
-                operator_commission_percentage,
-                delegation_pool_creation_seed,
-                delegator_address,
-                principle_stake,
-                unlock_numerators,
-                unlock_denominator,
-                unlock_start_time,
-                unlock_duration,
-            } => pbo_delegation_pool_initialize_delegation_pool_with_amount_without_multisig_admin(
-                amount,
-                operator_commission_percentage,
-                delegation_pool_creation_seed,
-                delegator_address,
-                principle_stake,
-                unlock_numerators,
-                unlock_denominator,
-                unlock_start_time,
-                unlock_duration,
-            ),
             PboDelegationPoolLockDelegatorsStakes {
                 pool_address,
                 delegators,
@@ -1652,19 +1567,6 @@ impl EntryFunctionCall {
             PboDelegationPoolUpdateCommissionPercentage {
                 new_commission_percentage,
             } => pbo_delegation_pool_update_commission_percentage(new_commission_percentage),
-            PboDelegationPoolUpdateUnlockingSchedule {
-                pool_address,
-                unlock_numerators,
-                unlock_denominator,
-                unlock_start_time,
-                unlock_duration,
-            } => pbo_delegation_pool_update_unlocking_schedule(
-                pool_address,
-                unlock_numerators,
-                unlock_denominator,
-                unlock_start_time,
-                unlock_duration,
-            ),
             PboDelegationPoolWithdraw {
                 pool_address,
                 amount,
@@ -3434,80 +3336,6 @@ pub fn pbo_delegation_pool_fund_delegators_with_stake(
     ))
 }
 
-/// Initialize a delegation pool without actual coin but withdraw from the owner's account.
-pub fn pbo_delegation_pool_initialize_delegation_pool_with_amount(
-    multisig_admin: AccountAddress,
-    amount: u64,
-    operator_commission_percentage: u64,
-    delegation_pool_creation_seed: Vec<u8>,
-    delegator_address: Vec<AccountAddress>,
-    principle_stake: Vec<u64>,
-    unlock_numerators: Vec<u64>,
-    unlock_denominator: u64,
-    unlock_start_time: u64,
-    unlock_duration: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("pbo_delegation_pool").to_owned(),
-        ),
-        ident_str!("initialize_delegation_pool_with_amount").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&multisig_admin).unwrap(),
-            bcs::to_bytes(&amount).unwrap(),
-            bcs::to_bytes(&operator_commission_percentage).unwrap(),
-            bcs::to_bytes(&delegation_pool_creation_seed).unwrap(),
-            bcs::to_bytes(&delegator_address).unwrap(),
-            bcs::to_bytes(&principle_stake).unwrap(),
-            bcs::to_bytes(&unlock_numerators).unwrap(),
-            bcs::to_bytes(&unlock_denominator).unwrap(),
-            bcs::to_bytes(&unlock_start_time).unwrap(),
-            bcs::to_bytes(&unlock_duration).unwrap(),
-        ],
-    ))
-}
-
-/// Initialize a delegation pool without actual coin but withdraw from the owner's account.
-pub fn pbo_delegation_pool_initialize_delegation_pool_with_amount_without_multisig_admin(
-    amount: u64,
-    operator_commission_percentage: u64,
-    delegation_pool_creation_seed: Vec<u8>,
-    delegator_address: Vec<AccountAddress>,
-    principle_stake: Vec<u64>,
-    unlock_numerators: Vec<u64>,
-    unlock_denominator: u64,
-    unlock_start_time: u64,
-    unlock_duration: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("pbo_delegation_pool").to_owned(),
-        ),
-        ident_str!("initialize_delegation_pool_with_amount_without_multisig_admin").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&amount).unwrap(),
-            bcs::to_bytes(&operator_commission_percentage).unwrap(),
-            bcs::to_bytes(&delegation_pool_creation_seed).unwrap(),
-            bcs::to_bytes(&delegator_address).unwrap(),
-            bcs::to_bytes(&principle_stake).unwrap(),
-            bcs::to_bytes(&unlock_numerators).unwrap(),
-            bcs::to_bytes(&unlock_denominator).unwrap(),
-            bcs::to_bytes(&unlock_start_time).unwrap(),
-            bcs::to_bytes(&unlock_duration).unwrap(),
-        ],
-    ))
-}
-
 /// Updates the `principle_stake` of each `delegator` in `delegators` according to the amount specified
 /// at the corresponding index of `new_principle_stakes`. Also ensures that the `delegator`'s `active` stake
 /// is as close to the specified amount as possible. The locked amount is subject to the vesting schedule
@@ -3701,39 +3529,6 @@ pub fn pbo_delegation_pool_update_commission_percentage(
         ident_str!("update_commission_percentage").to_owned(),
         vec![],
         vec![bcs::to_bytes(&new_commission_percentage).unwrap()],
-    ))
-}
-
-/// Pre-condition: `cumulative_unlocked_fraction` should be zero, which would indicate that even
-/// though there are principle stake holders, none of those have yet called `unlock` on the pool
-/// thus it is ``safe'' to change the schedule
-/// This is a temporary measure to allow Supra Foundation to change the schedule for those pools
-/// there were initialized with ``dummy/default'' schedule. This method must be disabled
-/// before external validators are allowed to join the validator set.
-pub fn pbo_delegation_pool_update_unlocking_schedule(
-    pool_address: AccountAddress,
-    unlock_numerators: Vec<u64>,
-    unlock_denominator: u64,
-    unlock_start_time: u64,
-    unlock_duration: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("pbo_delegation_pool").to_owned(),
-        ),
-        ident_str!("update_unlocking_schedule").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&pool_address).unwrap(),
-            bcs::to_bytes(&unlock_numerators).unwrap(),
-            bcs::to_bytes(&unlock_denominator).unwrap(),
-            bcs::to_bytes(&unlock_start_time).unwrap(),
-            bcs::to_bytes(&unlock_duration).unwrap(),
-        ],
     ))
 }
 
@@ -6245,49 +6040,6 @@ mod decoder {
         }
     }
 
-    pub fn pbo_delegation_pool_initialize_delegation_pool_with_amount(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(
-                EntryFunctionCall::PboDelegationPoolInitializeDelegationPoolWithAmount {
-                    multisig_admin: bcs::from_bytes(script.args().get(0)?).ok()?,
-                    amount: bcs::from_bytes(script.args().get(1)?).ok()?,
-                    operator_commission_percentage: bcs::from_bytes(script.args().get(2)?).ok()?,
-                    delegation_pool_creation_seed: bcs::from_bytes(script.args().get(3)?).ok()?,
-                    delegator_address: bcs::from_bytes(script.args().get(4)?).ok()?,
-                    principle_stake: bcs::from_bytes(script.args().get(5)?).ok()?,
-                    unlock_numerators: bcs::from_bytes(script.args().get(6)?).ok()?,
-                    unlock_denominator: bcs::from_bytes(script.args().get(7)?).ok()?,
-                    unlock_start_time: bcs::from_bytes(script.args().get(8)?).ok()?,
-                    unlock_duration: bcs::from_bytes(script.args().get(9)?).ok()?,
-                },
-            )
-        } else {
-            None
-        }
-    }
-
-    pub fn pbo_delegation_pool_initialize_delegation_pool_with_amount_without_multisig_admin(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::PboDelegationPoolInitializeDelegationPoolWithAmountWithoutMultisigAdmin {
-            amount : bcs::from_bytes(script.args().get(0)?).ok()?,
-            operator_commission_percentage : bcs::from_bytes(script.args().get(1)?).ok()?,
-            delegation_pool_creation_seed : bcs::from_bytes(script.args().get(2)?).ok()?,
-            delegator_address : bcs::from_bytes(script.args().get(3)?).ok()?,
-            principle_stake : bcs::from_bytes(script.args().get(4)?).ok()?,
-            unlock_numerators : bcs::from_bytes(script.args().get(5)?).ok()?,
-            unlock_denominator : bcs::from_bytes(script.args().get(6)?).ok()?,
-            unlock_start_time : bcs::from_bytes(script.args().get(7)?).ok()?,
-            unlock_duration : bcs::from_bytes(script.args().get(8)?).ok()?,
-        })
-        } else {
-            None
-        }
-    }
-
     pub fn pbo_delegation_pool_lock_delegators_stakes(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -6399,24 +6151,6 @@ mod decoder {
             Some(
                 EntryFunctionCall::PboDelegationPoolUpdateCommissionPercentage {
                     new_commission_percentage: bcs::from_bytes(script.args().get(0)?).ok()?,
-                },
-            )
-        } else {
-            None
-        }
-    }
-
-    pub fn pbo_delegation_pool_update_unlocking_schedule(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(
-                EntryFunctionCall::PboDelegationPoolUpdateUnlockingSchedule {
-                    pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-                    unlock_numerators: bcs::from_bytes(script.args().get(1)?).ok()?,
-                    unlock_denominator: bcs::from_bytes(script.args().get(2)?).ok()?,
-                    unlock_start_time: bcs::from_bytes(script.args().get(3)?).ok()?,
-                    unlock_duration: bcs::from_bytes(script.args().get(4)?).ok()?,
                 },
             )
         } else {
@@ -7677,11 +7411,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::pbo_delegation_pool_fund_delegators_with_stake),
         );
         map.insert(
-            "pbo_delegation_pool_initialize_delegation_pool_with_amount".to_string(),
-            Box::new(decoder::pbo_delegation_pool_initialize_delegation_pool_with_amount),
-        );
-        map.insert("pbo_delegation_pool_initialize_delegation_pool_with_amount_without_multisig_admin".to_string(), Box::new(decoder::pbo_delegation_pool_initialize_delegation_pool_with_amount_without_multisig_admin));
-        map.insert(
             "pbo_delegation_pool_lock_delegators_stakes".to_string(),
             Box::new(decoder::pbo_delegation_pool_lock_delegators_stakes),
         );
@@ -7716,10 +7445,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "pbo_delegation_pool_update_commission_percentage".to_string(),
             Box::new(decoder::pbo_delegation_pool_update_commission_percentage),
-        );
-        map.insert(
-            "pbo_delegation_pool_update_unlocking_schedule".to_string(),
-            Box::new(decoder::pbo_delegation_pool_update_unlocking_schedule),
         );
         map.insert(
             "pbo_delegation_pool_withdraw".to_string(),

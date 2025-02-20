@@ -646,7 +646,7 @@ package.
 
     <a href="event.md#0x1_event_emit">event::emit</a>(<a href="code.md#0x1_code_PublishPackage">PublishPackage</a> {
         code_address: addr,
-        is_upgrade: upgrade_number != 0
+        is_upgrade: upgrade_number &gt; 0
     });
 
     // Request publish

@@ -12,7 +12,6 @@ a 64-bit fractional part.
 -  [Function `sub`](#0x1_fixed_point64_sub)
 -  [Function `add`](#0x1_fixed_point64_add)
 -  [Function `multiply_u128`](#0x1_fixed_point64_multiply_u128)
--  [Function `multiply_u128_return_fixpoint64`](#0x1_fixed_point64_multiply_u128_return_fixpoint64)
 -  [Function `divide_u128`](#0x1_fixed_point64_divide_u128)
 -  [Function `create_from_rational`](#0x1_fixed_point64_create_from_rational)
 -  [Function `create_from_raw_value`](#0x1_fixed_point64_create_from_raw_value)
@@ -251,36 +250,6 @@ overflows.
     // Check whether the value is too large.
     <b>assert</b>!(product &lt;= <a href="fixed_point64.md#0x1_fixed_point64_MAX_U128">MAX_U128</a>, <a href="fixed_point64.md#0x1_fixed_point64_EMULTIPLICATION">EMULTIPLICATION</a>);
     (product <b>as</b> u128)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_fixed_point64_multiply_u128_return_fixpoint64"></a>
-
-## Function `multiply_u128_return_fixpoint64`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_multiply_u128_return_fixpoint64">multiply_u128_return_fixpoint64</a>(val: u128, multiplier: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_multiply_u128_return_fixpoint64">multiply_u128_return_fixpoint64</a>(val: u128, multiplier: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a> {
-    // The product of two 128 bit values <b>has</b> 256 bits, so perform the
-    // multiplication <b>with</b> u256 types and keep the full 256 bit product
-    // <b>to</b> avoid losing accuracy.
-    <b>let</b> unscaled_product = (val <b>as</b> u256) * (multiplier.value <b>as</b> u256);
-    // Check whether the value is too large.
-    <b>assert</b>!(unscaled_product &lt;= <a href="fixed_point64.md#0x1_fixed_point64_MAX_U128">MAX_U128</a>, <a href="fixed_point64.md#0x1_fixed_point64_EMULTIPLICATION">EMULTIPLICATION</a>);
-    <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">create_from_raw_value</a>((unscaled_product <b>as</b> u128))
 }
 </code></pre>
 
