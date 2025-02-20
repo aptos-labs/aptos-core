@@ -1395,6 +1395,10 @@ impl<'env> FunctionTranslator<'env> {
             Call(_, dests, oper, srcs, aa) => {
                 use Operation::*;
                 match oper {
+                    Closure(..) | Invoke => {
+                        // TODO(#15664): implement closures for prover
+                        panic!("closures not yet supported")
+                    },
                     TestVariant(mid, sid, variant, inst) => {
                         let inst = &self.inst_slice(inst);
                         let src_type = self.get_local_type(srcs[0]);

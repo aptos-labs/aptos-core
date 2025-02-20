@@ -48,6 +48,14 @@ impl ClosureMask {
         Self(mask)
     }
 
+    pub fn new_for_leading(n: usize) -> Self {
+        let mut mask = Self::new(0);
+        for i in 0..n {
+            mask.set_captured(i)
+        }
+        mask
+    }
+
     pub fn bits(&self) -> u64 {
         self.0
     }
@@ -55,7 +63,13 @@ impl ClosureMask {
     /// Returns true if the i'th argument is captured. If `i` is out of range, false will
     /// be returned.
     pub fn is_captured(&self, i: usize) -> bool {
-        i < 64 && self.0 & (1 << i) != 0
+        i < Self::MAX_ARGS && self.0 & (1 << i) != 0
+    }
+
+    /// Sets the ith argument to be captured
+    pub fn set_captured(&mut self, i: usize) {
+        assert!(i < Self::MAX_ARGS);
+        self.0 |= 1 << i
     }
 
     /// Apply a closure mask to a list of elements, returning only those
@@ -110,15 +124,20 @@ impl ClosureMask {
         Some(result)
     }
 
-    /// Return the max index of captured arguments
-    pub fn max_captured(&self) -> usize {
+    /// Return the max index of captured argument, or None if none is captured.
+    pub fn max_captured(&self) -> Option<usize> {
+        if self.0 == 0 {
+            return None;
+        }
         let mut i = 0;
         let mut mask = self.0;
-        while mask != 0 {
+        loop {
             mask >>= 1;
+            if mask == 0 {
+                return Some(i);
+            }
             i += 1
         }
-        i
     }
 
     /// Return the # of captured arguments in the mask
@@ -378,7 +397,7 @@ impl fmt::Display for MoveClosure {
         } = self;
         let captured_str = mask
             .merge_placeholder_strings(
-                mask.max_captured() + 1,
+                mask.captured_count() as usize,
                 captured.iter().map(|v| v.1.to_string()).collect(),
             )
             .unwrap_or_else(|| vec!["*invalid*".to_string()])

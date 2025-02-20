@@ -20,8 +20,8 @@ module 0x8675309::M {
         imm_imm(&mut 0, &mut 0);
     }
 
-    fun t2(f: |&u64, &mut u64|) {
-        f(&mut 0, &mut 0);
+    fun t2(f: |&u64, &mut u64| has copy) {
+        f(&mut 0, &mut 0); // need to further investigate this error
         f(&0, &mut 0);
     }
 
