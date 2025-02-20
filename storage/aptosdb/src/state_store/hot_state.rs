@@ -20,8 +20,8 @@ use std::{
 };
 
 const MAX_HOT_STATE_COMMIT_BACKLOG: usize = 10;
-const HOT_STATE_MAX_ITEMS: usize = 1_000_000;
-const HOT_STATE_MAX_VALUE_BYTES: usize = 4096;
+const HOT_STATE_MAX_ITEMS: usize = 10_000_000;
+const HOT_STATE_MAX_VALUE_BYTES: usize = 40960;
 
 #[derive(Debug)]
 pub struct HotStateBase {
