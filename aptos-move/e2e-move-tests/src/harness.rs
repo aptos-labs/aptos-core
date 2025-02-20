@@ -29,7 +29,7 @@ use aptos_types::{
     },
     transaction::{
         EntryFunction, Multisig, MultisigTransactionPayload, Script, SignedTransaction,
-        TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
+        TransactionArgument, TransactionOutput, TransactionPayloadWrapper, TransactionStatus,
         ViewFunctionOutput,
     },
     AptosCoinType,
@@ -251,7 +251,7 @@ impl MoveHarness {
     pub fn create_transaction_without_sign(
         &mut self,
         account: &Account,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> TransactionBuilder {
         let on_chain_seq_no = self.sequence_number_opt(account.address()).unwrap_or(0);
         let seq_no_ref = self.txn_seq_no.entry(*account.address()).or_insert(0);
@@ -270,7 +270,7 @@ impl MoveHarness {
     pub fn create_transaction_payload(
         &mut self,
         account: &Account,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> SignedTransaction {
         self.create_transaction_without_sign(account, payload)
             .sign()
@@ -280,7 +280,7 @@ impl MoveHarness {
     pub fn create_transaction_payload_mainnet(
         &mut self,
         account: &Account,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> SignedTransaction {
         self.create_transaction_without_sign(account, payload)
             .chain_id(ChainId::mainnet())
@@ -292,7 +292,7 @@ impl MoveHarness {
     pub fn run_transaction_payload(
         &mut self,
         account: &Account,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> TransactionStatus {
         let txn = self.create_transaction_payload(account, payload);
         self.run(txn)
@@ -302,7 +302,7 @@ impl MoveHarness {
     pub fn run_transaction_payload_mainnet(
         &mut self,
         account: &Account,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> TransactionStatus {
         let txn = self.create_transaction_payload_mainnet(account, payload);
         assert!(self.chain_id_is_mainnet(&CORE_CODE_ADDRESS));
@@ -310,7 +310,7 @@ impl MoveHarness {
     }
 
     /// Runs a transaction and return gas used.
-    pub fn evaluate_gas(&mut self, account: &Account, payload: TransactionPayload) -> u64 {
+    pub fn evaluate_gas(&mut self, account: &Account, payload: TransactionPayloadWrapper) -> u64 {
         let txn = self.create_transaction_payload(account, payload);
         let output = self.run_raw(txn);
         assert_success!(output.status().to_owned());
@@ -321,7 +321,7 @@ impl MoveHarness {
     pub fn evaluate_gas_with_profiler(
         &mut self,
         account: &Account,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> (TransactionGasLog, u64, Option<FeeStatement>) {
         let txn = self.create_transaction_payload(account, payload);
         let (output, gas_log) = self
@@ -353,7 +353,7 @@ impl MoveHarness {
         } = fun;
         self.create_transaction_payload(
             account,
-            TransactionPayload::EntryFunction(EntryFunction::new(
+            TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
                 module_id,
                 function_id,
                 ty_args,
@@ -371,7 +371,7 @@ impl MoveHarness {
     ) -> SignedTransaction {
         self.create_transaction_payload(
             account,
-            TransactionPayload::Multisig(Multisig {
+            TransactionPayloadWrapper::Multisig(Multisig {
                 multisig_address,
                 transaction_payload,
             }),
@@ -387,7 +387,7 @@ impl MoveHarness {
     ) -> SignedTransaction {
         self.create_transaction_payload(
             account,
-            TransactionPayload::Script(Script::new(code, ty_args, args)),
+            TransactionPayloadWrapper::Script(Script::new(code, ty_args, args)),
         )
     }
 

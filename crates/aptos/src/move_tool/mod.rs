@@ -51,7 +51,7 @@ use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     object_address::create_object_code_deployment_address,
     on_chain_config::aptos_test_feature_flags_genesis,
-    transaction::{Transaction, TransactionArgument, TransactionPayload, TransactionStatus},
+    transaction::{Transaction, TransactionArgument, TransactionPayloadWrapper, TransactionStatus},
 };
 use aptos_vm::data_cache::AsMoveResolver;
 use async_trait::async_trait;
@@ -782,11 +782,11 @@ pub struct PublishPackage {
 pub(crate) struct PackagePublicationData {
     metadata_serialized: Vec<u8>,
     compiled_units: Vec<Vec<u8>>,
-    payload: TransactionPayload,
+    payload: TransactionPayloadWrapper,
 }
 
 pub(crate) struct ChunkedPublishPayloads {
-    payloads: Vec<TransactionPayload>,
+    payloads: Vec<TransactionPayloadWrapper>,
 }
 
 /// Build a publication transaction payload and store it in a JSON output file.
@@ -1164,6 +1164,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         "CreateObjectAndPublishPackage"
     }
 
+    // TODO[Ordereless]: Update this code to support stateless accounts that don't have a sequence number
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let sender_address = self.txn_options.get_public_key_and_address()?.1;
 
@@ -1397,6 +1398,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
         "DeployObject"
     }
 
+    // TODO[Ordereless]: Update this code to support stateless accounts that don't have a sequence number
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let sender_address = self.txn_options.get_public_key_and_address()?.1;
         let sequence_number = if self.chunked_publish_option.chunked_publish {
@@ -1620,7 +1622,7 @@ fn build_package_options(
 }
 
 async fn submit_chunked_publish_transactions(
-    payloads: Vec<TransactionPayload>,
+    payloads: Vec<TransactionPayloadWrapper>,
     txn_options: &TransactionOptions,
     large_packages_module_address: AccountAddress,
 ) -> CliTypedResult<TransactionSummary> {
@@ -2115,7 +2117,7 @@ impl CliCommand<TransactionSummary> for RunFunction {
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         profile_or_submit(
-            TransactionPayload::EntryFunction(self.entry_function_args.try_into()?),
+            TransactionPayloadWrapper::EntryFunction(self.entry_function_args.try_into()?),
             &self.txn_options,
         )
         .await

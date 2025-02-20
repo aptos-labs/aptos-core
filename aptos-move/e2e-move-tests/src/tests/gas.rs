@@ -25,7 +25,7 @@ use aptos_types::{
     account_address::{default_stake_pool_address, AccountAddress},
     account_config::CORE_CODE_ADDRESS,
     fee_statement::FeeStatement,
-    transaction::{EntryFunction, TransactionPayload},
+    transaction::{EntryFunction, TransactionPayloadWrapper},
 };
 use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, value::MoveValue};
@@ -122,7 +122,7 @@ struct Runner {
 }
 
 impl Runner {
-    pub fn run(&mut self, function: &str, account: &Account, payload: TransactionPayload) {
+    pub fn run(&mut self, function: &str, account: &Account, payload: TransactionPayloadWrapper) {
         if !self.profile_gas {
             print_gas_cost(function, self.harness.evaluate_gas(account, payload));
         } else {
@@ -137,7 +137,7 @@ impl Runner {
         &mut self,
         function: &str,
         account: &Account,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
         tps: f64,
     ) {
         if !self.profile_gas {
@@ -458,7 +458,7 @@ fn test_gas() {
     runner.run(
         "UseDependencyChain-1",
         publisher,
-        TransactionPayload::EntryFunction(EntryFunction::new(
+        TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
             ModuleId::new(
                 AccountAddress::from_hex_literal("0xcafe").unwrap(),
                 Identifier::new("m1").unwrap(),
@@ -471,7 +471,7 @@ fn test_gas() {
     runner.run(
         "UseDependencyChain-2",
         publisher,
-        TransactionPayload::EntryFunction(EntryFunction::new(
+        TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
             ModuleId::new(
                 AccountAddress::from_hex_literal("0xcafe").unwrap(),
                 Identifier::new("m2").unwrap(),
@@ -484,7 +484,7 @@ fn test_gas() {
     runner.run(
         "UseDependencyChain-3",
         publisher,
-        TransactionPayload::EntryFunction(EntryFunction::new(
+        TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
             ModuleId::new(
                 AccountAddress::from_hex_literal("0xcafe").unwrap(),
                 Identifier::new("m3").unwrap(),

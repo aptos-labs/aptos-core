@@ -11,7 +11,7 @@ use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     move_utils::MemberId,
     on_chain_config::{FeatureFlag, OnChainConfig},
-    transaction::{ExecutionStatus, TransactionPayload, TransactionStatus},
+    transaction::{ExecutionStatus, TransactionPayloadWrapper, TransactionStatus},
 };
 use claims::assert_ok;
 use move_core_types::{
@@ -493,7 +493,7 @@ fn test_module_publishing_does_not_fallback() {
     }
 }
 
-fn publish_module_txn(source: String, module_name: &str) -> TransactionPayload {
+fn publish_module_txn(source: String, module_name: &str) -> TransactionPayloadWrapper {
     let mut builder = PackageBuilder::new(module_name).with_policy(UpgradePolicy::compat());
     builder.add_source(module_name, &source);
 

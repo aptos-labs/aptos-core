@@ -33,7 +33,8 @@ use aptos_types::{
     mempool_status::MempoolStatusCode,
     transaction::{
         EntryFunction, ExecutionStatus, MultisigTransactionPayload, RawTransaction,
-        RawTransactionWithData, SignedTransaction, TransactionPayload,
+        RawTransactionWithData, Script, SignedTransaction, TransactionExecutable,
+        TransactionPayloadInner, TransactionPayloadWrapper,
     },
     vm_status::StatusCode,
     AptosCoinType, CoinType,
@@ -1041,7 +1042,34 @@ impl TransactionsApi {
         data: SubmitTransactionPost,
     ) -> Result<SignedTransaction, SubmitTransactionError> {
         pub const MAX_SIGNED_TRANSACTION_DEPTH: usize = 16;
+        let validate_script = |script: &Script| -> Result<(), SubmitTransactionError> {
+            if script.code().is_empty() {
+                return Err(SubmitTransactionError::bad_request_with_code(
+                    "Script payload bytecode must not be empty",
+                    AptosErrorCode::InvalidInput,
+                    ledger_info,
+                ));
+            }
 
+            for arg in script.ty_args() {
+                let arg = MoveType::from(arg);
+                arg.verify(0)
+                    .context("Transaction script function type arg invalid")
+                    .map_err(|err| {
+                        SubmitTransactionError::bad_request_with_code(
+                            err,
+                            AptosErrorCode::InvalidInput,
+                            ledger_info,
+                        )
+                    })?;
+            }
+            Ok(())
+        };
+
+        let validate_entry_function =
+            |entry_function: &EntryFunction| -> Result<(), SubmitTransactionError> {
+                TransactionsApi::validate_entry_function_payload_format(ledger_info, entry_function)
+            };
         match data {
             SubmitTransactionPost::Bcs(data) => {
                 let signed_transaction: SignedTransaction =
@@ -1056,42 +1084,17 @@ impl TransactionsApi {
                         })?;
                 // Verify the signed transaction
                 match signed_transaction.payload() {
-                    TransactionPayload::EntryFunction(entry_function) => {
-                        TransactionsApi::validate_entry_function_payload_format(
-                            ledger_info,
-                            entry_function,
-                        )?;
+                    TransactionPayloadWrapper::EntryFunction(entry_function) => {
+                        validate_entry_function(entry_function)?;
                     },
-                    TransactionPayload::Script(script) => {
-                        if script.code().is_empty() {
-                            return Err(SubmitTransactionError::bad_request_with_code(
-                                "Script payload bytecode must not be empty",
-                                AptosErrorCode::InvalidInput,
-                                ledger_info,
-                            ));
-                        }
-
-                        for arg in script.ty_args() {
-                            let arg = MoveType::from(arg);
-                            arg.verify(0)
-                                .context("Transaction script function type arg invalid")
-                                .map_err(|err| {
-                                    SubmitTransactionError::bad_request_with_code(
-                                        err,
-                                        AptosErrorCode::InvalidInput,
-                                        ledger_info,
-                                    )
-                                })?;
-                        }
+                    TransactionPayloadWrapper::Script(script) => {
+                        validate_script(script)?;
                     },
-                    TransactionPayload::Multisig(multisig) => {
+                    TransactionPayloadWrapper::Multisig(multisig) => {
                         if let Some(payload) = &multisig.transaction_payload {
                             match payload {
                                 MultisigTransactionPayload::EntryFunction(entry_function) => {
-                                    TransactionsApi::validate_entry_function_payload_format(
-                                        ledger_info,
-                                        entry_function,
-                                    )?;
+                                    validate_entry_function(entry_function)?;
                                 },
                             }
                         }
@@ -1099,12 +1102,39 @@ impl TransactionsApi {
 
                     // Deprecated. To avoid panics when malicios users submit this
                     // payload, return an error.
-                    TransactionPayload::ModuleBundle(_) => {
+                    TransactionPayloadWrapper::ModuleBundle(_) => {
                         return Err(SubmitTransactionError::bad_request_with_code(
                             "Module bundle payload has been removed",
                             AptosErrorCode::InvalidInput,
                             ledger_info,
                         ))
+                    },
+                    TransactionPayloadWrapper::Payload(TransactionPayloadInner::V1 {
+                        executable,
+                        extra_config,
+                    }) => match executable {
+                        TransactionExecutable::Script(script) => {
+                            validate_script(script)?;
+                            if extra_config.is_multisig() {
+                                return Err(SubmitTransactionError::bad_request_with_code(
+                                    "Script transaction payload must not be a multisig transaction",
+                                    AptosErrorCode::InvalidInput,
+                                    ledger_info,
+                                ));
+                            }
+                        },
+                        TransactionExecutable::EntryFunction(entry_function) => {
+                            validate_entry_function(entry_function)?;
+                        },
+                        TransactionExecutable::Empty => {
+                            if !extra_config.is_multisig() {
+                                return Err(SubmitTransactionError::bad_request_with_code(
+                                    "Empty transaction payload must be a multisig transaction",
+                                    AptosErrorCode::InvalidInput,
+                                    ledger_info,
+                                ));
+                            }
+                        },
                     },
                 }
                 // TODO: Verify script args?
@@ -1401,15 +1431,17 @@ impl TransactionsApi {
         );
 
         let stats_key = match txn.payload() {
-            TransactionPayload::Script(_) => {
+            TransactionPayloadWrapper::Script(_) => {
                 format!("Script::{}", txn.committed_hash()).to_string()
             },
-            TransactionPayload::ModuleBundle(_) => "ModuleBundle::unknown".to_string(),
-            TransactionPayload::EntryFunction(entry_function) => FunctionStats::function_to_key(
-                entry_function.module(),
-                &entry_function.function().into(),
-            ),
-            TransactionPayload::Multisig(multisig) => {
+            TransactionPayloadWrapper::ModuleBundle(_) => "ModuleBundle::unknown".to_string(),
+            TransactionPayloadWrapper::EntryFunction(entry_function) => {
+                FunctionStats::function_to_key(
+                    entry_function.module(),
+                    &entry_function.function().into(),
+                )
+            },
+            TransactionPayloadWrapper::Multisig(multisig) => {
                 if let Some(payload) = &multisig.transaction_payload {
                     match payload {
                         MultisigTransactionPayload::EntryFunction(entry_function) => {
@@ -1422,6 +1454,30 @@ impl TransactionsApi {
                 } else {
                     "Multisig::unknown".to_string()
                 }
+            },
+            TransactionPayloadWrapper::Payload(TransactionPayloadInner::V1 {
+                executable,
+                extra_config,
+            }) => {
+                let mut stats_key: String = "V2::".to_string();
+                if extra_config.is_multisig() {
+                    stats_key += "Multisig::";
+                };
+                if extra_config.is_orderless() {
+                    stats_key += "Orderless::";
+                }
+                if let TransactionExecutable::Script(_) = executable {
+                    stats_key += format!("Script::{}", txn.committed_hash()).as_str();
+                } else if let TransactionExecutable::EntryFunction(entry_function) = executable {
+                    stats_key += FunctionStats::function_to_key(
+                        entry_function.module(),
+                        &entry_function.function().into(),
+                    )
+                    .as_str();
+                } else if let TransactionExecutable::Empty = executable {
+                    stats_key += "unknown";
+                };
+                stats_key
             },
         };
         self.context

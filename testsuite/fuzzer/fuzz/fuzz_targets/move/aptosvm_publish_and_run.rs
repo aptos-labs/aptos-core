@@ -9,7 +9,7 @@ use aptos_language_e2e_tests::{
 use aptos_types::{
     chain_id::ChainId,
     transaction::{
-        EntryFunction, ExecutionStatus, Script, TransactionArgument, TransactionPayload,
+        EntryFunction, ExecutionStatus, Script, TransactionArgument, TransactionPayloadWrapper,
         TransactionStatus,
     },
     write_set::WriteSet,
@@ -206,7 +206,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
                 .gas_unit_price(100)
                 .max_gas_amount(1000)
                 .sequence_number(0)
-                .payload(TransactionPayload::Script(Script::new(
+                .payload(TransactionPayloadWrapper::Script(Script::new(
                     script_bytes,
                     type_args,
                     args.into_iter()
@@ -248,12 +248,9 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
                 .gas_unit_price(100)
                 .max_gas_amount(1000)
                 .sequence_number(0)
-                .payload(TransactionPayload::EntryFunction(EntryFunction::new(
-                    module,
-                    function_name,
-                    type_args,
-                    args,
-                )))
+                .payload(TransactionPayloadWrapper::EntryFunction(
+                    EntryFunction::new(module, function_name, type_args, args),
+                ))
         },
     };
     let raw_tx = tx.raw();

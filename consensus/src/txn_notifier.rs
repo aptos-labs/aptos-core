@@ -56,7 +56,7 @@ impl TxnNotifier for MempoolNotifier {
             if let TransactionStatus::Discard(reason) = status {
                 rejected_txns.push(RejectedTransactionSummary {
                     sender: txn.sender(),
-                    sequence_number: txn.sequence_number(),
+                    replay_protector: txn.replay_protector(),
                     hash: txn.committed_hash(),
                     reason: *reason,
                 });

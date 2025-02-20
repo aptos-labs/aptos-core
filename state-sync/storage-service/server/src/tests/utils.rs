@@ -41,7 +41,7 @@ use aptos_types::{
     transaction::{
         ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
         TransactionAuxiliaryData, TransactionListWithProof, TransactionOutput,
-        TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
+        TransactionOutputListWithProof, TransactionPayloadWrapper, TransactionStatus,
     },
     validator_verifier::ValidatorVerifier,
     write_set::WriteSet,
@@ -203,7 +203,8 @@ fn create_test_transaction(sequence_number: u64, code_bytes: Vec<u8>) -> Transac
     let private_key = Ed25519PrivateKey::generate_for_testing();
     let public_key = private_key.public_key();
 
-    let transaction_payload = TransactionPayload::Script(Script::new(code_bytes, vec![], vec![]));
+    let transaction_payload =
+        TransactionPayloadWrapper::Script(Script::new(code_bytes, vec![], vec![]));
     let raw_transaction = RawTransaction::new(
         AccountAddress::random(),
         sequence_number,

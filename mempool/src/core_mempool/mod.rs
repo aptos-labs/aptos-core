@@ -8,7 +8,9 @@ pub mod transaction;
 mod transaction_store;
 
 pub use self::{
-    mempool::Mempool as CoreMempool, transaction::TimelineState,
+    index::TimelineId,
+    mempool::Mempool as CoreMempool,
+    transaction::{AccountSequenceNumberInfo, TimelineState},
     transaction_store::TXN_INDEX_ESTIMATED_BYTES,
 };
 #[cfg(test)]

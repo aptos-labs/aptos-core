@@ -8,7 +8,7 @@ use aptos_types::{
     account_config::ObjectCoreResource,
     event::EventHandle,
     move_utils::MemberId,
-    transaction::{EntryFunction, TransactionPayload},
+    transaction::{EntryFunction, TransactionPayloadWrapper},
 };
 use move_core_types::{identifier::Identifier, language_storage::StructTag};
 use serde::Deserialize;
@@ -110,35 +110,48 @@ pub fn publish_object_token_example(h: &mut MoveHarness, addr: AccountAddress, a
     assert_success!(result);
 }
 
-pub fn create_mint_hero_payload(addr: &AccountAddress, description: &str) -> TransactionPayload {
+pub fn create_mint_hero_payload(
+    addr: &AccountAddress,
+    description: &str,
+) -> TransactionPayloadWrapper {
     let fun = str::parse(&format!("0x{}::hero::mint_hero", addr.to_hex())).unwrap();
     let MemberId {
         module_id,
         member_id: function_id,
     } = fun;
 
-    TransactionPayload::EntryFunction(EntryFunction::new(module_id, function_id, vec![], vec![
-        bcs::to_bytes(description).unwrap(),
-        bcs::to_bytes("Male").unwrap(),
-        bcs::to_bytes("Wukong").unwrap(),
-        bcs::to_bytes("Monkey God").unwrap(),
-        bcs::to_bytes("404").unwrap(),
-    ]))
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
+        module_id,
+        function_id,
+        vec![],
+        vec![
+            bcs::to_bytes(description).unwrap(),
+            bcs::to_bytes("Male").unwrap(),
+            bcs::to_bytes("Wukong").unwrap(),
+            bcs::to_bytes("Monkey God").unwrap(),
+            bcs::to_bytes("404").unwrap(),
+        ],
+    ))
 }
 
 pub fn create_set_hero_description_payload(
     addr: &AccountAddress,
     description: &str,
-) -> TransactionPayload {
+) -> TransactionPayloadWrapper {
     let fun = str::parse(&format!("0x{}::hero::set_hero_description", addr.to_hex())).unwrap();
     let MemberId {
         module_id,
         member_id: function_id,
     } = fun;
 
-    TransactionPayload::EntryFunction(EntryFunction::new(module_id, function_id, vec![], vec![
-        bcs::to_bytes("Hero Quest!").unwrap(),
-        bcs::to_bytes("Wukong").unwrap(),
-        bcs::to_bytes(description).unwrap(),
-    ]))
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
+        module_id,
+        function_id,
+        vec![],
+        vec![
+            bcs::to_bytes("Hero Quest!").unwrap(),
+            bcs::to_bytes("Wukong").unwrap(),
+            bcs::to_bytes(description).unwrap(),
+        ],
+    ))
 }

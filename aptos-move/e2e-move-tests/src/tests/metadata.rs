@@ -14,7 +14,7 @@ use aptos_package_builder::PackageBuilder;
 use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{FeatureFlag, OnChainConfig},
-    transaction::{Script, TransactionPayload, TransactionStatus},
+    transaction::{Script, TransactionPayloadWrapper, TransactionStatus},
 };
 use move_binary_format::CompiledModule;
 use move_core_types::{
@@ -311,7 +311,7 @@ fn test_compilation_metadata_script_internal(
 
     let code = package.extract_script_code().into_iter().next().unwrap();
 
-    let script = TransactionPayload::Script(Script::new(code, vec![], vec![]));
+    let script = TransactionPayloadWrapper::Script(Script::new(code, vec![], vec![]));
 
     if mainnet_flag {
         h.set_resource(
