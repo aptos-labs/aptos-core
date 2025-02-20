@@ -4,7 +4,10 @@
 
 use crate::{core_mempool::TXN_INDEX_ESTIMATED_BYTES, counters, network::BroadcastPeerPriority};
 use aptos_crypto::HashValue;
-use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
+use aptos_types::{
+    account_address::AccountAddress,
+    transaction::{ReplayProtector, SignedTransaction},
+};
 use serde::{Deserialize, Serialize};
 use std::{
     mem::size_of,
@@ -14,6 +17,16 @@ use std::{
 
 /// Estimated per-txn size minus the raw transaction
 pub const TXN_FIXED_ESTIMATED_BYTES: usize = size_of::<MempoolTransaction>();
+
+// This is the sequence number for an account.
+// For the sender of regular transactions, the sequence number is required.
+// For the sender of orderless transactions, we don't calculate the sequence number.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub enum AccountSequenceNumberInfo {
+    // Question: Please suggest some better names.
+    Required(u64),
+    NotRequired,
+}
 
 #[derive(Clone, Debug)]
 pub struct MempoolTransaction {
@@ -35,15 +48,15 @@ impl MempoolTransaction {
         expiration_time: Duration,
         ranking_score: u64,
         timeline_state: TimelineState,
-        seqno: u64,
+        account_sequence_number: AccountSequenceNumberInfo,
         insertion_time: SystemTime,
         client_submitted: bool,
         priority_of_sender: Option<BroadcastPeerPriority>,
     ) -> Self {
         Self {
             sequence_info: SequenceInfo {
-                transaction_sequence_number: txn.sequence_number(),
-                account_sequence_number: seqno,
+                transaction_replay_protector: txn.replay_protector(),
+                account_sequence_number,
             },
             txn,
             expiration_time,
@@ -86,8 +99,8 @@ pub enum TimelineState {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct SequenceInfo {
-    pub transaction_sequence_number: u64,
-    pub account_sequence_number: u64,
+    pub transaction_replay_protector: ReplayProtector,
+    pub account_sequence_number: AccountSequenceNumberInfo,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -155,14 +168,16 @@ impl InsertionInfo {
 #[cfg(test)]
 mod test {
     use crate::{
-        core_mempool::{MempoolTransaction, TimelineState},
+        core_mempool::{AccountSequenceNumberInfo, MempoolTransaction, TimelineState},
         network::BroadcastPeerPriority,
     };
     use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
     use aptos_types::{
         account_address::AccountAddress,
         chain_id::ChainId,
-        transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
+        transaction::{
+            RawTransaction, ReplayProtector, Script, SignedTransaction, TransactionPayloadWrapper,
+        },
     };
     use std::time::{Duration, SystemTime};
 
@@ -177,12 +192,16 @@ mod test {
     }
 
     fn create_test_mempool_transaction(signed_txn: SignedTransaction) -> MempoolTransaction {
+        let account_sequence_number = match signed_txn.replay_protector() {
+            ReplayProtector::SequenceNumber(_) => AccountSequenceNumberInfo::Required(0),
+            ReplayProtector::Nonce(_) => AccountSequenceNumberInfo::NotRequired,
+        };
         MempoolTransaction::new(
             signed_txn,
             Duration::from_secs(1),
             1,
             TimelineState::NotReady,
-            0,
+            account_sequence_number,
             SystemTime::now(),
             false,
             Some(BroadcastPeerPriority::Primary),
@@ -195,7 +214,7 @@ mod test {
         let public_key = private_key.public_key();
 
         let transaction_payload =
-            TransactionPayload::Script(Script::new(code_bytes, vec![], vec![]));
+            TransactionPayloadWrapper::Script(Script::new(code_bytes, vec![], vec![]));
         let raw_transaction = RawTransaction::new(
             AccountAddress::random(),
             sequence_number,
