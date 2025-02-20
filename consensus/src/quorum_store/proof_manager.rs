@@ -34,6 +34,7 @@ pub struct ProofManager {
     back_pressure_total_proof_limit: u64,
     remaining_total_proof_num: u64,
     allow_batches_without_pos_in_proposal: bool,
+    enable_payload_v2: bool,
 }
 
 impl ProofManager {
@@ -43,6 +44,7 @@ impl ProofManager {
         back_pressure_total_proof_limit: u64,
         batch_store: Arc<BatchStore>,
         allow_batches_without_pos_in_proposal: bool,
+        enable_payload_v2: bool,
         batch_expiry_gap_when_init_usecs: u64,
     ) -> Self {
         Self {
@@ -56,6 +58,7 @@ impl ProofManager {
             back_pressure_total_proof_limit,
             remaining_total_proof_num: 0,
             allow_batches_without_pos_in_proposal,
+            enable_payload_v2,
         }
     }
 
@@ -199,7 +202,19 @@ impl ProofManager {
                 proof_block.len(),
                 inline_block.len()
             );
-            Payload::QuorumStoreInlineHybrid(inline_block, ProofWithData::new(proof_block), None)
+            if self.enable_payload_v2 {
+                Payload::QuorumStoreInlineHybridV2(
+                    inline_block,
+                    ProofWithData::new(proof_block),
+                    PayloadExecutionLimit::None,
+                )
+            } else {
+                Payload::QuorumStoreInlineHybrid(
+                    inline_block,
+                    ProofWithData::new(proof_block),
+                    None,
+                )
+            }
         };
 
         let res = GetPayloadResponse::GetPayloadResponse(response);
