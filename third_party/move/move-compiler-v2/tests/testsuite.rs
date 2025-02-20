@@ -795,7 +795,6 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         // Run env processor pipeline.
         let env_pipeline = move_compiler_v2::check_and_rewrite_pipeline(
             &options,
-            false,
             RewritingScope::CompilationTarget,
         );
         if config.dump_ast == DumpLevel::AllStages {
