@@ -326,9 +326,8 @@ impl From<ModuleId> for (AccountAddress, Identifier) {
 
 static SCRIPT_MODULE_ID: Lazy<ModuleId> = Lazy::new(|| ModuleId {
     address: AccountAddress::from_str_strict(
-        // This value is sha256 of a source file in the Move compiler
-        // with ~5000 lines of code.
-        "0x37f3f7e2ef809b1739f0f9b78508ad47c5b861ba47a9ae1c2a9c93e81f8326f9",
+        // This is generated using sha256sum on 10k of bytes from /dev/urandom
+        "0x8bd18359a7ebb84407b6defa7bc5da9aca34a3d1ce764ddfb4d0adcc663430b4",
     )
     .expect("parsing of script address constant"),
     name: Identifier::new("__script__").expect("valid identifier for script"),

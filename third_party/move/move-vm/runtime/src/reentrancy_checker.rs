@@ -78,11 +78,12 @@ impl ReentrancyChecker {
                 },
             }
         } else if call_type == CallType::ClosureDynamicDispatch || caller_module.is_none() {
-            // If this is closure dispatch, or we have no caller module (i.e. top-level entry),
-            // count the intra-module call like an inter-module call -- as reentrance.
+            // If this is closure dispatch, or we have no caller module (i.e. top-level entry).
+            // Count the intra-module call like an inter-module call, as reentrance.
             // A static local call is governed by Move's `acquire` static semantics; however,
             // a dynamic dispatched local call has accesses not known at the caller side, so needs
-            // the runtime reentrancy check.
+            // the runtime reentrancy check. Note that this doesn't apply to NativeDynamicDispatch
+            // which already has a check in place preventing a dispatch into the same module.
             *self
                 .active_modules
                 .entry(callee_module.clone())
