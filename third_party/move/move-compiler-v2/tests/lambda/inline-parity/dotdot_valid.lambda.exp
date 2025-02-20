@@ -470,11 +470,3 @@ error: match not exhaustive
     │                ^
     │
     = missing `E1::C{..}`
-
-error: match not exhaustive
-    ┌─ tests/lambda/inline-parity/dotdot_valid.move:153:16
-    │
-153 │         match (x) {
-    │                ^
-    │
-    = missing `E1::C{..}`
