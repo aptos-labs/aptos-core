@@ -1287,7 +1287,7 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                    if let aptos_types::transaction::TransactionPayloadWrapper::EntryFunction(
                         ref payload,
                     ) = txn.payload()
                     {
@@ -1337,7 +1337,7 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                    if let aptos_types::transaction::TransactionPayloadWrapper::EntryFunction(
                         ref payload,
                     ) = txn.payload()
                     {
@@ -1410,7 +1410,7 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                    if let aptos_types::transaction::TransactionPayloadWrapper::EntryFunction(
                         ref payload,
                     ) = txn.payload()
                     {
@@ -1444,7 +1444,7 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                    if let aptos_types::transaction::TransactionPayloadWrapper::EntryFunction(
                         ref payload,
                     ) = txn.payload()
                     {
@@ -1498,7 +1498,7 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                    if let aptos_types::transaction::TransactionPayloadWrapper::EntryFunction(
                         ref payload,
                     ) = txn.payload()
                     {
@@ -1547,7 +1547,7 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                    if let aptos_types::transaction::TransactionPayloadWrapper::EntryFunction(
                         ref payload,
                     ) = txn.payload()
                     {
@@ -1586,7 +1586,7 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                    if let aptos_types::transaction::TransactionPayloadWrapper::EntryFunction(
                         ref payload,
                     ) = txn.payload()
                     {
@@ -1625,7 +1625,7 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                    if let aptos_types::transaction::TransactionPayloadWrapper::EntryFunction(
                         ref payload,
                     ) = txn.payload()
                     {
@@ -1683,7 +1683,7 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                    if let aptos_types::transaction::TransactionPayloadWrapper::EntryFunction(
                         ref payload,
                     ) = txn.payload()
                     {
@@ -1739,7 +1739,7 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                    if let aptos_types::transaction::TransactionPayloadWrapper::EntryFunction(
                         ref payload,
                     ) = txn.payload()
                     {

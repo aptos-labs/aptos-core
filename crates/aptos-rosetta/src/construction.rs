@@ -44,7 +44,8 @@ use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{
-        authenticator::AuthenticationKey, RawTransaction, SignedTransaction, TransactionPayload,
+        authenticator::AuthenticationKey, RawTransaction, SignedTransaction,
+        TransactionPayloadWrapper,
     },
 };
 use serde::de::DeserializeOwned;
@@ -545,7 +546,7 @@ async fn construction_parse(
     // This is messy, but all we can do is to manually go through and check the entry functions associated to convert to Rosetta operations
     // TODO: We should centralize all this operation -> entry function / entry function -> operation code
     let operations = match unsigned_txn.into_payload() {
-        TransactionPayload::EntryFunction(inner) => {
+        TransactionPayloadWrapper::EntryFunction(inner) => {
             let (module, function_name, type_args, args) = inner.into_inner();
 
             match (
