@@ -79,8 +79,6 @@ impl GrpcManagerService {
                 {
                     continue;
                 }
-                // TODO(grao): Validate the data at the metadata manager side to make sure
-                // stream_info is always available.
                 let num_active_streams = info.stream_info.as_ref().unwrap().active_streams.len();
                 candidates.push((candidate.0, num_active_streams));
             }
@@ -98,8 +96,6 @@ impl GrpcManagerService {
         let mut candidates = vec![];
         for candidate in self.metadata_manager.get_historical_data_services_info() {
             if let Some(info) = candidate.1.back().as_ref() {
-                // TODO(grao): Validate the data at the metadata manager side to make sure
-                // stream_info is always available.
                 let num_active_streams = info.stream_info.as_ref().unwrap().active_streams.len();
                 candidates.push((candidate.0, num_active_streams));
             }
