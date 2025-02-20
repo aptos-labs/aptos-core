@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    assert_success, assert_vm_status, build_package, build_package_with_compiler_version,
-    MoveHarness,
-};
+use crate::{assert_success, assert_vm_status, build_package, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::{
     BuildOptions, RuntimeModuleMetadata, RuntimeModuleMetadataV1, APTOS_METADATA_KEY,
@@ -151,14 +148,14 @@ fn test_duplicate_compilation_metadata_entries() {
     };
     let result = test_compilation_metadata_with_changes(
         duplicate_compilation_metatdata,
-        CompilerVersion::V2_1,
+        CompilerVersion::latest(),
     );
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
     let result = test_compilation_metadata_with_changes(
         duplicate_compilation_metatdata,
-        CompilerVersion::V1,
+        CompilerVersion::latest_stable(),
     );
-    assert_success!(result);
+    assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 }
 
 fn test_compilation_metadata_with_changes(
@@ -180,11 +177,10 @@ fn test_compilation_metadata_with_changes(
     );
     let path = builder.write_to_temp().unwrap();
 
-    let package = build_package_with_compiler_version(
-        path.path().to_path_buf(),
-        BuildOptions::default(),
-        compiler_version,
-    )
+    let package = build_package(path.path().to_path_buf(), BuildOptions {
+        compiler_version: Some(compiler_version),
+        ..BuildOptions::default()
+    })
     .expect("building package must succeed");
     let origin_code = package.extract_code();
     let mut compiled_module = CompiledModule::deserialize(&origin_code[0]).unwrap();
@@ -207,7 +203,7 @@ fn test_compilation_metadata_with_changes(
 
 fn test_compilation_metadata_internal(
     mainnet_flag: bool,
-    v2_flag: bool,
+    unstable_flag: bool,
     feature_enabled: bool,
 ) -> TransactionStatus {
     let mut h = MoveHarness::new();
@@ -229,16 +225,15 @@ fn test_compilation_metadata_internal(
     );
     let path = builder.write_to_temp().unwrap();
 
-    let compiler_version = if v2_flag {
+    let compiler_version = if unstable_flag {
         CompilerVersion::latest()
     } else {
-        CompilerVersion::V1
+        CompilerVersion::latest_stable()
     };
-    let package = build_package_with_compiler_version(
-        path.path().to_path_buf(),
-        BuildOptions::default(),
-        compiler_version,
-    )
+    let package = build_package(path.path().to_path_buf(), BuildOptions {
+        compiler_version: Some(compiler_version),
+        ..BuildOptions::default()
+    })
     .expect("building package must succeed");
 
     let package_metadata = package
@@ -271,7 +266,7 @@ fn test_compilation_metadata_internal(
 
 fn test_compilation_metadata_script_internal(
     mainnet_flag: bool,
-    v2_flag: bool,
+    unstable_flag: bool,
     feature_enabled: bool,
 ) -> TransactionStatus {
     let mut h = MoveHarness::new();
@@ -297,16 +292,15 @@ fn test_compilation_metadata_script_internal(
     );
     let path = builder.write_to_temp().unwrap();
 
-    let compiler_version = if v2_flag {
+    let compiler_version = if unstable_flag {
         CompilerVersion::latest()
     } else {
-        CompilerVersion::V1
+        CompilerVersion::latest_stable()
     };
-    let package = build_package_with_compiler_version(
-        path.path().to_path_buf(),
-        BuildOptions::default(),
-        compiler_version,
-    )
+    let package = build_package(path.path().to_path_buf(), BuildOptions {
+        compiler_version: Some(compiler_version),
+        ..BuildOptions::default()
+    })
     .expect("building package must succeed");
 
     let code = package.extract_script_code().into_iter().next().unwrap();
@@ -328,24 +322,24 @@ fn test_compilation_metadata_script_internal(
 #[test]
 fn test_compilation_metadata_for_script() {
     let mut enable_check = true;
-    // run compiler v2 code to mainnet
+    // run unstable compiler code to mainnet
     assert_vm_status!(
         test_compilation_metadata_script_internal(true, true, enable_check),
         StatusCode::UNSTABLE_BYTECODE_REJECTED
     );
-    // run compiler v1 code to mainnet
+    // run stable compiler code to mainnet
     assert_success!(test_compilation_metadata_script_internal(
         true,
         false,
         enable_check
     ));
-    // run compiler v2 code to test
+    // run unstable compiler code to test
     assert_success!(test_compilation_metadata_script_internal(
         false,
         true,
         enable_check
     ));
-    // run compiler v1 code to test
+    // run stable compiler code to test
     assert_success!(test_compilation_metadata_script_internal(
         false,
         false,
@@ -353,27 +347,27 @@ fn test_compilation_metadata_for_script() {
     ));
 
     enable_check = false;
-    // run compiler v2 code to mainnet
+    // run unstable compiler code to mainnet
     // success because the feature flag is turned off
     assert_success!(test_compilation_metadata_script_internal(
         true,
         true,
         enable_check
     ),);
-    // run compiler v1 code to mainnet
+    // run stable compiler code to mainnet
     assert_success!(test_compilation_metadata_script_internal(
         true,
         false,
         enable_check
     ));
-    // run compiler v2 code to test
+    // run unstable compiler code to test
     // success because the feature flag is turned off
     assert_success!(test_compilation_metadata_script_internal(
         false,
         true,
         enable_check
     ),);
-    // run compiler v1 code to test
+    // run stable compiler code to test
     assert_success!(test_compilation_metadata_script_internal(
         false,
         false,
@@ -384,24 +378,24 @@ fn test_compilation_metadata_for_script() {
 #[test]
 fn test_compilation_metadata() {
     let mut enable_check = true;
-    // publish compiler v2 code to mainnet
+    // publish unstable compiler code to mainnet
     assert_vm_status!(
         test_compilation_metadata_internal(true, true, enable_check),
         StatusCode::UNSTABLE_BYTECODE_REJECTED
     );
-    // publish compiler v1 code to mainnet
+    // publish stable compiler code to mainnet
     assert_success!(test_compilation_metadata_internal(
         true,
         false,
         enable_check
     ));
-    // publish compiler v2 code to test
+    // publish unstable compiler code to test
     assert_success!(test_compilation_metadata_internal(
         false,
         true,
         enable_check
     ));
-    // publish compiler v1 code to test
+    // publish stable compiler code to test
     assert_success!(test_compilation_metadata_internal(
         false,
         false,
@@ -409,28 +403,28 @@ fn test_compilation_metadata() {
     ));
 
     enable_check = false;
-    // publish compiler v2 code to mainnet
+    // publish unstable compiler code to mainnet
     // failed because the metadata cannot be recognized
     assert_vm_status!(
         test_compilation_metadata_internal(true, true, enable_check),
         CONSTRAINT_NOT_SATISFIED
     );
-    // publish compiler v1 code to mainnet
-    assert_success!(test_compilation_metadata_internal(
-        true,
-        false,
-        enable_check
-    ));
-    // publish compiler v2 code to test
+    // publish stable compiler code to mainnet
+    // failed because the metadata cannot be recognized
+    assert_vm_status!(
+        test_compilation_metadata_internal(true, false, enable_check),
+        CONSTRAINT_NOT_SATISFIED
+    );
+    // publish unstable compiler code to test
     // failed because the metadata cannot be recognized
     assert_vm_status!(
         test_compilation_metadata_internal(false, true, enable_check),
         CONSTRAINT_NOT_SATISFIED
     );
-    // publish compiler v1 code to test
-    assert_success!(test_compilation_metadata_internal(
-        false,
-        false,
-        enable_check
-    ));
+    // publish stable compiler code to test
+    // failed because the metadata cannot be recognized
+    assert_vm_status!(
+        test_compilation_metadata_internal(false, false, enable_check),
+        CONSTRAINT_NOT_SATISFIED
+    );
 }
