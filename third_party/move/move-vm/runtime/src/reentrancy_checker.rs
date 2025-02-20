@@ -37,7 +37,7 @@ pub(crate) struct ReentrancyChecker {
 /// Ways how functions are called
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CallType {
-    /// Regular static function call
+    /// Regular static function call.
     Regular,
     /// Dynamic dispatch via the NativeDispatch feature.
     NativeDynamicDispatch,
@@ -61,23 +61,28 @@ impl ReentrancyChecker {
             // Cross module call.
             // When module lock is active, and we have already called into this module, this
             // reentry is disallowed
-            if self.module_lock_count > 0 && self.active_modules.contains_key(callee_module) {
-                return Err(
-                    PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR).with_message(format!(
-                        "Reentrancy disallowed: reentering `{}` via function `{}` \
+            match self.active_modules.entry(callee_module.clone()) {
+                Entry::Occupied(mut e) => {
+                    if self.module_lock_count > 0 {
+                        return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
+                            .with_message(format!(
+                                "Reentrancy disallowed: reentering `{}` via function `{}` \
                      (module locking is active)",
-                        callee_module, fun_name
-                    )),
-                );
+                                callee_module, fun_name
+                            )));
+                    }
+                    *e.get_mut() += 1
+                },
+                Entry::Vacant(e) => {
+                    e.insert(1);
+                },
             }
-            // Count the call.
-            *self
-                .active_modules
-                .entry(callee_module.clone())
-                .or_default() += 1;
         } else if call_type == CallType::ClosureDynamicDispatch || caller_module.is_none() {
             // If this is closure dispatch, or we have no caller module (i.e. top-level entry),
-            // count the call.
+            // count the intra-module call like an inter-module call -- as reentrance.
+            // A static local call is governed by Move's `acquire` static semantics; however,
+            // a dynamic dispatched local call has accesses not known at the caller side, so needs
+            // the runtime reentrancy check.
             *self
                 .active_modules
                 .entry(callee_module.clone())
