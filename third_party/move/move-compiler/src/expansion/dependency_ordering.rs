@@ -565,7 +565,7 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             tys.iter().for_each(|ty| type_(context, ty))
         },
 
-        E::Lambda(ll, e, _capture_kind, _abilities) => {
+        E::Lambda(ll, e, _capture_kind) => {
             use crate::expansion::ast::TypedLValue_;
             let mapped = ll.value.iter().map(|sp!(_, TypedLValue_(lv, _opt_ty))| lv);
             lvalues(context, mapped);

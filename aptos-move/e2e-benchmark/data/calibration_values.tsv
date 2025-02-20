@@ -1,15 +1,15 @@
 Loop { loop_count: Some(100000), loop_type: NoOp }	10	0.965	1.031	43125.6
-Loop { loop_count: Some(10000), loop_type: Arithmetic }	10	0.986	1.080	26810.1
+Loop { loop_count: Some(10000), loop_type: Arithmetic }	10	0.986	1.080	25800.0
 CreateObjects { num_objects: 10, object_payload_size: 0 }	10	0.952	1.025	167.2
 CreateObjects { num_objects: 10, object_payload_size: 10240 }	10	0.993	1.094	9731.3
 CreateObjects { num_objects: 100, object_payload_size: 0 }	10	0.976	1.066	1455.7
 CreateObjects { num_objects: 100, object_payload_size: 10240 }	10	0.958	1.079	11812.5
 InitializeVectorPicture { length: 128 }	10	0.976	1.062	189.6
-VectorPicture { length: 128 }	10	0.958	1.059	52.4
-VectorPictureRead { length: 128 }	10	0.952	1.041	51.3
+VectorPicture { length: 128 }	10	0.958	1.059	36.5
+VectorPictureRead { length: 128 }	10	0.952	1.041	35.2
 InitializeVectorPicture { length: 30720 }	10	0.958	1.086	28096.3
-VectorPicture { length: 30720 }	10	0.961	1.069	6811.7
-VectorPictureRead { length: 30720 }	10	0.953	1.066	6824.0
+VectorPicture { length: 30720 }	10	0.961	1.069	4830.4
+VectorPictureRead { length: 30720 }	10	0.953	1.066	4752.3
 SmartTablePicture { length: 30720, num_points_per_txn: 200 }	10	0.985	1.054	36305.8
 SmartTablePicture { length: 1048576, num_points_per_txn: 300 }	10	0.984	1.051	63197.1
 ResourceGroupsSenderWriteTag { string_length: 1024 }	10	0.922	1.031	21.9
@@ -27,11 +27,11 @@ EmitEvents { count: 1000 }	10	0.966	1.044	8216.6
 APTTransferWithPermissionedSigner	10	0.950	1.028	1463.5
 APTTransferWithMasterSigner	10	0.950	1.033	236.3
 VectorTrimAppend { vec_len: 3000, element_len: 1, index: 0, repeats: 0 }	10	0.961	1.073	6501.9
-VectorTrimAppend { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	10	0.963	1.205	27994.6
+VectorTrimAppend { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	10	0.963	1.205	29000.0
 VectorTrimAppend { vec_len: 3000, element_len: 1, index: 2990, repeats: 1000 }	10	0.966	1.050	16335.1
 VectorRemoveInsert { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	10	0.963	1.037	25367.0
 VectorRemoveInsert { vec_len: 3000, element_len: 1, index: 2998, repeats: 1000 }	10	0.965	1.045	16896.2
-VectorRangeMove { vec_len: 3000, element_len: 1, index: 1000, move_len: 500, repeats: 1000 }	10	0.898	1.066	32347.9
+VectorRangeMove { vec_len: 3000, element_len: 1, index: 1000, move_len: 500, repeats: 1000 }	10	0.898	1.066	25257.3
 VectorTrimAppend { vec_len: 100, element_len: 100, index: 0, repeats: 0 }	10	0.972	1.050	295.7
 VectorTrimAppend { vec_len: 100, element_len: 100, index: 10, repeats: 1000 }	10	0.969	1.043	10454.4
 VectorRangeMove { vec_len: 100, element_len: 100, index: 50, move_len: 10, repeats: 1000 }	10	0.958	1.030	4856.6

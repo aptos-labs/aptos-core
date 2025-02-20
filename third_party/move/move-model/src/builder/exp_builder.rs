@@ -25,13 +25,14 @@ use crate::{
         ReceiverFunctionInstance, ReferenceKind, Substitution, Type, TypeDisplayContext,
         TypeUnificationError, UnificationContext, Variance, WideningOrder, BOOL_TYPE,
     },
+    well_known::{BORROW_MUT_NAME, BORROW_NAME},
     FunId,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::file_format::{self};
 use move_compiler::{
-    expansion::ast::{self as EA, Exp_},
+    expansion::ast::{self as EA},
     hlir::ast as HA,
     naming::ast as NA,
     parser::ast::{self as PA, CallKind, Field},
@@ -40,6 +41,7 @@ use move_compiler::{
 use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
+    function::ClosureMask,
     value::MoveValue,
 };
 use move_ir_types::{
@@ -430,7 +432,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         reported_vars: &mut BTreeSet<u32>,
     ) -> Type {
         let ty = self.subs.specialize_with_defaults(ty);
-        let loc = self.env().get_node_loc(node_id);
         let mut incomplete = false;
         let mut visitor = |t: &Type| {
             use Type::*;
@@ -444,12 +445,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         ty.visit(&mut visitor);
         if incomplete {
             let displayed_ty = format!("{}", ty.display(&self.type_display_context()));
-            // Skip displaying the error message if there is already an error in the type; we must have another message about it already.
+            // Skip displaying the error message if there is already an error in the type;
+            // we must have another message about it already.
             if !displayed_ty.contains("*error*") {
+                let loc = self.env().get_node_loc(node_id);
                 self.error(
                     &loc,
                     &format!(
-                        "unable to infer instantiation of type `{}` (consider providing type arguments or annotating the type)",
+                        "unable to infer instantiation of type `{}` \
+                        (consider providing type arguments or annotating the type)",
                         displayed_ty
                     ),
                 );
@@ -1085,10 +1089,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 ReferenceKind::from_is_mut(*is_mut),
                 Box::new(self.translate_type(ty)),
             ),
-            Fun(args, result, abilities) => Type::Fun(
-                Box::new(Type::tuple(self.translate_types(args.as_ref()))),
-                Box::new(self.translate_type(result)),
-                AbilitySet::FUNCTIONS | self.parent.translate_abilities(abilities),
+            Fun(args, result, abilities) => Type::function(
+                Type::tuple(self.translate_types(args.as_ref())),
+                self.translate_type(result),
+                self.parent.translate_abilities(abilities),
             ),
             Unit => Type::Tuple(vec![]),
             Multiple(vst) => Type::Tuple(self.translate_types(vst.as_ref())),
@@ -1548,11 +1552,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             EA::Exp_::ExpCall(efexp, args) => {
                 let args_ref: Vec<_> = args.value.iter().collect();
                 let (arg_types, args) = self.translate_exp_list(&args_ref);
-
-                let fun_t = Type::Fun(
-                    Box::new(Type::tuple(arg_types)),
-                    Box::new(expected_type.clone()),
-                    AbilitySet::FUNCTIONS,
+                let fun_t = self.fresh_type_var_constr(
+                    loc.clone(),
+                    WideningOrder::LeftToRight,
+                    Constraint::SomeFunctionValue(Type::tuple(arg_types), expected_type.clone()),
                 );
                 let fexp = self.translate_exp(efexp, &fun_t);
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
@@ -1655,14 +1658,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 ExpData::LoopCont(id, nest, true)
             },
             EA::Exp_::Block(seq) => self.translate_seq(&loc, seq, expected_type, context),
-            EA::Exp_::Lambda(bindings, exp, capture_kind, abilities) => self.translate_lambda(
+            EA::Exp_::Lambda(bindings, exp, capture_kind) => self.translate_lambda(
                 &loc,
                 bindings,
                 exp,
                 expected_type,
                 context,
                 Self::translate_lambda_capture_kind(*capture_kind),
-                AbilitySet::FUNCTIONS | self.parent.translate_abilities(abilities),
             ),
             EA::Exp_::Quant(kind, ranges, triggers, condition, body) => self.translate_quant(
                 &loc,
@@ -2230,8 +2232,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     .iter()
                     .map(|t| self.finalize_type(id, t, &mut BTreeSet::new()))
                     .collect();
-                // Also need to evaluate type constraints on type parameters
-
                 self.env().set_node_instantiation(id, inst)
             }
         }
@@ -3232,20 +3232,16 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
             // Check whether this is an Invoke on a function value.
             if let Some(entry) = self.lookup_local(sym, false) {
-                // Check whether the local has the expected function type.
+                // Add constraint on expected function type of local
                 let sym_ty = entry.type_.clone();
                 let (arg_types, args) = self.translate_exp_list(args);
-                let fun_t = Type::Fun(
-                    Box::new(Type::tuple(arg_types)),
-                    Box::new(expected_type.clone()),
-                    if let Type::Fun(.., abilities) = &sym_ty {
-                        *abilities
-                    } else {
-                        // Don't constraint Abilities of sym_ty.
-                        AbilitySet::MAXIMAL_FUNCTIONS
-                    },
+                self.add_constraint_and_report(
+                    loc,
+                    context,
+                    &sym_ty,
+                    Constraint::SomeFunctionValue(Type::tuple(arg_types), expected_type.clone()),
+                    None,
                 );
-                let sym_ty = self.check_type(loc, &sym_ty, &fun_t, context);
 
                 let local_id = self.new_node_id_with_type_loc(&sym_ty, &self.to_loc(&n.loc));
                 let local_var = ExpData::LocalVar(local_id, sym);
@@ -3615,11 +3611,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         if let Some(entry) = self.parent.parent.fun_table.get(&global_var_sym) {
             let module_id = entry.module_id;
             let fun_id = entry.fun_id;
-            let fun_abilities = if entry.visibility.is_public() {
-                AbilitySet::PUBLIC_FUNCTIONS
-            } else {
-                AbilitySet::PRIVATE_FUNCTIONS
-            };
             let result_type = entry.result_type.clone();
             let type_params = entry.type_params.clone();
             let param_types = entry
@@ -3636,18 +3627,28 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             ) else {
                 return self.new_error_exp();
             };
-            let fun_type = Type::Fun(
-                Box::new(Type::tuple(param_types)),
-                Box::new(result_type),
-                fun_abilities,
+            let fun_type = self.fresh_type_var_constr(
+                loc.clone(),
+                WideningOrder::LeftToRight,
+                Constraint::SomeFunctionValue(
+                    Type::tuple(
+                        param_types
+                            .iter()
+                            .map(|t| t.instantiate(&instantiation))
+                            .collect(),
+                    ),
+                    result_type.instantiate(&instantiation),
+                ),
             );
-            let fun_type = fun_type.instantiate(&instantiation);
             let fun_type = self.check_type(loc, &fun_type, expected_type, context);
 
             let id = self.env().new_node(loc.clone(), fun_type);
             self.env().set_node_instantiation(id, instantiation);
-            let fn_exp = ExpData::Value(id, Value::Function(module_id, fun_id));
-            return fn_exp;
+            return ExpData::Call(
+                id,
+                Operation::Closure(module_id, fun_id, ClosureMask::new_for_leading(0)),
+                vec![],
+            );
         }
 
         // If a qualified name is not explicitly specified, do not print it out
@@ -3825,23 +3826,46 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         if *self.had_errors.borrow() {
             return self.new_error_exp();
         }
+        let instantiated_inner = self.subs.specialize(&inner_ty);
+        let node_id = self.env().new_node(
+            loc.clone(),
+            Type::Reference(
+                ReferenceKind::from_is_mut(mutable),
+                Box::new(instantiated_inner.clone()),
+            ),
+        );
+        self.set_node_instantiation(node_id, vec![inner_ty.clone()]);
         if let (Some(mid), Some(fid)) = self.get_vector_borrow(mutable) {
-            let instantiated_inner = self.subs.specialize(&inner_ty);
-            let node_id = self.env().new_node(
-                loc.clone(),
-                Type::Reference(
-                    ReferenceKind::from_is_mut(mutable),
-                    Box::new(instantiated_inner.clone()),
-                ),
-            );
-            self.set_node_instantiation(node_id, vec![inner_ty.clone()]);
             let call = ExpData::Call(node_id, Operation::MoveFunction(mid, fid), vec![
                 vec_exp_e.into_exp(),
                 idx_exp_e.clone().into_exp(),
             ]);
             return call;
+        } else {
+            // To use index notation in vector module
+            let borrow_fun_name = if mutable {
+                BORROW_MUT_NAME
+            } else {
+                BORROW_NAME
+            };
+            if let Some(borrow_symbol) = self
+                .parent
+                .parent
+                .vector_receiver_functions
+                .get(&self.env().symbol_pool.make(borrow_fun_name))
+            {
+                if let Some(borrow_fun_entry) = self.parent.parent.fun_table.get(borrow_symbol) {
+                    let mid = borrow_fun_entry.module_id;
+                    let fid = borrow_fun_entry.fun_id;
+                    return ExpData::Call(node_id, Operation::MoveFunction(mid, fid), vec![
+                        vec_exp_e.into_exp(),
+                        idx_exp_e.clone().into_exp(),
+                    ]);
+                }
+            }
         }
-        ExpData::Invalid(self.env().new_node_id())
+        self.error(loc, "cannot find vector module");
+        self.new_error_exp()
     }
 
     /// Try to translate a resource or vector Index expression
@@ -4241,7 +4265,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             );
             let receiver_call_opt = self.get_receiver_function(&arg_types[0], name);
             if let Some(receiver_call) = receiver_call_opt {
-                if let Exp_::ExpDotted(dotted) = &args[0].value {
+                if let EA::Exp_::ExpDotted(dotted) = &args[0].value {
                     // we need a special case for the receiver call S[x].f.fun(&mut...)
                     // when the first argument is a dotted expression with index notation:
                     // S[x].y because the reference type is by default set immutable ref
@@ -4254,7 +4278,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         );
                         translated_args[0] = first_arg.into_exp();
                     }
-                } else if let Exp_::Index(target, index) = &args[0].value {
+                } else if let EA::Exp_::Index(target, index) = &args[0].value {
                     // special case for the receiver call S[x].fun(&...), S[x].fun(&mut...)
                     // so that it behaves the same as (&S[x]).fun(&...), (&mut S[x]).fun(&mut...)
                     if receiver_call.arg_types[0].is_reference() {
@@ -5242,7 +5266,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         expected_type: &Type,
         context: &ErrorMessageContext,
         capture_kind: LambdaCaptureKind,
-        abilities: AbilitySet,
     ) -> ExpData {
         // Translate the argument list
         let arg_type = self.fresh_type_var();
@@ -5260,21 +5283,24 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
         // Create a fresh type variable for the body and check expected type before analyzing
         // body. This aids type inference for the lambda parameters.
-        let ty = self.fresh_type_var();
-        let rty = self.check_type(
+        let result_ty = self.fresh_type_var();
+
+        // Create a function value type constraint. Note we do not know the abilities
+        // of the lambda, so can't build a full function type here.
+        self.add_constraint_and_report(
             loc,
-            &Type::Fun(
-                Box::new(arg_type.clone()),
-                Box::new(ty.clone()),
-                abilities.union(AbilitySet::MAXIMAL_FUNCTIONS),
-            ),
-            expected_type,
             context,
+            expected_type,
+            Constraint::SomeFunctionValue(arg_type.clone(), result_ty.clone()),
+            None,
         );
-        let rbody = self.translate_exp(body, &ty);
+
+        // Translate body
+        let rbody = self.translate_exp(body, &result_ty);
         self.exit_scope();
-        let id = self.new_node_id_with_type_loc(&rty, loc);
-        ExpData::Lambda(id, pat, rbody.into_exp(), capture_kind, abilities)
+
+        let id = self.new_node_id_with_type_loc(expected_type, loc);
+        ExpData::Lambda(id, pat, rbody.into_exp(), capture_kind)
     }
 
     fn translate_quant(
@@ -5484,30 +5510,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     Value::Vector(b)
                 },
             },
-            (Type::Primitive(_), MoveValue::Vector(_))
-            | (Type::Primitive(_), MoveValue::Struct(_))
-            | (Type::Tuple(_), MoveValue::Vector(_))
-            | (Type::Tuple(_), MoveValue::Struct(_))
-            | (Type::Vector(_), MoveValue::Struct(_))
-            | (Type::Struct(_, _, _), MoveValue::Vector(_))
-            | (Type::Struct(_, _, _), MoveValue::Struct(_))
-            | (Type::TypeParameter(_), MoveValue::Vector(_))
-            | (Type::TypeParameter(_), MoveValue::Struct(_))
-            | (Type::Reference(_, _), MoveValue::Vector(_))
-            | (Type::Reference(_, _), MoveValue::Struct(_))
-            | (Type::Fun(..), MoveValue::Vector(_))
-            | (Type::Fun(..), MoveValue::Struct(_))
-            | (Type::TypeDomain(_), MoveValue::Vector(_))
-            | (Type::TypeDomain(_), MoveValue::Struct(_))
-            | (Type::ResourceDomain(_, _, _), MoveValue::Vector(_))
-            | (Type::ResourceDomain(_, _, _), MoveValue::Struct(_))
-            | (Type::Error, MoveValue::Vector(_))
-            | (Type::Error, MoveValue::Struct(_))
-            | (Type::Var(_), MoveValue::Vector(_))
-            | (Type::Var(_), MoveValue::Struct(_)) => {
+            _ => {
                 self.error(
                     loc,
-                    &format!("Not yet supported constant value: {:?}", value),
+                    &format!("Not supported constant value/type combination: {}", value),
                 );
                 Value::Bool(false)
             },

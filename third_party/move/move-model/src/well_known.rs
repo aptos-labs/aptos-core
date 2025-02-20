@@ -28,6 +28,8 @@ pub fn is_verify_only_attribute_name(s: &str) -> bool {
 pub const VECTOR_MODULE: &str = "vector";
 pub const VECTOR_BORROW_MUT: &str = "vector::borrow_mut";
 pub const EVENT_EMIT_EVENT: &str = "event::emit_event";
+pub const BORROW_NAME: &str = "borrow";
+pub const BORROW_MUT_NAME: &str = "borrow_mut";
 
 pub const TYPE_NAME_MOVE: &str = "type_info::type_name";
 pub const TYPE_NAME_SPEC: &str = "type_info::$type_name";

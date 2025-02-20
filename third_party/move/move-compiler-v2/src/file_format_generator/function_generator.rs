@@ -16,7 +16,7 @@ use move_binary_format::{
     file_format as FF,
     file_format::{CodeOffset, FunctionDefinitionIndex},
 };
-use move_core_types::ability;
+use move_core_types::{ability, function::ClosureMask};
 use move_model::{
     ast::{ExpData, Spec, SpecBlockTarget, TempIndex},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
@@ -410,6 +410,12 @@ impl<'a> FunctionGenerator<'a> {
             Operation::Function(mid, fid, inst) => {
                 self.gen_call(ctx, dest, mid.qualified(*fid), inst, source);
             },
+            Operation::Closure(mid, fid, inst, mask) => {
+                self.gen_closure(ctx, dest, mid.qualified(*fid), inst, *mask, source);
+            },
+            Operation::Invoke => {
+                self.gen_invoke(ctx, dest, source);
+            },
             Operation::Pack(mid, sid, inst) => {
                 self.gen_struct_oper(
                     ctx,
@@ -673,6 +679,55 @@ impl<'a> FunctionGenerator<'a> {
             );
             self.emit(FF::Bytecode::CallGeneric(idx))
         }
+        self.abstract_pop_n(ctx, source.len());
+        self.abstract_push_result(ctx, dest);
+    }
+
+    /// Generates code for construction of a closure.
+    fn gen_closure(
+        &mut self,
+        ctx: &BytecodeContext,
+        dest: &[TempIndex],
+        id: QualifiedId<FunId>,
+        inst: &[Type],
+        mask: ClosureMask,
+        source: &[TempIndex],
+    ) {
+        let fun_ctx = ctx.fun_ctx;
+        self.abstract_push_args(ctx, source, None);
+        if inst.is_empty() {
+            let idx = self.gen.function_index(
+                &fun_ctx.module,
+                &fun_ctx.loc,
+                &fun_ctx.module.env.get_function(id),
+            );
+            self.emit(FF::Bytecode::PackClosure(idx, mask))
+        } else {
+            let idx = self.gen.function_instantiation_index(
+                &fun_ctx.module,
+                &fun_ctx.loc,
+                &fun_ctx.module.env.get_function(id),
+                inst.to_vec(),
+            );
+            self.emit(FF::Bytecode::PackClosureGeneric(idx, mask))
+        }
+        self.abstract_pop_n(ctx, source.len());
+        self.abstract_push_result(ctx, dest);
+    }
+
+    /// Generates code for invoking of a closure.
+    fn gen_invoke(&mut self, ctx: &BytecodeContext, dest: &[TempIndex], source: &[TempIndex]) {
+        let clos_type = ctx
+            .fun_ctx
+            .fun
+            .get_local_type(*source.last().expect("invoke has function argument last"));
+        let sign_idx = self
+            .gen
+            .signature(&ctx.fun_ctx.module, &ctx.fun_ctx.loc, vec![
+                clos_type.clone()
+            ]);
+        self.abstract_push_args(ctx, source, None);
+        self.emit(FF::Bytecode::CallClosure(sign_idx));
         self.abstract_pop_n(ctx, source.len());
         self.abstract_push_result(ctx, dest);
     }
