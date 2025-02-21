@@ -594,22 +594,16 @@ where
                 _ => {},
             };
 
-            match env::var("INSTALL_KEYLESS_GROTH16_VK_FROM_URL") {
-                Ok(url) => {
-                    let response = ureq::get(&url).call();
-                    let json: Value = response.into_json().expect("Failed to parse JSON");
-                    configure_keyless_with_vk(genesis_config, json).unwrap();
-                },
-                _ => {},
-            };
+       if let Ok(url) = env::var("INSTALL_KEYLESS_GROTH16_VK_FROM_URL") {
+           let response = ureq::get(&url).call();
+           let json: Value = response.into_json().expect("Failed to parse JSON");
+           configure_keyless_with_vk(genesis_config, json).unwrap();
+       };
 
-            match env::var("INSTALL_KEYLESS_GROTH16_VK_FROM_PATH") {
-                Ok(path) => {
-                    let file_content = fs::read_to_string(&path).expect(&format!("Failed to read verification key file: {}", path));
-                    let json: Value = serde_json::from_str(&file_content).expect("Failed to parse JSON");
-                    configure_keyless_with_vk(genesis_config, json).unwrap();
-                },
-                _ => {},
+           if let Ok(path) = env::var("INSTALL_KEYLESS_GROTH16_VK_FROM_PATH") {
+                let file_content = fs::read_to_string(&path).expect(&format!("Failed to read verification key file: {}", path));
+                let json: Value = serde_json::from_str(&file_content).expect("Failed to parse JSON");
+                configure_keyless_with_vk(genesis_config, json).unwrap();
             };
         })))
         .with_randomize_first_validator_ports(random_ports);
@@ -637,15 +631,22 @@ where
     Ok(node_config)
 }
 
-fn configure_keyless_with_vk(genesis_config: &mut GenesisConfiguration, json: Value) -> anyhow::Result<()> {
+fn configure_keyless_with_vk(
+    genesis_config: &mut GenesisConfiguration,
+    json: Value,
+) -> anyhow::Result<()> {
     let vk = parse_groth16_vk_from_json(&json)?;
     genesis_config.keyless_groth16_vk = Some(vk);
-    genesis_config.jwk_consensus_config_override = Some(OnChainJWKConsensusConfig::default_enabled());
+    genesis_config.jwk_consensus_config_override =
+        Some(OnChainJWKConsensusConfig::default_enabled());
     Ok(())
 }
 
 fn parse_groth16_vk_from_json(json: &Value) -> Result<Groth16VerificationKey, anyhow::Error> {
-    println!("Loading verification key from JSON:\n{}", serde_json::to_string_pretty(&json).unwrap());
+    println!(
+        "Loading verification key from JSON:\n{}",
+        serde_json::to_string_pretty(&json).unwrap()
+    );
     let vk_data = json["data"].clone();
     let gamma_abc_g1 = vk_data["gamma_abc_g1"]
         .as_array()
