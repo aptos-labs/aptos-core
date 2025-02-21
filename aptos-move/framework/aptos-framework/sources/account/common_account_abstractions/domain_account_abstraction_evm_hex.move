@@ -20,6 +20,7 @@ module aptos_framework::domain_account_abstraction_evm_hex {
 
     const EINVALID_SIGNATURE: u64 = 1;
     const EADDR_MISMATCH: u64 = 2;
+    const EUNEXPECTED_V: u64 = 3;
 
     /// Authorization function for domain account abstraction.
     public fun authenticate(account: signer, aa_auth_data: AbstractionAuthData): signer {
@@ -37,17 +38,18 @@ module aptos_framework::domain_account_abstraction_evm_hex {
         // EVM recovery ID is either 27 or 28. We need to map this to 0 or 1
         let signature_bytes = aa_auth_data.domain_authenticator();
         let rs = vector::slice(&signature_bytes, 0, 64);
-        let v = *vector::borrow(&signature_bytes, 64) - 27;
+        let v = *vector::borrow(&signature_bytes, 64);
+        assert!(v == 27 || v == 28, error::permission_denied(EUNEXPECTED_V));
         let signature = secp256k1::ecdsa_signature_from_bytes(rs);
 
         // Attempt to recover the public key
         let maybe_recovered_public_key = secp256k1::ecdsa_recover(
             aptos_hash::keccak256(*string::bytes(&message)),
-            v,
+            v - 27,
             &signature,
         );
         assert!(
-            option::is_some(maybe_recovered_public_key),
+            option::is_some(&maybe_recovered_public_key),
             error::permission_denied(EINVALID_SIGNATURE)
         );
 
