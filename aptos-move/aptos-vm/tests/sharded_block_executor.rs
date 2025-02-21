@@ -21,15 +21,21 @@ use aptos_vm::sharded_block_executor::{
 use rand::{rngs::OsRng, Rng};
 use rstest::rstest;
 
-#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
-    case(true, false, false),
-    case(true, true, false),
-    case(true, true, true),
-    case(false, false, false),
-    case(false, true, false),
-    case(false, true, true),
+#[rstest(sender_stateless_account, receiver_stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true),
 )]
-fn test_partitioner_v2_uniform_sharded_block_executor_no_conflict(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+fn test_partitioner_v2_uniform_sharded_block_executor_no_conflict(sender_stateless_account: bool, receiver_stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     for merge_discard in [false, true] {
         let num_shards = 8;
         let client = LocalExecutorService::setup_local_executor_shards(num_shards, Some(2));
@@ -38,7 +44,7 @@ fn test_partitioner_v2_uniform_sharded_block_executor_no_conflict(stateless_acco
             .partition_last_round(merge_discard)
             .pre_partitioner_config(Box::new(UniformPartitionerConfig {}))
             .build();
-        test_utils::test_sharded_block_executor_no_conflict(partitioner, sharded_block_executor, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
+        test_utils::test_sharded_block_executor_no_conflict(partitioner, sharded_block_executor, sender_stateless_account, receiver_stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
     }
 }
 
@@ -250,7 +256,7 @@ fn test_partitioner_v2_connected_component_sharded_block_executor_with_random_tr
     case(false, true, false),
     case(false, true, true),
 )]
-fn test_partitioner_v2_connected_component_sharded_block_executor_with_random_transfers_sequential(stateless_account: bool, use_txn_payload_v2_type: bool, use_orderless_transactions: bool)
+fn test_partitioner_v2_connected_component_sharded_block_executor_with_random_transfers_sequential(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool)
 {
     for merge_discard in [false, true] {
         let mut rng = OsRng;
@@ -267,7 +273,7 @@ fn test_partitioner_v2_connected_component_sharded_block_executor_with_random_tr
             sharded_block_executor,
             1,
             stateless_account,
-            use_txn_payload_v2_type,
+            use_txn_payload_v2_format,
             use_orderless_transactions,
         )
     }

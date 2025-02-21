@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_abort, assert_success, tests::common, MoveHarness};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::account_address::AccountAddress;
@@ -96,7 +97,7 @@ fn init_module_when_republishing_package(stateless_account: bool, use_txn_payloa
 )]
 fn init_module_with_abort_and_republish(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x915").unwrap(), if stateless_account { None } else { Some(0) });
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x12").unwrap(), if stateless_account { None } else { Some(0) });
 
     let mut p1 = PackageBuilder::new("Pack");
     p1.add_source(

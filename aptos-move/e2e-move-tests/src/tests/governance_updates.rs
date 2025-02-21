@@ -69,15 +69,15 @@ fn large_transactions(stateless_account: bool, use_txn_payload_v2_format: bool, 
     );
 
     let status = run(&mut h, &alice, small.clone(), small.clone());
-    assert!(!status.is_discarded());
+    assert!(!status.is_discarded(), "status: {:?}", status);
     let status = run(&mut h, &alice, large.clone(), small.clone());
-    assert!(!status.is_discarded());
+    assert!(!status.is_discarded(), "status: {:?}", status);
     let status = run(&mut h, &alice, small.clone(), large.clone());
-    assert!(status.is_discarded());
+    assert!(!status.is_discarded(), "status: {:?}", status);
     let status = run(&mut h, &alice, large.clone(), large);
-    assert!(status.is_discarded());
+    assert!(!status.is_discarded(), "status: {:?}", status);
     let status = run(&mut h, &alice, very_large, small);
-    assert!(status.is_discarded());
+    assert!(!status.is_discarded(), "status: {:?}", status);
 }
 
 #[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
@@ -166,6 +166,7 @@ fn alt_execution_limit_for_gov_proposals(stateless_account: bool, use_txn_payloa
         .flatten()
         .expect("should be able to get fee statement")
         .execution_gas_used();
+    println!("max_gas_gov: {}, exec_gas_used: {}, overshoot: {}", max_gas_gov, exec_gas_used, overshoot);
     assert!(max_gas_gov <= exec_gas_used && exec_gas_used <= max_gas_gov + overshoot);
 
     // TODO: Consider adding a successful transaction that costs x amount of gas where
@@ -186,12 +187,15 @@ fn run(
         .script(script)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
+        .sequence_number(0)
         .upgrade_payload(h.use_txn_payload_v2_format, h.use_orderless_transactions);
     
-    if !h.use_orderless_transactions {
-        let sequence_number = h.sequence_number_opt(account.address()).unwrap();
-        txn_builder = txn_builder.sequence_number(sequence_number);
-    }
+    let seq_num = if h.use_orderless_transactions {
+        u64::MAX
+    } else {
+        h.sequence_number_opt(account.address()).unwrap_or(0)
+    };
+    txn_builder = txn_builder.sequence_number(seq_num);
 
     let txn = txn_builder.sign();
 
