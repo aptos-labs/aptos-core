@@ -103,6 +103,17 @@ module aptos_std::secp256k1 {
     //
 
     #[test]
+    #[expected_failure(abort_code = 65538, location = Self)]
+    /// Tests that bad recovery IDs get rejected
+    fun test_bad_ecdsa_recovery_id() {
+        let _ = ecdsa_recover(
+            b"test aptos secp256k1",
+            4,
+            &ECDSASignature { bytes: x"f7ad936da03f948c14c542020e3c5f4e02aaacd1f20427c11aa6e2fbf8776477646bba0e1a37f9e7c777c423a1d2849baafd7ff6a9930814a43c3f80d59db56f" },
+        );
+    }
+
+    #[test]
     /// Test on a valid secp256k1 ECDSA signature created using sk = x"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     fun test_ecdsa_recover() {
         use std::hash;
