@@ -26,9 +26,9 @@ use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{
-        primary_apt_store, AccountResource, CoinDeposit, CoinInfoResource, CoinRegister,
-        CoinStoreResource, CoinWithdraw, ConcurrentSupplyResource, DepositFAEvent,
-        FungibleStoreResource, WithdrawFAEvent,
+        primary_apt_store, AccountResource, CoinInfoResource, CoinRegister, CoinStoreResource,
+        ConcurrentSupplyResource, DepositEvent, DepositFAEvent, FungibleStoreResource,
+        WithdrawEvent, WithdrawFAEvent,
     },
     block_executor::{
         config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
@@ -36,7 +36,7 @@ use aptos_types::{
     },
     contract_event::ContractEvent,
     fee_statement::FeeStatement,
-    move_utils::move_event_v2::MoveEventV2Type,
+    move_utils::{move_event_v1::MoveEventV1Type, move_event_v2::MoveEventV2Type},
     on_chain_config::FeatureFlag,
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView},
     transaction::{
@@ -684,17 +684,13 @@ impl NativeVMExecutorTask {
         // first need to create events, to update the handle, and then serialize sender_coin_store
         if transfer_amount > 0 {
             events.push((
-                CoinWithdraw {
-                    coin_type: self.db_util.common.apt_coin_type_name.clone(),
-                    account: sender_address,
-                    amount: transfer_amount,
-                }
-                .create_event_v2(),
+                WithdrawEvent::new(transfer_amount)
+                    .create_event_v1(sender_coin_store.withdraw_events_mut()),
                 None,
             ));
         }
-        // coin doesn't emit WithdrawEvent for gas.
 
+        // coin doesn't emit WithdrawEvent for gas.
         resource_write_set.insert(
             sender_coin_store_key,
             AbstractResourceWriteOp::Write(WriteOp::modification(
@@ -840,12 +836,8 @@ impl NativeVMExecutorTask {
         // first need to create events, to update the handle, and then serialize sender_coin_store
         if transfer_amount > 0 {
             events.push((
-                CoinDeposit {
-                    coin_type: self.db_util.common.apt_coin_type_name.clone(),
-                    account: recipient_address,
-                    amount: transfer_amount,
-                }
-                .create_event_v2(),
+                DepositEvent::new(transfer_amount)
+                    .create_event_v1(recipient_coin_store.deposit_events_mut()),
                 None,
             ))
         }
