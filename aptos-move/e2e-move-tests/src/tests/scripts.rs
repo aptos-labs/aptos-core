@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_success, build_package, tests::common, MoveHarness};
 use aptos_language_e2e_tests::account::TransactionBuilder;
 use aptos_types::{
@@ -28,7 +29,7 @@ use rstest::rstest;
 fn test_script_with_object_parameter(alice_stateless_account: bool, bob_stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if alice_stateless_account { None } else { Some(10) });
+    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if alice_stateless_account { None } else { Some(0) });
     let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap(), if bob_stateless_account { None } else { Some(10) });
     let root = h.aptos_framework_account();
 
@@ -110,7 +111,7 @@ fn test_script_with_object_parameter(alice_stateless_account: bool, bob_stateles
 
     let txn = TransactionBuilder::new(alice.clone())
         .script(script.clone())
-        .sequence_number(13)
+        .sequence_number(3)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
         .upgrade_payload(h.use_txn_payload_v2_format, h.use_orderless_transactions)
@@ -123,7 +124,7 @@ fn test_script_with_object_parameter(alice_stateless_account: bool, bob_stateles
 
     let txn = TransactionBuilder::new(alice.clone())
         .script(script.clone())
-        .sequence_number(14)
+        .sequence_number(4)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
         .upgrade_payload(h.use_txn_payload_v2_format, h.use_orderless_transactions)
@@ -161,7 +162,7 @@ fn test_script_with_type_parameter(stateless_account: bool, use_txn_payload_v2_f
             std::iter::repeat_with(|| TypeTag::U64).take(33).collect(),
             vec![],
         ))
-        .sequence_number(10)
+        .sequence_number(0)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
         .upgrade_payload(h.use_txn_payload_v2_format, h.use_orderless_transactions)
@@ -182,7 +183,7 @@ fn test_script_with_type_parameter(stateless_account: bool, use_txn_payload_v2_f
 fn test_script_with_signer_parameter(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap(), if stateless_account { None } else { Some(10) });
+    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap(), if stateless_account { None } else { Some(0) });
 
     let package = build_package(
         common::test_dir_path("script_with_signer.data/pack"),
@@ -201,7 +202,7 @@ fn test_script_with_signer_parameter(stateless_account: bool, use_txn_payload_v2
                     .unwrap(),
             ),
         ]))
-        .sequence_number(10)
+        .sequence_number(0)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
         .upgrade_payload(h.use_txn_payload_v2_format, h.use_orderless_transactions)
@@ -277,11 +278,12 @@ fn test_two_to_two_transfer(alice_stateless_account: bool, bob_stateless_account
         .secondary_signers(vec![bob.clone()])
         .script(script)
         .max_gas_amount(1_000_000)
-        .gas_unit_price(1);
+        .gas_unit_price(1)
+        .upgrade_payload(h.use_txn_payload_v2_format, h.use_orderless_transactions);
 
     if !h.use_orderless_transactions {
         transaction_builder = transaction_builder
-            .sequence_number(h.sequence_number_opt(alice.address()).unwrap());
+            .sequence_number(h.sequence_number_opt(alice.address()).unwrap_or(0));
     }      
     let transaction = transaction_builder
         .sign_multi_agent();
