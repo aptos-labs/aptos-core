@@ -648,6 +648,7 @@ impl BufferManager {
                     e,
                     &counters::BUFFER_MANAGER_RECEIVED_EXECUTOR_ERROR_COUNT,
                     block_id,
+                    self.new_pipeline_enabled,
                 );
                 return;
             },
