@@ -1410,7 +1410,6 @@ dependencies = [
  "move-bytecode-verifier",
  "move-core-types",
  "reqwest 0.11.23",
- "rstest",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -4593,6 +4592,7 @@ dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",
  "rayon",
+ "rstest",
  "serde",
 ]
 
