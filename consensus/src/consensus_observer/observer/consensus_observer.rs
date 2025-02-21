@@ -814,9 +814,7 @@ impl ConsensusObserver {
                 .insert_ordered_block(ordered_block.clone());
 
             // If state sync is not syncing to a commit, finalize the ordered blocks
-            if !self.state_sync_manager.is_syncing_to_commit()
-                && !self.state_sync_manager.in_fallback_mode()
-            {
+            if !self.state_sync_manager.is_syncing_to_commit() {
                 self.finalize_ordered_block(ordered_block).await;
             }
         } else {
