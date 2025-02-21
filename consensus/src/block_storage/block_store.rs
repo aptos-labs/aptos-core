@@ -426,7 +426,8 @@ impl BlockStore {
             .inner
             .read()
             .get_ordered_block_window(&block, self.window_size)?;
-        for block in block_window.blocks() {
+        let blocks = block_window.blocks()?;
+        for block in blocks {
             if let Some(payload) = block.payload() {
                 self.payload_manager.prefetch_payload_data(
                     payload,
