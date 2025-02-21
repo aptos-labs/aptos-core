@@ -11,14 +11,22 @@ use aptos_types::{
 use move_core_types::{language_storage::TypeTag, value::MoveValue};
 use rstest::rstest;
 
-#[rstest(alice_stateless_account, bob_stateless_account,
-    case(true, true),
-    case(true, false),
-    case(false, true),
-    case(false, false),
+#[rstest(alice_stateless_account, bob_stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true),
 )]
-fn test_script_with_object_parameter(alice_stateless_account: bool, bob_stateless_account: bool) {
-    let mut h = MoveHarness::new();
+fn test_script_with_object_parameter(alice_stateless_account: bool, bob_stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if alice_stateless_account { None } else { Some(10) });
     let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap(), if bob_stateless_account { None } else { Some(10) });
@@ -126,12 +134,16 @@ fn test_script_with_object_parameter(alice_stateless_account: bool, bob_stateles
 }
 
 
-#[rstest(stateless_account,
-    case(true),
-    case(false),
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
 )]
-fn test_script_with_type_parameter(stateless_account: bool) {
-    let mut h = MoveHarness::new();
+fn test_script_with_type_parameter(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap(), if stateless_account { None } else { Some(0) });
 
@@ -159,12 +171,16 @@ fn test_script_with_type_parameter(stateless_account: bool) {
     assert_success!(status);
 }
 
-#[rstest(stateless_account,
-    case(true),
-    case(false),
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
 )]
-fn test_script_with_signer_parameter(stateless_account: bool) {
-    let mut h = MoveHarness::new();
+fn test_script_with_signer_parameter(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap(), if stateless_account { None } else { Some(10) });
 
@@ -202,14 +218,22 @@ fn test_script_with_signer_parameter(stateless_account: bool) {
     );
 }
 
-#[rstest(alice_stateless_account, bob_stateless_account,
-    case(true, true),
-    case(true, false),
-    case(false, true),
-    case(false, false),
+#[rstest(alice_stateless_account, bob_stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true),
 )]
-fn test_two_to_two_transfer(alice_stateless_account: bool, bob_stateless_account: bool) {
-    let mut h = MoveHarness::new();
+fn test_two_to_two_transfer(alice_stateless_account: bool, bob_stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap(), if alice_stateless_account { None } else { Some(0)});
     let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap(), if bob_stateless_account { None } else { Some(0)});

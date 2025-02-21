@@ -113,19 +113,42 @@ fn test_staking_end_to_end(owner_stateless_account: bool, operator_stateless_acc
 }
 
 // TODO[Orderless]: Revisit this test and remove unneccessary cases
-#[rstest(stateless_account1, stateless_account2, stateless_account3,
-    case(true, true, false),
-    case(true, false, false),
-    case(false, true, false),
-    case(false, false, false),
-    case(true, true, true),
-    case(true, false, true),
-    case(false, true, true),
-    case(false, false, true),
+#[rstest(stateless_account1, stateless_account2, stateless_account3, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, true, false, false),
+    case(true, true, true, true, false),
+    case(true, true, true, true, true),
+
+    case(true, false, true, false, false),
+    case(true, false, true, true, false),
+    case(true, false, true, true, true),
+
+    case(false, true, true, false, false),
+    case(false, true, true, true, false),
+    case(false, true, true, true, true),
+
+    case(false, false, true, false, false),
+    case(false, false, true, true, false),
+    case(false, false, true, true, true),
+
+    case(true, true, false, false, false),
+    case(true, true, false, true, false),
+    case(true, true, false, true, true),
+
+    case(true, false, false, false, false),
+    case(true, false, false, true, false),
+    case(true, false, false, true, true),
+
+    case(false, true, false, false, false),
+    case(false, true, false, true, false),
+    case(false, true, false, true, true),
+
+    case(false, false, false, false, false),
+    case(false, false, false, true, false),
+    case(false, false, false, true, true),
 )]
-fn test_staking_rewards(stateless_account1: bool, stateless_account2: bool, stateless_account3: bool) {
+fn test_staking_rewards(stateless_account1: bool, stateless_account2: bool, stateless_account3: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     // Genesis starts with one validator with index 0
-    let mut harness = MoveHarness::new();
+    let mut harness = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
     let validator_1 = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap(), if stateless_account1 { None } else { Some(0) });
     let validator_2 = harness.new_account_at(AccountAddress::from_hex_literal("0x234").unwrap(), if stateless_account2 { None } else { Some(0) });
     let validator_1_address = *validator_1.address();
@@ -323,12 +346,16 @@ fn test_staking_rewards(stateless_account1: bool, stateless_account2: bool, stat
     );
 }
 
-#[rstest(stateless_account,
-    case(true),
-    case(false),
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
 )]
-fn test_staking_rewards_pending_inactive(stateless_account: bool) {
-    let mut harness = MoveHarness::new();
+fn test_staking_rewards_pending_inactive(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut harness = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
     let validator = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap(), if stateless_account { None } else { Some(0) });
     let validator_address = *validator.address();
 
@@ -356,18 +383,41 @@ fn test_staking_rewards_pending_inactive(stateless_account: bool) {
 }
 
 // TODO[Orderless]: Revisit this test and remove unneccessary cases
-#[rstest(staker_stateless_account, stateless_account1, stateless_account2,
-    case(true, true, false),
-    case(true, false, false),
-    case(false, true, false),
-    case(false, false, false),
-    case(true, true, true),
-    case(true, false, true),
-    case(false, true, true),
-    case(false, false, true),
+#[rstest(staker_stateless_account, stateless_account1, stateless_account2, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, true, false, false),
+    case(true, true, true, true, false),
+    case(true, true, true, true, true),
+
+    case(true, false, true, false, false),
+    case(true, false, true, true, false),
+    case(true, false, true, true, true),
+
+    case(false, true, true, false, false),
+    case(false, true, true, true, false),
+    case(false, true, true, true, true),
+
+    case(false, false, true, false, false),
+    case(false, false, true, true, false),
+    case(false, false, true, true, true),
+
+    case(true, true, false, false, false),
+    case(true, true, false, true, false),
+    case(true, true, false, true, true),
+
+    case(true, false, false, false, false),
+    case(true, false, false, true, false),
+    case(true, false, false, true, true),
+
+    case(false, true, false, false, false),
+    case(false, true, false, true, false),
+    case(false, true, false, true, true),
+
+    case(false, false, false, false, false),
+    case(false, false, false, true, false),
+    case(false, false, false, true, true),
 )]
-fn test_staking_contract(staker_stateless_account: bool, stateless_account1: bool, stateless_account2: bool) {
-    let mut harness = MoveHarness::new();
+fn test_staking_contract(staker_stateless_account: bool, stateless_account1: bool, stateless_account2: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut harness = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
     let staker = harness.new_account_at(AccountAddress::from_hex_literal("0x11").unwrap(), if staker_stateless_account { None } else { Some(0) });
     let operator_1 = harness.new_account_at(AccountAddress::from_hex_literal("0x21").unwrap(), if stateless_account1 { None } else { Some(0) });
     let operator_2 = harness.new_account_at(AccountAddress::from_hex_literal("0x22").unwrap(), if stateless_account2 { None } else { Some(0) });

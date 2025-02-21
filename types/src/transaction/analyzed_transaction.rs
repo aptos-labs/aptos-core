@@ -8,7 +8,8 @@ use crate::{
     state_store::{state_key::StateKey, table::TableHandle},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
-        TransactionPayloadWrapper, EntryFunction, TransactionExecutable, TransactionPayloadInner
+        TransactionPayloadWrapper, EntryFunction, TransactionExecutable, TransactionPayloadInner,
+        TransactionExtraConfig,
     },
     AptosCoinType, CoinType,
 };
