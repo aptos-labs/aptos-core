@@ -1418,6 +1418,11 @@ impl Type {
         struct_resolver: &impl Fn(ModuleName, Symbol) -> QualifiedId<StructId>,
         sig: &SignatureToken,
     ) -> Self {
+        let from_slice = |ts: &[SignatureToken]| {
+            ts.iter()
+                .map(|t| Self::from_signature_token(env, module, struct_resolver, t))
+                .collect::<Vec<_>>()
+        };
         match sig {
             SignatureToken::Bool => Type::Primitive(PrimitiveType::Bool),
             SignatureToken::U8 => Type::Primitive(PrimitiveType::U8),
@@ -1459,18 +1464,13 @@ impl Type {
                     env.to_module_name(&struct_view.module_id()),
                     env.symbol_pool.make(struct_view.name().as_str()),
                 );
-                Type::Struct(
-                    struct_id.module_id,
-                    struct_id.id,
-                    args.iter()
-                        .map(|t| Self::from_signature_token(env, module, struct_resolver, t))
-                        .collect(),
-                )
+                Type::Struct(struct_id.module_id, struct_id.id, from_slice(args))
             },
-            SignatureToken::Function(..) => {
-                // TODO(#15664): implement function conversion
-                unimplemented!("signature token to model type")
-            },
+            SignatureToken::Function(args, result, abilities) => Type::Fun(
+                Box::new(Type::tuple(from_slice(args))),
+                Box::new(Type::Tuple(from_slice(result))),
+                *abilities,
+            ),
         }
     }
 

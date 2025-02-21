@@ -13,7 +13,7 @@ use move_core_types::{
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumString, FromRepr};
 
-/// The feature flags define in the Move source. This must stay aligned with the constants there.
+/// The feature flags defined in the Move source. This must stay aligned with the constants there.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr, EnumString)]
 #[allow(non_camel_case_types)]
 pub enum FeatureFlag {
@@ -121,6 +121,8 @@ pub enum FeatureFlag {
     /// Enables bytecode version v8
     VM_BINARY_FORMAT_V8 = 86,
     BULLETPROOFS_BATCH_NATIVES = 87,
+    /// Whether function values are enabled.
+    ENABLE_FUNCTION_VALUES = 88,
 }
 
 impl FeatureFlag {
@@ -207,6 +209,8 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
             FeatureFlag::ACCOUNT_ABSTRACTION,
             FeatureFlag::BULLETPROOFS_BATCH_NATIVES,
+            FeatureFlag::VM_BINARY_FORMAT_V8,
+            FeatureFlag::ENABLE_FUNCTION_VALUES,
         ]
     }
 }
