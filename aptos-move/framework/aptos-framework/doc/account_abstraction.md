@@ -9,9 +9,9 @@
 -  [Struct `RemoveDispatchableAuthenticator`](#0x1_account_abstraction_RemoveDispatchableAuthenticator)
 -  [Enum Resource `DispatchableAuthenticator`](#0x1_account_abstraction_DispatchableAuthenticator)
 -  [Constants](#@Constants_0)
--  [Function `add_dispatchable_authentication_function`](#0x1_account_abstraction_add_dispatchable_authentication_function)
--  [Function `remove_dispatchable_authentication_function`](#0x1_account_abstraction_remove_dispatchable_authentication_function)
--  [Function `remove_dispatchable_authenticator`](#0x1_account_abstraction_remove_dispatchable_authenticator)
+-  [Function `add_authentication_function`](#0x1_account_abstraction_add_authentication_function)
+-  [Function `remove_authentication_function`](#0x1_account_abstraction_remove_authentication_function)
+-  [Function `remove_authenticator`](#0x1_account_abstraction_remove_authenticator)
 -  [Function `resource_addr`](#0x1_account_abstraction_resource_addr)
 -  [Function `update_dispatchable_authenticator_impl`](#0x1_account_abstraction_update_dispatchable_authenticator_impl)
 -  [Function `using_dispatchable_authenticator`](#0x1_account_abstraction_using_dispatchable_authenticator)
@@ -19,6 +19,9 @@
 -  [Function `dispatchable_authenticator_internal`](#0x1_account_abstraction_dispatchable_authenticator_internal)
 -  [Function `authenticate`](#0x1_account_abstraction_authenticate)
 -  [Function `dispatchable_authenticate`](#0x1_account_abstraction_dispatchable_authenticate)
+-  [Function `add_dispatchable_authentication_function`](#0x1_account_abstraction_add_dispatchable_authentication_function)
+-  [Function `remove_dispatchable_authentication_function`](#0x1_account_abstraction_remove_dispatchable_authentication_function)
+-  [Function `remove_dispatchable_authenticator`](#0x1_account_abstraction_remove_dispatchable_authenticator)
 -  [Specification](#@Specification_1)
     -  [Function `dispatchable_authenticate`](#@Specification_1_dispatchable_authenticate)
 
@@ -180,6 +183,15 @@ enum <a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthent
 
 
 
+<a id="0x1_account_abstraction_EDEPRECATED_FUNCTION"></a>
+
+
+
+<pre><code><b>const</b> <a href="account_abstraction.md#0x1_account_abstraction_EDEPRECATED_FUNCTION">EDEPRECATED_FUNCTION</a>: u64 = 6;
+</code></pre>
+
+
+
 <a id="0x1_account_abstraction_EDISPATCHABLE_AUTHENTICATOR_IS_NOT_USED"></a>
 
 
@@ -198,15 +210,24 @@ enum <a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthent
 
 
 
-<a id="0x1_account_abstraction_add_dispatchable_authentication_function"></a>
+<a id="0x1_account_abstraction_EINCONSISTENT_SIGNER_ADDRESS"></a>
 
-## Function `add_dispatchable_authentication_function`
 
-Update dispatchable authenticator that enables account abstraction.
+
+<pre><code><b>const</b> <a href="account_abstraction.md#0x1_account_abstraction_EINCONSISTENT_SIGNER_ADDRESS">EINCONSISTENT_SIGNER_ADDRESS</a>: u64 = 5;
+</code></pre>
+
+
+
+<a id="0x1_account_abstraction_add_authentication_function"></a>
+
+## Function `add_authentication_function`
+
+Add dispatchable authentication function that enables account abstraction via this function.
 Note: it is a private entry function that can only be called directly from transaction.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_add_dispatchable_authentication_function">add_dispatchable_authentication_function</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, module_address: <b>address</b>, module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
+<pre><code>entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_add_authentication_function">add_authentication_function</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, module_address: <b>address</b>, module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
 </code></pre>
 
 
@@ -215,7 +236,7 @@ Note: it is a private entry function that can only be called directly from trans
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_add_dispatchable_authentication_function">add_dispatchable_authentication_function</a>(
+<pre><code>entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_add_authentication_function">add_authentication_function</a>(
     <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     module_address: <b>address</b>,
     module_name: String,
@@ -234,13 +255,15 @@ Note: it is a private entry function that can only be called directly from trans
 
 </details>
 
-<a id="0x1_account_abstraction_remove_dispatchable_authentication_function"></a>
+<a id="0x1_account_abstraction_remove_authentication_function"></a>
 
-## Function `remove_dispatchable_authentication_function`
+## Function `remove_authentication_function`
+
+Remove dispatchable authentication function that enables account abstraction via this function.
+Note: it is a private entry function that can only be called directly from transaction.
 
 
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_remove_dispatchable_authentication_function">remove_dispatchable_authentication_function</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, module_address: <b>address</b>, module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
+<pre><code>entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_remove_authentication_function">remove_authentication_function</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, module_address: <b>address</b>, module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
 </code></pre>
 
 
@@ -249,7 +272,7 @@ Note: it is a private entry function that can only be called directly from trans
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_remove_dispatchable_authentication_function">remove_dispatchable_authentication_function</a>(
+<pre><code>entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_remove_authentication_function">remove_authentication_function</a>(
     <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     module_address: <b>address</b>,
     module_name: String,
@@ -268,15 +291,16 @@ Note: it is a private entry function that can only be called directly from trans
 
 </details>
 
-<a id="0x1_account_abstraction_remove_dispatchable_authenticator"></a>
+<a id="0x1_account_abstraction_remove_authenticator"></a>
 
-## Function `remove_dispatchable_authenticator`
+## Function `remove_authenticator`
 
-Update dispatchable authenticator that disables account abstraction.
+Remove dispatchable authenticator so that all dispatchable authentication functions will be removed as well.
+After calling this function, the account is not abstracted at all.
 Note: it is a private entry function that can only be called directly from transaction.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_remove_dispatchable_authenticator">remove_dispatchable_authenticator</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code>entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_remove_authenticator">remove_authenticator</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -285,7 +309,7 @@ Note: it is a private entry function that can only be called directly from trans
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_remove_dispatchable_authenticator">remove_dispatchable_authenticator</a>(
+<pre><code>entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_remove_authenticator">remove_authenticator</a>(
     <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
 ) <b>acquires</b> <a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a> {
     <b>assert</b>!(!is_permissioned_signer(<a href="account.md#0x1_account">account</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="account_abstraction.md#0x1_account_abstraction_ENOT_MASTER_SIGNER">ENOT_MASTER_SIGNER</a>));
@@ -365,32 +389,31 @@ Note: it is a private entry function that can only be called directly from trans
             DispatchableAuthenticator::V1 { auth_functions: <a href="ordered_map.md#0x1_ordered_map_new">ordered_map::new</a>() }
         );
     };
-    <b>if</b> (<b>exists</b>&lt;<a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr)) {
-        <b>let</b> current_map = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr).auth_functions;
-        <b>if</b> (is_add) {
-            <b>assert</b>!(
-                !<a href="ordered_map.md#0x1_ordered_map_contains">ordered_map::contains</a>(current_map, &auth_function),
-                <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="account_abstraction.md#0x1_account_abstraction_EFUNCTION_INFO_EXISTENCE">EFUNCTION_INFO_EXISTENCE</a>)
-            );
-            <a href="ordered_map.md#0x1_ordered_map_add">ordered_map::add</a>(current_map, auth_function, <b>true</b>);
-        } <b>else</b> {
-            <b>assert</b>!(
-                <a href="ordered_map.md#0x1_ordered_map_contains">ordered_map::contains</a>(current_map, &auth_function),
-                <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account_abstraction.md#0x1_account_abstraction_EFUNCTION_INFO_EXISTENCE">EFUNCTION_INFO_EXISTENCE</a>)
-            );
-            <a href="ordered_map.md#0x1_ordered_map_remove">ordered_map::remove</a>(current_map, &auth_function);
-        };
-        <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="account_abstraction.md#0x1_account_abstraction_UpdateDispatchableAuthenticator">UpdateDispatchableAuthenticator</a> {
-                <a href="account.md#0x1_account">account</a>: addr,
-                <b>update</b>: <b>if</b> (is_add) { b"add" } <b>else</b> { b"remove" },
-                auth_function,
-            }
+    <b>assert</b>!(<b>exists</b>&lt;<a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account_abstraction.md#0x1_account_abstraction_EFUNCTION_INFO_EXISTENCE">EFUNCTION_INFO_EXISTENCE</a>));
+    <b>let</b> current_map = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr).auth_functions;
+    <b>if</b> (is_add) {
+        <b>assert</b>!(
+            !<a href="ordered_map.md#0x1_ordered_map_contains">ordered_map::contains</a>(current_map, &auth_function),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="account_abstraction.md#0x1_account_abstraction_EFUNCTION_INFO_EXISTENCE">EFUNCTION_INFO_EXISTENCE</a>)
         );
-        <b>if</b> (<a href="ordered_map.md#0x1_ordered_map_length">ordered_map::length</a>(current_map) == 0) {
-            <a href="account_abstraction.md#0x1_account_abstraction_remove_dispatchable_authenticator">remove_dispatchable_authenticator</a>(<a href="account.md#0x1_account">account</a>);
-        }
+        <a href="ordered_map.md#0x1_ordered_map_add">ordered_map::add</a>(current_map, auth_function, <b>true</b>);
+    } <b>else</b> {
+        <b>assert</b>!(
+            <a href="ordered_map.md#0x1_ordered_map_contains">ordered_map::contains</a>(current_map, &auth_function),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account_abstraction.md#0x1_account_abstraction_EFUNCTION_INFO_EXISTENCE">EFUNCTION_INFO_EXISTENCE</a>)
+        );
+        <a href="ordered_map.md#0x1_ordered_map_remove">ordered_map::remove</a>(current_map, &auth_function);
     };
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="account_abstraction.md#0x1_account_abstraction_UpdateDispatchableAuthenticator">UpdateDispatchableAuthenticator</a> {
+            <a href="account.md#0x1_account">account</a>: addr,
+            <b>update</b>: <b>if</b> (is_add) { b"add" } <b>else</b> { b"remove" },
+            auth_function,
+        }
+    );
+    <b>if</b> (<a href="ordered_map.md#0x1_ordered_map_length">ordered_map::length</a>(current_map) == 0) {
+            <a href="account_abstraction.md#0x1_account_abstraction_remove_authenticator">remove_authenticator</a>(<a href="account.md#0x1_account">account</a>);
+    }
 }
 </code></pre>
 
@@ -500,10 +523,17 @@ Return the current dispatchable authenticator move function info. <code>None</co
     func_info: FunctionInfo,
     signing_data: AbstractionAuthData,
 ): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a> {
-    <b>let</b> func_infos = <a href="account_abstraction.md#0x1_account_abstraction_dispatchable_authenticator_internal">dispatchable_authenticator_internal</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>));
+    <b>let</b> master_signer_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
+    <b>let</b> func_infos = <a href="account_abstraction.md#0x1_account_abstraction_dispatchable_authenticator_internal">dispatchable_authenticator_internal</a>(master_signer_addr);
     <b>assert</b>!(<a href="ordered_map.md#0x1_ordered_map_contains">ordered_map::contains</a>(func_infos, &func_info), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account_abstraction.md#0x1_account_abstraction_EFUNCTION_INFO_EXISTENCE">EFUNCTION_INFO_EXISTENCE</a>));
     <a href="function_info.md#0x1_function_info_load_module_from_function">function_info::load_module_from_function</a>(&func_info);
-    <a href="account_abstraction.md#0x1_account_abstraction_dispatchable_authenticate">dispatchable_authenticate</a>(<a href="account.md#0x1_account">account</a>, signing_data, &func_info)
+    <b>let</b> returned_signer = <a href="account_abstraction.md#0x1_account_abstraction_dispatchable_authenticate">dispatchable_authenticate</a>(<a href="account.md#0x1_account">account</a>, signing_data, &func_info);
+    // Returned <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> MUST represent the same <a href="account.md#0x1_account">account</a> <b>address</b>. Otherwise, it may <b>break</b> the <b>invariant</b> of Aptos blockchain!
+    <b>assert</b>!(
+        master_signer_addr == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&returned_signer),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account_abstraction.md#0x1_account_abstraction_EINCONSISTENT_SIGNER_ADDRESS">EINCONSISTENT_SIGNER_ADDRESS</a>)
+    );
+    returned_signer
 }
 </code></pre>
 
@@ -532,6 +562,93 @@ The native function to dispatch customized move authentication function.
     signing_data: AbstractionAuthData,
     function: &FunctionInfo
 ): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_account_abstraction_add_dispatchable_authentication_function"></a>
+
+## Function `add_dispatchable_authentication_function`
+
+
+
+<pre><code>#[deprecated]
+<b>public</b> entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_add_dispatchable_authentication_function">add_dispatchable_authentication_function</a>(_account: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _module_address: <b>address</b>, _module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, _function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_add_dispatchable_authentication_function">add_dispatchable_authentication_function</a>(
+    _account: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    _module_address: <b>address</b>,
+    _module_name: String,
+    _function_name: String,
+) {
+    <b>abort</b> std::error::unavailable(<a href="account_abstraction.md#0x1_account_abstraction_EDEPRECATED_FUNCTION">EDEPRECATED_FUNCTION</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_account_abstraction_remove_dispatchable_authentication_function"></a>
+
+## Function `remove_dispatchable_authentication_function`
+
+
+
+<pre><code>#[deprecated]
+<b>public</b> entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_remove_dispatchable_authentication_function">remove_dispatchable_authentication_function</a>(_account: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _module_address: <b>address</b>, _module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, _function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_remove_dispatchable_authentication_function">remove_dispatchable_authentication_function</a>(
+    _account: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    _module_address: <b>address</b>,
+    _module_name: String,
+    _function_name: String,
+) {
+    <b>abort</b> std::error::unavailable(<a href="account_abstraction.md#0x1_account_abstraction_EDEPRECATED_FUNCTION">EDEPRECATED_FUNCTION</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_account_abstraction_remove_dispatchable_authenticator"></a>
+
+## Function `remove_dispatchable_authenticator`
+
+
+
+<pre><code>#[deprecated]
+<b>public</b> entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_remove_dispatchable_authenticator">remove_dispatchable_authenticator</a>(_account: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_remove_dispatchable_authenticator">remove_dispatchable_authenticator</a>(
+    _account: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+) {
+    <b>abort</b> std::error::unavailable(<a href="account_abstraction.md#0x1_account_abstraction_EDEPRECATED_FUNCTION">EDEPRECATED_FUNCTION</a>)
+}
 </code></pre>
 
 

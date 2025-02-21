@@ -25,18 +25,11 @@ const RELEVANT_FILE_PATHS_FOR_COMPILER_V2: [&str; 5] = [
     "aptos-move/move-examples",
     "third_party/move",
 ];
-const NO_MVC_BLOCK_V1_PACKAGES: [&str; 11] = [
+const NO_MVC_BLOCK_V1_PACKAGES: [&str; 4] = [
     "e2e-move-tests", // no block v1 because the meta data test requires using v1
-    "move-prover",
-    "move-prover-bytecode-pipeline",
     "move-compiler",
     "move-compiler-transactional-tests",
     "move-compiler-v2-transactional-tests",
-    "move-to-yul",
-    "move-vm-integration-tests",
-    "move-model",
-    "move-stackless-bytecode-test-utils",
-    "move-stackless-bytecode",
 ];
 const RELEVANT_FILE_PATHS_FOR_EXECUTION_PERFORMANCE_TESTS: [&str; 5] = [
     ".github/workflows/execution-performance.yaml",
@@ -272,16 +265,12 @@ impl AptosCargoCommand {
 
                 // Determine if any relevant files or packages were changed
                 #[allow(unused_assignments)]
-                let mut relevant_changes_detected = detect_relevant_changes(
+                let relevant_changes_detected = detect_relevant_changes(
                     RELEVANT_FILE_PATHS_FOR_FRAMEWORK_UPGRADE_TESTS.to_vec(),
                     RELEVANT_PACKAGES_FOR_FRAMEWORK_UPGRADE_TESTS.to_vec(),
                     changed_files,
                     affected_package_paths,
                 );
-
-                // TODO: remove this! This is a temporary fix to disable
-                // the framework upgrade test while we debug the failures.
-                relevant_changes_detected = false;
 
                 // Output if relevant changes were detected that require the framework upgrade
                 // test. This will be consumed by Github Actions and used to run the test.

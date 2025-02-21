@@ -36,14 +36,10 @@ fn test_runner(path: &Path, options: ModelBuilderOptions) -> datatest_stable::Re
 }
 
 fn runner(path: &Path) -> datatest_stable::Result<()> {
-    if path.display().to_string().contains("/compile_via_model/") {
-        test_runner(path, ModelBuilderOptions {
-            compile_via_model: true,
-            ..Default::default()
-        })
-    } else {
-        test_runner(path, ModelBuilderOptions::default())
-    }
+    test_runner(path, ModelBuilderOptions {
+        compile_via_model: true,
+        ..Default::default()
+    })
 }
 
 datatest_stable::harness!(runner, "tests/sources", r".*\.move$");

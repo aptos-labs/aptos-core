@@ -163,20 +163,18 @@ fun m::consume_($t0: 0xc0ffee::m::W) {
 [variant baseline]
 public fun m::test1($t0: u64) {
      var $t1: u64 [unused]
-  0: $t0 := move($t0)
+  0: m::consume($t0)
   1: m::consume($t0)
-  2: m::consume($t0)
-  3: return ()
+  2: return ()
 }
 
 
 [variant baseline]
 public fun m::test2($t0: 0xc0ffee::m::W) {
      var $t1: 0xc0ffee::m::W [unused]
-  0: $t0 := move($t0)
+  0: m::consume_($t0)
   1: m::consume_($t0)
-  2: m::consume_($t0)
-  3: return ()
+  2: return ()
 }
 
 
@@ -187,27 +185,27 @@ struct W has copy, drop {
 	x: u64
 }
 
-consume(Arg0: u64) /* def_idx: 0 */ {
+consume(_x: u64) /* def_idx: 0 */ {
 B0:
 	0: Ret
 }
-consume_(Arg0: W) /* def_idx: 1 */ {
+consume_(_x: W) /* def_idx: 1 */ {
 B0:
 	0: Ret
 }
-public test1(Arg0: u64) /* def_idx: 2 */ {
+public test1(x: u64) /* def_idx: 2 */ {
 B0:
-	0: CopyLoc[0](Arg0: u64)
+	0: CopyLoc[0](x: u64)
 	1: Call consume(u64)
-	2: MoveLoc[0](Arg0: u64)
+	2: MoveLoc[0](x: u64)
 	3: Call consume(u64)
 	4: Ret
 }
-public test2(Arg0: W) /* def_idx: 3 */ {
+public test2(x: W) /* def_idx: 3 */ {
 B0:
-	0: CopyLoc[0](Arg0: W)
+	0: CopyLoc[0](x: W)
 	1: Call consume_(W)
-	2: MoveLoc[0](Arg0: W)
+	2: MoveLoc[0](x: W)
 	3: Call consume_(W)
 	4: Ret
 }

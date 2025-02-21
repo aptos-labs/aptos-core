@@ -87,12 +87,6 @@ pub struct Test {
     /// Collect coverage information for later use with the various `move coverage` subcommands
     #[clap(long = "coverage")]
     pub compute_coverage: bool,
-
-    /// Use the EVM-based execution backend.
-    /// Does not work with --stackless.
-    #[cfg(feature = "evm-backend")]
-    #[clap(long = "evm")]
-    pub evm: bool,
 }
 
 impl Test {
@@ -116,8 +110,6 @@ impl Test {
             check_stackless_vm,
             verbose_mode,
             compute_coverage,
-            #[cfg(feature = "evm-backend")]
-            evm,
         } = self;
         let unit_test_config = UnitTestingConfig {
             filter,
@@ -128,9 +120,6 @@ impl Test {
             check_stackless_vm,
             verbose: verbose_mode,
             ignore_compile_warnings,
-            #[cfg(feature = "evm-backend")]
-            evm,
-
             ..UnitTestingConfig::default()
         };
         let result = run_move_unit_tests(
@@ -348,8 +337,8 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
             let buf_writer = &mut *LOGGING_FILE_WRITER.lock().unwrap();
             buf_writer.flush().unwrap();
         }
-        let coverage_map = CoverageMap::from_trace_file(trace_path.clone());
-        output_map_to_file(coverage_map_path, &coverage_map).unwrap();
+        let coverage_map = CoverageMap::from_trace_file(&trace_path)?;
+        output_map_to_file(&coverage_map_path, &coverage_map)?;
     }
     cleanup_trace();
     Ok(UnitTestResult::Success)

@@ -1181,6 +1181,7 @@ pub struct MovePackageDir {
     /// ...or --compiler COMPILER_VERSION
     /// Specify the version of the compiler.
     /// Defaults to the latest stable compiler version (at least 2)
+    /// Note: `aptos move prove` does not support v1
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
            alias = "compiler",
            default_value = LATEST_STABLE_COMPILER_VERSION,
@@ -1205,6 +1206,7 @@ pub struct MovePackageDir {
     pub move_2: bool,
 
     /// Select bytecode, language, and compiler versions for Move 1.
+    /// Note: `aptos move prove` does not support v1
     #[clap(long, verbatim_doc_comment)]
     pub move_1: bool,
 }

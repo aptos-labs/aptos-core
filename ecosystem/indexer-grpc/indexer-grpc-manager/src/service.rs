@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{data_manager::DataManager, metadata_manager::MetadataManager};
+use crate::{data_manager::DataManager, metadata_manager::MetadataManager, metrics::COUNTER};
 use aptos_protos::indexer::v1::{
     grpc_manager_server::GrpcManager, service_info::Info, GetDataServiceForRequestRequest,
     GetDataServiceForRequestResponse, GetTransactionsRequest, HeartbeatRequest, HeartbeatResponse,
@@ -168,10 +168,13 @@ impl GrpcManager for GrpcManagerService {
             // TODO(grao): Use a simple strategy for now. Consider to make it smarter in the
             // future.
             if let Some(address) = self.pick_live_data_service(starting_version) {
+                COUNTER.with_label_values(&["live_data_service_picked"]).inc();
                 address
             } else if let Some(address) = self.pick_historical_data_service(starting_version).await {
+                COUNTER.with_label_values(&["historical_data_service_picked"]).inc();
                 address
             } else {
+                COUNTER.with_label_values(&["failed_to_pick_data_service"]).inc();
                 return Err(Status::internal(
                     "Cannot find a data service instance to serve the provided request.",
                 ));

@@ -120,6 +120,7 @@ pub enum FeatureFlag {
     ACCOUNT_ABSTRACTION = 85,
     /// Enables bytecode version v8
     VM_BINARY_FORMAT_V8 = 86,
+    BULLETPROOFS_BATCH_NATIVES = 87,
 }
 
 impl FeatureFlag {
@@ -203,8 +204,9 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_LOADER_V2,
             FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES,
             FeatureFlag::PERMISSIONED_SIGNER,
-            // FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
+            FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
             FeatureFlag::ACCOUNT_ABSTRACTION,
+            FeatureFlag::BULLETPROOFS_BATCH_NATIVES,
         ]
     }
 }

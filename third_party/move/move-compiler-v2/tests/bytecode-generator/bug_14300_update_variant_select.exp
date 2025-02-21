@@ -198,103 +198,103 @@ enum CommonFields has drop {
 }
 
 update_common_field(): u64 /* def_idx: 0 */ {
-L0:	loc0: CommonFields
+L0:	common: CommonFields
 B0:
 	0: LdU64(30)
 	1: LdU8(40)
 	2: LdU32(50)
 	3: PackVariant[0](CommonFields/Bar)
-	4: StLoc[0](loc0: CommonFields)
+	4: StLoc[0](common: CommonFields)
 	5: LdU64(15)
-	6: MutBorrowLoc[0](loc0: CommonFields)
+	6: MutBorrowLoc[0](common: CommonFields)
 	7: MutBorrowVariantField[0](Foo.x|Bar.x: u64)
 	8: WriteRef
-	9: ImmBorrowLoc[0](loc0: CommonFields)
+	9: ImmBorrowLoc[0](common: CommonFields)
 	10: ImmBorrowVariantField[0](Foo.x|Bar.x: u64)
 	11: ReadRef
 	12: Ret
 }
 update_common_field_different_offset(): u8 /* def_idx: 1 */ {
-L0:	loc0: CommonFields
-L1:	loc1: u8
-L2:	loc2: &mut CommonFields
-L3:	loc3: &mut u8
-L4:	loc4: &CommonFields
-L5:	loc5: &u8
+L0:	common: CommonFields
+L1:	$t3: u8
+L2:	$t7: &mut CommonFields
+L3:	$t6: &mut u8
+L4:	$t9: &CommonFields
+L5:	$t10: &u8
 B0:
 	0: LdU64(30)
 	1: LdU8(40)
 	2: LdU32(50)
 	3: PackVariant[0](CommonFields/Bar)
-	4: StLoc[0](loc0: CommonFields)
+	4: StLoc[0](common: CommonFields)
 	5: LdU8(15)
-	6: StLoc[1](loc1: u8)
-	7: MutBorrowLoc[0](loc0: CommonFields)
-	8: StLoc[2](loc2: &mut CommonFields)
-	9: CopyLoc[2](loc2: &mut CommonFields)
+	6: StLoc[1]($t3: u8)
+	7: MutBorrowLoc[0](common: CommonFields)
+	8: StLoc[2]($t7: &mut CommonFields)
+	9: CopyLoc[2]($t7: &mut CommonFields)
 	10: TestVariant[1](CommonFields/Foo)
 	11: BrFalse(39)
 B1:
 	12: Branch(13)
 B2:
-	13: MoveLoc[2](loc2: &mut CommonFields)
+	13: MoveLoc[2]($t7: &mut CommonFields)
 	14: MutBorrowVariantField[1](Foo.y|Bar.y: u8)
-	15: StLoc[3](loc3: &mut u8)
+	15: StLoc[3]($t6: &mut u8)
 B3:
-	16: MoveLoc[1](loc1: u8)
-	17: MoveLoc[3](loc3: &mut u8)
+	16: MoveLoc[1]($t3: u8)
+	17: MoveLoc[3]($t6: &mut u8)
 	18: WriteRef
-	19: ImmBorrowLoc[0](loc0: CommonFields)
-	20: StLoc[4](loc4: &CommonFields)
-	21: CopyLoc[4](loc4: &CommonFields)
+	19: ImmBorrowLoc[0](common: CommonFields)
+	20: StLoc[4]($t9: &CommonFields)
+	21: CopyLoc[4]($t9: &CommonFields)
 	22: TestVariant[1](CommonFields/Foo)
 	23: BrFalse(31)
 B4:
 	24: Branch(25)
 B5:
-	25: MoveLoc[4](loc4: &CommonFields)
+	25: MoveLoc[4]($t9: &CommonFields)
 	26: ImmBorrowVariantField[1](Foo.y|Bar.y: u8)
-	27: StLoc[5](loc5: &u8)
+	27: StLoc[5]($t10: &u8)
 B6:
-	28: MoveLoc[5](loc5: &u8)
+	28: MoveLoc[5]($t10: &u8)
 	29: ReadRef
 	30: Ret
 B7:
-	31: CopyLoc[4](loc4: &CommonFields)
+	31: CopyLoc[4]($t9: &CommonFields)
 	32: TestVariant[0](CommonFields/Bar)
 	33: BrFalse(35)
 B8:
 	34: Branch(25)
 B9:
-	35: MoveLoc[4](loc4: &CommonFields)
+	35: MoveLoc[4]($t9: &CommonFields)
 	36: ImmBorrowVariantField[2](Baz.y: u8)
-	37: StLoc[5](loc5: &u8)
+	37: StLoc[5]($t10: &u8)
 	38: Branch(28)
 B10:
-	39: CopyLoc[2](loc2: &mut CommonFields)
+	39: CopyLoc[2]($t7: &mut CommonFields)
 	40: TestVariant[0](CommonFields/Bar)
 	41: BrFalse(43)
 B11:
 	42: Branch(13)
 B12:
-	43: MoveLoc[2](loc2: &mut CommonFields)
+	43: MoveLoc[2]($t7: &mut CommonFields)
 	44: MutBorrowVariantField[2](Baz.y: u8)
-	45: StLoc[3](loc3: &mut u8)
+	45: StLoc[3]($t6: &mut u8)
 	46: Branch(16)
 }
 update_non_common_field(): u32 /* def_idx: 2 */ {
-L0:	loc0: CommonFields
+L0:	common: CommonFields
 B0:
 	0: LdU64(30)
 	1: LdU8(40)
 	2: LdU32(50)
 	3: PackVariant[0](CommonFields/Bar)
-	4: StLoc[0](loc0: CommonFields)
+	4: StLoc[0](common: CommonFields)
 	5: LdU32(15)
-	6: MutBorrowLoc[0](loc0: CommonFields)
+	6: MutBorrowLoc[0](common: CommonFields)
 	7: MutBorrowVariantField[3](Bar.z: u32)
 	8: WriteRef
-	9: ImmBorrowLoc[0](loc0: CommonFields)
+	9: ImmBorrowLoc[0](common: CommonFields)
 	10: ImmBorrowVariantField[3](Bar.z: u32)
 	11: ReadRef
 	12: Ret

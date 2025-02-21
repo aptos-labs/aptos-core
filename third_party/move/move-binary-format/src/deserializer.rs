@@ -1951,6 +1951,7 @@ impl SerializedType {
             0xD => Ok(SerializedType::U16),
             0xE => Ok(SerializedType::U32),
             0xF => Ok(SerializedType::U256),
+            0x10 => Ok(SerializedType::FUNCTION),
             _ => Err(PartialVMError::new(StatusCode::UNKNOWN_SERIALIZED_TYPE)),
         }
     }

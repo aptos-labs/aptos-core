@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::bail;
-use move_binary_format::file_format_common::{VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2};
+use move_binary_format::file_format_common::{
+    VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2, VERSION_MAX,
+};
 use move_command_line_common::{env, env::get_move_compiler_v1_from_env};
 use move_compiler::shared::LanguageVersion as CompilerLanguageVersion;
 use once_cell::sync::Lazy;
@@ -294,7 +296,7 @@ impl LanguageVersion {
             LanguageVersion::V1 => VERSION_DEFAULT,
             LanguageVersion::V2_0 => VERSION_DEFAULT_LANG_V2,
             LanguageVersion::V2_1 => VERSION_DEFAULT_LANG_V2,
-            LanguageVersion::V2_2 => VERSION_DEFAULT_LANG_V2, // Update once we have v8 bytecode
+            LanguageVersion::V2_2 => VERSION_MAX,
         })
     }
 

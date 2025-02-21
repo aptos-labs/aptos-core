@@ -637,16 +637,6 @@ generate_unique_address uses this for domain separation within its native implem
 
 
 
-<a id="0x1_object_EBURN_NOT_ALLOWED"></a>
-
-Objects cannot be burnt
-
-
-<pre><code><b>const</b> <a href="object.md#0x1_object_EBURN_NOT_ALLOWED">EBURN_NOT_ALLOWED</a>: u64 = 10;
-</code></pre>
-
-
-
 <a id="0x1_object_ECANNOT_DELETE"></a>
 
 The object does not allow for deletion
@@ -683,6 +673,16 @@ The object does not have ungated transfers enabled
 
 
 <pre><code><b>const</b> <a href="object.md#0x1_object_ENO_UNGATED_TRANSFERS">ENO_UNGATED_TRANSFERS</a>: u64 = 3;
+</code></pre>
+
+
+
+<a id="0x1_object_EOBJECT_ALREADY_BURNT"></a>
+
+Cannot burn an object that is already burnt.
+
+
+<pre><code><b>const</b> <a href="object.md#0x1_object_EOBJECT_ALREADY_BURNT">EOBJECT_ALREADY_BURNT</a>: u64 = 10;
 </code></pre>
 
 
@@ -1720,7 +1720,7 @@ Removes from the specified Object from global storage.
     } = object_core;
 
     <b>if</b> (<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self)) {
-      <b>let</b> <a href="object.md#0x1_object_Untransferable">Untransferable</a> {} = <b>move_from</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self);
+        <b>let</b> <a href="object.md#0x1_object_Untransferable">Untransferable</a> {} = <b>move_from</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self);
     };
 
     <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(transfer_events);
@@ -2179,13 +2179,13 @@ objects may have cyclic dependencies.
 
 ## Function `burn`
 
-Previously allowed to burn objects, has now been disabled.  Objects can still be unburnt.
+Add a TombStone to the object.  The object will then be interpreted as hidden via indexers.
+This only works for objects directly owned and for simplicity does not apply to indirectly owned objects.
+Original owners can reclaim burnt objects any time in the future by calling unburn.
+Please use the test only [<code>object::burn_object_with_transfer</code>] for testing with previously burned objects.
 
-Please use the test only [<code>object::burn_object</code>] for testing with previously burned objects.
 
-
-<pre><code>#[deprecated]
-<b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _object: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
 </code></pre>
 
 
@@ -2194,8 +2194,12 @@ Please use the test only [<code>object::burn_object</code>] for testing with pre
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _object: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;) {
-    <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_EBURN_NOT_ALLOWED">EBURN_NOT_ALLOWED</a>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    <b>let</b> original_owner = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+    <b>assert</b>!(<a href="object.md#0x1_object_is_owner">is_owner</a>(<a href="object.md#0x1_object">object</a>, original_owner), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>));
+    <b>let</b> object_addr = <a href="object.md#0x1_object">object</a>.inner;
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_addr), <a href="object.md#0x1_object_EOBJECT_ALREADY_BURNT">EOBJECT_ALREADY_BURNT</a>);
+    <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer">create_signer</a>(object_addr), <a href="object.md#0x1_object_TombStone">TombStone</a> { original_owner });
 }
 </code></pre>
 
@@ -2230,9 +2234,21 @@ Allow origin owners to reclaim any objects they previous burnt.
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_EOBJECT_NOT_TRANSFERRABLE">EOBJECT_NOT_TRANSFERRABLE</a>)
     );
 
-    <b>let</b> <a href="object.md#0x1_object_TombStone">TombStone</a> { original_owner: original_owner_addr } = <b>move_from</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_addr);
-    <b>assert</b>!(original_owner_addr == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(original_owner), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>));
-    <a href="object.md#0x1_object_transfer_raw_inner">transfer_raw_inner</a>(object_addr, original_owner_addr);
+    // The new owner of the <a href="object.md#0x1_object">object</a> can always unburn it, but <b>if</b> it's the burn <b>address</b>, we go <b>to</b> the <b>old</b> functionality
+    <b>let</b> object_core = <b>borrow_global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(object_addr);
+    <b>if</b> (object_core.owner == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(original_owner)) {
+        <b>let</b> <a href="object.md#0x1_object_TombStone">TombStone</a> { original_owner: _ } = <b>move_from</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_addr);
+    } <b>else</b> <b>if</b> (object_core.owner == <a href="object.md#0x1_object_BURN_ADDRESS">BURN_ADDRESS</a>) {
+        // The <b>old</b> functionality
+        <b>let</b> <a href="object.md#0x1_object_TombStone">TombStone</a> { original_owner: original_owner_addr } = <b>move_from</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_addr);
+        <b>assert</b>!(
+            original_owner_addr == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(original_owner),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>)
+        );
+        <a href="object.md#0x1_object_transfer_raw_inner">transfer_raw_inner</a>(object_addr, original_owner_addr);
+    } <b>else</b> {
+        <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>);
+    };
 }
 </code></pre>
 
@@ -3351,14 +3367,18 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 ### Function `burn`
 
 
-<pre><code>#[deprecated]
-<b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _object: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> <b>true</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>let</b> object_address = <a href="object.md#0x1_object">object</a>.inner;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(object_address);
+<b>aborts_if</b> <a href="object.md#0x1_object_owner">owner</a>(<a href="object.md#0x1_object">object</a>) != <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+<b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_address);
+<b>ensures</b> <a href="object.md#0x1_object_is_owner">is_owner</a>(<a href="object.md#0x1_object">object</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
 </code></pre>
 
 
@@ -3379,7 +3399,9 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(object_address);
 <b>aborts_if</b> !<a href="object.md#0x1_object_is_burnt">is_burnt</a>(<a href="object.md#0x1_object">object</a>);
 <b>let</b> tomb_stone = <b>borrow_global</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_address);
-<b>aborts_if</b> tomb_stone.original_owner != <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(original_owner);
+<b>let</b> original_owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(original_owner);
+<b>let</b> object_current_owner = <b>borrow_global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(object_address).owner;
+<b>aborts_if</b> object_current_owner != original_owner_address && tomb_stone.original_owner != original_owner_address;
 </code></pre>
 
 

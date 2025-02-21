@@ -16,8 +16,11 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-indexer-grpc-server-framework = { workspace = true }
 aptos-indexer-grpc-utils = { workspace = true }
+aptos-metrics-core = { workspace = true }
 aptos-protos = { workspace = true }
+aptos-transaction-filter = { workspace = true }
 async-trait = { workspace = true }
+build_html = { workspace = true }
 clap = { workspace = true }
 dashmap = { workspace = true }
 futures = { workspace = true }
@@ -32,6 +35,7 @@ tonic = { workspace = true }
 tonic-reflection = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
+warp = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 jemallocator = { workspace = true }

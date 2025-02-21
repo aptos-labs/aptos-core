@@ -46,7 +46,8 @@ use aptos_types::{
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{
-    ResourceGroupSize, StateStorageView, TModuleView, TResourceGroupView, TResourceView,
+    BlockSynchronizationKillSwitch, ResourceGroupSize, StateStorageView, TModuleView,
+    TResourceGroupView, TResourceView,
 };
 use bytes::Bytes;
 use claims::assert_ok;
@@ -1090,10 +1091,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
                 "[VM, StateView] Error getting data from storage for {:?}",
                 state_key
             );
-            self.mark_incorrect_use();
         }
 
-        ret.map_err(Into::into)
+        ret
     }
 
     fn patch_base_value(
@@ -1446,6 +1446,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             ValueWithLayout::RawFromStorage(Arc::new(metadata_op)),
         );
         Ok(())
+    }
+}
+
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> BlockSynchronizationKillSwitch
+    for LatestView<'a, T, S>
+{
+    fn interrupt_requested(&self) -> bool {
+        match &self.latest_view {
+            ViewState::Sync(state) => state.scheduler.has_halted(),
+            ViewState::Unsync(_) => false,
+        }
     }
 }
 

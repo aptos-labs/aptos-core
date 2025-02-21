@@ -216,13 +216,6 @@ module aptos_framework::primary_fungible_store {
         dispatchable_fungible_asset::deposit(store, fa);
     }
 
-    /// Deposit fungible asset `fa` to the given account's primary store.
-    public(friend) fun force_deposit(owner: address, fa: FungibleAsset) acquires DeriveRefPod {
-        let metadata = fungible_asset::asset_metadata(&fa);
-        let store = ensure_primary_store_exists(owner, metadata);
-        fungible_asset::unchecked_deposit(object::object_address(&store), fa);
-    }
-
     /// Transfer `amount` of fungible asset from sender's primary store to receiver's primary store.
     public entry fun transfer<T: key>(
         sender: &signer,
@@ -420,7 +413,7 @@ module aptos_framework::primary_fungible_store {
 
         // User 2 burns their primary store but should still be able to transfer afterward.
         let user_2_primary_store = primary_store(user_2_address, metadata);
-        object::burn_object(user_2, user_2_primary_store);
+        object::burn_object_with_transfer(user_2, user_2_primary_store);
         assert!(object::is_burnt(user_2_primary_store), 0);
         // Balance still works
         assert!(balance(user_2_address, metadata) == 80, 0);
@@ -444,7 +437,7 @@ module aptos_framework::primary_fungible_store {
 
         // User 2 burns their primary store but should still be able to withdraw afterward.
         let user_2_primary_store = primary_store(user_2_address, metadata);
-        object::burn_object(user_2, user_2_primary_store);
+        object::burn_object_with_transfer(user_2, user_2_primary_store);
         assert!(object::is_burnt(user_2_primary_store), 0);
         let coins = withdraw(user_2, metadata, 70);
         assert!(balance(user_2_address, metadata) == 10, 0);

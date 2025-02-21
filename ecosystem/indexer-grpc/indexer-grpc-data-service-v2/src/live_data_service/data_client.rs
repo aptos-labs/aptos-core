@@ -22,12 +22,13 @@ impl DataClient {
             starting_version: Some(starting_version),
             transactions_count: None,
             batch_size: None,
+            transaction_filter: None,
         };
         loop {
             let mut client = self
                 .connection_manager
                 .get_grpc_manager_client_for_request();
-            let response = client.get_transactions(request).await;
+            let response = client.get_transactions(request.clone()).await;
             if let Ok(response) = response {
                 return response.into_inner().transactions;
             }

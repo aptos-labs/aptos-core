@@ -843,6 +843,38 @@ fn check_module_name(context: &mut Context, ident_loc: &Loc, mident: &ModuleIden
     }
 }
 
+/// Can `address_name::module_name` be resolved to a valid module access?
+///      ^^^^^^^^^^^^^^^^^^^^^^^^^ is the `full_loc`
+///      ^^^^^^^^^^^^              is the `address_loc`
+fn can_be_resolved_as_module(
+    context: &mut Context,
+    full_loc: Loc,
+    address_loc: Loc,
+    address_name: Name,
+    module_name: Name,
+) -> Option<ModuleIdent> {
+    use P::LeadingNameAccess_ as LN;
+    if context
+        .named_address_mapping
+        .as_ref()
+        .map(|m| m.contains_key(&address_name.value))
+        .unwrap_or(false)
+    {
+        // We have `address_name` resolved to `addr`.
+        let addr = address(context, false, sp(address_loc, LN::Name(address_name)));
+        let mident = sp(full_loc, ModuleIdent_::new(addr, ModuleName(module_name)));
+        // Is `addr::module_name` a resolvable module? If so, return it.
+        if context.module_members.contains_key(&mident) {
+            check_for_deprecated_module_use(context, &mident);
+            Some(mident)
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
 fn attribute_value(
     context: &mut Context,
     sp!(loc, avalue_): P::AttributeValue,
@@ -869,24 +901,24 @@ fn attribute_value(
             check_module_name(context, &ident_loc, &mident);
             EV::Module(mident)
         },
-        PV::ModuleAccess(sp!(ident_loc, PN::Two(sp!(aloc, LN::Name(n1)), n2)))
-            if context
-                .named_address_mapping
-                .as_ref()
-                .map(|m| m.contains_key(&n1.value))
-                .unwrap_or(false) =>
-        {
-            let addr = address(context, false, sp(aloc, LN::Name(n1)));
-            let mident = sp(ident_loc, ModuleIdent_::new(addr, ModuleName(n2)));
-            check_module_name(context, &ident_loc, &mident);
-            EV::Module(mident)
+        PV::ModuleAccess(ma) => {
+            let value = match ma {
+                sp!(ident_loc, PN::Two(sp!(aloc, LN::Name(n1)), n2)) => {
+                    // Check to see if `n1::n2` can be resolved to be module access.
+                    can_be_resolved_as_module(context, ident_loc, aloc, n1, n2)
+                },
+                _ => None,
+            };
+            match value {
+                Some(mident) => EV::Module(mident),
+                None => EV::ModuleAccess(name_access_chain(
+                    context,
+                    Access::Type,
+                    ma,
+                    Some(DeprecatedItem::Module),
+                )?),
+            }
         },
-        PV::ModuleAccess(ma) => EV::ModuleAccess(name_access_chain(
-            context,
-            Access::Type,
-            ma,
-            Some(DeprecatedItem::Module),
-        )?),
     }))
 }
 
@@ -2629,12 +2661,11 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
         PE::While(label, pb, ploop) => EE::While(label, exp(context, *pb), exp(context, *ploop)),
         PE::Loop(label, ploop) => EE::Loop(label, exp(context, *ploop)),
         PE::Block(seq) => EE::Block(sequence(context, loc, seq)),
-        PE::Lambda(pbs, pe, capture_kind, abilities_vec) => {
+        PE::Lambda(pbs, pe, capture_kind) => {
             let tbs_opt = typed_bind_list(context, pbs);
             let e = exp_(context, *pe);
-            let abilities = ability_set(context, "lambda expression", abilities_vec);
             match tbs_opt {
-                Some(tbs) => EE::Lambda(tbs, Box::new(e), capture_kind, abilities),
+                Some(tbs) => EE::Lambda(tbs, Box::new(e), capture_kind),
                 None => {
                     assert!(context.env.has_errors());
                     EE::UnresolvedError
@@ -3361,7 +3392,7 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
         EE::Loop(_, eloop) => unbound_names_exp(unbound, eloop),
 
         EE::Block(seq) => unbound_names_sequence(unbound, seq),
-        EE::Lambda(ls, er, _capture_kind, _abilities) => {
+        EE::Lambda(ls, er, _capture_kind) => {
             unbound_names_exp(unbound, er);
             // remove anything in `ls`
             unbound_names_typed_binds(unbound, ls);

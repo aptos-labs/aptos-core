@@ -48,13 +48,13 @@ impl DataService for DataServiceWrapperWrapper {
             if let Some(historical_data_service) = self.historical_data_service.as_ref() {
                 let request = req.into_inner();
                 let mut stream = live_data_service
-                    .get_transactions(Request::new(request))
+                    .get_transactions(Request::new(request.clone()))
                     .await?
                     .into_inner();
                 let peekable = std::pin::pin!(stream.as_mut().peekable());
                 if let Some(Ok(_)) = peekable.peek().await {
                     return live_data_service
-                        .get_transactions(Request::new(request))
+                        .get_transactions(Request::new(request.clone()))
                         .await;
                 }
 

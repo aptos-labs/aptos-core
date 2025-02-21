@@ -90,7 +90,6 @@ fn test_docgen(path: &Path, mut options: Options, suffix: &str) -> anyhow::Resul
     temp_path.push(&base_name);
 
     if path.to_str().is_some_and(|s| s.contains(V2_TEST_DIR)) {
-        options.compiler_v2 = true;
         options.language_version = Some(LanguageVersion::latest_stable());
     }
 

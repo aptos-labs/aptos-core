@@ -1734,7 +1734,7 @@ where
             module_cache_manager_guard
                 .environment()
                 .runtime_environment()
-                .flush_struct_name_and_info_caches();
+                .flush_struct_name_and_tag_caches();
             module_cache_manager_guard.module_cache_mut().flush();
 
             info!("parallel execution requiring fallback");

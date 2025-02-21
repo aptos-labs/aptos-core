@@ -402,7 +402,8 @@ impl Module {
                 if let Some(code_unit) = &func.code {
                     for bc in &code_unit.code {
                         match bc {
-                            Bytecode::VecPack(si, _)
+                            Bytecode::CallClosure(si)
+                            | Bytecode::VecPack(si, _)
                             | Bytecode::VecLen(si)
                             | Bytecode::VecImmBorrow(si)
                             | Bytecode::VecMutBorrow(si)

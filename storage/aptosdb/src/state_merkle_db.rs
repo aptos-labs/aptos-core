@@ -392,7 +392,7 @@ impl StateMerkleDb {
             Vec::new();
         sharded_value_set.resize(NUM_STATE_SHARDS, Default::default());
         value_set.into_iter().for_each(|(k, v)| {
-            sharded_value_set[get_state_shard_id(k) as usize].push((k, v));
+            sharded_value_set[get_state_shard_id(&k) as usize].push((k, v));
         });
 
         let (shard_root_nodes, sharded_batches) = (0..16)

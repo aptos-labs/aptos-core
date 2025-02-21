@@ -441,35 +441,6 @@ impl<'r, 'l> Session<'r, 'l> {
         )
     }
 
-    pub fn get_type_layout(
-        &mut self,
-        type_tag: &TypeTag,
-        module_storage: &impl ModuleStorage,
-    ) -> VMResult<MoveTypeLayout> {
-        self.move_vm.runtime.loader().get_type_layout(
-            type_tag,
-            &mut self.data_cache,
-            &self.module_store,
-            module_storage,
-        )
-    }
-
-    pub fn get_fully_annotated_type_layout(
-        &mut self,
-        type_tag: &TypeTag,
-        module_storage: &impl ModuleStorage,
-    ) -> VMResult<MoveTypeLayout> {
-        self.move_vm
-            .runtime
-            .loader()
-            .get_fully_annotated_type_layout(
-                type_tag,
-                &mut self.data_cache,
-                &self.module_store,
-                module_storage,
-            )
-    }
-
     pub fn get_type_tag(
         &self,
         ty: &Type,
@@ -482,6 +453,8 @@ impl<'r, 'l> Session<'r, 'l> {
             .map_err(|e| e.finish(Location::Undefined))
     }
 
+    /// Returns [MoveTypeLayout] of a given runtime type. For [TypeTag] to layout conversions, one
+    /// needs to first convert the tag to runtime type.
     pub fn get_type_layout_from_ty(
         &self,
         ty: &Type,
@@ -546,8 +519,20 @@ impl<'r, 'l> Session<'r, 'l> {
                     .idx_to_struct_name(*idx)?;
                 Some((struct_identifier.module, struct_identifier.name))
             },
-            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | TyParam(_)
-            | Vector(_) | Reference(_) | MutableReference(_) => None,
+            Bool
+            | U8
+            | U16
+            | U32
+            | U64
+            | U128
+            | U256
+            | Address
+            | Signer
+            | TyParam(_)
+            | Vector(_)
+            | Reference(_)
+            | MutableReference(_)
+            | Function { .. } => None,
         })
     }
 

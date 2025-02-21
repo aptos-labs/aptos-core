@@ -964,8 +964,8 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIter<'a> {
                     },
 
                     Function(args, result, _) => {
-                        self.stack.extend(args.iter().rev());
                         self.stack.extend(result.iter().rev());
+                        self.stack.extend(args.iter().rev());
                     },
 
                     Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Struct(_)
@@ -1003,9 +1003,9 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIterWithDepth<'a> {
 
                     Function(args, result, _) => {
                         self.stack
-                            .extend(args.iter().map(|tok| (tok, depth + 1)).rev());
-                        self.stack
                             .extend(result.iter().map(|tok| (tok, depth + 1)).rev());
+                        self.stack
+                            .extend(args.iter().map(|tok| (tok, depth + 1)).rev());
                     },
 
                     Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Struct(_)
@@ -1150,6 +1150,12 @@ impl SignatureToken {
                 SignatureToken::Function(args1, results1, abs1),
                 SignatureToken::Function(args2, results2, abs2),
             ) => args1 == args2 && results1 == results2 && abs1.is_subset(*abs2),
+            (SignatureToken::Reference(ty1), SignatureToken::Reference(ty2)) => {
+                ty1.is_assignable_from(ty2)
+            },
+            (SignatureToken::MutableReference(ty1), SignatureToken::MutableReference(ty2)) => {
+                ty1.is_assignable_from(ty2)
+            },
             _ => self == source,
         }
     }

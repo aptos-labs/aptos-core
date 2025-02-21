@@ -87,41 +87,41 @@ jobs:
           name: cli-builds-linux-arm
           path: aptos-cli-*.zip
 
-  build-macos-x86_64-binary:
-    name: "Build MacOS x86_64 binary"
-    runs-on: macos-13
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.source_git_ref_override }}
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-        with:
-          macos: true
-      - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "macOS" "${{inputs.release_version}}"
-      - name: Upload Binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: cli-builds-macos-x86-64
-          path: aptos-cli-*.zip
+#  build-macos-x86_64-binary:
+#    name: "Build MacOS x86_64 binary"
+#    runs-on: macos-13
+#    steps:
+#      - uses: actions/checkout@v4
+#        with:
+#          ref: ${{ github.event.inputs.source_git_ref_override }}
+#      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+#        with:
+#          macos: true
+#      - name: Build CLI
+#        run: scripts/cli/build_cli_release.sh "macOS" "${{inputs.release_version}}"
+#      - name: Upload Binary
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: cli-builds-macos-x86-64
+#          path: aptos-cli-*.zip
 
-  build-macos-arm-binary:
-    name: "Build MacOS ARM binary"
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.source_git_ref_override }}
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-        with:
-          macos: true
-      - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "macOS" "${{inputs.release_version}}"
-      - name: Upload Binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: cli-builds-macos-arm
-          path: aptos-cli-*.zip
+#  build-macos-arm-binary:
+#    name: "Build MacOS ARM binary"
+#    runs-on: macos-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#        with:
+#          ref: ${{ github.event.inputs.source_git_ref_override }}
+#      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+#        with:
+#          macos: true
+#      - name: Build CLI
+#        run: scripts/cli/build_cli_release.sh "macOS" "${{inputs.release_version}}"
+#      - name: Upload Binary
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: cli-builds-macos-arm
+#          path: aptos-cli-*.zip
 
   build-windows-binary:
     name: "Build Windows binary"
@@ -130,6 +130,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
+      # Ensure that long paths work
+      - name: Ensure long paths work
+        run: git config --system core.longpaths true
+        shell: bash
       - name: Build CLI
         run: scripts\cli\build_cli_release.ps1
       - name: Upload Binary
@@ -146,8 +150,8 @@ jobs:
       - build-windows-binary
       - build-linux-binary
       - build-linux-arm-binary
-      - build-macos-arm-binary
-      - build-macos-x86_64-binary
+#      - build-macos-arm-binary
+#      - build-macos-x86_64-binary
     runs-on: ubuntu-latest
     permissions:
       contents: "write"

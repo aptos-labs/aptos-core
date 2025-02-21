@@ -1,0 +1,14 @@
+comparison between v1 and v2 failed:
+- processed 2 tasks
+- 
+- task 1 'publish'. lines 11-16:
+- Error: bug[ICE12001]: BYTECODE GENERATION FAILED
+-    ┌─ TEMPFILE1:12:18
+-    │
+- 12 │ module 0xc0ffee::dummy2 {
+-    │                  ^^^^^^ IR ERROR: Missing constant definition for CC
+- 
+- 
+- 
++ processed 2 tasks
++ 

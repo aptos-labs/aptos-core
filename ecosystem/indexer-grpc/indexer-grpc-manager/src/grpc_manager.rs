@@ -6,6 +6,7 @@ use crate::{
     data_manager::DataManager,
     file_store_uploader::FileStoreUploader,
     metadata_manager::MetadataManager,
+    metrics::IS_MASTER,
     service::GrpcManagerService,
 };
 use anyhow::Result;
@@ -70,6 +71,7 @@ impl GrpcManager {
         );
 
         info!("DataManager is created.");
+        IS_MASTER.set(config.is_master as i64);
 
         Self {
             chain_id,
@@ -117,5 +119,13 @@ impl GrpcManager {
         });
 
         Ok(())
+    }
+
+    pub(crate) fn get_metadata_manager(&self) -> &MetadataManager {
+        &self.metadata_manager
+    }
+
+    pub(crate) fn get_data_manager(&self) -> &DataManager {
+        &self.data_manager
     }
 }

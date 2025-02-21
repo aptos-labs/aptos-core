@@ -58,15 +58,15 @@ struct Wrap {
 	e: u64
 }
 
-public make(Arg0: u64, Arg1: u64, Arg2: u64, Arg3: &S, Arg4: u64): Wrap /* def_idx: 0 */ {
+public make(a: u64, b: u64, c: u64, d: &S, e: u64): Wrap /* def_idx: 0 */ {
 B0:
-	0: MoveLoc[0](Arg0: u64)
-	1: MoveLoc[1](Arg1: u64)
-	2: MoveLoc[2](Arg2: u64)
-	3: MoveLoc[3](Arg3: &S)
+	0: MoveLoc[0](a: u64)
+	1: MoveLoc[1](b: u64)
+	2: MoveLoc[2](c: u64)
+	3: MoveLoc[3](d: &S)
 	4: ImmBorrowField[0](S.x: u64)
 	5: ReadRef
-	6: MoveLoc[4](Arg4: u64)
+	6: MoveLoc[4](e: u64)
 	7: Pack[1](Wrap)
 	8: Ret
 }

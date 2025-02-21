@@ -1,7 +1,14 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{config::CacheConfig, metadata_manager::MetadataManager};
+use crate::{
+    config::CacheConfig,
+    metadata_manager::MetadataManager,
+    metrics::{
+        CACHE_END_VERSION, CACHE_SIZE, CACHE_START_VERSION, IS_FILE_STORE_LAGGING, MAX_CACHE_SIZE,
+        TARGET_CACHE_SIZE,
+    },
+};
 use anyhow::{bail, ensure, Result};
 use aptos_indexer_grpc_utils::{
     config::IndexerGrpcFileStoreConfig, file_store_operator_v2::file_store_reader::FileStoreReader,
@@ -37,6 +44,11 @@ struct Cache {
 
 impl Cache {
     fn new(cache_config: CacheConfig, file_store_version: u64) -> Self {
+        MAX_CACHE_SIZE.set(cache_config.max_cache_size as i64);
+        TARGET_CACHE_SIZE.set(cache_config.target_cache_size as i64);
+        CACHE_START_VERSION.set(file_store_version as i64);
+        CACHE_END_VERSION.set(file_store_version as i64);
+
         Self {
             start_version: file_store_version,
             file_store_version: AtomicU64::new(file_store_version),
@@ -61,6 +73,9 @@ impl Cache {
             self.start_version += 1;
         }
 
+        CACHE_SIZE.set(self.cache_size as i64);
+        CACHE_START_VERSION.set(self.start_version as i64);
+
         self.cache_size <= self.max_cache_size
     }
 
@@ -70,6 +85,8 @@ impl Cache {
             .map(|transaction| transaction.encoded_len())
             .sum::<usize>();
         self.transactions.extend(transactions);
+        CACHE_SIZE.set(self.cache_size as i64);
+        CACHE_END_VERSION.set(self.start_version as i64 + self.transactions.len() as i64);
     }
 
     fn get_transactions(
@@ -175,8 +192,10 @@ impl DataManager {
             while let Some(response_item) = response.next().await {
                 loop {
                     if self.cache.write().await.maybe_gc() {
+                        IS_FILE_STORE_LAGGING.set(0);
                         break;
                     }
+                    IS_FILE_STORE_LAGGING.set(1);
                     // If file store is lagging, we are not inserting more data.
                     let cache = self.cache.read().await;
                     warn!("Filestore is lagging behind, cache is full [{}, {}), known_latest_version ({}).",
@@ -269,11 +288,12 @@ impl DataManager {
                 start_version,
                 /*retries=*/ 3,
                 /*max_files=*/ Some(1),
+                /*filter=*/ None,
                 tx,
             )
             .await;
 
-        if let Some((transactions, _)) = rx.recv().await {
+        if let Some((transactions, _, _)) = rx.recv().await {
             debug!(
                 "Transactions returned from filestore: [{start_version}, {}).",
                 transactions.last().unwrap().version
@@ -307,5 +327,18 @@ impl DataManager {
 
     pub(crate) async fn get_file_store_version(&self) -> u64 {
         self.file_store_reader.get_latest_version().await.unwrap()
+    }
+
+    pub(crate) async fn cache_stats(&self) -> String {
+        let cache = self.cache.read().await;
+        let len = cache.transactions.len() as u64;
+        format!(
+            "cache version: [{}, {}), # of txns: {}, file store version: {}, cache size: {}",
+            cache.start_version,
+            cache.start_version + len,
+            len,
+            cache.file_store_version.load(Ordering::SeqCst),
+            cache.cache_size
+        )
     }
 }

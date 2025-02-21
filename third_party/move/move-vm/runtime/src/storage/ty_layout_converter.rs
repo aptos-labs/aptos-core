@@ -4,15 +4,17 @@
 use crate::{
     config::VMConfig,
     loader::{LegacyModuleStorageAdapter, Loader, PseudoGasContext, VALUE_DEPTH_MAX},
-    storage::{ty_cache::StructInfoCache, ty_tag_converter::TypeTagConverter},
+    storage::ty_tag_converter::TypeTagConverter,
     ModuleStorage,
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
+    function::MoveFunctionLayout,
     language_storage::StructTag,
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
+use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::loaded_data::{
     runtime_types::{StructLayout, StructType, Type},
     struct_name_indexing::{StructNameIndex, StructNameIndexMap},
@@ -28,6 +30,8 @@ const MAX_TYPE_TO_LAYOUT_NODES: u64 = 256;
 pub trait LayoutConverter: LayoutConverterBase {
     /// Converts a runtime type to a type layout.
     fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+        let _timer = VM_TIMER.timer_with_label("Loader::type_to_type_layout");
+
         let mut count = 0;
         self.type_to_type_layout_impl(ty, &mut count, 1)
             .map(|(l, _)| l)
@@ -38,6 +42,8 @@ pub trait LayoutConverter: LayoutConverterBase {
         &self,
         ty: &Type,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
+        let _timer = VM_TIMER.timer_with_label("Loader::type_to_type_layout");
+
         let mut count = 0;
         self.type_to_type_layout_impl(ty, &mut count, 1)
     }
@@ -45,6 +51,8 @@ pub trait LayoutConverter: LayoutConverterBase {
     /// Converts a runtime type to a fully annotated type layout, containing information about
     /// field names.
     fn type_to_fully_annotated_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+        let _timer = VM_TIMER.timer_with_label("Loader::type_to_type_layout");
+
         let mut count = 0;
         self.type_to_fully_annotated_layout_impl(ty, &mut count, 1)
     }
@@ -54,7 +62,6 @@ pub trait LayoutConverter: LayoutConverterBase {
 // into this crate trait.
 pub(crate) trait LayoutConverterBase {
     fn vm_config(&self) -> &VMConfig;
-    fn struct_info_cache(&self) -> &StructInfoCache;
     fn fetch_struct_ty_by_idx(&self, idx: StructNameIndex) -> PartialVMResult<Arc<StructType>>;
     fn struct_name_index_map(&self) -> &StructNameIndexMap;
 
@@ -151,6 +158,33 @@ pub(crate) trait LayoutConverterBase {
                 *count += 1;
                 self.struct_name_to_type_layout(*idx, ty_args, count, depth + 1)?
             },
+            Type::Function {
+                args,
+                results,
+                abilities,
+            } => {
+                *count += 1;
+                let mut identifier_mapping = false;
+                let mut to_list = |tys: &[Type]| {
+                    tys.iter()
+                        .map(|ety| {
+                            self.type_to_type_layout_impl(ety, count, depth + 1)
+                                .map(|(l, has)| {
+                                    identifier_mapping |= has;
+                                    l
+                                })
+                        })
+                        .collect::<PartialVMResult<Vec<_>>>()
+                };
+                (
+                    MoveTypeLayout::Function(MoveFunctionLayout(
+                        to_list(args)?,
+                        to_list(results)?,
+                        *abilities,
+                    )),
+                    identifier_mapping,
+                )
+            },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -167,15 +201,6 @@ pub(crate) trait LayoutConverterBase {
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        let struct_cache = self.struct_info_cache();
-        if let Some((struct_layout, node_count, has_identifier_mappings)) =
-            struct_cache.get_struct_layout_info(&struct_name_idx, ty_args)
-        {
-            *count += node_count;
-            return Ok((struct_layout, has_identifier_mappings));
-        }
-
-        let count_before = *count;
         let struct_type = self.fetch_struct_ty_by_idx(struct_name_idx)?;
 
         let mut has_identifier_mappings = false;
@@ -249,14 +274,6 @@ pub(crate) trait LayoutConverterBase {
             },
         };
 
-        let field_node_count = *count - count_before;
-        struct_cache.store_struct_layout_info(
-            struct_name_idx,
-            ty_args.to_vec(),
-            layout.clone(),
-            field_node_count,
-            has_identifier_mappings,
-        );
         Ok((layout, has_identifier_mappings))
     }
 
@@ -318,6 +335,22 @@ pub(crate) trait LayoutConverterBase {
             Type::StructInstantiation { idx, ty_args, .. } => {
                 self.struct_name_to_fully_annotated_layout(*idx, ty_args, count, depth + 1)?
             },
+            Type::Function {
+                args,
+                results,
+                abilities,
+            } => {
+                let mut to_list = |tys: &[Type]| {
+                    tys.iter()
+                        .map(|ety| self.type_to_fully_annotated_layout_impl(ety, count, depth + 1))
+                        .collect::<PartialVMResult<Vec<_>>>()
+                };
+                MoveTypeLayout::Function(MoveFunctionLayout(
+                    to_list(args)?,
+                    to_list(results)?,
+                    *abilities,
+                ))
+            },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -334,14 +367,6 @@ pub(crate) trait LayoutConverterBase {
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<MoveTypeLayout> {
-        let struct_info_cache = self.struct_info_cache();
-        if let Some((layout, annotated_node_count)) =
-            struct_info_cache.get_annotated_struct_layout_info(&struct_name_idx, ty_args)
-        {
-            *count += annotated_node_count;
-            return Ok(layout);
-        }
-
         let struct_type = self.fetch_struct_ty_by_idx(struct_name_idx)?;
 
         // TODO(#13806): have annotated layouts for variants. Currently, we just return the raw
@@ -352,7 +377,6 @@ pub(crate) trait LayoutConverterBase {
                 .map(|(l, _)| l);
         }
 
-        let count_before = *count;
         let struct_tag = self.struct_name_idx_to_struct_tag(struct_name_idx, ty_args)?;
         let fields = struct_type.fields(None)?;
 
@@ -369,14 +393,7 @@ pub(crate) trait LayoutConverterBase {
             .collect::<PartialVMResult<Vec<_>>>()?;
         let struct_layout =
             MoveTypeLayout::Struct(MoveStructLayout::with_types(struct_tag, field_layouts));
-        let field_node_count = *count - count_before;
 
-        struct_info_cache.store_annotated_struct_layout_info(
-            struct_name_idx,
-            ty_args.to_vec(),
-            struct_layout.clone(),
-            field_node_count,
-        );
         Ok(struct_layout)
     }
 }
@@ -397,10 +414,6 @@ impl<'a> StorageLayoutConverter<'a> {
 impl<'a> LayoutConverterBase for StorageLayoutConverter<'a> {
     fn vm_config(&self) -> &VMConfig {
         self.storage.runtime_environment().vm_config()
-    }
-
-    fn struct_info_cache(&self) -> &StructInfoCache {
-        self.storage.runtime_environment().ty_cache()
     }
 
     fn fetch_struct_ty_by_idx(&self, idx: StructNameIndex) -> PartialVMResult<Arc<StructType>> {
@@ -456,10 +469,6 @@ impl<'a> LoaderLayoutConverter<'a> {
 impl<'a> LayoutConverterBase for LoaderLayoutConverter<'a> {
     fn vm_config(&self) -> &VMConfig {
         self.loader.vm_config()
-    }
-
-    fn struct_info_cache(&self) -> &StructInfoCache {
-        self.loader.ty_cache(self.module_storage)
     }
 
     fn fetch_struct_ty_by_idx(&self, idx: StructNameIndex) -> PartialVMResult<Arc<StructType>> {

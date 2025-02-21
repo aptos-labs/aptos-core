@@ -6,7 +6,10 @@
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use arbitrary::Arbitrary;
 use move_binary_format::file_format::CompiledModule;
-use move_core_types::value::{MoveStructLayout, MoveTypeLayout};
+use move_core_types::{
+    function::MoveFunctionLayout,
+    value::{MoveStructLayout, MoveTypeLayout},
+};
 
 #[macro_export]
 macro_rules! tdbg {
@@ -81,6 +84,9 @@ pub(crate) fn is_valid_layout(layout: &MoveTypeLayout) -> bool {
                 return false;
             }
             fields.iter().all(is_valid_layout)
+        },
+        L::Function(MoveFunctionLayout(args, results, _)) => {
+            args.iter().chain(results).all(is_valid_layout)
         },
         L::Struct(_) => {
             // decorated layouts not supported

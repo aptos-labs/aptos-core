@@ -48,7 +48,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         experiments: &[],
         language_version: LanguageVersion::latest_stable(),
         include: &[],
-        exclude: &["/operator_eval/", "/access_control/"],
+        exclude: &["/operator_eval/", "/access_control/", "/closures/"],
     },
     // Test optimize/no-optimize/etc., except for `/access_control/`
     TestConfig {
@@ -60,7 +60,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         ],
         language_version: LanguageVersion::latest_stable(),
         include: &[], // all tests except those excluded below
-        exclude: &["/operator_eval/", "/access_control/"],
+        exclude: &["/operator_eval/", "/access_control/", "/closures/"],
     },
     TestConfig {
         name: "no-optimize",
@@ -68,7 +68,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         experiments: &[(Experiment::OPTIMIZE, false)],
         language_version: LanguageVersion::latest_stable(),
         include: &[], // all tests except those excluded below
-        exclude: &["/operator_eval/", "/access_control/"],
+        exclude: &["/operator_eval/", "/access_control/", "/closures/"],
     },
     TestConfig {
         name: "optimize-no-simplify",
@@ -80,7 +80,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         ],
         language_version: LanguageVersion::latest_stable(),
         include: &[], // all tests except those excluded below
-        exclude: &["/operator_eval/", "/access_control/"],
+        exclude: &["/operator_eval/", "/access_control/", "/closures/"],
     },
     // Test `/operator_eval/` with language version 1 and 2
     TestConfig {
@@ -99,20 +99,13 @@ const TEST_CONFIGS: &[TestConfig] = &[
         include: &["/operator_eval/"],
         exclude: &[],
     },
-    // Test `/lambda/` with lambdas enabled
+    // Test `/closures/` with function values enabled
     TestConfig {
-        name: "lambda",
-        runner: |p| run(p, get_config_by_name("lambda")),
-        experiments: &[
-            (Experiment::OPTIMIZE, true),
-            (Experiment::LAMBDA_FIELDS, true),
-            (Experiment::LAMBDA_IN_PARAMS, true),
-            (Experiment::LAMBDA_IN_RETURNS, true),
-            (Experiment::LAMBDA_VALUES, true),
-            (Experiment::LAMBDA_LIFTING, true),
-        ],
+        name: "closures",
+        runner: |p| run(p, get_config_by_name("closures")),
+        experiments: &[(Experiment::FUNCTION_VALUES, true)],
         language_version: LanguageVersion::V2_2,
-        include: &["/lambda/"],
+        include: &["/closures/"],
         exclude: &[],
     },
     // Test optimize/no-optimize/etc., just for `/access_control/`, which
@@ -182,8 +175,6 @@ const SEPARATE_BASELINE: &[&str] = &[
     "no-v1-comparison/assert_one.move",
     // Flaky redundant unused assignment error
     "no-v1-comparison/enum/enum_scoping.move",
-    // Needs LAMBDA features and V2.2+ to function; baseline checks expected errors
-    "/lambda/",
     // Needs ACQUIRES_CHECK disabled to function; baseline checks expected errors
     "/access_control/",
 ];

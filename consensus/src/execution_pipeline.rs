@@ -9,6 +9,7 @@ use crate::{
     monitor,
     pipeline::pipeline_phase::CountedRequest,
     state_computer::StateComputeResultFut,
+    transaction_shuffler::TransactionShuffler,
 };
 use aptos_consensus_types::{
     block::Block, pipeline_execution_result::PipelineExecutionResult, quorum_cert::QuorumCert,
@@ -99,6 +100,7 @@ impl ExecutionPipeline {
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         pre_commit_hook: PreCommitHook,
         lifetime_guard: CountedRequest<()>,
+        shuffler: Arc<dyn TransactionShuffler>,
     ) -> StateComputeResultFut {
         let (result_tx, result_rx) = oneshot::channel();
         let block_id = block.id();
@@ -114,6 +116,7 @@ impl ExecutionPipeline {
                 pre_commit_hook,
                 lifetime_guard,
                 block_qc,
+                shuffler,
             })
             .expect("Failed to send block to execution pipeline.");
 
@@ -144,6 +147,7 @@ impl ExecutionPipeline {
             command_creation_time,
             lifetime_guard,
             block_qc,
+            shuffler,
         } = command;
         counters::PREPARE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
         debug!("prepare_block received block {}.", block.id());
@@ -183,6 +187,7 @@ impl ExecutionPipeline {
                     result_tx,
                     command_creation_time: Instant::now(),
                     lifetime_guard,
+                    shuffler,
                 })
                 .expect("Failed to send block to execution pipeline.");
         })
@@ -217,6 +222,7 @@ impl ExecutionPipeline {
             result_tx,
             command_creation_time,
             lifetime_guard,
+            shuffler: _,
         }) = block_rx.recv().await
         {
             counters::EXECUTE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
@@ -383,6 +389,7 @@ struct PrepareBlockCommand {
     command_creation_time: Instant,
     lifetime_guard: CountedRequest<()>,
     block_qc: Option<Arc<QuorumCert>>,
+    shuffler: Arc<dyn TransactionShuffler>,
 }
 
 struct ExecuteBlockCommand {
@@ -394,6 +401,8 @@ struct ExecuteBlockCommand {
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
     command_creation_time: Instant,
     lifetime_guard: CountedRequest<()>,
+    #[allow(dead_code)]
+    shuffler: Arc<dyn TransactionShuffler>,
 }
 
 struct LedgerApplyCommand {

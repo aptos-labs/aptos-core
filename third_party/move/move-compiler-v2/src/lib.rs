@@ -17,11 +17,11 @@ pub mod plan_builder;
 use crate::{
     diagnostics::Emitter,
     env_pipeline::{
-        acquires_checker, ast_simplifier, cyclic_instantiation_checker, flow_insensitive_checkers,
-        function_checker, inliner, lambda_lifter, lambda_lifter::LambdaLiftingOptions,
-        model_ast_lints, recursive_struct_checker, rewrite_target::RewritingScope,
-        seqs_in_binop_checker, spec_checker, spec_rewriter, unused_params_checker,
-        EnvProcessorPipeline,
+        acquires_checker, ast_simplifier, closure_checker, cyclic_instantiation_checker,
+        flow_insensitive_checkers, function_checker, inliner, lambda_lifter,
+        lambda_lifter::LambdaLiftingOptions, model_ast_lints, recursive_struct_checker,
+        rewrite_target::RewritingScope, seqs_in_binop_checker, spec_checker, spec_rewriter,
+        unused_params_checker, EnvProcessorPipeline,
     },
     pipeline::{
         ability_processor::AbilityProcessor,
@@ -48,9 +48,8 @@ use codespan_reporting::{
 };
 pub use experiments::{Experiment, EXPERIMENTS};
 use log::{debug, info, log_enabled, Level};
-use move_binary_format::{binary_views::BinaryIndexedView, errors::VMError};
+use move_binary_format::errors::VMError;
 use move_bytecode_source_map::source_map::SourceMap;
-use move_command_line_common::files::FileHash;
 use move_compiler::{
     command_line,
     compiled_unit::{
@@ -62,7 +61,6 @@ use move_compiler::{
 };
 use move_core_types::vm_status::StatusType;
 use move_disassembler::disassembler::Disassembler;
-use move_ir_types::location;
 use move_model::{
     metadata::LanguageVersion,
     model::{GlobalEnv, Loc, MoveIrLoc},
@@ -390,6 +388,11 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
             )
         });
     }
+    if options.experiment_on(Experiment::FUNCTION_VALUES) {
+        env_pipeline.add("closure-ability-checker", |env: &mut GlobalEnv| {
+            closure_checker::check_closures(env)
+        });
+    }
 
     if options.experiment_on(Experiment::SPEC_CHECK) {
         // Specification language checks are not done by the v1 compiler, so this
@@ -515,14 +518,7 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
 pub fn disassemble_compiled_units(units: &[CompiledUnit]) -> anyhow::Result<String> {
     let disassembled_units: anyhow::Result<Vec<_>> = units
         .iter()
-        .map(|unit| {
-            let view = match unit {
-                CompiledUnit::Module(module) => BinaryIndexedView::Module(&module.module),
-                CompiledUnit::Script(script) => BinaryIndexedView::Script(&script.script),
-            };
-            Disassembler::from_view(view, location::Loc::new(FileHash::empty(), 0, 0))
-                .and_then(|d| d.disassemble())
-        })
+        .map(|unit| Disassembler::from_unit(unit).disassemble())
         .collect();
     Ok(disassembled_units?.concat())
 }
