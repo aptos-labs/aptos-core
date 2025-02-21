@@ -21,6 +21,30 @@ pub enum BlockRetrievalRequest {
     V2(BlockRetrievalRequestV2),
 }
 
+impl BlockRetrievalRequest {
+    pub fn new_with_target_round(block_id: HashValue, num_blocks: u64, target_round: u64) -> Self {
+        Self::V2(BlockRetrievalRequestV2 {
+            block_id,
+            num_blocks,
+            target_round,
+        })
+    }
+
+    pub fn block_id(&self) -> HashValue {
+        match self {
+            BlockRetrievalRequest::V1(req) => req.block_id,
+            BlockRetrievalRequest::V2(req) => req.block_id,
+        }
+    }
+
+    pub fn num_blocks(&self) -> u64 {
+        match self {
+            BlockRetrievalRequest::V1(req) => req.num_blocks,
+            BlockRetrievalRequest::V2(req) => req.num_blocks,
+        }
+    }
+}
+
 /// RPC to get a chain of block of the given length starting from the given block id.
 /// TODO @bchocho @hariria fix comment after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
 ///
@@ -81,7 +105,7 @@ impl fmt::Display for BlockRetrievalRequestV1 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "[BlockRetrievalRequest starting from id {} with {} blocks]",
+            "[BlockRetrievalRequestV1 starting from id {} with {} blocks]",
             self.block_id, self.num_blocks
         )
     }
@@ -129,6 +153,16 @@ impl BlockRetrievalRequestV2 {
     }
 }
 
+impl fmt::Display for BlockRetrievalRequestV2 {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "[BlockRetrievalRequestV2 starting from id {} with {} blocks]",
+            self.block_id, self.num_blocks
+        )
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum BlockRetrievalStatus {
     // Successfully fill in the request.
@@ -161,28 +195,51 @@ impl BlockRetrievalResponse {
         &self.blocks
     }
 
-    /// TODO @bchocho @hariria change `retrieval_request` after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
+    /// TODO @bchocho @hariria deprecate `BlockRetrievalRequest::V1` after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
     pub fn verify(
         &self,
-        retrieval_request: BlockRetrievalRequestV1,
+        retrieval_request: BlockRetrievalRequest,
         sig_verifier: &ValidatorVerifier,
     ) -> anyhow::Result<()> {
-        ensure!(
-            self.status != BlockRetrievalStatus::Succeeded
-                || self.blocks.len() as u64 == retrieval_request.num_blocks(),
-            "not enough blocks returned, expect {}, get {}",
-            retrieval_request.num_blocks(),
-            self.blocks.len(),
-        );
-        ensure!(
-            self.status != BlockRetrievalStatus::SucceededWithTarget
-                || self
-                    .blocks
-                    .last()
-                    .map_or(false, |block| retrieval_request.match_target_id(block.id())),
-            "target not found in blocks returned, expect {:?}",
-            retrieval_request.target_block_id(),
-        );
+        match &retrieval_request {
+            BlockRetrievalRequest::V1(retrieval_request) => {
+                ensure!(
+                    self.status != BlockRetrievalStatus::Succeeded
+                        || self.blocks.len() as u64 == retrieval_request.num_blocks(),
+                    "not enough blocks returned, expect {}, get {}",
+                    retrieval_request.num_blocks(),
+                    self.blocks.len(),
+                );
+                ensure!(
+                    self.status != BlockRetrievalStatus::SucceededWithTarget
+                        || self
+                            .blocks
+                            .last()
+                            .map_or(false, |block| retrieval_request.match_target_id(block.id())),
+                    "target not found in blocks returned, expect {:?}",
+                    retrieval_request.target_block_id(),
+                );
+            },
+            BlockRetrievalRequest::V2(retrieval_request) => {
+                ensure!(
+                    self.status != BlockRetrievalStatus::Succeeded
+                        || self.blocks.len() as u64 == retrieval_request.num_blocks(),
+                    "not enough blocks returned, expect {}, get {}",
+                    retrieval_request.num_blocks(),
+                    self.blocks.len(),
+                );
+                ensure!(
+                    self.status != BlockRetrievalStatus::SucceededWithTarget
+                        || (!self.blocks.is_empty()
+                            && retrieval_request
+                                .match_target_round(self.blocks.last().unwrap().round())),
+                    "target not found in blocks returned, expected {:?}, got {:?}",
+                    retrieval_request.target_round(),
+                    self.blocks.iter().map(|b| b.round()).collect::<Vec<_>>(),
+                );
+            },
+        }
+
         self.blocks
             .iter()
             .try_fold(retrieval_request.block_id(), |expected_id, block| {
