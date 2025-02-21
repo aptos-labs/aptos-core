@@ -181,6 +181,17 @@ impl TreeInserter {
         self.insert_block_with_qc(parent_qc, parent, round).await
     }
 
+    pub async fn insert_nil_block(
+        &mut self,
+        parent: &PipelinedBlock,
+        round: Round,
+        committed_block: Option<BlockInfo>,
+    ) -> Arc<PipelinedBlock> {
+        // Node must carry a QC to its parent
+        let parent_qc = self.create_qc_for_block(parent, committed_block);
+        self.insert_nil_block_with_qc(parent_qc, round).await
+    }
+
     pub async fn insert_block_with_qc(
         &mut self,
         parent_qc: QuorumCert,
@@ -195,6 +206,17 @@ impl TreeInserter {
                 Payload::empty(false, true),
                 vec![],
             ))
+            .await
+            .unwrap()
+    }
+
+    pub async fn insert_nil_block_with_qc(
+        &mut self,
+        parent_qc: QuorumCert,
+        round: Round,
+    ) -> Arc<PipelinedBlock> {
+        self.block_store
+            .insert_block_with_qc(self.create_nil_block_with_qc(round, parent_qc, vec![]))
             .await
             .unwrap()
     }
@@ -235,6 +257,15 @@ impl TreeInserter {
             failed_authors,
         )
         .unwrap()
+    }
+
+    pub fn create_nil_block_with_qc(
+        &self,
+        round: Round,
+        quorum_cert: QuorumCert,
+        failed_authors: Vec<(Round, Author)>,
+    ) -> Block {
+        Block::new_nil(round, quorum_cert, failed_authors)
     }
 }
 

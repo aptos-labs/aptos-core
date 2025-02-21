@@ -36,7 +36,7 @@ fn get_blocks_from_block_store_and_window(
         .read()
         .get_ordered_block_window(block, window_size);
     let ordered_block_window = windowed_blocks.unwrap();
-    ordered_block_window.blocks().to_owned()
+    ordered_block_window.blocks().unwrap().to_owned()
 }
 
 /// Helper function for getting `commit_root`, `window_root`
@@ -210,6 +210,67 @@ async fn create_block_tree_with_forks_unordered_parents(
     let d1_r8 = inserter.insert_block(&b1_r2, 8, None).await;
     let a4_r9 = inserter
         .insert_block(&a3_r6, 9, Some(genesis.block_info()))
+        .await;
+
+    let pipelined_blocks: [Arc<PipelinedBlock>; 10] = [
+        genesis_block,
+        a1_r1,
+        a2_r3,
+        a3_r6,
+        a4_r9,
+        b1_r2,
+        b2_r4,
+        b3_r5,
+        c1_r7,
+        d1_r8,
+    ];
+
+    (inserter, block_store, pipelined_blocks)
+}
+
+/// Same as [`create_block_tree_with_forks_unordered_parents`](create_block_tree_with_forks_unordered_parents)
+/// but makes `a4_r9` a nil block and `b2_r4` a nil block. This is to test that nil blocks have
+/// windows. See the test case below.
+async fn create_block_tree_with_forks_unordered_parents_and_nil_blocks(
+    window_size: Option<u64>,
+) -> (TreeInserter, Arc<BlockStore>, [Arc<PipelinedBlock>; 10]) {
+    let validator_signer = ValidatorSigner::random(None);
+    let mut inserter = TreeInserter::new_with_params(
+        validator_signer,
+        window_size,
+        DEFAULT_MAX_PRUNED_BLOCKS_IN_MEM,
+    );
+    let block_store = inserter.block_store();
+    let genesis = block_store.ordered_root();
+    let genesis_block_id = genesis.id();
+    let genesis_block = block_store
+        .get_block(genesis_block_id)
+        .expect("genesis block must exist");
+    assert_eq!(genesis_block.parent_id(), HashValue::zero());
+
+    assert_eq!(block_store.len(), 1);
+    assert_eq!(block_store.child_links(), block_store.len() - 1);
+    assert!(block_store.block_exists(genesis_block.id()));
+
+    // a1 -> round 1
+    let a1_r1 = inserter
+        .insert_block_with_qc(certificate_for_genesis(), &genesis_block, 1)
+        .await;
+    let b1_r2 = inserter
+        .insert_block_with_qc(certificate_for_genesis(), &genesis_block, 2)
+        .await;
+    let a2_r3 = inserter.insert_block(&a1_r1, 3, None).await;
+
+    // Nil block
+    let b2_r4 = inserter.insert_nil_block(&b1_r2, 4, None).await;
+    let b3_r5 = inserter.insert_block(&b2_r4, 5, None).await;
+    let a3_r6 = inserter.insert_block(&a2_r3, 6, None).await;
+    let c1_r7 = inserter.insert_block(&b1_r2, 7, None).await;
+    let d1_r8 = inserter.insert_block(&b1_r2, 8, None).await;
+
+    // Nil block
+    let a4_r9 = inserter
+        .insert_nil_block(&a3_r6, 9, Some(genesis.block_info()))
         .await;
 
     let pipelined_blocks: [Arc<PipelinedBlock>; 10] = [
@@ -719,4 +780,57 @@ async fn test_window_root_with_non_sequential_round_forks() {
     assert_eq!(commit_root.id(), a2_r3.id());
     assert_eq!(window_root.expect("Window root not found"), a1_r1.id());
     assert_eq!(block_window.len(), 3);
+}
+
+/// Checks to make sure:
+/// 1. nil blocks can have a window
+/// 2. nil blocks can be in a window
+#[tokio::test]
+async fn test_window_root_with_non_sequential_round_forks_and_nil_blocks() {
+    // window_size > length of longest fork
+    let window_size = Some(6u64);
+
+    //                            nil_block
+    //                               ↓
+    //       ╭--> A1--> A2--> A3--> A4
+    // Genesis--> B1--> B2--> B3
+    //             │    ↑
+    //             │  nil_block
+    //             ╰--> C1
+    //             ╰--> D1
+    //
+    let (_, block_store, pipelined_blocks) =
+        create_block_tree_with_forks_unordered_parents_and_nil_blocks(window_size).await;
+    let [genesis_block, _a1_r1, _a2_r3, a3_r6, a4_r9, _b1_r2, _b2_r4, _b3_r5, _c1_r7, _d1_r8] =
+        pipelined_blocks;
+
+    // a4_r9 is the nil block
+    let current_block = a4_r9.block();
+    let (commit_root, window_root) = get_roots(current_block, block_store.clone(), window_size);
+    let block_window =
+        get_blocks_from_block_store_and_window(block_store.clone(), current_block, window_size);
+
+    assert_eq!(commit_root.id(), genesis_block.id());
+    assert_eq!(window_root.expect("Window root not found"), a3_r6.id());
+    assert_eq!(block_window.len(), 1);
+
+    // ----------------------------------------------------------------------------------------- //
+
+    let (_, block_store, pipelined_blocks) =
+        create_block_tree_with_forks_unordered_parents_and_nil_blocks(window_size).await;
+    let [_genesis_block, _a1_r1, _a2_r3, _a3_r6, _a4_r9, b1_r2, b2_r4, b3_r5, _c1_r7, _d1_r8] =
+        pipelined_blocks;
+
+    // Nil block is at b2_r4. Setting current block to b3_r5.
+    // Checking to make sure the nil block is included in the window
+    let current_block = b3_r5.block();
+    let block_window =
+        get_blocks_from_block_store_and_window(block_store.clone(), current_block, window_size);
+
+    assert_eq!(block_window.first().unwrap().id(), b1_r2.id());
+
+    // Nil block is included in OrderedBlockWindow
+    assert_eq!(block_window.get(1).unwrap().id(), b2_r4.id());
+    assert!(b2_r4.block().is_nil_block());
+    assert_eq!(block_window.len(), 2);
 }
