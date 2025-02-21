@@ -15,7 +15,6 @@ module aptos_framework::domain_account_abstraction_evm_hex {
     use aptos_std::option;
     use aptos_std::secp256k1;
     use aptos_std::string;
-    use aptos_std::string;
     use aptos_std::string_utils;
     use aptos_std::vector;
 
