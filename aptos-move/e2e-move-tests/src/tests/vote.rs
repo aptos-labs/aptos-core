@@ -1,10 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{
     aptos_governance::*, assert_abort, assert_success, increase_lockup, setup_staking,
     tests::common, MoveHarness,
 };
+use aptos_language_e2e_tests::feature_flags_for_orderless;
 use aptos_types::account_address::AccountAddress;
 use move_core_types::transaction_argument::TransactionArgument;
 use once_cell::sync::Lazy;
@@ -20,19 +22,43 @@ fn build_scripts() -> BTreeMap<String, Vec<u8>> {
 }
 
 // TODO[Orderless]: Remove some cases if unneccessary
-#[rstest(stateless_account1, stateless_account2, stateless_account3,
-    case(true, true, true),
-    case(true, false, true),
-    case(false, true, true),
-    case(false, false, true),
-    case(true, true, false),
-    case(true, false, false),
-    case(false, true, false),
-    case(false, false, false),
+#[rstest(stateless_account1, stateless_account2, stateless_account3, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, true, false, false),
+    case(true, true, true, true, false),
+    case(true, true, true, true, true),
+
+    case(true, false, true, false, false),
+    case(true, false, true, true, false),
+    case(true, false, true, true, true),
+
+    case(false, true, true, false, false),
+    case(false, true, true, true, false),
+    case(false, true, true, true, true),
+
+    case(false, false, true, false, false),
+    case(false, false, true, true, false),
+    case(false, false, true, true, true),
+
+    case(true, true, false, false, false),
+    case(true, true, false, true, false),
+    case(true, true, false, true, true),
+
+    case(true, false, false, false, false),
+    case(true, false, false, true, false),
+    case(true, false, false, true, true),
+
+    case(false, true, false, false, false),
+    case(false, true, false, true, false),
+    case(false, true, false, true, true),
+
+    case(false, false, false, false, false),
+    case(false, false, false, true, false),
+    case(false, false, false, true, true),
 )]
-fn test_vote(stateless_account1: bool, stateless_account2: bool, stateless_account3: bool) {
+fn test_vote(stateless_account1: bool, stateless_account2: bool, stateless_account3: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     // Genesis starts with one validator with index 0
     let mut harness = MoveHarness::new();
+    harness.enable_features(feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions), vec![]);
     let validator_1 = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap(), if stateless_account1 { None } else { Some(0)});
     let validator_2 = harness.new_account_at(AccountAddress::from_hex_literal("0x234").unwrap(), if stateless_account2 { None } else { Some(0)});
     let validator_1_address = *validator_1.address();

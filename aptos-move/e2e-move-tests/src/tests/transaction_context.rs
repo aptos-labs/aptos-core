@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_success, tests::common, MoveHarness};
-use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
+use aptos_language_e2e_tests::{account::{Account, TransactionBuilder}, feature_flags_for_orderless};
 use aptos_types::{
     move_utils::MemberId,
     on_chain_config::FeatureFlag,
@@ -240,72 +241,102 @@ fn new_move_harness() -> MoveHarness {
     )
 }
 
-#[rstest(stateless_account,
-    case(true),
-    case(false),
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
 )]
-fn test_transaction_context_sender(stateless_account: bool) {
+fn test_transaction_context_sender(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut harness = new_move_harness();
+    harness.enable_features(feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions), vec![]);
     let account = setup(&mut harness, stateless_account);
 
     let addr = call_get_sender_from_native_txn_context(&mut harness, &account);
     assert_eq!(addr, AccountAddress::ONE);
 }
 
-#[rstest(stateless_account,
-    case(true),
-    case(false),
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
 )]
-fn test_transaction_context_max_gas_amount(stateless_account: bool) {
+fn test_transaction_context_max_gas_amount(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut harness = new_move_harness();
+    harness.enable_features(feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions), vec![]);
     let account = setup(&mut harness, stateless_account);
 
     let max_gas_amount = call_get_max_gas_amount_from_native_txn_context(&mut harness, &account);
     assert_eq!(max_gas_amount, 2000000);
 }
 
-#[rstest(stateless_account,
-    case(true),
-    case(false),
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
 )]
-fn test_transaction_context_gas_unit_price(stateless_account: bool) {
+fn test_transaction_context_gas_unit_price(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut harness = new_move_harness();
+    harness.enable_features(feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions), vec![]);
     let account = setup(&mut harness, stateless_account);
 
     let max_gas_amount = call_get_gas_unit_price_from_native_txn_context(&mut harness, &account);
     assert_eq!(max_gas_amount, 100);
 }
 
-#[rstest(stateless_account,
-    case(true),
-    case(false),
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
 )]
-fn test_transaction_context_chain_id(stateless_account: bool) {
+fn test_transaction_context_chain_id(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut harness = new_move_harness();
+    harness.enable_features(feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions), vec![]);
     let account = setup(&mut harness, stateless_account);
 
     let chain_id = call_get_chain_id_from_native_txn_context(&mut harness, &account);
     assert_eq!(chain_id, 4);
 }
 
-#[rstest(stateless_account,
-    case(true),
-    case(false),
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
 )]
-fn test_transaction_context_gas_payer_as_sender(stateless_account: bool) {
+fn test_transaction_context_gas_payer_as_sender(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut harness = new_move_harness();
+    harness.enable_features(feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions), vec![]);
     let account = setup(&mut harness, stateless_account);
 
     let gas_payer = call_get_gas_payer_from_native_txn_context(&mut harness, &account);
     assert_eq!(gas_payer, *account.address());
 }
 
-#[rstest(stateless_account,
-    case(true),
-    case(false),
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
 )]
-fn test_transaction_context_secondary_signers_empty(stateless_account: bool) {
+fn test_transaction_context_secondary_signers_empty(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut harness = new_move_harness();
+    harness.enable_features(feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions), vec![]);
     let account = setup(&mut harness, stateless_account);
 
     let secondary_signers =
@@ -313,15 +344,26 @@ fn test_transaction_context_secondary_signers_empty(stateless_account: bool) {
     assert_eq!(secondary_signers, vec![]);
 }
 
-#[rstest(stateless_account,
-    case(true),
-    case(false),
+#[rstest(alice_stateless_account, bob_stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true),
 )]
-fn test_transaction_context_gas_payer_as_separate_account(stateless_account: bool) {
+fn test_transaction_context_gas_payer_as_separate_account(alice_stateless_account: bool, bob_stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut harness = new_move_harness();
+    harness.enable_features(feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions), vec![]);
 
-    let alice = setup(&mut harness, stateless_account);
-    let bob = harness.new_account_with_balance_and_sequence_number(1000000, if stateless_account { None } else { Some(0) });
+    let alice = setup(&mut harness, alice_stateless_account);
+    let bob = harness.new_account_with_balance_and_sequence_number(1000000, if bob_stateless_account { None } else { Some(0) });
 
     let fun: MemberId =
         str::parse("0x1::transaction_context_test::store_gas_payer_from_native_txn_context")
@@ -364,14 +406,23 @@ fn test_transaction_context_gas_payer_as_separate_account(stateless_account: boo
     assert_eq!(gas_payer, *bob.address());
 }
 
-#[rstest(alice_stateless_account, bob_stateless_account,
-    case(true, true),
-    case(true, false),
-    case(false, true),
-    case(false, false),
+#[rstest(alice_stateless_account, bob_stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true),
 )]
-fn test_transaction_context_secondary_signers(alice_stateless_account: bool, bob_stateless_account: bool) {
+fn test_transaction_context_secondary_signers(alice_stateless_account: bool, bob_stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut harness = new_move_harness();
+    harness.enable_features(feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions), vec![]);
 
     let alice = setup(&mut harness, alice_stateless_account);
     let bob = harness.new_account_with_balance_and_sequence_number(1000000, if bob_stateless_account { None } else { Some(0) });
@@ -418,12 +469,17 @@ fn test_transaction_context_secondary_signers(alice_stateless_account: bool, bob
     assert_eq!(secondary_signers, vec![*bob.address()]);
 }
 
-#[rstest(stateless_account,
-    case(true),
-    case(false),
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
 )]
-fn test_transaction_context_entry_function_payload(stateless_account: bool) {
+fn test_transaction_context_entry_function_payload(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut harness = new_move_harness();
+    harness.enable_features(feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions), vec![]);
     let account = setup(&mut harness, stateless_account);
 
     let (account_address, module_name, function_name, type_arg_names, args) =
@@ -446,12 +502,17 @@ fn test_transaction_context_entry_function_payload(stateless_account: bool) {
     ]);
 }
 
-#[rstest(stateless_account,
-    case(true),
-    case(false),
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
 )]
-fn test_transaction_context_multisig_payload(stateless_account: bool) {
+fn test_transaction_context_multisig_payload(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut harness = new_move_harness();
+    harness.enable_features(feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions), vec![]);
     let account = setup(&mut harness, stateless_account);
 
     let multisig_transaction_payload =
