@@ -444,7 +444,8 @@ mod test {
         public_inputs_hash: [u8; 32],
     }
 
-    // Run the prover service locally at http://localhost:8083/
+    // Run the prover service locally - https://github.com/aptos-labs/keyless-zk-proofs/tree/main/prover
+    // Follow the README and make sure to use port 8083
     #[ignore]
     #[tokio::test]
     async fn fetch_sample_proofs_from_prover() {
