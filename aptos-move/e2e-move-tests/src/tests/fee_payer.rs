@@ -22,8 +22,6 @@ use move_core_types::{move_resource::MoveStructType, vm_status::StatusCode};
 use once_cell::sync::Lazy;
 use rstest::rstest;
 
-// TODO[Orderless]: Support stateless accounts
-
 // Fee payer has several modes and requires several tests to validate:
 // Account exists:
 // * Account exists and transaction executes successfully

@@ -237,14 +237,22 @@ fn sample_mint_nft_part4_unit_test_signature(stateless_account: bool, use_txn_pa
 /// Run `cargo test generate_nft_tutorial_part4_signature -- --nocapture`
 /// to generate a valid signature for `[resource_account_address]::create_nft_getting_production_ready::mint_event_pass()` function
 /// in `aptos-move/move-examples/mint_nft/4-Getting-Production-Ready/sources/create_nft_getting_production_ready.move`. åååååååå
-#[rstest(resource_stateless_account, receiver_stateless_account,
-    case(true, true),
-    case(true, false),
-    case(false, true),
-    case(false, false),
+#[rstest(resource_stateless_account, receiver_stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true),
 )]
-fn generate_nft_tutorial_part4_signature(resource_stateless_account: bool, receiver_stateless_account: bool) {
-    let mut h = MoveHarness::new();
+fn generate_nft_tutorial_part4_signature(resource_stateless_account: bool, receiver_stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
     // When running this test to generate a valid signature, supply the actual resource_address to line 217.
     // Uncomment line 223 and comment out line 224 (it's just a placeholder).

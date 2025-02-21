@@ -3,7 +3,6 @@
 
 use crate::MoveHarness;
 use aptos_cached_packages::aptos_stdlib::aptos_account_transfer;
-use aptos_language_e2e_tests::feature_flags_for_orderless;
 use aptos_types::{
     state_store::state_key::StateKey, transaction::ExecutionStatus, write_set::WriteOp,
 };
@@ -29,8 +28,7 @@ use rstest::rstest;
     case(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, false, true, true),
 )]
 fn failed_transaction_cleanup_charges_gas(status_code: StatusCode, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
-    let mut h = MoveHarness::new();
-    h.enable_features(feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions), vec![]);
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
     let sender = h.new_account_with_balance_and_sequence_number(1_000_000, if stateless_account { None } else { Some(0) });
     let receiver = h.new_account_with_balance_and_sequence_number(1_000_000, Some(10));
 

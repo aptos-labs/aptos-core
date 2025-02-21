@@ -29,14 +29,22 @@ struct RotationCapabilityOfferProofChallengeV2 {
 // Should the sequence number in the above test be made optional?
 // Will the rotation capability fail for stateless accounts?
 
-#[rstest(offerer_stateless_account, delegate_stateless_account,
-    case(true, true),
-    case(true, false),
-    case(false, true),
-    case(false, false),
+#[rstest(offerer_stateless_account, delegate_stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true),
 )]
-fn offer_rotation_capability_test(offerer_stateless_account: bool, delegate_stateless_account: bool) {
-    let mut harness = MoveHarness::new();
+fn offer_rotation_capability_test(offerer_stateless_account: bool, delegate_stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut harness = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
     let offerer_account = harness.new_account_with_key_pair(if offerer_stateless_account { None } else { Some(0) });
     let delegate_account = harness.new_account_with_key_pair(if delegate_stateless_account { None } else { Some(0) });
 

@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::MoveHarness;
 use aptos_types::{
     on_chain_config::{CurrentTimeMicroseconds, FeatureFlag},
