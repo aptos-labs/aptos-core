@@ -23,6 +23,7 @@ use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
 use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
+use aptos_genesis::builder::GenesisConfiguration;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
 use aptos_types::{
@@ -584,27 +585,29 @@ where
             genesis_config.epoch_duration_secs = EPOCH_LENGTH_SECS;
             genesis_config.recurring_lockup_duration_secs = 7200;
 
-           match env::var("ENABLE_KEYLESS_DEFAULT") {
+            match env::var("ENABLE_KEYLESS_DEFAULT") {
                 Ok(val) if val.as_str() == "1" => {
-                    println!("Flag `ENABLE_KEYLESS_DEFAULT` detected, will install default Groth16VerificationKey and OIDC providers");
-                    let json_str = include_str!("Groth16VerificationKey.json");
-                    let json = serde_json::from_str(json_str).expect("Failed to parse JSON");
-                    println!("Loading default verification key from JSON:\n{}", serde_json::to_string_pretty(&json).unwrap());
-                    let vk = parse_groth16_vk_from_json(&json).unwrap();
-                    genesis_config.keyless_groth16_vk = Some(vk);
-                    genesis_config.jwk_consensus_config_override = Some(OnChainJWKConsensusConfig::default_enabled());
-                }
+                    let response = ureq::get("https://api.devnet.aptoslabs.com/v1/accounts/0x1/resource/0x1::keyless_account::Groth16VerificationKey").call();
+                    let json: Value = response.into_json().expect("Failed to parse JSON");
+                    configure_keyless_with_vk(genesis_config, json).unwrap();
+                },
                 _ => {},
             };
 
-            match env::var("KEYLESS_GROTH16_VK_PATH") {
+            match env::var("INSTALL_KEYLESS_GROTH16_VK_FROM_URL") {
+                Ok(url) => {
+                    let response = ureq::get(&url).call();
+                    let json: Value = response.into_json().expect("Failed to parse JSON");
+                    configure_keyless_with_vk(genesis_config, json).unwrap();
+                },
+                _ => {},
+            };
+
+            match env::var("INSTALL_KEYLESS_GROTH16_VK_FROM_PATH") {
                 Ok(path) => {
                     let file_content = fs::read_to_string(&path).expect(&format!("Failed to read verification key file: {}", path));
                     let json: Value = serde_json::from_str(&file_content).expect("Failed to parse JSON");
-                    println!("Loading verification key from JSON:\n{}", serde_json::to_string_pretty(&json).unwrap());
-                    let vk = parse_groth16_vk_from_json(&json).unwrap();
-                    genesis_config.keyless_groth16_vk = Some(vk);
-                    genesis_config.jwk_consensus_config_override = Some(OnChainJWKConsensusConfig::default_enabled());
+                    configure_keyless_with_vk(genesis_config, json).unwrap();
                 },
                 _ => {},
             };
@@ -634,7 +637,15 @@ where
     Ok(node_config)
 }
 
+fn configure_keyless_with_vk(genesis_config: &mut GenesisConfiguration, json: Value) -> anyhow::Result<()> {
+    let vk = parse_groth16_vk_from_json(&json)?;
+    genesis_config.keyless_groth16_vk = Some(vk);
+    genesis_config.jwk_consensus_config_override = Some(OnChainJWKConsensusConfig::default_enabled());
+    Ok(())
+}
+
 fn parse_groth16_vk_from_json(json: &Value) -> Result<Groth16VerificationKey, anyhow::Error> {
+    println!("Loading verification key from JSON:\n{}", serde_json::to_string_pretty(&json).unwrap());
     let vk_data = json["data"].clone();
     let gamma_abc_g1 = vk_data["gamma_abc_g1"]
         .as_array()
