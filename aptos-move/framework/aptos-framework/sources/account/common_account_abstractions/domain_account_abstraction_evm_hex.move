@@ -9,7 +9,6 @@
 /// authenticator is expected to be signature: vector<u8>
 /// account_identity is raw public_key.
 module aptos_framework::domain_account_abstraction_evm_hex {
-    use std::error;
     use aptos_framework::auth_data::AbstractionAuthData;
     use aptos_std::aptos_hash;
     use aptos_std::option;
@@ -17,6 +16,7 @@ module aptos_framework::domain_account_abstraction_evm_hex {
     use aptos_std::string;
     use aptos_std::string_utils;
     use aptos_std::vector;
+    use std::error;
 
     const EINVALID_SIGNATURE: u64 = 1;
     const EADDR_MISMATCH: u64 = 2;
@@ -42,7 +42,7 @@ module aptos_framework::domain_account_abstraction_evm_hex {
 
         // Attempt to recover the public key
         let maybe_recovered_public_key = secp256k1::ecdsa_recover(
-            aptos_hash::keccak256(message),
+            aptos_hash::keccak256(*string::bytes(&message)),
             v,
             &signature,
         );
