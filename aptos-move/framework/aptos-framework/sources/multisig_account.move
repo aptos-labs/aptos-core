@@ -355,7 +355,7 @@ module aptos_framework::multisig_account {
     #[view]
     /// Return true if the provided owner is an owner of the provided multisig account.
     public fun is_owner(owner: address, multisig_account: address): bool acquires MultisigAccount {
-        vector::contains(&borrow_global<MultisigAccount>(multisig_account).owners, &owner)
+        borrow_global<MultisigAccount>(multisig_account).owners.contains(&owner)
     }
 
     #[view]
@@ -369,7 +369,7 @@ module aptos_framework::multisig_account {
             sequence_number > 0 && sequence_number < multisig_account_resource.next_sequence_number,
             error::invalid_argument(EINVALID_SEQUENCE_NUMBER),
         );
-        *table::borrow(&multisig_account_resource.transactions, sequence_number)
+        *multisig_account_resource.transactions.borrow(sequence_number)
     }
 
     #[view]
@@ -382,8 +382,8 @@ module aptos_framework::multisig_account {
         let i = multisig_account.last_executed_sequence_number + 1;
         let next_sequence_number = multisig_account.next_sequence_number;
         while (i < next_sequence_number) {
-            vector::push_back(&mut pending_transactions, *table::borrow(&multisig_account.transactions, i));
-            i = i + 1;
+            pending_transactions.push_back(*multisig_account.transactions.borrow(i));
+            i += 1;
         };
         pending_transactions
     }
@@ -394,10 +394,10 @@ module aptos_framework::multisig_account {
         multisig_account: address, provided_payload: vector<u8>): vector<u8> acquires MultisigAccount {
         let multisig_account_resource = borrow_global<MultisigAccount>(multisig_account);
         let sequence_number = multisig_account_resource.last_executed_sequence_number + 1;
-        let transaction = table::borrow(&multisig_account_resource.transactions, sequence_number);
+        let transaction = multisig_account_resource.transactions.borrow(sequence_number);
 
-        if (option::is_some(&transaction.payload)) {
-            *option::borrow(&transaction.payload)
+        if (transaction.payload.is_some()) {
+            *transaction.payload.borrow()
         } else {
             provided_payload
         }
@@ -418,7 +418,7 @@ module aptos_framework::multisig_account {
         assert_valid_sequence_number(multisig_account, sequence_number);
         let (num_approvals, _) = num_approvals_and_rejections(multisig_account, sequence_number);
         if (!has_voted_for_approval(multisig_account, sequence_number, owner)) {
-            num_approvals = num_approvals + 1;
+            num_approvals += 1;
         };
         is_owner(owner, multisig_account) &&
             sequence_number == last_resolved_sequence_number(multisig_account) + 1 &&
@@ -440,7 +440,7 @@ module aptos_framework::multisig_account {
         assert_valid_sequence_number(multisig_account, sequence_number);
         let (_, num_rejections) = num_approvals_and_rejections(multisig_account, sequence_number);
         if (!has_voted_for_rejection(multisig_account, sequence_number, owner)) {
-            num_rejections = num_rejections + 1;
+            num_rejections += 1;
         };
         is_owner(owner, multisig_account) &&
             sequence_number == last_resolved_sequence_number(multisig_account) + 1 &&
@@ -477,10 +477,10 @@ module aptos_framework::multisig_account {
             sequence_number > 0 && sequence_number < multisig_account_resource.next_sequence_number,
             error::invalid_argument(EINVALID_SEQUENCE_NUMBER),
         );
-        let transaction = table::borrow(&multisig_account_resource.transactions, sequence_number);
+        let transaction = multisig_account_resource.transactions.borrow(sequence_number);
         let votes = &transaction.votes;
-        let voted = simple_map::contains_key(votes, &owner);
-        let vote = voted && *simple_map::borrow(votes, &owner);
+        let voted = votes.contains_key(&owner);
+        let vote = voted && *votes.borrow(&owner);
         (voted, vote)
     }
 
@@ -688,7 +688,7 @@ module aptos_framework::multisig_account {
         metadata_values: vector<vector<u8>>,
     ) acquires MultisigAccount {
         let (multisig_account, multisig_signer_cap) = create_multisig_account(owner);
-        vector::push_back(&mut additional_owners, address_of(owner));
+        additional_owners.push_back(address_of(owner));
         create_with_owners_internal(
             &multisig_account,
             additional_owners,
@@ -736,7 +736,7 @@ module aptos_framework::multisig_account {
     ) acquires MultisigAccount {
         assert!(features::multisig_accounts_enabled(), error::unavailable(EMULTISIG_ACCOUNTS_NOT_ENABLED_YET));
         assert!(
-            num_signatures_required > 0 && num_signatures_required <= vector::length(&owners),
+            num_signatures_required > 0 && num_signatures_required <= owners.length(),
             error::invalid_argument(EINVALID_SIGNATURES_REQUIRED),
         );
 
@@ -902,9 +902,9 @@ module aptos_framework::multisig_account {
         values: vector<vector<u8>>,
         emit_event: bool,
     ) acquires MultisigAccount {
-        let num_attributes = vector::length(&keys);
+        let num_attributes = keys.length();
         assert!(
-            num_attributes == vector::length(&values),
+            num_attributes == values.length(),
             error::invalid_argument(ENUMBER_OF_METADATA_KEYS_AND_VALUES_DONT_MATCH),
         );
 
@@ -916,15 +916,15 @@ module aptos_framework::multisig_account {
         let metadata = &mut multisig_account_resource.metadata;
         let i = 0;
         while (i < num_attributes) {
-            let key = *vector::borrow(&keys, i);
-            let value = *vector::borrow(&values, i);
+            let key = keys[i];
+            let value = values[i];
             assert!(
-                !simple_map::contains_key(metadata, &key),
+                !metadata.contains_key(&key),
                 error::invalid_argument(EDUPLICATE_METADATA_KEY),
             );
 
-            simple_map::add(metadata, key, value);
-            i = i + 1;
+            metadata.add(key, value);
+            i += 1;
         };
 
         if (emit_event) {
@@ -956,7 +956,7 @@ module aptos_framework::multisig_account {
         multisig_account: address,
         payload: vector<u8>,
     ) acquires MultisigAccount {
-        assert!(vector::length(&payload) > 0, error::invalid_argument(EPAYLOAD_CANNOT_BE_EMPTY));
+        assert!(payload.length() > 0, error::invalid_argument(EPAYLOAD_CANNOT_BE_EMPTY));
 
         assert_multisig_account_exists(multisig_account);
         assert_is_owner(owner, multisig_account);
@@ -981,7 +981,7 @@ module aptos_framework::multisig_account {
         payload_hash: vector<u8>,
     ) acquires MultisigAccount {
         // Payload hash is a sha3-256 hash, so it must be exactly 32 bytes.
-        assert!(vector::length(&payload_hash) == 32, error::invalid_argument(EINVALID_PAYLOAD_HASH));
+        assert!(payload_hash.length() == 32, error::invalid_argument(EINVALID_PAYLOAD_HASH));
 
         assert_multisig_account_exists(multisig_account);
         assert_is_owner(owner, multisig_account);
@@ -1019,17 +1019,17 @@ module aptos_framework::multisig_account {
         assert_is_owner_internal(owner, multisig_account_resource);
 
         assert!(
-            table::contains(&multisig_account_resource.transactions, sequence_number),
+            multisig_account_resource.transactions.contains(sequence_number),
             error::not_found(ETRANSACTION_NOT_FOUND),
         );
-        let transaction = table::borrow_mut(&mut multisig_account_resource.transactions, sequence_number);
+        let transaction = multisig_account_resource.transactions.borrow_mut(sequence_number);
         let votes = &mut transaction.votes;
         let owner_addr = address_of(owner);
 
-        if (simple_map::contains_key(votes, &owner_addr)) {
-            *simple_map::borrow_mut(votes, &owner_addr) = approved;
+        if (votes.contains_key(&owner_addr)) {
+            *votes.borrow_mut(&owner_addr) = approved;
         } else {
-            simple_map::add(votes, owner_addr, approved);
+            votes.add(owner_addr, approved);
         };
 
         if (std::features::module_event_migration_enabled()) {
@@ -1067,7 +1067,7 @@ module aptos_framework::multisig_account {
         let sequence_number = starting_sequence_number;
         while(sequence_number <= final_sequence_number) {
             vote_transanction(owner, multisig_account, sequence_number, approved);
-            sequence_number = sequence_number + 1;
+            sequence_number += 1;
         }
     }
 
@@ -1159,9 +1159,9 @@ module aptos_framework::multisig_account {
         // If the transaction payload is not stored on chain, verify that the provided payload matches the hashes stored
         // on chain.
         let multisig_account_resource = borrow_global<MultisigAccount>(multisig_account);
-        let transaction = table::borrow(&multisig_account_resource.transactions, sequence_number);
-        if (option::is_some(&transaction.payload_hash)) {
-            let payload_hash = option::borrow(&transaction.payload_hash);
+        let transaction = multisig_account_resource.transactions.borrow(sequence_number);
+        if (transaction.payload_hash.is_some()) {
+            let payload_hash = transaction.payload_hash.borrow();
             assert!(
                 sha3_256(payload) == *payload_hash,
                 error::invalid_argument(EPAYLOAD_DOES_NOT_MATCH_HASH),
@@ -1171,10 +1171,10 @@ module aptos_framework::multisig_account {
         // If the transaction payload is stored on chain and there is a provided payload,
         // verify that the provided payload matches the stored payload.
         if (features::abort_if_multisig_payload_mismatch_enabled()
-            && option::is_some(&transaction.payload)
-            && !vector::is_empty(&payload)
+            && transaction.payload.is_some()
+            && !payload.is_empty()
         ) {
-            let stored_payload = option::borrow(&transaction.payload);
+            let stored_payload = transaction.payload.borrow();
             assert!(
                 payload == *stored_payload,
                 error::invalid_argument(EPAYLOAD_DOES_NOT_MATCH),
@@ -1278,7 +1278,7 @@ module aptos_framework::multisig_account {
                     }
                 );
             };
-            num_approvals = num_approvals + 1;
+            num_approvals += 1;
         };
 
         num_approvals
@@ -1287,7 +1287,7 @@ module aptos_framework::multisig_account {
     // Remove the next transaction in the queue as it's been executed and return the number of approvals it had.
     fun remove_executed_transaction(multisig_account_resource: &mut MultisigAccount): (u64, u64) {
         let sequence_number = multisig_account_resource.last_executed_sequence_number + 1;
-        let transaction = table::remove(&mut multisig_account_resource.transactions, sequence_number);
+        let transaction = multisig_account_resource.transactions.remove(sequence_number);
         multisig_account_resource.last_executed_sequence_number = sequence_number;
         num_approvals_and_rejections_internal(&multisig_account_resource.owners, &transaction)
     }
@@ -1307,14 +1307,14 @@ module aptos_framework::multisig_account {
         let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_account);
 
         // The transaction creator also automatically votes for the transaction.
-        simple_map::add(&mut transaction.votes, creator, true);
+        transaction.votes.add(creator, true);
 
         let sequence_number = multisig_account_resource.next_sequence_number;
         multisig_account_resource.next_sequence_number = sequence_number + 1;
-        table::add(&mut multisig_account_resource.transactions, sequence_number, transaction);
+        multisig_account_resource.transactions.add(sequence_number, transaction);
         if (std::features::module_event_migration_enabled()) {
             emit(
-                CreateTransaction { multisig_account: multisig_account, creator, sequence_number, transaction }
+                CreateTransaction { multisig_account, creator, sequence_number, transaction }
             );
         } else {
             emit_event(
@@ -1340,26 +1340,26 @@ module aptos_framework::multisig_account {
     fun create_multisig_account_seed(seed: vector<u8>): vector<u8> {
         // Generate a seed that will be used to create the resource account that hosts the multisig account.
         let multisig_account_seed = vector::empty<u8>();
-        vector::append(&mut multisig_account_seed, DOMAIN_SEPARATOR);
-        vector::append(&mut multisig_account_seed, seed);
+        multisig_account_seed.append(DOMAIN_SEPARATOR);
+        multisig_account_seed.append(seed);
 
         multisig_account_seed
     }
 
     fun validate_owners(owners: &vector<address>, multisig_account: address) {
         let distinct_owners: vector<address> = vector[];
-        vector::for_each_ref(owners, |owner| {
+        owners.for_each_ref(|owner| {
             let owner = *owner;
             assert!(owner != multisig_account, error::invalid_argument(EOWNER_CANNOT_BE_MULTISIG_ACCOUNT_ITSELF));
-            let (found, _) = vector::index_of(&distinct_owners, &owner);
+            let (found, _) = distinct_owners.index_of(&owner);
             assert!(!found, error::invalid_argument(EDUPLICATE_OWNER));
-            vector::push_back(&mut distinct_owners, owner);
+            distinct_owners.push_back(owner);
         });
     }
 
     inline fun assert_is_owner_internal(owner: &signer, multisig_account: &MultisigAccount) {
         assert!(
-            vector::contains(&multisig_account.owners, &address_of(owner)),
+            multisig_account.owners.contains(&address_of(owner)),
             error::permission_denied(ENOT_OWNER),
         );
     }
@@ -1374,12 +1374,12 @@ module aptos_framework::multisig_account {
         let num_rejections = 0;
 
         let votes = &transaction.votes;
-        vector::for_each_ref(owners, |owner| {
-            if (simple_map::contains_key(votes, owner)) {
-                if (*simple_map::borrow(votes, owner)) {
-                    num_approvals = num_approvals + 1;
+        owners.for_each_ref(|owner| {
+            if (votes.contains_key(owner)) {
+                if (*votes.borrow(owner)) {
+                    num_approvals += 1;
                 } else {
-                    num_rejections = num_rejections + 1;
+                    num_rejections += 1;
                 };
             }
         });
@@ -1389,7 +1389,7 @@ module aptos_framework::multisig_account {
 
     inline fun num_approvals_and_rejections(multisig_account: address, sequence_number: u64): (u64, u64) acquires MultisigAccount {
         let multisig_account_resource = borrow_global<MultisigAccount>(multisig_account);
-        let transaction = table::borrow(&multisig_account_resource.transactions, sequence_number);
+        let transaction = multisig_account_resource.transactions.borrow(sequence_number);
         num_approvals_and_rejections_internal(&multisig_account_resource.owners, transaction)
     }
 
@@ -1418,7 +1418,7 @@ module aptos_framework::multisig_account {
     inline fun assert_transaction_exists(multisig_account: address, sequence_number: u64) acquires MultisigAccount {
         let multisig_account_resource = borrow_global<MultisigAccount>(multisig_account);
         assert!(
-            table::contains(&multisig_account_resource.transactions, sequence_number),
+            multisig_account_resource.transactions.contains(sequence_number),
             error::not_found(ETRANSACTION_NOT_FOUND),
         );
     }
@@ -1434,15 +1434,15 @@ module aptos_framework::multisig_account {
         let multisig_account_ref_mut =
             borrow_global_mut<MultisigAccount>(multisig_address);
         // Verify no overlap between new owners and owners to remove.
-        vector::for_each_ref(&new_owners, |new_owner_ref| {
+        new_owners.for_each_ref(|new_owner_ref| {
             assert!(
-                !vector::contains(&owners_to_remove, new_owner_ref),
+                !owners_to_remove.contains(new_owner_ref),
                 error::invalid_argument(EOWNERS_TO_REMOVE_NEW_OWNERS_OVERLAP)
             )
         });
         // If new owners provided, try to add them and emit an event.
-        if (vector::length(&new_owners) > 0) {
-            vector::append(&mut multisig_account_ref_mut.owners, new_owners);
+        if (new_owners.length() > 0) {
+            multisig_account_ref_mut.owners.append(new_owners);
             validate_owners(
                 &multisig_account_ref_mut.owners,
                 multisig_address
@@ -1457,21 +1457,18 @@ module aptos_framework::multisig_account {
             };
         };
         // If owners to remove provided, try to remove them.
-        if (vector::length(&owners_to_remove) > 0) {
+        if (owners_to_remove.length() > 0) {
             let owners_ref_mut = &mut multisig_account_ref_mut.owners;
             let owners_removed = vector[];
-            vector::for_each_ref(&owners_to_remove, |owner_to_remove_ref| {
+            owners_to_remove.for_each_ref(|owner_to_remove_ref| {
                 let (found, index) =
-                    vector::index_of(owners_ref_mut, owner_to_remove_ref);
+                    owners_ref_mut.index_of(owner_to_remove_ref);
                 if (found) {
-                    vector::push_back(
-                        &mut owners_removed,
-                        vector::swap_remove(owners_ref_mut, index)
-                    );
+                    owners_removed.push_back(owners_ref_mut.swap_remove(index));
                 }
             });
             // Only emit event if owner(s) actually removed.
-            if (vector::length(&owners_removed) > 0) {
+            if (owners_removed.length() > 0) {
                 if (std::features::module_event_migration_enabled()) {
                     emit(
                         RemoveOwners { multisig_account: multisig_address, owners_removed }
@@ -1485,9 +1482,9 @@ module aptos_framework::multisig_account {
             }
         };
         // If new signature count provided, try to update count.
-        if (option::is_some(&optional_new_num_signatures_required)) {
+        if (optional_new_num_signatures_required.is_some()) {
             let new_num_signatures_required =
-                option::extract(&mut optional_new_num_signatures_required);
+                optional_new_num_signatures_required.extract();
             assert!(
                 new_num_signatures_required > 0,
                 error::invalid_argument(EINVALID_SIGNATURES_REQUIRED)
@@ -1518,7 +1515,7 @@ module aptos_framework::multisig_account {
             }
         };
         // Verify number of owners.
-        let num_owners = vector::length(&multisig_account_ref_mut.owners);
+        let num_owners = multisig_account_ref_mut.owners.length();
         assert!(
             num_owners >= multisig_account_ref_mut.num_signatures_required,
             error::invalid_state(ENOT_ENOUGH_OWNERS)
@@ -1908,9 +1905,9 @@ module aptos_framework::multisig_account {
             vector[vector[1], vector[2]],
         );
         let updated_metadata = metadata(multisig_account);
-        assert!(simple_map::length(&updated_metadata) == 2, 0);
-        assert!(simple_map::borrow(&updated_metadata, &utf8(b"key1")) == &vector[1], 0);
-        assert!(simple_map::borrow(&updated_metadata, &utf8(b"key2")) == &vector[2], 0);
+        assert!(updated_metadata.length() == 2, 0);
+        assert!(updated_metadata.borrow(&utf8(b"key1")) == &vector[1], 0);
+        assert!(updated_metadata.borrow(&utf8(b"key2")) == &vector[2], 0);
     }
 
     #[test(owner = @0x123)]
@@ -2025,13 +2022,13 @@ module aptos_framework::multisig_account {
         create_transaction(owner_1, multisig_account, PAYLOAD);
         let transaction = get_transaction(multisig_account, 1);
         assert!(transaction.creator == owner_1_addr, 0);
-        assert!(option::is_some(&transaction.payload), 1);
-        assert!(option::is_none(&transaction.payload_hash), 2);
-        let payload = option::extract(&mut transaction.payload);
+        assert!(transaction.payload.is_some(), 1);
+        assert!(transaction.payload_hash.is_none(), 2);
+        let payload = transaction.payload.extract();
         assert!(payload == PAYLOAD, 4);
         // Automatic yes vote from creator.
-        assert!(simple_map::length(&transaction.votes) == 1, 5);
-        assert!(*simple_map::borrow(&transaction.votes, &owner_1_addr), 5);
+        assert!(transaction.votes.length() == 1, 5);
+        assert!(*transaction.votes.borrow(&owner_1_addr), 5);
     }
 
     #[test(owner = @0x123)]
@@ -2103,10 +2100,10 @@ module aptos_framework::multisig_account {
         approve_transaction(owner_2, multisig_account, 1);
         approve_transaction(owner_3, multisig_account, 1);
         let transaction = get_transaction(multisig_account, 1);
-        assert!(simple_map::length(&transaction.votes) == 3, 0);
-        assert!(*simple_map::borrow(&transaction.votes, &owner_1_addr), 1);
-        assert!(*simple_map::borrow(&transaction.votes, &owner_2_addr), 2);
-        assert!(*simple_map::borrow(&transaction.votes, &owner_3_addr), 3);
+        assert!(transaction.votes.length() == 3, 0);
+        assert!(*transaction.votes.borrow(&owner_1_addr), 1);
+        assert!(*transaction.votes.borrow(&owner_2_addr), 2);
+        assert!(*transaction.votes.borrow(&owner_3_addr), 3);
     }
 
     #[test(owner_1 = @0x123, owner_2 = @0x124, owner_3 = @0x125)]
@@ -2171,7 +2168,7 @@ module aptos_framework::multisig_account {
         reject_transaction(owner, multisig_account, 1);
         approve_transaction(owner, multisig_account, 1);
         let transaction = get_transaction(multisig_account, 1);
-        assert!(*simple_map::borrow(&transaction.votes, &owner_addr), 1);
+        assert!(*transaction.votes.borrow(&owner_addr), 1);
     }
 
     #[test(owner_1 = @0x123, owner_2 = @0x124, owner_3 = @0x125)]
@@ -2190,10 +2187,10 @@ module aptos_framework::multisig_account {
         reject_transaction(owner_2, multisig_account, 1);
         reject_transaction(owner_3, multisig_account, 1);
         let transaction = get_transaction(multisig_account, 1);
-        assert!(simple_map::length(&transaction.votes) == 3, 0);
-        assert!(!*simple_map::borrow(&transaction.votes, &owner_1_addr), 1);
-        assert!(!*simple_map::borrow(&transaction.votes, &owner_2_addr), 2);
-        assert!(!*simple_map::borrow(&transaction.votes, &owner_3_addr), 3);
+        assert!(transaction.votes.length() == 3, 0);
+        assert!(!*transaction.votes.borrow(&owner_1_addr), 1);
+        assert!(!*transaction.votes.borrow(&owner_2_addr), 2);
+        assert!(!*transaction.votes.borrow(&owner_3_addr), 3);
     }
 
     #[test(owner = @0x123)]
@@ -2208,7 +2205,7 @@ module aptos_framework::multisig_account {
         create_transaction(owner, multisig_account, PAYLOAD);
         reject_transaction(owner, multisig_account, 1);
         let transaction = get_transaction(multisig_account, 1);
-        assert!(!*simple_map::borrow(&transaction.votes, &owner_addr), 1);
+        assert!(!*transaction.votes.borrow(&owner_addr), 1);
     }
 
     #[test(owner = @0x123)]
@@ -2250,7 +2247,7 @@ module aptos_framework::multisig_account {
         // Owner 1 doesn't need to explicitly approve as they created the transaction.
         approve_transaction(owner_2, multisig_account, 1);
         assert!(can_be_executed(multisig_account, 1), 1);
-        assert!(table::contains(&borrow_global<MultisigAccount>(multisig_account).transactions, 1), 0);
+        assert!(borrow_global<MultisigAccount>(multisig_account).transactions.contains(1), 0);
         successful_transaction_execution_cleanup(owner_3_addr, multisig_account, vector[]);
     }
 
@@ -2269,7 +2266,7 @@ module aptos_framework::multisig_account {
         // Owner 1 doesn't need to explicitly approve as they created the transaction.
         approve_transaction(owner_2, multisig_account, 1);
         assert!(can_be_executed(multisig_account, 1), 1);
-        assert!(table::contains(&borrow_global<MultisigAccount>(multisig_account).transactions, 1), 0);
+        assert!(borrow_global<MultisigAccount>(multisig_account).transactions.contains(1), 0);
         failed_transaction_execution_cleanup(owner_3_addr, multisig_account, vector[], execution_error());
     }
 
@@ -2288,7 +2285,7 @@ module aptos_framework::multisig_account {
         // Owner 3 doesn't need to explicitly approve as they created the transaction.
         approve_transaction(owner_1, multisig_account, 1);
         assert!(can_be_executed(multisig_account, 1), 1);
-        assert!(table::contains(&borrow_global<MultisigAccount>(multisig_account).transactions, 1), 0);
+        assert!(borrow_global<MultisigAccount>(multisig_account).transactions.contains(1), 0);
         successful_transaction_execution_cleanup(owner_3_addr, multisig_account, PAYLOAD);
     }
 
@@ -2307,7 +2304,7 @@ module aptos_framework::multisig_account {
         reject_transaction(owner_2, multisig_account, 1);
         reject_transaction(owner_3, multisig_account, 1);
         assert!(can_be_rejected(multisig_account, 1), 1);
-        assert!(table::contains(&borrow_global<MultisigAccount>(multisig_account).transactions, 1), 0);
+        assert!(borrow_global<MultisigAccount>(multisig_account).transactions.contains(1), 0);
         execute_rejected_transaction(owner_3, multisig_account);
     }
 
@@ -2398,7 +2395,7 @@ module aptos_framework::multisig_account {
         let remaining_iterations = MAX_PENDING_TRANSACTIONS + 1;
         while (remaining_iterations > 0) {
             create_transaction(owner_1, multisig_address, PAYLOAD);
-            remaining_iterations = remaining_iterations - 1;
+            remaining_iterations -= 1;
         }
     }
 
@@ -2446,7 +2443,7 @@ module aptos_framework::multisig_account {
         let remaining_iterations = MAX_PENDING_TRANSACTIONS;
         while (remaining_iterations > 0) {
             create_transaction(owner_3, multisig_address, PAYLOAD);
-            remaining_iterations = remaining_iterations - 1;
+            remaining_iterations -= 1;
         };
 
         // No one can create a transaction anymore because the transaction queue is full.

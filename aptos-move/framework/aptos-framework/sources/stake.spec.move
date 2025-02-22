@@ -203,9 +203,9 @@ spec aptos_framework::stake {
         aborts_if voting_power >maximum_stake;
 
         let validator_config = global<ValidatorConfig>(pool_address);
-        aborts_if vector::is_empty(validator_config.consensus_pubkey);
+        aborts_if validator_config.consensus_pubkey.is_empty();
 
-        let validator_set_size = vector::length(validator_set.active_validators) + vector::length(validator_set.pending_active) + 1;
+        let validator_set_size = validator_set.active_validators.length() + validator_set.pending_active.length() + 1;
         aborts_if validator_set_size > MAX_VALIDATOR_SET_SIZE;
 
         let voting_power_increase_limit = (staking_config::get_voting_power_increase_limit(config) as u128);
@@ -299,9 +299,9 @@ spec aptos_framework::stake {
             + len(post_pending_inactive_validators);
 
         aborts_if !validator_find_bool && !option::spec_is_some(spec_find_validator(active_validators, pool_address));
-        aborts_if !validator_find_bool && vector::length(validator_set.active_validators) <= option::spec_borrow(spec_find_validator(active_validators, pool_address));
-        aborts_if !validator_find_bool && vector::length(validator_set.active_validators) < 2;
-        aborts_if validator_find_bool && vector::length(validator_set.pending_active) <= option::spec_borrow(spec_find_validator(pending_active, pool_address));
+        aborts_if !validator_find_bool && validator_set.active_validators.length() <= option::spec_borrow(spec_find_validator(active_validators, pool_address));
+        aborts_if !validator_find_bool && validator_set.active_validators.length() < 2;
+        aborts_if validator_find_bool && validator_set.pending_active.length() <= option::spec_borrow(spec_find_validator(pending_active, pool_address));
         let post p_validator_set = global<ValidatorSet>(@aptos_framework);
         let validator_stake = (get_next_epoch_voting_power(stake_pool) as u128);
         ensures validator_find_bool && validator_set.total_joining_power > validator_stake ==>
@@ -601,7 +601,7 @@ spec aptos_framework::stake {
         let addr = type_info::type_of<AptosCoin>().account_address;
         aborts_if (rewards_amount > 0) && !exists<coin::CoinInfo<AptosCoin>>(addr);
         modifies global<coin::CoinInfo<AptosCoin>>(addr);
-        include (rewards_amount > 0) ==> coin::CoinAddAbortsIf<AptosCoin> { amount: amount };
+        include (rewards_amount > 0) ==> coin::CoinAddAbortsIf<AptosCoin> { amount };
     }
 
     spec get_reconfig_start_time_secs(): u64 {
@@ -654,10 +654,10 @@ spec aptos_framework::stake {
     spec find_validator {
         pragma opaque;
         aborts_if false;
-        ensures option::is_none(result) ==> (forall i in 0..len(v): v[i].addr != addr);
-        ensures option::is_some(result) ==> v[option::borrow(result)].addr == addr;
+        ensures result.is_none() ==> (forall i in 0..len(v): v[i].addr != addr);
+        ensures result.is_some() ==> v[result.borrow()].addr == addr;
         // Additional postcondition to help the quantifier instantiation.
-        ensures option::is_some(result) ==> spec_contains(v, addr);
+        ensures result.is_some() ==> spec_contains(v, addr);
         ensures [abstract] result == spec_find_validator(v,addr);
     }
 

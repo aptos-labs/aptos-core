@@ -173,9 +173,8 @@ spec aptos_framework::coin {
         amount: u64;
         let addr = type_info::type_of<CoinType>().account_address;
         let maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
-        include (option::is_some(
-            maybe_supply
-        )) ==> optional_aggregator::SubAbortsIf { optional_aggregator: option::borrow(maybe_supply), value: amount };
+        include (maybe_supply.is_some()) ==> optional_aggregator::SubAbortsIf { optional_aggregator: maybe_supply.borrow(
+        ), value: amount };
     }
 
     spec schema CoinAddAbortsIf<CoinType> {
@@ -183,9 +182,8 @@ spec aptos_framework::coin {
         amount: u64;
         let addr = type_info::type_of<CoinType>().account_address;
         let maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
-        include (option::is_some(
-            maybe_supply
-        )) ==> optional_aggregator::AddAbortsIf { optional_aggregator: option::borrow(maybe_supply), value: amount };
+        include (maybe_supply.is_some()) ==> optional_aggregator::AddAbortsIf { optional_aggregator: maybe_supply.borrow(
+        ), value: amount };
     }
 
     spec schema AbortsIfNotExistCoinInfo<CoinType> {
@@ -391,8 +389,8 @@ spec aptos_framework::coin {
         aborts_if type_info::type_of<CoinType>().account_address != account_addr;
         /// [high-level-req-2]
         aborts_if exists<CoinInfo<CoinType>>(account_addr);
-        aborts_if string::length(name) > MAX_COIN_NAME_LENGTH;
-        aborts_if string::length(symbol) > MAX_COIN_SYMBOL_LENGTH;
+        aborts_if name.length() > MAX_COIN_NAME_LENGTH;
+        aborts_if symbol.length() > MAX_COIN_SYMBOL_LENGTH;
     }
 
     // `account` must be `@aptos_framework`.

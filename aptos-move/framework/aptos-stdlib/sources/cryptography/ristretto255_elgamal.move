@@ -41,9 +41,9 @@ module aptos_std::ristretto255_elgamal {
     /// Creates a new public key from a serialized Ristretto255 point.
     public fun new_pubkey_from_bytes(bytes: vector<u8>): Option<CompressedPubkey> {
         let point = ristretto255::new_compressed_point_from_bytes(bytes);
-        if (std::option::is_some(&mut point)) {
+        if (point.is_some()) {
             let pk = CompressedPubkey {
-                point: std::option::extract(&mut point)
+                point: point.extract()
             };
             std::option::some(pk)
         } else {
@@ -69,19 +69,19 @@ module aptos_std::ristretto255_elgamal {
     /// Creates a new ciphertext from two serialized Ristretto255 points: the first 32 bytes store `r * G` while the
     /// next 32 bytes store `v * G + r * Y`, where `Y` is the public key.
     public fun new_ciphertext_from_bytes(bytes: vector<u8>): Option<Ciphertext> {
-        if(vector::length(&bytes) != 64) {
+        if(bytes.length() != 64) {
             return std::option::none<Ciphertext>()
         };
 
-        let bytes_right = vector::trim(&mut bytes, 32);
+        let bytes_right = bytes.trim(32);
 
         let left_point = ristretto255::new_point_from_bytes(bytes);
         let right_point = ristretto255::new_point_from_bytes(bytes_right);
 
-        if (std::option::is_some<RistrettoPoint>(&mut left_point) && std::option::is_some<RistrettoPoint>(&mut right_point)) {
+        if (left_point.is_some::<RistrettoPoint>() && right_point.is_some::<RistrettoPoint>()) {
             std::option::some<Ciphertext>(Ciphertext {
-                left: std::option::extract<RistrettoPoint>(&mut left_point),
-                right: std::option::extract<RistrettoPoint>(&mut right_point)
+                left: left_point.extract::<RistrettoPoint>(),
+                right: right_point.extract::<RistrettoPoint>()
             })
         } else {
             std::option::none<Ciphertext>()
@@ -118,8 +118,8 @@ module aptos_std::ristretto255_elgamal {
         let bytes_left = ristretto255::point_to_bytes(&ristretto255::point_compress(&ct.left));
         let bytes_right = ristretto255::point_to_bytes(&ristretto255::point_compress(&ct.right));
         let bytes = vector::empty<u8>();
-        vector::append<u8>(&mut bytes, bytes_left);
-        vector::append<u8>(&mut bytes, bytes_right);
+        bytes.append::<u8>(bytes_left);
+        bytes.append::<u8>(bytes_right);
         bytes
     }
 

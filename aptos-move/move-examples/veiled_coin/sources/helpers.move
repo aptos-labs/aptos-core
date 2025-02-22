@@ -11,14 +11,14 @@ module veiled_coin::helpers {
     /// Given a vector `vec`, removes the last `cut_len` elements of `vec` and returns them in order. (This function
     /// exists because we did not like the interface of `std::vector::trim`.)
     public fun cut_vector<T>(vec: &mut vector<T>, cut_len: u64): vector<T> {
-        let len = vector::length(vec);
+        let len = vec.length();
         let res = vector::empty();
         assert!(len >= cut_len, error::out_of_range(EVECTOR_CUT_TOO_LARGE));
         while (cut_len > 0) {
-            vector::push_back(&mut res, vector::pop_back(vec));
-            cut_len = cut_len - 1;
+            res.push_back(vec.pop_back());
+            cut_len -= 1;
         };
-        vector::reverse(&mut res);
+        res.reverse();
         res
     }
 

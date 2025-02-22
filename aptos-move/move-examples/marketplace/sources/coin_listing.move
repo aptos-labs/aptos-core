@@ -338,14 +338,14 @@ module coin_listing {
             let now = timestamp::now_seconds();
             assert!(now < auction_end_time, error::invalid_state(EAUCTION_ENDED));
 
-            assert!(option::is_some(&buy_it_now_price), error::invalid_argument(ENO_BUY_IT_NOW));
-            if (option::is_some(&current_bid)) {
-                let Bid { bidder, coins } = option::destroy_some(current_bid);
+            assert!(buy_it_now_price.is_some(), error::invalid_argument(ENO_BUY_IT_NOW));
+            if (current_bid.is_some()) {
+                let Bid { bidder, coins } = current_bid.destroy_some();
                 aptos_account::deposit_coins(bidder, coins);
             } else {
-                option::destroy_none(current_bid);
+                current_bid.destroy_none();
             };
-            (option::destroy_some(buy_it_now_price), string::utf8(AUCTION_TYPE))
+            (buy_it_now_price.destroy_some(), string::utf8(AUCTION_TYPE))
         } else if (exists<FixedPriceListing<CoinType>>(listing_addr)) {
             let FixedPriceListing {
                 price,
@@ -402,8 +402,8 @@ module coin_listing {
         let now = timestamp::now_seconds();
         assert!(now < auction_listing.auction_end_time, error::invalid_state(EAUCTION_ENDED));
 
-        let (previous_bidder, previous_bid, minimum_bid) = if (option::is_some(&auction_listing.current_bid)) {
-            let Bid { bidder, coins } = option::extract(&mut auction_listing.current_bid);
+        let (previous_bidder, previous_bid, minimum_bid) = if (auction_listing.current_bid.is_some()) {
+            let Bid { bidder, coins } = auction_listing.current_bid.extract();
             let current_bid = coin::value(&coins);
             aptos_account::deposit_coins(bidder, coins);
             (option::some(bidder), option::some(current_bid), current_bid + auction_listing.bid_increment)
@@ -417,7 +417,7 @@ module coin_listing {
             bidder: signer::address_of(bidder),
             coins,
         };
-        option::fill(&mut auction_listing.current_bid, bid);
+        auction_listing.current_bid.fill(bid);
 
         let fee_schedule = listing::fee_schedule(object);
         aptos_account::transfer_coins<CoinType>(
@@ -471,11 +471,11 @@ module coin_listing {
 
         let seller = listing::seller(object);
 
-        let (purchaser, coins) = if (option::is_some(&current_bid)) {
-            let Bid { bidder, coins } = option::destroy_some(current_bid);
+        let (purchaser, coins) = if (current_bid.is_some()) {
+            let Bid { bidder, coins } = current_bid.destroy_some();
             (bidder, coins)
         } else {
-            option::destroy_none(current_bid);
+            current_bid.destroy_none();
             (seller, coin::zero<CoinType>())
         };
 
@@ -579,8 +579,8 @@ module coin_listing {
         object: Object<Listing>,
     ): Option<address> acquires AuctionListing {
         let auction = borrow_auction<CoinType>(object);
-        if (option::is_some(&auction.current_bid)) {
-            option::some(option::borrow(&auction.current_bid).bidder)
+        if (auction.current_bid.is_some()) {
+            option::some(auction.current_bid.borrow().bidder)
         } else {
             option::none()
         }
@@ -591,8 +591,8 @@ module coin_listing {
         object: Object<Listing>,
     ): Option<u64> acquires AuctionListing {
         let auction = borrow_auction<CoinType>(object);
-        if (option::is_some(&auction.current_bid)) {
-            let coins = &option::borrow(&auction.current_bid).coins;
+        if (auction.current_bid.is_some()) {
+            let coins = &auction.current_bid.borrow().coins;
             option::some(coin::value(coins))
         } else {
             option::none()

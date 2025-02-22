@@ -11,7 +11,6 @@
 module large_packages::large_packages {
     use std::error;
     use std::signer;
-    use std::vector;
     use aptos_std::smart_table::{Self, SmartTable};
 
     use aptos_framework::code::{Self, PackageRegistry};
@@ -79,7 +78,7 @@ module large_packages::large_packages {
         code_chunks: vector<vector<u8>>,
     ): &mut StagingArea acquires StagingArea {
         assert!(
-            vector::length(&code_indices) == vector::length(&code_chunks),
+            code_indices.length() == code_chunks.length(),
             error::invalid_argument(ECODE_MISMATCH),
         );
 
@@ -95,24 +94,24 @@ module large_packages::large_packages {
 
         let staging_area = borrow_global_mut<StagingArea>(owner_address);
 
-        if (!vector::is_empty(&metadata_chunk)) {
-            vector::append(&mut staging_area.metadata_serialized, metadata_chunk);
+        if (!metadata_chunk.is_empty()) {
+            staging_area.metadata_serialized.append(metadata_chunk);
         };
 
         let i = 0;
-        while (i < vector::length(&code_chunks)) {
-            let inner_code = *vector::borrow(&code_chunks, i);
-            let idx = (*vector::borrow(&code_indices, i) as u64);
+        while (i < code_chunks.length()) {
+            let inner_code = code_chunks[i];
+            let idx = (code_indices[i] as u64);
 
-            if (smart_table::contains(&staging_area.code, idx)) {
-                vector::append(smart_table::borrow_mut(&mut staging_area.code, idx), inner_code);
+            if (staging_area.code.contains(idx)) {
+                staging_area.code.borrow_mut(idx).append(inner_code);
             } else {
-                smart_table::add(&mut staging_area.code, idx, inner_code);
+                staging_area.code.add(idx, inner_code);
                 if (idx > staging_area.last_module_idx) {
                     staging_area.last_module_idx = idx;
                 }
             };
-            i = i + 1;
+            i += 1;
         };
 
         staging_area
@@ -150,11 +149,8 @@ module large_packages::large_packages {
         let code = vector[];
         let i = 0;
         while (i <= last_module_idx) {
-            vector::push_back(
-                &mut code,
-                *smart_table::borrow(&staging_area.code, i)
-            );
-            i = i + 1;
+            code.push_back(*staging_area.code.borrow(i));
+            i += 1;
         };
         code
     }
@@ -165,6 +161,6 @@ module large_packages::large_packages {
             code,
             last_module_idx: _,
         } = move_from<StagingArea>(signer::address_of(owner));
-        smart_table::destroy(code);
+        code.destroy();
     }
 }

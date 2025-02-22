@@ -665,7 +665,7 @@ Initialize package metadata for Genesis.
     <b>if</b> (!<b>exists</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(addr)) {
         <b>move_to</b>(package_owner, <a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a> { packages: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[metadata] })
     } <b>else</b> {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(addr).packages, metadata)
+        <b>borrow_global_mut</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(addr).packages.push_back(metadata)
     }
 }
 </code></pre>
@@ -712,11 +712,10 @@ package.
     // the <b>package</b> need <b>to</b> be an immutable variable
     <b>let</b> module_names = <a href="code.md#0x1_code_get_module_names">get_module_names</a>(&pack);
     <b>let</b> package_immutable = &<b>borrow_global</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(addr).packages;
-    <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(package_immutable);
+    <b>let</b> len = package_immutable.length();
     <b>let</b> index = len;
     <b>let</b> upgrade_number = 0;
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_enumerate_ref">vector::enumerate_ref</a>(package_immutable
-    , |i, <b>old</b>| {
+    package_immutable.enumerate_ref(|i, <b>old</b>| {
         <b>let</b> <b>old</b>: &<a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a> = <b>old</b>;
         <b>if</b> (<b>old</b>.name == pack.name) {
             upgrade_number = <b>old</b>.upgrade_number + 1;
@@ -734,9 +733,9 @@ package.
     // Update registry
     <b>let</b> policy = pack.upgrade_policy;
     <b>if</b> (index &lt; len) {
-        *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(packages, index) = pack
+        *packages.borrow_mut(index) = pack
     } <b>else</b> {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(packages, pack)
+        packages.push_back(pack)
     };
 
     <a href="event.md#0x1_event_emit">event::emit</a>(<a href="code.md#0x1_code_PublishPackage">PublishPackage</a> {
@@ -783,7 +782,7 @@ package.
     );
 
     <b>let</b> registry = <b>borrow_global_mut</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(code_object_addr);
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_mut">vector::for_each_mut</a>(&<b>mut</b> registry.packages, |pack| {
+    registry.packages.for_each_mut(|pack| {
         <b>let</b> <b>package</b>: &<b>mut</b> <a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a> = pack;
         <b>package</b>.upgrade_policy = <a href="code.md#0x1_code_upgrade_policy_immutable">upgrade_policy_immutable</a>();
     });
@@ -792,7 +791,7 @@ package.
     // needs <b>to</b> borrow <a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a> from the dependency packages.
     // This would increase the amount of gas used, but this is a rare operation and it's rare <b>to</b> have many packages
     // in a single <a href="code.md#0x1_code">code</a> <a href="object.md#0x1_object">object</a>.
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each">vector::for_each</a>(registry.packages, |pack| {
+    registry.packages.for_each(|pack| {
         <a href="code.md#0x1_code_check_dependencies">check_dependencies</a>(code_object_addr, &pack);
     });
 }
@@ -853,9 +852,9 @@ Checks whether the given package is upgradable, and returns true if a compatibil
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="code.md#0x1_code_EUPGRADE_WEAKER_POLICY">EUPGRADE_WEAKER_POLICY</a>));
     <b>let</b> old_modules = <a href="code.md#0x1_code_get_module_names">get_module_names</a>(old_pack);
 
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&old_modules, |old_module| {
+    old_modules.for_each_ref(|old_module| {
         <b>assert</b>!(
-            <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_contains">vector::contains</a>(new_modules, old_module),
+            new_modules.contains(old_module),
             <a href="code.md#0x1_code_EMODULE_MISSING">EMODULE_MISSING</a>
         );
     });
@@ -884,13 +883,13 @@ Checks whether a new package with given names can co-exist with old package.
 
 <pre><code><b>fun</b> <a href="code.md#0x1_code_check_coexistence">check_coexistence</a>(old_pack: &<a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a>, new_modules: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;) {
     // The modules introduced by each <b>package</b> must not overlap <b>with</b> `names`.
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&old_pack.modules, |old_mod| {
+    old_pack.modules.for_each_ref(|old_mod| {
         <b>let</b> old_mod: &<a href="code.md#0x1_code_ModuleMetadata">ModuleMetadata</a> = old_mod;
         <b>let</b> j = 0;
-        <b>while</b> (j &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(new_modules)) {
-            <b>let</b> name = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(new_modules, j);
+        <b>while</b> (j &lt; new_modules.length()) {
+            <b>let</b> name = new_modules.borrow(j);
             <b>assert</b>!(&old_mod.name != name, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="code.md#0x1_code_EMODULE_NAME_CLASH">EMODULE_NAME_CLASH</a>));
-            j = j + 1;
+            j += 1;
         };
     });
 }
@@ -922,17 +921,17 @@ is passed on to the native layer to verify that bytecode dependencies are actual
 <b>acquires</b> <a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a> {
     <b>let</b> allowed_module_deps = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
     <b>let</b> deps = &pack.deps;
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(deps, |dep| {
+    deps.for_each_ref(|dep| {
         <b>let</b> dep: &<a href="code.md#0x1_code_PackageDep">PackageDep</a> = dep;
         <b>assert</b>!(<b>exists</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(dep.<a href="account.md#0x1_account">account</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="code.md#0x1_code_EPACKAGE_DEP_MISSING">EPACKAGE_DEP_MISSING</a>));
         <b>if</b> (<a href="code.md#0x1_code_is_policy_exempted_address">is_policy_exempted_address</a>(dep.<a href="account.md#0x1_account">account</a>)) {
             // Allow all modules from this <b>address</b>, by using "" <b>as</b> a wildcard in the <a href="code.md#0x1_code_AllowedDep">AllowedDep</a>
             <b>let</b> <a href="account.md#0x1_account">account</a>: <b>address</b> = dep.<a href="account.md#0x1_account">account</a>;
             <b>let</b> module_name = <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"");
-            <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> allowed_module_deps, <a href="code.md#0x1_code_AllowedDep">AllowedDep</a> { <a href="account.md#0x1_account">account</a>, module_name });
+            allowed_module_deps.push_back(<a href="code.md#0x1_code_AllowedDep">AllowedDep</a> { <a href="account.md#0x1_account">account</a>, module_name });
         } <b>else</b> {
             <b>let</b> registry = <b>borrow_global</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(dep.<a href="account.md#0x1_account">account</a>);
-            <b>let</b> found = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_any">vector::any</a>(&registry.packages, |dep_pack| {
+            <b>let</b> found = registry.packages.<a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a>(|dep_pack| {
                 <b>let</b> dep_pack: &<a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a> = dep_pack;
                 <b>if</b> (dep_pack.name == dep.package_name) {
                     // Check policy
@@ -949,11 +948,11 @@ is passed on to the native layer to verify that bytecode dependencies are actual
                     // Add allowed deps
                     <b>let</b> <a href="account.md#0x1_account">account</a> = dep.<a href="account.md#0x1_account">account</a>;
                     <b>let</b> k = 0;
-                    <b>let</b> r = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&dep_pack.modules);
+                    <b>let</b> r = dep_pack.modules.length();
                     <b>while</b> (k &lt; r) {
-                        <b>let</b> module_name = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&dep_pack.modules, k).name;
-                        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> allowed_module_deps, <a href="code.md#0x1_code_AllowedDep">AllowedDep</a> { <a href="account.md#0x1_account">account</a>, module_name });
-                        k = k + 1;
+                        <b>let</b> module_name = dep_pack.modules.borrow(k).name;
+                        allowed_module_deps.push_back(<a href="code.md#0x1_code_AllowedDep">AllowedDep</a> { <a href="account.md#0x1_account">account</a>, module_name });
+                        k += 1;
                     };
                     <b>true</b>
                 } <b>else</b> {
@@ -1017,9 +1016,9 @@ Get the names of the modules in a package.
 
 <pre><code><b>fun</b> <a href="code.md#0x1_code_get_module_names">get_module_names</a>(pack: &<a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt; {
     <b>let</b> module_names = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&pack.modules, |pack_module| {
+    pack.modules.for_each_ref(|pack_module| {
         <b>let</b> pack_module: &<a href="code.md#0x1_code_ModuleMetadata">ModuleMetadata</a> = pack_module;
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> module_names, pack_module.name);
+        module_names.push_back(pack_module.name);
     });
     module_names
 }

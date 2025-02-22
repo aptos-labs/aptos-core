@@ -312,9 +312,9 @@ this account and leaves the signer cap readily available for pickup.
 
     <b>let</b> container = <b>borrow_global_mut</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(origin_addr);
     <b>let</b> resource_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&resource);
-    <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_add">simple_map::add</a>(&<b>mut</b> container.store, resource_addr, resource_signer_cap);
+    container.store.add(resource_addr, resource_signer_cap);
 
-    <b>let</b> auth_key = <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&optional_auth_key)) {
+    <b>let</b> auth_key = <b>if</b> (optional_auth_key.is_empty()) {
         <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(origin_addr)
     } <b>else</b> {
         optional_auth_key
@@ -355,17 +355,17 @@ the SignerCapability.
     <b>let</b> (resource_signer_cap, empty_container) = {
         <b>let</b> container = <b>borrow_global_mut</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr);
         <b>assert</b>!(
-            <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(&container.store, &resource_addr),
+            container.store.contains_key(&resource_addr),
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="resource_account.md#0x1_resource_account_EUNAUTHORIZED_NOT_OWNER">EUNAUTHORIZED_NOT_OWNER</a>)
         );
-        <b>let</b> (_resource_addr, signer_cap) = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_remove">simple_map::remove</a>(&<b>mut</b> container.store, &resource_addr);
-        (signer_cap, <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_length">simple_map::length</a>(&container.store) == 0)
+        <b>let</b> (_resource_addr, signer_cap) = container.store.remove(&resource_addr);
+        (signer_cap, container.store.length() == 0)
     };
 
     <b>if</b> (empty_container) {
-        <b>let</b> container = <b>move_from</b>(source_addr);
+        <b>let</b> container = <b>move_from</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr);
         <b>let</b> <a href="resource_account.md#0x1_resource_account_Container">Container</a> { store } = container;
-        <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_destroy_empty">simple_map::destroy_empty</a>(store);
+        store.destroy_empty();
     };
 
     <a href="account.md#0x1_account_rotate_authentication_key_internal">account::rotate_authentication_key_internal</a>(resource, <a href="resource_account.md#0x1_resource_account_ZERO_AUTH_KEY">ZERO_AUTH_KEY</a>);
@@ -555,7 +555,7 @@ the SignerCapability.
 // This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
 <b>ensures</b> <b>exists</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(origin));
 // This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a>:
-<b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(optional_auth_key) != 0 ==&gt;
+<b>ensures</b> optional_auth_key.length() != 0 ==&gt;
     <b>global</b>&lt;aptos_framework::account::Account&gt;(resource_addr).authentication_key == optional_auth_key;
 </code></pre>
 

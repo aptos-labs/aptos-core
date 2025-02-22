@@ -19,7 +19,6 @@ module aptos_framework::object {
     use std::error;
     use std::hash;
     use std::signer;
-    use std::vector;
 
     use aptos_std::from_bcs;
 
@@ -216,8 +215,8 @@ module aptos_framework::object {
     /// Derives an object address from source material: sha3_256([creator address | seed | 0xFE]).
     public fun create_object_address(source: &address, seed: vector<u8>): address {
         let bytes = bcs::to_bytes(source);
-        vector::append(&mut bytes, seed);
-        vector::push_back(&mut bytes, OBJECT_FROM_SEED_ADDRESS_SCHEME);
+        bytes.append(seed);
+        bytes.push_back(OBJECT_FROM_SEED_ADDRESS_SCHEME);
         from_bcs::to_address(hash::sha3_256(bytes))
     }
 
@@ -229,8 +228,8 @@ module aptos_framework::object {
             create_user_derived_object_address_impl(source, derive_from)
         } else {
             let bytes = bcs::to_bytes(&source);
-            vector::append(&mut bytes, bcs::to_bytes(&derive_from));
-            vector::push_back(&mut bytes, OBJECT_DERIVED_SCHEME);
+            bytes.append(bcs::to_bytes(&derive_from));
+            bytes.push_back(OBJECT_DERIVED_SCHEME);
             from_bcs::to_address(hash::sha3_256(bytes))
         }
     }
@@ -239,7 +238,7 @@ module aptos_framework::object {
     public fun create_guid_object_address(source: address, creation_num: u64): address {
         let id = guid::create_id(source, creation_num);
         let bytes = bcs::to_bytes(&id);
-        vector::push_back(&mut bytes, OBJECT_FROM_GUID_ADDRESS_SCHEME);
+        bytes.push_back(OBJECT_FROM_GUID_ADDRESS_SCHEME);
         from_bcs::to_address(hash::sha3_256(bytes))
     }
 
@@ -319,7 +318,7 @@ module aptos_framework::object {
 
     fun create_object_from_guid(creator_address: address, guid: guid::GUID): ConstructorRef {
         let bytes = bcs::to_bytes(&guid);
-        vector::push_back(&mut bytes, OBJECT_FROM_GUID_ADDRESS_SCHEME);
+        bytes.push_back(OBJECT_FROM_GUID_ADDRESS_SCHEME);
         let obj_addr = from_bcs::to_address(hash::sha3_256(bytes));
         create_object_internal(creator_address, obj_addr, true)
     }
@@ -607,7 +606,7 @@ module aptos_framework::object {
         let current_address = object.owner;
         let count = 0;
         while (owner != current_address) {
-            count = count + 1;
+            count += 1;
             assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING));
             // At this point, the first object exists and so the more likely case is that the
             // object's owner is not an object. So we return a more sensible error.
@@ -707,7 +706,7 @@ module aptos_framework::object {
 
         let count = 0;
         while (owner != current_address) {
-            count = count + 1;
+            count += 1;
             assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING));
             if (!exists<ObjectCore>(current_address)) {
                 return false
@@ -825,7 +824,7 @@ module aptos_framework::object {
     ) acquires Hero, ObjectCore {
         transfer_to_object(owner, weapon, hero);
         let hero_obj = borrow_global_mut<Hero>(object_address(&hero));
-        option::fill(&mut hero_obj.weapon, weapon);
+        hero_obj.weapon.fill(weapon);
         event::emit_event(
             &mut hero_obj.equip_events,
             HeroEquipEvent { weapon_id: option::some(weapon) },
@@ -840,7 +839,7 @@ module aptos_framework::object {
     ) acquires Hero, ObjectCore {
         transfer(owner, weapon, signer::address_of(owner));
         let hero = borrow_global_mut<Hero>(object_address(&hero));
-        option::extract(&mut hero.weapon);
+        hero.weapon.extract();
         event::emit_event(
             &mut hero.equip_events,
             HeroEquipEvent { weapon_id: option::none() },
@@ -906,19 +905,19 @@ module aptos_framework::object {
         unburn(creator, hero);
     }
 
-    #[test(fx = @std)]
+    #[test]
     fun test_correct_auid() {
         let auid1 = aptos_framework::transaction_context::generate_auid_address();
         let bytes = aptos_framework::transaction_context::get_transaction_hash();
-        std::vector::push_back(&mut bytes, 1);
-        std::vector::push_back(&mut bytes, 0);
-        std::vector::push_back(&mut bytes, 0);
-        std::vector::push_back(&mut bytes, 0);
-        std::vector::push_back(&mut bytes, 0);
-        std::vector::push_back(&mut bytes, 0);
-        std::vector::push_back(&mut bytes, 0);
-        std::vector::push_back(&mut bytes, 0);
-        std::vector::push_back(&mut bytes, DERIVE_AUID_ADDRESS_SCHEME);
+        bytes.push_back(1);
+        bytes.push_back(0);
+        bytes.push_back(0);
+        bytes.push_back(0);
+        bytes.push_back(0);
+        bytes.push_back(0);
+        bytes.push_back(0);
+        bytes.push_back(0);
+        bytes.push_back(DERIVE_AUID_ADDRESS_SCHEME);
         let auid2 = aptos_framework::from_bcs::to_address(std::hash::sha3_256(bytes));
         assert!(auid1 == auid2, 0);
     }
@@ -941,8 +940,8 @@ module aptos_framework::object {
         assert!(in_move == in_native, 0);
 
         let bytes = bcs::to_bytes(&source);
-        vector::append(&mut bytes, bcs::to_bytes(&derive_from));
-        vector::push_back(&mut bytes, OBJECT_DERIVED_SCHEME);
+        bytes.append(bcs::to_bytes(&derive_from));
+        bytes.push_back(OBJECT_DERIVED_SCHEME);
         let directly = from_bcs::to_address(hash::sha3_256(bytes));
 
         assert!(directly == in_native, 0);

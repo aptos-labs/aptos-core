@@ -224,15 +224,10 @@ module aptos_framework::permissioned_signer {
 
         let granted_permissions =
             borrow_global_mut<GrantedPermissionHandles>(master_account_addr);
-        let delete_list = vector::trim_reverse(
-            &mut granted_permissions.active_handles, 0
-        );
-        vector::destroy(
-            delete_list,
-            |address| {
-                destroy_permissions_storage_address(address);
-            }
-        )
+        let delete_list = granted_permissions.active_handles.trim_reverse(0);
+        delete_list.destroy(|address| {
+            destroy_permissions_storage_address(address);
+        })
     }
 
     /// initialize permission storage by putting an empty storage under the address.
@@ -317,10 +312,7 @@ module aptos_framework::permissioned_signer {
         if (exists<PermissionStorage>(permissions_storage_addr)) {
             let PermissionStorage::V1 { perms } =
                 move_from<PermissionStorage>(permissions_storage_addr);
-            big_ordered_map::destroy(
-                perms,
-                |_dv| {},
-            );
+            perms.destroy(|_dv| {});
         }
     }
 
@@ -375,7 +367,7 @@ module aptos_framework::permissioned_signer {
         match (perm) {
             StoredPermission::Capacity(current_capacity) => {
                 if (*current_capacity >= threshold) {
-                    *current_capacity = *current_capacity - threshold;
+                    *current_capacity -= threshold;
                     true
                 } else { false }
             }

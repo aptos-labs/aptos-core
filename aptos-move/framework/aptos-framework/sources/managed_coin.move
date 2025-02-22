@@ -130,9 +130,6 @@ module aptos_framework::managed_coin {
     //
 
     #[test_only]
-    use std::option;
-
-    #[test_only]
     use aptos_framework::aggregator_factory;
 
     #[test_only]
@@ -172,8 +169,8 @@ module aptos_framework::managed_coin {
         assert!(coin::balance<FakeMoney>(destination_addr) == 10, 2);
 
         let supply = coin::supply<FakeMoney>();
-        assert!(option::is_some(&supply), 1);
-        assert!(option::extract(&mut supply) == 60, 2);
+        assert!(supply.is_some(), 1);
+        assert!(supply.extract() == 60, 2);
 
         coin::transfer<FakeMoney>(&source, destination_addr, 10);
         assert!(coin::balance<FakeMoney>(source_addr) == 40, 3);
@@ -185,7 +182,7 @@ module aptos_framework::managed_coin {
         assert!(coin::balance<FakeMoney>(source_addr) == 0, 1);
 
         let new_supply = coin::supply<FakeMoney>();
-        assert!(option::extract(&mut new_supply) == 20, 2);
+        assert!(new_supply.extract() == 20, 2);
 
         // Destroy mint capabilities
         destroy_caps<FakeMoney>(&mod_account);

@@ -192,7 +192,7 @@ module ambassador::ambassador {
         // Creates the ambassador token, and get the constructor ref of the token. The constructor ref
         // is used to generate the refs of the token.
         let uri = base_uri;
-        string::append(&mut uri, string::utf8(RANK_BRONZE));
+        uri.append(string::utf8(RANK_BRONZE));
         let constructor_ref = if (numbered) {
             token::create_numbered_token(
                 creator,
@@ -334,7 +334,7 @@ module ambassador::ambassador {
         property_map::update_typed(property_mutator_ref, &string::utf8(b"Rank"), string::utf8(new_rank));
         // Updates the token URI based on the new rank.
         let uri = ambassador_token.base_uri;
-        string::append(&mut uri, string::utf8(new_rank));
+        uri.append(string::utf8(new_rank));
         token::set_uri(&ambassador_token.mutator_ref, uri);
     }
 

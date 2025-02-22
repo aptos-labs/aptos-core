@@ -4,7 +4,6 @@ module aptos_framework::gas_schedule {
     use std::bcs;
     use std::error;
     use std::string::String;
-    use std::vector;
     use aptos_std::aptos_hash;
     use aptos_framework::chain_status;
     use aptos_framework::config_buffer;
@@ -42,7 +41,7 @@ module aptos_framework::gas_schedule {
     /// Only called during genesis.
     public(friend) fun initialize(aptos_framework: &signer, gas_schedule_blob: vector<u8>) {
         system_addresses::assert_aptos_framework(aptos_framework);
-        assert!(!vector::is_empty(&gas_schedule_blob), error::invalid_argument(EINVALID_GAS_SCHEDULE));
+        assert!(!gas_schedule_blob.is_empty(), error::invalid_argument(EINVALID_GAS_SCHEDULE));
 
         // TODO(Gas): check if gas schedule is consistent
         let gas_schedule: GasScheduleV2 = from_bytes(gas_schedule_blob);
@@ -56,7 +55,7 @@ module aptos_framework::gas_schedule {
     /// TODO: update all the tests that reference this function, then disable this function.
     public fun set_gas_schedule(aptos_framework: &signer, gas_schedule_blob: vector<u8>) acquires GasSchedule, GasScheduleV2 {
         system_addresses::assert_aptos_framework(aptos_framework);
-        assert!(!vector::is_empty(&gas_schedule_blob), error::invalid_argument(EINVALID_GAS_SCHEDULE));
+        assert!(!gas_schedule_blob.is_empty(), error::invalid_argument(EINVALID_GAS_SCHEDULE));
         chain_status::assert_genesis();
 
         if (exists<GasScheduleV2>(@aptos_framework)) {
@@ -90,7 +89,7 @@ module aptos_framework::gas_schedule {
     /// ```
     public fun set_for_next_epoch(aptos_framework: &signer, gas_schedule_blob: vector<u8>) acquires GasScheduleV2 {
         system_addresses::assert_aptos_framework(aptos_framework);
-        assert!(!vector::is_empty(&gas_schedule_blob), error::invalid_argument(EINVALID_GAS_SCHEDULE));
+        assert!(!gas_schedule_blob.is_empty(), error::invalid_argument(EINVALID_GAS_SCHEDULE));
         let new_gas_schedule: GasScheduleV2 = from_bytes(gas_schedule_blob);
         if (exists<GasScheduleV2>(@aptos_framework)) {
             let cur_gas_schedule = borrow_global<GasScheduleV2>(@aptos_framework);
@@ -111,7 +110,7 @@ module aptos_framework::gas_schedule {
         new_gas_schedule_blob: vector<u8>
     ) acquires GasScheduleV2 {
         system_addresses::assert_aptos_framework(aptos_framework);
-        assert!(!vector::is_empty(&new_gas_schedule_blob), error::invalid_argument(EINVALID_GAS_SCHEDULE));
+        assert!(!new_gas_schedule_blob.is_empty(), error::invalid_argument(EINVALID_GAS_SCHEDULE));
 
         let new_gas_schedule: GasScheduleV2 = from_bytes(new_gas_schedule_blob);
         if (exists<GasScheduleV2>(@aptos_framework)) {

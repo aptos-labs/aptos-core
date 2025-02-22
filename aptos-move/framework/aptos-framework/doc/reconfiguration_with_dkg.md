@@ -56,8 +56,8 @@ Do nothing if one is already in progress.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_start">try_start</a>() {
     <b>let</b> incomplete_dkg_session = <a href="dkg.md#0x1_dkg_incomplete_session">dkg::incomplete_session</a>();
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&incomplete_dkg_session)) {
-        <b>let</b> session = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&incomplete_dkg_session);
+    <b>if</b> (incomplete_dkg_session.is_some()) {
+        <b>let</b> session = incomplete_dkg_session.borrow();
         <b>if</b> (<a href="dkg.md#0x1_dkg_session_dealer_epoch">dkg::session_dealer_epoch</a>(session) == <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>()) {
             <b>return</b>
         }

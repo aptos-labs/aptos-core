@@ -25,7 +25,6 @@ module aptos_framework::voting {
     use std::option::{Self, Option};
     use std::signer;
     use std::string::{String, utf8};
-    use std::vector;
 
     use aptos_std::from_bcs::to_u64;
     use aptos_std::simple_map::{Self, SimpleMap};
@@ -38,6 +37,9 @@ module aptos_framework::voting {
     use aptos_framework::timestamp;
     use aptos_framework::transaction_context;
     use aptos_std::from_bcs;
+
+    #[test_only]
+    use std::vector;
 
     /// Current script's execution hash does not match the specified proposal's
     const EPROPOSAL_EXECUTION_HASH_NOT_MATCHING: u64 = 1;
@@ -301,35 +303,35 @@ module aptos_framework::voting {
         metadata: SimpleMap<String, vector<u8>>,
         is_multi_step_proposal: bool,
     ): u64 acquires VotingForum {
-        if (option::is_some(&early_resolution_vote_threshold)) {
+        if (early_resolution_vote_threshold.is_some()) {
             assert!(
-                min_vote_threshold <= *option::borrow(&early_resolution_vote_threshold),
+                min_vote_threshold <= *early_resolution_vote_threshold.borrow(),
                 error::invalid_argument(EINVALID_MIN_VOTE_THRESHOLD),
             );
         };
         // Make sure the execution script's hash is not empty.
-        assert!(vector::length(&execution_hash) > 0, error::invalid_argument(EPROPOSAL_EMPTY_EXECUTION_HASH));
+        assert!(execution_hash.length() > 0, error::invalid_argument(EPROPOSAL_EMPTY_EXECUTION_HASH));
 
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
         let proposal_id = voting_forum.next_proposal_id;
-        voting_forum.next_proposal_id = voting_forum.next_proposal_id + 1;
+        voting_forum.next_proposal_id += 1;
 
         // Add a flag to indicate if this proposal is single-step or multi-step.
-        simple_map::add(&mut metadata, utf8(IS_MULTI_STEP_PROPOSAL_KEY), to_bytes(&is_multi_step_proposal));
+        metadata.add(utf8(IS_MULTI_STEP_PROPOSAL_KEY), to_bytes(&is_multi_step_proposal));
 
         let is_multi_step_in_execution_key = utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         if (is_multi_step_proposal) {
             // If the given proposal is a multi-step proposal, we will add a flag to indicate if this multi-step proposal is in execution.
             // This value is by default false. We turn this value to true when we start executing the multi-step proposal. This value
             // will be used to disable further voting after we started executing the multi-step proposal.
-            simple_map::add(&mut metadata, is_multi_step_in_execution_key, to_bytes(&false));
+            metadata.add(is_multi_step_in_execution_key, to_bytes(&false));
             // If the proposal is a single-step proposal, we check if the metadata passed by the client has the IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY key.
             // If they have the key, we will remove it, because a single-step proposal that doesn't need this key.
-        } else if (simple_map::contains_key(&metadata, &is_multi_step_in_execution_key)) {
-            simple_map::remove(&mut metadata, &is_multi_step_in_execution_key);
+        } else if (metadata.contains_key(&is_multi_step_in_execution_key)) {
+            metadata.remove(&is_multi_step_in_execution_key);
         };
 
-        table::add(&mut voting_forum.proposals, proposal_id, Proposal {
+        voting_forum.proposals.add(proposal_id, Proposal {
             proposer,
             creation_time_secs: timestamp::now_seconds(),
             execution_content: option::some<ProposalType>(execution_content),
@@ -387,7 +389,7 @@ module aptos_framework::voting {
         should_pass: bool,
     ) acquires VotingForum {
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
-        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        let proposal = voting_forum.proposals.borrow_mut(proposal_id);
         // Voting might still be possible after the proposal has enough yes votes to be resolved early. This would only
         // lead to possible proposal resolution failure if the resolve early threshold is not definitive (e.g. < 50% + 1
         // of the total voting token's supply). In this case, more voting might actually still be desirable.
@@ -396,25 +398,25 @@ module aptos_framework::voting {
         assert!(!is_voting_period_over(proposal), error::invalid_state(EPROPOSAL_VOTING_ALREADY_ENDED));
         assert!(!proposal.is_resolved, error::invalid_state(EPROPOSAL_ALREADY_RESOLVED));
         // Assert this proposal is single-step, or if the proposal is multi-step, it is not in execution yet.
-        assert!(!simple_map::contains_key(&proposal.metadata, &utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY))
-            || *simple_map::borrow(&proposal.metadata, &utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY)) == to_bytes(
+        assert!(!proposal.metadata.contains_key(&utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY))
+            || *proposal.metadata.borrow(&utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY)) == to_bytes(
             &false
         ),
             error::invalid_state(EMULTI_STEP_PROPOSAL_IN_EXECUTION));
 
         if (should_pass) {
-            proposal.yes_votes = proposal.yes_votes + (num_votes as u128);
+            proposal.yes_votes += (num_votes as u128);
         } else {
-            proposal.no_votes = proposal.no_votes + (num_votes as u128);
+            proposal.no_votes += (num_votes as u128);
         };
 
         // Record the resolvable time to ensure that resolution has to be done non-atomically.
         let timestamp_secs_bytes = to_bytes(&timestamp::now_seconds());
         let key = utf8(RESOLVABLE_TIME_METADATA_KEY);
-        if (simple_map::contains_key(&proposal.metadata, &key)) {
-            *simple_map::borrow_mut(&mut proposal.metadata, &key) = timestamp_secs_bytes;
+        if (proposal.metadata.contains_key(&key)) {
+            *proposal.metadata.borrow_mut(&key) = timestamp_secs_bytes;
         } else {
-            simple_map::add(&mut proposal.metadata, key, timestamp_secs_bytes);
+            proposal.metadata.add(key, timestamp_secs_bytes);
         };
 
         if (std::features::module_event_migration_enabled()) {
@@ -436,12 +438,12 @@ module aptos_framework::voting {
         assert!(proposal_state == PROPOSAL_STATE_SUCCEEDED, error::invalid_state(EPROPOSAL_CANNOT_BE_RESOLVED));
 
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
-        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        let proposal = voting_forum.proposals.borrow_mut(proposal_id);
         assert!(!proposal.is_resolved, error::invalid_state(EPROPOSAL_ALREADY_RESOLVED));
 
         // We need to make sure that the resolution is happening in
         // a separate transaction from the last vote to guard against any potential flashloan attacks.
-        let resolvable_time = to_u64(*simple_map::borrow(&proposal.metadata, &utf8(RESOLVABLE_TIME_METADATA_KEY)));
+        let resolvable_time = to_u64(*proposal.metadata.borrow(&utf8(RESOLVABLE_TIME_METADATA_KEY)));
         assert!(timestamp::now_seconds() > resolvable_time, error::invalid_state(ERESOLUTION_CANNOT_BE_ATOMIC));
 
         assert!(
@@ -462,13 +464,13 @@ module aptos_framework::voting {
         is_proposal_resolvable<ProposalType>(voting_forum_address, proposal_id);
 
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
-        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        let proposal = voting_forum.proposals.borrow_mut(proposal_id);
 
         // Assert that the specified proposal is not a multi-step proposal.
         let multi_step_key = utf8(IS_MULTI_STEP_PROPOSAL_KEY);
-        let has_multi_step_key = simple_map::contains_key(&proposal.metadata, &multi_step_key);
+        let has_multi_step_key = proposal.metadata.contains_key(&multi_step_key);
         if (has_multi_step_key) {
-            let is_multi_step_proposal = from_bcs::to_bool(*simple_map::borrow(&proposal.metadata, &multi_step_key));
+            let is_multi_step_proposal = from_bcs::to_bool(*proposal.metadata.borrow(&multi_step_key));
             assert!(
                 !is_multi_step_proposal,
                 error::permission_denied(EMULTI_STEP_PROPOSAL_CANNOT_USE_SINGLE_STEP_RESOLVE_FUNCTION)
@@ -500,7 +502,7 @@ module aptos_framework::voting {
             );
         };
 
-        option::extract(&mut proposal.execution_content)
+        proposal.execution_content.extract()
     }
 
     /// Resolve a single-step or a multi-step proposal with the given id.
@@ -519,23 +521,20 @@ module aptos_framework::voting {
         is_proposal_resolvable<ProposalType>(voting_forum_address, proposal_id);
 
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
-        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        let proposal = voting_forum.proposals.borrow_mut(proposal_id);
 
         // Update the IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY key to indicate that the multi-step proposal is in execution.
         let multi_step_in_execution_key = utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
-        if (simple_map::contains_key(&proposal.metadata, &multi_step_in_execution_key)) {
-            let is_multi_step_proposal_in_execution_value = simple_map::borrow_mut(
-                &mut proposal.metadata,
-                &multi_step_in_execution_key
-            );
+        if (proposal.metadata.contains_key(&multi_step_in_execution_key)) {
+            let is_multi_step_proposal_in_execution_value = proposal.metadata.borrow_mut(&multi_step_in_execution_key);
             *is_multi_step_proposal_in_execution_value = to_bytes(&true);
         };
 
         let multi_step_key = utf8(IS_MULTI_STEP_PROPOSAL_KEY);
-        let is_multi_step = simple_map::contains_key(&proposal.metadata, &multi_step_key) && from_bcs::to_bool(
-            *simple_map::borrow(&proposal.metadata, &multi_step_key)
+        let is_multi_step = proposal.metadata.contains_key(&multi_step_key) && from_bcs::to_bool(
+            *proposal.metadata.borrow(&multi_step_key)
         );
-        let next_execution_hash_is_empty = vector::length(&next_execution_hash) == 0;
+        let next_execution_hash_is_empty = next_execution_hash.length() == 0;
 
         // Assert that if this proposal is single-step, the `next_execution_hash` parameter is empty.
         assert!(
@@ -553,8 +552,7 @@ module aptos_framework::voting {
 
             // Set the `IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY` value to false upon successful resolution of the last step of a multi-step proposal.
             if (is_multi_step) {
-                let is_multi_step_proposal_in_execution_value = simple_map::borrow_mut(
-                    &mut proposal.metadata,
+                let is_multi_step_proposal_in_execution_value = proposal.metadata.borrow_mut(
                     &multi_step_in_execution_key
                 );
                 *is_multi_step_proposal_in_execution_value = to_bytes(&false);
@@ -618,8 +616,8 @@ module aptos_framework::voting {
 
     /// Return true if the proposal has reached early resolution threshold (if specified).
     public fun can_be_resolved_early<ProposalType: store>(proposal: &Proposal<ProposalType>): bool {
-        if (option::is_some(&proposal.early_resolution_vote_threshold)) {
-            let early_resolution_threshold = *option::borrow(&proposal.early_resolution_vote_threshold);
+        if (proposal.early_resolution_vote_threshold.is_some()) {
+            let early_resolution_threshold = *proposal.early_resolution_vote_threshold.borrow();
             if (proposal.yes_votes >= early_resolution_threshold || proposal.no_votes >= early_resolution_threshold) {
                 return true
             };
@@ -643,7 +641,7 @@ module aptos_framework::voting {
         metadata_key: String,
     ): vector<u8> acquires VotingForum {
         let proposal = get_proposal<ProposalType>(voting_forum_address, proposal_id);
-        *simple_map::borrow(&proposal.metadata, &metadata_key)
+        *proposal.metadata.borrow(&metadata_key)
     }
 
     #[view]
@@ -757,13 +755,13 @@ module aptos_framework::voting {
         proposal_id: u64,
     ): bool acquires VotingForum {
         let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
-        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
+        let proposal = voting_forum.proposals.borrow(proposal_id);
         let is_multi_step_in_execution_key = utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         assert!(
-            simple_map::contains_key(&proposal.metadata, &is_multi_step_in_execution_key),
+            proposal.metadata.contains_key(&is_multi_step_in_execution_key),
             error::invalid_argument(EPROPOSAL_IS_SINGLE_STEP)
         );
-        from_bcs::to_bool(*simple_map::borrow(&proposal.metadata, &is_multi_step_in_execution_key))
+        from_bcs::to_bool(*proposal.metadata.borrow(&is_multi_step_in_execution_key))
     }
 
     /// Return true if the voting period of the given proposal has already ended.
@@ -776,7 +774,7 @@ module aptos_framework::voting {
         proposal_id: u64,
     ): &Proposal<ProposalType> acquires VotingForum {
         let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
-        table::borrow(&voting_forum.proposals, proposal_id)
+        voting_forum.proposals.borrow(proposal_id)
     }
 
     #[test_only]
@@ -798,7 +796,7 @@ module aptos_framework::voting {
 
         // This works because our Move unit test extensions mock out the execution hash to be [1].
         let execution_hash = vector::empty<u8>();
-        vector::push_back(&mut execution_hash, 1);
+        execution_hash.push_back(1);
         let metadata = simple_map::create<String, vector<u8>>();
 
         if (use_generic_create_proposal_function) {
@@ -836,7 +834,7 @@ module aptos_framework::voting {
     ) acquires VotingForum {
         if (is_multi_step) {
             let execution_hash = vector::empty<u8>();
-            vector::push_back(&mut execution_hash, 1);
+            execution_hash.push_back(1);
             resolve_proposal_v2<TestProposal>(voting_forum_address, proposal_id, execution_hash);
 
             if (finish_multi_step_execution) {
@@ -942,7 +940,7 @@ module aptos_framework::voting {
             resolve_proposal_for_test<TestProposal>(governance_address, proposal_id, use_resolve_multi_step, true);
         };
         let voting_forum = borrow_global<VotingForum<TestProposal>>(governance_address);
-        assert!(table::borrow(&voting_forum.proposals, proposal_id).is_resolved, 2);
+        assert!(voting_forum.proposals.borrow(proposal_id).is_resolved, 2);
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
@@ -1052,13 +1050,13 @@ module aptos_framework::voting {
             // Assert that the multi-step proposal is in execution but not resolved yet.
             assert!(is_multi_step_proposal_in_execution<TestProposal>(governance_address, 0), 4);
             let voting_forum = borrow_global_mut<VotingForum<TestProposal>>(governance_address);
-            let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+            let proposal = voting_forum.proposals.borrow_mut(proposal_id);
             assert!(!proposal.is_resolved, 5);
         };
 
         resolve_proposal_for_test<TestProposal>(governance_address, proposal_id, is_multi_step, true);
         let voting_forum = borrow_global_mut<VotingForum<TestProposal>>(governance_address);
-        assert!(table::borrow(&voting_forum.proposals, proposal_id).is_resolved, 6);
+        assert!(voting_forum.proposals.borrow(proposal_id).is_resolved, 6);
 
         // Assert that the IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY value is set back to `false` upon successful resolution of this multi-step proposal.
         if (is_multi_step) {
@@ -1294,8 +1292,8 @@ module aptos_framework::voting {
 
         resolve_proposal_v2<TestProposal>(governance_address, proposal_id, vector[10u8]);
         let voting_forum = borrow_global<VotingForum<TestProposal>>(governance_address);
-        let proposal = table::borrow(&voting_forum.proposals, 0);
+        let proposal = voting_forum.proposals.borrow(0);
         assert!(proposal.execution_hash == vector[10u8], 2);
-        assert!(!table::borrow(&voting_forum.proposals, proposal_id).is_resolved, 3);
+        assert!(!voting_forum.proposals.borrow(proposal_id).is_resolved, 3);
     }
 }

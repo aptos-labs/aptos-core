@@ -68,7 +68,7 @@ module common_account::common_account {
         other: address,
     ) acquires Management {
         let management = assert_is_admin(sender, common_account);
-        simple_map::add(&mut management.unclaimed_capabilities, other, Empty {});
+        management.unclaimed_capabilities.add(other, Empty {});
     }
 
     /// Remove an account from the management group.
@@ -78,8 +78,8 @@ module common_account::common_account {
         other: address,
     ) acquires Capability, Management {
         let management = assert_is_admin(admin, common_account);
-        if (simple_map::contains_key(&management.unclaimed_capabilities, &other)) {
-            simple_map::remove(&mut management.unclaimed_capabilities, &other);
+        if (management.unclaimed_capabilities.contains_key(&other)) {
+            management.unclaimed_capabilities.remove(&other);
         } else {
             assert!(exists<Capability>(other), error::not_found(ENO_CAPABILITY_FOUND));
             move_from<Capability>(other);
@@ -95,10 +95,10 @@ module common_account::common_account {
 
         let management = borrow_management(common_account);
         assert!(
-            simple_map::contains_key(&management.unclaimed_capabilities, &sender_addr),
+            management.unclaimed_capabilities.contains_key(&sender_addr),
             error::not_found(ENO_CAPABILITY_OFFERED),
         );
-        simple_map::remove(&mut management.unclaimed_capabilities, &sender_addr);
+        management.unclaimed_capabilities.remove(&sender_addr);
 
         move_to(sender, Capability { common_account });
     }

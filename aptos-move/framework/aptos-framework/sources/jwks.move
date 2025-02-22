@@ -189,13 +189,13 @@ module aptos_framework::jwks {
         };
 
         let fed_jwks = borrow_global_mut<FederatedJWKs>(jwk_addr);
-        vector::for_each_ref(&patches, |obj|{
+        patches.for_each_ref(|obj|{
             let patch: &Patch = obj;
             apply_patch(&mut fed_jwks.jwks, *patch);
         });
 
         // TODO: Can we check the size more efficiently instead of serializing it via BCS?
-        let num_bytes = vector::length(&bcs::to_bytes(fed_jwks));
+        let num_bytes = bcs::to_bytes(fed_jwks).length();
         assert!(num_bytes < MAX_FEDERATED_JWKS_SIZE_BYTES, error::invalid_argument(EFEDERATED_JWKS_TOO_LARGE));
     }
 
@@ -253,22 +253,22 @@ module aptos_framework::jwks {
     ///
     /// NOTE: Currently only RSA keys are supported.
     public entry fun update_federated_jwk_set(jwk_owner: &signer, iss: vector<u8>, kid_vec: vector<String>, alg_vec: vector<String>, e_vec: vector<String>, n_vec: vector<String>) acquires FederatedJWKs {
-        assert!(!vector::is_empty(&kid_vec), error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
-        let num_jwk = vector::length<String>(&kid_vec);
-        assert!(vector::length(&alg_vec) == num_jwk , error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
-        assert!(vector::length(&e_vec) == num_jwk, error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
-        assert!(vector::length(&n_vec) == num_jwk, error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
+        assert!(!kid_vec.is_empty(), error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
+        let num_jwk = kid_vec.length::<String>();
+        assert!(alg_vec.length() == num_jwk , error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
+        assert!(e_vec.length() == num_jwk, error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
+        assert!(n_vec.length() == num_jwk, error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
 
         let remove_all_patch = new_patch_remove_all();
         let patches = vector[remove_all_patch];
-        while (!vector::is_empty(&kid_vec)) {
-            let kid = vector::pop_back(&mut kid_vec);
-            let alg = vector::pop_back(&mut alg_vec);
-            let e = vector::pop_back(&mut e_vec);
-            let n = vector::pop_back(&mut n_vec);
+        while (!kid_vec.is_empty()) {
+            let kid = kid_vec.pop_back();
+            let alg = alg_vec.pop_back();
+            let e = e_vec.pop_back();
+            let n = n_vec.pop_back();
             let jwk = new_rsa_jwk(kid, alg, e, n);
             let patch = new_patch_upsert_jwk(iss, jwk);
-            vector::push_back(&mut patches, patch)
+            patches.push_back(patch)
         };
         patch_federated_jwks(jwk_owner, patches);
     }

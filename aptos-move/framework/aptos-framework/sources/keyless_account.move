@@ -3,11 +3,9 @@
 module aptos_framework::keyless_account {
     use std::bn254_algebra;
     use std::config_buffer;
-    use std::option;
     use std::option::Option;
     use std::signer;
     use std::string::String;
-    use std::vector;
     use aptos_std::crypto_algebra;
     use aptos_std::ed25519;
     use aptos_framework::chain_status;
@@ -115,12 +113,18 @@ module aptos_framework::keyless_account {
     /// Pre-validate the VK to actively-prevent incorrect VKs from being set on-chain.
     fun validate_groth16_vk(vk: &Groth16VerificationKey) {
         // Could be leveraged to speed up the VM deserialization of the VK by 2x, since it can assume the points are valid.
-        assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Compr>(&vk.alpha_g1)), E_INVALID_BN254_G1_SERIALIZATION);
-        assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.beta_g2)), E_INVALID_BN254_G2_SERIALIZATION);
-        assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.gamma_g2)), E_INVALID_BN254_G2_SERIALIZATION);
-        assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.delta_g2)), E_INVALID_BN254_G2_SERIALIZATION);
-        for (i in 0..vector::length(&vk.gamma_abc_g1)) {
-            assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Compr>(vector::borrow(&vk.gamma_abc_g1, i))), E_INVALID_BN254_G1_SERIALIZATION);
+        assert!(
+            crypto_algebra::deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Compr>(&vk.alpha_g1).is_some(), E_INVALID_BN254_G1_SERIALIZATION);
+        assert!(
+            crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.beta_g2).is_some(), E_INVALID_BN254_G2_SERIALIZATION);
+        assert!(
+            crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.gamma_g2).is_some(), E_INVALID_BN254_G2_SERIALIZATION);
+        assert!(
+            crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.delta_g2).is_some(), E_INVALID_BN254_G2_SERIALIZATION);
+        for (i in 0..vk.gamma_abc_g1.length()) {
+            assert!(
+                crypto_algebra::deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Compr>(vk.gamma_abc_g1.borrow(i)).is_some(
+                ), E_INVALID_BN254_G1_SERIALIZATION);
         };
     }
 
@@ -151,8 +155,8 @@ module aptos_framework::keyless_account {
         system_addresses::assert_aptos_framework(fx);
         chain_status::assert_genesis();
 
-        if (option::is_some(&pk)) {
-            assert!(vector::length(option::borrow(&pk)) == 32, E_TRAINING_WHEELS_PK_WRONG_SIZE)
+        if (pk.is_some()) {
+            assert!(pk.borrow().length() == 32, E_TRAINING_WHEELS_PK_WRONG_SIZE)
         };
 
         let config = borrow_global_mut<Configuration>(signer::address_of(fx));
@@ -183,7 +187,7 @@ module aptos_framework::keyless_account {
         chain_status::assert_genesis();
 
         let config = borrow_global_mut<Configuration>(signer::address_of(fx));
-        vector::push_back(&mut config.override_aud_vals, aud);
+        config.override_aud_vals.push_back(aud);
     }
 
     /// Queues up a change to the Groth16 verification key. The change will only be effective after reconfiguration.
@@ -217,10 +221,10 @@ module aptos_framework::keyless_account {
         system_addresses::assert_aptos_framework(fx);
 
         // If a PK is being set, validate it first.
-        if (option::is_some(&pk)) {
-            let bytes = *option::borrow(&pk);
+        if (pk.is_some()) {
+            let bytes = *pk.borrow();
             let vpk = ed25519::new_validated_public_key_from_bytes(bytes);
-            assert!(option::is_some(&vpk), E_TRAINING_WHEELS_PK_WRONG_SIZE)
+            assert!(vpk.is_some(), E_TRAINING_WHEELS_PK_WRONG_SIZE)
         };
 
         let config = if (config_buffer::does_exist<Configuration>()) {
@@ -282,7 +286,7 @@ module aptos_framework::keyless_account {
             *borrow_global<Configuration>(signer::address_of(fx))
         };
 
-        vector::push_back(&mut config.override_aud_vals, aud);
+        config.override_aud_vals.push_back(aud);
 
         set_configuration_for_next_epoch(fx, config);
     }

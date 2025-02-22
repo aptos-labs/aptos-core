@@ -954,7 +954,7 @@ Stores the signer capability for a given address.
     };
 
     <b>let</b> signer_caps = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceResponsbility">GovernanceResponsbility</a>&gt;(@aptos_framework).signer_caps;
-    <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_add">simple_map::add</a>(signer_caps, signer_address, signer_cap);
+    signer_caps.add(signer_address, signer_cap);
 }
 </code></pre>
 
@@ -1201,7 +1201,7 @@ Return true if a stake pool has already voted on a proposal before partial gover
     // If a <a href="stake.md#0x1_stake">stake</a> pool <b>has</b> already voted on a proposal before partial governance <a href="voting.md#0x1_voting">voting</a> is enabled,
     // there is a record in <a href="aptos_governance.md#0x1_aptos_governance_VotingRecords">VotingRecords</a>.
     <b>let</b> voting_records = <b>borrow_global</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_VotingRecords">VotingRecords</a>&gt;(@aptos_framework);
-    <a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(&voting_records.votes, record_key)
+    voting_records.votes.contains(record_key)
 }
 </code></pre>
 
@@ -1256,7 +1256,7 @@ Note: a stake pool's voting power on a proposal could increase over time(e.g. re
     <b>let</b> used_voting_power = 0u64;
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_partial_governance_voting_enabled">features::partial_governance_voting_enabled</a>()) {
         <b>let</b> voting_records_v2 = <b>borrow_global</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>&gt;(@aptos_framework);
-        used_voting_power = *<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow_with_default">smart_table::borrow_with_default</a>(&voting_records_v2.votes, record_key, &0);
+        used_voting_power = *voting_records_v2.votes.borrow_with_default(record_key, &0);
     };
     <a href="aptos_governance.md#0x1_aptos_governance_get_voting_power">get_voting_power</a>(stake_pool) - used_voting_power
 }
@@ -3357,8 +3357,8 @@ pool_address must exist in StakePool.
 <pre><code><b>schema</b> <a href="aptos_governance.md#0x1_aptos_governance_CreateProposalMetadataAbortsIf">CreateProposalMetadataAbortsIf</a> {
     metadata_location: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
     metadata_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(utf8(metadata_location)) &gt; 256;
-    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(utf8(metadata_hash)) &gt; 256;
+    <b>aborts_if</b> utf8(metadata_location).length() &gt; 256;
+    <b>aborts_if</b> utf8(metadata_hash).length() &gt; 256;
     <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(metadata_location);
     <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(metadata_hash);
     <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(<a href="aptos_governance.md#0x1_aptos_governance_METADATA_LOCATION_KEY">METADATA_LOCATION_KEY</a>);

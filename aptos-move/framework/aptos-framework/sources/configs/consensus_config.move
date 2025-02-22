@@ -2,7 +2,6 @@
 /// Reconfiguration, and may be updated by root.
 module aptos_framework::consensus_config {
     use std::error;
-    use std::vector;
     use aptos_framework::chain_status;
     use aptos_framework::config_buffer;
 
@@ -22,7 +21,7 @@ module aptos_framework::consensus_config {
     /// Publishes the ConsensusConfig config.
     public(friend) fun initialize(aptos_framework: &signer, config: vector<u8>) {
         system_addresses::assert_aptos_framework(aptos_framework);
-        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
+        assert!(config.length() > 0, error::invalid_argument(EINVALID_CONFIG));
         move_to(aptos_framework, ConsensusConfig { config });
     }
 
@@ -34,7 +33,7 @@ module aptos_framework::consensus_config {
     public fun set(account: &signer, config: vector<u8>) acquires ConsensusConfig {
         system_addresses::assert_aptos_framework(account);
         chain_status::assert_genesis();
-        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
+        assert!(config.length() > 0, error::invalid_argument(EINVALID_CONFIG));
 
         let config_ref = &mut borrow_global_mut<ConsensusConfig>(@aptos_framework).config;
         *config_ref = config;
@@ -51,7 +50,7 @@ module aptos_framework::consensus_config {
     /// ```
     public fun set_for_next_epoch(account: &signer, config: vector<u8>) {
         system_addresses::assert_aptos_framework(account);
-        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
+        assert!(config.length() > 0, error::invalid_argument(EINVALID_CONFIG));
         std::config_buffer::upsert<ConsensusConfig>(ConsensusConfig {config});
     }
 
