@@ -147,6 +147,7 @@ spec aptos_framework::account {
     /// Check if the bytes of the new address is 32.
     /// The Account does not exist under the new address before creating the account.
     spec create_account_unchecked(new_address: address): signer {
+        pragma opaque;
         include CreateAccountAbortsIf {addr: new_address};
         modifies global<Account>(new_address);
         ensures signer::address_of(result) == new_address;
