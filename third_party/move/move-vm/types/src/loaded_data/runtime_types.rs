@@ -621,18 +621,17 @@ impl Type {
         paranoid_failure!(msg)
     }
 
-    pub fn paranoid_check_ref_eq(
+    pub fn paranoid_check_ref_eq<const IS_MUT: bool>(
         &self,
         expected_inner_ty: &Self,
-        is_mut: bool,
     ) -> PartialVMResult<()> {
         match self {
             Type::MutableReference(inner_ty) => inner_ty.paranoid_check_eq(expected_inner_ty),
-            Type::Reference(inner_ty) if !is_mut => inner_ty.paranoid_check_eq(expected_inner_ty),
+            Type::Reference(inner_ty) if !IS_MUT => inner_ty.paranoid_check_eq(expected_inner_ty),
             _ => {
                 let msg = format!(
                     "Expected a (mutable: {}) reference type, got {}",
-                    is_mut, self
+                    IS_MUT, self
                 );
                 paranoid_failure!(msg)
             },
@@ -886,7 +885,7 @@ impl TypeBuilder {
     /// Creates a (possibly mutable) reference type from the given inner type.
     /// Returns an error if the type size or depth are too large.
     #[inline]
-    pub fn create_ref_ty(&self, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
+    pub fn create_ref_ty<const IS_MUT: bool>(&self, inner_ty: &Type) -> PartialVMResult<Type> {
         let mut count = 1;
         let check = |c: &mut u64, d: u64| self.check(c, d);
         let inner_ty = self
@@ -896,12 +895,12 @@ impl TypeBuilder {
                     '.',
                     format!(
                         "Failed to create a (mutable: {}) reference type with inner type {}",
-                        is_mut, inner_ty
+                        IS_MUT, inner_ty
                     ),
                 )
             })?;
         let inner_ty = Box::new(inner_ty);
-        Ok(if is_mut {
+        Ok(if IS_MUT {
             Type::MutableReference(inner_ty)
         } else {
             Type::Reference(inner_ty)
@@ -1543,18 +1542,18 @@ mod unit_tests {
         let mut depth = 1;
         let mut ty = Type::Bool;
         while depth < max_ty_depth {
-            ty = assert_ok!(ty_builder.create_ref_ty(&ty, false));
+            ty = assert_ok!(ty_builder.create_ref_ty::<false>(&ty));
             assert_matches!(ty, Type::Reference(_));
             depth += 1;
         }
         assert_eq!(depth, max_ty_depth);
 
-        let err = assert_err!(ty_builder.create_ref_ty(&ty, false));
+        let err = assert_err!(ty_builder.create_ref_ty::<false>(&ty));
         assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
 
         let max_ty_size = 5;
         let ty_builder = TypeBuilder::with_limits(max_ty_size, 100);
-        let err = assert_err!(ty_builder.create_ref_ty(&ty, false));
+        let err = assert_err!(ty_builder.create_ref_ty::<false>(&ty));
         assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
     }
 
@@ -1566,18 +1565,18 @@ mod unit_tests {
         let mut depth = 1;
         let mut ty = Type::Bool;
         while depth < max_ty_depth {
-            ty = assert_ok!(ty_builder.create_ref_ty(&ty, true));
+            ty = assert_ok!(ty_builder.create_ref_ty::<true>(&ty));
             assert_matches!(ty, Type::MutableReference(_));
             depth += 1;
         }
         assert_eq!(depth, max_ty_depth);
 
-        let err = assert_err!(ty_builder.create_ref_ty(&ty, true));
+        let err = assert_err!(ty_builder.create_ref_ty::<true>(&ty));
         assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
 
         let max_ty_size = 5;
         let ty_builder = TypeBuilder::with_limits(max_ty_size, 100);
-        let err = assert_err!(ty_builder.create_ref_ty(&ty, true));
+        let err = assert_err!(ty_builder.create_ref_ty::<true>(&ty));
         assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
     }
 
