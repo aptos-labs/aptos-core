@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// This is duplicated from `aptos-move/move-examples/tests/move_unit_tests.rs` then slightly modified.
+
 use aptos_framework::extended_checks;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
