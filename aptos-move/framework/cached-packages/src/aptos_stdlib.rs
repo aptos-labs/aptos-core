@@ -11,16 +11,16 @@ use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
     account_address::AccountAddress,
-    transaction::{EntryFunction, TransactionPayload},
+    transaction::{EntryFunction, TransactionPayloadWrapper},
     AptosCoinType, CoinType,
 };
 use move_core_types::{ident_str, language_storage::ModuleId};
 
-pub fn aptos_coin_transfer(to: AccountAddress, amount: u64) -> TransactionPayload {
+pub fn aptos_coin_transfer(to: AccountAddress, amount: u64) -> TransactionPayloadWrapper {
     coin_transfer(AptosCoinType::type_tag(), to, amount)
 }
 
-pub fn publish_module_source(module_name: &str, module_src: &str) -> TransactionPayload {
+pub fn publish_module_source(module_name: &str, module_src: &str) -> TransactionPayloadWrapper {
     let mut builder = PackageBuilder::new("tmp");
     builder.add_source(module_name, module_src);
 
@@ -42,8 +42,8 @@ pub fn object_code_deployment_upgrade(
     metadata_serialized: Vec<u8>,
     code: Vec<Vec<u8>>,
     code_object: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -65,8 +65,8 @@ pub fn object_code_deployment_upgrade(
 /// when auto generating move transaction payloads. Will address in separate PR.
 pub fn object_code_deployment_freeze_code_object(
     code_object: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

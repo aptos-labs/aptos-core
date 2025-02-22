@@ -8,7 +8,7 @@ use aptos_types::{
     account_address::AccountAddress,
     transaction::{
         authenticator::{AccountAuthenticator, TransactionAuthenticator},
-        EntryFunction, RawTransaction, SignedTransaction, TransactionPayload,
+        EntryFunction, RawTransaction, SignedTransaction, TransactionPayloadWrapper,
     },
 };
 use move_core_types::{ident_str, language_storage::ModuleId};
@@ -131,7 +131,8 @@ async fn test_simulate_txn_with_aggregator() {
     let txn = account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
     context.commit_block(&vec![txn]).await;
 
-    let payload = TransactionPayload::EntryFunction(EntryFunction::new(
+    // TODO[Orderless]: Change this to payload v2 format.
+    let payload = TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(account.address(), ident_str!("counter").to_owned()),
         ident_str!("increment_counter").to_owned(),
         vec![],

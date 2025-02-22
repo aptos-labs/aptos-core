@@ -6,7 +6,7 @@ use aptos_sdk::{
     move_types::{
         account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     },
-    types::transaction::{EntryFunction, TransactionPayload},
+    types::transaction::{EntryFunction, TransactionPayloadWrapper},
 };
 use rand::rngs::StdRng;
 
@@ -45,7 +45,7 @@ pub trait EntryPointTrait: std::fmt::Debug + Sync + Send + CloneEntryPointTrait 
         module_name: &str,
         rng: Option<&mut StdRng>,
         other: Option<&AccountAddress>,
-    ) -> TransactionPayload;
+    ) -> TransactionPayloadWrapper;
 
     fn initialize_entry_point(&self) -> Option<Box<dyn EntryPointTrait>> {
         None
@@ -64,8 +64,8 @@ pub fn get_payload(
     module_id: ModuleId,
     func: Identifier,
     args: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(module_id, func, vec![], args))
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(module_id, func, vec![], args))
 }
 
 pub trait CloneEntryPointTrait {
