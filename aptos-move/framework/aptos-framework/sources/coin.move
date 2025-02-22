@@ -114,6 +114,7 @@ module aptos_framework::coin {
 
     const MAX_COIN_NAME_LENGTH: u64 = 32;
     const MAX_COIN_SYMBOL_LENGTH: u64 = 10;
+    const MAX_NEW_COIN_SYMBOL_LENGTH: u64 = 32;
 
     /// Core data structures
 
@@ -1043,7 +1044,14 @@ module aptos_framework::coin {
         );
 
         assert!(string::length(&name) <= MAX_COIN_NAME_LENGTH, error::invalid_argument(ECOIN_NAME_TOO_LONG));
-        assert!(string::length(&symbol) <= MAX_COIN_SYMBOL_LENGTH, error::invalid_argument(ECOIN_SYMBOL_TOO_LONG));
+
+        let max_symbol_length = if(features::is_extended_coin_symbols_enabled()) {
+            MAX_NEW_COIN_SYMBOL_LENGTH
+        } else {
+            MAX_COIN_SYMBOL_LENGTH
+        };
+
+        assert!(string::length(&symbol) <= max_symbol_length, error::invalid_argument(ECOIN_SYMBOL_TOO_LONG));
 
         let coin_info = CoinInfo<CoinType> {
             name,
