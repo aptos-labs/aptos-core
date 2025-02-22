@@ -6,14 +6,18 @@ use crate::{
     state_store::{
         state_delta::StateDelta,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
-        state_view::cached_state_view::{CachedStateView, ShardedStateCache, StateCacheShard},
-        versioned_state_value::{StateUpdate, StateUpdateRef},
+        state_view::{
+            cached_state_view::{CachedStateView, ShardedStateCache, StateCacheShard},
+            hot_state_view::HotStateView,
+        },
+        versioned_state_value::{DbStateUpdate, StateUpdateRef},
         NUM_STATE_SHARDS,
     },
     DbReader,
 };
 use anyhow::Result;
 use aptos_experimental_layered_map::{LayeredMap, MapLayer};
+use aptos_infallible::duration_since_epoch;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage, StateViewId},
@@ -34,7 +38,7 @@ pub struct State {
     ///  N.b. this is not directly iteratable, one needs to make a `StateDelta`
     ///       between this and a `base_version` to list the updates or create a
     ///       new `State` at a descendant version.
-    shards: Arc<[MapLayer<StateKey, StateUpdate>; NUM_STATE_SHARDS]>,
+    shards: Arc<[MapLayer<StateKey, DbStateUpdate>; NUM_STATE_SHARDS]>,
     /// The total usage of the state at the current version.
     usage: StateStorageUsage,
 }
@@ -42,7 +46,7 @@ pub struct State {
 impl State {
     pub fn new_with_updates(
         version: Option<Version>,
-        shards: Arc<[MapLayer<StateKey, StateUpdate>; NUM_STATE_SHARDS]>,
+        shards: Arc<[MapLayer<StateKey, DbStateUpdate>; NUM_STATE_SHARDS]>,
         usage: StateStorageUsage,
     ) -> Self {
         Self {
@@ -76,7 +80,7 @@ impl State {
         self.usage
     }
 
-    pub fn shards(&self) -> &[MapLayer<StateKey, StateUpdate>; NUM_STATE_SHARDS] {
+    pub fn shards(&self) -> &[MapLayer<StateKey, DbStateUpdate>; NUM_STATE_SHARDS] {
         &self.shards
     }
 
@@ -95,6 +99,35 @@ impl State {
 
     pub fn is_descendant_of(&self, rhs: &State) -> bool {
         self.shards[0].is_descendant_of(&rhs.shards[0])
+    }
+
+    pub fn update_with_cached_reads(
+        &self,
+        persisted: &State,
+        state_cache: &ShardedStateCache,
+    ) -> Self {
+        let _timer = TIMER.timer_with(&["state__cache_reads"]);
+        let access_time_secs = duration_since_epoch().as_secs() as u32;
+
+        let overlay = self.make_delta(persisted);
+        let shards: Vec<_> = (state_cache.shards.as_slice(), overlay.shards.as_slice())
+            .into_par_iter()
+            .map(|(cache, overlay)| {
+                overlay.new_layer(
+                    &cache
+                        .iter()
+                        .filter_map(|entry| {
+                            let (key, read) = entry.pair();
+                            read.to_read_cache_update_opt(access_time_secs)
+                                .map(|upd_opt| (key.clone(), upd_opt))
+                        })
+                        .collect_vec(),
+                )
+            })
+            .collect();
+        let shards = Arc::new(shards.try_into().expect("Known to be 16 shards."));
+
+        State::new_with_updates(self.version(), shards, self.usage)
     }
 
     pub fn update(
@@ -121,6 +154,7 @@ impl State {
         assert!(self.next_version() >= state_cache.next_version());
 
         let overlay = self.make_delta(persisted);
+        let access_time_secs = duration_since_epoch().as_secs() as u32;
         let (shards, usage_delta_per_shard): (Vec<_>, Vec<_>) = (
             state_cache.shards.as_slice(),
             overlay.shards.as_slice(),
@@ -133,7 +167,7 @@ impl State {
                     overlay.new_layer(
                         &updates
                             .iter()
-                            .map(|(k, u)| ((*k).clone(), (*u).cloned()))
+                            .map(|(k, u)| ((*k).clone(), u.to_db_state_update(access_time_secs)))
                             .collect_vec(),
                     ),
                     Self::usage_delta_for_shard(cache, overlay, updates),
@@ -160,7 +194,7 @@ impl State {
 
     fn usage_delta_for_shard<'kv>(
         cache: &StateCacheShard,
-        overlay: &LayeredMap<StateKey, StateUpdate>,
+        overlay: &LayeredMap<StateKey, DbStateUpdate>,
         updates: &HashMap<&'kv StateKey, StateUpdateRef<'kv>>,
     ) -> (i64, i64) {
         let mut items_delta: i64 = 0;
@@ -177,7 +211,11 @@ impl State {
             // otherwise we can't calculate the correct usage.
             let old_value = overlay
                 .get(k)
-                .map(|update| update.value)
+                .map(|update| {
+                    update
+                        .value
+                        .and_then(|db_val| db_val.into_state_value_opt())
+                })
                 .or_else(|| cache.get(k).map(|entry| entry.value().to_state_value_opt()))
                 .expect("Must cache read");
             if let Some(old_v) = old_value {
@@ -233,15 +271,18 @@ impl LedgerState {
         reads: &ShardedStateCache,
     ) -> LedgerState {
         let _timer = TIMER.timer_with(&["ledger_state__update"]);
+        let cache_refreshed = self
+            .latest()
+            .update_with_cached_reads(persisted_snapshot, reads);
 
         let last_checkpoint = if let Some(updates) = &updates.for_last_checkpoint {
-            self.latest().update(persisted_snapshot, updates, reads)
+            cache_refreshed.update(persisted_snapshot, updates, reads)
         } else {
             self.last_checkpoint.clone()
         };
 
         let base_of_latest = if updates.for_last_checkpoint.is_none() {
-            self.latest()
+            &cache_refreshed
         } else {
             &last_checkpoint
         };
@@ -259,12 +300,14 @@ impl LedgerState {
     pub fn update_with_db_reader(
         &self,
         persisted_snapshot: &State,
+        hot_state: Arc<dyn HotStateView>,
         updates: &StateUpdateRefs,
         reader: Arc<dyn DbReader>,
     ) -> Result<(LedgerState, ShardedStateCache)> {
         let state_view = CachedStateView::new_impl(
             StateViewId::Miscellaneous,
             reader,
+            hot_state,
             persisted_snapshot.clone(),
             self.latest().clone(),
         );

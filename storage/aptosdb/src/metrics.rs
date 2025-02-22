@@ -263,3 +263,11 @@ pub static CONCURRENCY_GAUGE: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub(crate) static HOT_STATE_COMMIT_BACKLOG: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_storage_hot_state_commit_backlog",
+        "Backlog of the hot state commit queue."
+    )
+    .unwrap()
+});
