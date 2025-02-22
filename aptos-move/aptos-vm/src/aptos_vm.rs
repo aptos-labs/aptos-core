@@ -983,7 +983,7 @@ impl AptosVM {
         });
 
         gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
-        if txn_data.is_keyless() {
+        for _ in 0..txn_data.num_keyless_authenticators {
             gas_meter.charge_keyless()?;
         }
 
