@@ -33,6 +33,8 @@ impl Default for BlockExecutorModuleCacheLocalConfig {
 /// Local, per-node configuration.
 #[derive(Clone, Debug)]
 pub struct BlockExecutorLocalConfig {
+    // If enabled, uses BlockSTMv2 algorithm / scheduler for parallel execution.
+    pub block_stm_v2: bool,
     pub concurrency_level: usize,
     // If specified, parallel execution fallbacks to sequential, if issue occurs.
     // Otherwise, if there is an error in either of the execution, we will panic.
@@ -50,6 +52,7 @@ impl BlockExecutorLocalConfig {
     ///   - Default module cache configs.
     pub fn default_with_concurrency_level(concurrency_level: usize) -> Self {
         Self {
+            block_stm_v2: false,
             concurrency_level,
             allow_fallback: true,
             discard_failed_blocks: false,
