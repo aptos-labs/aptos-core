@@ -801,6 +801,10 @@ impl<'env, 'builder, 'module_builder> UnificationContext
         self.parent.parent.lookup_struct_field_decl(id, field_name)
     }
 
+    fn get_function_wrapper_type(&self, id: &QualifiedInstId<StructId>) -> Option<Type> {
+        self.parent.parent.get_function_wrapper_type(id)
+    }
+
     fn get_receiver_function(
         &mut self,
         ty: &Type,
