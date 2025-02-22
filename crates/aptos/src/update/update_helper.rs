@@ -34,6 +34,7 @@ pub fn build_updater(
     linux_name: &str,
     mac_os_name: &str,
     windows_name: &str,
+    assume_yes: bool,
 ) -> Result<Box<dyn ReleaseUpdate>> {
     // Determine the target we should download based on how the CLI itself was built.
     let arch_str = get_arch();
@@ -71,6 +72,7 @@ pub fn build_updater(
         .current_version(current_version)
         .target_version_tag(&format!("v{}", info.target_version))
         .target(&target)
+        .no_confirm(assume_yes)
         .build()
         .map_err(|e| anyhow!("Failed to build self-update configuration: {:#}", e))
 }
