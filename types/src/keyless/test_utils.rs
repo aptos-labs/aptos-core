@@ -410,7 +410,7 @@ mod test {
     use aptos_crypto::PrivateKey;
     use ark_ff::PrimeField;
     use reqwest::Client;
-    use serde_json::{json, Value};
+    use serde_json::{json, to_string_pretty, Value};
     use std::ops::Deref;
 
     /// Since our proof generation toolkit is incomplete; currently doing it here.
@@ -444,9 +444,8 @@ mod test {
         public_inputs_hash: [u8; 32],
     }
 
-    // Run the prover service locally - https://github.com/aptos-labs/prover-service
-    // Then run ./scripts/dev_setup.sh
-    // Lastly run ./scripts/run_test_server.sh
+    // Run the prover service locally - https://github.com/aptos-labs/keyless-zk-proofs/tree/main/prover
+    // Follow the README and make sure to use port 8083
     #[ignore]
     #[tokio::test]
     async fn fetch_sample_proofs_from_prover() {
@@ -463,6 +462,9 @@ mod test {
             "extra_field": SAMPLE_JWT_EXTRA_FIELD_KEY,
             "use_insecure_test_jwk": true,
         });
+
+        println!("Request Body: {}", to_string_pretty(&body).unwrap());
+
         make_prover_request(&client, body, "SAMPLE_PROOF").await;
 
         let body = json!({
