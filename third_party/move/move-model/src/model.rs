@@ -1708,8 +1708,29 @@ impl GlobalEnv {
         module: &CompiledModule,
         def_idx: FunctionDefinitionIndex,
     ) -> BTreeSet<QualifiedId<FunId>> {
-        // TODO(LAMBDA) -- fix when we extend bytecode with function values
-        self.get_called_funs_from_bytecode(module, def_idx)
+        let function_definition = module.function_def_at(def_idx);
+        let function_definition_view = FunctionDefinitionView::new(module, function_definition);
+        let used_funs: BTreeSet<QualifiedId<FunId>> = match function_definition_view.code() {
+            Some(unit) => unit
+                .code
+                .iter()
+                .filter_map(|c| {
+                    let handle_idx = match c {
+                        Bytecode::Call(i) | Bytecode::PackClosure(i, ..) => Some(*i),
+                        Bytecode::CallGeneric(i) | Bytecode::PackClosureGeneric(i, ..) => {
+                            Some(module.function_instantiation_at(*i).handle)
+                        },
+                        _ => None,
+                    };
+                    handle_idx.map(|idx| {
+                        ModuleEnv::get_used_function_from_compiled_module(self, idx, module)
+                            .get_qualified_id()
+                    })
+                })
+                .collect(),
+            None => BTreeSet::default(),
+        };
+        used_funs
     }
 
     fn get_called_funs_from_bytecode(
