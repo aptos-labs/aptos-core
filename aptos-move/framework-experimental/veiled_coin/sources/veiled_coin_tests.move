@@ -2,7 +2,7 @@
 ///
 /// TODO: improve testing framework; currently very cumbersome to set up a veiled payment test
 /// TODO: test that payments to self return successfully (ideally, they should do nothing)
-module veiled_coin::veiled_coin_tests {
+module framework_experimental::veiled_coin_tests {
     #[test_only]
     use std::features;
     #[test_only]
@@ -27,13 +27,13 @@ module veiled_coin::veiled_coin_tests {
     use aptos_framework::coin;
 
     #[test_only]
-    use veiled_coin::veiled_coin;
+    use framework_experimental::veiled_coin;
     #[test_only]
-    use veiled_coin::helpers::generate_elgamal_keypair;
+    use framework_experimental::helpers::generate_elgamal_keypair;
     #[test_only]
-    use veiled_coin::sigma_protos::{serialize_withdrawal_subproof, prove_withdrawal};
+    use framework_experimental::sigma_protos::{serialize_withdrawal_subproof, prove_withdrawal};
     #[test_only]
-    use veiled_coin::sigma_protos;
+    use framework_experimental::sigma_protos;
 
     //
     // Test-only functions
@@ -117,7 +117,7 @@ module veiled_coin::veiled_coin_tests {
     // Tests
     //
 
-    #[test(veiled_coin = @veiled_coin, aptos_fx = @aptos_framework, sender = @0xc0ffee, recipient = @0x1337)]
+    #[test(veiled_coin = @framework_experimental, aptos_fx = @aptos_framework, sender = @0xc0ffee, recipient = @0x1337)]
     fun veil_test(
         veiled_coin: signer,
         aptos_fx: signer,
@@ -126,7 +126,7 @@ module veiled_coin::veiled_coin_tests {
     ) {
         println(b"Starting veil_test()...");
         println(b"@veiled_coin:");
-        print(&@veiled_coin);
+        print(&@framework_experimental);
         println(b"@aptos_framework:");
         print(&@aptos_framework);
 
@@ -191,7 +191,7 @@ module veiled_coin::veiled_coin_tests {
             signer::address_of(&recipient), 100u32, &ristretto255::scalar_zero(), &recipient_pk), 1);
     }
 
-    #[test(veiled_coin = @veiled_coin, aptos_fx = @aptos_framework, sender = @0x1337)]
+    #[test(veiled_coin = @framework_experimental, aptos_fx = @aptos_framework, sender = @0x1337)]
     fun unveil_test(
         veiled_coin: signer,
         aptos_fx: signer,
@@ -199,7 +199,7 @@ module veiled_coin::veiled_coin_tests {
     ) {
         println(b"Starting unveil_test()...");
         println(b"@veiled_coin:");
-        print(&@veiled_coin);
+        print(&@framework_experimental);
         println(b"@aptos_framework:");
         print(&@aptos_framework);
 
@@ -270,7 +270,7 @@ module veiled_coin::veiled_coin_tests {
         assert!(remaining_public_balance == veiled_coin::cast_u32_to_u64_amount(400), 3);
     }
 
-    #[test(veiled_coin = @veiled_coin, aptos_fx = @aptos_framework, sender = @0xc0ffee, recipient = @0x1337)]
+    #[test(veiled_coin = @framework_experimental, aptos_fx = @aptos_framework, sender = @0xc0ffee, recipient = @0x1337)]
     fun basic_viability_test(
         veiled_coin: signer,
         aptos_fx: signer,
