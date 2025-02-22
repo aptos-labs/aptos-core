@@ -634,6 +634,13 @@ module std::features {
         is_enabled(ACCOUNT_ABSTRACTION)
     }
 
+    /// Whether bytecode version v8 is enabled.
+    /// Lifetime: transient
+    ///
+    /// We do not expect use from Move, so for now only for documentation purposes here
+    const VM_BINARY_FORMAT_V8: u64 = 87;
+
+
     /// Whether the batch Bulletproofs native functions are available. This is needed because of the introduction of a new native function.
     /// Lifetime: transient
     const BULLETPROOFS_BATCH_NATIVES: u64 = 87;
@@ -643,6 +650,13 @@ module std::features {
     public fun bulletproofs_batch_enabled(): bool acquires Features {
         is_enabled(BULLETPROOFS_BATCH_NATIVES)
     }
+
+    /// Whether function values are enabled.
+    /// Lifetime: transient
+    ///
+    /// We do not expect use from Move, so for now only for documentation purposes here
+    const ENABLE_FUNCTION_VALUES: u64 = 88;
+
 
     // ============================================================================================
     // Feature Flag Implementation

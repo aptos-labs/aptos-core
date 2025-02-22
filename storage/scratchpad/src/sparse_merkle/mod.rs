@@ -529,6 +529,7 @@ impl FrozenSparseMerkleTree {
     }
 
     /// Queries a `key` in this `SparseMerkleTree`.
+    #[cfg(any(feature = "fuzzing", feature = "bench", test))]
     fn get(&self, key: HashValue) -> StateStoreStatus {
         let mut subtree = self.smt.root_weak();
         let mut bits = key.iter_bits();
