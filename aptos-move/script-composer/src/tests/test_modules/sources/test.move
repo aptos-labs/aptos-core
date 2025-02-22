@@ -77,4 +77,12 @@ module 0x1::batched_execution {
     public fun multiple_returns(): (DroppableValue, NonDroppableValue) {
         return (DroppableValue { val: 0 }, NonDroppableValue { val: 1} )
     }
+
+    public fun multiple_generics<T, F>(v: GenericNonDroppableValue<T>, v2: GenericNonDroppableValue<F>) {
+        let GenericNonDroppableValue { val } = v;
+        assert!(val == 10, 10);
+
+        let GenericNonDroppableValue { val } = v2;
+        assert!(val == 20, 20);
+    }
 }
