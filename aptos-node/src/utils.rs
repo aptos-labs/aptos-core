@@ -75,6 +75,7 @@ pub fn set_aptos_vm_configurations(node_config: &NodeConfig) {
 
 pub fn ensure_max_open_files_limit(required: u64, assert_success: bool) {
     if required == 0 {
+        #[allow(clippy::needless_return)] // for Windows
         return;
     }
 
