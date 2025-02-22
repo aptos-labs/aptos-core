@@ -23,7 +23,7 @@ public fun m::test() {
 
 
 Diagnostics:
-warning: Unused assignment to `z`. Consider removing or prefixing with an underscore: `_z`
+warning: Unused assignment/binding to `z`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_z`), or binding to `_`
   ┌─ tests/variable-coalescing/unused_add.move:5:17
   │
 5 │         let z = x + y;
