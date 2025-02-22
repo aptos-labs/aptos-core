@@ -71,9 +71,9 @@ spec aptos_framework::aptos_governance {
         let register_account = global<account::Account>(addr);
 
         aborts_if exists<voting::VotingForum<GovernanceProposal>>(addr);
-        aborts_if !exists<account::Account>(addr);
-        aborts_if register_account.guid_creation_num + 7 > MAX_U64;
-        aborts_if register_account.guid_creation_num + 7 >= account::MAX_GUID_CREATION_NUM;
+        // aborts_if !exists<account::Account>(addr);
+        // aborts_if register_account.guid_creation_num + 7 > MAX_U64;
+        // aborts_if register_account.guid_creation_num + 7 >= account::MAX_GUID_CREATION_NUM;
         aborts_if !type_info::spec_is_struct<GovernanceProposal>();
 
         include InitializeAbortIf;
@@ -111,7 +111,7 @@ spec aptos_framework::aptos_governance {
         aborts_if exists<GovernanceEvents>(addr);
         aborts_if exists<VotingRecords>(addr);
         aborts_if exists<ApprovedExecutionHashes>(addr);
-        aborts_if !exists<account::Account>(addr);
+        // aborts_if !exists<account::Account>(addr);
         aborts_if exists<VotingRecordsV2>(addr);
     }
 

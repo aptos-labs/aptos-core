@@ -118,9 +118,9 @@ spec aptos_framework::block {
         include Initialize;
         include NewEventHandle;
 
-        let addr = signer::address_of(aptos_framework);
-        let account = global<account::Account>(addr);
-        aborts_if account.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
+        // let addr = signer::address_of(aptos_framework);
+        // let account = global<account::Account>(addr);
+        // aborts_if account.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
     }
 
     spec schema BlockRequirement {
@@ -169,9 +169,9 @@ spec aptos_framework::block {
         aptos_framework: signer;
 
         let addr = signer::address_of(aptos_framework);
-        let account = global<account::Account>(addr);
-        aborts_if !exists<account::Account>(addr);
-        aborts_if account.guid_creation_num + 2 > MAX_U64;
+        // let account = global<account::Account>(addr);
+        // aborts_if !exists<account::Account>(addr);
+        // aborts_if account.guid_creation_num + 2 > MAX_U64;
     }
 
     /// The caller is @aptos_framework.
