@@ -979,6 +979,10 @@ impl ExecutionStatus {
         matches!(self, ExecutionStatus::Success)
     }
 
+    pub fn is_out_of_gas(&self) -> bool {
+        matches!(self, ExecutionStatus::OutOfGas)
+    }
+
     pub fn aug_with_aux_data(self, aux_data: &TransactionAuxiliaryData) -> Self {
         if let Some(aux_error) = aux_data.get_detail_error_message() {
             if let ExecutionStatus::MiscellaneousError(status_code) = self {
