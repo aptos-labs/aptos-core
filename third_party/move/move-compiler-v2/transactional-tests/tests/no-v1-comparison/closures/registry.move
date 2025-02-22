@@ -15,12 +15,7 @@ module 0x66::registry {
 module 0x66::delayed_work {
     use 0x66::registry;
 
-    struct Work(|u64|u64 has store) has store;
-
-    fun doit(self: Work): |u64|u64 {
-        let Work(fn) = self;
-        fn
-    }
+    struct Work(|u64|u64) has store;
 
     entry fun initialize(s: &signer) {
         registry::store(s, Work(id_fun))
@@ -33,11 +28,11 @@ module 0x66::delayed_work {
 
     entry fun eval(s: &signer, amount: u64, expected: u64) {
         let todo = registry::remove<Work>(s);
-        assert!(doit(todo)(amount) == expected)
+        assert!(todo(amount) == expected)
     }
 
     public fun more_work(old: Work, x: u64, y: u64): u64 {
-        doit(old)(x) + y
+        old(x) + y
     }
 
     public fun id_fun(x: u64): u64 {

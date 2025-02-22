@@ -1479,8 +1479,15 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         for (name_loc, field_name, (idx, ty)) in fields {
             let field_loc = et.to_loc(&name_loc);
             let field_sym = et.symbol_pool().make(field_name);
-            let field_ty = et.translate_type(ty);
+            let mut field_ty = et.translate_type(ty);
             let field_ty_loc = et.to_loc(&ty.loc);
+            // If the field type has a function type with empty abilities,
+            // assign struct abilities.
+            if let Type::Fun(arg, res, abilities) = &field_ty {
+                if abilities.is_empty() {
+                    field_ty = Type::Fun(arg.clone(), res.clone(), struct_abilities)
+                }
+            }
             for ctr in Constraint::for_field(struct_abilities, &field_ty) {
                 et.add_constraint_and_report(
                     &field_ty_loc,
