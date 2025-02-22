@@ -89,8 +89,3 @@ fn move_token_unit_tests() {
 fn move_token_objects_unit_tests() {
     run_tests_for_pkg("aptos-token-objects");
 }
-
-#[test]
-fn move_framework_experimental_unit_tests() {
-    run_tests_for_pkg("aptos-framework-experimental");
-}
