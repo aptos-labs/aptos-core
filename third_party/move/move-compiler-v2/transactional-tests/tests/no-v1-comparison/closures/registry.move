@@ -15,22 +15,29 @@ module 0x66::registry {
 module 0x66::delayed_work {
     use 0x66::registry;
 
-    entry fun initialize(s: &signer) {
-        registry::store< |u64|u64 has store >(s, id_fun)
+    struct Work(|u64|u64 has store) has store;
+
+    fun doit(self: Work): |u64|u64 {
+        let Work(fn) = self;
+        fn
     }
 
-    entry fun delayed_add(s: &signer, amount: u64) {
-        let current = registry::remove< |u64|u64 has store >(s);
-        registry::store< |u64|u64 has store >(s, |x| add_fun(current, amount, x))
+    entry fun initialize(s: &signer) {
+        registry::store(s, Work(id_fun))
+    }
+
+    entry fun add(s: &signer, amount: u64) {
+        let current = registry::remove<Work>(s);
+        registry::store(s, Work(|x| more_work(current, amount, x)))
     }
 
     entry fun eval(s: &signer, amount: u64, expected: u64) {
-        let current = registry::remove< |u64|u64 has store >(s);
-        assert!(current(amount) == expected)
+        let todo = registry::remove<Work>(s);
+        assert!(doit(todo)(amount) == expected)
     }
 
-    public fun add_fun(old: |u64|u64, x: u64, y: u64): u64 {
-        old(x) + y
+    public fun more_work(old: Work, x: u64, y: u64): u64 {
+        doit(old)(x) + y
     }
 
     public fun id_fun(x: u64): u64 {
@@ -40,8 +47,8 @@ module 0x66::delayed_work {
 
 //# run 0x66::delayed_work::initialize --signers 0x66
 
-//# run 0x66::delayed_work::delayed_add --verbose --signers 0x66 --args 5
+//# run 0x66::delayed_work::add --verbose --signers 0x66 --args 5
 
-//# run 0x66::delayed_work::delayed_add --verbose --signers 0x66 --args 7
+//# run 0x66::delayed_work::add --verbose --signers 0x66 --args 7
 
 //# run 0x66::delayed_work::eval --signers 0x66 --args 3 15

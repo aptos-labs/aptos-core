@@ -17,37 +17,44 @@ fn function_value_registry() {
           use 0x1::signer;
           struct R<T>(T) has key;
           public fun store<T: store>(s: &signer, x: T) {
-            move_to(s, R(x))
+              move_to(s, R(x))
           }
           public fun remove<T: store>(s: &signer): T acquires R {
-            let R(x) = move_from<R<T>>(signer::address_of(s));
-            x
+              let R(x) = move_from<R<T>>(signer::address_of(s));
+              x
           }
         }
 
         module 0x66::delayed_work {
           use 0x66::registry;
 
+          struct Work(|u64|u64 has store) has store;
+
+          fun doit(self: Work): |u64|u64 {
+              let Work(fn) = self;
+              fn
+          }
+
           entry fun initialize(s: &signer) {
-            registry::store< |u64|u64 has store >(s, id_fun)
+              registry::store(s, Work(id_fun))
           }
 
           entry fun add(s: &signer, amount: u64) {
-            let old = registry::remove< |u64|u64 has store >(s);
-            registry::store< |u64|u64 has store >(s, |x| add_fun(old, amount, x))
+              let current = registry::remove<Work>(s);
+              registry::store(s, Work(|x| more_work(current, amount, x)))
           }
 
           entry fun eval(s: &signer, amount: u64, expected: u64) {
-            let current = registry::remove< |u64|u64 has store >(s);
-            assert!(current(amount) == expected)
+              let todo = registry::remove<Work>(s);
+              assert!(doit(todo)(amount) == expected)
           }
 
-          public fun add_fun(old: |u64|u64, x: u64, y: u64): u64 {
-            old(x) + y
+          public fun more_work(old: Work, x: u64, y: u64): u64 {
+              doit(old)(x) + y
           }
 
           public fun id_fun(x: u64): u64 {
-            x
+              x
           }
         }
     "#;
