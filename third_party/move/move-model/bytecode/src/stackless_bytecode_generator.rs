@@ -1725,7 +1725,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
         for cond in &spec.conditions {
             let attr_id = self.context.new_loc_attr(cond.loc.clone());
             let kind = match cond.kind {
-                ConditionKind::Assert => PropKind::Assert,
+                ConditionKind::Assert(cond) => PropKind::Assert(cond),
                 ConditionKind::Assume => PropKind::Assume,
                 ConditionKind::LoopInvariant => {
                     let global_env = self.func_env.module_env.env;
@@ -1733,7 +1733,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     match cond.properties.get(&sym) {
                         None => {
                             self.context.loop_invariants.insert(attr_id);
-                            PropKind::Assert
+                            PropKind::Assert(None)
                         },
                         Some(PropertyValue::Value(Value::Number(count))) => {
                             // the only allowed loop invariant condition is `True`
@@ -1799,7 +1799,7 @@ impl BytecodeGeneratorContext {
         for cond in &spec.conditions {
             let attr_id = self.new_loc_attr(cond.loc.clone());
             let kind = match cond.kind {
-                ConditionKind::Assert => PropKind::Assert,
+                ConditionKind::Assert(cond) => PropKind::Assert(cond),
                 ConditionKind::Assume => PropKind::Assume,
                 ConditionKind::LoopInvariant => {
                     let global_env = func_env.module_env.env;
@@ -1807,7 +1807,7 @@ impl BytecodeGeneratorContext {
                     match cond.properties.get(&sym) {
                         None => {
                             self.loop_invariants.insert(attr_id);
-                            PropKind::Assert
+                            PropKind::Assert(None)
                         },
                         Some(PropertyValue::Value(Value::Number(count))) => {
                             // the only allowed loop invariant condition is `True`
