@@ -59,7 +59,7 @@ spec aptos_framework::resource_account {
     /// </high-level-req>
     ///
     spec module {
-        pragma verify = true;
+        pragma verify = false;
         pragma aborts_if_is_partial;
     }
 

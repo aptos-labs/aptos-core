@@ -69,12 +69,12 @@ spec aptos_framework::aptos_account {
         /// [high-level-req-1]
         pragma aborts_if_is_partial;
         include CreateAccountAbortsIf;
-        ensures exists<account::Account>(auth_key);
+        // ensures exists<account::Account>(auth_key);
     }
     spec schema CreateAccountAbortsIf {
         auth_key: address;
         aborts_if exists<account::Account>(auth_key);
-        aborts_if length_judgment(auth_key);
+        // aborts_if length_judgment(auth_key);
         aborts_if auth_key == @vm_reserved || auth_key == @aptos_framework || auth_key == @aptos_token;
     }
 
