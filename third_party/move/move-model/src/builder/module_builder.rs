@@ -2598,7 +2598,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 let translated =
                     et.translate_seq(&loc, seq, &result_type, &ErrorMessageContext::Return);
                 et.finalize_types();
-                self.spec_funs[self.spec_fun_index].body = Some(translated.into_exp());
+                let translated = et.post_process_body(translated.into_exp());
+                self.spec_funs[self.spec_fun_index].body = Some(translated);
             },
             EA::FunctionBody_::Native => {
                 if !uninterpreted {
