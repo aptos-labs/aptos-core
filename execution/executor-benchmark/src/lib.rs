@@ -933,7 +933,7 @@ mod tests {
         account_address::AccountAddress,
         on_chain_config::{FeatureFlag, Features},
         state_store::state_key::inner::StateKeyInner,
-        transaction::{Transaction, TransactionPayload},
+        transaction::{Transaction, TransactionPayloadWrapper},
     };
     use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
     use itertools::Itertools;
@@ -1001,7 +1001,7 @@ mod tests {
     fn test_compare_prod_and_another<E: VMBlockExecutor>(
         values_match: bool,
         features: Features,
-        txn_payload_f: impl Fn(AccountAddress) -> TransactionPayload,
+        txn_payload_f: impl Fn(AccountAddress) -> TransactionPayloadWrapper,
     ) {
         aptos_logger::Logger::new().init();
 

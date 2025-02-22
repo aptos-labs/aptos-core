@@ -28,7 +28,7 @@ use aptos_types::{
     chain_id::ChainId,
     transaction::{
         analyzed_transaction::AnalyzedTransaction, EntryFunction, RawTransaction,
-        SignedTransaction, Transaction, TransactionPayload,
+        SignedTransaction, Transaction, TransactionPayloadWrapper,
     },
     AptosCoinType, CoinType,
 };
@@ -81,7 +81,7 @@ pub fn create_signed_p2p_transaction(
 ) -> Vec<AnalyzedTransaction> {
     let mut transactions = Vec::new();
     for receiver in receivers.iter() {
-        let transaction_payload = TransactionPayload::EntryFunction(EntryFunction::new(
+        let transaction_payload = TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
             ModuleId::new(AccountAddress::ONE, Identifier::new("coin").unwrap()),
             Identifier::new("transfer").unwrap(),
             vec![AptosCoinType::type_tag()],

@@ -12,7 +12,7 @@ use crate::{
     types::{
         account_address::AccountAddress,
         chain_id::ChainId,
-        transaction::{EntryFunction, TransactionPayload},
+        transaction::{EntryFunction, TransactionPayloadWrapper},
         LocalAccount,
     },
 };
@@ -70,7 +70,7 @@ impl<'a> CoinClient<'a> {
             .inner()
             .chain_id;
         let transaction_builder = TransactionBuilder::new(
-            TransactionPayload::EntryFunction(EntryFunction::new(
+            TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
                 ModuleId::new(
                     AccountAddress::ONE,
                     Identifier::new("aptos_account").unwrap(),

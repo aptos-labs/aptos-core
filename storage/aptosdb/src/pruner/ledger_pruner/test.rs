@@ -173,7 +173,7 @@ fn verify_txn_not_in_store(
     // Ensure that transaction by account store has been pruned
     if let Some(txn) = txns.get(index as usize).unwrap().try_as_signed_user_txn() {
         assert!(transaction_store
-            .get_account_transaction_version(txn.sender(), txn.sequence_number(), ledger_version,)
+            .get_account_transaction_version(txn.sender(), txn.replay_protector(), ledger_version,)
             .unwrap()
             .is_none());
     }
@@ -284,11 +284,11 @@ fn verify_transaction_in_account_txn_by_version_index(
     transaction_store: &TransactionStore,
     expected_value: Version,
     address: AccountAddress,
-    sequence_number: u64,
+    replay_protector: ReplayProtector,
     ledger_version: Version,
 ) {
     let transaction = transaction_store
-        .get_account_transaction_version(address, sequence_number, ledger_version)
+        .get_account_transaction_version(address, replay_protector, ledger_version)
         .unwrap()
         .unwrap();
     assert_eq!(transaction, expected_value)

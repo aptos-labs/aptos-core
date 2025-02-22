@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+// TODO: Update the sdk builder to generate transactions with new payload format
 use crate::common;
 use aptos_types::transaction::{
     ArgumentABI, EntryABI, EntryFunctionABI, TransactionScriptABI, TypeArgumentABI,
@@ -217,8 +218,8 @@ impl ScriptCall {
             r#"Structured representation of a call into a known Move entry function.
 ```ignore
 impl EntryFunctionCall {
-    pub fn encode(self) -> TransactionPayload { .. }
-    pub fn decode(&TransactionPayload) -> Option<EntryFunctionCall> { .. }
+    pub fn encode(self) -> TransactionPayloadWrapper { .. }
+    pub fn decode(&TransactionPayloadWrapper) -> Option<EntryFunctionCall> { .. }
 }
 ```
 "#
@@ -263,7 +264,7 @@ impl EntryFunctionCall {
                 ]),
                 ("move_core_types", vec!["ident_str"]),
                 ("aptos_types::transaction", vec![
-                    "TransactionPayload",
+                    "TransactionPayloadWrapper",
                     "EntryFunction",
                 ]),
                 ("aptos_types::account_address", vec!["AccountAddress"]),
@@ -275,7 +276,7 @@ impl EntryFunctionCall {
                 "Script",
                 "EntryFunction",
                 "TransactionArgument",
-                "TransactionPayload",
+                "TransactionPayloadWrapper",
                 "ModuleId",
                 "Identifier",
             ])]
@@ -318,8 +319,8 @@ pub fn encode(self) -> Script {{"#
         writeln!(
             self.out,
             r#"
-/// Build an Aptos `TransactionPayload` from a structured object `EntryFunctionCall`.
-pub fn encode(self) -> TransactionPayload {{"#
+/// Build an Aptos `TransactionPayloadWrapper` from a structured object `EntryFunctionCall`.
+pub fn encode(self) -> TransactionPayloadWrapper {{"#
         )?;
         self.out.indent();
         writeln!(self.out, "use EntryFunctionCall::*;\nmatch self {{")?;
@@ -380,9 +381,9 @@ pub fn decode(script: &Script) -> Option<ScriptCall> {{
         writeln!(
             self.out,
             r#"
-/// Try to recognize an Aptos `TransactionPayload` and convert it into a structured object `EntryFunctionCall`.
-pub fn decode(payload: &TransactionPayload) -> Option<EntryFunctionCall> {{
-    if let TransactionPayload::EntryFunction(script) = payload {{
+/// Try to recognize an Aptos `TransactionPayloadWrapper` and convert it into a structured object `EntryFunctionCall`.
+pub fn decode(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {{
+    if let TransactionPayloadWrapper::EntryFunction(script) = payload {{
         match SCRIPT_FUNCTION_DECODER_MAP.get(&format!("{{}}_{{}}", {}, {})) {{
             Some(decoder) => decoder(payload),
             None => None,
@@ -489,7 +490,7 @@ Script {{
     fn emit_entry_function_encoder_function(&mut self, abi: &EntryFunctionABI) -> Result<()> {
         write!(
             self.out,
-            "pub fn {}_{}({}) -> TransactionPayload {{",
+            "pub fn {}_{}({}) -> TransactionPayloadWrapper {{",
             abi.module_name().name().to_string().to_snake_case(),
             abi.name(),
             [
@@ -504,7 +505,7 @@ Script {{
             writeln!(
                 self.out,
                 r#"
-TransactionPayload::EntryFunction(EntryFunction::new(
+TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
     {},
     {},
     vec![{}],
@@ -519,7 +520,7 @@ TransactionPayload::EntryFunction(EntryFunction::new(
             writeln!(
                 self.out,
                 r#"
-TransactionPayload::EntryFunction(EntryFunction {{
+TransactionPayloadWrapper::EntryFunction(EntryFunction {{
     module: {},
     function: {},
     ty_args: vec![{}],
@@ -556,14 +557,14 @@ TransactionPayload::EntryFunction(EntryFunction {{
         //
         writeln!(
             self.out,
-            "\npub fn {}_{}(payload: &TransactionPayload) -> Option<EntryFunctionCall> {{",
+            "\npub fn {}_{}(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {{",
             abi.module_name().name().to_string().to_snake_case(),
             abi.name(),
         )?;
         self.out.indent();
         writeln!(
             self.out,
-            "if let TransactionPayload::EntryFunction({}script) = payload {{",
+            "if let TransactionPayloadWrapper::EntryFunction({}script) = payload {{",
             // fix warning "unused variable"
             if abi.ty_args().is_empty() && abi.args().is_empty() {
                 "_"
@@ -690,7 +691,7 @@ static TRANSACTION_SCRIPT_DECODER_MAP: once_cell::sync::Lazy<TransactionScriptDe
         writeln!(
             self.out,
             r#"
-type EntryFunctionDecoderMap = std::collections::HashMap<String, Box<dyn Fn(&TransactionPayload) -> Option<EntryFunctionCall> + std::marker::Sync + std::marker::Send>>;
+type EntryFunctionDecoderMap = std::collections::HashMap<String, Box<dyn Fn(&TransactionPayloadWrapper) -> Option<EntryFunctionCall> + std::marker::Sync + std::marker::Send>>;
 
 static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMap> = once_cell::sync::Lazy::new(|| {{"#
         )?;

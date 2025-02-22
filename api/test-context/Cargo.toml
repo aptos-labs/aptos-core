@@ -37,6 +37,7 @@ bcs = { workspace = true }
 bytes = { workspace = true }
 goldenfile = { workspace = true }
 hyper = { workspace = true }
+move-command-line-common = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
 serde_json = { workspace = true }

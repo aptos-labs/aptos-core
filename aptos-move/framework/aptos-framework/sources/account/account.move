@@ -337,7 +337,8 @@ module aptos_framework::account {
     /// 3. During multisig_v2 account creation
     public(friend) fun rotate_authentication_key_internal(account: &signer, new_auth_key: vector<u8>) acquires Account {
         let addr = signer::address_of(account);
-        assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+        // Question[Orderless]: Is it okay to comment this statement to accommodate stateless accounts?
+        // assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
         assert!(
             vector::length(&new_auth_key) == 32,
             error::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
@@ -397,7 +398,8 @@ module aptos_framework::account {
         cap_update_table: vector<u8>,
     ) acquires Account, OriginatingAddress {
         let addr = signer::address_of(account);
-        assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+        // Question[Orderless]: Is it okay to comment this statement to accommodate stateless accounts?
+        // assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
         check_rotation_permission(account);
         let account_resource = borrow_global_mut<Account>(addr);
 
@@ -577,7 +579,8 @@ module aptos_framework::account {
     /// authority of the new authentication key.
     entry fun set_originating_address(account: &signer) acquires Account, OriginatingAddress {
         let account_addr = signer::address_of(account);
-        assert!(exists<Account>(account_addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+        // Question[Orderless]: Is it okay to comment this statement to accommodate stateless accounts?
+        // assert!(exists<Account>(account_addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
         let auth_key_as_address =
             from_bcs::to_address(borrow_global<Account>(account_addr).authentication_key);
         let address_map_ref_mut =
@@ -612,7 +615,8 @@ module aptos_framework::account {
 
     /// Revoke the rotation capability offer given to `to_be_revoked_recipient_address` from `account`
     public entry fun revoke_rotation_capability(account: &signer, to_be_revoked_address: address) acquires Account {
-        assert!(exists_at(to_be_revoked_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+        // Question[Orderless]: Is it okay to comment this statement to accommodate stateless accounts?
+        // assert!(exists_at(to_be_revoked_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
         check_rotation_permission(account);
         let addr = signer::address_of(account);
         let account_resource = borrow_global<Account>(addr);
@@ -648,7 +652,8 @@ module aptos_framework::account {
     ) acquires Account {
         check_offering_permission(account);
         let source_address = signer::address_of(account);
-        assert!(exists_at(recipient_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+        // Question[Orderless]: Is it okay to comment this statement to accommodate stateless accounts?
+        // assert!(exists_at(recipient_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
 
         // Proof that this account intends to delegate its signer capability to another account.
         let proof_challenge = SignerCapabilityOfferProofChallengeV2 {

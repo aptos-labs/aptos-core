@@ -27,7 +27,7 @@ use aptos_rest_client::Client;
 use aptos_sdk::{bcs, types::LocalAccount};
 use aptos_types::{
     account_address::AccountAddress,
-    transaction::{EntryFunction, TransactionPayload},
+    transaction::{EntryFunction, TransactionPayloadWrapper},
 };
 use move_core_types::{ident_str, language_storage::ModuleId};
 use std::{collections::BTreeMap, path::PathBuf};
@@ -216,7 +216,7 @@ async fn publish_module(
     };
 
     // create payload
-    let payload: aptos_types::transaction::TransactionPayload =
+    let payload: aptos_types::transaction::TransactionPayloadWrapper =
         EntryFunctionCall::CodePublishPackageTxn {
             metadata_serialized,
             code: blobs.clone(),
@@ -306,7 +306,7 @@ async fn set_message(client: &Client, account: &mut LocalAccount) -> Result<(), 
     };
 
     // create payload
-    let payload = TransactionPayload::EntryFunction(EntryFunction::new(
+    let payload = TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(account.address(), ident_str!(MODULE_NAME).to_owned()),
         ident_str!("set_message").to_owned(),
         vec![],
