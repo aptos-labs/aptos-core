@@ -295,7 +295,9 @@ impl Payload {
                     .sum::<usize>()) as u64)
                 .min(max_txns_to_execute.unwrap_or(u64::MAX)),
             Payload::OptQuorumStore(opt_qs_payload) => {
-                opt_qs_payload.max_txns_to_execute().unwrap_or(u64::MAX)
+                let num_txns = opt_qs_payload.num_txns() as u64;
+                let max_txns_to_execute = opt_qs_payload.max_txns_to_execute().unwrap_or(u64::MAX);
+                num_txns.min(max_txns_to_execute)
             },
         }
     }
