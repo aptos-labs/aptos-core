@@ -644,6 +644,15 @@ module std::features {
         is_enabled(BULLETPROOFS_BATCH_NATIVES)
     }
 
+    /// Whether the account abstraction is enabled.
+    ///
+    /// Lifetime: transient
+    const DOMAIN_ACCOUNT_ABSTRACTION: u64 = 88;
+
+    public fun is_domain_account_abstraction_enabled(): bool acquires Features {
+        is_enabled(DOMAIN_ACCOUNT_ABSTRACTION)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

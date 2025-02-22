@@ -315,6 +315,7 @@ fn test_db_indexer_data() {
         ident_str!("validator_consensus_info"),
         ident_str!("ristretto255_bulletproofs"),
         ident_str!("dispatchable_fungible_asset"),
+        ident_str!("domain_account_abstraction_ed25519_hex"),
     ]
     .into_iter()
     .map(|module| StateKey::module(&AccountAddress::ONE, module))
@@ -376,6 +377,10 @@ fn test_db_indexer_data() {
         (
             false,
             "0x1::randomness_config_seqnum::RandomnessConfigSeqNum",
+        ),
+        (
+            false,
+            "0x1::account_abstraction::DomainDispatchableAuthenticator",
         ),
         (false, "0x1::coin::CoinInfo<0x1::aptos_coin::AptosCoin>"),
         (
