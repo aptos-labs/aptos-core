@@ -125,7 +125,7 @@ fn setup_vm(modules: &[ModuleCode]) -> (RuntimeEnvironment, MoveVM, InMemoryStor
     let mut storage = InMemoryStorage::new();
     compile_modules(&mut storage, modules);
     let runtime_environment = RuntimeEnvironment::new(vec![]);
-    let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
+    let vm = MoveVM::new();
     (runtime_environment, vm, storage)
 }
 

@@ -1017,7 +1017,7 @@ impl FakeExecutor {
 
         let env = AptosEnvironment::new(&self.data_store);
         let resolver = self.data_store.as_move_resolver();
-        let vm = MoveVmExt::new(env.clone(), &resolver);
+        let vm = MoveVmExt::new(env.clone());
 
         // Create module storage, and ensure the module for the function we want to execute is
         // cached.
@@ -1031,11 +1031,10 @@ impl FakeExecutor {
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             // load function name into cache to ensure cache is hot
-            let _ = session.load_function(
-                &module_storage,
+            let _ = module_storage.load_instantiated_function(
                 module,
                 &Self::name(function_name),
-                &type_params.clone(),
+                &type_params,
             );
 
             let fun_name = Self::name(function_name);
@@ -1163,7 +1162,7 @@ impl FakeExecutor {
                 }),
             );
             let resolver = self.data_store.as_move_resolver();
-            let vm = MoveVmExt::new(env.clone(), &resolver);
+            let vm = MoveVmExt::new(env.clone());
 
             let module_storage = self.data_store.as_aptos_code_storage(env.clone());
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
@@ -1224,7 +1223,7 @@ impl FakeExecutor {
         let (write_set, events) = {
             let env = AptosEnvironment::new(&self.data_store);
             let resolver = self.data_store.as_move_resolver();
-            let vm = MoveVmExt::new(env.clone(), &resolver);
+            let vm = MoveVmExt::new(env.clone());
 
             let module_storage = self.data_store.as_aptos_code_storage(env.clone());
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
@@ -1267,7 +1266,7 @@ impl FakeExecutor {
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
         let env = AptosEnvironment::new(&self.data_store);
         let resolver = self.data_store.as_move_resolver();
-        let vm = MoveVmExt::new(env.clone(), &resolver);
+        let vm = MoveVmExt::new(env.clone());
 
         let module_storage = self.data_store.as_aptos_code_storage(env.clone());
 

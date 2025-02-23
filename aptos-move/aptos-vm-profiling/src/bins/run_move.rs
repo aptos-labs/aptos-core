@@ -159,8 +159,7 @@ fn main() -> Result<()> {
         &mut builder,
     ));
 
-    let runtime_environment = RuntimeEnvironment::new(natives);
-    let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
+    let vm = MoveVM::new();
     let mut storage = InMemoryStorage::new();
 
     let test_modules = compile_test_modules();
@@ -188,6 +187,7 @@ fn main() -> Result<()> {
     let mut sess = vm.new_session_with_extensions(&storage, extensions);
 
     let traversal_storage = TraversalStorage::new();
+    let runtime_environment = RuntimeEnvironment::new(natives);
     let code_storage = storage.as_unsync_code_storage(runtime_environment);
 
     let args: Vec<Vec<u8>> = vec![];

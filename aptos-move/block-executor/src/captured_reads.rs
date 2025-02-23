@@ -326,9 +326,6 @@ pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
     data_reads: HashMap<T::Key, DataRead<T::Value>>,
     group_reads: HashMap<T::Key, GroupRead<T>>,
     delayed_field_reads: HashMap<DelayedFieldID, DelayedFieldRead>,
-
-    #[deprecated]
-    pub(crate) deprecated_module_reads: Vec<T::Key>,
     module_reads: hashbrown::HashMap<K, ModuleRead<DC, VC, S>>,
 
     /// If there is a speculative failure (e.g. delta application failure, or an observed
@@ -796,11 +793,6 @@ where
             }
         }
 
-        // TODO(loader_v2): Test summaries are the same.
-        #[allow(deprecated)]
-        for key in &self.deprecated_module_reads {
-            ret.insert(InputOutputKey::Resource(key.clone()));
-        }
         for key in self.module_reads.keys() {
             let key = T::Key::from_address_and_module_name(key.address(), key.name());
             ret.insert(InputOutputKey::Resource(key));
@@ -822,9 +814,6 @@ pub(crate) struct UnsyncReadSet<T: Transaction, K> {
     pub(crate) resource_reads: HashSet<T::Key>,
     pub(crate) group_reads: HashMap<T::Key, HashSet<T::Tag>>,
     pub(crate) delayed_field_reads: HashSet<DelayedFieldID>,
-
-    #[deprecated]
-    pub(crate) deprecated_module_reads: HashSet<T::Key>,
     module_reads: HashSet<K>,
 }
 
@@ -850,11 +839,6 @@ where
             }
         }
 
-        // TODO(loader_v2): Test summaries are the same if we switch.
-        #[allow(deprecated)]
-        for key in &self.deprecated_module_reads {
-            ret.insert(InputOutputKey::Resource(key.clone()));
-        }
         for key in &self.module_reads {
             let key = T::Key::from_address_and_module_name(key.address(), key.name());
             ret.insert(InputOutputKey::Resource(key));

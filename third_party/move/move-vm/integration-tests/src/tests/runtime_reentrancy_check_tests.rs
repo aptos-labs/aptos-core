@@ -162,7 +162,7 @@ fn runtime_reentrancy_check() {
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("A").unwrap());
 
     let runtime_environment = RuntimeEnvironment::new(natives);
-    let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
+    let vm = MoveVM::new();
     let mut sess = vm.new_session(&storage);
     let module_storage = storage.as_unsync_module_storage(runtime_environment);
     let traversal_storage = TraversalStorage::new();
