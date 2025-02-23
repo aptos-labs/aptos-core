@@ -27,9 +27,9 @@ use anyhow::{anyhow, bail, Context};
 use aptos_consensus_types::{
     block::Block,
     block_retrieval::{
-        BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse,
-        BlockRetrievalStatus, NUM_PEERS_PER_RETRY, NUM_RETRIES, RETRY_INTERVAL_MSEC,
-        RPC_TIMEOUT_MSEC,
+        BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalRequestV2,
+        BlockRetrievalResponse, BlockRetrievalStatus, NUM_PEERS_PER_RETRY, NUM_RETRIES,
+        RETRY_INTERVAL_MSEC, RPC_TIMEOUT_MSEC,
     },
     common::Author,
     quorum_cert::QuorumCert,
@@ -693,17 +693,12 @@ impl BlockRetriever {
                         target_block_id,
                     ))
                 },
-                TargetBlockRetrieval::TargetRound(_) => {
-                    // TLDR: We cannot use this until BlockRetrievalRequestV2 is available in the next release
-                    // For more info, see bail!() in tokio::select! below
-                    //
-                    // TODO @bchocho @hariria to fix after the release
-                    // let request = BlockRetrievalRequest::new_with_target_round(
-                    //     block_id,
-                    //     retrieve_batch_size,
-                    //     target_round,
-                    // );
-                    bail!("Unexpected target round request")
+                TargetBlockRetrieval::TargetRound(target_round) => {
+                    BlockRetrievalRequest::V2(BlockRetrievalRequestV2::new_with_target_round(
+                        block_id,
+                        retrieve_batch_size,
+                        target_round,
+                    ))
                 },
             };
 
@@ -737,25 +732,12 @@ impl BlockRetriever {
                                 failed_attempt
                             );
                             let remote_peer = peer;
-                            // TODO @bchocho @hariria fix once BlockRetrievalRequestV2 is released
-                            match &request {
-                                BlockRetrievalRequest::V1(v1) => {
-                                    let future = self.network.request_block(
-                                        v1.clone(),
-                                        peer,
-                                        rpc_timeout,
-                                    );
-                                    futures.push(async move { (remote_peer, future.await) }.boxed());
-                                }
-                                // Using a BlockRetrievalRequestV2 currently bails. This is
-                                // intentional since we should not make network requests for V2
-                                // BlockRetrievalRequests yet.That being said, we have gone ahead
-                                // and already implement the logic for processing these requests.
-                                BlockRetrievalRequest::V2(_) => {
-                                    bail!("BlockRetrievalRequest::V2 is not enabled yet, bailed at retrieve_block_for_id_chunk")
-                                }
-                            }
-
+                            let future = self.network.request_block(
+                                request.clone(),
+                                peer,
+                                rpc_timeout,
+                            );
+                            futures.push(async move { (remote_peer, future.await) }.boxed());
                         }
                     }
                     Some((peer, response)) = futures.next() => {

@@ -535,7 +535,10 @@ mod tests {
     };
     use aptos_config::network_id::{NetworkId, PeerNetworkId};
     use aptos_consensus_types::{
-        block_retrieval::{BlockRetrievalRequestV1, BlockRetrievalResponse, BlockRetrievalStatus},
+        block_retrieval::{
+            BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse,
+            BlockRetrievalStatus,
+        },
         common::Payload,
     };
     use aptos_crypto::HashValue;
@@ -843,7 +846,7 @@ mod tests {
         timed_block_on(&runtime, async {
             let response = nodes[0]
                 .request_block(
-                    BlockRetrievalRequestV1::new(HashValue::zero(), 1),
+                    BlockRetrievalRequest::V1(BlockRetrievalRequestV1::new(HashValue::zero(), 1)),
                     peer,
                     Duration::from_secs(5),
                 )
