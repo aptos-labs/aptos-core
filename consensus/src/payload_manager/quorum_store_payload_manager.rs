@@ -13,20 +13,21 @@ use crate::{
 use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
     block::Block,
-    common::{Author, Payload, ProofWithData},
+    common::{Author, Payload, ProofWithData, Round},
     payload::{BatchPointer, TDataInfo},
     pipelined_block::OrderedBlockWindow,
     proof_of_store::BatchInfo,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::*;
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use async_trait::async_trait;
 use futures::{channel::mpsc::Sender, future::Shared};
 use itertools::Itertools;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     future::Future,
     ops::Deref,
     pin::Pin,
@@ -70,6 +71,7 @@ pub struct QuorumStorePayloadManager {
     maybe_consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ordered_authors: Vec<PeerId>,
     address_to_validator_index: HashMap<PeerId, usize>,
+    round_to_batches: Mutex<BTreeMap<Round, Vec<BatchInfo>>>,
 }
 
 impl QuorumStorePayloadManager {
@@ -86,6 +88,7 @@ impl QuorumStorePayloadManager {
             maybe_consensus_publisher,
             ordered_authors,
             address_to_validator_index,
+            round_to_batches: Mutex::new(BTreeMap::new()),
         }
     }
 
@@ -161,6 +164,43 @@ impl QuorumStorePayloadManager {
         batches
     }
 
+    fn get_committed_timestamp_and_round(
+        block: &Block,
+        block_window: &OrderedBlockWindow,
+    ) -> (u64, Round) {
+        let block_window_blocks = block_window.blocks().expect("upgrade block window");
+        let blocks: Vec<_> = block_window_blocks
+            .iter()
+            .chain(std::iter::once(block))
+            .collect();
+        let oldest_block = blocks.first().expect("at least one block");
+        if block_window.window_start_round() == oldest_block.round() {
+            (oldest_block.timestamp_usecs(), oldest_block.round())
+        } else {
+            let certified_block = oldest_block.quorum_cert().certified_block();
+            (certified_block.timestamp_usecs(), certified_block.round())
+        }
+    }
+
+    fn remove_committed_batches(&self, committed_round: Round) -> Vec<BatchInfo> {
+        let mut round_to_batches = self.round_to_batches.lock();
+        let split_round = committed_round + 1;
+        let rounds_remaining = round_to_batches.split_off(&split_round);
+        let mut batches_removed = HashSet::new();
+        for (_, batches) in round_to_batches.iter() {
+            for batch in batches {
+                batches_removed.insert(batch.clone());
+            }
+        }
+        for (_, batches) in rounds_remaining.iter() {
+            for batch in batches {
+                batches_removed.remove(batch);
+            }
+        }
+        *round_to_batches = rounds_remaining;
+        batches_removed.into_iter().collect()
+    }
+
     fn batches_removed_from_window(
         block: &Block,
         block_window: &OrderedBlockWindow,
@@ -192,27 +232,17 @@ impl QuorumStorePayloadManager {
 #[async_trait]
 impl TPayloadManager for QuorumStorePayloadManager {
     fn notify_commit(&self, block: &Block, block_window: Option<&OrderedBlockWindow>) {
+        let batches_in_block = Self::batches_in_block(block);
         if let Some(block_window) = block_window {
-            let block_window_blocks = block_window.blocks().expect("upgrade block window");
-            let blocks: Vec<_> = block_window_blocks
-                .iter()
-                .chain(std::iter::once(block))
-                .collect();
-            let oldest_block = blocks.first().expect("at least one block");
-            let timestamp = if block_window.window_start_round() == oldest_block.round() {
-                oldest_block.timestamp_usecs()
-            } else {
-                oldest_block
-                    .quorum_cert()
-                    .certified_block()
-                    .timestamp_usecs()
-            };
+            self.round_to_batches
+                .lock()
+                .insert(block.round(), batches_in_block);
+
+            let (timestamp, round) = Self::get_committed_timestamp_and_round(block, block_window);
+            let batches_removed = self.remove_committed_batches(round);
+
             self.batch_reader.update_certified_timestamp(timestamp);
-            self.commit_notifier.notify(
-                timestamp,
-                // TODO: fix this to be more exact
-                Self::batches_removed_from_window(block, block_window),
-            );
+            self.commit_notifier.notify(timestamp, batches_removed);
         } else {
             self.batch_reader
                 .update_certified_timestamp(block.timestamp_usecs());
