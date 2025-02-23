@@ -129,7 +129,6 @@ impl BatchStore {
     pub(crate) fn new(
         epoch: u64,
         is_new_epoch: bool,
-        last_certified_time: u64,
         db: Arc<dyn QuorumStoreStorage>,
         memory_quota: usize,
         db_quota: usize,
@@ -138,9 +137,10 @@ impl BatchStore {
         expiration_buffer_usecs: u64,
     ) -> Self {
         let db_clone = db.clone();
+        let initial_last_certified_time = 0;
         let batch_store = Self {
             epoch: OnceCell::with_value(epoch),
-            last_certified_time: AtomicU64::new(last_certified_time),
+            last_certified_time: AtomicU64::new(initial_last_certified_time),
             db_cache: DashMap::new(),
             peer_quota: DashMap::new(),
             expirations: Mutex::new(TimeExpirations::new()),
@@ -161,7 +161,7 @@ impl BatchStore {
             Self::populate_cache_and_gc_expired_batches(
                 db_clone,
                 epoch,
-                last_certified_time,
+                initial_last_certified_time,
                 expiration_buffer_usecs,
                 &batch_store,
             );

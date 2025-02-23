@@ -445,16 +445,6 @@ impl StateComputer for ExecutionProxy {
             return Ok(());
         }
 
-        // This is to update QuorumStore with the latest known commit in the system,
-        // so it can set batches expiration accordingly.
-        // Might be none if called in the recovery path, or between epoch stop and start.
-        if let Some(inner) = self.state.read().as_ref() {
-            let block_timestamp = target.commit_info().timestamp_usecs();
-            inner
-                .payload_manager
-                .notify_commit(block_timestamp, None, None);
-        }
-
         // Inject an error for fail point testing
         fail_point!("consensus::sync_to_target", |_| {
             Err(anyhow::anyhow!("Injected error in sync_to_target").into())
