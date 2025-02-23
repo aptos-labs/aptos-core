@@ -9,9 +9,7 @@ use crate::{
 };
 use aptos_config::config::transaction_filter_type::Filter;
 use aptos_consensus_notifications::{ConsensusNotificationSender, Error};
-use aptos_consensus_types::{
-    block::Block, block_data::BlockData, pipelined_block::OrderedBlockWindow,
-};
+use aptos_consensus_types::{block::Block, block_data::BlockData};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
     state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorResult,
@@ -200,14 +198,7 @@ async fn should_see_and_notify_validator_txns() {
 
     // Ensure the dummy executor has received the txns.
     let _ = execution_policy
-        .schedule_compute(
-            &block,
-            &OrderedBlockWindow::empty(),
-            HashValue::zero(),
-            None,
-            None,
-            dummy_guard(),
-        )
+        .schedule_compute(&block, None, HashValue::zero(), None, None, dummy_guard())
         .await
         .await
         .unwrap();

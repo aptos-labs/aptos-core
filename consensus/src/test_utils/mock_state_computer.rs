@@ -125,7 +125,7 @@ impl StateComputer for RandomComputeResultStateComputer {
     async fn schedule_compute(
         &self,
         _block: &Block,
-        _block_window: &OrderedBlockWindow,
+        _block_window: Option<&OrderedBlockWindow>,
         parent_block_id: HashValue,
         _randomness: Option<Randomness>,
         _block_qc: Option<Arc<QuorumCert>>,

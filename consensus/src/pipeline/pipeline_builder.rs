@@ -277,7 +277,7 @@ impl PipelineBuilder {
         let (futs, tx, abort_handles) = self.build_internal(
             parent_futs,
             Arc::new(pipelined_block.block().clone()),
-            Arc::new(pipelined_block.block_window().clone()),
+            Arc::new(pipelined_block.block_window().cloned()),
             block_store_callback,
         );
         pipelined_block.set_pipeline_futs(futs);
@@ -289,7 +289,7 @@ impl PipelineBuilder {
         &self,
         parent: PipelineFutures,
         block: Arc<Block>,
-        block_window: Arc<OrderedBlockWindow>,
+        block_window: Arc<Option<OrderedBlockWindow>>,
         block_store_callback: Box<dyn FnOnce(LedgerInfoWithSignatures) + Send + Sync>,
     ) -> (PipelineFutures, PipelineInputTx, Vec<AbortHandle>) {
         let mut abort_handles = vec![];
@@ -422,7 +422,7 @@ impl PipelineBuilder {
     async fn prepare(
         preparer: Arc<BlockPreparer>,
         block: Arc<Block>,
-        block_window: Arc<OrderedBlockWindow>,
+        block_window: Arc<Option<OrderedBlockWindow>>,
         qc_rx: oneshot::Receiver<Arc<QuorumCert>>,
     ) -> TaskResult<PrepareResult> {
         let mut tracker = Tracker::start_waiting("prepare", &block);
@@ -441,7 +441,7 @@ impl PipelineBuilder {
         // the loop can only be abort by the caller
         let input_txns = loop {
             match preparer
-                .prepare_block(&block, &block_window, qc_rx.clone())
+                .prepare_block(&block, block_window.as_ref().as_ref(), qc_rx.clone())
                 .await
             {
                 Ok(input_txns) => break input_txns,
@@ -757,7 +757,7 @@ impl PipelineBuilder {
         payload_manager: Arc<dyn TPayloadManager>,
         block_store_callback: Box<dyn FnOnce(LedgerInfoWithSignatures) + Send + Sync>,
         block: Arc<Block>,
-        block_window: Arc<OrderedBlockWindow>,
+        block_window: Arc<Option<OrderedBlockWindow>>,
     ) -> TaskResult<PostCommitResult> {
         let mut tracker = Tracker::start_waiting("post_commit_ledger", &block);
         parent_post_commit.await?;
@@ -769,9 +769,8 @@ impl PipelineBuilder {
         update_counters_for_block(&block);
         update_counters_for_compute_result(&compute_result);
 
-        let timestamp = block.timestamp_usecs();
         // TODO: change notify_commit
-        payload_manager.notify_commit(timestamp, Some(&block), Some(&block_window));
+        payload_manager.notify_commit(&block, block_window.as_ref().as_ref());
 
         if let Some(ledger_info_with_sigs) = maybe_ledger_info_with_sigs {
             block_store_callback(ledger_info_with_sigs);

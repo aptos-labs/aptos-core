@@ -33,7 +33,7 @@ pub trait StateComputer: Send + Sync {
         &self,
         // The block that will be computed.
         _block: &Block,
-        _block_window: &OrderedBlockWindow,
+        _block_window: Option<&OrderedBlockWindow>,
         // The parent block root hash.
         _parent_block_id: HashValue,
         _randomness: Option<Randomness>,

@@ -94,7 +94,7 @@ impl ExecutionPipeline {
     pub async fn queue(
         &self,
         block: Block,
-        block_window: OrderedBlockWindow,
+        block_window: Option<OrderedBlockWindow>,
         metadata: BlockMetadataExt,
         parent_block_id: HashValue,
         block_qc: Option<Arc<QuorumCert>>,
@@ -156,7 +156,7 @@ impl ExecutionPipeline {
         counters::PREPARE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
         debug!("prepare_block received block {}.", block.id());
         let input_txns = block_preparer
-            .prepare_block(&block, &block_window, async { block_qc }.shared())
+            .prepare_block(&block, block_window.as_ref(), async { block_qc }.shared())
             .await;
         if let Err(e) = input_txns {
             result_tx
@@ -383,7 +383,7 @@ impl ExecutionPipeline {
 
 struct PrepareBlockCommand {
     block: Block,
-    block_window: OrderedBlockWindow,
+    block_window: Option<OrderedBlockWindow>,
     metadata: BlockMetadataExt,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     // The parent block id.

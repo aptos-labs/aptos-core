@@ -191,26 +191,33 @@ impl QuorumStorePayloadManager {
 
 #[async_trait]
 impl TPayloadManager for QuorumStorePayloadManager {
-    fn notify_commit(
-        &self,
-        block_timestamp: u64,
-        block: Option<&Block>,
-        block_window: Option<&OrderedBlockWindow>,
-    ) {
-        self.batch_reader
-            .update_certified_timestamp(block_timestamp);
-
-        if let Some(block) = block {
-            if let Some(block_window) = block_window {
-                // TODO: This can miss some batches, is there a better way to do this?
-                let mut batches_removed = HashSet::new();
-                for batch in Self::batches_removed_from_window(block, block_window) {
-                    batches_removed.insert(batch);
-                }
-
-                self.commit_notifier
-                    .notify(block_timestamp, batches_removed.into_iter().collect());
-            }
+    fn notify_commit(&self, block: &Block, block_window: Option<&OrderedBlockWindow>) {
+        if let Some(block_window) = block_window {
+            let block_window_blocks = block_window.blocks().expect("upgrade block window");
+            let blocks: Vec<_> = block_window_blocks
+                .iter()
+                .chain(std::iter::once(block))
+                .collect();
+            let oldest_block = blocks.first().expect("at least one block");
+            let timestamp = if block_window.window_start_round() == oldest_block.round() {
+                oldest_block.timestamp_usecs()
+            } else {
+                oldest_block
+                    .quorum_cert()
+                    .certified_block()
+                    .timestamp_usecs()
+            };
+            self.batch_reader.update_certified_timestamp(timestamp);
+            self.commit_notifier.notify(
+                timestamp,
+                // TODO: fix this to be more exact
+                Self::batches_removed_from_window(block, block_window),
+            );
+        } else {
+            self.batch_reader
+                .update_certified_timestamp(block.timestamp_usecs());
+            self.commit_notifier
+                .notify(block.timestamp_usecs(), Self::batches_in_block(block));
         }
     }
 

@@ -22,7 +22,7 @@ use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
     block::Block,
     common::Round,
-    pipelined_block::{ExecutionSummary, OrderedBlockWindow, PipelinedBlock},
+    pipelined_block::{ExecutionSummary, PipelinedBlock},
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutCertificate,
@@ -409,7 +409,7 @@ impl BlockStore {
             "Recovered block already exists"
         );
 
-        let pipelined_block = PipelinedBlock::new_ordered(block, OrderedBlockWindow::empty());
+        let pipelined_block = PipelinedBlock::new_ordered(block, None);
         self.insert_block_inner(pipelined_block).await
     }
 
@@ -426,14 +426,16 @@ impl BlockStore {
             .inner
             .read()
             .get_ordered_block_window(&block, self.window_size)?;
-        let blocks = block_window.blocks()?;
-        for block in blocks {
-            if let Some(payload) = block.payload() {
-                self.payload_manager.prefetch_payload_data(
-                    payload,
-                    block.author().expect("Payload block must have author"),
-                    block.timestamp_usecs(),
-                );
+        if let Some(ref block_window) = block_window {
+            let blocks = block_window.blocks()?;
+            for block in blocks {
+                if let Some(payload) = block.payload() {
+                    self.payload_manager.prefetch_payload_data(
+                        payload,
+                        block.author().expect("Payload block must have author"),
+                        block.timestamp_usecs(),
+                    );
+                }
             }
         }
 

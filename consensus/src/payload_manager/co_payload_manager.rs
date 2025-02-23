@@ -93,13 +93,7 @@ impl ConsensusObserverPayloadManager {
 
 #[async_trait]
 impl TPayloadManager for ConsensusObserverPayloadManager {
-    fn notify_commit(
-        &self,
-        _block_timestamp: u64,
-        _block: Option<&Block>,
-        _block_window: Option<&OrderedBlockWindow>,
-    ) {
-    }
+    fn notify_commit(&self, _block: &Block, _block_window: Option<&OrderedBlockWindow>) {}
 
     fn prefetch_payload_data(&self, _payload: &Payload, _author: Author, _timestamp: u64) {}
 

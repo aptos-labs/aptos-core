@@ -43,11 +43,15 @@ impl BlockPreparer {
     async fn get_transactions(
         &self,
         block: &Block,
-        block_window: &OrderedBlockWindow,
+        block_window: Option<&OrderedBlockWindow>,
         block_qc_fut: Shared<impl Future<Output = Option<Arc<QuorumCert>>>>,
     ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
         let mut all_txns = vec![];
-        let pipelined_blocks = block_window.pipelined_blocks();
+        let pipelined_blocks = if let Some(block_window) = block_window {
+            block_window.pipelined_blocks()
+        } else {
+            vec![]
+        };
         let mut futures = FuturesOrdered::new();
         for block in pipelined_blocks.iter() {
             futures.push_back(async move {
@@ -95,7 +99,7 @@ impl BlockPreparer {
     pub async fn prepare_block(
         &self,
         block: &Block,
-        block_window: &OrderedBlockWindow,
+        block_window: Option<&OrderedBlockWindow>,
         block_qc_fut: Shared<impl Future<Output = Option<Arc<QuorumCert>>>>,
     ) -> ExecutorResult<Vec<SignedTransaction>> {
         fail_point!("consensus::prepare_block", |_| {
