@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    config::VMConfig,
     loader::{Function, Module, Script},
     storage::{
         code_storage::{ambassador_impl_CodeStorage, CodeStorage},
@@ -11,6 +12,7 @@ use crate::{
         implementations::unsync_module_storage::{AsUnsyncModuleStorage, UnsyncModuleStorage},
         module_storage::{ambassador_impl_ModuleStorage, ModuleStorage},
     },
+    LoadedFunction,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
@@ -20,12 +22,17 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::TypeTag,
+    account_address::AccountAddress,
+    identifier::IdentStr,
+    language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
 };
 use move_vm_types::{
     code::{ambassador_impl_ScriptCache, Code, ModuleBytesStorage, ScriptCache, UnsyncScriptCache},
-    loaded_data::runtime_types::{StructType, Type},
+    loaded_data::{
+        runtime_types::{StructType, Type, TypeBuilder},
+        struct_name_indexing::StructNameIndex,
+    },
 };
 use std::sync::Arc;
 

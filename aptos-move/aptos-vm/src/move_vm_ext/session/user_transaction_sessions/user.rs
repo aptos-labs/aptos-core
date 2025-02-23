@@ -103,8 +103,8 @@ impl<'r, 'l> UserSession<'r, 'l> {
 
             self.session.execute(|session| {
                 let module_id = module.self_id();
-                let init_function_exists = session
-                    .load_function(&staging_module_storage, &module_id, init_func_name, &[])
+                let init_function_exists = staging_module_storage
+                    .load_instantiated_function(&module_id, init_func_name, &[])
                     .is_ok();
 
                 if init_function_exists {
@@ -144,7 +144,7 @@ impl<'r, 'l> UserSession<'r, 'l> {
             staging_module_storage.release_verified_module_bundle(),
         )
         .map_err(|e| e.finish(Location::Undefined))?;
-        let module_write_set = ModuleWriteSet::new(false, write_ops);
+        let module_write_set = ModuleWriteSet::new(write_ops);
         UserSessionChangeSet::new(change_set, module_write_set, change_set_configs)
     }
 }

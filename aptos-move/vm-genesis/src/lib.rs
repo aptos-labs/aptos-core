@@ -890,55 +890,6 @@ fn publish_framework(
     hash_value: HashValue,
     framework: &ReleaseBundle,
 ) -> (VMChangeSet, ModuleWriteSet) {
-    if genesis_runtime_environment.vm_config().use_loader_v2 {
-        publish_framework_with_loader_v2(
-            genesis_vm,
-            genesis_runtime_environment,
-            hash_value,
-            framework,
-        )
-    } else {
-        publish_framework_with_loader_v1(
-            genesis_vm,
-            genesis_runtime_environment,
-            hash_value,
-            framework,
-        )
-    }
-}
-
-fn code_to_writes_for_loader_v2_publishing(
-    genesis_runtime_environment: &RuntimeEnvironment,
-    genesis_features: &Features,
-    genesis_state_view: &GenesisStateView,
-    addr: AccountAddress,
-    code: Vec<Bytes>,
-) -> VMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
-    let module_storage = genesis_state_view.as_aptos_code_storage(genesis_runtime_environment);
-    let resolver = genesis_state_view.as_move_resolver();
-
-    let module_storage_with_staged_modules =
-        StagingModuleStorage::create(&addr, &module_storage, code)?;
-    let verified_module_bundle =
-        module_storage_with_staged_modules.release_verified_module_bundle();
-
-    convert_modules_into_write_ops(
-        &resolver,
-        genesis_features,
-        &module_storage,
-        verified_module_bundle,
-    )
-    .map_err(|e| e.finish(Location::Undefined))
-}
-
-fn publish_framework_with_loader_v2(
-    genesis_vm: &GenesisMoveVM,
-    genesis_runtime_environment: &RuntimeEnvironment,
-    hash_value: HashValue,
-    framework: &ReleaseBundle,
-) -> (VMChangeSet, ModuleWriteSet) {
-    assert!(genesis_runtime_environment.vm_config().use_loader_v2);
-
     // Reset state view to be empty, to make sure all module write ops are creations.
     let mut state_view = GenesisStateView::new();
 
@@ -973,7 +924,7 @@ fn publish_framework_with_loader_v2(
         writes.extend(package_writes.clone());
         state_view.add_module_write_ops(package_writes);
     }
-    let module_write_set = ModuleWriteSet::new(true, writes);
+    let module_write_set = ModuleWriteSet::new(writes);
 
     // At this point we processed all packages, and the state view contains all the code. We can
     // run package initialization.
@@ -1004,56 +955,28 @@ fn publish_framework_with_loader_v2(
     (change_set, module_write_set)
 }
 
-fn publish_framework_with_loader_v1(
-    genesis_vm: &GenesisMoveVM,
+fn code_to_writes_for_loader_v2_publishing(
     genesis_runtime_environment: &RuntimeEnvironment,
-    hash_value: HashValue,
-    framework: &ReleaseBundle,
-) -> (VMChangeSet, ModuleWriteSet) {
-    assert!(!genesis_runtime_environment.vm_config().use_loader_v2);
+    genesis_features: &Features,
+    genesis_state_view: &GenesisStateView,
+    addr: AccountAddress,
+    code: Vec<Bytes>,
+) -> VMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
+    let module_storage = genesis_state_view.as_aptos_code_storage(genesis_runtime_environment);
+    let resolver = genesis_state_view.as_move_resolver();
 
-    // Here, we set the state view to be empty. Hence, publishing module bundle will always create
-    // new write ops.
-    let state_view = GenesisStateView::new();
-    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment);
+    let module_storage_with_staged_modules =
+        StagingModuleStorage::create(&addr, &module_storage, code)?;
+    let verified_module_bundle =
+        module_storage_with_staged_modules.release_verified_module_bundle();
 
-    let resolver = state_view.as_move_resolver();
-    let mut session = genesis_vm.new_genesis_session(&resolver, hash_value);
-
-    for pack in &framework.packages {
-        let modules = pack.sorted_code_and_modules();
-
-        let addr = *modules.first().unwrap().1.self_id().address();
-        let code = modules
-            .into_iter()
-            .map(|(c, _)| c.to_vec())
-            .collect::<Vec<_>>();
-
-        #[allow(deprecated)]
-        session
-            .publish_module_bundle(code, addr, &mut UnmeteredGasMeter)
-            .unwrap_or_else(|e| {
-                panic!(
-                    "Failure publishing package `{}`: {:?}",
-                    pack.package_metadata().name,
-                    e
-                )
-            });
-
-        // Fun fact:
-        //   This initialization only works because of loader V1 caches. Package initialization
-        //   requires 0x1::code to exist. However, when publishing packages we first publish Move
-        //   standard library, and so, given that the state view is empty, this cannot really work,
-        //   right?
-        //   However, loader V1 cache is not a bug, but a feature! Publishing is done after all on-
-        //   chain resources are initialized using a state view with modules from all framework
-        //   packages. This means that the loader cache actually contains all modules at this point
-        //   and so the initialization succeeds. We still create a new write op though, because the
-        //   state view is empty. Beautiful!
-        initialize_package(&mut session, &module_storage, addr, pack);
-    }
-
-    assert_ok!(session.finish(&genesis_vm.genesis_change_set_configs(), &module_storage))
+    convert_modules_into_write_ops(
+        &resolver,
+        genesis_features,
+        &module_storage,
+        verified_module_bundle,
+    )
+    .map_err(|e| e.finish(Location::Undefined))
 }
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.
@@ -1356,27 +1279,16 @@ pub fn test_genesis_module_publishing() {
     let genesis_vm = genesis_runtime_builder.build_genesis_vm();
     let genesis_runtime_environment = genesis_runtime_builder.build_genesis_runtime_environment();
 
-    // We only test loader V2 flow here because V1 flow does not make sense. V1 relies on modules
-    // being cached in loader prior to publishing, which happens to be the case when resources are
-    // initialized (when we generate a genesis transaction). This is not the case here, and so the
-    // publishing will always fail. The previous version of this test did a wonderful thing:
-    //   1. added modules to state view,
-    //   2. run publishing (which obviously was passing because 0x1::code existed),
-    //   3. did not assert anything about the write set, even though in this test modifications
-    //      were created...
-    if genesis_runtime_environment.vm_config().use_loader_v2 {
-        let (change_set, module_write_set) = publish_framework(
-            &genesis_vm,
-            &genesis_runtime_environment,
-            HashValue::zero(),
-            aptos_cached_packages::head_release_bundle(),
-        );
+    let (change_set, module_write_set) = publish_framework(
+        &genesis_vm,
+        &genesis_runtime_environment,
+        HashValue::zero(),
+        aptos_cached_packages::head_release_bundle(),
+    );
 
-        // All write ops must be a creation!
-        let change_set =
-            assert_ok!(change_set.try_combine_into_storage_change_set(module_write_set));
-        verify_genesis_module_write_set(change_set.write_set());
-    }
+    // All write ops must be a creation!
+    let change_set = assert_ok!(change_set.try_combine_into_storage_change_set(module_write_set));
+    verify_genesis_module_write_set(change_set.write_set());
 }
 
 #[test]

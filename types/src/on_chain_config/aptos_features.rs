@@ -366,10 +366,6 @@ impl Features {
         self.is_enabled(FeatureFlag::NATIVE_MEMORY_OPERATIONS)
     }
 
-    pub fn is_loader_v2_enabled(&self) -> bool {
-        true
-    }
-
     pub fn is_call_tree_and_instruction_vm_cache_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE)
     }

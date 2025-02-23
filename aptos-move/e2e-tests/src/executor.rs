@@ -1031,11 +1031,10 @@ impl FakeExecutor {
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             // load function name into cache to ensure cache is hot
-            let _ = session.load_function(
-                &module_storage,
+            let _ = module_storage.load_instantiated_function(
                 module,
                 &Self::name(function_name),
-                &type_params.clone(),
+                &type_params,
             );
 
             let fun_name = Self::name(function_name);

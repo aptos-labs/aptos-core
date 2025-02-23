@@ -35,9 +35,7 @@ mod reentrancy_checker;
 mod runtime_type_checks;
 mod storage;
 
-pub use loader::{Function, LoadedFunction, Module, Script};
-#[cfg(any(test, feature = "testing"))]
-pub use storage::implementations::unreachable_code_storage;
+pub use loader::{Function, LoadedFunction, LoadedFunctionOwner, Module, Script};
 pub use storage::{
     code_storage::{ambassador_impl_CodeStorage, CodeStorage},
     environment::{
@@ -49,5 +47,5 @@ pub use storage::{
     },
     module_storage::{ambassador_impl_ModuleStorage, AsFunctionValueExtension, ModuleStorage},
     publishing::{StagingModuleStorage, VerifiedModuleBundle},
-    ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
+    ty_layout_converter::LayoutConverter,
 };

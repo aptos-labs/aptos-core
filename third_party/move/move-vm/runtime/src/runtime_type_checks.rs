@@ -135,7 +135,7 @@ fn with_instantiation<R>(
     } else {
         action(
             &resolver
-                .loader()
+                .module_storage()
                 .ty_builder()
                 .create_ty_with_subst(ty, func.ty_args())?,
         )
@@ -153,7 +153,7 @@ fn with_owned_instantiation<R>(
     } else {
         action(
             resolver
-                .loader()
+                .module_storage()
                 .ty_builder()
                 .create_ty_with_subst(ty, func.ty_args())?,
         )
@@ -347,7 +347,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         ty_cache: &mut FrameTypeCache,
         instruction: &Bytecode,
     ) -> PartialVMResult<()> {
-        let ty_builder = resolver.loader().ty_builder();
+        let ty_builder = resolver.module_storage().ty_builder();
 
         match instruction {
             Bytecode::BrTrue(_) | Bytecode::BrFalse(_) => (),

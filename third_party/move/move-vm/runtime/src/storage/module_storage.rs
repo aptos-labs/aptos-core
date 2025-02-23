@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    config::VMConfig,
     loader::{Function, LazyLoadedFunction, LazyLoadedFunctionState, Module},
     logging::expect_no_verification_errors,
-    LayoutConverter, StorageLayoutConverter, WithRuntimeEnvironment,
+    storage::ty_layout_converter::LoaderLayoutConverter,
+    LayoutConverter, LoadedFunction, LoadedFunctionOwner, WithRuntimeEnvironment,
 };
 use ambassador::delegatable_trait;
 use bytes::Bytes;
@@ -23,7 +25,10 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
-    loaded_data::runtime_types::{StructType, Type},
+    loaded_data::{
+        runtime_types::{StructType, Type, TypeBuilder},
+        struct_name_indexing::StructNameIndex,
+    },
     module_cyclic_dependency_error, module_linker_error,
     value_serde::FunctionValueExtension,
     values::{AbstractFunction, SerializedFunctionData},
@@ -34,11 +39,14 @@ use std::sync::Arc;
 /// implement their own module storage to pass to the VM to resolve code.
 #[delegatable_trait]
 pub trait ModuleStorage: WithRuntimeEnvironment {
-    /// Returns true if loader V2 implementation is enabled. Will be removed in the future, for now
-    /// it is simply a convenient way to check the feature flag if module storage is available.
-    // TODO(loader_v2): Remove this when loader V2 is enabled.
-    fn is_enabled(&self) -> bool {
-        self.runtime_environment().vm_config().use_loader_v2
+    /// Returns the [VMConfig] used by the loader.
+    fn vm_config(&self) -> &VMConfig {
+        self.runtime_environment().vm_config()
+    }
+
+    /// Returns the builder for runtime types.
+    fn ty_builder(&self) -> &TypeBuilder {
+        &self.runtime_environment().vm_config().ty_builder
     }
 
     /// Returns true if the module exists, and false otherwise. An error is returned if there is a
@@ -153,6 +161,22 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
             .clone())
     }
 
+    /// Returns a struct type corresponding to the interned index (struct name).
+    fn fetch_struct_ty_by_idx(&self, idx: StructNameIndex) -> PartialVMResult<Arc<StructType>> {
+        // Ensure we do not return a guard here (still holding the lock) because loading the struct
+        // type below can fetch struct type by index recursively.
+        let struct_name = self
+            .runtime_environment()
+            .struct_name_index_map()
+            .idx_to_struct_name_ref(idx)?;
+
+        self.fetch_struct_ty(
+            struct_name.module.address(),
+            struct_name.module.name(),
+            struct_name.name.as_ident_str(),
+        )
+    }
+
     /// Returns a runtime type corresponding to the specified type tag (file format type
     /// representation). If a struct type is constructed, the module containing the struct
     /// definition is fetched and cached.
@@ -160,9 +184,7 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
         // TODO(loader_v2): Loader V1 uses VMResults everywhere, but partial VM errors
         //                  seem better fit. Here we map error to VMError to reuse existing
         //                  type builder implementation, and then strip the location info.
-        self.runtime_environment()
-            .vm_config()
-            .ty_builder
+        self.ty_builder()
             .create_ty(ty_tag, |st| {
                 self.fetch_struct_ty(
                     &st.address,
@@ -198,6 +220,41 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
             })?
             .clone();
         Ok((module, function))
+    }
+
+    fn load_instantiated_function(
+        &self,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
+        ty_args: &[TypeTag],
+    ) -> VMResult<LoadedFunction> {
+        let _timer = VM_TIMER.timer_with_label("Loader::load_function");
+
+        let (module, function) =
+            self.fetch_function_definition(module_id.address(), module_id.name(), function_name)?;
+
+        let ty_args = ty_args
+            .iter()
+            .map(|ty_arg| self
+                .fetch_ty(ty_arg)
+                .map_err(|e| e.finish(Location::Undefined)))
+            .collect::<VMResult<Vec<_>>>()
+            .map_err(|mut err| {
+                // User provided type argument failed to load. Set extra sub status to distinguish from internal type loading error.
+                if StatusCode::TYPE_RESOLUTION_FAILURE == err.major_status() {
+                    err.set_sub_status(move_core_types::vm_status::sub_status::type_resolution_failure::EUSER_TYPE_LOADING_FAILURE);
+                }
+                err
+            })?;
+
+        Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
+            .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
+
+        Ok(LoadedFunction {
+            owner: LoadedFunctionOwner::Module(module),
+            ty_args,
+            function,
+        })
     }
 }
 
@@ -464,12 +521,8 @@ impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
         match &*LazyLoadedFunction::expect_this_impl(fun)?.0.borrow() {
             LazyLoadedFunctionState::Unresolved { data, .. } => Ok(data.clone()),
             LazyLoadedFunctionState::Resolved { fun, mask, ty_args } => {
-                let ty_converter = StorageLayoutConverter::new(self.module_storage);
-                let ty_builder = &self
-                    .module_storage
-                    .runtime_environment()
-                    .vm_config()
-                    .ty_builder;
+                let ty_converter = LoaderLayoutConverter::new(self.module_storage);
+                let ty_builder = self.module_storage.ty_builder();
                 let instantiate = |ty: &Type| -> PartialVMResult<Type> {
                     if fun.ty_args.is_empty() {
                         Ok(ty.clone())

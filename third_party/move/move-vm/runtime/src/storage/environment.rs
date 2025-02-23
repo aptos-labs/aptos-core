@@ -3,7 +3,6 @@
 
 use crate::{
     config::VMConfig,
-    loader::check_natives,
     native_functions::{NativeFunction, NativeFunctions},
     storage::{ty_tag_converter::TypeTagCache, verified_module_cache::VERIFIED_MODULES_V2},
     Module, Script,
@@ -12,9 +11,9 @@ use ambassador::delegatable_trait;
 use bytes::Bytes;
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
-    errors::{Location, PartialVMError, PartialVMResult, VMResult},
-    file_format::CompiledScript,
-    CompiledModule,
+    errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
+    file_format::{CompiledScript, StructFieldInformation, TableIndex},
+    CompiledModule, IndexKind,
 };
 use move_bytecode_verifier::dependencies;
 use move_core_types::{
@@ -233,11 +232,6 @@ impl RuntimeEnvironment {
         Ok(())
     }
 
-    /// Returns native functions available to this runtime.
-    pub(crate) fn natives(&self) -> &NativeFunctions {
-        &self.natives
-    }
-
     /// Returns the re-indexing map currently used by this runtime environment to remap struct
     /// identifiers into indices.
     pub(crate) fn struct_name_index_map(&self) -> &StructNameIndexMap {
@@ -326,4 +320,20 @@ impl LocallyVerifiedScript {
     ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
         self.0.immediate_dependencies_iter()
     }
+}
+
+fn check_natives(module: &CompiledModule) -> VMResult<()> {
+    // TODO: fix check and error code if we leave something around for native structs.
+    // For now this generates the only error test cases care about...
+    for (idx, struct_def) in module.struct_defs().iter().enumerate() {
+        if struct_def.field_information == StructFieldInformation::Native {
+            return Err(verification_error(
+                StatusCode::MISSING_DEPENDENCY,
+                IndexKind::FunctionHandle,
+                idx as TableIndex,
+            )
+            .finish(Location::Module(module.self_id())));
+        }
+    }
+    Ok(())
 }
