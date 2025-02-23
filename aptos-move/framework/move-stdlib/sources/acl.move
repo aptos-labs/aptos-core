@@ -41,6 +41,6 @@ module std::acl {
 
     /// assert! that the ACL has the address.
     public fun assert_contains(self: &ACL, addr: address) {
-        assert!(contains(self, addr), error::invalid_argument(ENOT_CONTAIN));
+        assert!(self.contains(addr), error::invalid_argument(ENOT_CONTAIN));
     }
 }

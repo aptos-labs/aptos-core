@@ -88,7 +88,7 @@ module std::vector {
     /// Return an vector of size one containing element `e`.
     public fun singleton<Element>(e: Element): vector<Element> {
         let v = empty();
-        push_back(&mut v, e);
+        v.push_back(e);
         v
     }
     spec singleton {
@@ -98,8 +98,8 @@ module std::vector {
 
     /// Reverses the order of the elements in the vector `self` in place.
     public fun reverse<Element>(self: &mut vector<Element>) {
-        let len = length(self);
-        reverse_slice(self, 0, len);
+        let len = self.length();
+        self.reverse_slice(0, len);
     }
 
     spec reverse {
@@ -110,11 +110,11 @@ module std::vector {
     public fun reverse_slice<Element>(self: &mut vector<Element>, left: u64, right: u64) {
         assert!(left <= right, EINVALID_RANGE);
         if (left == right) return;
-        right = right - 1;
+        right -= 1;
         while (left < right) {
-            swap(self, left, right);
-            left = left + 1;
-            right = right - 1;
+            self.swap(left, right);
+            left += 1;
+            right -= 1;
         }
     }
     spec reverse_slice {
@@ -124,13 +124,13 @@ module std::vector {
     /// Pushes all of the elements of the `other` vector into the `self` vector.
     public fun append<Element>(self: &mut vector<Element>, other: vector<Element>) {
         if (USE_MOVE_RANGE) {
-            let self_length = length(self);
-            let other_length = length(&other);
+            let self_length = self.length();
+            let other_length = other.length();
             move_range(&mut other, 0, other_length, self, self_length);
-            destroy_empty(other);
+            other.destroy_empty();
         } else {
-            reverse(&mut other);
-            reverse_append(self, other);
+            other.reverse();
+            self.reverse_append(other);
         }
     }
     spec append {
@@ -142,12 +142,12 @@ module std::vector {
 
     /// Pushes all of the elements of the `other` vector into the `self` vector.
     public fun reverse_append<Element>(self: &mut vector<Element>, other: vector<Element>) {
-        let len = length(&other);
+        let len = other.length();
         while (len > 0) {
-            push_back(self, pop_back(&mut other));
-            len = len - 1;
+            self.push_back(other.pop_back());
+            len -= 1;
         };
-        destroy_empty(other);
+        other.destroy_empty();
     }
     spec reverse_append {
         pragma intrinsic = true;
@@ -159,7 +159,7 @@ module std::vector {
     /// with its previous capacity unchanged.
     /// In many languages this is also called `split_off`.
     public fun trim<Element>(self: &mut vector<Element>, new_len: u64): vector<Element> {
-        let len = length(self);
+        let len = self.length();
         assert!(new_len <= len, EINDEX_OUT_OF_BOUNDS);
 
         let other = empty();
@@ -167,10 +167,10 @@ module std::vector {
             move_range(self, new_len, len - new_len, &mut other, 0);
         } else {
             while (len > new_len) {
-                push_back(&mut other, pop_back(self));
-                len = len - 1;
+                other.push_back(self.pop_back());
+                len -= 1;
             };
-            reverse(&mut other);
+            other.reverse();
         };
 
         other
@@ -181,12 +181,12 @@ module std::vector {
 
     /// Trim a vector to a smaller size, returning the evicted elements in reverse order
     public fun trim_reverse<Element>(self: &mut vector<Element>, new_len: u64): vector<Element> {
-        let len = length(self);
+        let len = self.length();
         assert!(new_len <= len, EINDEX_OUT_OF_BOUNDS);
         let result = empty();
         while (new_len < len) {
-            push_back(&mut result, pop_back(self));
-            len = len - 1;
+            result.push_back(self.pop_back());
+            len -= 1;
         };
         result
     }
@@ -197,16 +197,16 @@ module std::vector {
 
     /// Return `true` if the vector `self` has no elements and `false` otherwise.
     public fun is_empty<Element>(self: &vector<Element>): bool {
-        length(self) == 0
+        self.length() == 0
     }
 
     /// Return true if `e` is in the vector `self`.
     public fun contains<Element>(self: &vector<Element>, e: &Element): bool {
         let i = 0;
-        let len = length(self);
+        let len = self.length();
         while (i < len) {
-            if (borrow(self, i) == e) return true;
-            i = i + 1;
+            if (self.borrow(i) == e) return true;
+            i += 1;
         };
         false
     }
@@ -218,10 +218,10 @@ module std::vector {
     /// Otherwise, returns `(false, 0)`.
     public fun index_of<Element>(self: &vector<Element>, e: &Element): (bool, u64) {
         let i = 0;
-        let len = length(self);
+        let len = self.length();
         while (i < len) {
-            if (borrow(self, i) == e) return (true, i);
-            i = i + 1;
+            if (self.borrow(i) == e) return (true, i);
+            i += 1;
         };
         (false, 0)
     }
@@ -236,15 +236,15 @@ module std::vector {
         let find = false;
         let found_index = 0;
         let i = 0;
-        let len = length(self);
+        let len = self.length();
         while (i < len) {
             // Cannot call return in an inline function so we need to resort to break here.
-            if (f(borrow(self, i))) {
+            if (f(self.borrow(i))) {
                 find = true;
                 found_index = i;
                 break
             };
-            i = i + 1;
+            i += 1;
         };
         (find, found_index)
     }
@@ -252,28 +252,28 @@ module std::vector {
     /// Insert a new element at position 0 <= i <= length, using O(length - i) time.
     /// Aborts if out of bounds.
     public fun insert<Element>(self: &mut vector<Element>, i: u64, e: Element) {
-        let len = length(self);
+        let len = self.length();
         assert!(i <= len, EINDEX_OUT_OF_BOUNDS);
 
         if (USE_MOVE_RANGE) {
             if (i + 2 >= len) {
                 // When we are close to the end, it is cheaper to not create
                 // a temporary vector, and swap directly
-                push_back(self, e);
+                self.push_back(e);
                 while (i < len) {
-                    swap(self, i, len);
-                    i = i + 1;
+                    self.swap(i, len);
+                    i += 1;
                 };
             } else {
                 let other = singleton(e);
                 move_range(&mut other, 0, 1, self, i);
-                destroy_empty(other);
+                other.destroy_empty();
             }
         } else {
-            push_back(self, e);
+            self.push_back(e);
             while (i < len) {
-                swap(self, i, len);
-                i = i + 1;
+                self.swap(i, len);
+                i += 1;
             };
         };
     }
@@ -285,7 +285,7 @@ module std::vector {
     /// This is O(n) and preserves ordering of elements in the vector.
     /// Aborts if `i` is out of bounds.
     public fun remove<Element>(self: &mut vector<Element>, i: u64): Element {
-        let len = length(self);
+        let len = self.length();
         // i out of bounds; abort
         if (i >= len) abort EINDEX_OUT_OF_BOUNDS;
 
@@ -293,20 +293,20 @@ module std::vector {
             // When we are close to the end, it is cheaper to not create
             // a temporary vector, and swap directly
             if (i + 3 >= len) {
-                len = len - 1;
-                while (i < len) swap(self, i, { i = i + 1; i });
-                pop_back(self)
+                len -= 1;
+                while (i < len) self.swap(i, { i += 1; i });
+                self.pop_back()
             } else {
                 let other = empty();
                 move_range(self, i, 1, &mut other, 0);
-                let result = pop_back(&mut other);
-                destroy_empty(other);
+                let result = other.pop_back();
+                other.destroy_empty();
                 result
             }
         } else {
-            len = len - 1;
-            while (i < len) swap(self, i, { i = i + 1; i });
-            pop_back(self)
+            len -= 1;
+            while (i < len) self.swap(i, { i += 1; i });
+            self.pop_back()
         }
     }
     spec remove {
@@ -322,9 +322,9 @@ module std::vector {
     public fun remove_value<Element>(self: &mut vector<Element>, val: &Element): vector<Element> {
         // This doesn't cost a O(2N) run time as index_of scans from left to right and stops when the element is found,
         // while remove would continue from the identified index to the end of the vector.
-        let (found, index) = index_of(self, val);
+        let (found, index) = self.index_of(val);
         if (found) {
-            vector[remove(self, index)]
+            vector[self.remove(index)]
         } else {
            vector[]
         }
@@ -337,10 +337,10 @@ module std::vector {
     /// This is O(1), but does not preserve ordering of elements in the vector.
     /// Aborts if `i` is out of bounds.
     public fun swap_remove<Element>(self: &mut vector<Element>, i: u64): Element {
-        assert!(!is_empty(self), EINDEX_OUT_OF_BOUNDS);
-        let last_idx = length(self) - 1;
-        swap(self, i, last_idx);
-        pop_back(self)
+        assert!(!self.is_empty(), EINDEX_OUT_OF_BOUNDS);
+        let last_idx = self.length() - 1;
+        self.swap(i, last_idx);
+        self.pop_back()
     }
     spec swap_remove {
         pragma intrinsic = true;
@@ -350,49 +350,49 @@ module std::vector {
     /// to the caller the value that was there before.
     /// Aborts if `i` is out of bounds.
     public fun replace<Element>(self: &mut vector<Element>, i: u64, val: Element): Element {
-        let last_idx = length(self);
+        let last_idx = self.length();
         assert!(i < last_idx, EINDEX_OUT_OF_BOUNDS);
         if (USE_MOVE_RANGE) {
-            mem::replace(borrow_mut(self, i), val)
+            mem::replace(self.borrow_mut(i), val)
         } else {
-            push_back(self, val);
-            swap(self, i, last_idx);
-            pop_back(self)
+            self.push_back(val);
+            self.swap(i, last_idx);
+            self.pop_back()
         }
     }
 
     /// Apply the function to each element in the vector, consuming it.
     public inline fun for_each<Element>(self: vector<Element>, f: |Element|) {
-        reverse(&mut self); // We need to reverse the vector to consume it efficiently
-        for_each_reverse(self, |e| f(e));
+        self.reverse(); // We need to reverse the vector to consume it efficiently
+        self.for_each_reverse(|e| f(e));
     }
 
     /// Apply the function to each element in the vector, consuming it.
     public inline fun for_each_reverse<Element>(self: vector<Element>, f: |Element|) {
-        let len = length(&self);
+        let len = self.length();
         while (len > 0) {
-            f(pop_back(&mut self));
-            len = len - 1;
+            f(self.pop_back());
+            len -= 1;
         };
-        destroy_empty(self)
+        self.destroy_empty()
     }
 
     /// Apply the function to a reference of each element in the vector.
     public inline fun for_each_ref<Element>(self: &vector<Element>, f: |&Element|) {
         let i = 0;
-        let len = length(self);
+        let len = self.length();
         while (i < len) {
-            f(borrow(self, i));
-            i = i + 1
+            f(self.borrow(i));
+            i += 1
         }
     }
 
     /// Apply the function to each pair of elements in the two given vectors, consuming them.
     public inline fun zip<Element1, Element2>(self: vector<Element1>, v2: vector<Element2>, f: |Element1, Element2|) {
         // We need to reverse the vectors to consume it efficiently
-        reverse(&mut self);
-        reverse(&mut v2);
-        zip_reverse(self, v2, |e1, e2| f(e1, e2));
+        self.reverse();
+        v2.reverse();
+        self.zip_reverse(v2, |e1, e2| f(e1, e2));
     }
 
     /// Apply the function to each pair of elements in the two given vectors in the reverse order, consuming them.
@@ -402,16 +402,16 @@ module std::vector {
         v2: vector<Element2>,
         f: |Element1, Element2|,
     ) {
-        let len = length(&self);
+        let len = self.length();
         // We can't use the constant EVECTORS_LENGTH_MISMATCH here as all calling code would then need to define it
         // due to how inline functions work.
-        assert!(len == length(&v2), 0x20002);
+        assert!(len == v2.length(), 0x20002);
         while (len > 0) {
-            f(pop_back(&mut self), pop_back(&mut v2));
-            len = len - 1;
+            f(self.pop_back(), v2.pop_back());
+            len -= 1;
         };
-        destroy_empty(self);
-        destroy_empty(v2);
+        self.destroy_empty();
+        v2.destroy_empty();
     }
 
     /// Apply the function to the references of each pair of elements in the two given vectors.
@@ -421,34 +421,34 @@ module std::vector {
         v2: &vector<Element2>,
         f: |&Element1, &Element2|,
     ) {
-        let len = length(self);
+        let len = self.length();
         // We can't use the constant EVECTORS_LENGTH_MISMATCH here as all calling code would then need to define it
         // due to how inline functions work.
-        assert!(len == length(v2), 0x20002);
+        assert!(len == v2.length(), 0x20002);
         let i = 0;
         while (i < len) {
-            f(borrow(self, i), borrow(v2, i));
-            i = i + 1
+            f(self.borrow(i), v2.borrow(i));
+            i += 1
         }
     }
 
     /// Apply the function to a reference of each element in the vector with its index.
     public inline fun enumerate_ref<Element>(self: &vector<Element>, f: |u64, &Element|) {
         let i = 0;
-        let len = length(self);
+        let len = self.length();
         while (i < len) {
-            f(i, borrow(self, i));
-            i = i + 1;
+            f(i, self.borrow(i));
+            i += 1;
         };
     }
 
     /// Apply the function to a mutable reference to each element in the vector.
     public inline fun for_each_mut<Element>(self: &mut vector<Element>, f: |&mut Element|) {
         let i = 0;
-        let len = length(self);
+        let len = self.length();
         while (i < len) {
-            f(borrow_mut(self, i));
-            i = i + 1
+            f(self.borrow_mut(i));
+            i += 1
         }
     }
 
@@ -460,23 +460,23 @@ module std::vector {
         f: |&mut Element1, &mut Element2|,
     ) {
         let i = 0;
-        let len = length(self);
+        let len = self.length();
         // We can't use the constant EVECTORS_LENGTH_MISMATCH here as all calling code would then need to define it
         // due to how inline functions work.
-        assert!(len == length(v2), 0x20002);
+        assert!(len == v2.length(), 0x20002);
         while (i < len) {
-            f(borrow_mut(self, i), borrow_mut(v2, i));
-            i = i + 1
+            f(self.borrow_mut(i), v2.borrow_mut(i));
+            i += 1
         }
     }
 
     /// Apply the function to a mutable reference of each element in the vector with its index.
     public inline fun enumerate_mut<Element>(self: &mut vector<Element>, f: |u64, &mut Element|) {
         let i = 0;
-        let len = length(self);
+        let len = self.length();
         while (i < len) {
-            f(i, borrow_mut(self, i));
-            i = i + 1;
+            f(i, self.borrow_mut(i));
+            i += 1;
         };
     }
 
@@ -488,7 +488,7 @@ module std::vector {
         f: |Accumulator,Element|Accumulator
     ): Accumulator {
         let accu = init;
-        for_each(self, |elem| accu = f(accu, elem));
+        self.for_each(|elem| accu = f(accu, elem));
         accu
     }
 
@@ -500,7 +500,7 @@ module std::vector {
         f: |Element, Accumulator|Accumulator
     ): Accumulator {
         let accu = init;
-        for_each_reverse(self, |elem| accu = f(elem, accu));
+        self.for_each_reverse(|elem| accu = f(elem, accu));
         accu
     }
 
@@ -511,7 +511,7 @@ module std::vector {
         f: |&Element|NewElement
     ): vector<NewElement> {
         let result = vector<NewElement>[];
-        for_each_ref(self, |elem| push_back(&mut result, f(elem)));
+        self.for_each_ref(|elem| result.push_back(f(elem)));
         result
     }
 
@@ -524,10 +524,10 @@ module std::vector {
     ): vector<NewElement> {
         // We can't use the constant EVECTORS_LENGTH_MISMATCH here as all calling code would then need to define it
         // due to how inline functions work.
-        assert!(length(self) == length(v2), 0x20002);
+        assert!(self.length() == v2.length(), 0x20002);
 
         let result = vector<NewElement>[];
-        zip_ref(self, v2, |e1, e2| push_back(&mut result, f(e1, e2)));
+        self.zip_ref(v2, |e1, e2| result.push_back(f(e1, e2)));
         result
     }
 
@@ -537,7 +537,7 @@ module std::vector {
         f: |Element|NewElement
     ): vector<NewElement> {
         let result = vector<NewElement>[];
-        for_each(self, |elem| push_back(&mut result, f(elem)));
+        self.for_each(|elem| result.push_back(f(elem)));
         result
     }
 
@@ -549,10 +549,10 @@ module std::vector {
     ): vector<NewElement> {
         // We can't use the constant EVECTORS_LENGTH_MISMATCH here as all calling code would then need to define it
         // due to how inline functions work.
-        assert!(length(&self) == length(&v2), 0x20002);
+        assert!(self.length() == v2.length(), 0x20002);
 
         let result = vector<NewElement>[];
-        zip(self, v2, |e1, e2| push_back(&mut result, f(e1, e2)));
+        self.zip(v2, |e1, e2| result.push_back(f(e1, e2)));
         result
     }
 
@@ -562,8 +562,8 @@ module std::vector {
         p: |&Element|bool
     ): vector<Element> {
         let result = vector<Element>[];
-        for_each(self, |elem| {
-            if (p(&elem)) push_back(&mut result, elem);
+        self.for_each(|elem| {
+            if (p(&elem)) result.push_back(elem);
         });
         result
     }
@@ -576,19 +576,19 @@ module std::vector {
         pred: |&Element|bool
     ): u64 {
         let i = 0;
-        let len = length(self);
+        let len = self.length();
         while (i < len) {
-            if (!pred(borrow(self, i))) break;
-            i = i + 1;
+            if (!pred(self.borrow(i))) break;
+            i += 1;
         };
         let p = i;
-        i = i + 1;
+        i += 1;
         while (i < len) {
-            if (pred(borrow(self, i))) {
-                swap(self, p, i);
-                p = p + 1;
+            if (pred(self.borrow(i))) {
+                self.swap(p, i);
+                p += 1;
             };
-            i = i + 1;
+            i += 1;
         };
         p
     }
@@ -599,8 +599,8 @@ module std::vector {
         self: &mut vector<Element>,
         rot: u64
     ): u64 {
-        let len = length(self);
-        rotate_slice(self, 0, rot, len)
+        let len = self.length();
+        self.rotate_slice(0, rot, len)
     }
     spec rotate {
         pragma intrinsic = true;
@@ -614,9 +614,9 @@ module std::vector {
         rot: u64,
         right: u64
     ): u64 {
-        reverse_slice(self, left, rot);
-        reverse_slice(self, rot, right);
-        reverse_slice(self, left, right);
+        self.reverse_slice(left, rot);
+        self.reverse_slice(rot, right);
+        self.reverse_slice(left, right);
         left + (right - rot)
     }
     spec rotate_slice {
@@ -629,21 +629,21 @@ module std::vector {
         self: &mut vector<Element>,
         p: |&Element|bool
     ): u64 {
-        let len = length(self);
+        let len = self.length();
         let t = empty();
         let f = empty();
         while (len > 0) {
-            let e = pop_back(self);
+            let e = self.pop_back();
             if (p(&e)) {
-                push_back(&mut t, e);
+                t.push_back(e);
             } else {
-                push_back(&mut f, e);
+                f.push_back(e);
             };
-            len = len - 1;
+            len -= 1;
         };
-        let pos = length(&t);
-        reverse_append(self, t);
-        reverse_append(self, f);
+        let pos = t.length();
+        self.reverse_append(t);
+        self.reverse_append(f);
         pos
     }
 
@@ -654,12 +654,12 @@ module std::vector {
     ): bool {
         let result = false;
         let i = 0;
-        while (i < length(self)) {
-            result = p(borrow(self, i));
+        while (i < self.length()) {
+            result = p(self.borrow(i));
             if (result) {
                 break
             };
-            i = i + 1
+            i += 1
         };
         result
     }
@@ -671,12 +671,12 @@ module std::vector {
     ): bool {
         let result = true;
         let i = 0;
-        while (i < length(self)) {
-            result = p(borrow(self, i));
+        while (i < self.length()) {
+            result = p(self.borrow(i));
             if (!result) {
                 break
             };
-            i = i + 1
+            i += 1
         };
         result
     }
@@ -687,7 +687,7 @@ module std::vector {
         self: vector<Element>,
         d: |Element|
     ) {
-        for_each_reverse(self, |e| d(e))
+        self.for_each_reverse(|e| d(e))
     }
 
     public fun range(start: u64, end: u64): vector<u64> {
@@ -699,8 +699,8 @@ module std::vector {
 
         let vec = vector[];
         while (start < end) {
-            push_back(&mut vec, start);
-            start = start + step;
+            vec.push_back(start);
+            start += step;
         };
         vec
     }
@@ -710,12 +710,12 @@ module std::vector {
         start: u64,
         end: u64
     ): vector<Element> {
-        assert!(start <= end && end <= length(self), EINVALID_SLICE_RANGE);
+        assert!(start <= end && end <= self.length(), EINVALID_SLICE_RANGE);
 
         let vec = vector[];
         while (start < end) {
-            push_back(&mut vec, *borrow(self, start));
-            start = start + 1;
+            vec.push_back(*self.borrow(start));
+            start += 1;
         };
         vec
     }
