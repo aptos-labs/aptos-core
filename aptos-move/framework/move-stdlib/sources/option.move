@@ -101,7 +101,7 @@ module std::option {
     /// Aborts if `self` does not hold a value
     public fun borrow<Element>(self: &Option<Element>): &Element {
         assert!(self.is_some(), EOPTION_NOT_SET);
-        self.vec.borrow(0)
+        &self.vec[0]
     }
     spec borrow {
         pragma opaque;
@@ -117,7 +117,7 @@ module std::option {
     public fun borrow_with_default<Element>(self: &Option<Element>, default_ref: &Element): &Element {
         let vec_ref = &self.vec;
         if (vec_ref.is_empty()) default_ref
-        else vec_ref.borrow(0)
+        else &vec_ref[0]
     }
     spec borrow_with_default {
         pragma opaque;

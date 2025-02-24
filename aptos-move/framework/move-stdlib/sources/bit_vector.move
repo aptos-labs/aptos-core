@@ -29,7 +29,7 @@ module std::bit_vector {
             invariant len(bit_field) == counter;
         };
             (counter < length)}) {
-            vector::push_back(&mut bit_field, false);
+            bit_field.push_back(false);
             counter += 1;
         };
         spec {
@@ -56,8 +56,7 @@ module std::bit_vector {
     /// Set the bit at `bit_index` in the `self` regardless of its previous state.
     public fun set(self: &mut BitVector, bit_index: u64) {
         assert!(bit_index < self.bit_field.length(), EINDEX);
-        let x = self.bit_field.borrow_mut(bit_index);
-        *x = true;
+        self.bit_field[bit_index] = true;
     }
     spec set {
         include SetAbortsIf;
@@ -72,8 +71,7 @@ module std::bit_vector {
     /// Unset the bit at `bit_index` in the `self` regardless of its previous state.
     public fun unset(self: &mut BitVector, bit_index: u64) {
         assert!(bit_index < self.bit_field.length(), EINDEX);
-        let x = self.bit_field.borrow_mut(bit_index);
-        *x = false;
+        self.bit_field[bit_index] = false;
     }
     spec unset {
         include UnsetAbortsIf;
@@ -160,7 +158,7 @@ module std::bit_vector {
             };
             index < self.length
         }) {
-            if (!is_index_set(self, index)) break;
+            if (!self.is_index_set(index)) break;
             index += 1;
         };
 
@@ -180,7 +178,7 @@ module std::bit_vector {
     #[verify_only]
     public fun shift_left_for_verification_only(self: &mut BitVector, amount: u64) {
         if (amount >= self.length) {
-            let len = vector::length(&self.bit_field);
+            let len = self.bit_field.length();
             let i = 0;
             while ({
                 spec {
@@ -190,7 +188,7 @@ module std::bit_vector {
                 };
                 i < len
             }) {
-                let elem = vector::borrow_mut(&mut self.bit_field, i);
+                let elem = self.bit_field.borrow_mut(i);
                 *elem = false;
                 i += 1;
             };
@@ -207,8 +205,8 @@ module std::bit_vector {
                 };
                 i < self.length
             }) {
-                if (is_index_set(self, i)) set(self, i - amount)
-                else unset(self, i - amount);
+                if (self.is_index_set(i)) self.set(i - amount)
+                else self.unset(i - amount);
                 i += 1;
             };
 
@@ -223,8 +221,8 @@ module std::bit_vector {
                 };
                 i < self.length
             }) {
-                unset(self, i);
-                i = i + 1;
+                self.unset(i);
+                i += 1;
             }
         }
     }
