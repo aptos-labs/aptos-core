@@ -50,18 +50,41 @@ struct TokenStore {
 }
 
 // TODO[Orderless]: Revisit the test and remove unnecessary cases
-#[rstest(creator_stateless_account, receiver_stateless_account, resource_stateless_account,
-    case(true, true, false),
-    case(true, false, false),
-    case(false, true, false),
-    case(false, false, false),
-    case(true, true, true),
-    case(true, false, true),
-    case(false, true, true),
-    case(false, false, true),
+#[rstest(creator_stateless_account, receiver_stateless_account, resource_stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, false, false, false),
+    case(true, true, false, true, false),
+    case(true, true, false, true, true),
+
+    case(true, false, false, false, false),
+    case(true, false, false, true, false),
+    case(true, false, false, true, true),
+
+    case(false, true, false, false, false),
+    case(false, true, false, true, false),
+    case(false, true, false, true, true),
+
+    case(false, false, false, false, false),
+    case(false, false, false, true, false),
+    case(false, false, false, true, true),
+
+    case(true, true, true, false, false),
+    case(true, true, true, true, false),
+    case(true, true, true, true, true),
+
+    case(true, false, true, false, false),
+    case(true, false, true, true, false),
+    case(true, false, true, true, true),
+
+    case(false, true, true, false, false),
+    case(false, true, true, true, false),
+    case(false, true, true, true, true),
+
+    case(false, false, true, false, false),
+    case(false, false, true, true, false),
+    case(false, false, true, true, true),
 )]
-fn mint_nft_e2e(creator_stateless_account: bool, receiver_stateless_account: bool, resource_stateless_account: bool) {
-    let mut h = MoveHarness::new();
+fn mint_nft_e2e(creator_stateless_account: bool, receiver_stateless_account: bool, resource_stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if creator_stateless_account { None } else { Some(0) });
     let resource_address = create_resource_address(*acc.address(), &[]);
