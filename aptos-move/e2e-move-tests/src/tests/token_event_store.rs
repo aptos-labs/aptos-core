@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::MoveHarness;
 use aptos_cached_packages::aptos_stdlib::aptos_token_stdlib;
 use rstest::rstest;
