@@ -63,6 +63,7 @@ fn instantiation_err() {
             return_: SignatureIndex(0),
             type_parameters: vec![AbilitySet::PRIMITIVES],
             access_specifiers: None,
+            attributes: vec![],
         }],
         field_handles: vec![],
         friend_decls: vec![],

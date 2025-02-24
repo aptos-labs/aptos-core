@@ -921,6 +921,12 @@ fn load_function_handle(
         None
     };
 
+    let attributes = if version >= VERSION_8 {
+        load_function_attributes(cursor)?
+    } else {
+        vec![]
+    };
+
     Ok(FunctionHandle {
         module,
         name,
@@ -928,6 +934,7 @@ fn load_function_handle(
         return_,
         type_parameters,
         access_specifiers: accesses,
+        attributes,
     })
 }
 
@@ -1024,6 +1031,25 @@ fn load_signature_tokens(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Vec
         tokens.push(load_signature_token(cursor)?);
     }
     Ok(tokens)
+}
+
+fn load_function_attributes(
+    cursor: &mut VersionedCursor,
+) -> BinaryLoaderResult<Vec<FunctionAttribute>> {
+    let mut attributes = Vec::new();
+    let count = read_uleb_internal(cursor, ATTRIBUTE_COUNT_MAX)?;
+    for _ in 0..count {
+        attributes.push(load_attribute(cursor)?);
+    }
+    Ok(attributes)
+}
+
+fn load_attribute(cursor: &mut VersionedCursor) -> BinaryLoaderResult<FunctionAttribute> {
+    use SerializedAttribute::*;
+    Ok(match SerializedAttribute::from_u8(load_u8(cursor)?)? {
+        PERSISTENT => FunctionAttribute::Persistent,
+        MODULE_LOCK => FunctionAttribute::ModuleLock,
+    })
 }
 
 fn load_access_specifiers(
@@ -1484,6 +1510,7 @@ fn load_field_def(cursor: &mut VersionedCursor) -> BinaryLoaderResult<FieldDefin
 
 fn load_variants(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Vec<VariantDefinition>> {
     let mut variants = Vec::new();
+
     let variant_count = load_variant_count(cursor)?;
     for _ in 0..variant_count {
         variants.push(load_variant(cursor)?);
@@ -2115,6 +2142,18 @@ impl SerializedBool {
             0x2 => Ok(true),
             _ => Err(PartialVMError::new(StatusCode::MALFORMED)
                 .with_message("malformed boolean".to_owned())),
+        }
+    }
+}
+
+impl SerializedAttribute {
+    fn from_u8(value: u8) -> BinaryLoaderResult<Self> {
+        use SerializedAttribute::*;
+        match value {
+            0x1 => Ok(PERSISTENT),
+            0x2 => Ok(MODULE_LOCK),
+            _ => Err(PartialVMError::new(StatusCode::MALFORMED)
+                .with_message("malformed attribute".to_owned())),
         }
     }
 }
