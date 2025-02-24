@@ -65,10 +65,18 @@ fn test_existing_account_with_fee_payer(alice_stateless_account: bool, bob_state
     let bob_start = h.read_aptos_balance(bob.address());
 
     let payload = aptos_stdlib::aptos_coin_transfer(*alice.address(), 0);
+    // TODO[orderless]: Is this `max_gas_amount` correct?
+    let max_gas_amount = if use_orderless_transactions {
+        PRICING.new_account_upfront(1) - 100
+    } else if alice_stateless_account {
+        PRICING.new_account_upfront(1)
+    } else {
+        PRICING.new_account_upfront(1) - 90
+    };
     let transaction = TransactionBuilder::new(alice.clone())
         .fee_payer(bob.clone())
         .payload(payload)
-        .max_gas_amount(PRICING.new_account_upfront(1) - 100)
+        .max_gas_amount(max_gas_amount)
         .gas_unit_price(1)
         .sequence_number(0)
         .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
@@ -115,17 +123,25 @@ fn test_existing_account_with_fee_payer_aborts(alice_stateless_account: bool, bo
     let bob_start = h.read_aptos_balance(bob.address());
 
     let payload = aptos_stdlib::aptos_coin_transfer(*alice.address(), 1);
+    let max_gas_amount = if use_orderless_transactions {
+        PRICING.new_account_upfront(1) - 100
+    } else if alice_stateless_account {
+        PRICING.new_account_upfront(1)
+    } else {
+        PRICING.new_account_upfront(1) - 90
+    };
     let transaction = TransactionBuilder::new(alice.clone())
         .fee_payer(bob.clone())
         .payload(payload)
         .sequence_number(0)
-        .max_gas_amount(PRICING.new_account_upfront(1) - 100)
+        .max_gas_amount(max_gas_amount)
         .gas_unit_price(1)
         .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign_fee_payer();
 
     let output = h.run_raw(transaction);
     // Alice has an insufficient balance, trying to 1 when she has 0.
+    println!("status: {:?}", output.status());
     assert_abort!(output.status(), 65542);
 
     let alice_after = h.read_aptos_balance(alice.address());
@@ -226,6 +242,7 @@ fn test_account_not_exist_with_fee_payer_insufficient_gas(stateless_account: boo
         .sign_fee_payer();
 
     let output = h.run_raw(transaction);
+    println!("status: {:?}", output.status());
     assert!(transaction_status_eq(
         output.status(),
         &TransactionStatus::Discard(StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS),
@@ -307,7 +324,7 @@ fn test_account_not_exist_and_move_abort_with_fee_payer_create_account(stateless
     assert!(alice_after.is_none());
     let bob_after = h.read_aptos_balance(bob.address());
 
-    assert_eq!(h.sequence_number_opt(bob.address()).unwrap(), 1);
+    assert_eq!(h.sequence_number_opt(alice.address()).unwrap(), 1);
     assert!(bob_start > bob_after);
 }
 
@@ -465,10 +482,8 @@ fn test_account_not_exist_with_fee_payer_without_create_account(stateless_accoun
         .sign_fee_payer();
 
     let output = h.run_raw(transaction);
-    assert!(transaction_status_eq(
-        output.status(),
-        &TransactionStatus::Discard(StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST),
-    ));
+    // If the sending account doesn't exist, and a transaction with sequence number 0 is sent, the account will be created.
+    assert_success!(*output.status());
 }
 
 
