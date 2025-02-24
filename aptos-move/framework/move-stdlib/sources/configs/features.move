@@ -763,11 +763,11 @@ module std::features {
         while (features.length() <= byte_index) {
             features.push_back(0)
         };
-        let entry = features.borrow_mut(byte_index);
+
         if (include)
-            *entry |= bit_mask
+            features[byte_index] |= bit_mask
         else
-            *entry &= (0xff ^ bit_mask)
+            features[byte_index] &= (0xff ^ bit_mask)
     }
 
     /// Helper to check whether a feature flag is enabled.
