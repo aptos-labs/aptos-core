@@ -141,8 +141,6 @@ return true.
 -  [Function `is_account_abstraction_enabled`](#0x1_features_is_account_abstraction_enabled)
 -  [Function `get_bulletproofs_batch_feature`](#0x1_features_get_bulletproofs_batch_feature)
 -  [Function `bulletproofs_batch_enabled`](#0x1_features_bulletproofs_batch_enabled)
--  [Function `get_extended_coin_symbols_feature`](#0x1_features_get_extended_coin_symbols_feature)
--  [Function `is_extended_coin_symbols_enabled`](#0x1_features_is_extended_coin_symbols_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -556,18 +554,6 @@ The provided signer has not a framework address.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_EINVALID_FEATURE">EINVALID_FEATURE</a>: u64 = 1;
-</code></pre>
-
-
-
-<a id="0x1_features_EXTENDED_COIN_SYMBOLS"></a>
-
-Whether coin / FA symbols should be extended in length to 32 bytes
-
-Lifetime: transient
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_EXTENDED_COIN_SYMBOLS">EXTENDED_COIN_SYMBOLS</a>: u64 = 86;
 </code></pre>
 
 
@@ -3515,52 +3501,6 @@ Deprecated feature
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bulletproofs_batch_enabled">bulletproofs_batch_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BULLETPROOFS_BATCH_NATIVES">BULLETPROOFS_BATCH_NATIVES</a>)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_features_get_extended_coin_symbols_feature"></a>
-
-## Function `get_extended_coin_symbols_feature`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_extended_coin_symbols_feature">get_extended_coin_symbols_feature</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_extended_coin_symbols_feature">get_extended_coin_symbols_feature</a>(): u64 { <a href="features.md#0x1_features_EXTENDED_COIN_SYMBOLS">EXTENDED_COIN_SYMBOLS</a> }
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_features_is_extended_coin_symbols_enabled"></a>
-
-## Function `is_extended_coin_symbols_enabled`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_extended_coin_symbols_enabled">is_extended_coin_symbols_enabled</a>(): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_extended_coin_symbols_enabled">is_extended_coin_symbols_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_EXTENDED_COIN_SYMBOLS">EXTENDED_COIN_SYMBOLS</a>)
 }
 </code></pre>
 

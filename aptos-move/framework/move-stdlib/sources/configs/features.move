@@ -644,18 +644,6 @@ module std::features {
         is_enabled(BULLETPROOFS_BATCH_NATIVES)
     }
 
-    /// Whether coin / FA symbols should be extended in length to 32 bytes
-    ///
-    /// Lifetime: transient
-    const EXTENDED_COIN_SYMBOLS: u64 = 86;
-
-    public fun get_extended_coin_symbols_feature(): u64 { EXTENDED_COIN_SYMBOLS }
-
-    public fun is_extended_coin_symbols_enabled(): bool acquires Features {
-        is_enabled(EXTENDED_COIN_SYMBOLS)
-    }
-
-
     // ============================================================================================
     // Feature Flag Implementation
 

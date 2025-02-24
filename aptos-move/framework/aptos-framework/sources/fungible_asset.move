@@ -100,8 +100,7 @@ module aptos_framework::fungible_asset {
     //
 
     const MAX_NAME_LENGTH: u64 = 32;
-    const MAX_SYMBOL_LENGTH: u64 = 10;
-    const MAX_NEW_SYMBOL_LENGTH: u64 = 32;
+    const MAX_SYMBOL_LENGTH: u64 = 32;
     const MAX_DECIMALS: u8 = 32;
     const MAX_URI_LENGTH: u64 = 512;
 
@@ -268,12 +267,7 @@ module aptos_framework::fungible_asset {
         assert!(!object::can_generate_delete_ref(constructor_ref), error::invalid_argument(EOBJECT_IS_DELETABLE));
         let metadata_object_signer = &object::generate_signer(constructor_ref);
         assert!(string::length(&name) <= MAX_NAME_LENGTH, error::out_of_range(ENAME_TOO_LONG));
-	let max_symbol_length = if(features::is_extended_coin_symbols_enabled()) {
-            MAX_NEW_SYMBOL_LENGTH 
-        } else {
-            MAX_SYMBOL_LENGTH
-        };
-        assert!(string::length(&symbol) <= max_symbol_length, error::out_of_range(ESYMBOL_TOO_LONG));
+        assert!(string::length(&symbol) <= MAX_SYMBOL_LENGTH, error::out_of_range(ESYMBOL_TOO_LONG));
         assert!(decimals <= MAX_DECIMALS, error::out_of_range(EDECIMALS_TOO_LARGE));
         assert!(string::length(&icon_uri) <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
         assert!(string::length(&project_uri) <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
