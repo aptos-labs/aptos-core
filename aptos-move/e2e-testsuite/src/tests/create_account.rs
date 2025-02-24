@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use aptos_language_e2e_tests::{
     common_transactions::create_account_txn, current_function_name,
     executor::FakeExecutor, feature_flags_for_orderless,
@@ -54,6 +55,6 @@ fn create_account(stateless_account: bool, use_txn_payload_v2_format: bool, use_
         let updated_sender = executor
             .read_account_resource(sender.account())
             .expect("sender must exist");
-        assert_eq!(1, updated_sender.sequence_number());
+        assert_eq!(if use_orderless_transactions { 0 } else { 1 }, updated_sender.sequence_number());
     }
 }

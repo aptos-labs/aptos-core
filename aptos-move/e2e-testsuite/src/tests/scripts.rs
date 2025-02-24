@@ -83,7 +83,7 @@ fn script_code_unverifiable(stateless_account: bool, use_txn_payload_v2_format: 
         let updated_sender = executor
             .read_account_resource(sender.account())
             .expect("sender must exist");
-        assert_eq!(1, updated_sender.sequence_number());
+        assert_eq!(if use_orderless_transactions { 0 } else { 1 }, updated_sender.sequence_number());
     }
 }
 
@@ -179,7 +179,7 @@ fn script_none_existing_module_dep(stateless_account: bool, use_txn_payload_v2_f
         let updated_sender = executor
             .read_account_resource(sender.account())
             .expect("sender must exist");
-        assert_eq!(1, updated_sender.sequence_number());
+        assert_eq!(if use_orderless_transactions { 0 } else { 1 }, updated_sender.sequence_number());
     }
 }
 
@@ -274,7 +274,7 @@ fn script_non_existing_function_dep(stateless_account: bool, use_txn_payload_v2_
         let updated_sender = executor
             .read_account_resource(sender.account())
             .expect("sender must exist");
-        assert_eq!(1, updated_sender.sequence_number());
+        assert_eq!(if use_orderless_transactions { 0 } else { 1 }, updated_sender.sequence_number());
     }
 }
 
@@ -370,7 +370,7 @@ fn script_bad_sig_function_dep(stateless_account: bool, use_txn_payload_v2_forma
         let updated_sender = executor
             .read_account_resource(sender.account())
             .expect("sender must exist");
-        assert_eq!(1, updated_sender.sequence_number());
+        assert_eq!(if use_orderless_transactions { 0 } else { 1 }, updated_sender.sequence_number());
     }
 }
 
@@ -452,7 +452,7 @@ fn script_type_argument_module_does_not_exist(stateless_account: bool, use_txn_p
         let updated_sender = executor
             .read_account_resource(sender.account())
             .expect("sender must exist");
-        assert_eq!(1, updated_sender.sequence_number());
+        assert_eq!(if use_orderless_transactions { 0 } else { 1 }, updated_sender.sequence_number());
     }
 }
 
@@ -536,7 +536,7 @@ fn script_nested_type_argument_module_does_not_exist(stateless_account: bool, us
         let updated_sender = executor
             .read_account_resource(sender.account())
             .expect("sender must exist");
-        assert_eq!(1, updated_sender.sequence_number());
+        assert_eq!(if use_orderless_transactions { 0 } else { 1 }, updated_sender.sequence_number());
     }
 }
 
@@ -633,6 +633,6 @@ fn forbid_script_emitting_events(stateless_account: bool, use_txn_payload_v2_for
         let updated_sender = executor
             .read_account_resource(sender.account())
             .expect("sender must exist");
-        assert_eq!(1, updated_sender.sequence_number());
+        assert_eq!(if use_orderless_transactions { 0 } else { 1 }, updated_sender.sequence_number());
     }
 }

@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
@@ -36,8 +37,8 @@ fn create_test_txn(
 
 fn run_entry_functions<F: Fn(ExecutionStatus)>(func_names: Vec<&str>, check_status: F, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
-    publish_test_package(&mut h, &acc);
+    let aptos_framework_account = h.new_account_at(AccountAddress::from_hex_literal("0x1").unwrap(), if stateless_account { None } else { Some(0) });
+    publish_test_package(&mut h, &aptos_framework_account);
 
     // Make sure aggregators are enabled, so that we can test
     h.enable_features(
@@ -51,7 +52,7 @@ fn run_entry_functions<F: Fn(ExecutionStatus)>(func_names: Vec<&str>, check_stat
 
     let txns = func_names
         .into_iter()
-        .map(|name| create_test_txn(&mut h, &acc, name))
+        .map(|name| create_test_txn(&mut h, &aptos_framework_account, name))
         .collect();
 
     let statuses = h.run_block(txns);
