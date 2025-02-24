@@ -1948,6 +1948,7 @@ impl GlobalEnv {
         params: Vec<Parameter>,
         result_type: Type,
         def: Exp,
+        spec_opt: Option<Spec>,
     ) {
         let used_funs = def.used_funs();
         let called_funs = def.called_funs();
@@ -1969,7 +1970,7 @@ impl GlobalEnv {
             params,
             result_type,
             access_specifiers: None,
-            spec: RefCell::new(Default::default()),
+            spec: RefCell::new(spec_opt.unwrap_or_default()),
             def: Some(def),
             called_funs: Some(called_funs),
             calling_funs: RefCell::new(None),

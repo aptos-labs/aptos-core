@@ -44,7 +44,7 @@ use itertools::Itertools;
 use move_binary_format::file_format::Visibility;
 use move_core_types::function::ClosureMask;
 use move_model::{
-    ast::{Exp, ExpData, LambdaCaptureKind, Operation, Pattern, TempIndex},
+    ast::{Exp, ExpData, LambdaCaptureKind, Operation, Pattern, Spec, TempIndex},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, TypeParameter},
     symbol::Symbol,
@@ -121,6 +121,7 @@ pub fn lift_lambdas(options: LambdaLiftingOptions, env: &mut GlobalEnv) {
             params,
             result_type,
             def,
+            spec,
         } in new_funs
         {
             env.add_function_def(
@@ -133,6 +134,7 @@ pub fn lift_lambdas(options: LambdaLiftingOptions, env: &mut GlobalEnv) {
                 params,
                 result_type,
                 def,
+                spec,
             )
         }
     }
@@ -176,6 +178,7 @@ struct ClosureFunction {
     params: Vec<Parameter>,
     result_type: Type,
     def: Exp,
+    spec: Option<Spec>,
 }
 
 impl<'a> LambdaLifter<'a> {
@@ -493,6 +496,7 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         pat: &Pattern,
         body: &Exp,
         capture_kind: LambdaCaptureKind,
+        spec_opt: &Option<Exp>,
     ) -> Option<Exp> {
         if self.exempted_lambdas.contains(&id) {
             return None;
@@ -571,11 +575,32 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
             if let RewriteTarget::Temporary(temp) = target {
                 let new_temp = param_index_mapping.get(&temp).cloned().unwrap_or(temp);
                 return Some(ExpData::Temporary(id, new_temp).into_exp());
+            } else if let RewriteTarget::LocalVar(sym) = target {
+                for (i, par) in params.iter().enumerate() {
+                    if sym == par.0 {
+                        return Some(ExpData::Temporary(id, i).into_exp());
+                    }
+                }
             }
             None
         };
         let body = ExpRewriter::new(env, &mut replacer).rewrite_exp(body.clone());
         let fun_id = FunId::new(fun_name);
+        let spec = if let Some(spec_exp) = spec_opt {
+            if let ExpData::SpecBlock(_, _) = spec_exp.as_ref() {
+                let new_spec_exp =
+                    ExpRewriter::new(env, &mut replacer).rewrite_exp(spec_exp.clone());
+                if let ExpData::SpecBlock(_, new_spec) = new_spec_exp.as_ref() {
+                    Some(new_spec.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
         self.lifted.push(ClosureFunction {
             loc: lambda_loc.clone(),
             fun_id,
@@ -583,6 +608,7 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
             params,
             result_type: result_type.clone(),
             def: self.bind(bindings, body),
+            spec,
         });
 
         // Create and return closure expression. The type instantiation
