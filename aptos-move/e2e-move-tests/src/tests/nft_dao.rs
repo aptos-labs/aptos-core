@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-
+// Note[Orderless]: Done
 use crate::{assert_success, build_package, tests::common, MoveHarness};
 use aptos_types::account_address::create_resource_address;
 use move_core_types::account_address::AccountAddress;
@@ -9,13 +9,13 @@ use rstest::rstest;
 #[rstest(stateless_account1, stateless_account2, use_txn_payload_v2_format, use_orderless_transactions,
     case(true, true, false, false),
     case(true, true, true, false),
-    case(true, true, true, true),
+        case(true, true, true, true),
     case(true, false, false, false),
     case(true, false, true, false),
-    case(true, false, true, true),
+        case(true, false, true, true),
     case(false, true, false, false),
     case(false, true, true, false),
-    case(false, true, true, true),
+        case(false, true, true, true),
     case(false, false, false, false),
     case(false, false, true, false),
     case(false, false, true, true),
@@ -59,7 +59,7 @@ fn test_nft_dao_txn_arguments(stateless_account1: bool, stateless_account2: bool
         .collect();
     let desc = "desc".to_owned().into_bytes();
     let voter = h.new_account_at(AccountAddress::from_hex_literal("0xaf").unwrap(), if stateless_account2 { None } else { Some(0) });
-    h.run_transaction_payload(
+    assert_success!(h.run_transaction_payload(
         &acc,
         aptos_cached_packages::aptos_token_sdk_builder::token_create_collection_script(
             collection_name.clone(),
@@ -68,9 +68,9 @@ fn test_nft_dao_txn_arguments(stateless_account1: bool, stateless_account2: bool
             5,
             vec![false, false, false],
         ),
-    );
+    ));
     for tok in &token_names {
-        h.run_transaction_payload(
+        assert_success!(h.run_transaction_payload(
             &acc,
             aptos_cached_packages::aptos_token_sdk_builder::token_create_token_script(
                 collection_name.clone(),
@@ -87,11 +87,11 @@ fn test_nft_dao_txn_arguments(stateless_account1: bool, stateless_account2: bool
                 vec![],
                 vec![],
             ),
-        );
+        ));
     }
 
     // create a DAO
-    h.run_entry_function(
+    assert_success!(h.run_entry_function(
         &acc,
         str::parse("0xcafe::nft_dao::create_dao").unwrap(),
         vec![],
@@ -103,7 +103,7 @@ fn test_nft_dao_txn_arguments(stateless_account1: bool, stateless_account2: bool
             bcs::to_bytes(&collection_name).unwrap(),
             bcs::to_bytes(&1u64).unwrap(),
         ],
-    );
+    ));
     // get DAO address
     let mut salt = bcs::to_bytes("dao").unwrap();
     salt.append(&mut bcs::to_bytes(acc.address()).unwrap());
@@ -111,7 +111,7 @@ fn test_nft_dao_txn_arguments(stateless_account1: bool, stateless_account2: bool
     let dao = create_resource_address(*acc.address(), salt.as_slice());
 
     // transfer two NFTs to DAO and transfer 1 NFT to voter
-    h.run_transaction_payload(
+    assert_success!( h.run_transaction_payload(
         &acc,
         aptos_cached_packages::aptos_token_sdk_builder::token_transfer_with_opt_in(
             *acc.address(),
@@ -121,8 +121,8 @@ fn test_nft_dao_txn_arguments(stateless_account1: bool, stateless_account2: bool
             dao,
             1,
         ),
-    );
-    h.run_transaction_payload(
+    ));
+    assert_success!(h.run_transaction_payload(
         &acc,
         aptos_cached_packages::aptos_token_sdk_builder::token_transfer_with_opt_in(
             *acc.address(),
@@ -132,13 +132,13 @@ fn test_nft_dao_txn_arguments(stateless_account1: bool, stateless_account2: bool
             dao,
             1,
         ),
-    );
+    ));
     // voter opt-in direct transfer
-    h.run_transaction_payload(
+    assert_success!(h.run_transaction_payload(
         &voter,
         aptos_cached_packages::aptos_token_sdk_builder::token_opt_in_direct_transfer(true),
-    );
-    h.run_transaction_payload(
+    ));
+    assert_success!(h.run_transaction_payload(
         &acc,
         aptos_cached_packages::aptos_token_sdk_builder::token_transfer_with_opt_in(
             *acc.address(),
@@ -148,7 +148,7 @@ fn test_nft_dao_txn_arguments(stateless_account1: bool, stateless_account2: bool
             *voter.address(),
             1,
         ),
-    );
+    ));
     let fnames = vec!["offer_nft".as_bytes(), "offer_nft".as_bytes()];
     let arg_name = vec![
         "creator".as_bytes(),
@@ -184,7 +184,7 @@ fn test_nft_dao_txn_arguments(stateless_account1: bool, stateless_account2: bool
     ];
 
     // propose to transfer two NFTs to voter
-    h.run_entry_function(
+    assert_success!(h.run_entry_function(
         &acc,
         str::parse("0xcafe::nft_dao::create_proposal").unwrap(),
         vec![],
@@ -200,10 +200,10 @@ fn test_nft_dao_txn_arguments(stateless_account1: bool, stateless_account2: bool
             bcs::to_bytes(&vec![token_names[3].clone()]).unwrap(),
             bcs::to_bytes(&vec![0u64]).unwrap(),
         ],
-    );
+    ));
     // vote
     h.new_epoch();
-    h.run_entry_function(
+    assert_success!(h.run_entry_function(
         &voter,
         str::parse("0xcafe::nft_dao::vote").unwrap(),
         vec![],
@@ -214,7 +214,7 @@ fn test_nft_dao_txn_arguments(stateless_account1: bool, stateless_account2: bool
             bcs::to_bytes(&vec![token_names[2].clone()]).unwrap(),
             bcs::to_bytes(&vec![0u64]).unwrap(),
         ],
-    );
+    ));
     // resolve
     h.new_epoch();
     let res = h.run_entry_function(

@@ -294,6 +294,10 @@ module aptos_framework::account {
         exists<Account>(addr)
     }
 
+    inline fun resource_exists_at(addr: address): bool {
+        exists<Account>(addr)
+    }
+
     #[view]
     public fun get_guid_next_creation_num(addr: address): u64 acquires Account {
         borrow_global<Account>(addr).guid_creation_num
@@ -311,6 +315,12 @@ module aptos_framework::account {
             option::some(*table::borrow(address_map_ref, auth_key))
         } else {
             option::none()
+        }
+    }
+
+    inline fun ensure_resource_exists(addr: address) {
+        if (!resource_exists_at(addr)) {
+            create_account_unchecked(addr);
         }
     }
 
@@ -892,6 +902,7 @@ module aptos_framework::account {
 
     public fun create_guid(account_signer: &signer): guid::GUID acquires Account {
         let addr = signer::address_of(account_signer);
+        ensure_resource_exists(addr);
         let account = borrow_global_mut<Account>(addr);
         let guid = guid::create(addr, &mut account.guid_creation_num);
         assert!(

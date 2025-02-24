@@ -30,9 +30,11 @@
 -  [Function `create_account`](#0x1_account_create_account)
 -  [Function `create_account_unchecked`](#0x1_account_create_account_unchecked)
 -  [Function `exists_at`](#0x1_account_exists_at)
+-  [Function `resource_exists_at`](#0x1_account_resource_exists_at)
 -  [Function `get_guid_next_creation_num`](#0x1_account_get_guid_next_creation_num)
 -  [Function `get_sequence_number`](#0x1_account_get_sequence_number)
 -  [Function `originating_address`](#0x1_account_originating_address)
+-  [Function `ensure_resource_exists`](#0x1_account_ensure_resource_exists)
 -  [Function `increment_sequence_number`](#0x1_account_increment_sequence_number)
 -  [Function `get_authentication_key`](#0x1_account_get_authentication_key)
 -  [Function `rotate_authentication_key_internal`](#0x1_account_rotate_authentication_key_internal)
@@ -1267,6 +1269,30 @@ is returned. This way, the caller of this function can publish additional resour
 
 </details>
 
+<a id="0x1_account_resource_exists_at"></a>
+
+## Function `resource_exists_at`
+
+
+
+<pre><code><b>fun</b> <a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(addr: <b>address</b>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(addr: <b>address</b>): bool {
+    <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_account_get_guid_next_creation_num"></a>
 
 ## Function `get_guid_next_creation_num`
@@ -1339,6 +1365,32 @@ is returned. This way, the caller of this function can publish additional resour
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*<a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(address_map_ref, auth_key))
     } <b>else</b> {
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_account_ensure_resource_exists"></a>
+
+## Function `ensure_resource_exists`
+
+
+
+<pre><code><b>fun</b> <a href="account.md#0x1_account_ensure_resource_exists">ensure_resource_exists</a>(addr: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="account.md#0x1_account_ensure_resource_exists">ensure_resource_exists</a>(addr: <b>address</b>) {
+    <b>if</b> (!<a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(addr)) {
+        <a href="account.md#0x1_account_create_account_unchecked">create_account_unchecked</a>(addr);
     }
 }
 </code></pre>
@@ -2392,6 +2444,7 @@ GUID management methods.
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_create_guid">create_guid</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <a href="guid.md#0x1_guid_GUID">guid::GUID</a> <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(account_signer);
+    <a href="account.md#0x1_account_ensure_resource_exists">ensure_resource_exists</a>(addr);
     <b>let</b> <a href="account.md#0x1_account">account</a> = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
     <b>let</b> <a href="guid.md#0x1_guid">guid</a> = <a href="guid.md#0x1_guid_create">guid::create</a>(addr, &<b>mut</b> <a href="account.md#0x1_account">account</a>.guid_creation_num);
     <b>assert</b>!(
