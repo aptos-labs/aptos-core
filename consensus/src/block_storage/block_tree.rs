@@ -451,7 +451,6 @@ impl BlockTree {
             // Add the children to the blocks to be pruned (if any), but stop when it reaches the
             // new root
             for child_id in block_to_remove.children() {
-                info!(" child_id: {}", child_id);
                 if next_window_root_id == *child_id {
                     continue;
                 }
@@ -459,11 +458,9 @@ impl BlockTree {
                     self.get_linkable_block(child_id)
                         .expect("Child must exist in the tree"),
                 );
-                info!("blocks_to_be_pruned: {:?}", blocks_to_be_pruned);
             }
             // Track all the block ids removed
             blocks_pruned.push_back(block_to_remove.id());
-            info!("blocks_pruned: {:?}", blocks_pruned);
         }
         blocks_pruned
     }
