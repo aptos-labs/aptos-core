@@ -934,7 +934,6 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 <pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
 <b>pragma</b> aborts_if_is_partial;
 <b>include</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a>;
-<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(auth_key);
 </code></pre>
 
 
@@ -946,7 +945,6 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 <pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {
     auth_key: <b>address</b>;
     <b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(auth_key);
-    <b>aborts_if</b> <a href="aptos_account.md#0x1_aptos_account_length_judgment">length_judgment</a>(auth_key);
     <b>aborts_if</b> auth_key == @vm_reserved || auth_key == @aptos_framework || auth_key == @aptos_token;
 }
 </code></pre>

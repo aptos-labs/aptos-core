@@ -439,8 +439,8 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
         output: &mut IncrementalOutput,
     ) -> Result<()> {
         let sender_account_key = self.db_util.new_state_key_account(&sender_address);
-        let mut sender_account =
-            DbAccessUtil::get_account(&sender_account_key, state_view)?.unwrap();
+        let mut sender_account = DbAccessUtil::get_account(&sender_account_key, state_view)?
+            .unwrap_or_else(|| DbAccessUtil::new_account_resource(sender_address));
 
         sender_account.sequence_number = sequence_number + 1;
 
@@ -804,7 +804,9 @@ impl CommonNativeRawTransactionExecutor for NativeValueCacheRawTransactionExecut
         match self
             .cache_get_mut_or_init(&sender_account_key, |key| {
                 CachedResource::Account(
-                    DbAccessUtil::get_account(key, state_view).unwrap().unwrap(),
+                    DbAccessUtil::get_account(key, state_view)
+                        .unwrap()
+                        .unwrap_or_else(|| DbAccessUtil::new_account_resource(sender_address)),
                 )
             })
             .value_mut()

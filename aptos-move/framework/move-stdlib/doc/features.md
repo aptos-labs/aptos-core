@@ -141,12 +141,9 @@ return true.
 -  [Function `is_account_abstraction_enabled`](#0x1_features_is_account_abstraction_enabled)
 -  [Function `get_bulletproofs_batch_feature`](#0x1_features_get_bulletproofs_batch_feature)
 -  [Function `bulletproofs_batch_enabled`](#0x1_features_bulletproofs_batch_enabled)
-<<<<<<< HEAD
 -  [Function `is_domain_account_abstraction_enabled`](#0x1_features_is_domain_account_abstraction_enabled)
-=======
 -  [Function `get_default_account_resource_feature`](#0x1_features_get_default_account_resource_feature)
 -  [Function `is_default_account_resource_enabled`](#0x1_features_is_default_account_resource_enabled)
->>>>>>> 82185647f0 (Stateless account)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -465,7 +462,7 @@ Lifetime: transient
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_DEFAULT_ACCOUNT_RESOURCE">DEFAULT_ACCOUNT_RESOURCE</a>: u64 = 88;
+<pre><code><b>const</b> <a href="features.md#0x1_features_DEFAULT_ACCOUNT_RESOURCE">DEFAULT_ACCOUNT_RESOURCE</a>: u64 = 90;
 </code></pre>
 
 
@@ -3563,7 +3560,6 @@ Deprecated feature
 
 </details>
 
-<<<<<<< HEAD
 <a id="0x1_features_is_domain_account_abstraction_enabled"></a>
 
 ## Function `is_domain_account_abstraction_enabled`
@@ -3571,15 +3567,6 @@ Deprecated feature
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_domain_account_abstraction_enabled">is_domain_account_abstraction_enabled</a>(): bool
-=======
-<a id="0x1_features_get_default_account_resource_feature"></a>
-
-## Function `get_default_account_resource_feature`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_default_account_resource_feature">get_default_account_resource_feature</a>(): u64
->>>>>>> 82185647f0 (Stateless account)
 </code></pre>
 
 
@@ -3588,10 +3575,30 @@ Deprecated feature
 <summary>Implementation</summary>
 
 
-<<<<<<< HEAD
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_domain_account_abstraction_enabled">is_domain_account_abstraction_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DOMAIN_ACCOUNT_ABSTRACTION">DOMAIN_ACCOUNT_ABSTRACTION</a>)
-=======
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_default_account_resource_feature"></a>
+
+## Function `get_default_account_resource_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_default_account_resource_feature">get_default_account_resource_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_default_account_resource_feature">get_default_account_resource_feature</a>(): u64 { <a href="features.md#0x1_features_DEFAULT_ACCOUNT_RESOURCE">DEFAULT_ACCOUNT_RESOURCE</a> }
 </code></pre>
 
@@ -3616,7 +3623,6 @@ Deprecated feature
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_default_account_resource_enabled">is_default_account_resource_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DEFAULT_ACCOUNT_RESOURCE">DEFAULT_ACCOUNT_RESOURCE</a>)
->>>>>>> 82185647f0 (Stateless account)
 }
 </code></pre>
 
