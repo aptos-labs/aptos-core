@@ -415,6 +415,40 @@ impl<'a> ExpRewriterFunctions for SpecConverter<'a> {
                         exp.clone()
                     }
                 },
+                Invoke(id, call, args) => {
+                    if let ExpData::Call(_, Closure(mid, fid, mask), captured) = call.as_ref() {
+                        let spec_fun_id = self
+                            .function_mapping
+                            .get(&mid.qualified(*fid))
+                            .unwrap_or_else(|| {
+                                panic!(
+                                    "associated spec fun for {}",
+                                    self.env.get_function(mid.qualified(*fid)).get_name_str()
+                                )
+                            });
+                        let spec_fun_decl = self.env.get_spec_fun(*spec_fun_id);
+                        let mut new_args = vec![];
+                        let mut captured_num = 0;
+                        let mut free_num = 0;
+                        for i in 0..spec_fun_decl.params.len() {
+                            if mask.is_captured(i) {
+                                new_args.push(captured[captured_num].clone());
+                                captured_num += 1;
+                            } else {
+                                new_args.push(args[free_num].clone());
+                                free_num += 1;
+                            }
+                        }
+
+                        return Call(
+                            *id,
+                            SpecFunction(spec_fun_id.module_id, spec_fun_id.id, None),
+                            new_args.clone(),
+                        )
+                        .into_exp();
+                    }
+                    exp.clone()
+                },
                 _ => exp.clone(),
             }
         }
