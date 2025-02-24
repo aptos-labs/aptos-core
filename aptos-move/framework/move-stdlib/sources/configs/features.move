@@ -663,7 +663,7 @@ module std::features {
     /// Lifetime: transient
     ///
     /// We do not expect use from Move, so for now only for documentation purposes here
-    const ENABLE_FUNCTION_VALUES: u64 = 90;
+    const ENABLE_FUNCTION_VALUES: u64 = 89;
 
 
     // ============================================================================================

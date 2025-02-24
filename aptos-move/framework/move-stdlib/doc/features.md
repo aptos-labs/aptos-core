@@ -579,7 +579,7 @@ Lifetime: transient
 We do not expect use from Move, so for now only for documentation purposes here
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_ENABLE_FUNCTION_VALUES">ENABLE_FUNCTION_VALUES</a>: u64 = 88;
+<pre><code><b>const</b> <a href="features.md#0x1_features_ENABLE_FUNCTION_VALUES">ENABLE_FUNCTION_VALUES</a>: u64 = 89;
 </code></pre>
 
 
@@ -1008,7 +1008,7 @@ Lifetime: transient
 We do not expect use from Move, so for now only for documentation purposes here
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_VM_BINARY_FORMAT_V8">VM_BINARY_FORMAT_V8</a>: u64 = 87;
+<pre><code><b>const</b> <a href="features.md#0x1_features_VM_BINARY_FORMAT_V8">VM_BINARY_FORMAT_V8</a>: u64 = 86;
 </code></pre>
 
 
