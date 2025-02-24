@@ -95,6 +95,7 @@ impl StateComputer for EmptyStateComputer {
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
         _: bool,
+        _: bool,
     ) {
     }
 
@@ -182,6 +183,7 @@ impl StateComputer for RandomComputeResultStateComputer {
         _: Arc<dyn TransactionShuffler>,
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
+        _: bool,
         _: bool,
     ) {
     }

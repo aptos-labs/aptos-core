@@ -769,7 +769,6 @@ impl PipelineBuilder {
         update_counters_for_block(&block);
         update_counters_for_compute_result(&compute_result);
 
-        // TODO: change notify_commit
         payload_manager.notify_commit(&block, block_window.as_ref().as_ref());
 
         if let Some(ledger_info_with_sigs) = maybe_ledger_info_with_sigs {

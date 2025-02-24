@@ -23,6 +23,7 @@ pub struct BlockPreparer {
     txn_filter: Arc<TransactionFilter>,
     txn_deduper: Arc<dyn TransactionDeduper>,
     txn_shuffler: Arc<dyn TransactionShuffler>,
+    is_execution_pool_enabled: bool,
 }
 
 impl BlockPreparer {
@@ -31,12 +32,14 @@ impl BlockPreparer {
         txn_filter: Arc<TransactionFilter>,
         txn_deduper: Arc<dyn TransactionDeduper>,
         txn_shuffler: Arc<dyn TransactionShuffler>,
+        is_execution_pool_enabled: bool,
     ) -> Self {
         Self {
             payload_manager,
             txn_filter,
             txn_deduper,
             txn_shuffler,
+            is_execution_pool_enabled,
         }
     }
 
@@ -48,7 +51,11 @@ impl BlockPreparer {
     ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
         let mut all_txns = vec![];
         let pipelined_blocks = if let Some(block_window) = block_window {
-            block_window.pipelined_blocks()
+            if self.is_execution_pool_enabled {
+                block_window.pipelined_blocks()
+            } else {
+                vec![]
+            }
         } else {
             vec![]
         };

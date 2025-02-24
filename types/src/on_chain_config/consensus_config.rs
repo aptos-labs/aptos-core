@@ -211,7 +211,7 @@ impl OnChainConsensusConfig {
         OnChainConsensusConfig::V4 {
             alg: ConsensusAlgorithmConfig::default_for_genesis(),
             vtxn: ValidatorTxnConfig::default_for_genesis(),
-            window_size: DEFAULT_WINDOW_SIZE,
+            window_size: DEFAULT_ENABLED_WINDOW_SIZE,
         }
     }
 
