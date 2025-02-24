@@ -35,7 +35,7 @@ fn get_blocks_from_block_store_and_window(
         .inner
         .read()
         .get_ordered_block_window(block, window_size);
-    let ordered_block_window = windowed_blocks.unwrap();
+    let ordered_block_window = windowed_blocks.unwrap().unwrap();
     ordered_block_window.blocks().unwrap().to_owned()
 }
 

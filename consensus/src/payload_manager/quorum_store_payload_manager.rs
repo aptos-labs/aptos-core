@@ -13,18 +13,26 @@ use crate::{
 use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
     block::Block,
-    common::{Author, Payload, ProofWithData},
+    common::{Author, Payload, ProofWithData, Round},
     payload::{BatchPointer, TDataInfo},
+    pipelined_block::OrderedBlockWindow,
     proof_of_store::BatchInfo,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::*;
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use async_trait::async_trait;
 use futures::{channel::mpsc::Sender, future::Shared};
 use itertools::Itertools;
-use std::{collections::HashMap, future::Future, ops::Deref, pin::Pin, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    future::Future,
+    ops::Deref,
+    pin::Pin,
+    sync::Arc,
+};
 
 pub trait TQuorumStoreCommitNotifier: Send + Sync {
     fn notify(&self, block_timestamp: u64, batches: Vec<BatchInfo>);
@@ -63,6 +71,7 @@ pub struct QuorumStorePayloadManager {
     maybe_consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ordered_authors: Vec<PeerId>,
     address_to_validator_index: HashMap<PeerId, usize>,
+    round_to_batches: Mutex<BTreeMap<Round, Vec<BatchInfo>>>,
 }
 
 impl QuorumStorePayloadManager {
@@ -79,6 +88,7 @@ impl QuorumStorePayloadManager {
             maybe_consensus_publisher,
             ordered_authors,
             address_to_validator_index,
+            round_to_batches: Mutex::new(BTreeMap::new()),
         }
     }
 
@@ -116,50 +126,129 @@ impl QuorumStorePayloadManager {
         }
         Ok(all_txns)
     }
+
+    fn batches_in_block(block: &Block) -> Vec<BatchInfo> {
+        let mut batches = vec![];
+        for payload in block.payload().iter() {
+            match payload {
+                Payload::DirectMempool(_) => {
+                    unreachable!("InQuorumStore should be used");
+                },
+                Payload::InQuorumStore(proof_with_status) => {
+                    for proof in proof_with_status.proofs.iter() {
+                        batches.push(proof.info().clone());
+                    }
+                },
+                Payload::InQuorumStoreWithLimit(proof_with_status) => {
+                    for proof in proof_with_status.proof_with_data.proofs.iter() {
+                        batches.push(proof.info().clone());
+                    }
+                },
+                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
+                    for (batch_info, _) in inline_batches.iter() {
+                        batches.push(batch_info.clone());
+                    }
+                    for proof in proof_with_data.proofs.iter() {
+                        batches.push(proof.info().clone());
+                    }
+                },
+                Payload::OptQuorumStore(opt_quorum_store_payload) => {
+                    // TODO: how to avoid the clone?
+                    batches = opt_quorum_store_payload
+                        .clone()
+                        .into_inner()
+                        .get_all_batch_infos();
+                },
+            }
+        }
+        batches
+    }
+
+    fn get_committed_timestamp_and_round(
+        block: &Block,
+        block_window: &OrderedBlockWindow,
+    ) -> (u64, Round) {
+        let block_window_blocks = block_window.blocks().expect("upgrade block window");
+        let blocks: Vec<_> = block_window_blocks
+            .iter()
+            .chain(std::iter::once(block))
+            .collect();
+        let oldest_block = blocks.first().expect("at least one block");
+        if block_window.window_start_round() == oldest_block.round() {
+            (oldest_block.timestamp_usecs(), oldest_block.round())
+        } else {
+            let certified_block = oldest_block.quorum_cert().certified_block();
+            (certified_block.timestamp_usecs(), certified_block.round())
+        }
+    }
+
+    fn remove_committed_batches(&self, committed_round: Round) -> Vec<BatchInfo> {
+        let mut round_to_batches = self.round_to_batches.lock();
+        let split_round = committed_round + 1;
+        let rounds_remaining = round_to_batches.split_off(&split_round);
+        let mut batches_removed = HashSet::new();
+        for (_, batches) in round_to_batches.iter() {
+            for batch in batches {
+                batches_removed.insert(batch.clone());
+            }
+        }
+        for (_, batches) in rounds_remaining.iter() {
+            for batch in batches {
+                batches_removed.remove(batch);
+            }
+        }
+        *round_to_batches = rounds_remaining;
+        batches_removed.into_iter().collect()
+    }
+
+    fn batches_removed_from_window(
+        block: &Block,
+        block_window: &OrderedBlockWindow,
+    ) -> Vec<BatchInfo> {
+        let mut batches_removed = HashSet::new();
+        if let Ok(block_window) = block_window.blocks() {
+            if let Some(block_removed) = block_window.iter().chain(std::iter::once(block)).next() {
+                for batch in Self::batches_in_block(block_removed) {
+                    batches_removed.insert(batch);
+                }
+            }
+            block_window
+                .iter()
+                .chain(std::iter::once(block))
+                .skip(1)
+                .for_each(|block| {
+                    for batch in Self::batches_in_block(block) {
+                        batches_removed.remove(&batch);
+                    }
+                });
+            batches_removed.into_iter().collect()
+        } else {
+            warn!("Failed to get block window for block {}", block.id());
+            vec![]
+        }
+    }
 }
 
 #[async_trait]
 impl TPayloadManager for QuorumStorePayloadManager {
-    fn notify_commit(&self, block_timestamp: u64, payloads: Vec<Payload>) {
-        self.batch_reader
-            .update_certified_timestamp(block_timestamp);
+    fn notify_commit(&self, block: &Block, block_window: Option<&OrderedBlockWindow>) {
+        let batches_in_block = Self::batches_in_block(block);
+        if let Some(block_window) = block_window {
+            self.round_to_batches
+                .lock()
+                .insert(block.round(), batches_in_block);
 
-        let batches: Vec<_> = payloads
-            .into_iter()
-            .flat_map(|payload| match payload {
-                Payload::DirectMempool(_) => {
-                    unreachable!("InQuorumStore should be used");
-                },
-                Payload::InQuorumStore(proof_with_status) => proof_with_status
-                    .proofs
-                    .iter()
-                    .map(|proof| proof.info().clone())
-                    .collect::<Vec<_>>(),
-                Payload::InQuorumStoreWithLimit(proof_with_status) => proof_with_status
-                    .proof_with_data
-                    .proofs
-                    .iter()
-                    .map(|proof| proof.info().clone())
-                    .collect::<Vec<_>>(),
-                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
-                    inline_batches
-                        .iter()
-                        .map(|(batch_info, _)| batch_info.clone())
-                        .chain(
-                            proof_with_data
-                                .proofs
-                                .iter()
-                                .map(|proof| proof.info().clone()),
-                        )
-                        .collect::<Vec<_>>()
-                },
-                Payload::OptQuorumStore(opt_quorum_store_payload) => {
-                    opt_quorum_store_payload.into_inner().get_all_batch_infos()
-                },
-            })
-            .collect();
+            let (timestamp, round) = Self::get_committed_timestamp_and_round(block, block_window);
+            let batches_removed = self.remove_committed_batches(round);
 
-        self.commit_notifier.notify(block_timestamp, batches);
+            self.batch_reader.update_certified_timestamp(timestamp);
+            self.commit_notifier.notify(timestamp, batches_removed);
+        } else {
+            self.batch_reader
+                .update_certified_timestamp(block.timestamp_usecs());
+            self.commit_notifier
+                .notify(block.timestamp_usecs(), Self::batches_in_block(block));
+        }
     }
 
     fn prefetch_payload_data(&self, payload: &Payload, author: Author, timestamp: u64) {

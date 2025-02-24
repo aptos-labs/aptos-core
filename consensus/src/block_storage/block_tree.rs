@@ -30,6 +30,8 @@ use std::{
 
 /// This structure is a wrapper of [`ExecutedBlock`](aptos_consensus_types::pipelined_block::PipelinedBlock)
 /// that adds `children` field to know the parent-child relationship between blocks.
+// TODO: remove debug
+#[derive(Debug)]
 struct LinkableBlock {
     /// Executed block that has raw block data and execution output.
     executed_block: Arc<PipelinedBlock>,
@@ -283,10 +285,10 @@ impl BlockTree {
         &self,
         block: &Block,
         window_size: Option<u64>,
-    ) -> anyhow::Result<OrderedBlockWindow> {
+    ) -> anyhow::Result<Option<OrderedBlockWindow>> {
         // window_size is None only if execution pool is turned off
         if window_size.is_none() {
-            return Ok(OrderedBlockWindow::empty());
+            return Ok(None);
         }
 
         // TODO Currently we do not check to see if the `block` provided exists in the `BlockTree`
@@ -302,7 +304,7 @@ impl BlockTree {
         let window_size = (round + 1) - window_start_round;
         ensure!(window_size > 0, "window_size must be greater than 0");
         if window_size == 1 {
-            return Ok(OrderedBlockWindow::empty());
+            return Ok(Some(OrderedBlockWindow::empty(window_start_round)));
         }
 
         let mut window = vec![];
@@ -326,7 +328,7 @@ impl BlockTree {
         // The window order is lower round -> higher round
         window.reverse();
         ensure!(window.len() < window_size as usize);
-        Ok(OrderedBlockWindow::new(window))
+        Ok(Some(OrderedBlockWindow::new(window, window_start_round)))
     }
 
     pub(super) fn insert_block(
@@ -511,13 +513,18 @@ impl BlockTree {
         let ordered_block_window = self
             .get_ordered_block_window(block.block(), window_size)
             .expect("Ordered block window not found");
-        let pipelined_blocks = ordered_block_window.pipelined_blocks();
-        let first_block = pipelined_blocks
-            .iter()
-            .chain(std::iter::once(&block))
-            .next()
-            .expect("Ordered block window not found");
-        first_block.id()
+
+        if let Some(ordered_block_window) = ordered_block_window {
+            let pipelined_blocks = ordered_block_window.pipelined_blocks();
+            let first_block = pipelined_blocks
+                .iter()
+                .chain(std::iter::once(&block))
+                .next()
+                .expect("Ordered block window not found");
+            first_block.id()
+        } else {
+            block.id()
+        }
     }
 
     /// Process the data returned by the prune_tree, they're separated because caller might
