@@ -36,14 +36,22 @@ fn update_stake_amount_and_assert_with_errors(
     *stake_amount = get_stake_pool(harness, &validator_address).active;
 }
 
-#[rstest(owner_stateless_account, operator_stateless_account,
-    case(true, true),
-    case(true, false),
-    case(false, true),
-    case(false, false),
+#[rstest(owner_stateless_account, operator_stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true),
 )]
-fn test_staking_end_to_end(owner_stateless_account: bool, operator_stateless_account: bool) {
-    let mut harness = MoveHarness::new();
+fn test_staking_end_to_end(owner_stateless_account: bool, operator_stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut harness = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
     let owner = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap(), if owner_stateless_account { None } else { Some(0) });
     let operator = harness.new_account_at(AccountAddress::from_hex_literal("0x234").unwrap(), if operator_stateless_account { None } else { Some(0) });
     let owner_address = *owner.address();
@@ -361,7 +369,7 @@ fn test_staking_rewards_pending_inactive(stateless_account: bool, use_txn_payloa
 
     // Initialize the validator.
     let stake_amount = 50_000_000;
-    setup_staking(&mut harness, &validator, stake_amount);
+    assert_success!(setup_staking(&mut harness, &validator, stake_amount));
     harness.new_epoch();
 
     // Validator requests to leave.
