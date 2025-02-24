@@ -1485,7 +1485,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             // assign struct abilities.
             if let Type::Fun(arg, res, abilities) = &field_ty {
                 if abilities.is_empty() {
-                    field_ty = Type::Fun(arg.clone(), res.clone(), struct_abilities)
+                    let abilities = if struct_abilities.has_key() {
+                        struct_abilities.remove(Ability::Key).add(Ability::Store)
+                    } else {
+                        struct_abilities
+                    };
+                    field_ty = Type::Fun(arg.clone(), res.clone(), abilities)
                 }
             }
             for ctr in Constraint::for_field(struct_abilities, &field_ty) {
