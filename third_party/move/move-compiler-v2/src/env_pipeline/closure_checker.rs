@@ -16,6 +16,7 @@ use move_core_types::ability::Ability;
 use move_model::{
     ast::{ExpData, Operation},
     model::GlobalEnv,
+    well_known,
 };
 
 /// Checks lambda expression abilities in all target module functions.
@@ -35,12 +36,16 @@ pub fn check_closures(env: &GlobalEnv) {
                         // from the function type of the closure, it cannot have `key` ability.
                         if required_abilities.has_ability(Ability::Store)
                             && fun_env.visibility() != Visibility::Public
+                            && !fun_env.has_attribute(|attr| {
+                                env.symbol_pool().string(attr.name()).as_str()
+                                    == well_known::PERSISTENT_ATTRIBUTE
+                            })
                         {
                             let is_lambda_lifted = lambda_lifter::is_lambda_lifted_fun(&fun_env);
                             env.error_with_notes(
                                 &env.get_node_loc(*id),
                                 &format!(
-                                    "non-public function {} is missing the `store` ability",
+                                    "function {} is missing the `store` ability",
                                     if is_lambda_lifted {
                                         "resulting from lambda lifting".to_string()
                                     } else {
@@ -53,7 +58,9 @@ pub fn check_closures(env: &GlobalEnv) {
                                         existing function"
                                             .to_string()
                                     } else {
-                                        "only public functions can be stored".to_string()
+                                        "only public functions or functions with the \
+                                        `#[persistent]` attribute can be stored"
+                                            .to_string()
                                     },
                                     format!(
                                         "expected function type: `{}`",

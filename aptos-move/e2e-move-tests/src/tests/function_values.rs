@@ -99,3 +99,84 @@ fn function_value_registry() {
         ],
     ));
 }
+
+#[test]
+fn function_value_persistent() {
+    let mut builder = PackageBuilder::new("Package");
+    let source = r#"
+module 0x66::actions {
+    #[persistent]
+    package fun incr(x: u64): u64 {
+        x + 1
+    }
+
+    #[persistent]
+    package fun decr(x: u64): u64 {
+        x - 1
+    }
+}
+
+module 0x66::work {
+    use 0x1::signer::address_of;
+    use 0x66::actions;
+
+    struct Work(|u64|u64) has key, copy, drop;
+
+    entry fun set(s: &signer, incr: bool) acquires Work {
+        if (exists<Work>(address_of(s))) {
+            move_from<Work>(address_of(s));
+        };
+        if (incr) {
+            move_to(s, Work(actions::incr))
+        } else {
+            move_to(s, Work(actions::decr))
+        }
+    }
+
+    entry fun exec(s: &signer, x: u64, r: u64) acquires Work {
+        // TODO: should be able to write `Work[x](y)`
+        assert!((Work[address_of(s)])(x) == r)
+    }
+}
+    "#;
+    builder.add_source("persistent.move", source);
+    builder.add_local_dep(
+        "AptosFramework",
+        &common::framework_dir_path("aptos-framework").to_string_lossy(),
+    );
+    let path = builder.write_to_temp().unwrap();
+
+    let mut h = MoveHarness::new();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x66").unwrap());
+    assert_success!(h.publish_package_with_options(
+        &acc,
+        path.path(),
+        BuildOptions::move_2().set_latest_language()
+    ));
+
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0x66::work::set").unwrap(),
+        vec![],
+        vec![bcs::to_bytes(&true).unwrap()],
+    ));
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0x66::work::exec").unwrap(),
+        vec![],
+        vec![bcs::to_bytes(&1u64).unwrap(), bcs::to_bytes(&2u64).unwrap()],
+    ));
+
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0x66::work::set").unwrap(),
+        vec![],
+        vec![bcs::to_bytes(&false).unwrap()],
+    ));
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0x66::work::exec").unwrap(),
+        vec![],
+        vec![bcs::to_bytes(&2u64).unwrap(), bcs::to_bytes(&1u64).unwrap()],
+    ));
+}

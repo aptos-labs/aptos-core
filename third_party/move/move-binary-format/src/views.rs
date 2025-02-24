@@ -326,6 +326,10 @@ impl<'a, T: ModuleAccess> FunctionHandleView<'a, T> {
     pub fn module_id(&self) -> ModuleId {
         self.module.module_id_for_handle(self.module_handle())
     }
+
+    pub fn attributes(&self) -> &[FunctionAttribute] {
+        &self.function_handle.attributes
+    }
 }
 
 pub struct StructDefinitionView<'a, T> {
@@ -501,6 +505,10 @@ impl<'a, T: ModuleAccess> FunctionDefinitionView<'a, T> {
 
     pub fn visibility(&self) -> Visibility {
         self.function_def.visibility
+    }
+
+    pub fn attributes(&self) -> &[FunctionAttribute] {
+        self.function_handle_view.attributes()
     }
 
     pub fn is_entry(&self) -> bool {

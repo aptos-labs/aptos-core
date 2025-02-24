@@ -16,7 +16,9 @@ use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     errors::{PartialVMError, PartialVMResult},
-    file_format::{Bytecode, CompiledModule, FunctionDefinitionIndex, Visibility},
+    file_format::{
+        Bytecode, CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility,
+    },
 };
 use move_core_types::{
     ability::{Ability, AbilitySet},
@@ -53,6 +55,8 @@ pub struct Function {
     pub(crate) local_tys: Vec<Type>,
     pub(crate) param_tys: Vec<Type>,
     pub(crate) access_specifier: AccessSpecifier,
+    pub(crate) is_persistent: bool,
+    pub(crate) has_module_reentrancy_lock: bool,
 }
 
 /// For loaded function representation, specifies the owner: a script or a module.
@@ -499,6 +503,8 @@ impl Function {
             return_tys,
             param_tys,
             access_specifier,
+            is_persistent: handle.attributes.contains(&FunctionAttribute::Persistent),
+            has_module_reentrancy_lock: handle.attributes.contains(&FunctionAttribute::ModuleLock),
         })
     }
 
@@ -533,6 +539,14 @@ impl Function {
 
     pub fn param_tys(&self) -> &[Type] {
         &self.param_tys
+    }
+
+    pub fn is_persistent(&self) -> bool {
+        self.is_persistent || !self.is_friend_or_private()
+    }
+
+    pub fn has_module_lock(&self) -> bool {
+        self.has_module_reentrancy_lock
     }
 
     /// Creates the function type instance for this function. This requires cloning

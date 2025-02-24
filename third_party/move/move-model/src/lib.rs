@@ -687,6 +687,7 @@ pub fn script_into_module(compiled_script: CompiledScript, name: &str) -> Compil
         return_: return_sig_idx,
         type_parameters: script.type_parameters,
         access_specifiers: None, // TODO: access specifiers for script functions
+        attributes: vec![],
     });
 
     // Create a function definition for the main function.
