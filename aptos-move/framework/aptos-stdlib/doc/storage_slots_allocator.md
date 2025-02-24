@@ -275,6 +275,16 @@ and there is unique owner for each slot.
 
 
 
+<a id="0x1_storage_slots_allocator_ESLOT_DOESNT_EXIST"></a>
+
+Storage slot that is tried to be removed, doesn't exist
+
+
+<pre><code><b>const</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ESLOT_DOESNT_EXIST">ESLOT_DOESNT_EXIST</a>: u64 = 8;
+</code></pre>
+
+
+
 <a id="0x1_storage_slots_allocator_FIRST_INDEX"></a>
 
 
@@ -855,6 +865,8 @@ Remove storage slot, but reserve it for later.
 
 
 <pre><code><b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_remove_link">remove_link</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;, slot_index: u64): <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_Link">Link</a>&lt;T&gt; {
+    <b>let</b> slots = self.slots.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow_mut">borrow_mut</a>();
+    <b>assert</b>!(slots.contains(slot_index), <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ESLOT_DOESNT_EXIST">ESLOT_DOESNT_EXIST</a>);
     self.slots.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow_mut">borrow_mut</a>().<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_remove">remove</a>(slot_index)
 }
 </code></pre>

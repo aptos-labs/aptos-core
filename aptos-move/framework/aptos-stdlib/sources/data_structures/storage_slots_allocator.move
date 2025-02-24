@@ -23,6 +23,8 @@ module aptos_std::storage_slots_allocator {
     const EINVALID_ARGUMENT: u64 = 1;
     const ECANNOT_HAVE_SPARES_WITHOUT_REUSE: u64 = 2;
     const EINTERNAL_INVARIANT_BROKEN: u64 = 7;
+    /// Storage slot that is tried to be removed, doesn't exist
+    const ESLOT_DOESNT_EXIST: u64 = 8;
 
     const NULL_INDEX: u64 = 0;
     const FIRST_INDEX: u64 = 10; // keeping space for usecase-specific values
@@ -223,6 +225,8 @@ module aptos_std::storage_slots_allocator {
     }
 
     fun remove_link<T: store>(self: &mut StorageSlotsAllocator<T>, slot_index: u64): Link<T> {
+        let slots = self.slots.borrow_mut();
+        assert!(slots.contains(slot_index), ESLOT_DOESNT_EXIST);
         self.slots.borrow_mut().remove(slot_index)
     }
 
