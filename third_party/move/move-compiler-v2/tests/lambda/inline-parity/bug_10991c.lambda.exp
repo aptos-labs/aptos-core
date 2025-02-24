@@ -45,13 +45,11 @@ fun Test::foo($t0: |(u64, u64, u64, u64)|u64, $t1: u64, $t2: u64, $t3: u64, $t4:
      var $t6: u64
      var $t7: u64
      var $t8: u64
-     var $t9: u64
   0: $t6 := infer($t1)
   1: $t7 := infer($t2)
   2: $t8 := infer($t3)
-  3: $t9 := infer($t4)
-  4: $t5 := invoke($t6, $t7, $t8, $t9, $t0)
-  5: return $t5
+  3: $t5 := invoke($t6, $t7, $t8, $t4, $t0)
+  4: return $t5
 }
 
 
@@ -106,7 +104,6 @@ fun Test::foo($t0: |(u64, u64, u64, u64)|u64, $t1: u64, $t2: u64, $t3: u64, $t4:
      var $t6: u64 [unused]
      var $t7: u64 [unused]
      var $t8: u64 [unused]
-     var $t9: u64 [unused]
      # live vars: $t0, $t1, $t2, $t3, $t4
   0: $t1 := move($t1)
      # live vars: $t0, $t1, $t2, $t3, $t4
@@ -114,11 +111,9 @@ fun Test::foo($t0: |(u64, u64, u64, u64)|u64, $t1: u64, $t2: u64, $t3: u64, $t4:
      # live vars: $t0, $t1, $t2, $t3, $t4
   2: $t3 := move($t3)
      # live vars: $t0, $t1, $t2, $t3, $t4
-  3: $t4 := move($t4)
-     # live vars: $t0, $t1, $t2, $t3, $t4
-  4: $t1 := invoke($t1, $t2, $t3, $t4, $t0)
+  3: $t1 := invoke($t1, $t2, $t3, $t4, $t0)
      # live vars: $t1
-  5: return $t1
+  4: return $t1
 }
 
 

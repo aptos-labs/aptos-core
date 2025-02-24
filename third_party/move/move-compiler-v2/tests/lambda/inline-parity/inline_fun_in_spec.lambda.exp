@@ -102,15 +102,13 @@ module 0x42::m {
 fun m::exec<#0, #1>($t0: |#0|#1 with copy, $t1: #0): #1 {
      var $t2: #1
      var $t3: #1
-     var $t4: #0
-  0: $t4 := infer($t1)
-  1: $t3 := invoke($t4, $t0)
-  2: spec {
+  0: $t3 := invoke($t1, $t0)
+  1: spec {
   assert Eq<#1>($t3, ($t0)($t1));
 }
 
-  3: $t2 := infer($t3)
-  4: return $t2
+  2: $t2 := infer($t3)
+  3: return $t2
 }
 
 
@@ -159,20 +157,17 @@ fun m::__lambda__1__function_code_spec_block($t0: num): bool {
 fun m::exec<#0, #1>($t0: |#0|#1 with copy, $t1: #0): #1 {
      var $t2: #1
      var $t3: #1
-     var $t4: #0
      # live vars: $t0, $t1
-  0: $t4 := copy($t1)
-     # live vars: $t0, $t1, $t4
-  1: $t3 := invoke($t4, $t0)
+  0: $t3 := invoke($t1, $t0)
      # live vars: $t0, $t1, $t3
-  2: spec {
+  1: spec {
   assert Eq<#1>($t3, ($t0)($t1));
 }
 
      # live vars: $t3
-  3: $t2 := move($t3)
+  2: $t2 := move($t3)
      # live vars: $t2
-  4: return $t2
+  3: return $t2
 }
 
 
