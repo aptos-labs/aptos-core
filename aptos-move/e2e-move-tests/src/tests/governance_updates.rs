@@ -46,15 +46,19 @@ fn large_transactions(stateless_account: bool, use_txn_payload_v2_format: bool, 
     let very_large = vec![0; 1024 * 1024];
 
     let status = run(&mut h, &alice, small.clone(), small.clone());
-    assert!(!status.is_discarded());
+    assert!(!status.is_discarded(), "status: {:?}", status);
+
     let status = run(&mut h, &alice, large.clone(), small.clone());
-    assert!(status.is_discarded());
+    assert!(status.is_discarded(), "status: {:?}", status);
+
     let status = run(&mut h, &alice, small.clone(), large.clone());
-    assert!(status.is_discarded());
+    assert!(status.is_discarded(), "status: {:?}", status);
+
     let status = run(&mut h, &alice, large.clone(), large.clone());
-    assert!(status.is_discarded());
+    assert!(status.is_discarded(), "status: {:?}", status);
+
     let status = run(&mut h, &alice, very_large.clone(), small.clone());
-    assert!(status.is_discarded());
+    assert!(status.is_discarded(), "status: {:?}", status);
 
     let entries = ApprovedExecutionHashes {
         entries: vec![
@@ -70,14 +74,18 @@ fn large_transactions(stateless_account: bool, use_txn_payload_v2_format: bool, 
 
     let status = run(&mut h, &alice, small.clone(), small.clone());
     assert!(!status.is_discarded(), "status: {:?}", status);
+    
     let status = run(&mut h, &alice, large.clone(), small.clone());
     assert!(!status.is_discarded(), "status: {:?}", status);
+
     let status = run(&mut h, &alice, small.clone(), large.clone());
-    assert!(!status.is_discarded(), "status: {:?}", status);
+    assert!(status.is_discarded(), "status: {:?}", status);
+
     let status = run(&mut h, &alice, large.clone(), large);
-    assert!(!status.is_discarded(), "status: {:?}", status);
+    assert!(status.is_discarded(), "status: {:?}", status);
+
     let status = run(&mut h, &alice, very_large, small);
-    assert!(!status.is_discarded(), "status: {:?}", status);
+    assert!(status.is_discarded(), "status: {:?}", status);
 }
 
 #[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 

@@ -36,7 +36,7 @@ impl Multisig {
     }
 
     pub fn as_transaction_executable(&self) -> TransactionExecutable {
-        // TODO: See how to avoid cloning the entry function here.
+        // TODO[Orderless]: See how to avoid cloning the entry function here.
         match &self.transaction_payload {
             Some(MultisigTransactionPayload::EntryFunction(entry)) => {
                 TransactionExecutable::EntryFunction(entry.clone())

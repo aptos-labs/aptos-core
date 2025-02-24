@@ -249,7 +249,11 @@ fn is_approved_gov_script(
     txn_metadata: &TransactionMetadata,
 ) -> bool {
     match txn.payload() {
-        TransactionPayloadWrapper::Script(_script) => {
+        TransactionPayloadWrapper::Script(_script)
+        | TransactionPayloadWrapper::Payload(TransactionPayloadInner::V1 {
+            executable: TransactionExecutable::Script(_script),
+            ..
+        }) => {
             match ApprovedExecutionHashes::fetch_config(resolver) {
                 Some(approved_execution_hashes) => approved_execution_hashes
                     .entries
@@ -587,7 +591,7 @@ impl AptosVM {
         change_set_configs: &ChangeSetConfigs,
         traversal_context: &mut TraversalContext,
     ) -> Result<VMOutput, VMStatus> {
-        println!("finish_aborted_transaction");
+        // println!("finish_aborted_transaction");
         // Storage refund is zero since no slots are deleted in aborted transactions.
         const ZERO_STORAGE_REFUND: u64 = 0;
 
@@ -597,7 +601,7 @@ impl AptosVM {
             resolver,
             module_storage,
         )?;
-        println!("is_account_init_for_sponsored_transaction: {}", is_account_init_for_sponsored_transaction);
+        // println!("is_account_init_for_sponsored_transaction: {}", is_account_init_for_sponsored_transaction);
 
         let (previous_session_change_set, fee_statement) =
             if is_account_init_for_sponsored_transaction {
@@ -2137,7 +2141,7 @@ impl AptosVM {
                 code_storage
             ));
         if is_account_init_for_sponsored_transaction {
-            println!("creater_account_if_does_not_exist");
+            // println!("creater_account_if_does_not_exist");
             unwrap_or_discard!(
                 user_session.execute(|session| create_account_if_does_not_exist(
                     session,
@@ -3329,7 +3333,7 @@ fn create_account_if_does_not_exist(
     account: AccountAddress,
     traversal_context: &mut TraversalContext,
 ) -> VMResult<()> {
-    println!("   create_account_if_does_not_exist");
+    // println!("   create_account_if_does_not_exist");
     session
         .execute_function_bypass_visibility(
             &ACCOUNT_MODULE,
@@ -3415,7 +3419,7 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
             .map_err(|e| e.finish(Location::Undefined))?;
         return Ok(maybe_bytes.is_none());
     }
-    println!("no is_account_init_for_sponsored_transaction");
+    // println!("no is_account_init_for_sponsored_transaction");
     Ok(false)
 }
 

@@ -8,9 +8,7 @@ use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{
-        authenticator::AuthenticationProof, user_transaction_context::UserTransactionContext,
-        EntryFunction, Multisig, ReplayProtector, SignedTransaction, TransactionExecutable, TransactionPayloadInner,
-        TransactionPayloadWrapper,
+        authenticator::AuthenticationProof, user_transaction_context::UserTransactionContext, EntryFunction, Multisig, MultisigTransactionPayload, ReplayProtector, SignedTransaction, TransactionExecutable, TransactionExtraConfig, TransactionPayloadInner, TransactionPayloadWrapper
     },
 };
 
@@ -87,18 +85,48 @@ impl TransactionMetadata {
                 },
             },
             script_size: match txn.payload() {
-                TransactionPayloadWrapper::Script(s) => (s.code().len() as u64).into(),
+                TransactionPayloadWrapper::Script(s) |
+                TransactionPayloadWrapper::Payload(TransactionPayloadInner::V1 {
+                    executable: TransactionExecutable::Script(s),
+                    ..
+                }) => (s.code().len() as u64).into(),
+
                 _ => NumBytes::zero(),
             },
             is_keyless: aptos_types::keyless::get_authenticators(txn)
                 .map(|res| !res.is_empty())
                 .unwrap_or(false),
             entry_function_payload: match txn.payload() {
-                TransactionPayloadWrapper::EntryFunction(e) => Some(e.clone()),
+                TransactionPayloadWrapper::EntryFunction(e)
+                | TransactionPayloadWrapper::Payload(TransactionPayloadInner::V1 {
+                    executable: TransactionExecutable::EntryFunction(e),
+                    extra_config: TransactionExtraConfig::V1 {
+                        multisig_address: None,
+                        ..
+                    }
+                }) => Some(e.clone()),
                 _ => None,
             },
             multisig_payload: match txn.payload() {
                 TransactionPayloadWrapper::Multisig(m) => Some(m.clone()),
+                TransactionPayloadWrapper::Payload(TransactionPayloadInner::V1 {
+                    executable,
+                    extra_config: TransactionExtraConfig::V1 {
+                        multisig_address: Some(multisig_address),
+                        ..
+                    }
+                }) => Some(
+                    Multisig {
+                        multisig_address: *multisig_address,
+                        transaction_payload: match executable {
+                            TransactionExecutable::EntryFunction(e) => {
+                                // TODO[Orderless]: How to avoid the clone operation here.
+                                Some(MultisigTransactionPayload::EntryFunction(e.clone()))
+                            },
+                            _ => None,
+                        },
+                    }
+                ),
                 _ => None,
             },
         }
