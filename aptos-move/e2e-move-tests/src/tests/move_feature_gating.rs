@@ -82,23 +82,21 @@ fn resource_access_control(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>
 )]
 fn function_values(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
     let positive_test = !enabled.is_empty();
-    let mut h = MoveHarness::new_with_features(enabled, disabled);
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap());
 
     let sources = &[
         r#"
-            module 0x815::m1 {
+            module 0x815::m {
                 fun test(_f: |u64| has drop) {
                 }
             }
         "#,
         r#"
-            module 0x815::m2 {
+            module 0x815::m {
                 struct S { f: |u64| }
             }
         "#,
         r#"
-            module 0x815::m3 {
+            module 0x815::m {
                 fun test(): u64 {
                     let f = |x| x + 1;
                     f(2)
@@ -110,6 +108,8 @@ fn function_values(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
         let mut builder = PackageBuilder::new("Package");
         builder.add_source("m.move", source);
         let path = builder.write_to_temp().unwrap();
+        let mut h = MoveHarness::new_with_features(enabled.clone(), disabled.clone());
+        let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap());
         let result = h.publish_package_with_options(
             &acc,
             path.path(),
