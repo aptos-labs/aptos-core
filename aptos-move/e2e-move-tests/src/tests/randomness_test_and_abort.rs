@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_abort, assert_success, build_package, tests::common, MoveHarness};
 use aptos_framework::BuiltPackage;
 use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
@@ -181,13 +182,19 @@ fn deploy_code(
 }
 
 fn run_script(h: &mut MoveHarness, package: &BuiltPackage, stateless_account: bool) -> TransactionStatus {
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap(), if stateless_account { None } else { Some(0) });
+    let alice = AccountAddress::from_hex_literal("0xa11ce").unwrap();
+    let seq_num = if let Some(seq_num) = h.sequence_number_opt(&alice) {
+        seq_num
+    } else {
+        0
+    };
+    let alice = h.new_account_at(alice, if stateless_account { None } else { Some(seq_num) });
     let scripts = package.extract_script_code();
     let code = scripts[0].clone();
 
     let txn = TransactionBuilder::new(alice.clone())
         .script(Script::new(code, vec![], vec![]))
-        .sequence_number(10)
+        .sequence_number(seq_num)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
         .upgrade_payload(h.use_txn_payload_v2_format, h.use_orderless_transactions)

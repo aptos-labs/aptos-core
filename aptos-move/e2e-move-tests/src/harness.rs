@@ -576,7 +576,6 @@ impl MoveHarness {
             .extract_metadata()
             .expect("extracting package metadata must succeed");
         patch_metadata(&mut metadata);
-        println!("creating transaction payload");
         self.create_transaction_payload(
             account,
             aptos_stdlib::code_publish_package_txn(
@@ -649,7 +648,6 @@ impl MoveHarness {
     ) -> SignedTransaction {
         let package = BuiltPackage::build(path.to_owned(), options.unwrap_or_default())
             .expect("building package must succeed");
-        println!("package built");
         self.create_publish_built_package(account, &package, patch_metadata)
     }
 
@@ -716,7 +714,6 @@ impl MoveHarness {
     /// Runs transaction which publishes the Move Package.
     pub fn publish_package(&mut self, account: &Account, path: &Path) -> TransactionStatus {
         let txn = self.create_publish_package(account, path, None, |_| {});
-        println!("txn created");
         self.run(txn)
     }
 

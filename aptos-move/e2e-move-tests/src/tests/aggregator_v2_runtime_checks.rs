@@ -14,6 +14,7 @@ use move_core_types::{
     language_storage::ModuleId,
     vm_status::{sub_status::NFE_BCS_SERIALIZATION_FAILURE, AbortLocation},
 };
+use rstest::rstest;
 
 fn publish_test_package(h: &mut MoveHarness, aptos_framework_account: &Account) {
     let path_buf = common::test_dir_path("aggregator_v2.data/pack");
@@ -22,21 +23,21 @@ fn publish_test_package(h: &mut MoveHarness, aptos_framework_account: &Account) 
 
 fn create_test_txn(
     h: &mut MoveHarness,
-    aptos_framework_account: &Account,
+    acc: &Account,
     name: &str,
 ) -> SignedTransaction {
     h.create_entry_function(
-        aptos_framework_account,
+        acc,
         str::parse(name).unwrap(),
         vec![],
         vec![],
     )
 }
 
-fn run_entry_functions<F: Fn(ExecutionStatus)>(func_names: Vec<&str>, check_status: F) {
-    let mut h = MoveHarness::new();
-    let aptos_framework_account = h.aptos_framework_account();
-    publish_test_package(&mut h, &aptos_framework_account);
+fn run_entry_functions<F: Fn(ExecutionStatus)>(func_names: Vec<&str>, check_status: F, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
+    publish_test_package(&mut h, &acc);
 
     // Make sure aggregators are enabled, so that we can test
     h.enable_features(
@@ -50,7 +51,7 @@ fn run_entry_functions<F: Fn(ExecutionStatus)>(func_names: Vec<&str>, check_stat
 
     let txns = func_names
         .into_iter()
-        .map(|name| create_test_txn(&mut h, &aptos_framework_account, name))
+        .map(|name| create_test_txn(&mut h, &acc, name))
         .collect();
 
     let statuses = h.run_block(txns);
@@ -60,8 +61,15 @@ fn run_entry_functions<F: Fn(ExecutionStatus)>(func_names: Vec<&str>, check_stat
     }
 }
 
-#[test]
-fn test_equality() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_equality(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let func_names = vec![
         // Aggregators.
         "0x1::runtime_checks::test_equality_with_aggregators_I",
@@ -78,11 +86,18 @@ fn test_equality() {
     ];
     run_entry_functions(func_names, |status: ExecutionStatus| {
         assert_matches!(status, ExecutionStatus::ExecutionFailure { .. });
-    });
+    }, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
 }
 
-#[test]
-fn test_serialization() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_serialization(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let func_names = vec![
         "0x1::runtime_checks::test_serialization_with_aggregators",
         "0x1::runtime_checks::test_serialization_with_snapshots",
@@ -98,11 +113,18 @@ fn test_serialization() {
             code: NFE_BCS_SERIALIZATION_FAILURE,
             info: None,
         });
-    });
+    }, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
 }
 
-#[test]
-fn test_serialized_size() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_serialized_size(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let func_names = vec![
         "0x1::runtime_checks::test_serialized_size_with_aggregators",
         "0x1::runtime_checks::test_serialized_size_with_snapshots",
@@ -113,11 +135,18 @@ fn test_serialized_size() {
     // these functions should succeed, unlike regular serialization.
     run_entry_functions(func_names, |status: ExecutionStatus| {
         assert_eq!(status, ExecutionStatus::Success);
-    });
+    }, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
 }
 
-#[test]
-fn test_string_utils() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_string_utils(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let func_names = vec![
         // Aggregators.
         "0x1::runtime_checks::test_to_string_with_aggregators",
@@ -148,5 +177,5 @@ fn test_string_utils() {
         } else {
             unreachable!("Expected Move abort, got {:?}", status)
         }
-    });
+    }, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
 }
