@@ -101,6 +101,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
                     .schedule_compute(
                         b.block(),
                         b.block_window(),
+                        b.executed_transactions_writer(),
                         b.parent_id(),
                         b.randomness().cloned(),
                         b.qc(),

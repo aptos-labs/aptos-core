@@ -20,7 +20,8 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorError, ExecutorResult,
+    state_compute_result::StateComputeResult, transactions_with_output::TransactionsWithOutput,
+    BlockExecutorTrait, ExecutorError, ExecutorResult,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
@@ -98,7 +99,7 @@ where
         block: ExecutableBlock,
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> ExecutorResult<()> {
+    ) -> ExecutorResult<TransactionsWithOutput> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "execute_and_state_checkpoint"]);
 
         self.maybe_initialize()?;
@@ -184,7 +185,7 @@ where
         block: ExecutableBlock,
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> ExecutorResult<()> {
+    ) -> ExecutorResult<TransactionsWithOutput> {
         let _timer = BLOCK_EXECUTION_WORKFLOW_WHOLE.start_timer();
         let ExecutableBlock {
             block_id,
@@ -240,10 +241,11 @@ where
             };
 
         let output = PartialStateComputeResult::new(execution_output);
+        let transactions_with_output = output.execution_output.transactions_with_output().clone();
         let _ = self
             .block_tree
             .add_block(parent_block_id, block_id, output)?;
-        Ok(())
+        Ok(transactions_with_output)
     }
 
     fn ledger_update(

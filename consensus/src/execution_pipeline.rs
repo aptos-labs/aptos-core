@@ -12,8 +12,10 @@ use crate::{
     transaction_shuffler::TransactionShuffler,
 };
 use aptos_consensus_types::{
-    block::Block, pipeline_execution_result::PipelineExecutionResult,
-    pipelined_block::OrderedBlockWindow, quorum_cert::QuorumCert,
+    block::Block,
+    pipeline_execution_result::PipelineExecutionResult,
+    pipelined_block::{ExecutedTransactionsWriter, OrderedBlockWindow},
+    quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
@@ -26,6 +28,7 @@ use aptos_types::{
     block_metadata_ext::BlockMetadataExt,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
+        Transaction, TransactionStatus,
     },
 };
 use fail::fail_point;
@@ -95,6 +98,7 @@ impl ExecutionPipeline {
         &self,
         block: Block,
         block_window: Option<OrderedBlockWindow>,
+        executed_transactions_writer: Arc<dyn ExecutedTransactionsWriter>,
         metadata: BlockMetadataExt,
         parent_block_id: HashValue,
         block_qc: Option<Arc<QuorumCert>>,
@@ -110,6 +114,7 @@ impl ExecutionPipeline {
             .send(PrepareBlockCommand {
                 block,
                 block_window,
+                executed_transactions_writer,
                 metadata,
                 block_executor_onchain_config,
                 parent_block_id,
@@ -142,6 +147,7 @@ impl ExecutionPipeline {
         let PrepareBlockCommand {
             block,
             block_window,
+            executed_transactions_writer,
             metadata,
             block_executor_onchain_config,
             parent_block_id,
@@ -188,6 +194,7 @@ impl ExecutionPipeline {
                 .send(ExecuteBlockCommand {
                     input_txns,
                     block: (block.id(), sig_verified_txns).into(),
+                    executed_transactions_writer,
                     parent_block_id,
                     block_executor_onchain_config,
                     pre_commit_hook,
@@ -223,6 +230,7 @@ impl ExecutionPipeline {
         while let Some(ExecuteBlockCommand {
             input_txns,
             block,
+            executed_transactions_writer,
             parent_block_id,
             block_executor_onchain_config,
             pre_commit_hook,
@@ -236,7 +244,7 @@ impl ExecutionPipeline {
             let block_id = block.block_id;
             debug!("execute_stage received block {}.", block_id);
             let executor = executor.clone();
-            let execution_time = monitor!(
+            let execution_output = monitor!(
                 "execute_block",
                 tokio::task::spawn_blocking(move || {
                     fail_point!("consensus::compute", |_| {
@@ -251,18 +259,36 @@ impl ExecutionPipeline {
                             parent_block_id,
                             block_executor_onchain_config,
                         )
-                        .map(|_| start.elapsed())
+                        .map(|output| (output, start.elapsed()))
                 })
                 .await
             )
             .expect("Failed to spawn_blocking.");
+
+            let executed: Vec<_> = if let Ok((output, _)) = &execution_output {
+                output
+                    .iter()
+                    .filter_map(|(txn, output)| {
+                        if let TransactionStatus::Keep(_) = output.status() {
+                            if let Transaction::UserTransaction(txn) = &txn {
+                                return Some(txn.committed_hash());
+                            }
+                        }
+                        None
+                    })
+                    .collect()
+            } else {
+                // TODO: instead, panic here?
+                vec![]
+            };
+            executed_transactions_writer.set(executed);
 
             ledger_apply_tx
                 .send(LedgerApplyCommand {
                     input_txns,
                     block_id,
                     parent_block_id,
-                    execution_time,
+                    execution_time: execution_output.map(|(_, time)| time),
                     pre_commit_hook,
                     result_tx,
                     command_creation_time: Instant::now(),
@@ -387,6 +413,7 @@ impl ExecutionPipeline {
 struct PrepareBlockCommand {
     block: Block,
     block_window: Option<OrderedBlockWindow>,
+    executed_transactions_writer: Arc<dyn ExecutedTransactionsWriter>,
     metadata: BlockMetadataExt,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     // The parent block id.
@@ -403,6 +430,7 @@ struct PrepareBlockCommand {
 struct ExecuteBlockCommand {
     input_txns: Vec<SignedTransaction>,
     block: ExecutableBlock,
+    executed_transactions_writer: Arc<dyn ExecutedTransactionsWriter>,
     parent_block_id: HashValue,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     pre_commit_hook: PreCommitHook,

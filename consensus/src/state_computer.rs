@@ -23,7 +23,7 @@ use aptos_consensus_types::{
     block::Block,
     common::Round,
     pipeline_execution_result::PipelineExecutionResult,
-    pipelined_block::{OrderedBlockWindow, PipelinedBlock},
+    pipelined_block::{ExecutedTransactionsWriter, OrderedBlockWindow, PipelinedBlock},
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
@@ -229,6 +229,7 @@ impl StateComputer for ExecutionProxy {
         // The block to be executed.
         block: &Block,
         block_window: Option<&OrderedBlockWindow>,
+        executed_transactions_writer: Arc<dyn ExecutedTransactionsWriter>,
         // The parent block id.
         parent_block_id: HashValue,
         randomness: Option<Randomness>,
@@ -280,6 +281,7 @@ impl StateComputer for ExecutionProxy {
             .queue(
                 block.clone(),
                 block_window.cloned(),
+                executed_transactions_writer.clone(),
                 metadata.clone(),
                 parent_block_id,
                 block_qc,
@@ -294,8 +296,16 @@ impl StateComputer for ExecutionProxy {
         counters::PIPELINE_ENTRY_TO_INSERTED_TIME.observe_duration(pipeline_entry_time.elapsed());
         let pipeline_inserted_timestamp = Instant::now();
 
+        executed_transactions_writer.init();
         Box::pin(async move {
-            let pipeline_execution_result = fut.await?;
+            let pipeline_execution_result = match fut.await {
+                Ok(result) => result,
+                Err(e) => {
+                    error!(error = ?e, "Failed to execute block in pipeline");
+                    executed_transactions_writer.cancel();
+                    return Err(e);
+                },
+            };
             debug!(
                 block_id = block_id,
                 "Got state compute result, post processing."
@@ -514,6 +524,7 @@ async fn test_commit_sync_race() {
     };
     use aptos_config::config::transaction_filter_type::Filter;
     use aptos_consensus_notifications::Error;
+    use aptos_executor_types::transactions_with_output::TransactionsWithOutput;
     use aptos_infallible::Mutex;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
@@ -552,7 +563,7 @@ async fn test_commit_sync_race() {
             _block: ExecutableBlock,
             _parent_block_id: HashValue,
             _onchain_config: BlockExecutorConfigFromOnchain,
-        ) -> ExecutorResult<()> {
+        ) -> ExecutorResult<TransactionsWithOutput> {
             todo!()
         }
 

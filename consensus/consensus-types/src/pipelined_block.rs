@@ -221,6 +221,8 @@ pub struct PipelinedBlock {
     pipeline_abort_handle: Arc<Mutex<Option<Vec<AbortHandle>>>>,
     #[derivative(PartialEq = "ignore")]
     block_qc: Arc<Mutex<Option<Arc<QuorumCert>>>>,
+    #[derivative(PartialEq = "ignore")]
+    executed_transactions: Arc<ExecutedTransactions>,
 }
 
 impl Serialize for PipelinedBlock {
@@ -407,6 +409,7 @@ impl PipelinedBlock {
             pipeline_tx: Arc::new(Mutex::new(None)),
             pipeline_abort_handle: Arc::new(Mutex::new(None)),
             block_qc: Arc::new(Mutex::new(None)),
+            executed_transactions: Arc::new(ExecutedTransactions::new()),
         }
     }
 
@@ -416,6 +419,15 @@ impl PipelinedBlock {
         Self {
             block_window: window,
             ..Self::new(block, input_transactions, state_compute_result)
+        }
+    }
+
+    pub fn new_recovered(block: Block, executed_transactions: Vec<HashValue>) -> Self {
+        Self {
+            executed_transactions: Arc::new(ExecutedTransactions::new_with_transactions(
+                executed_transactions,
+            )),
+            ..Self::new(block, vec![], StateComputeResult::new_dummy())
         }
     }
 
@@ -525,6 +537,14 @@ impl PipelinedBlock {
     pub fn qc(&self) -> Option<Arc<QuorumCert>> {
         self.block_qc.lock().clone()
     }
+
+    pub fn executed_transactions_reader(&self) -> Arc<dyn ExecutedTransactionsReader> {
+        self.executed_transactions.clone()
+    }
+
+    pub fn executed_transactions_writer(&self) -> Arc<dyn ExecutedTransactionsWriter> {
+        self.executed_transactions.clone()
+    }
 }
 
 /// Pipeline related functions
@@ -606,4 +626,108 @@ pub struct ExecutionSummary {
     pub execution_time: Duration,
     pub root_hash: HashValue,
     pub gas_used: Option<u64>,
+}
+
+pub trait ExecutedTransactionsReader: Sync + Send {
+    fn wait(&self) -> ExecutorResult<Arc<Vec<HashValue>>>;
+}
+
+pub trait ExecutedTransactionsWriter: Sync + Send {
+    fn init(&self);
+    fn set(&self, transactions: Vec<HashValue>);
+    fn cancel(&self);
+}
+
+pub struct ExecutedTransactions {
+    inner: Mutex<ExecutedTransactionsInner>,
+}
+
+impl ExecutedTransactions {
+    pub fn new() -> Self {
+        Self {
+            inner: Mutex::new(ExecutedTransactionsInner {
+                transactions: None,
+                tx: None,
+                is_cancelled: false,
+            }),
+        }
+    }
+
+    pub fn new_with_transactions(transactions: Vec<HashValue>) -> Self {
+        Self {
+            inner: Mutex::new(ExecutedTransactionsInner {
+                transactions: Some(Arc::new(transactions)),
+                tx: None,
+                is_cancelled: false,
+            }),
+        }
+    }
+}
+
+impl ExecutedTransactionsReader for ExecutedTransactions {
+    fn wait(&self) -> ExecutorResult<Arc<Vec<HashValue>>> {
+        let mut inner = self.inner.lock();
+        if inner.is_cancelled {
+            return Err(ExecutorError::InternalError {
+                error: "Execution was cancelled".to_string(),
+            });
+        }
+        if let Some(transactions) = &inner.transactions {
+            return Ok(transactions.clone());
+        }
+
+        assert!(inner.tx.is_none());
+        let (tx, rx) = oneshot::channel();
+        inner.tx = Some(tx);
+        drop(inner);
+
+        match rx.blocking_recv() {
+            Ok(received) => received,
+            Err(e) => Err(ExecutorError::InternalError {
+                error: format!("Failed to receive executed transactions: {}", e),
+            }),
+        }
+    }
+}
+
+impl ExecutedTransactionsWriter for ExecutedTransactions {
+    fn init(&self) {
+        let mut inner = self.inner.lock();
+        assert!(inner.tx.is_none());
+        inner.is_cancelled = false;
+    }
+
+    fn set(&self, transactions: Vec<HashValue>) {
+        let mut inner = self.inner.lock();
+        inner.is_cancelled = false;
+        let transactions = Arc::new(transactions);
+        inner.transactions = Some(transactions.clone());
+        if let Some(tx) = inner.tx.take() {
+            drop(inner);
+            let _ = tx.send(Ok(transactions));
+        }
+    }
+
+    fn cancel(&self) {
+        let mut inner = self.inner.lock();
+        inner.is_cancelled = true;
+        if let Some(tx) = inner.tx.take() {
+            drop(inner);
+            let _ = tx.send(Err(ExecutorError::InternalError {
+                error: "Execution was cancelled".to_string(),
+            }));
+        }
+    }
+}
+
+impl Default for ExecutedTransactions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+struct ExecutedTransactionsInner {
+    pub transactions: Option<Arc<Vec<HashValue>>>,
+    pub tx: Option<oneshot::Sender<ExecutorResult<Arc<Vec<HashValue>>>>>,
+    pub is_cancelled: bool,
 }
