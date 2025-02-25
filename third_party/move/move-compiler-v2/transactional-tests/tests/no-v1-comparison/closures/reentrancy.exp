@@ -1,0 +1,15 @@
+processed 5 tasks
+
+task 3 'run'. lines 45-45:
+return values: true
+
+task 4 'run'. lines 47-47:
+Error: Function execution failed with VMError: {
+    message: Resource `0x42::caller::R` cannot be accessed because of active reentrancy of defining module.,
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x42::caller,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 3)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000042, name: Identifier("callee") }), FunctionDefinitionIndex(0), 2), (Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000042, name: Identifier("caller") }), FunctionDefinitionIndex(1), 5)] }),
+}

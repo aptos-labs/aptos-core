@@ -266,8 +266,8 @@ pub fn run_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
         let data = bytecode_generator::generate_bytecode(env, id);
         targets.insert_target_data(&id, FunctionVariant::Baseline, data);
         for callee in func_env
-            .get_called_functions()
-            .expect("called functions available")
+            .get_used_functions()
+            .expect("used functions available")
         {
             if !done.contains(callee) {
                 todo.insert(*callee);

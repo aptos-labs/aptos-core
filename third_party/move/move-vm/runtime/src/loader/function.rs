@@ -22,6 +22,7 @@ use move_core_types::{
     ability::{Ability, AbilitySet},
     function::ClosureMask,
     identifier::{IdentStr, Identifier},
+    language_storage,
     language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
     vm_status::StatusCode,
@@ -312,6 +313,14 @@ impl LoadedFunction {
         match &self.owner {
             LoadedFunctionOwner::Module(m) => Some(Module::self_id(m)),
             LoadedFunctionOwner::Script(_) => None,
+        }
+    }
+
+    /// Returns the module id or, if it is a script, the pseudo module id for scripts.
+    pub fn module_or_script_id(&self) -> &ModuleId {
+        match &self.owner {
+            LoadedFunctionOwner::Module(m) => Module::self_id(m),
+            LoadedFunctionOwner::Script(_) => language_storage::pseudo_script_module_id(),
         }
     }
 
