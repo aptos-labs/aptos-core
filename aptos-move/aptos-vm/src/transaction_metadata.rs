@@ -73,7 +73,7 @@ impl TransactionMetadata {
             },
             num_keyless_authenticators: aptos_types::keyless::get_authenticators(txn)
                 .map(|res| res.len())
-                .unwrap_or(0),
+                .unwrap_or(0) as u8,
             entry_function_payload: match txn.payload() {
                 TransactionPayload::EntryFunction(e) => Some(e.clone()),
                 _ => None,
@@ -146,7 +146,7 @@ impl TransactionMetadata {
     }
 
     pub fn is_keyless(&self) -> bool {
-        self.is_keyless
+        self.num_keyless_authenticators > 0
     }
 
     pub fn entry_function_payload(&self) -> Option<EntryFunction> {

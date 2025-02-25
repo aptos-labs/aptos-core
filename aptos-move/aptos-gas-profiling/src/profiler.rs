@@ -656,8 +656,8 @@ where
         res
     }
 
-    fn charge_keyless(&mut self) -> VMResult<()> {
-        let (_cost, res) = self.delegate_charge(|base| base.charge_keyless());
+    fn charge_keyless(&mut self, num_authenticators: u8) -> VMResult<()> {
+        let (_cost, res) = self.delegate_charge(|base| base.charge_keyless(num_authenticators));
 
         // TODO: add keyless
 

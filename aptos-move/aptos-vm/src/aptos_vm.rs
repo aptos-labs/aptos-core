@@ -983,8 +983,8 @@ impl AptosVM {
         });
 
         gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
-        for _ in 0..txn_data.num_keyless_authenticators {
-            gas_meter.charge_keyless()?;
+        if txn_data.num_keyless_authenticators > 0 {
+            gas_meter.charge_keyless(txn_data.num_keyless_authenticators)?;
         }
 
         match payload {
@@ -1204,8 +1204,8 @@ impl AptosVM {
         });
 
         gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
-        if txn_data.is_keyless() {
-            gas_meter.charge_keyless()?;
+        if txn_data.num_keyless_authenticators > 0 {
+            gas_meter.charge_keyless(txn_data.num_keyless_authenticators)?;
         }
 
         // Step 1: Obtain the payload. If any errors happen here, the entire transaction should fail
