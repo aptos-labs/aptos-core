@@ -103,6 +103,13 @@ pub struct NativeContext<'a, 'b, 'c> {
     extensions: &'a mut NativeContextExtensions<'b>,
     gas_balance: InternalGas,
     traversal_context: &'a TraversalContext<'a>,
+
+    /// Counter used to record the (conceptual) heap memory usage by a native functions,
+    /// measured in abstract memory unit.
+    ///
+    /// This is a hack to emulate memory usage tracking, before we could refactor native functions
+    /// and allow them to access the gas meter directly.
+    heap_memory_usage: u64,
 }
 
 impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
@@ -121,6 +128,8 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
             extensions,
             gas_balance,
             traversal_context,
+
+            heap_memory_usage: 0,
         }
     }
 }
@@ -192,6 +201,14 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
 
     pub fn gas_balance(&self) -> InternalGas {
         self.gas_balance
+    }
+
+    pub fn use_heap_memory(&mut self, amount: u64) {
+        self.heap_memory_usage = self.heap_memory_usage.saturating_add(amount);
+    }
+
+    pub fn heap_memory_usage(&self) -> u64 {
+        self.heap_memory_usage
     }
 
     pub fn traversal_context(&self) -> &TraversalContext {

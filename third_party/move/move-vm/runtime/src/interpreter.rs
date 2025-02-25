@@ -755,6 +755,8 @@ impl InterpreterImpl {
 
         let result = native_function(&mut native_context, ty_args.to_vec(), args)?;
 
+        gas_meter.charge_heap_memory(native_context.heap_memory_usage())?;
+
         // Note(Gas): The order by which gas is charged / error gets returned MUST NOT be modified
         //            here or otherwise it becomes an incompatible change!!!
         match result {
