@@ -15,7 +15,7 @@ use anyhow::{anyhow, Result};
 use aptos_consensus_types::{
     block::Block,
     pipeline_execution_result::PipelineExecutionResult,
-    pipelined_block::{OrderedBlockWindow, PipelinedBlock},
+    pipelined_block::{ExecutedTransactionsWriter, OrderedBlockWindow, PipelinedBlock},
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
@@ -127,6 +127,7 @@ impl StateComputer for RandomComputeResultStateComputer {
         &self,
         _block: &Block,
         _block_window: Option<&OrderedBlockWindow>,
+        _executed_transactions_writer: Arc<dyn ExecutedTransactionsWriter>,
         parent_block_id: HashValue,
         _randomness: Option<Randomness>,
         _block_qc: Option<Arc<QuorumCert>>,
