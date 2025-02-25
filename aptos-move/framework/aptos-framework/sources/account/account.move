@@ -337,7 +337,11 @@ module aptos_framework::account {
 
     #[view]
     public fun get_authentication_key(addr: address): vector<u8> acquires Account {
-        borrow_global<Account>(addr).authentication_key
+        if (resource_exists_at(addr)) {
+            borrow_global<Account>(addr).authentication_key
+        } else {
+            bcs::to_bytes(&addr)
+        }
     }
 
     /// This function is used to rotate a resource account's authentication key to `new_auth_key`. This is done in

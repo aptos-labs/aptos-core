@@ -134,10 +134,10 @@ module aptos_framework::transaction_validation {
                     // Question[Orderless]: Skipping this check when transaction sender is a stateless account. Is it okay?
                     // TODO[Orderless]: For some reason, this test is failing for stateless accounts. Need to investigate.
                     // if (account::exists_at(transaction_sender)) {
-                    //     assert!(
-                    //         txn_authentication_key == option::some(account::get_authentication_key(transaction_sender)),
-                    //         error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
-                    //     );
+                        assert!(
+                            txn_authentication_key == option::some(account::get_authentication_key(transaction_sender)),
+                            error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
+                        );
                     // }
                 }
                 else {
@@ -204,13 +204,13 @@ module aptos_framework::transaction_validation {
         };
 
         // TODO[Orderless]: For some reason, this test is failing of nonce based transactions. Need to investigate
-        // if (!features::transaction_simulation_enhancement_enabled() ||
-        //         !skip_auth_key_check(is_simulation, &txn_authentication_key)) {
-        //     assert!(
-        //         txn_authentication_key == option::some(bcs::to_bytes(&sender)),
-        //         error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
-        //     );
-        // }
+        if (!features::transaction_simulation_enhancement_enabled() ||
+                !skip_auth_key_check(is_simulation, &txn_authentication_key)) {
+            assert!(
+                txn_authentication_key == option::some(bcs::to_bytes(&sender)),
+                error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
+            );
+        }
     }
 
 
