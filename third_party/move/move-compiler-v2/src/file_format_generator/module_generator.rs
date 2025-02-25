@@ -367,16 +367,17 @@ impl ModuleGenerator {
                     ReferenceKind::Mutable => FF::SignatureToken::MutableReference(target_ty),
                 }
             },
-            Fun(_param_ty, _result_ty, _abilities) => {
-                // TODO(LAMBDA)
-                ctx.error(
-                    loc,
-                    format!(
-                        "Unimplemented type: {}",
-                        ty.display(&ctx.env.get_type_display_ctx())
-                    ),
-                );
-                FF::SignatureToken::Bool
+            Fun(param_ty, result_ty, abilities) => {
+                let list = |gen: &mut ModuleGenerator, ts: Vec<Type>| {
+                    ts.into_iter()
+                        .map(|t| gen.signature_token(ctx, loc, &t))
+                        .collect_vec()
+                };
+                FF::SignatureToken::Function(
+                    list(self, param_ty.clone().flatten()),
+                    list(self, result_ty.clone().flatten()),
+                    *abilities,
+                )
             },
             TypeDomain(_) | ResourceDomain(_, _, _) | Error | Var(_) => {
                 ctx.internal_error(
@@ -1077,7 +1078,7 @@ impl<'env> ModuleContext<'env> {
                 if fun.is_inline() {
                     continue;
                 }
-                if let Some(callees) = fun.get_used_functions() {
+                if let Some(callees) = fun.get_called_functions() {
                     let mut usage = usage_map[&fun.get_id()].clone();
                     let count = usage.len();
                     // Extend usage by that of callees from the same module. Acquires is only

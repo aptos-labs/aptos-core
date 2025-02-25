@@ -73,7 +73,7 @@ pub fn set_aptos_vm_configurations(node_config: &NodeConfig) {
     }
 }
 
-pub fn ensure_max_open_files_limit(required: u64) {
+pub fn ensure_max_open_files_limit(required: u64, assert_success: bool) {
     if required == 0 {
         return;
     }
@@ -118,7 +118,14 @@ pub fn ensure_max_open_files_limit(required: u64) {
         rlimit::Resource::NOFILE
             .set(required, hard)
             .unwrap_or_else(|err| {
-                panic!("Failed raising RLIMIT_NOFILE soft limit to {required}. Error: {err}")
+                let msg = format!("RLIMIT_NOFILE soft limit is {soft}, configured requirement is {required}, and \
+                    failed to raise to it. Please make sure that `limit -n` shows a number larger than \
+                    {required} before starting the node. Error: {err}.");
+                if assert_success {
+                    panic!("{}", msg)
+                } else {
+                    error!("{}", msg)
+                }
             });
     }
 }

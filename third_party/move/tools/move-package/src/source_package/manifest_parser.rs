@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::layout::SourcePackageLayout;
-use crate::{package_hooks, source_package::parsed_manifest as PM, Architecture};
+use crate::{package_hooks, source_package::parsed_manifest as PM};
 use anyhow::{bail, format_err, Context, Result};
 use move_command_line_common::env::MOVE_HOME;
 use move_core_types::account_address::{AccountAddress, AccountAddressParseError};
@@ -197,13 +197,12 @@ pub fn parse_dependencies(tval: TV) -> Result<PM::Dependencies> {
 pub fn parse_build_info(tval: TV) -> Result<PM::BuildInfo> {
     match tval {
         TV::Table(mut table) => {
-            warn_if_unknown_field_names(&table, &["language_version", "arch"]);
+            warn_if_unknown_field_names(&table, &["language_version"]);
             Ok(PM::BuildInfo {
                 language_version: table
                     .remove("language_version")
                     .map(parse_version)
                     .transpose()?,
-                architecture: table.remove("arch").map(parse_architecture).transpose()?,
             })
         },
         x => bail!(
@@ -504,10 +503,6 @@ fn parse_version(tval: TV) -> Result<PM::Version> {
             .parse::<u64>()
             .context("Invalid bugfix version")?,
     ))
-}
-
-fn parse_architecture(tval: TV) -> Result<Architecture> {
-    Architecture::try_parse_from_str(tval.as_str().unwrap())
 }
 
 fn parse_digest(tval: TV) -> Result<PM::PackageDigest> {

@@ -19,7 +19,7 @@ module aptos_framework::coin {
     use aptos_framework::fungible_asset::{Self, FungibleAsset, Metadata, MintRef, TransferRef, BurnRef};
     use aptos_framework::object::{Self, Object, object_address};
     use aptos_framework::primary_fungible_store;
-    use aptos_std::type_info::{Self, TypeInfo, type_name};
+    use aptos_std::type_info::{Self, TypeInfo};
     use aptos_framework::create_signer;
 
     friend aptos_framework::aptos_coin;
@@ -113,7 +113,7 @@ module aptos_framework::coin {
     //
 
     const MAX_COIN_NAME_LENGTH: u64 = 32;
-    const MAX_COIN_SYMBOL_LENGTH: u64 = 10;
+    const MAX_COIN_SYMBOL_LENGTH: u64 = 32;
 
     /// Core data structures
 
@@ -862,16 +862,10 @@ module aptos_framework::coin {
                 !coin_store.frozen,
                 error::permission_denied(EFROZEN),
             );
-            if (std::features::module_event_migration_enabled()) {
-                event::emit(
-                    CoinDeposit { coin_type: type_name<CoinType>(), account: account_addr, amount: coin.value }
-                );
-            } else {
                 event::emit_event<DepositEvent>(
                     &mut coin_store.deposit_events,
                     DepositEvent { amount: coin.value },
                 );
-            };
             merge(&mut coin_store.coin, coin);
         } else {
             let metadata = paired_metadata<CoinType>();
@@ -1153,18 +1147,10 @@ module aptos_framework::coin {
                 !coin_store.frozen,
                 error::permission_denied(EFROZEN),
             );
-            if (std::features::module_event_migration_enabled()) {
-                event::emit(
-                    CoinWithdraw {
-                        coin_type: type_name<CoinType>(), account: account_addr, amount: coin_amount_to_withdraw
-                    }
-                );
-            } else {
-                event::emit_event<WithdrawEvent>(
-                    &mut coin_store.withdraw_events,
-                    WithdrawEvent { amount: coin_amount_to_withdraw },
-                );
-            };
+            event::emit_event<WithdrawEvent>(
+                &mut coin_store.withdraw_events,
+                WithdrawEvent { amount: coin_amount_to_withdraw },
+            );
             extract(&mut coin_store.coin, coin_amount_to_withdraw)
         } else {
             zero()
@@ -1792,7 +1778,6 @@ module aptos_framework::coin {
             !coin_store.frozen,
             error::permission_denied(EFROZEN),
         );
-
         event::emit_event<DepositEvent>(
             &mut coin_store.deposit_events,
             DepositEvent { amount: coin.value },

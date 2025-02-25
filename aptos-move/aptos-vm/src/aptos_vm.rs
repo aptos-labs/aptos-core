@@ -1930,7 +1930,15 @@ impl AptosVM {
                     function_info,
                     auth_data,
                 }) => {
-                    if self.features().is_account_abstraction_enabled() {
+                    let enabled = match auth_data {
+                        AbstractionAuthData::V1 { .. } => {
+                            self.features().is_account_abstraction_enabled()
+                        },
+                        AbstractionAuthData::DomainV1 { .. } => {
+                            self.features().is_domain_account_abstraction_enabled()
+                        },
+                    };
+                    if enabled {
                         dispatchable_authenticate(
                             session,
                             gas_meter,
@@ -1962,7 +1970,15 @@ impl AptosVM {
                     function_info,
                     auth_data,
                 } => {
-                    if self.features().is_account_abstraction_enabled() {
+                    let enabled = match auth_data {
+                        AbstractionAuthData::V1 { .. } => {
+                            self.features().is_account_abstraction_enabled()
+                        },
+                        AbstractionAuthData::DomainV1 { .. } => {
+                            self.features().is_domain_account_abstraction_enabled()
+                        },
+                    };
+                    if enabled {
                         dispatchable_authenticate(
                             session,
                             gas_meter,

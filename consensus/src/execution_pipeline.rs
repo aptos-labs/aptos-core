@@ -401,6 +401,7 @@ struct ExecuteBlockCommand {
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
     command_creation_time: Instant,
     lifetime_guard: CountedRequest<()>,
+    #[allow(dead_code)]
     shuffler: Arc<dyn TransactionShuffler>,
 }
 
@@ -439,6 +440,7 @@ fn log_failed_to_send_result<T>(
                 e,
                 &counters::PIPELINE_DISCARDED_EXECUTOR_ERROR_COUNT,
                 block_id,
+                false,
             );
         }
     }

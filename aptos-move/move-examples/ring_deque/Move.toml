@@ -1,0 +1,9 @@
+[package]
+name = "RingDeque"
+version = "0.0.0"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
+
+[addresses]
+ring_deque = "_"

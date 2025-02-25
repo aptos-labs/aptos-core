@@ -1134,6 +1134,7 @@ pub fn log_executor_error_occurred(
     e: ExecutorError,
     counter: &Lazy<IntCounterVec>,
     block_id: HashValue,
+    new_pipeline_enabled: bool,
 ) {
     match e {
         ExecutorError::CouldNotGetData => {
@@ -1152,10 +1153,17 @@ pub fn log_executor_error_occurred(
         },
         e => {
             counter.with_label_values(&["UnexpectedError"]).inc();
-            error!(
-                block_id = block_id,
-                "Execution error {:?} for {}", e, block_id
-            );
+            if new_pipeline_enabled {
+                warn!(
+                    block_id = block_id,
+                    "Execution error {:?} for {}", e, block_id
+                );
+            } else {
+                error!(
+                    block_id = block_id,
+                    "Execution error {:?} for {}", e, block_id
+                );
+            }
         },
     }
 }

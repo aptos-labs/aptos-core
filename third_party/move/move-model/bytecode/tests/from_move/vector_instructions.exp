@@ -79,33 +79,23 @@ public intrinsic fun vector::swap_remove<#0>($t0|v: &mut vector<#0>, $t1|i: u64)
 
 [variant baseline]
 fun M::f() {
-     var $t0|v: vector<u8>
-     var $t1: u8
-     var $t2: u8
-     var $t3: vector<u8>
-     var $t4: &mut vector<u8>
-     var $t5: &vector<u8>
+     var $t0|$t2: vector<u8>
+     var $t1: vector<u8>
+     var $t2: &vector<u8>
+     var $t3: u64
+     var $t4: u64
+     var $t5: bool
      var $t6: u64
-     var $t7: u64
-     var $t8: bool
-     var $t9: u64
-  0: $t1 := 0
-  1: $t2 := 0
-  2: $t3 := vector::empty<u8>()
-  3: $t4 := borrow_local($t3)
-  4: vector::push_back<u8>($t4, $t1)
-  5: vector::push_back<u8>($t4, $t2)
-  6: $t0 := $t3
-  7: $t5 := borrow_local($t0)
-  8: $t6 := vector::length<u8>($t5)
-  9: $t7 := 1
- 10: $t8 := ==($t6, $t7)
- 11: if ($t8) goto 12 else goto 14
- 12: label L1
- 13: goto 17
- 14: label L0
- 15: $t9 := 0
- 16: abort($t9)
- 17: label L2
- 18: return ()
+  0: $t1 := [0, 0]
+  1: $t0 := $t1
+  2: $t2 := borrow_local($t0)
+  3: $t3 := vector::length<u8>($t2)
+  4: $t4 := 1
+  5: $t5 := ==($t3, $t4)
+  6: if ($t5) goto 7 else goto 9
+  7: label L1
+  8: return ()
+  9: label L0
+ 10: $t6 := 0
+ 11: abort($t6)
 }
