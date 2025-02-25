@@ -29,7 +29,7 @@ use std::{
     },
     time::Duration,
 };
-use tokio::sync::{mpsc::channel, RwLock};
+use tokio::sync::{mpsc::channel, RwLock, RwLockReadGuard};
 use tracing::{debug, error, info, trace, warn};
 
 struct Cache {
@@ -162,12 +162,14 @@ impl DataManager {
         }
     }
 
-    pub(crate) async fn start(&self) {
+    pub(crate) async fn start(&self, watch_file_store_version: bool) {
         info!("Starting DataManager loop.");
 
         'out: loop {
-            let mut fullnode_client = self.metadata_manager.get_fullnode_for_request();
             let cache = self.cache.read().await;
+            if watch_file_store_version {
+                self.update_file_store_version_in_cache(&cache).await;
+            }
             let request = GetTransactionsFromNodeRequest {
                 starting_version: Some(cache.start_version + cache.transactions.len() as u64),
                 transactions_count: Some(100000),
@@ -178,6 +180,7 @@ impl DataManager {
                 "Requesting transactions from fullnodes, starting_version: {}.",
                 request.starting_version.unwrap()
             );
+            let mut fullnode_client = self.metadata_manager.get_fullnode_for_request(&request);
             let response = fullnode_client.get_transactions_from_node(request).await;
             if response.is_err() {
                 warn!(
@@ -203,6 +206,9 @@ impl DataManager {
                           cache.start_version + cache.transactions.len() as u64,
                           self.metadata_manager.get_known_latest_version());
                     tokio::time::sleep(Duration::from_millis(100)).await;
+                    if watch_file_store_version {
+                        self.update_file_store_version_in_cache(&cache).await;
+                    }
                 }
                 match response_item {
                     Ok(r) => {
@@ -252,7 +258,8 @@ impl DataManager {
                         transactions_count: Some(5000),
                     };
 
-                    let mut fullnode_client = self.metadata_manager.get_fullnode_for_request();
+                    let mut fullnode_client =
+                        self.metadata_manager.get_fullnode_for_request(&request);
                     let response = fullnode_client.get_transactions_from_node(request).await?;
                     let mut response = response.into_inner();
                     while let Some(Ok(response_item)) = response.next().await {
@@ -340,5 +347,17 @@ impl DataManager {
             cache.file_store_version.load(Ordering::SeqCst),
             cache.cache_size
         )
+    }
+
+    async fn update_file_store_version_in_cache(&self, cache: &RwLockReadGuard<'_, Cache>) {
+        let file_store_version = self.file_store_reader.get_latest_version().await;
+        if let Some(file_store_version) = file_store_version {
+            let file_store_version_after_update = cache
+                .file_store_version
+                .fetch_max(file_store_version, Ordering::SeqCst);
+            if file_store_version_after_update != file_store_version {
+                panic!("File store version is going backward, data might be corrupted. {file_store_version_after_update} v.s. {file_store_version}");
+            };
+        }
     }
 }

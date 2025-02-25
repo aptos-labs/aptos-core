@@ -24,7 +24,6 @@ use aptos_sdk::types::on_chain_config::{
 };
 use aptos_testcases::{
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
-    modifiers::CpuChaosTest,
     multi_region_network_test::MultiRegionNetworkEmulationTest,
     performance_test::PerformanceBenchmark,
     two_traffics_test::TwoTrafficsTest,
@@ -504,9 +503,8 @@ pub fn wrap_with_realistic_env<T: NetworkTest + 'static>(
     num_validators: usize,
     test: T,
 ) -> CompositeNetworkTest {
-    CompositeNetworkTest::new_with_two_wrappers(
+    CompositeNetworkTest::new(
         MultiRegionNetworkEmulationTest::default_for_validator_count(num_validators),
-        CpuChaosTest::default(),
         test,
     )
 }
