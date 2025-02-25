@@ -959,7 +959,7 @@ because it's 0 for "none" or 1 for "some".
 
 
 <pre><code><b>fun</b> <a href="option.md#0x1_option_spec_none">spec_none</a>&lt;Element&gt;(): <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt; {
-   <a href="option.md#0x1_option_Option">Option</a>{ vec: vec() }
+   <a href="option.md#0x1_option_Option">Option</a>{ vec: <a href="vector.md#0x1_vector">vector</a>[] }
 }
 </code></pre>
 
@@ -1005,7 +1005,7 @@ because it's 0 for "none" or 1 for "some".
 
 
 
-<pre><code><b>aborts_if</b> <a href="vector.md#0x1_vector_length">vector::length</a>(vec) &gt; 1;
+<pre><code><b>aborts_if</b> vec.length() &gt; 1;
 </code></pre>
 
 
@@ -1033,7 +1033,7 @@ because it's 0 for "none" or 1 for "some".
 
 
 <pre><code><b>fun</b> <a href="option.md#0x1_option_spec_is_none">spec_is_none</a>&lt;Element&gt;(self: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;): bool {
-   <a href="vector.md#0x1_vector_is_empty">vector::is_empty</a>(self.vec)
+   self.vec.is_empty()
 }
 </code></pre>
 
@@ -1062,7 +1062,7 @@ because it's 0 for "none" or 1 for "some".
 
 
 <pre><code><b>fun</b> <a href="option.md#0x1_option_spec_is_some">spec_is_some</a>&lt;Element&gt;(self: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;): bool {
-   !<a href="vector.md#0x1_vector_is_empty">vector::is_empty</a>(self.vec)
+   !self.vec.is_empty()
 }
 </code></pre>
 
@@ -1091,7 +1091,7 @@ because it's 0 for "none" or 1 for "some".
 
 
 <pre><code><b>fun</b> <a href="option.md#0x1_option_spec_contains">spec_contains</a>&lt;Element&gt;(self: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;, e: Element): bool {
-   <a href="option.md#0x1_option_is_some">is_some</a>(self) && <a href="option.md#0x1_option_borrow">borrow</a>(self) == e
+   self.<a href="option.md#0x1_option_is_some">is_some</a>() && self.<a href="option.md#0x1_option_borrow">borrow</a>() == e
 }
 </code></pre>
 
