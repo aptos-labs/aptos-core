@@ -11,6 +11,8 @@ execution:
   genesis_file_location: /opt/aptos/genesis/genesis.blob
 
 storage:
+  rocksdb_configs:
+    enable_storage_sharding: true
   backup_service_address: "0.0.0.0:6186"
 
 # Configure a public and VFN network

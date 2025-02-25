@@ -38,7 +38,7 @@ use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::{
     access::ModuleAccess,
-    file_format::{Ability, AbilitySet, Constant, Visibility},
+    file_format::{Constant, Visibility},
     CompiledModule,
 };
 use move_bytecode_source_map::source_map::SourceMap;
@@ -48,6 +48,7 @@ use move_compiler::{
     parser::ast as PA,
     shared::{unique_map::UniqueMap, Identifier, Name},
 };
+use move_core_types::ability::{Ability, AbilitySet};
 use move_ir_types::{
     ast::ConstantName,
     location::{sp, Spanned},
@@ -767,6 +768,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     ) {
         let name = self.symbol_pool().make(&name.0.value);
         let (type_params, params, result_type) = self.decl_ana_signature(signature, false);
+        // Eliminate references in parameters and result type for spec functions
+        // `derive_spec_fun` does the same when generating spec functions from general move functions
+        let params = params
+            .into_iter()
+            .map(|Parameter(sym, ty, loc)| Parameter(sym, ty.skip_reference().clone(), loc))
+            .collect_vec();
+        let result_type = result_type.skip_reference().clone();
 
         // Add the function to the symbol table.
         let fun_id = SpecFunId::new(self.spec_funs.len());
@@ -911,7 +919,14 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 /// # Definition Analysis
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
-    pub fn check_language_version(&self, loc: &Loc, feature: &str, version_min: LanguageVersion) {
+    /// Returns `true` if language version is ok. Otherwise,
+    /// issues an error message and returns `false`.
+    pub fn test_language_version(
+        &self,
+        loc: &Loc,
+        feature: &str,
+        version_min: LanguageVersion,
+    ) -> bool {
         if !self.parent.env.language_version().is_at_least(version_min) {
             self.parent.env.error(
                 loc,
@@ -919,7 +934,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     "not supported before language version `{}`: {}",
                     version_min, feature
                 ),
-            )
+            );
+            false
+        } else {
+            true
         }
     }
 
@@ -1005,11 +1023,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 if !self.parent.const_table.contains_key(&qsym) {
                     continue;
                 }
-                self.check_language_version(
+                if !self.test_language_version(
                     &loc,
                     "constant definitions referring to other constants",
                     LanguageVersion::V2_0,
-                );
+                ) {
+                    continue;
+                }
                 if visited.contains(&const_name) {
                     continue;
                 }
@@ -1532,10 +1552,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
             }
             et.enter_scope();
-            let is_lang_version_2 = et.env().language_version.is_at_least(LanguageVersion::V2_0);
+            let is_lang_version_2_1 = et.env().language_version.is_at_least(LanguageVersion::V2_1);
             for (idx, Parameter(n, ty, loc)) in params.iter().enumerate() {
                 let symbol_pool = et.parent.parent.env.symbol_pool();
-                if !is_lang_version_2 || symbol_pool.string(*n).as_ref() != "_" {
+                if !is_lang_version_2_1 || symbol_pool.string(*n).as_ref() != "_" {
                     et.define_local(loc, *n, ty.clone(), None, Some(idx));
                 }
             }
@@ -2578,7 +2598,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 let translated =
                     et.translate_seq(&loc, seq, &result_type, &ErrorMessageContext::Return);
                 et.finalize_types();
-                self.spec_funs[self.spec_fun_index].body = Some(translated.into_exp());
+                let translated = et.post_process_body(translated.into_exp());
+                self.spec_funs[self.spec_fun_index].body = Some(translated);
             },
             EA::FunctionBody_::Native => {
                 if !uninterpreted {
@@ -2627,10 +2648,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     ) {
         // Type check and translate lhs and rhs. They must have the same type.
         let mut et = self.exp_translator_for_context(loc, context, &ConditionKind::Requires);
-        let (expected_ty, lhs) = et.translate_exp_free(lhs);
-        let rhs = et.translate_exp(rhs, &expected_ty);
+        let (expected_ty, translated_lhs) = et.translate_exp_free(lhs);
+        let translated_rhs = et.translate_exp(rhs, &expected_ty);
         et.finalize_types();
-        if lhs.extract_ghost_mem_access(self.parent.env).is_some() {
+        if translated_lhs
+            .extract_ghost_mem_access(self.parent.env)
+            .is_some()
+        {
             // Add as a condition to the context.
             self.add_conditions_to_context(
                 context,
@@ -2639,15 +2663,15 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     loc: loc.clone(),
                     kind: ConditionKind::Update,
                     properties: Default::default(),
-                    exp: rhs.into_exp(),
-                    additional_exps: vec![lhs.into_exp()],
+                    exp: translated_rhs.into_exp(),
+                    additional_exps: vec![translated_lhs.into_exp()],
                 }],
                 PropertyBag::default(),
                 "",
             );
         } else {
             self.parent.error(
-                &self.parent.env.get_node_loc(lhs.node_id()),
+                &self.parent.env.get_node_loc(translated_lhs.node_id()),
                 "target of `update` restricted to specification variables",
             )
         }
@@ -3719,6 +3743,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let spec = self.fun_specs.remove(&name.symbol).unwrap_or_default();
             let def = self.fun_defs.remove(&name.symbol);
             let called_funs = Some(def.as_ref().map(|e| e.called_funs()).unwrap_or_default());
+            let used_funs = Some(def.as_ref().map(|e| e.used_funs()).unwrap_or_default());
             let access_specifiers = self.fun_access_specifiers.remove(&name.symbol);
             let fun_id = FunId::new(name.symbol);
             let data = FunctionData {
@@ -3744,6 +3769,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 called_funs,
                 calling_funs: RefCell::default(),
                 transitive_closure_of_called_funs: RefCell::default(),
+                used_funs,
+                using_funs: RefCell::default(),
+                transitive_closure_of_used_funs: RefCell::default(),
             };
             function_data.insert(fun_id, data);
         }

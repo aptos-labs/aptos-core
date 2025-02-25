@@ -46,7 +46,7 @@ pub use self::{
     consensus_config::{
         AnchorElectionMode, ConsensusAlgorithmConfig, ConsensusConfigV1, DagConsensusConfigV1,
         LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig, ProposerElectionType,
-        ValidatorTxnConfig,
+        ValidatorTxnConfig, DEFAULT_WINDOW_SIZE,
     },
     execution_config::{
         BlockGasLimitType, ExecutionConfigV1, ExecutionConfigV2, ExecutionConfigV4,
@@ -238,6 +238,7 @@ pub fn struct_tag_for_config(config_id: ConfigID) -> StructTag {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ConfigurationResource {
     epoch: u64,
+    /// Unix epoch timestamp (in microseconds) of the last reconfiguration time.
     last_reconfiguration_time: u64,
     events: EventHandle,
 }
@@ -247,7 +248,8 @@ impl ConfigurationResource {
         self.epoch
     }
 
-    pub fn last_reconfiguration_time(&self) -> u64 {
+    /// Return the last Unix epoch timestamp (in microseconds) of the last reconfiguration time.
+    pub fn last_reconfiguration_time_micros(&self) -> u64 {
         self.last_reconfiguration_time
     }
 
@@ -267,6 +269,11 @@ impl ConfigurationResource {
             last_reconfiguration_time,
             events,
         }
+    }
+
+    #[cfg(feature = "fuzzing")]
+    pub fn set_last_reconfiguration_time_for_test(&mut self, last_reconfiguration_time: u64) {
+        self.last_reconfiguration_time = last_reconfiguration_time;
     }
 }
 

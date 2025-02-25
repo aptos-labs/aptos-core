@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::bail;
-use move_binary_format::file_format_common::{VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2};
-use move_command_line_common::{
-    env,
-    env::{get_move_compiler_v2_from_env, read_bool_env_var},
+use move_binary_format::file_format_common::{
+    VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2, VERSION_MAX,
 };
+use move_command_line_common::{env, env::get_move_compiler_v1_from_env};
 use move_compiler::shared::LanguageVersion as CompilerLanguageVersion;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -17,6 +16,10 @@ use std::{
 };
 
 const UNSTABLE_MARKER: &str = "-unstable";
+pub const LATEST_STABLE_LANGUAGE_VERSION_VALUE: LanguageVersion = LanguageVersion::V2_1;
+pub const LATEST_STABLE_COMPILER_VERSION_VALUE: CompilerVersion = CompilerVersion::V2_0;
+pub const LATEST_STABLE_LANGUAGE_VERSION: &str = LATEST_STABLE_LANGUAGE_VERSION_VALUE.to_str();
+pub const LATEST_STABLE_COMPILER_VERSION: &str = LATEST_STABLE_COMPILER_VERSION_VALUE.to_str();
 
 pub static COMPILATION_METADATA_KEY: &[u8] = "compilation_metadata".as_bytes();
 
@@ -89,11 +92,11 @@ pub enum CompilerVersion {
 impl Default for CompilerVersion {
     /// We allow the default to be set via an environment variable.
     fn default() -> Self {
-        static MOVE_COMPILER_V2: Lazy<bool> = Lazy::new(get_move_compiler_v2_from_env);
-        if *MOVE_COMPILER_V2 {
-            Self::V2_0
-        } else {
+        static MOVE_COMPILER_V1: Lazy<bool> = Lazy::new(get_move_compiler_v1_from_env);
+        if *MOVE_COMPILER_V1 {
             Self::V1
+        } else {
+            Self::latest_stable()
         }
     }
 }
@@ -146,13 +149,13 @@ impl CompilerVersion {
     }
 
     /// The latest compiler version.
-    pub fn latest() -> Self {
+    pub const fn latest() -> Self {
         CompilerVersion::V2_1
     }
 
     /// The latest stable compiler version.
-    pub fn latest_stable() -> Self {
-        CompilerVersion::V2_0
+    pub const fn latest_stable() -> Self {
+        LATEST_STABLE_COMPILER_VERSION_VALUE
     }
 
     /// Check whether the compiler version supports the given language version,
@@ -167,6 +170,23 @@ impl CompilerVersion {
                 }
             },
             _ => Ok(()),
+        }
+    }
+
+    /// Infer the latest stable language version based on the compiler version
+    pub fn infer_stable_language_version(&self) -> LanguageVersion {
+        if *self == CompilerVersion::V1 {
+            LanguageVersion::V1
+        } else {
+            LanguageVersion::latest_stable()
+        }
+    }
+
+    pub const fn to_str(&self) -> &'static str {
+        match self {
+            CompilerVersion::V1 => "1",
+            CompilerVersion::V2_0 => "2.0",
+            CompilerVersion::V2_1 => "2.1",
         }
     }
 }
@@ -196,13 +216,18 @@ pub enum LanguageVersion {
     V2_2,
 }
 
+impl LanguageVersion {
+    /// Leave this symbolic for now in case of more versions.
+    pub const V2_LAMBDA: Self = Self::V2_2;
+}
+
 impl Default for LanguageVersion {
     fn default() -> Self {
-        static MOVE_LANGUAGE_V2: Lazy<bool> = Lazy::new(|| read_bool_env_var("MOVE_LANGUAGE_V2"));
-        if *MOVE_LANGUAGE_V2 {
-            Self::latest_stable()
-        } else {
+        static MOVE_COMPILER_V1: Lazy<bool> = Lazy::new(get_move_compiler_v1_from_env);
+        if *MOVE_COMPILER_V1 {
             Self::V1
+        } else {
+            Self::latest_stable()
         }
     }
 }
@@ -241,7 +266,7 @@ impl From<LanguageVersion> for CompilerLanguageVersion {
 impl LanguageVersion {
     /// Whether the language version is unstable. An unstable version
     /// should not be allowed on production networks.
-    pub fn unstable(self) -> bool {
+    pub const fn unstable(self) -> bool {
         use LanguageVersion::*;
         match self {
             V1 | V2_0 | V2_1 => false,
@@ -250,13 +275,13 @@ impl LanguageVersion {
     }
 
     /// The latest language version.
-    pub fn latest() -> Self {
+    pub const fn latest() -> Self {
         LanguageVersion::V2_2
     }
 
     /// The latest stable language version.
-    pub fn latest_stable() -> Self {
-        LanguageVersion::V2_1
+    pub const fn latest_stable() -> Self {
+        LATEST_STABLE_LANGUAGE_VERSION_VALUE
     }
 
     /// Whether the language version is equal to greater than `ver`
@@ -271,8 +296,17 @@ impl LanguageVersion {
             LanguageVersion::V1 => VERSION_DEFAULT,
             LanguageVersion::V2_0 => VERSION_DEFAULT_LANG_V2,
             LanguageVersion::V2_1 => VERSION_DEFAULT_LANG_V2,
-            LanguageVersion::V2_2 => VERSION_DEFAULT_LANG_V2, // Update once we have v8 bytecode
+            LanguageVersion::V2_2 => VERSION_MAX,
         })
+    }
+
+    pub const fn to_str(&self) -> &'static str {
+        match self {
+            LanguageVersion::V1 => "1",
+            LanguageVersion::V2_0 => "2.0",
+            LanguageVersion::V2_1 => "2.1",
+            LanguageVersion::V2_2 => "2.2",
+        }
     }
 }
 

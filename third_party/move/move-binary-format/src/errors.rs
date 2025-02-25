@@ -16,6 +16,23 @@ pub type VMResult<T> = ::std::result::Result<T, VMError>;
 pub type BinaryLoaderResult<T> = ::std::result::Result<T, PartialVMError>;
 pub type PartialVMResult<T> = ::std::result::Result<T, PartialVMError>;
 
+/// This macro is used to panic while debugging fuzzing crashes obtaining the right stack trace.
+/// e.g. DEBUG_VM_STATUS=ABORTED,UNKNOWN_INVARIANT_VIOLATION_ERROR ./fuzz.sh run move_aptosvm_publish_and_run <testcase>
+/// third_party/move/move-core/types/src/vm_status.rs:506 for the list of status codes.
+#[cfg(feature = "fuzzing")]
+macro_rules! fuzzing_maybe_panic {
+    ($major_status:expr, $message:expr) => {{
+        if let Ok(debug_statuses) = std::env::var("DEBUG_VM_STATUS") {
+            if debug_statuses
+                .split(',')
+                .any(|s| s.trim() == format!("{:?}", $major_status))
+            {
+                panic!("PartialVMError: {:?} {:?}", $major_status, $message);
+            }
+        }
+    }};
+}
+
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Location {
     Undefined,
@@ -438,6 +455,10 @@ impl PartialVMError {
         } else {
             None
         };
+
+        #[cfg(feature = "fuzzing")]
+        fuzzing_maybe_panic!(major_status, message);
+
         Self(Box::new(PartialVMError_ {
             major_status,
             sub_status: None,
@@ -446,6 +467,10 @@ impl PartialVMError {
             indices: vec![],
             offsets: vec![],
         }))
+    }
+
+    pub fn new_invariant_violation(msg: impl ToString) -> PartialVMError {
+        Self::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(msg.to_string())
     }
 
     pub fn major_status(&self) -> StatusCode {

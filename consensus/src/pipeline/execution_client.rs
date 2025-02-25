@@ -13,6 +13,7 @@ use crate::{
         buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
         decoupled_execution_utils::prepare_phases_and_buffer_manager,
         errors::Error,
+        pipeline_builder::PipelineBuilder,
         signing_phase::CommitSignerProvider,
     },
     rand::rand_gen::{
@@ -58,7 +59,7 @@ pub trait TExecutionClient: Send + Sync {
     /// Initialize the execution phase for a new epoch.
     async fn start_epoch(
         &self,
-        maybe_consensus_key: Option<Arc<PrivateKey>>,
+        maybe_consensus_key: Arc<PrivateKey>,
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -69,6 +70,7 @@ pub trait TExecutionClient: Send + Sync {
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
+        new_pipeline_enabled: bool,
     );
 
     /// This is needed for some DAG tests. Clean this up as a TODO.
@@ -104,11 +106,15 @@ pub trait TExecutionClient: Send + Sync {
 
     /// Shutdown the current processor at the end of the epoch.
     async fn end_epoch(&self);
+
+    /// Returns a pipeline builder for the current epoch.
+    fn pipeline_builder(&self, signer: Arc<ValidatorSigner>) -> PipelineBuilder;
 }
 
 struct BufferManagerHandle {
     pub execute_tx: Option<UnboundedSender<OrderedBlocks>>,
-    pub commit_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
+    pub commit_tx:
+        Option<aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingCommitRequest)>>,
     pub reset_tx_to_buffer_manager: Option<UnboundedSender<ResetRequest>>,
     pub reset_tx_to_rand_manager: Option<UnboundedSender<ResetRequest>>,
 }
@@ -126,7 +132,7 @@ impl BufferManagerHandle {
     pub fn init(
         &mut self,
         execute_tx: UnboundedSender<OrderedBlocks>,
-        commit_tx: aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
+        commit_tx: aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingCommitRequest)>,
         reset_tx_to_buffer_manager: UnboundedSender<ResetRequest>,
         reset_tx_to_rand_manager: Option<UnboundedSender<ResetRequest>>,
     ) {
@@ -192,7 +198,7 @@ impl ExecutionProxyClient {
 
     fn spawn_decoupled_execution(
         &self,
-        maybe_consensus_key: Option<Arc<PrivateKey>>,
+        consensus_sk: Arc<PrivateKey>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
@@ -203,6 +209,7 @@ impl ExecutionProxyClient {
         buffer_manager_back_pressure_enabled: bool,
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
+        new_pipeline_enabled: bool,
     ) {
         let network_sender = NetworkSender::new(
             self.author,
@@ -214,7 +221,7 @@ impl ExecutionProxyClient {
         let (reset_buffer_manager_tx, reset_buffer_manager_rx) = unbounded::<ResetRequest>();
 
         let (commit_msg_tx, commit_msg_rx) =
-            aptos_channel::new::<AccountAddress, IncomingCommitRequest>(
+            aptos_channel::new::<AccountAddress, (AccountAddress, IncomingCommitRequest)>(
                 QueueStyle::FIFO,
                 100,
                 Some(&counters::BUFFER_MANAGER_MSGS),
@@ -226,8 +233,6 @@ impl ExecutionProxyClient {
                 let (rand_ready_block_tx, rand_ready_block_rx) = unbounded::<OrderedBlocks>();
 
                 let (reset_tx_to_rand_manager, reset_rand_manager_rx) = unbounded::<ResetRequest>();
-                let consensus_sk = maybe_consensus_key
-                    .expect("consensus key unavailable for ExecutionProxyClient");
                 let signer = Arc::new(ValidatorSigner::new(self.author, consensus_sk));
 
                 let rand_manager = RandManager::<Share, AugmentedData>::new(
@@ -292,6 +297,7 @@ impl ExecutionProxyClient {
             consensus_publisher,
             self.consensus_config
                 .max_pending_rounds_in_commit_vote_cache,
+            new_pipeline_enabled,
         );
 
         tokio::spawn(execution_schedule_phase.start());
@@ -306,7 +312,7 @@ impl ExecutionProxyClient {
 impl TExecutionClient for ExecutionProxyClient {
     async fn start_epoch(
         &self,
-        maybe_consensus_key: Option<Arc<PrivateKey>>,
+        maybe_consensus_key: Arc<PrivateKey>,
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -317,6 +323,7 @@ impl TExecutionClient for ExecutionProxyClient {
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
+        new_pipeline_enabled: bool,
     ) {
         let maybe_rand_msg_tx = self.spawn_decoupled_execution(
             maybe_consensus_key,
@@ -330,6 +337,7 @@ impl TExecutionClient for ExecutionProxyClient {
             self.consensus_config.enable_pre_commit,
             self.consensus_observer_config,
             self.consensus_publisher.clone(),
+            new_pipeline_enabled,
         );
 
         let transaction_shuffler =
@@ -398,7 +406,7 @@ impl TExecutionClient for ExecutionProxyClient {
         commit_msg: IncomingCommitRequest,
     ) -> Result<()> {
         if let Some(tx) = &self.handle.read().commit_tx {
-            tx.push(peer_id, commit_msg)
+            tx.push(peer_id, (peer_id, commit_msg))
         } else {
             counters::EPOCH_MANAGER_ISSUES_DETAILS
                 .with_label_values(&["buffer_manager_not_started"])
@@ -510,6 +518,10 @@ impl TExecutionClient for ExecutionProxyClient {
         }
         self.execution_proxy.end_epoch();
     }
+
+    fn pipeline_builder(&self, signer: Arc<ValidatorSigner>) -> PipelineBuilder {
+        self.execution_proxy.pipeline_builder(signer)
+    }
 }
 
 pub struct DummyExecutionClient;
@@ -518,7 +530,7 @@ pub struct DummyExecutionClient;
 impl TExecutionClient for DummyExecutionClient {
     async fn start_epoch(
         &self,
-        _maybe_consensus_key: Option<Arc<PrivateKey>>,
+        _maybe_consensus_key: Arc<PrivateKey>,
         _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
         _payload_manager: Arc<dyn TPayloadManager>,
@@ -529,6 +541,7 @@ impl TExecutionClient for DummyExecutionClient {
         _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _highest_committed_round: Round,
+        _new_pipeline_enabled: bool,
     ) {
     }
 
@@ -567,4 +580,8 @@ impl TExecutionClient for DummyExecutionClient {
     }
 
     async fn end_epoch(&self) {}
+
+    fn pipeline_builder(&self, _signer: Arc<ValidatorSigner>) -> PipelineBuilder {
+        todo!()
+    }
 }

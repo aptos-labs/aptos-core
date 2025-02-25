@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{intern_type, BinaryCache, Function, FunctionHandle, FunctionInstantiation};
-use crate::{loader::ScriptHash, storage::struct_name_index_map::StructNameIndexMap};
+use crate::loader::ScriptHash;
 use move_binary_format::{
     access::ScriptAccess,
     binary_views::BinaryIndexedView,
@@ -13,6 +13,7 @@ use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_sta
 use move_vm_types::loaded_data::{
     runtime_access_specifier::AccessSpecifier,
     runtime_types::{StructIdentifier, Type},
+    struct_name_indexing::StructNameIndexMap,
 };
 use std::{collections::BTreeMap, ops::Deref, sync::Arc};
 
@@ -47,10 +48,11 @@ impl Script {
             let struct_name = script.identifier_at(struct_handle.name);
             let module_handle = script.module_handle_at(struct_handle.module);
             let module_id = script.module_id_for_handle(module_handle);
-            struct_names.push(struct_name_index_map.struct_name_to_idx(StructIdentifier {
+            let struct_name = StructIdentifier {
                 module: module_id,
                 name: struct_name.to_owned(),
-            })?);
+            };
+            struct_names.push(struct_name_index_map.struct_name_to_idx(&struct_name)?);
         }
 
         let mut function_refs = vec![];

@@ -2,10 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{Experiment, Options};
 use codespan_reporting::diagnostic::Severity;
 use ethnum::U256;
 use itertools::Itertools;
-use move_binary_format::file_format::Ability;
+use move_core_types::ability::Ability;
 use move_model::{
     ast::{Exp, ExpData, MatchArm, Operation, Pattern, SpecBlockTarget, TempIndex, Value},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
@@ -27,9 +28,8 @@ use move_stackless_bytecode::{
 use num::ToPrimitive;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fmt,
+    fmt, iter,
 };
-
 // ======================================================================================
 // Entry
 
@@ -324,6 +324,23 @@ impl<'env> Generator<'env> {
         let loc = env.get_node_loc(id);
         env.diag(severity, &loc, msg.as_ref())
     }
+
+    fn check_if_lambdas_enabled(&self) -> bool {
+        let options = self
+            .env()
+            .get_extension::<Options>()
+            .expect("Options is available");
+        options.experiment_on(Experiment::FUNCTION_VALUES)
+    }
+
+    fn expect_function_values_enabled(&self, id: NodeId) {
+        if !self.check_if_lambdas_enabled() {
+            self.error(
+                id,
+                "function values outside of inline functions not supported in this language version",
+            )
+        }
+    }
 }
 
 // ======================================================================================
@@ -337,6 +354,20 @@ impl<'env> Generator<'env> {
             ExpData::Value(id, val) => self.gen_value(targets, *id, val),
             ExpData::LocalVar(id, name) => self.gen_local(targets, *id, *name),
             ExpData::Call(id, op, args) => self.gen_call(targets, *id, op, args),
+            ExpData::Invoke(id, fun, args) => {
+                self.expect_function_values_enabled(*id);
+                self.gen_invoke(targets, *id, fun, args)
+            },
+            ExpData::Lambda(id, ..) => {
+                if self.check_if_lambdas_enabled() {
+                    self.internal_error(
+                        *id,
+                        "unexpected lambda, expected to be eliminated by lambda lifting",
+                    )
+                } else {
+                    self.expect_function_values_enabled(*id)
+                }
+            },
             ExpData::Sequence(_, exps) => {
                 for step in exps.iter().take(exps.len() - 1) {
                     // Result is thrown away, but for typing reasons, we need to introduce
@@ -406,12 +437,9 @@ impl<'env> Generator<'env> {
                         ),
                     );
                 }
-                self.emit_call(
-                    *id,
-                    targets,
-                    BytecodeOperation::WriteRef,
-                    vec![lhs_temp, rhs_temp],
-                )
+                self.emit_call(*id, targets, BytecodeOperation::WriteRef, vec![
+                    lhs_temp, rhs_temp,
+                ])
             },
             ExpData::Assign(id, lhs, rhs) => self.gen_assign(*id, lhs, rhs, None),
             ExpData::Return(id, exp) => {
@@ -479,16 +507,6 @@ impl<'env> Generator<'env> {
                     .rewrite_spec_descent(&SpecBlockTarget::Inline, spec);
                 self.emit_with(*id, |attr| Bytecode::SpecBlock(attr, spec));
             },
-            // TODO(LAMBDA)
-            ExpData::Lambda(id, _, _) => self.error(
-                *id,
-                "Function-typed values not yet supported except as parameters to calls to inline functions",
-            ),
-            // TODO(LAMBDA)
-            ExpData::Invoke(_, exp, _) => self.error(
-                exp.as_ref().node_id(),
-                "Calls to function values other than inline function parameters not yet supported",
-            ),
             ExpData::Quant(id, _, _, _, _, _) => {
                 self.internal_error(*id, "unsupported specification construct")
             },
@@ -617,6 +635,11 @@ impl<'env> Generator<'env> {
 // Calls
 
 impl<'env> Generator<'env> {
+    fn gen_invoke(&mut self, targets: Vec<TempIndex>, id: NodeId, fun: &Exp, args: &[Exp]) {
+        let args = args.iter().chain(iter::once(fun)).cloned().collect_vec();
+        self.gen_op_call(targets, id, BytecodeOperation::Invoke, &args)
+    }
+
     fn gen_call(&mut self, targets: Vec<TempIndex>, id: NodeId, op: &Operation, args: &[Exp]) {
         match op {
             Operation::Vector => self.gen_op_call(targets, id, BytecodeOperation::Vector, args),
@@ -785,6 +808,22 @@ impl<'env> Generator<'env> {
             Operation::MoveFunction(m, f) => {
                 self.gen_function_call(targets, id, m.qualified(*f), args)
             },
+            Operation::Closure(mid, fid, mask) => {
+                self.expect_function_values_enabled(id);
+                let inst = self.env().get_node_instantiation(id);
+                debug_assert_eq!(
+                    inst.len(),
+                    self.env()
+                        .get_function(mid.qualified(*fid))
+                        .get_type_parameter_count(),
+                );
+                self.gen_op_call(
+                    targets,
+                    id,
+                    BytecodeOperation::Closure(*mid, *fid, inst, *mask),
+                    args,
+                )
+            },
             Operation::TestVariants(mid, sid, variants) => {
                 self.gen_test_variants(targets, id, mid.qualified(*sid), variants, args)
             },
@@ -812,12 +851,6 @@ impl<'env> Generator<'env> {
             Operation::Not => self.gen_op_call(targets, id, BytecodeOperation::Not, args),
 
             Operation::NoOp => {}, // do nothing
-
-            // TODO(LAMBDA)
-            Operation::Closure(..) => self.error(
-                id,
-                "Function-typed values not yet supported except as parameters to calls to inline functions",
-            ),
 
             // Non-supported specification related operations
             Operation::Exists(Some(_))
@@ -1075,15 +1108,12 @@ impl<'env> Generator<'env> {
     /// Generate the code for a list of arguments.
     /// Note that the arguments are evaluated in left-to-right order.
     fn gen_arg_list(&mut self, exps: &[Exp]) -> Vec<TempIndex> {
-        // If all args are side-effect free, we don't need to force temporary generation
-        // to get left-to-right evaluation.
-        let with_forced_temp = !exps.iter().all(is_definitely_pure);
         let len = exps.len();
-        // Generate code with (potentially) forced creation of temporaries for all except last arg.
+        // Generate code with forced creation of temporaries for all except last arg.
         let mut args = exps
             .iter()
             .take(if len == 0 { 0 } else { len - 1 })
-            .map(|exp| self.gen_escape_auto_ref_arg(exp, with_forced_temp))
+            .map(|exp| self.gen_escape_auto_ref_arg(exp, true))
             .collect::<Vec<_>>();
         // If there is a last arg, we don't need to force create a temporary for it.
         if let Some(last_arg) = exps
@@ -2183,7 +2213,7 @@ impl ValueShape {
         let mut values = BTreeSet::new();
         for (_, shape) in &pattern_shapes {
             for partial_value in shape.possible_values(env) {
-                Self::join_value_shape(&mut values, partial_value)
+                values = Self::join_value_shape(values, partial_value);
             }
         }
         // Now go over all patterns in sequence and incrementally remove matched
@@ -2299,6 +2329,7 @@ impl ValueShape {
             for (s1, s2) in shapes1.iter().zip(shapes2) {
                 if let Some(s) = s1.try_join(s2) {
                     result.push(s);
+                } else {
                     break;
                 }
             }
@@ -2323,16 +2354,21 @@ impl ValueShape {
 
     /// Given a list of value shapes, join a new one. This attempts specializing existing shapes
     /// via the join operator in order to keep the list minimal.
-    fn join_value_shape(set: &mut BTreeSet<ValueShape>, value: ValueShape) {
-        for v in set.iter() {
+    fn join_value_shape(set: BTreeSet<ValueShape>, value: ValueShape) -> BTreeSet<ValueShape> {
+        let mut new_set = BTreeSet::new();
+        let mut joined = false;
+        for v in set.into_iter() {
             if let Some(unified) = v.try_join(&value) {
-                let v = v.clone(); // to free set
-                set.remove(&v);
-                set.insert(unified);
-                return;
+                new_set.insert(unified);
+                joined = true;
+            } else {
+                new_set.insert(v);
             }
         }
-        set.insert(value);
+        if !joined {
+            new_set.insert(value);
+        }
+        new_set
     }
 
     /// Checks whether one shape is instance of another. It holds that
@@ -2405,6 +2441,7 @@ impl<'a> fmt::Display for ValueShapeDisplay<'a> {
 // Helpers
 
 /// Is this a leaf expression which cannot contain another expression?
+#[allow(dead_code)]
 fn is_leaf_exp(exp: &Exp) -> bool {
     matches!(
         exp.as_ref(),
@@ -2413,6 +2450,7 @@ fn is_leaf_exp(exp: &Exp) -> bool {
 }
 
 /// Can we be certain that this expression is side-effect free?
+#[allow(dead_code)]
 fn is_definitely_pure(exp: &Exp) -> bool {
     is_leaf_exp(exp) // A leaf expression is pure.
         || match exp.as_ref() {

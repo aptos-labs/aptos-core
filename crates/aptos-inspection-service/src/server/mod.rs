@@ -30,6 +30,7 @@ mod tests;
 
 // The list of endpoints offered by the inspection service
 pub const CONFIGURATION_PATH: &str = "/configuration";
+pub const CONSENSUS_HEALTH_CHECK_PATH: &str = "/consensus_health_check";
 pub const FORGE_METRICS_PATH: &str = "/forge_metrics";
 pub const INDEX_PATH: &str = "/";
 pub const JSON_METRICS_PATH: &str = "/json_metrics";
@@ -110,6 +111,11 @@ async fn serve_requests(
             // /configuration
             // Exposes the node configuration
             configuration::handle_configuration_request(&node_config)
+        },
+        CONSENSUS_HEALTH_CHECK_PATH => {
+            // /consensus_health_check
+            // Exposes the consensus health check
+            metrics::handle_consensus_health_check(&node_config).await
         },
         FORGE_METRICS_PATH => {
             // /forge_metrics

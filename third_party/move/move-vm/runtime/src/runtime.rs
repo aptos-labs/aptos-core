@@ -11,8 +11,11 @@ use crate::{
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     session::SerializedReturnValues,
-    storage::{code_storage::CodeStorage, module_storage::ModuleStorage},
-    RuntimeEnvironment,
+    storage::{
+        code_storage::CodeStorage, module_storage::ModuleStorage,
+        ty_layout_converter::LoaderLayoutConverter,
+    },
+    AsFunctionValueExtension, LayoutConverter, RuntimeEnvironment,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -29,6 +32,7 @@ use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::Type,
+    value_serde::ValueSerDeContext,
     values::{Locals, Reference, VMValueCast, Value},
 };
 use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
@@ -245,18 +249,18 @@ impl VMRuntime {
         ty: &Type,
         arg: impl Borrow<[u8]>,
     ) -> PartialVMResult<Value> {
-        let (layout, has_identifier_mappings) = match self
-            .loader
-            .type_to_type_layout_with_identifier_mappings(ty, module_store, module_storage)
-        {
-            Ok(layout) => layout,
-            Err(_err) => {
-                return Err(PartialVMError::new(
-                    StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION,
-                )
-                .with_message("[VM] failed to get layout from type".to_string()));
-            },
-        };
+        let (layout, has_identifier_mappings) =
+            match LoaderLayoutConverter::new(&self.loader, module_store, module_storage)
+                .type_to_type_layout_with_identifier_mappings(ty)
+            {
+                Ok(layout) => layout,
+                Err(_err) => {
+                    return Err(PartialVMError::new(
+                        StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION,
+                    )
+                    .with_message("[VM] failed to get layout from type".to_string()));
+                },
+            };
 
         let deserialization_error = || -> PartialVMError {
             PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)
@@ -270,7 +274,11 @@ impl VMRuntime {
             return Err(deserialization_error());
         }
 
-        match Value::simple_deserialize(arg.borrow(), &layout) {
+        let function_value_extension = module_storage.as_function_value_extension();
+        match ValueSerDeContext::new()
+            .with_func_args_deserialization(&function_value_extension)
+            .deserialize(arg.borrow(), &layout)
+        {
             Some(val) => Ok(val),
             None => Err(deserialization_error()),
         }
@@ -334,15 +342,16 @@ impl VMRuntime {
             _ => (ty, value),
         };
 
-        let (layout, has_identifier_mappings) = self
-            .loader
-            .type_to_type_layout_with_identifier_mappings(ty, module_store, module_storage)
-            .map_err(|_err| {
-                // TODO: Should we use `err` instead of mapping?
-                PartialVMError::new(StatusCode::VERIFICATION_ERROR).with_message(
-                    "entry point functions cannot have non-serializable return types".to_string(),
-                )
-            })?;
+        let (layout, has_identifier_mappings) =
+            LoaderLayoutConverter::new(&self.loader, module_store, module_storage)
+                .type_to_type_layout_with_identifier_mappings(ty)
+                .map_err(|_err| {
+                    // TODO: Should we use `err` instead of mapping?
+                    PartialVMError::new(StatusCode::VERIFICATION_ERROR).with_message(
+                        "entry point functions cannot have non-serializable return types"
+                            .to_string(),
+                    )
+                })?;
 
         let serialization_error = || -> PartialVMError {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -354,8 +363,10 @@ impl VMRuntime {
             return Err(serialization_error());
         }
 
-        let bytes = value
-            .simple_serialize(&layout)
+        let function_value_extension = module_storage.as_function_value_extension();
+        let bytes = ValueSerDeContext::new()
+            .with_func_args_deserialization(&function_value_extension)
+            .serialize(&value, &layout)?
             .ok_or_else(serialization_error)?;
         Ok((bytes, layout))
     }

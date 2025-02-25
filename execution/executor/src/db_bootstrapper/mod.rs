@@ -12,13 +12,16 @@ use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_storage_interface::{
-    async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
-    DbWriter, ExecutedTrees,
+    state_store::state_view::cached_state_view::CachedStateView, DbReaderWriter, DbWriter,
+    LedgerSummary,
 };
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     aggregate_signature::AggregateSignature,
-    block_executor::config::BlockExecutorConfigFromOnchain,
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain,
+        transaction_slice_metadata::TransactionSliceMetadata,
+    },
     block_info::{BlockInfo, GENESIS_EPOCH, GENESIS_ROUND, GENESIS_TIMESTAMP_USECS},
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ConfigurationResource,
@@ -27,36 +30,36 @@ use aptos_types::{
     transaction::Transaction,
     waypoint::Waypoint,
 };
-use aptos_vm::VMExecutor;
+use aptos_vm::VMBlockExecutor;
 use std::sync::Arc;
 
-pub fn generate_waypoint<V: VMExecutor>(
+pub fn generate_waypoint<V: VMBlockExecutor>(
     db: &DbReaderWriter,
     genesis_txn: &Transaction,
 ) -> Result<Waypoint> {
-    let executed_trees = db.reader.get_latest_executed_trees()?;
+    let ledger_summary = db.reader.get_pre_committed_ledger_summary()?;
 
-    let committer = calculate_genesis::<V>(db, executed_trees, genesis_txn)?;
+    let committer = calculate_genesis::<V>(db, ledger_summary, genesis_txn)?;
     Ok(committer.waypoint)
 }
 
 /// If current version + 1 != waypoint.version(), return Ok(false) indicating skipping the txn.
 /// otherwise apply the txn and commit it if the result matches the waypoint.
 /// Returns Ok(true) if committed otherwise Err.
-pub fn maybe_bootstrap<V: VMExecutor>(
+pub fn maybe_bootstrap<V: VMBlockExecutor>(
     db: &DbReaderWriter,
     genesis_txn: &Transaction,
     waypoint: Waypoint,
 ) -> Result<Option<LedgerInfoWithSignatures>> {
-    let executed_trees = db.reader.get_latest_executed_trees()?;
+    let ledger_summary = db.reader.get_pre_committed_ledger_summary()?;
     // if the waypoint is not targeted with the genesis txn, it may be either already bootstrapped, or
     // aiming for state sync to catch up.
-    if executed_trees.version().map_or(0, |v| v + 1) != waypoint.version() {
+    if ledger_summary.version().map_or(0, |v| v + 1) != waypoint.version() {
         info!(waypoint = %waypoint, "Skip genesis txn.");
         return Ok(None);
     }
 
-    let committer = calculate_genesis::<V>(db, executed_trees, genesis_txn)?;
+    let committer = calculate_genesis::<V>(db, ledger_summary, genesis_txn)?;
     ensure!(
         waypoint == committer.waypoint(),
         "Waypoint verification failed. Expected {:?}, got {:?}.",
@@ -110,19 +113,19 @@ impl GenesisCommitter {
     }
 }
 
-pub fn calculate_genesis<V: VMExecutor>(
+pub fn calculate_genesis<V: VMBlockExecutor>(
     db: &DbReaderWriter,
-    executed_trees: ExecutedTrees,
+    ledger_summary: LedgerSummary,
     genesis_txn: &Transaction,
 ) -> Result<GenesisCommitter> {
     // DB bootstrapper works on either an empty transaction accumulator or an existing block chain.
     // In the very extreme and sad situation of losing quorum among validators, we refer to the
     // second use case said above.
-    let genesis_version = executed_trees.version().map_or(0, |v| v + 1);
-    let base_state_view = executed_trees.verified_state_view(
+    let genesis_version = ledger_summary.version().map_or(0, |v| v + 1);
+    let base_state_view = CachedStateView::new(
         StateViewId::Miscellaneous,
         Arc::clone(&db.reader),
-        Arc::new(AsyncProofFetcher::new(db.reader.clone())),
+        ledger_summary.state.latest().clone(),
     )?;
 
     let epoch = if genesis_version == 0 {
@@ -132,10 +135,12 @@ pub fn calculate_genesis<V: VMExecutor>(
     };
 
     let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
+        &V::new(),
         vec![genesis_txn.clone().into()].into(),
+        &ledger_summary.state,
         base_state_view,
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
-        None,
+        TransactionSliceMetadata::unknown(),
     )?;
     ensure!(
         execution_output.num_transactions_to_commit() != 0,
@@ -146,7 +151,7 @@ pub fn calculate_genesis<V: VMExecutor>(
         "Genesis txn didn't output reconfig event."
     );
 
-    let output = ApplyExecutionOutput::run(execution_output, &executed_trees)?;
+    let output = ApplyExecutionOutput::run(execution_output, ledger_summary, db.reader.as_ref())?;
     let timestamp_usecs = if genesis_version == 0 {
         // TODO(aldenhu): fix existing tests before using real timestamp and check on-chain epoch.
         GENESIS_TIMESTAMP_USECS
@@ -154,9 +159,7 @@ pub fn calculate_genesis<V: VMExecutor>(
         let state_view = CachedStateView::new(
             StateViewId::Miscellaneous,
             Arc::clone(&db.reader),
-            output.execution_output.next_version(),
-            output.expect_result_state().current.clone(),
-            Arc::new(AsyncProofFetcher::new(db.reader.clone())),
+            output.result_state().latest().clone(),
         )?;
         let next_epoch = epoch
             .checked_add(1)

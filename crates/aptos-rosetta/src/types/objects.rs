@@ -31,7 +31,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::{
         fungible_store::FungibleStoreResource, AccountResource, CoinStoreResourceUntyped,
-        CoinWithdraw, WithdrawEvent,
+        CoinWithdraw, DepositFAEvent, ObjectCoreResource, WithdrawEvent,
     },
     contract_event::{ContractEvent, ContractEventV2, FEE_STATEMENT_EVENT_TYPE},
     event::EventKey,
@@ -1512,7 +1512,7 @@ fn parse_object_owner(
     data: &[u8],
     object_to_owner: &mut HashMap<AccountAddress, AccountAddress>,
 ) {
-    if let Ok(object_core) = bcs::from_bytes::<ObjectCore>(data) {
+    if let Ok(object_core) = bcs::from_bytes::<ObjectCoreResource>(data) {
         object_to_owner.insert(object_address, object_core.owner);
     }
 }
@@ -2175,8 +2175,8 @@ fn get_amount_from_event_v2(
 ) -> Vec<u64> {
     filter_v2_events(type_tag, events, |event| {
         if let Ok(event) = bcs::from_bytes::<CoinWithdraw>(event.event_data()) {
-            if event.account == account_address && &event.coin_type == coin_type {
-                Some(event.amount)
+            if event.account() == &account_address && event.coin_type() == coin_type {
+                Some(event.amount())
             } else {
                 None
             }
@@ -2195,7 +2195,8 @@ fn get_amount_from_fa_event(
     store_address: AccountAddress,
 ) -> Vec<u64> {
     filter_v2_events(type_tag, events, |event| {
-        if let Ok(event) = bcs::from_bytes::<FungibleAssetChangeEvent>(event.event_data()) {
+        // since we are only deserializing, both DepositFAEvent and WithdrawFAEvent have identical fields
+        if let Ok(event) = bcs::from_bytes::<DepositFAEvent>(event.event_data()) {
             if event.store == store_address {
                 Some(event.amount)
             } else {

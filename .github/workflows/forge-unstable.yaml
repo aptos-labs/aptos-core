@@ -24,10 +24,6 @@ on:
         required: false
         type: string
         description: The git SHA1 to checkout. This affects the Forge test runner that is used. If not specified, the latest main will be used
-  # NOTE: to support testing different branches on different schedules, you need to specify the cron schedule in the 'determine-test-branch' step as well below
-  # Reference: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule
-  schedule:
-    - cron: "30 */2 * * *" # Run this on an aggressive cadence to get signal on the tests. They should be fully evaluated (moved to forge stable or removed entirely) after baking
   pull_request:
     paths:
       - ".github/workflows/forge-unstable.yaml"
@@ -120,7 +116,7 @@ jobs:
 # To add a new Forge test, add a new job definition below. Copy all fields and change only the:
 # * job name
 # * "needs" dependency. You need "determine-test-metadata", and the previous job (jobs are run sequentially)
-# * with.FORGE_TEST_SUITE, change this to your test s uite
+# * with.FORGE_TEST_SUITE, change this to your test suite
 # * with.FORGE_*, any features or customizations you need
   forge-indexer:
     if: ${{ github.event_name != 'pull_request' }}
@@ -132,4 +128,16 @@ jobs:
       FORGE_NAMESPACE: forge-indexer-test-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
       COMMENT_HEADER: forge-indexer
       FORGE_TEST_SUITE: indexer_test
+      FORGE_ENABLE_INDEXER: true
+  forge-indexer-sdk:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-indexer-sdk-test-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
+      COMMENT_HEADER: forge-indexer-sdk
+      FORGE_TEST_SUITE: indexer_test
+      FORGE_DEPLOYER_PROFILE: forge_indexer_sdk
       FORGE_ENABLE_INDEXER: true

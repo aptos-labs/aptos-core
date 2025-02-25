@@ -5,7 +5,10 @@
 use crate::{
     loader::{LegacyModuleStorageAdapter, Loader},
     logging::expect_no_verification_errors,
-    ModuleStorage,
+    storage::{
+        module_storage::FunctionValueExtensionAdapter, ty_layout_converter::LoaderLayoutConverter,
+    },
+    LayoutConverter, ModuleStorage,
 };
 use bytes::Bytes;
 use move_binary_format::{
@@ -26,7 +29,7 @@ use move_core_types::{
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     resolver::MoveResolver,
-    value_serde::deserialize_and_allow_delayed_values,
+    value_serde::ValueSerDeContext,
     values::{GlobalValue, Value},
 };
 use sha3::{Digest, Sha3_256};
@@ -118,8 +121,10 @@ impl<'r> TransactionDataCache<'r> {
     ) -> PartialVMResult<ChangeSet> {
         let resource_converter =
             |value: Value, layout: MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
-                value
-                    .simple_serialize(&layout)
+                let function_value_extension = FunctionValueExtensionAdapter { module_storage };
+                ValueSerDeContext::new()
+                    .with_func_args_deserialization(&function_value_extension)
+                    .serialize(&value, &layout)?
                     .map(Into::into)
                     .ok_or_else(|| {
                         PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
@@ -226,8 +231,9 @@ impl<'r> TransactionDataCache<'r> {
                 },
             };
             // TODO(Gas): Shall we charge for this?
-            let (ty_layout, has_aggregator_lifting) = loader
-                .type_to_type_layout_with_identifier_mappings(ty, module_store, module_storage)?;
+            let (ty_layout, has_aggregator_lifting) =
+                LoaderLayoutConverter::new(loader, module_store, module_storage)
+                    .type_to_type_layout_with_identifier_mappings(ty)?;
 
             let (data, bytes_loaded) = match loader {
                 Loader::V1(_) => {
@@ -275,9 +281,14 @@ impl<'r> TransactionDataCache<'r> {
             };
             load_res = Some(NumBytes::new(bytes_loaded as u64));
 
+            let function_value_extension = FunctionValueExtensionAdapter { module_storage };
             let gv = match data {
                 Some(blob) => {
-                    let val = match deserialize_and_allow_delayed_values(&blob, &ty_layout) {
+                    let val = match ValueSerDeContext::new()
+                        .with_func_args_deserialization(&function_value_extension)
+                        .with_delayed_fields_serde()
+                        .deserialize(&blob, &ty_layout)
+                    {
                         Some(val) => val,
                         None => {
                             let msg =

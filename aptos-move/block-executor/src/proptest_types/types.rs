@@ -17,7 +17,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{
-        errors::StateviewError,
+        errors::StateViewError,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
         StateViewId, TStateView,
@@ -25,10 +25,13 @@ use aptos_types::{
     transaction::BlockExecutableTransaction as Transaction,
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
 };
+use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{
     module_and_script_storage::code_storage::AptosCodeStorage,
     module_write_set::ModuleWrite,
-    resolver::{ResourceGroupSize, TExecutorView, TResourceGroupView},
+    resolver::{
+        BlockSynchronizationKillSwitch, ResourceGroupSize, TExecutorView, TResourceGroupView,
+    },
     resource_group_adapter::{
         decrement_size_for_remove_tag, group_tagged_resource_size, increment_size_for_add_tag,
     },
@@ -38,7 +41,6 @@ use claims::{assert_ge, assert_le, assert_ok};
 use move_core_types::{
     ident_str, identifier::IdentStr, language_storage::ModuleId, value::MoveTypeLayout,
 };
-use move_vm_runtime::{RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
@@ -73,7 +75,7 @@ where
     type Key = K;
 
     // Contains mock storage value with STORAGE_AGGREGATOR_VALUE.
-    fn get_state_value(&self, _: &K) -> Result<Option<StateValue>, StateviewError> {
+    fn get_state_value(&self, _: &K) -> Result<Option<StateValue>, StateViewError> {
         Ok(Some(StateValue::new_legacy(
             serialize(&STORAGE_AGGREGATOR_VALUE).into(),
         )))
@@ -83,7 +85,7 @@ where
         StateViewId::Miscellaneous
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
         unreachable!("Not used in tests");
     }
 }
@@ -99,7 +101,7 @@ where
     type Key = K;
 
     // Contains mock storage value with a non-empty group (w. value at RESERVED_TAG).
-    fn get_state_value(&self, key: &K) -> Result<Option<StateValue>, StateviewError> {
+    fn get_state_value(&self, key: &K) -> Result<Option<StateValue>, StateViewError> {
         if self.group_keys.contains(key) {
             let group: BTreeMap<u32, Bytes> = BTreeMap::from([(RESERVED_TAG, vec![0].into())]);
 
@@ -117,31 +119,7 @@ where
         StateViewId::Miscellaneous
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
-        unreachable!("Not used in tests");
-    }
-}
-
-pub(crate) struct EmptyDataView<K> {
-    pub(crate) phantom: PhantomData<K>,
-}
-
-impl<K> TStateView for EmptyDataView<K>
-where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-{
-    type Key = K;
-
-    /// Gets the state value for a given state key.
-    fn get_state_value(&self, _: &K) -> Result<Option<StateValue>, StateviewError> {
-        Ok(None)
-    }
-
-    fn id(&self) -> StateViewId {
-        StateViewId::Miscellaneous
-    }
-
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
         unreachable!("Not used in tests");
     }
 }
@@ -416,6 +394,7 @@ impl<K, E> MockIncarnation<K, E> {
 /// value determines the index for choosing the read & write sets of the particular execution.
 #[derive(Clone, Debug)]
 pub(crate) enum MockTransaction<K, E> {
+    InterruptRequested,
     Write {
         /// Incarnation counter, increased during each mock (re-)execution. Allows tracking the final
         /// incarnation for each mock transaction, whose behavior should be reproduced for baseline.
@@ -454,6 +433,9 @@ impl<K, E> MockTransaction<K, E> {
             } => incarnation_behaviors,
             Self::SkipRest(_) => unreachable!("SkipRest does not contain incarnation behaviors"),
             Self::Abort => unreachable!("Abort does not contain incarnation behaviors"),
+            Self::InterruptRequested => {
+                unreachable!("InterruptRequested does not contain incarnation behaviors")
+            },
         }
     }
 }
@@ -464,7 +446,6 @@ impl<
     > Transaction for MockTransaction<K, E>
 {
     type Event = E;
-    type Identifier = DelayedFieldID;
     type Key = K;
     type Tag = u32;
     type Value = ValueType;
@@ -857,44 +838,25 @@ impl<K, E> MockTask<K, E> {
     }
 }
 
-#[derive(Clone)]
-pub(crate) struct MockEnvironment {
-    runtime_environment: RuntimeEnvironment,
-}
-
-impl MockEnvironment {
-    pub(crate) fn new() -> Self {
-        Self {
-            runtime_environment: RuntimeEnvironment::new(vec![]),
-        }
-    }
-}
-
-impl WithRuntimeEnvironment for MockEnvironment {
-    fn runtime_environment(&self) -> &RuntimeEnvironment {
-        &self.runtime_environment
-    }
-}
-
 impl<K, E> ExecutorTask for MockTask<K, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
-    type Environment = MockEnvironment;
     type Error = usize;
     type Output = MockOutput<K, E>;
     type Txn = MockTransaction<K, E>;
 
-    fn init(_env: Self::Environment, _state_view: &impl TStateView<Key = K>) -> Self {
+    fn init(_environment: AptosEnvironment, _state_view: &impl TStateView<Key = K>) -> Self {
         Self::new()
     }
 
     fn execute_transaction(
         &self,
-        view: &(impl TExecutorView<K, u32, MoveTypeLayout, DelayedFieldID, ValueType>
+        view: &(impl TExecutorView<K, u32, MoveTypeLayout, ValueType>
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>
-              + AptosCodeStorage),
+              + AptosCodeStorage
+              + BlockSynchronizationKillSwitch),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
@@ -1083,6 +1045,10 @@ where
                 ExecutionStatus::SkipRest(mock_output)
             },
             MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
+            MockTransaction::InterruptRequested => {
+                while !view.interrupt_requested() {}
+                ExecutionStatus::SkipRest(MockOutput::skip_output())
+            },
         }
     }
 
@@ -1156,12 +1122,7 @@ where
         self.deltas.clone()
     }
 
-    fn delayed_field_change_set(
-        &self,
-    ) -> BTreeMap<
-        <Self::Txn as Transaction>::Identifier,
-        DelayedChange<<Self::Txn as Transaction>::Identifier>,
-    > {
+    fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
         // TODO[agg_v2](tests): add aggregators V2 to the proptest?
         BTreeMap::new()
     }
@@ -1307,7 +1268,6 @@ where
         crate::types::InputOutputKey<
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Tag,
-            <Self::Txn as Transaction>::Identifier,
         >,
     > {
         HashSet::new()

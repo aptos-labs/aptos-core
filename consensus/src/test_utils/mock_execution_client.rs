@@ -8,7 +8,7 @@ use crate::{
     payload_manager::{DirectMempoolPayloadManager, TPayloadManager},
     pipeline::{
         buffer_manager::OrderedBlocks, execution_client::TExecutionClient,
-        signing_phase::CommitSignerProvider,
+        pipeline_builder::PipelineBuilder, signing_phase::CommitSignerProvider,
     },
     rand::rand_gen::types::RandConfig,
     state_replication::StateComputerCommitCallBackType,
@@ -29,6 +29,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig},
     transaction::SignedTransaction,
+    validator_signer::ValidatorSigner,
 };
 use futures::{channel::mpsc, SinkExt};
 use futures_channel::mpsc::UnboundedSender;
@@ -74,8 +75,10 @@ impl MockExecutionClient {
                 .lock()
                 .remove(&block.id())
                 .ok_or_else(|| format_err!("Cannot find block"))?;
-            let (mut payload_txns, _max_txns_from_block_to_execute) =
-                self.payload_manager.get_transactions(block.block()).await?;
+            let (mut payload_txns, _max_txns_from_block_to_execute) = self
+                .payload_manager
+                .get_transactions(block.block(), None)
+                .await?;
             txns.append(&mut payload_txns);
         }
         // they may fail during shutdown
@@ -94,7 +97,7 @@ impl MockExecutionClient {
 impl TExecutionClient for MockExecutionClient {
     async fn start_epoch(
         &self,
-        _maybe_consensus_key: Option<Arc<PrivateKey>>,
+        _maybe_consensus_key: Arc<PrivateKey>,
         _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
         _payload_manager: Arc<dyn TPayloadManager>,
@@ -105,6 +108,7 @@ impl TExecutionClient for MockExecutionClient {
         _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _highest_committed_round: Round,
+        _new_pipeline_enabled: bool,
     ) {
     }
 
@@ -186,4 +190,8 @@ impl TExecutionClient for MockExecutionClient {
     }
 
     async fn end_epoch(&self) {}
+
+    fn pipeline_builder(&self, _signer: Arc<ValidatorSigner>) -> PipelineBuilder {
+        unimplemented!()
+    }
 }

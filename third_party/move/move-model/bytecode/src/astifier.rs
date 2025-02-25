@@ -15,9 +15,9 @@
 //! # 1. Cleanup
 //!
 //! The code is cleaned up such that there are no jump proxies of the form `label L; goto L1`.
-//! Also, adjacent sequential blocks are merged, and fallthroughs extended by explicit jumps.
-//! It is important for the algorithm to work that all those intermediate blocks are removed
-//! and all remaining blocks represent a true branching structure.
+//! Also, adjacent sequential blocks are merged, and fallthrough branches replaced by explicit
+//! jumps. It is important for the algorithm to produce best results if intermediate
+//! blocks are removed.
 //!
 //! # 2. Loop Analysis
 //!
@@ -28,66 +28,21 @@
 //! # 3. Topological Sorting
 //!
 //! Topological sort the blocks using forward edges only. For those blocks which are not related
-//! in the partial order, prioritize that for a branch `if c goto L1 else goto L2`, target
-//! blocks follow after the branch. Moreover, for any blocks belonging to a loop, ensure that
-//! they all appear before any blocks which are part of the loop.
+//! in the partial order, group blocks such that all those blocks belonging to a loop are not
+//! interleaved with any blocks outside the loop in the order. This order exists because of
+//! the regularity of the control flow graph: each loop has a unique header block.
 //!
 //! # 4. Raw AST Generation
 //!
 //! The article linked above describes well how blocks can be used to synthesize structured
 //! code. However, it leaves open when to open blocks and when to close them.
 //!
-//! First, in Move, we express blocks (whether they have back jumps and are proper loops or not)
-//! by `loop { ..; break }`. Now, in the presence of nested `break[n]` and `continue[n]`, any
-//! forward (via break) and backward (via continue) jump can be modelled.
-//!
-//! ## 4.1 Opening Loops
-//!
-//! Loops are opened when we either encounter a loop header or a branch. We know what block
-//! a loop header is and what are the back edges from (2) above. In the case of
-//! branches we need two loops. Consider bytecode for an if-then-else
-//!
-//! ```ignore
-//!   if c goto L1 else goto L2
-//!   label L1
-//!   .. then ..
-//!   goto L3
-//!   label L2
-//!   .. else ..
-//!   goto L3
-//!   label L3
-//!   .. end ..
-//! ```
-//!
-//! This is translated to:
-//!
-//! ```ignore
-//! loop {
-//!   loop {
-//!     if !c break;
-//!     .. then ..
-//!     break[1]
-//!   } // L2 jumps here
-//!   .. else ..
-//!   break
-//! } // L3 jumps here
-//! ```
-//!
-//! Notice at the point when those two loops are opened (on encountering
-//! `if c goto L1 else goto L2`), the label `L3` is not known. It appears
-//! somewhere later in the sequence of blocks, with an arbitrary number
-//! of other blocks in between resulting from nested control flows.
-//! The algorithm continues to process the blocks in topological
-//! order, opening sub-blocks as needed, until it encounters a jump
-//! to a label which is not yet associated with any loop, which is then
-//! associated with the unbound loop label. In the above bytecode example, this
-//! would be the first `jump L3` in sequence. This is sound
-//! because of the way how the blocks were sorted in (3): there are no
-//! "interleaving" control flows (as also mentioned in the linked article),
-//! and at the moment `L3` is encountered, no other sub-graphs of the control flow
-//! have still open blocks.
-//!
-//! ## 4.2 Closing Loops
+//! The way how this is implemented here is by maintaining a so-called `block_stack`
+//! which contains information of open blocks, and then walking over the blocks in the
+//! order as determined in (3). During this walk, blocks are created and sorted into the
+//! stack depending on the type of construct. For example, for a loop a block is pushed
+//! when the header is reached. For forward jumps, a block is inserted into the stack
+//! such that it is nested underneath existing blocks which encloses the jump target.
 //!
 //! Loops are closed when their exit label is reached. For the above
 //! example, the inner loop is closed on bytecode `label L2` and the
@@ -136,8 +91,12 @@ use move_model::{
     symbol::Symbol,
     ty::{ReferenceKind, Type},
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    cmp::Ordering,
+    collections::{BTreeMap, BTreeSet},
+};
 use topological_sort::TopologicalSort;
+use try_match::match_ok;
 
 const DEBUG: bool = false;
 
@@ -199,6 +158,7 @@ pub fn generate_ast_raw(target: &FunctionTarget) -> Option<Exp> {
         unreached_labels,
         used_labels: BTreeSet::new(),
         current_attr: None,
+        block_order: BTreeMap::new(),
     };
     Some(gen.gen(&ctx))
 }
@@ -240,6 +200,9 @@ struct Generator {
     used_labels: BTreeSet<Label>,
     /// The attribute of the current bytecode instruction processed.
     current_attr: Option<AttrId>,
+    /// A block ordering, maps each block id to an offset which determines
+    /// its order.
+    block_order: BTreeMap<BlockId, usize>,
 }
 
 /// Information about a block currently processed.
@@ -420,6 +383,14 @@ impl<'a> Context<'a> {
                     .filter(|l| !loop_blocks.contains(l));
                 after_loop_blocks.extend(outside_succs);
             }
+            if DEBUG {
+                debug!(
+                    "loop at {} blocks {} after blocks {}",
+                    header,
+                    loop_blocks.iter().map(|l| l.to_string()).join(","),
+                    after_loop_blocks.iter().map(|l| l.to_string()).join(","),
+                )
+            }
             // Store result
             self.loop_labels.insert(*header, loop_blocks);
             self.after_loop_labels.insert(*header, after_loop_blocks);
@@ -479,6 +450,20 @@ impl<'a> Context<'a> {
             .iter()
             .filter_map(|b| self.label_of_block(*b))
     }
+
+    /// Returns true of the edge `from` block `to` block is a back edge.
+    fn is_back_edge(&self, from: BlockId, to: BlockId) -> bool {
+        let range = self.forward_cfg.code_range(from);
+        if !range.is_empty() {
+            let code_offset = (range.end - 1) as CodeOffset;
+            if let Some(label) = self.label_of_block(to) {
+                if self.back_edges.contains(&(code_offset, label)) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
 }
 
 // -------------------------------------------------------------------------------------------
@@ -490,6 +475,13 @@ impl Generator {
         let mut blocks = ctx.forward_cfg.blocks();
         // Sort blocks topologically.
         self.sort_blocks(ctx, &mut blocks);
+        // Remember the order
+        self.block_order = blocks
+            .iter()
+            .cloned()
+            .enumerate()
+            .map(|(pos, blk_id)| (blk_id, pos))
+            .collect();
         // Push a virtual block onto the stack to collect outer statements.
         self.block_stack.push(BlockInfo {
             stms: vec![],
@@ -523,15 +515,8 @@ impl Generator {
         let original_blocks = std::mem::take(blocks);
         for blk_id in original_blocks {
             for succ in ctx.forward_cfg.successors(blk_id) {
-                let range = ctx.forward_cfg.code_range(blk_id);
-                if !range.is_empty() {
-                    let code_offset = (range.end - 1) as CodeOffset;
-                    if let Some(label) = ctx.label_of_block(*succ) {
-                        if ctx.back_edges.contains(&(code_offset, label)) {
-                            // This is a back edge, ignore for ordering
-                            continue;
-                        }
-                    }
+                if ctx.is_back_edge(blk_id, *succ) {
+                    continue;
                 }
                 top_sort.add_dependency(blk_id, *succ)
             }
@@ -548,39 +533,84 @@ impl Generator {
                 }
             }
         }
-        // Repeatedly pull blocks which do not have any successors left.
+
         loop {
-            let mut group = top_sort.pop_all();
+            // Peek the group of blocks which are available according to the partial order.
+            // We select one of them below.
+            let group = top_sort.peek_all();
             if group.is_empty() {
                 break;
             }
-            // Sort the members of the group (1) by priority of the block terminator. We want
-            // to have jumps and other exits first (2) by code offset as it was determined
-            // by the DFS ordering of blocks in cleanup.
-            let terminator_priority = |blk: BlockId| -> isize {
+            // Select the smallest of the group according to the following order:
+            // (1) A block belonging to an active loop is smaller.
+            // (2) Next, according the way blocks are terminated. This is semantically
+            //     not relevant, but leads to better readable code, e.g. abort
+            //     first.
+            // (2) Finally, which is earlier in the code as produced by the DFS ordering of blocks
+            //     in cleanup.
+            let current_loop = blocks
+                .last()
+                .and_then(|blk_id| ctx.label_of_block(*blk_id))
+                .and_then(|l| ctx.block_to_header.get(&l))
+                .cloned();
+            let loop_priority = |b1: BlockId| -> usize {
+                if current_loop
+                    .and_then(|header| {
+                        ctx.label_of_block(b1)
+                            .map(|l| ctx.loop_labels[&header].contains(&l))
+                    })
+                    .unwrap_or(false)
+                {
+                    // Block has higher priority since it belongs to active loop
+                    0
+                } else {
+                    1
+                }
+            };
+            let terminator_priority = |blk: BlockId| -> usize {
                 use Bytecode::*;
                 match ctx.code_for_block(blk).last() {
                     None => 0,
-                    Some(Jump(..)) => 1,
-                    Some(Abort(..)) => 2,
-                    Some(Ret(..)) => 3,
-                    Some(Branch(..)) => 4,
+                    Some(Abort(..)) => 1,
+                    Some(Jump(..)) => 2,
+                    Some(Branch(..)) => 3,
+                    Some(Ret(..)) => 4,
                     _ => panic!("unexpected block terminator"),
                 }
             };
-            group.sort_by(|b1, b2| {
-                let c = terminator_priority(*b1).cmp(&terminator_priority(*b2));
-                if c.is_eq() {
-                    // Use code offset
-                    ctx.forward_cfg
-                        .code_range(*b1)
-                        .start
-                        .cmp(&ctx.forward_cfg.code_range(*b2).start)
-                } else {
-                    c
+            let min = group
+                .iter()
+                .copied()
+                .copied()
+                .reduce(|b1, b2| {
+                    match loop_priority(b1).cmp(&loop_priority(b2)).then_with(|| {
+                        terminator_priority(b1)
+                            .cmp(&terminator_priority(b2))
+                            .then_with(|| {
+                                ctx.forward_cfg
+                                    .code_range(b1)
+                                    .start
+                                    .cmp(&ctx.forward_cfg.code_range(b2).start)
+                            })
+                    }) {
+                        Ordering::Less | Ordering::Equal => b1,
+                        Ordering::Greater => b2,
+                    }
+                })
+                .expect("non-empty `group`");
+            // Draw a virtual edge from the smallest node to all others, so next time
+            // we do top_sort.pop, we get the chosen one.
+            // What is the point of these edges? The 2nd pop will put the
+            // successors of the chosen one side-by-side with the non-chosen, allowing
+            // to traverse deeper in neighbors of the former. (Like additional loop
+            // blocks.) This allows to generate a tailored DFS order.
+            for other in group.into_iter().cloned().collect_vec() {
+                if other != min {
+                    top_sort.add_dependency(min, other)
                 }
-            });
-            blocks.append(&mut group)
+            }
+            debug_assert_eq!(min, top_sort.pop().expect("expected order consistent"));
+            blocks.push(min);
         }
         assert!(top_sort.is_empty(), "unexpected cycle in forward jumps");
         if DEBUG {
@@ -595,17 +625,6 @@ impl Generator {
 
         let block_code = ctx.code_for_block(block_id);
         let next_block_label = rest.first().and_then(|id| ctx.label_of_block(*id));
-        if let Some(loop_label) = ctx
-            .label_of_block(block_id)
-            .filter(|label| ctx.loop_headers.contains(label))
-        {
-            // This is the header of a loop, open a loop block
-            self.block_stack.push(BlockInfo {
-                stms: vec![],
-                break_label: None,
-                continue_label: Some(loop_label),
-            });
-        }
 
         for bc in block_code.iter() {
             self.set_current_attr(ctx, bc.get_attr_id());
@@ -613,7 +632,15 @@ impl Generator {
                 // Instructions dealing with control flow
                 Label(_, label) => {
                     // Mark the label as reached.
-                    self.label_reached(ctx, *label)
+                    self.label_reached(ctx, *label);
+                    // If this is the header of a loop, open a loop block
+                    if ctx.loop_headers.contains(label) {
+                        self.block_stack.push(BlockInfo {
+                            stms: vec![],
+                            break_label: None,
+                            continue_label: Some(*label),
+                        });
+                    }
                 },
                 Ret(_, temps) => {
                     let stm = ExpData::Return(
@@ -707,45 +734,29 @@ impl Generator {
             // Do the `if` as jump
             self.gen_jump(ctx, next_block_label, if_true)
         } else {
-            // Both are forward jumps. Determine which is fall through and swap
-            // branches if needed.
+            // Both are forward jumps. Determine whether false branch is a better fall through.
             let (negated_cond, if_true, if_false) = if Some(if_false) == next_block_label {
                 (cond, if_false, if_true)
             } else {
-                assert_eq!(
-                    Some(if_true),
-                    next_block_label,
-                    "at least one target must fall-through \
-                    (unexpected divergence of control flow)"
-                );
                 (self.make_not(ctx, cond), if_true, if_false)
             };
-            // Push two blocks such we generate code as follows:
+            // Push a block such we generate code as follows:
             // ```
-            //    cond = ...
-            //    block {
-            //      block {
-            //        if !cond break;
-            //        ..
-            //        break[2]
-            //      } // if_false target
-            //      ..
-            //      break
-            //    } // exit from inner computation
-            //
-            // The outer block serves as a target for any jumps exiting these blocks. At
-            // the point the block is pushed, the target is unbound, and will bound later
-            // during processing of blocks in topological order.
-            self.block_stack.push(BlockInfo {
-                stms: vec![],
-                break_label: None,
-                continue_label: None,
-            });
-            self.block_stack.push(BlockInfo {
-                stms: vec![],
-                break_label: Some(if_false),
-                continue_label: None,
-            });
+            //   block {
+            //     if !cond break;
+            //     <if_true>
+            //   }
+            //   <if_false>
+            // ```
+            self.add_block_to_stack(
+                ctx,
+                BlockInfo {
+                    stms: vec![],
+                    break_label: Some(if_false),
+                    continue_label: None,
+                },
+                if_false,
+            );
             self.used_labels.insert(if_false);
             self.add_stm(
                 ctx.builder
@@ -761,32 +772,64 @@ impl Generator {
             if let Some(nest) = self.find_continue_nest(ctx, target) {
                 // continue loop
                 self.add_stm(ctx.builder.continue_(&self.current_loc(ctx), nest))
-            } else {
-                // must bind to an outer block for forward jump
-                let nest = self.find_or_bind_break_nest(ctx, target);
+            } else if let Some(nest) = self.find_break_nest(ctx, target) {
+                // bind to an existing outer block for forward jump
                 self.add_stm(ctx.builder.break_(&self.current_loc(ctx), nest));
+            } else {
+                // we need to create a new block and add to the stack
+                let new_block = BlockInfo {
+                    stms: vec![],
+                    break_label: Some(target),
+                    continue_label: None,
+                };
+                self.add_block_to_stack(ctx, new_block, target);
+                self.add_stm(
+                    ctx.builder.break_(
+                        &self.current_loc(ctx),
+                        self.find_break_nest(ctx, target)
+                            .expect("expected label assigned"),
+                    ),
+                );
             }
         }
     }
 
-    fn find_or_bind_break_nest(&mut self, _ctx: &Context, label: Label) -> usize {
-        let len = self.block_stack.len();
-        for (nest, info) in self.block_stack.iter_mut().rev().enumerate() {
-            if nest >= len - 1 {
-                // Can't bind to outer virtual block
-                break;
-            }
-            match &info.break_label {
-                Some(l) if &label == l => return nest,
-                Some(_) => continue,
-                None => {
-                    // Label for this block not assigned, assign it now.
-                    info.break_label = Some(label);
-                    return nest;
+    /// Adds a new block for the given target to the block stack. This searches the stack
+    /// to find the point under which to nest the given block.
+    fn add_block_to_stack(&mut self, ctx: &Context, block_info: BlockInfo, target: Label) {
+        if let Some((idx, _)) = self.block_stack.iter().rev().find_position(|info| {
+            match info {
+                BlockInfo {
+                    continue_label: Some(header),
+                    ..
+                } => {
+                    // If the target block is part of this loop, it must be nested inside the loop
+                    ctx.loop_labels[header].contains(&target)
                 },
+                BlockInfo {
+                    break_label: Some(label),
+                    ..
+                } => {
+                    // If the target block is before this block, it must be nested inside the block
+                    self.label_comes_after(ctx, *label, target)
+                },
+                _ => false,
             }
+        }) {
+            // Insert nested in the other block.
+            self.block_stack
+                .insert(self.block_stack.len() - idx, block_info)
+        } else {
+            // Insert at top-level, beneath the virtual root block
+            self.block_stack.insert(1, block_info)
         }
-        panic!("label not found and all blocks are bound: {}", label);
+    }
+
+    /// Returns true if the first label is defined afterward in the code. This can
+    /// use the code offset for sorted blocks.
+    fn label_comes_after(&self, ctx: &Context, label: Label, other_label: Label) -> bool {
+        self.block_order[&ctx.block_of_label(label)]
+            > self.block_order[&ctx.block_of_label(other_label)]
     }
 
     fn find_continue_nest(&self, _ctx: &Context, label: Label) -> Option<usize> {
@@ -811,37 +854,23 @@ impl Generator {
         if DEBUG {
             self.dprint_stack(ctx, "closing", self.block_stack.iter().rev().take(1));
         }
-        let info = self.top_block();
-        // Check whether this is an obsolete block. Such a block has not been
-        // referenced via break or continue and can be eliminated.
-        if (info.break_label.is_none() || !self.used_labels.contains(&info.break_label.unwrap()))
-            && (info.continue_label.is_none()
-                || !self.used_labels.contains(&info.continue_label.unwrap()))
-        {
-            let stms = self.block_stack.pop().unwrap().stms;
-            for stm in stms {
-                // Need to adjust the nest of break/continue statements by -1, as we are not
-                // actually creating a loop block.
-                self.add_stm(rewrite_loop_nest(ctx.env(), stm, -1))
-            }
-            return;
-        }
+        let mut stms = self.block_stack.pop().unwrap().stms;
 
         // The last statement of a block which is not already terminated must have a break
-        let needs_break = info.stms.is_empty()
+        let needs_break = stms.is_empty()
             || !matches!(
-                info.stms.last().unwrap().as_ref(),
+                stms.last().unwrap().as_ref(),
                 ExpData::LoopCont(..)
                     | ExpData::Return(..)
                     | ExpData::Call(_, Operation::Abort, ..)
             );
         if needs_break {
-            self.add_stm(ctx.builder.break_(&self.current_loc(ctx), 0))
+            stms.push(ctx.builder.break_(&self.current_loc(ctx), 0))
         }
+
         // Create a loop and add to parent
-        let stms = self.block_stack.pop().unwrap().stms;
         let body = ctx.builder.seq(&self.current_loc(ctx), stms);
-        let stm = ExpData::Loop(self.new_stm_node_id(ctx), body).into_exp();
+        let stm = ctx.builder.loop_(body);
         self.add_stm(stm)
     }
 
@@ -862,50 +891,41 @@ impl Generator {
                 self.block_stack.iter().rev(),
             );
         }
-        if ctx.loop_headers.contains(&label) {
-            return;
-        }
-        // Compute the blocks to close as a result of this label being reached.
-        let mut new_stack_level = self.block_stack.len() - 1;
-        let mut skipping_unbound = true;
-        while new_stack_level > 0 {
-            match &self.block_stack[new_stack_level] {
+
+        // Close blocks as result of reaching this label
+        while self.block_stack.len() > 1 {
+            match self.block_stack.last().unwrap() {
                 BlockInfo {
                     continue_label: Some(header),
                     ..
                 } if !ctx.loop_labels[header].contains(&label) => {
-                    // The block is close because the reached label is not part of it
-                    new_stack_level -= 1;
-                    skipping_unbound = false;
+                    // The loop block is closed because the reached label is not part of it
+                    self.close_block(ctx);
+                    // Continue closing outer blocks
                 },
                 BlockInfo {
-                    break_label: None,
-                    continue_label: None,
+                    break_label: Some(break_label),
                     ..
                 } => {
-                    // The block has no binding yet, if an outer block is closed, we can
-                    // close it.
-                    new_stack_level -= 1;
-                    if self.unreached_labels.is_empty() {
-                        // The break label is not bound, but there is no more label to reach,
-                        // so we can close this block
-                        skipping_unbound = false;
+                    if break_label == &label {
+                        self.close_block(ctx);
+                    } else {
+                        // The label must not appear anywhere at an outer level, otherwise
+                        // we violated the invariants that blocks must not overlap
+                        assert!(
+                            !self
+                                .block_stack
+                                .iter()
+                                .any(|i| i.break_label == Some(label)),
+                            "invalid block nesting: expecting {} but reached {}",
+                            break_label,
+                            label
+                        )
                     }
-                },
-                BlockInfo {
-                    break_label: Some(label),
-                    ..
-                } if !self.unreached_labels.contains(label) => {
-                    // The block is actually reached
-                    new_stack_level -= 1;
-                    skipping_unbound = false;
+                    // Stop closing outer blocks
+                    break;
                 },
                 _ => break,
-            }
-        }
-        if !skipping_unbound {
-            while new_stack_level < self.block_stack.len() - 1 {
-                self.close_block(ctx)
             }
         }
         if DEBUG {
@@ -933,6 +953,10 @@ impl Generator {
                 Operation::MoveFunction(*mid, *fid),
                 srcs,
             ),
+            Closure(..) | Invoke => {
+                // TODO(#15664): implement closure opcodes for astifier
+                panic!("closure operations not supported: {:?}", oper)
+            },
             Pack(mid, sid, inst) => {
                 self.gen_call_stm(
                     ctx,
@@ -1147,12 +1171,6 @@ impl Generator {
             .expect("expected block stack not be empty")
     }
 
-    fn top_block(&self) -> &BlockInfo {
-        self.block_stack
-            .last()
-            .expect("expected block stack not be empty")
-    }
-
     fn add_stm(&mut self, exp: impl Into<Exp>) {
         self.top_block_mut().stms.push(exp.into())
     }
@@ -1348,8 +1366,6 @@ impl<'a> ExpRewriterFunctions for IfElseTransformer<'a> {
             self.rewrite_exp_descent(result)
         } else if let Some(result) = self.try_make_if(exp.clone()) {
             self.rewrite_exp_descent(result)
-        } else if let Some(result) = self.try_make_if_continue(exp.clone()) {
-            self.rewrite_exp_descent(result)
         } else {
             self.rewrite_exp_descent(exp)
         }
@@ -1359,77 +1375,63 @@ impl<'a> ExpRewriterFunctions for IfElseTransformer<'a> {
 impl<'a> IfElseTransformer<'a> {
     /// Attempts to create an if-then-else from the given expression.
     /// This recognizes the pattern below, as produced by the AST
-    /// generator:
+    /// generator. Here, with 'does not branch out of a loop' we mean
+    /// that an expressions does not contain any unbound break or
+    /// continue statements which point outside the given loop:
     ///
     /// ```move
     /// loop {
-    ///   loop {
-    ///     if (c) break; // exclusive binding to inner loop
-    ///     <else-branch>
-    ///     break[1]; // 1st binding to outer loop
+    ///   loop { // no loop header
+    ///     ( if (c_i) break; )+
+    ///     <else-branch> // no reference to inner loop
+    ///     break[1]
     ///   }
-    ///   <then-branch> // must not reference outer loop
-    ///   break | abort | return; // 2nd binding to outer loop or exit
+    ///   <then-branch>
+    /// }
+    /// ==>
+    /// if (c1 || .. || cn) {
+    ///   loop {
+    ///     <then-branch>
+    ///   }
+    /// else {
+    ///   loop {
+    ///     <else-branch> where loop_nest -= 1
+    ///   }
     /// }
     /// ```
-    ///
-    /// The comment at the break indicates that both loops
-    /// must have exactly one associated break statement.
     fn try_make_if_else(&self, exp: Exp) -> Option<Exp> {
         let node_id = exp.node_id();
         let default_loc = self.builder.env().get_node_loc(node_id);
-        let (outer_id, outer_body) = self.builder.match_loop(exp)?;
-        let (outer_first, outer_rest) = self.builder.extract_first(outer_body);
-        let (mut outer_rest, outer_break) = self
-            .builder
-            .extract_last(self.builder.seq(&default_loc, outer_rest));
 
-        let mut loop_binding_count = self.loop_to_cont[&outer_id].len();
-        if outer_break.is_loop_cont(Some(0), false) {
-            // This is a break against the outer loop, count
-            loop_binding_count -= 1
-        } else if matches!(
-            outer_break.as_ref(),
-            ExpData::Call(_, Operation::Abort, ..) | ExpData::Return(..)
-        ) {
-            // Not counting for loop bindings, and put expression
-            // back
-            outer_rest.push(outer_break)
-        } else {
+        // Match the pattern as described above
+        let outer_body = match_ok!(exp.as_ref(), ExpData::Loop(_, _0))?;
+        let (outer_first, then_branch) = self.builder.extract_first(outer_body.clone());
+        let (inner_id, inner_body) = match_ok!(outer_first.as_ref(), ExpData::Loop(_0, _1))?;
+        let (cond, inner_rest) = self.builder.match_if_break_list(inner_body.clone())?;
+        // When getting the else branch, do not match exits as there are better treated with
+        // if without else.
+        let else_branch = self.builder.extract_terminated_prefix(
+            &default_loc,
+            inner_rest,
+            1,
+            /*allow_exit*/ false,
+        )?;
+
+        // Check whether the inner 'loop' is not a loop header
+        self.check_no_loop_header(*inner_id)?;
+
+        // Check whether else-branch is not referencing the inner loop
+        if else_branch.branches_to(0..1) {
             return None;
         }
-
-        let (inner_id, inner_body) = self.builder.match_loop(outer_first)?;
-        if self.loop_to_cont[&inner_id].len() != 1 {
-            return None;
-        }
-        let (inner_first, mut inner_rest) = self.builder.extract_first(inner_body);
-        let inner_last = inner_rest.pop()?;
-        let cond = self.builder.match_if_loop_cont(inner_first, 0, false)?;
-        // If this break addresses the outer loop, and this one and the
-        // exit `outer_break` are all existing loop bindings, we found if-then-else.
-        if inner_last.is_loop_cont(Some(1), false) && loop_binding_count == 1 {
-            // found if-then-else
-            let if_true = rewrite_loop_nest(
-                self.builder.env(),
-                self.builder.seq(&default_loc, outer_rest),
-                -1,
-            );
-            let if_false = rewrite_loop_nest(
-                self.builder.env(),
-                self.builder.seq(&default_loc, inner_rest),
-                -2,
-            );
-            let (cond, if_true, if_false) =
-                if let ExpData::Call(_, Operation::Not, args) = cond.as_ref() {
-                    (args[0].clone(), if_false, if_true)
-                } else {
-                    (cond, if_true, if_false)
-                };
-            Some(self.builder.if_else(cond, if_true, if_false))
-        } else {
-            None
-        }
+        // Create result
+        let else_branch = else_branch.rewrite_loop_nest(-1);
+        let then_branch = self.builder.seq(&default_loc, then_branch);
+        Some(self.builder.if_else(
+            cond.clone(),
+            self.builder.push_loop_block_into(then_branch),
+            self.builder.push_loop_block_into(else_branch),
+        ))
     }
 
     /// Attempts to create an if-then (without else) from the given expression.
@@ -1437,74 +1439,64 @@ impl<'a> IfElseTransformer<'a> {
     /// generator:
     ///
     /// ```move
-    ///   loop {
-    ///     if (c) break; // 1st binding to loop
-    ///     <then-branch>
-    ///     break         // 2nd binding to loop
+    ///   loop { // no loop header
+    ///     ( if (c_i) break; )+
+    ///     <then-branch> // does not reference loop
+    ///     break|abort|return|continue
+    ///   }
+    ///
+    /// ==>
+    ///
+    ///   if (!(c1 || .. || cn)) {
+    ///     <then-branch> where loop_nest -= 1
     ///   }
     /// ```
     fn try_make_if(&self, exp: Exp) -> Option<Exp> {
         let node_id = exp.node_id();
         let default_loc = self.builder.env().get_node_loc(node_id);
-        let (loop_id, body) = self.builder.match_loop(exp)?;
-        if self.loop_to_cont[&loop_id].len() != 2 {
+
+        // Match the pattern as described above
+        let (loop_id, body) = match_ok!(exp.as_ref(), ExpData::Loop(_0, _1))?;
+        let (cond, rest) = self.builder.match_if_break_list(body.clone())?;
+        let then_branch = self.builder.extract_terminated_prefix(
+            &default_loc,
+            rest,
+            0,
+            /*allow_exit*/ true,
+        )?;
+
+        // Check conditions
+        self.check_no_loop_header(*loop_id)?;
+        if then_branch.branches_to(0..1) {
             return None;
         }
-        let (first, rest) = self.builder.extract_first(body);
-        let cond = self.builder.match_if_loop_cont(first, 0, false)?;
-        let (rest, last) = self
-            .builder
-            .extract_last(self.builder.seq(&default_loc, rest));
-        if !last.is_loop_cont(Some(0), false) {
-            return None;
-        }
+
+        // Construct result
+        let then_branch = then_branch.rewrite_loop_nest(-1);
         Some(self.builder.if_else(
             self.builder.not(cond),
-            rewrite_loop_nest(self.builder.env(), self.builder.seq(&default_loc, rest), -1),
+            then_branch,
             self.builder.nop(&default_loc),
         ))
     }
 
-    /// Attempts to create an if-then-continue from the given expression.
-    /// This recognizes the pattern below, as produced by the AST
-    /// generator for while loop style code:
-    ///
-    /// ```move
-    ///   loop {
-    ///     if (c) break; // exclusive binding to loop
-    ///     <then-branch>
-    ///     continue[n]   // continue in outer loop with n > 0
-    ///   }
-    /// ```
-    fn try_make_if_continue(&self, exp: Exp) -> Option<Exp> {
-        let node_id = exp.node_id();
-        let default_loc = self.builder.env().get_node_loc(node_id);
-        let (loop_id, body) = self.builder.match_loop(exp)?;
-        if self.loop_to_cont[&loop_id].len() != 1 {
-            return None;
-        }
-        let (first, rest) = self.builder.extract_first(body);
-        let cond = self.builder.match_if_loop_cont(first, 0, false)?;
-        if rest.is_empty() {
-            return None;
-        }
-        if matches!(rest.last().unwrap().as_ref(), ExpData::LoopCont(_, _, true)) {
-            Some(self.builder.if_else(
-                self.builder.not(cond),
-                rewrite_loop_nest(self.builder.env(), self.builder.seq(&default_loc, rest), -1),
-                self.builder.nop(&default_loc),
-            ))
-        } else {
+    fn check_no_loop_header(&self, node_id: NodeId) -> Option<()> {
+        if self
+            .loop_to_cont
+            .get(&node_id)
+            .map(|conts| conts.iter().any(|(_, is_cont)| *is_cont))
+            .unwrap_or(false)
+        {
             None
+        } else {
+            Some(())
         }
     }
 }
 
 // ===================================================================================
 
-/// A rewriter which eliminates single and unused assignments
-/// and introduces lets
-/// for all free variables.
+/// A rewriter which eliminates single and unused assignments.
 pub fn transform_assigns(target: &FunctionTarget, exp: Exp) -> Exp {
     let usage = analyze_usage(target, exp.as_ref());
     let builder = ExpBuilder::new(target.global_env());
@@ -1518,10 +1510,11 @@ pub fn bind_free_vars(target: &FunctionTarget, exp: Exp) -> Exp {
     FreeVariableBinder {
         usage,
         builder,
-        parameter_names: target
+        // Parameters set to be bound
+        bound_vars: vec![target
             .get_parameters()
             .map(|temp| target.get_local_name(temp))
-            .collect(),
+            .collect()],
     }
     .rewrite_exp(exp)
 }
@@ -1533,13 +1526,14 @@ struct AssignTransformer<'a> {
     builder: ExpBuilder<'a>,
 }
 
+#[allow(unused)]
 struct FreeVariableBinder<'a> {
     /// Usage information about variables in the expression
     usage: BTreeMap<NodeId, UsageInfo>,
     /// The expression builder.
     builder: ExpBuilder<'a>,
-    /// The symbolic names of function parameters
-    parameter_names: BTreeSet<Symbol>,
+    /// Variables which are bound in outer scopes
+    bound_vars: Vec<BTreeSet<Symbol>>,
 }
 
 impl<'a> ExpRewriterFunctions for AssignTransformer<'a> {
@@ -1555,7 +1549,19 @@ impl<'a> ExpRewriterFunctions for AssignTransformer<'a> {
 
 impl<'a> AssignTransformer<'a> {
     fn simplify_seq(&mut self, seq_id: NodeId, stms: &[Exp]) -> Vec<Exp> {
-        let seq_usage = self.usage[&seq_id].clone();
+        let Some(last) = stms.last() else {
+            return vec![];
+        };
+        let mut after_block_usage = self.usage[&last.node_id()].clone();
+        if matches!(last.as_ref(), ExpData::LoopCont(..)) && stms.len() > 1 {
+            // TODO: it seems to be weird to need to go back after terminator, but the usage
+            //   after the terminator is cleared (because the code there is never used). Lets try
+            //   to consolidate this in a better way
+            let before_last = &stms[stms.len() - 2];
+            if let Some(u) = self.usage.get(&before_last.node_id()) {
+                after_block_usage.join(u);
+            }
+        }
         let mut blocks = vec![];
         let mut new_stms = vec![];
         let mut substitution: BTreeMap<Symbol, Exp> = BTreeMap::new();
@@ -1568,7 +1574,7 @@ impl<'a> AssignTransformer<'a> {
                 ExpData::Assign(id, Pattern::Var(_, var), rhs)
                 if
                 // Cannot be read outside this block
-                seq_usage.read_count(*var) == 0 &&
+                after_block_usage.read_count(*var) == 0 &&
                     // Must be read zero or once inside the block
                     stm_usage.read_count(*var) <= 1 &&
                     // If it's been written to after, only via this exact statement (this
@@ -1583,15 +1589,19 @@ impl<'a> AssignTransformer<'a> {
                             self.rewrite_exp(self.builder.unfold(&substitution, rhs.clone())));
                     },
                 // Check whether an assignment can be transformed into a let
+                // TODO: refine to the correct implementation, the below doesn't work
+                //   if variable is already assigned (need reaching definitions).
+                /*
                 ExpData::Assign(_, pat, rhs)
                 // None of the variables in the pattern is used after the block
-                if pat.vars().into_iter().all(|(_, var)| seq_usage.read_count(var) == 0) => {
+                if pat.vars().into_iter().all(|(_, var)| after_block_usage.read_count(var) == 0) => {
                     // Save building the block for later when we have the rest of the sequence
                     blocks.push((new_stms, pat.clone(),
                                  self.rewrite_exp(
                                      self.builder.unfold(&substitution, rhs.clone()))));
                     new_stms = vec![];
                 }
+                 */
                 _ => {
                     new_stms.push(self.rewrite_exp(
                         self.builder.unfold(&substitution, stm.clone())))
@@ -1612,78 +1622,20 @@ impl<'a> AssignTransformer<'a> {
 }
 
 impl<'a> ExpRewriterFunctions for FreeVariableBinder<'a> {
-    fn rewrite_exp(&mut self, exp: Exp) -> Exp {
-        let last = self.builder.extract_last(exp.clone()).1;
-        let last_id = last.node_id();
-        let exp = self.rewrite_exp_descent(exp);
-        if matches!(exp.as_ref(), ExpData::Sequence(..) | ExpData::Block(..)) {
-            if let Some(usage) = self.usage.get(&last_id) {
-                // Bind any locals which are still free and not used after this expression,
-                // and are not parameters.
-                let mut locals = vec![];
-                exp.visit_free_local_vars(|node_id, var| locals.push((node_id, var)));
-                let mut bound = BTreeSet::new();
-                for (node_id, var) in locals {
-                    if self.parameter_names.contains(&var) {
-                        // Do not bind parameters
-                        continue;
-                    }
-                    if bound.insert(var)
-                        // Check whether the variable is not used after this block
-                        && usage.read_count(var) == 0
-                    {
-                        return self.builder.block(
-                            Pattern::Var(self.builder.clone_node_id(node_id), var),
-                            None,
-                            exp.clone(),
-                        );
-                    }
-                }
-            }
-        }
-        exp
-    }
-}
-
-// ===================================================================================
-
-/// Rewrite an expression such that any break/continue nests referring to outer loops
-/// have the given delta added to their nesting. This simulates removing or adding a loop to
-/// the given expression. Nests bound to loops of the given expression are not effected.
-///
-/// If this is needed elsewhere we can move it out, currently it's a local helper.
-fn rewrite_loop_nest(_env: &GlobalEnv, exp: Exp, delta: isize) -> Exp {
-    LoopLifter {
-        loop_depth: 0,
-        delta,
-    }
-    .rewrite_exp(exp)
-}
-
-struct LoopLifter {
-    loop_depth: usize,
-    delta: isize,
-}
-
-impl ExpRewriterFunctions for LoopLifter {
-    fn rewrite_exp(&mut self, exp: Exp) -> Exp {
-        match exp.as_ref() {
-            ExpData::LoopCont(id, nest, cont) if *nest >= self.loop_depth => {
-                let new_nest = (*nest as isize) + self.delta;
-                assert!(
-                    new_nest >= 0,
-                    "loop removed which has break/continue references?"
+    fn rewrite_exp(&mut self, mut exp: Exp) -> Exp {
+        // TODO: this currently just adds lets on outermost level.
+        //   Refine this to push lets down to leafs.
+        let mut bound = BTreeSet::new();
+        exp.clone().visit_free_local_vars(|node_id, var| {
+            if bound.insert(var) && !self.bound_vars.iter().any(|b| b.contains(&var)) {
+                exp = self.builder.block(
+                    Pattern::Var(self.builder.clone_node_id(node_id), var),
+                    None,
+                    exp.clone(),
                 );
-                ExpData::LoopCont(*id, new_nest as usize, *cont).into_exp()
-            },
-            ExpData::Loop(_, _) => {
-                self.loop_depth += 1;
-                let result = self.rewrite_exp_descent(exp);
-                self.loop_depth -= 1;
-                result
-            },
-            _ => self.rewrite_exp_descent(exp),
-        }
+            }
+        });
+        exp
     }
 }
 
@@ -1874,18 +1826,33 @@ where
         exp: &ExpData,
         mut post_state: D,
     ) {
+        assert!(!self.forward);
         post_state_map.insert(exp.node_id(), post_state.clone());
         match exp {
             ExpData::Sequence(_, stms) if !stms.is_empty() => {
                 for stm in stms.iter().rev() {
+                    if let ExpData::LoopCont(cont_id, _, true) = stm.as_ref() {
+                        let header = self.cont_to_loop[cont_id];
+                        post_state = post_state_map[&header].clone();
+                    }
                     self.compute_post_state(post_state_map, stm.as_ref(), post_state);
-                    post_state = self.state[&stm.node_id()].clone();
+                    post_state = self.state(&stm.node_id()).cloned().unwrap_or_default();
                 }
             },
-            ExpData::Loop(_, body) => self.compute_post_state(post_state_map, body, post_state),
+            ExpData::Loop(id, body) => {
+                for (cont_id, is_cont) in &self.loop_to_cont[id] {
+                    if *is_cont {
+                        post_state_map.insert(*cont_id, post_state.clone());
+                    }
+                }
+                self.compute_post_state(post_state_map, body, post_state)
+            },
             ExpData::IfElse(_, _, if_true, if_false) => {
                 self.compute_post_state(post_state_map, if_true, post_state.clone());
                 self.compute_post_state(post_state_map, if_false, post_state.clone())
+            },
+            ExpData::Block(_, _, _, body) => {
+                self.compute_post_state(post_state_map, body, post_state)
             },
             _ => {
                 // leaf
@@ -1907,6 +1874,10 @@ where
                 if !self.forward {
                     (self.step_fun)(state, cond.as_ref());
                 }
+                self.join(state, id)
+            },
+            Block(id, _, _, body) => {
+                self.run(state, body);
                 self.join(state, id)
             },
             Sequence(id, stms) => {
@@ -1958,6 +1929,11 @@ where
                     self.join(state, id)
                 }
             },
+            LoopCont(id, _, false) if !self.forward => {
+                // On backwards analysis and a break, reset state to annotated
+                // one
+                *state = self.state(id).cloned().unwrap_or_default();
+            },
             _ => {
                 // All other expressions are treated as "flat", that is, we directly
                 // call the step function on them.
@@ -1975,7 +1951,13 @@ where
         }
     }
 
-    #[allow(unused)]
+    fn is_terminator(&self, exp: &ExpData) -> bool {
+        matches!(
+            exp,
+            ExpData::LoopCont(..) | ExpData::Return(..) | ExpData::Call(_, Operation::Abort, ..)
+        )
+    }
+
     fn state(&self, id: &NodeId) -> Option<&D> {
         self.state.get(id)
     }
@@ -1988,12 +1970,5 @@ where
             self.state.insert(*id, state.clone());
             self.changed = JoinResult::Changed
         }
-    }
-
-    pub fn is_terminator(&self, exp: &ExpData) -> bool {
-        matches!(
-            exp,
-            ExpData::LoopCont(..) | ExpData::Return(..) | ExpData::Call(_, Operation::Abort, ..)
-        )
     }
 }

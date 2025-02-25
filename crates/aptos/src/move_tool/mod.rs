@@ -45,7 +45,7 @@ use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_rest_client::{
     aptos_api_types::{EntryFunctionId, HexEncodedBytes, IdentifierWrapper, MoveModuleId},
     error::RestError,
-    Client,
+    AptosBaseUrl, Client,
 };
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
@@ -206,8 +206,8 @@ impl FrameworkPackageArgs {
         prompt_options: PromptOptions,
     ) -> CliTypedResult<()> {
         const APTOS_FRAMEWORK: &str = "AptosFramework";
-        const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-core.git";
-        const SUBDIR_PATH: &str = "aptos-move/framework/aptos-framework";
+        const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-framework.git";
+        const SUBDIR_PATH: &str = "aptos-framework";
         const DEFAULT_BRANCH: &str = "mainnet";
 
         let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
@@ -390,6 +390,10 @@ pub struct CompilePackage {
     #[clap(long)]
     pub save_metadata: bool,
 
+    /// Fetch dependencies of a package from the network, skipping the actual compilation
+    #[clap(long)]
+    pub fetch_deps_only: bool,
+
     #[clap(flatten)]
     pub included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
@@ -410,6 +414,12 @@ impl CliCommand<Vec<String>> for CompilePackage {
                 .included_artifacts
                 .build_options(&self.move_options)?
         };
+        let package_path = self.move_options.get_package_path()?;
+        if self.fetch_deps_only {
+            let config = BuiltPackage::create_build_config(&build_options)?;
+            BuiltPackage::prepare_resolution_graph(package_path, config)?;
+            return Ok(vec![]);
+        }
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
         if self.save_metadata {
@@ -564,8 +574,14 @@ impl CliCommand<&'static str> for TestPackage {
                     self.move_options.bytecode_version,
                     self.move_options.language_version,
                 ),
-                compiler_version: self.move_options.compiler_version,
-                language_version: self.move_options.language_version,
+                compiler_version: self
+                    .move_options
+                    .compiler_version
+                    .or_else(|| Some(CompilerVersion::latest_stable())),
+                language_version: self
+                    .move_options
+                    .language_version
+                    .or_else(|| Some(LanguageVersion::latest_stable())),
                 experiments: experiments_from_opt_level(&self.move_options.optimize),
             },
             ..Default::default()
@@ -717,12 +733,15 @@ impl CliCommand<&'static str> for DocumentPackage {
                 move_options.bytecode_version,
                 move_options.language_version,
             ),
-            compiler_version: move_options.compiler_version,
-            language_version: move_options.language_version,
+            compiler_version: move_options
+                .compiler_version
+                .or_else(|| Some(CompilerVersion::latest_stable())),
+            language_version: move_options
+                .language_version
+                .or_else(|| Some(LanguageVersion::latest_stable())),
             skip_attribute_checks: move_options.skip_attribute_checks,
             check_test_code: move_options.check_test_code,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
-            move_2: move_options.move_2,
             ..BuildOptions::default()
         };
         BuiltPackage::build(move_options.get_package_path()?, build_options)?;
@@ -821,6 +840,7 @@ impl AsyncTryInto<ChunkedPublishPayloads> for &PublishPackage {
             PublishType::AccountDeploy,
             None,
             self.chunked_publish_option.large_packages_module_address,
+            self.chunked_publish_option.chunk_size,
         )?;
 
         let size = &chunked_publish_payloads
@@ -899,8 +919,12 @@ impl IncludedArtifacts {
         let override_std = move_options.override_std.clone();
         let bytecode_version =
             fix_bytecode_version(move_options.bytecode_version, move_options.language_version);
-        let compiler_version = move_options.compiler_version;
-        let language_version = move_options.language_version;
+        let compiler_version = move_options
+            .compiler_version
+            .or_else(|| Some(CompilerVersion::latest_stable()));
+        let language_version = move_options
+            .language_version
+            .or_else(|| Some(LanguageVersion::latest_stable()));
         let skip_attribute_checks = move_options.skip_attribute_checks;
         let check_test_code = move_options.check_test_code;
         let optimize = move_options.optimize.clone();
@@ -908,11 +932,7 @@ impl IncludedArtifacts {
         experiments.append(&mut move_options.experiments.clone());
         experiments.append(&mut more_experiments);
 
-        // TODO(#14441): Remove `None |` here when we update default CompilerVersion
-        if matches!(
-            move_options.compiler_version,
-            Option::None | Some(CompilerVersion::V1)
-        ) {
+        if matches!(compiler_version, Some(CompilerVersion::V1)) {
             if !matches!(optimize, Option::None | Some(OptimizationLevel::Default)) {
                 return Err(CliError::CommandArgumentError(
                     "`--optimization-level`/`--optimize` flag is not compatible with Move Compiler V1"
@@ -1013,6 +1033,7 @@ fn create_chunked_publish_payloads(
     publish_type: PublishType,
     object_address: Option<AccountAddress>,
     large_packages_module_address: AccountAddress,
+    chunk_size: usize,
 ) -> CliTypedResult<ChunkedPublishPayloads> {
     let compiled_units = package.extract_code();
     let metadata = package.extract_metadata()?;
@@ -1030,6 +1051,7 @@ fn create_chunked_publish_payloads(
         publish_type,
         maybe_object_address,
         large_packages_module_address,
+        chunk_size,
     );
 
     Ok(ChunkedPublishPayloads { payloads })
@@ -1157,6 +1179,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 PublishType::AccountDeploy,
                 None,
                 self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option.chunk_size,
             )?
             .payloads;
             let staging_tx_count = (mock_payloads.len() - 1) as u64;
@@ -1183,6 +1206,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 PublishType::ObjectDeploy,
                 None,
                 self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option.chunk_size,
             )?
             .payloads;
 
@@ -1295,6 +1319,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
                 self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option.chunk_size,
             )?
             .payloads;
 
@@ -1386,6 +1411,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                 PublishType::AccountDeploy,
                 None,
                 self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option.chunk_size,
             )?
             .payloads;
             let staging_tx_count = (mock_payloads.len() - 1) as u64;
@@ -1412,6 +1438,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                 PublishType::ObjectDeploy,
                 None,
                 self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option.chunk_size,
             )?
             .payloads;
 
@@ -1530,6 +1557,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
                 self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option.chunk_size,
             )?
             .payloads;
 
@@ -2179,6 +2207,11 @@ pub struct Replay {
     /// If present, skip the comparison against the expected transaction output.
     #[clap(long)]
     pub(crate) skip_comparison: bool,
+
+    /// Key to use for ratelimiting purposes with the node API. This value will be used
+    /// as `Authorization: Bearer <key>`
+    #[clap(long)]
+    pub(crate) node_api_key: Option<String>,
 }
 
 impl FromStr for ReplayNetworkSelection {
@@ -2216,10 +2249,20 @@ impl CliCommand<TransactionSummary> for Replay {
             RestEndpoint(url) => url,
         };
 
-        let debugger = AptosDebugger::rest_client(Client::new(
+        // Build the client
+        let client = Client::builder(AptosBaseUrl::Custom(
             Url::parse(rest_endpoint)
                 .map_err(|_err| CliError::UnableToParse("url", rest_endpoint.to_string()))?,
-        ))?;
+        ));
+
+        // add the node API key if it is provided
+        let client = if let Some(api_key) = self.node_api_key {
+            client.api_key(&api_key).unwrap().build()
+        } else {
+            client.build()
+        };
+
+        let debugger = AptosDebugger::rest_client(client)?;
 
         // Fetch the transaction to replay.
         let (txn, txn_info) = debugger

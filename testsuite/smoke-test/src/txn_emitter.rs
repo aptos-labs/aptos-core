@@ -37,7 +37,8 @@ pub async fn generate_traffic(
     .await?;
     let transaction_factory =
         TransactionFactory::new(swarm.chain_info().chain_id).with_gas_unit_price(gas_price);
-    let emitter = TxnEmitter::new(transaction_factory, rng);
+    let rest_cli = swarm.validators().next().unwrap().rest_client();
+    let emitter = TxnEmitter::new(transaction_factory, rng, rest_cli);
     emitter
         .emit_txn_for_with_stats(
             swarm.chain_info().root_account,
@@ -68,8 +69,8 @@ pub async fn generate_keyless_traffic(
     .await?;
     let transaction_factory =
         TransactionFactory::new(swarm.chain_info().chain_id).with_gas_unit_price(gas_price);
-
-    let emitter = TxnEmitter::new(transaction_factory, rng);
+    let rest_cli = swarm.validators().next().unwrap().rest_client();
+    let emitter = TxnEmitter::new(transaction_factory, rng, rest_cli);
     emitter
         .emit_txn_for_with_stats(
             swarm.chain_info().root_account,
@@ -146,10 +147,10 @@ static TRANSACTION_MIX_PER_PHASE: Lazy<Vec<Vec<(TransactionType, usize)>>> = Laz
             ),
             (
                 TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::MakeOrChangeTable {
+                    entry_point: Box::new(EntryPoints::MakeOrChangeTable {
                         offset: 0,
                         count: 60,
-                    },
+                    }),
                     num_modules: 1,
                     use_account_pool: false,
                 },
@@ -234,10 +235,10 @@ async fn test_txn_emmitter_with_high_pending_latency() {
         100,
         vec![vec![(
             TransactionType::CallCustomModules {
-                entry_point: EntryPoints::SmartTablePicture {
+                entry_point: Box::new(EntryPoints::SmartTablePicture {
                     length: 128 * 1024,
                     num_points_per_txn: 256,
-                },
+                }),
                 num_modules: 1,
                 use_account_pool: false,
             },
@@ -255,7 +256,7 @@ async fn test_txn_emmitter_low_funds() {
     let account_1 = create_and_fund_account(&mut swarm, 5705100).await;
 
     let transaction_type = TransactionType::CallCustomModules {
-        entry_point: EntryPoints::Nop,
+        entry_point: Box::new(EntryPoints::Nop),
         num_modules: 1,
         use_account_pool: false,
     };
@@ -267,7 +268,7 @@ async fn test_txn_emmitter_low_funds() {
         .collect::<Vec<_>>();
     let chain_info = swarm.chain_info();
     let transaction_factory = TransactionFactory::new(chain_info.chain_id).with_gas_unit_price(100);
-    let emitter = TxnEmitter::new(transaction_factory, rng);
+    let emitter = TxnEmitter::new(transaction_factory, rng, validator_clients[0].clone());
 
     let emit_job_request = EmitJobRequest::default()
         .rest_clients(validator_clients)

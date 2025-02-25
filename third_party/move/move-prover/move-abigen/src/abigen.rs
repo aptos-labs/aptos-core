@@ -6,11 +6,12 @@ use anyhow::{anyhow, bail};
 use heck::ToSnakeCase;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
-use move_binary_format::{file_format::Ability, CompiledModule};
+use move_binary_format::CompiledModule;
 use move_bytecode_verifier::script_signature;
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_core_types::{
     abi::{ArgumentABI, ScriptABI, ScriptFunctionABI, TransactionScriptABI, TypeArgumentABI},
+    ability::Ability,
     identifier::IdentStr,
     language_storage::{StructTag, TypeTag},
 };
@@ -324,7 +325,7 @@ impl<'env> Abigen<'env> {
             },
             Tuple(_)
             | TypeParameter(_)
-            | Fun(_, _)
+            | Fun(..)
             | TypeDomain(_)
             | ResourceDomain(..)
             | Error

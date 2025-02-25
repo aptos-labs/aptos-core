@@ -28,4 +28,4 @@ error: cannot move local `x` since it is still in use
 4 │         let y = move x;
   │                 ^^^^^^ attempted to move here
 5 │         x + y
-  │         ----- used here
+  │         - used here

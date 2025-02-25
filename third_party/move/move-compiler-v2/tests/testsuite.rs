@@ -106,7 +106,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         // Turn optimization on by default. Some configs below may turn it off.
         .set_experiment(Experiment::OPTIMIZE, true)
         .set_experiment(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true)
-        .set_language_version(LanguageVersion::V2_1);
+        .set_language_version(LanguageVersion::latest_stable());
     opts.testing = true;
     let configs = vec![
         // --- Tests for checking and ast processing
@@ -160,7 +160,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter: None,
         },
-        // Tests for lambda lifting and lambdas -- with full lambda support
+        // Tests for lambda lifting and lambdas, with function values enabled
         TestConfig {
             name: "lambda",
             runner: |p| run_test(p, get_config_by_name("lambda")),
@@ -170,13 +170,11 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             options: opts
                 .clone()
                 // .set_experiment(Experiment::AST_SIMPLIFY, true)
-                .set_experiment(Experiment::LAMBDA_FIELDS, true)
-                .set_experiment(Experiment::LAMBDA_IN_PARAMS, true)
-                .set_experiment(Experiment::LAMBDA_IN_RETURNS, true)
-                .set_experiment(Experiment::LAMBDA_VALUES, true)
-                .set_experiment(Experiment::LAMBDA_LIFTING, true),
+                .set_experiment(Experiment::FUNCTION_VALUES, true)
+                .set_experiment(Experiment::LAMBDA_LIFTING, true)
+                .set_language_version(LanguageVersion::V2_LAMBDA),
             stop_after: StopAfter::FileFormat,
-            dump_ast: DumpLevel::AllStages,
+            dump_ast: DumpLevel::EndStage,
             dump_bytecode: DumpLevel::EndStage,
             dump_bytecode_filter: None,
         },
@@ -214,7 +212,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         TestConfig {
             name: "inlining-et-al",
             runner: |p| run_test(p, get_config_by_name("inlining-et-al")),
-            include: vec!["/inlining/", "/folding/", "/simplifier/", "/lambda/"],
+            include: vec!["/inlining/", "/folding/", "/simplifier/"],
             exclude: vec!["/more-v1/"],
             exp_suffix: None,
             options: opts.clone().set_experiment(Experiment::AST_SIMPLIFY, true),
@@ -264,7 +262,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,
             dump_bytecode: DumpLevel::EndStage,
-            dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE]),
+            dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE, FILE_FORMAT_STAGE]),
         },
         // -- Tests for stages in the bytecode pipeline
         // Live-var tests
@@ -275,10 +273,15 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exclude: vec![],
             exp_suffix: None,
             options: opts.clone(),
-            stop_after: StopAfter::BytecodePipeline(Some("LiveVarAnalysisProcessor")),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::AllStages,
-            dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE, "LiveVarAnalysisProcessor"]),
+            dump_bytecode_filter: Some(vec![
+                INITIAL_BYTECODE_STAGE,
+                "LiveVarAnalysisProcessor",
+                FILE_FORMAT_STAGE,
+            ]),
         },
         // Reference safety tests, old version (with optimizations on)
         TestConfig {
@@ -385,7 +388,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exclude: vec![],
             exp_suffix: None,
             options: opts.clone(),
-            stop_after: StopAfter::BytecodePipeline(Some("AbilityProcessor")),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::AllStages,
             dump_bytecode_filter: Some(vec![
@@ -394,6 +398,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 "LiveVarAnalysisProcessor",
                 "ReferenceSafetyProcessor",
                 "AbilityProcessor",
+                FILE_FORMAT_STAGE,
             ]),
         },
         TestConfig {
@@ -540,6 +545,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 INITIAL_BYTECODE_STAGE,
                 "UnreachableCodeProcessor",
                 "UnreachableCodeRemover",
+                FILE_FORMAT_STAGE,
             ]),
         },
         // Uninitialized use checker
@@ -552,10 +558,15 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             options: opts
                 .clone()
                 .set_experiment(Experiment::KEEP_UNINIT_ANNOTATIONS, true),
-            stop_after: StopAfter::BytecodePipeline(Some("uninitialized_use_checker")),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::AllStages,
-            dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE, "uninitialized_use_checker"]),
+            dump_bytecode_filter: Some(vec![
+                INITIAL_BYTECODE_STAGE,
+                "uninitialized_use_checker",
+                FILE_FORMAT_STAGE,
+            ]),
         },
         // -- File Format Generation
         // Test without bytecode optimizations enabled
@@ -671,21 +682,6 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode_filter: None,
         },
         TestConfig {
-            name: "lint-checks",
-            runner: |p| run_test(p, get_config_by_name("lint-checks")),
-            include: vec![
-                "/lints/model_ast_lints/",
-                "/lints/stackless_bytecode_lints/",
-            ],
-            exclude: vec![],
-            exp_suffix: None,
-            options: opts.clone().set_experiment(Experiment::LINT_CHECKS, true),
-            stop_after: StopAfter::FileFormat,
-            dump_ast: DumpLevel::None,
-            dump_bytecode: DumpLevel::None,
-            dump_bytecode_filter: None,
-        },
-        TestConfig {
             name: "control-flow-simplification-on",
             runner: |p| run_test(p, get_config_by_name("control-flow-simplification-on")),
             include: vec!["/control-flow-simplification/"],
@@ -738,6 +734,20 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::EndStage,
             dump_bytecode_filter: None,
         },
+        TestConfig {
+            name: "compiler-message-format-json",
+            runner: |p| run_test(p, get_config_by_name("compiler-message-format-json")),
+            include: vec!["/compiler-message-format-json/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts
+                .clone()
+                .set_experiment(Experiment::MESSAGE_FORMAT_JSON, true),
+            stop_after: StopAfter::AstPipeline,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::None,
+            dump_bytecode_filter: None,
+        },
     ];
     configs.into_iter().map(|c| (c.name, c)).collect()
 });
@@ -781,7 +791,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
 
     // Run context checker
     let mut env = move_compiler_v2::run_checker(options.clone())?;
-    let mut ok = check_diags(&mut test_output.borrow_mut(), &env);
+    let mut ok = check_diags(&mut test_output.borrow_mut(), &env, &options);
 
     if ok {
         // Run env processor pipeline.
@@ -797,10 +807,10 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
             test_output
                 .borrow_mut()
                 .push_str(&String::from_utf8_lossy(&out.into_inner()));
-            ok = check_diags(&mut test_output.borrow_mut(), &env);
+            ok = check_diags(&mut test_output.borrow_mut(), &env, &options);
         } else {
             env_pipeline.run(&mut env);
-            ok = check_diags(&mut test_output.borrow_mut(), &env);
+            ok = check_diags(&mut test_output.borrow_mut(), &env, &options);
             if ok && config.dump_ast == DumpLevel::EndStage {
                 test_output.borrow_mut().push_str(&format!(
                     "// -- Model dump before bytecode pipeline\n{}\n",
@@ -825,13 +835,13 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         // In real use, this is run outside of the compilation process, but the needed info is
         // available in `env` once we finish the AST.
         plan_builder::construct_test_plan(&env, None);
-        ok = check_diags(&mut test_output.borrow_mut(), &env);
+        ok = check_diags(&mut test_output.borrow_mut(), &env, &options);
     }
 
     if ok && config.stop_after > StopAfter::AstPipeline {
         // Run stackless bytecode generator
         let mut targets = move_compiler_v2::run_bytecode_gen(&env);
-        ok = check_diags(&mut test_output.borrow_mut(), &env);
+        ok = check_diags(&mut test_output.borrow_mut(), &env, &options);
         if ok {
             // Run the target pipeline.
             let bytecode_pipeline = if config.stop_after == StopAfter::BytecodeGen {
@@ -853,7 +863,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                 // bytecode from the generator, if requested.
                 |targets_before| {
                     let out = &mut test_output.borrow_mut();
-                    update_diags(ok.borrow_mut(), out, &env);
+                    update_diags(ok.borrow_mut(), out, &env, &options);
                     if bytecode_dump_enabled(&config, true, INITIAL_BYTECODE_STAGE) {
                         let dump =
                             &move_stackless_bytecode::print_targets_with_annotations_for_test(
@@ -871,7 +881,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                 // bytecode after the processor, if requested.
                 |i, processor, targets_after| {
                     let out = &mut test_output.borrow_mut();
-                    update_diags(ok.borrow_mut(), out, &env);
+                    update_diags(ok.borrow_mut(), out, &env, &options);
                     if bytecode_dump_enabled(&config, i + 1 == count, processor.name().as_str()) {
                         let title = format!("after {}:", processor.name());
                         let dump =
@@ -891,7 +901,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
             if *ok.borrow() && config.stop_after == StopAfter::FileFormat {
                 let units = run_file_format_gen(&mut env, &targets);
                 let out = &mut test_output.borrow_mut();
-                update_diags(ok.borrow_mut(), out, &env);
+                update_diags(ok.borrow_mut(), out, &env, &options);
                 if *ok.borrow() {
                     if bytecode_dump_enabled(&config, true, FILE_FORMAT_STAGE) {
                         out.push_str(
@@ -905,7 +915,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                     } else {
                         out.push_str("\n============ bytecode verification failed ========\n");
                     }
-                    check_diags(out, &env);
+                    check_diags(out, &env, &options);
                 }
             }
         }
@@ -930,9 +940,12 @@ fn bytecode_dump_enabled(config: &TestConfig, is_last: bool, name: &str) -> bool
 }
 
 /// Checks for diagnostics and adds them to the baseline.
-fn check_diags(baseline: &mut String, env: &GlobalEnv) -> bool {
+fn check_diags(baseline: &mut String, env: &GlobalEnv, options: &Options) -> bool {
     let mut error_writer = Buffer::no_color();
-    env.report_diag(&mut error_writer, Severity::Note);
+    {
+        let mut emitter = options.error_emitter(&mut error_writer);
+        emitter.report_diag(env, Severity::Note);
+    }
     let diag = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
     if !diag.is_empty() {
         *baseline += &format!("\nDiagnostics:\n{}", diag);
@@ -942,8 +955,8 @@ fn check_diags(baseline: &mut String, env: &GlobalEnv) -> bool {
     ok
 }
 
-fn update_diags(mut ok: RefMut<bool>, baseline: &mut String, env: &GlobalEnv) {
-    if !check_diags(baseline, env) {
+fn update_diags(mut ok: RefMut<bool>, baseline: &mut String, env: &GlobalEnv, options: &Options) {
+    if !check_diags(baseline, env, options) {
         *ok = false;
     }
 }

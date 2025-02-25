@@ -5,7 +5,6 @@
 //! This file defines state store APIs that are related account state Merkle tree.
 
 use crate::{
-    common::NUM_STATE_SHARDS,
     ledger_db::LedgerDb,
     metrics::{OTHER_TIMERS_SECONDS, STATE_ITEMS, TOTAL_STATE_BYTES},
     pruner::{StateKvPrunerManager, StateMerklePrunerManager},
@@ -22,10 +21,9 @@ use crate::{
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
     state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode, StateValueWriter},
-    state_store::buffered_state::BufferedState,
+    state_store::{buffered_state::BufferedState, persisted_state::PersistedState},
     utils::{
         iterators::PrefixedStateValueIterator,
-        new_sharded_kv_schema_batch,
         truncation_helper::{
             find_tree_root_at_or_before, get_max_version_in_state_merkle_db, truncate_ledger_db,
             truncate_state_kv_db, truncate_state_merkle_db,
@@ -33,9 +31,8 @@ use crate::{
         ShardedStateKvSchemaBatch,
     },
 };
-use anyhow::Context;
 use aptos_crypto::{
-    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
+    hash::{CryptoHash, CORRUPTION_SENTINEL, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
@@ -43,43 +40,50 @@ use aptos_db_indexer_schemas::{
     metadata::{MetadataKey, MetadataValue, StateSnapshotProgress},
     schema::indexer_metadata::InternalIndexerMetadataSchema,
 };
-use aptos_executor::types::in_memory_state_calculator_v2::InMemoryStateCalculatorV2;
-use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
-use aptos_schemadb::SchemaBatch;
-use aptos_scratchpad::{SmtAncestors, SparseMerkleTree};
+use aptos_metrics_core::TimerHelper;
+use aptos_schemadb::batch::{NativeBatch, SchemaBatch, WriteBatch};
+use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
-    async_proof_fetcher::AsyncProofFetcher,
-    cached_state_view::{CachedStateView, ShardedStateCache},
     db_ensure as ensure, db_other_bail as bail,
-    state_delta::StateDelta,
+    state_store::{
+        state::{LedgerState, State},
+        state_summary::{ProvableStateSummary, StateSummary},
+        state_update_refs::{PerVersionStateUpdateRefs, StateUpdateRefs},
+        state_view::cached_state_view::{ShardedStateCache, StateCacheShard},
+        state_with_summary::{LedgerStateWithSummary, StateWithSummary},
+        versioned_state_value::{StateCacheEntry, StateUpdateRef},
+        NUM_STATE_SHARDS,
+    },
     AptosDbError, DbReader, Result, StateSnapshotReceiver,
 };
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
-        create_empty_sharded_state_updates,
         state_key::{prefix::StateKeyPrefix, StateKey},
         state_storage_usage::StateStorageUsage,
         state_value::{
             StaleStateValueByKeyHashIndex, StaleStateValueIndex, StateValue,
             StateValueChunkWithProof,
         },
-        ShardedStateUpdates, StateViewId,
     },
     transaction::Version,
-    write_set::{TransactionWrite, WriteSet},
 };
 use claims::{assert_ge, assert_le};
+use itertools::Itertools;
 use rayon::prelude::*;
-use std::{collections::HashSet, ops::Deref, sync::Arc};
+use std::{
+    ops::Deref,
+    sync::{Arc, MutexGuard},
+};
 
 pub(crate) mod buffered_state;
 mod state_merkle_batch_committer;
 mod state_snapshot_committer;
 
+mod persisted_state;
 #[cfg(test)]
 mod state_store_test;
 
@@ -104,12 +108,16 @@ pub(crate) struct StateDb {
 
 pub(crate) struct StateStore {
     pub state_db: Arc<StateDb>,
-    // The `base` of buffered_state is the latest snapshot in state_merkle_db while `current`
-    // is the latest state sparse merkle tree that is replayed from that snapshot until the latest
-    // write set stored in ledger_db.
+    /// The `base` of buffered_state is the latest snapshot in state_merkle_db while `current`
+    /// is the latest state sparse merkle tree that is replayed from that snapshot until the latest
+    /// write set stored in ledger_db.
     buffered_state: Mutex<BufferedState>,
+    /// CurrentState is shared between this and the buffered_state.
+    /// On read, we don't need to lock the `buffered_state` to get the latest state.
+    current_state: Arc<Mutex<LedgerStateWithSummary>>,
+    /// Tracks a persisted smt, any state older than that is guaranteed to be found in RocksDB
+    persisted_state: Arc<Mutex<PersistedState>>,
     buffered_state_target_items: usize,
-    smt_ancestors: Mutex<SmtAncestors<StateValue>>,
     internal_indexer_db: Option<InternalIndexerDB>,
 }
 
@@ -164,29 +172,29 @@ impl DbReader for StateDb {
     /// Returns the proof of the given state key and version.
     fn get_state_proof_by_version_ext(
         &self,
-        state_key: &StateKey,
+        key_hash: &HashValue,
         version: Version,
         root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         let (_, proof) = self
             .state_merkle_db
-            .get_with_proof_ext(state_key, version, root_depth)?;
+            .get_with_proof_ext(key_hash, version, root_depth)?;
         Ok(proof)
     }
 
     /// Get the state value with proof given the state key and version
     fn get_state_value_with_proof_by_version_ext(
         &self,
-        state_key: &StateKey,
+        key_hash: &HashValue,
         version: Version,
         root_depth: usize,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         let (leaf_data, proof) = self
             .state_merkle_db
-            .get_with_proof_ext(state_key, version, root_depth)?;
+            .get_with_proof_ext(key_hash, version, root_depth)?;
         Ok((
             match leaf_data {
-                Some((_, (key, version))) => Some(self.expect_value_by_version(&key, version)?),
+                Some((_val_hash, (key, ver))) => Some(self.expect_value_by_version(&key, ver)?),
                 None => None,
             },
             proof,
@@ -207,8 +215,12 @@ impl DbReader for StateDb {
 }
 
 impl DbReader for StateStore {
-    fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>> {
-        Ok(self.smt_ancestors.lock().get_youngest())
+    fn get_persisted_state(&self) -> Result<State> {
+        Ok(self.persisted_state_locked().state().clone())
+    }
+
+    fn get_persisted_state_summary(&self) -> Result<StateSummary> {
+        Ok(self.persisted_state_locked().summary().clone())
     }
 
     /// Returns the latest state snapshot strictly before `next_version` if any.
@@ -244,23 +256,23 @@ impl DbReader for StateStore {
     /// Returns the proof of the given state key and version.
     fn get_state_proof_by_version_ext(
         &self,
-        state_key: &StateKey,
+        key_hash: &HashValue,
         version: Version,
         root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         self.deref()
-            .get_state_proof_by_version_ext(state_key, version, root_depth)
+            .get_state_proof_by_version_ext(key_hash, version, root_depth)
     }
 
     /// Get the state value with proof extension given the state key and version
     fn get_state_value_with_proof_by_version_ext(
         &self,
-        state_key: &StateKey,
+        key_hash: &HashValue,
         version: Version,
         root_depth: usize,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         self.deref()
-            .get_state_value_with_proof_by_version_ext(state_key, version, root_depth)
+            .get_state_value_with_proof_by_version_ext(key_hash, version, root_depth)
     }
 }
 
@@ -313,11 +325,15 @@ impl StateStore {
             state_kv_pruner,
             skip_usage,
         });
-        let (buffered_state, smt_ancestors) = if empty_buffered_state_for_restore {
-            BufferedState::new(
+        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_dummy()));
+        let persisted_state = Arc::new(Mutex::new(PersistedState::new_dummy()));
+        let buffered_state = if empty_buffered_state_for_restore {
+            BufferedState::new_at_snapshot(
                 &state_db,
-                StateDelta::new_empty(),
+                StateWithSummary::new_empty(),
                 buffered_state_target_items,
+                current_state.clone(),
+                persisted_state.clone(),
             )
         } else {
             Self::create_buffered_state_from_latest_snapshot(
@@ -325,6 +341,8 @@ impl StateStore {
                 buffered_state_target_items,
                 hack_for_tests,
                 /*check_max_versions_after_snapshot=*/ true,
+                current_state.clone(),
+                persisted_state.clone(),
             )
             .expect("buffered state creation failed.")
         };
@@ -333,7 +351,8 @@ impl StateStore {
             state_db,
             buffered_state: Mutex::new(buffered_state),
             buffered_state_target_items,
-            smt_ancestors: Mutex::new(smt_ancestors),
+            current_state,
+            persisted_state,
             internal_indexer_db,
         }
     }
@@ -378,7 +397,7 @@ impl StateStore {
             if crash_if_difference_is_too_large {
                 assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
             }
-            truncate_ledger_db(ledger_db, overall_commit_progress)
+            truncate_ledger_db(ledger_db.clone(), overall_commit_progress)
                 .expect("Failed to truncate ledger db.");
 
             // State K/V commit progress isn't (can't be) written atomically with the data,
@@ -408,16 +427,18 @@ impl StateStore {
                     assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
                 }
             }
-            let db = state_merkle_db.metadata_db();
-            let state_merkle_target_version =
-                find_tree_root_at_or_before(db, &state_merkle_db, overall_commit_progress)
-                    .expect("DB read failed.")
-                    .unwrap_or_else(|| {
-                        panic!(
+            let state_merkle_target_version = find_tree_root_at_or_before(
+                ledger_metadata_db,
+                &state_merkle_db,
+                overall_commit_progress,
+            )
+            .expect("DB read failed.")
+            .unwrap_or_else(|| {
+                panic!(
                     "Could not find a valid root before or at version {}, maybe it was pruned?",
                     overall_commit_progress
                 )
-                    });
+            });
             if state_merkle_target_version < state_merkle_max_version {
                 info!(
                     state_merkle_max_version = state_merkle_max_version,
@@ -461,11 +482,18 @@ impl StateStore {
             state_kv_pruner,
             skip_usage: false,
         });
-        let (buffered_state, _) = Self::create_buffered_state_from_latest_snapshot(
-            &state_db, 0, /*hack_for_tests=*/ false,
+        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_dummy()));
+        let persisted_state = Arc::new(Mutex::new(PersistedState::new_dummy()));
+        let _ = Self::create_buffered_state_from_latest_snapshot(
+            &state_db,
+            0,
+            /*hack_for_tests=*/ false,
             /*check_max_versions_after_snapshot=*/ false,
+            current_state.clone(),
+            persisted_state,
         )?;
-        Ok(buffered_state.current_state().base_version)
+        let base_version = current_state.lock().version();
+        Ok(base_version)
     }
 
     fn create_buffered_state_from_latest_snapshot(
@@ -473,7 +501,9 @@ impl StateStore {
         buffered_state_target_items: usize,
         hack_for_tests: bool,
         check_max_versions_after_snapshot: bool,
-    ) -> Result<(BufferedState, SmtAncestors<StateValue>)> {
+        out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
+        out_persisted_state: Arc<Mutex<PersistedState>>,
+    ) -> Result<BufferedState> {
         let num_transactions = state_db
             .ledger_db
             .metadata_db()
@@ -499,19 +529,22 @@ impl StateStore {
             *SPARSE_MERKLE_PLACEHOLDER_HASH
         };
         let usage = state_db.get_state_storage_usage(latest_snapshot_version)?;
-        let (mut buffered_state, smt_ancestors) = BufferedState::new(
+        let state = StateWithSummary::new_at_version(
+            latest_snapshot_version,
+            latest_snapshot_root_hash,
+            usage,
+        );
+        let mut buffered_state = BufferedState::new_at_snapshot(
             state_db,
-            StateDelta::new_at_checkpoint(
-                latest_snapshot_root_hash,
-                usage,
-                latest_snapshot_version,
-            ),
+            state.clone(),
             buffered_state_target_items,
+            out_current_state.clone(),
+            out_persisted_state,
         );
 
         // In some backup-restore tests we hope to open the db without consistency check.
         if hack_for_tests {
-            return Ok((buffered_state, smt_ancestors));
+            return Ok(buffered_state);
         }
 
         // Make sure the committed transactions is ahead of the latest snapshot.
@@ -536,18 +569,6 @@ impl StateStore {
                     num_transactions,
                 );
             }
-            let snapshot = state_db.get_state_snapshot_before(num_transactions)?;
-            let speculative_state = buffered_state
-                .current_state()
-                .current
-                .freeze(&buffered_state.current_state().base);
-            let latest_snapshot_state_view = CachedStateView::new_impl(
-                StateViewId::Miscellaneous,
-                num_transactions,
-                snapshot,
-                speculative_state,
-                Arc::new(AsyncProofFetcher::new(state_db.clone())),
-            );
             let write_sets = state_db
                 .ledger_db
                 .write_set_db()
@@ -564,51 +585,67 @@ impl StateStore {
                 .filter(|(_idx, txn_info)| txn_info.has_state_checkpoint_hash())
                 .last()
                 .map(|(idx, _)| idx);
-            latest_snapshot_state_view.prime_cache_by_write_set(&write_sets)?;
 
-            let state_checkpoint_output =
-                InMemoryStateCalculatorV2::calculate_for_write_sets_after_snapshot(
-                    // TODO(aldenhu): avoid cloning the HashMap inside.
-                    &Arc::new(buffered_state.current_state().clone()),
-                    &latest_snapshot_state_view.into_state_cache(),
-                    last_checkpoint_index,
-                    &write_sets,
-                )?;
+            let state_update_refs = StateUpdateRefs::index_write_sets(
+                state.next_version(),
+                &write_sets,
+                write_sets.len(),
+                last_checkpoint_index,
+            );
+            let current_state = out_current_state.lock().clone();
+            let (new_state, _state_reads) = current_state.ledger_state().update_with_db_reader(
+                &state,
+                &state_update_refs,
+                state_db.clone(),
+            )?;
+            let new_state_summary = current_state.ledger_state_summary().update(
+                &ProvableStateSummary::new(state.summary().clone(), state_db.as_ref()),
+                &state_update_refs,
+            )?;
+            let updated =
+                LedgerStateWithSummary::from_state_and_summary(new_state, new_state_summary);
 
             // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
             buffered_state.update(
-                state_checkpoint_output
-                    .state_updates_before_last_checkpoint
-                    .as_ref(),
-                &state_checkpoint_output.result_state,
+                updated, 0,    /* estimated_items, doesn't matter since we sync-commit */
                 true, /* sync_commit */
             )?;
         }
 
+        let current_state = out_current_state.lock().clone();
         info!(
-            latest_snapshot_version = buffered_state.current_state().base_version,
-            latest_snapshot_root_hash = buffered_state.current_state().base.root_hash(),
-            latest_in_memory_version = buffered_state.current_state().current_version,
-            latest_in_memory_root_hash = buffered_state.current_state().current.root_hash(),
+            latest_in_memory_version = current_state.version(),
+            latest_in_memory_root_hash = current_state.summary().root_hash(),
+            latest_snapshot_version = current_state.last_checkpoint().version(),
+            latest_snapshot_root_hash = current_state.last_checkpoint().summary().root_hash(),
             "StateStore initialization finished.",
         );
-        Ok((buffered_state, smt_ancestors))
+        Ok(buffered_state)
     }
 
     pub fn reset(&self) {
-        let (buffered_state, smt_ancestors) = Self::create_buffered_state_from_latest_snapshot(
+        self.buffered_state.lock().quit();
+        *self.buffered_state.lock() = Self::create_buffered_state_from_latest_snapshot(
             &self.state_db,
             self.buffered_state_target_items,
             false,
             true,
+            self.current_state.clone(),
+            self.persisted_state.clone(),
         )
         .expect("buffered state creation failed.");
-        *self.buffered_state.lock() = buffered_state;
-        *self.smt_ancestors.lock() = smt_ancestors;
     }
 
     pub fn buffered_state(&self) -> &Mutex<BufferedState> {
         &self.buffered_state
+    }
+
+    pub fn current_state_locked(&self) -> MutexGuard<LedgerStateWithSummary> {
+        self.current_state.lock()
+    }
+
+    pub fn persisted_state_locked(&self) -> MutexGuard<PersistedState> {
+        self.persisted_state.lock()
     }
 
     /// Returns the key, value pairs for a particular state key prefix at at desired version. This
@@ -639,125 +676,80 @@ impl StateStore {
         self.state_merkle_db.get_range_proof(rightmost_key, version)
     }
 
-    /// Put the write sets on top of current state
-    pub fn put_write_sets(
+    /// Without the executor and execution pipeline, the State and StateSummary for both the
+    /// latest version and the last checkpoint version need to be calculated before committing
+    /// to the DB. This is useful for the db-restore tooling and tests.
+    pub fn calculate_state_and_put_updates(
         &self,
-        write_sets: Vec<WriteSet>,
-        first_version: Version,
-        batch: &SchemaBatch,
-        sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
-        enable_sharding: bool,
-    ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["put_writesets"])
-            .start_timer();
+        state_update_refs: &StateUpdateRefs,
+        ledger_batch: &mut SchemaBatch,
+        sharded_state_kv_batches: &mut ShardedStateKvSchemaBatch,
+    ) -> Result<LedgerState> {
+        let current = self.current_state_locked().ledger_state();
+        let persisted = self.persisted_state_locked().state().clone();
+        let (new_state, reads) =
+            current.update_with_db_reader(&persisted, state_update_refs, self.state_db.clone())?;
 
-        let value_state_sets: Vec<ShardedStateUpdates> = write_sets
-            .iter()
-            .map(|ws| {
-                let mut sharded_state_updates = create_empty_sharded_state_updates();
-                ws.iter().for_each(|(key, value)| {
-                    sharded_state_updates[key.get_shard_id() as usize]
-                        .insert(key.clone(), value.as_state_value());
-                });
-                sharded_state_updates
-            })
-            .collect::<Vec<_>>();
-
-        self.put_stats_and_indices(
-            &value_state_sets,
-            first_version,
-            StateStorageUsage::new_untracked(),
-            None,
-            batch,
-            sharded_state_kv_batches,
-            /*skip_usage=*/ false,
-            None,
-            enable_sharding,
-        )?;
-
-        self.put_state_values(
-            &value_state_sets,
-            first_version,
-            sharded_state_kv_batches,
-            enable_sharding,
-        )?;
-
-        Ok(())
-    }
-
-    /// Put the `value_state_sets` into its own CF.
-    pub fn put_value_sets(
-        &self,
-        value_state_sets: &[ShardedStateUpdates],
-        first_version: Version,
-        expected_usage: StateStorageUsage,
-        sharded_state_cache: Option<&ShardedStateCache>,
-        ledger_batch: &SchemaBatch,
-        sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
-        enable_sharding: bool,
-        skip_usage: bool,
-        last_checkpoint_index: Option<usize>,
-    ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["put_value_sets"])
-            .start_timer();
-
-        self.put_stats_and_indices(
-            value_state_sets,
-            first_version,
-            expected_usage,
-            sharded_state_cache,
+        self.put_state_updates(
+            &new_state,
+            &state_update_refs.per_version,
+            &reads,
             ledger_batch,
             sharded_state_kv_batches,
-            skip_usage,
-            last_checkpoint_index,
-            enable_sharding,
         )?;
 
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["add_state_kv_batch"])
-            .start_timer();
+        Ok(new_state)
+    }
 
-        self.put_state_values(
-            value_state_sets,
-            first_version,
+    pub fn put_state_updates(
+        &self,
+        state: &LedgerState,
+        state_update_refs: &PerVersionStateUpdateRefs,
+        state_reads: &ShardedStateCache,
+        ledger_batch: &mut SchemaBatch,
+        sharded_state_kv_batches: &mut ShardedStateKvSchemaBatch,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_value_sets"]);
+        let current_state = self.current_state_locked().state().clone();
+
+        self.put_stats_and_indices(
+            &current_state,
+            state,
+            state_update_refs,
+            state_reads,
+            ledger_batch,
             sharded_state_kv_batches,
-            enable_sharding,
-        )
+        )?;
+
+        self.put_state_values(state_update_refs, sharded_state_kv_batches)
     }
 
     pub fn put_state_values(
         &self,
-        value_state_sets: &[ShardedStateUpdates],
-        first_version: Version,
-        sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
-        enable_sharding: bool,
+        state_update_refs: &PerVersionStateUpdateRefs,
+        sharded_state_kv_batches: &mut ShardedStateKvSchemaBatch,
     ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["add_state_kv_batch"]);
+
+        // TODO(aldenhu): put by refs; batch put
         sharded_state_kv_batches
-            .par_iter()
-            .enumerate()
-            .try_for_each(|(shard_id, batch)| {
-                value_state_sets
-                    .par_iter()
-                    .enumerate()
-                    .flat_map_iter(|(i, shards)| {
-                        let version = first_version + i as Version;
-                        let kvs = &shards[shard_id];
-                        kvs.iter().map(move |(k, v)| {
-                            if enable_sharding {
-                                batch.put::<StateValueByKeyHashSchema>(
-                                    &(k.clone().hash(), version),
-                                    v,
-                                )
-                            } else {
-                                batch.put::<StateValueSchema>(&(k.clone(), version), v)
-                            }
-                        })
-                    })
-                    .collect::<Result<_>>()
-            })?;
-        Ok(())
+            .par_iter_mut()
+            .zip_eq(state_update_refs.shards.par_iter())
+            .try_for_each(|(batch, updates)| {
+                updates.iter().try_for_each(|(key, update)| {
+                    if self.state_kv_db.enabled_sharding() {
+                        batch.put::<StateValueByKeyHashSchema>(
+                            &(CryptoHash::hash(*key), update.version),
+                            &update.value.cloned(),
+                        )
+                    } else {
+                        batch.put::<StateValueSchema>(
+                            &((*key).clone(), update.version),
+                            &update.value.cloned(),
+                        )
+                    }
+                })
+            })
     }
 
     pub fn get_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
@@ -778,209 +770,169 @@ impl StateStore {
     /// extra stale index as 1 cover the latter case.
     pub fn put_stats_and_indices(
         &self,
-        value_state_sets: &[ShardedStateUpdates],
-        first_version: Version,
-        expected_usage: StateStorageUsage,
-        // If not None, it must contains all keys in the value_state_sets.
+        current_state: &State,
+        latest_state: &LedgerState,
+        state_update_refs: &PerVersionStateUpdateRefs,
         // TODO(grao): Restructure this function.
-        sharded_state_cache: Option<&ShardedStateCache>,
-        batch: &SchemaBatch,
-        sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
-        skip_usage: bool,
-        last_checkpoint_index: Option<usize>,
-        enable_sharding: bool,
+        state_reads: &ShardedStateCache,
+        batch: &mut SchemaBatch,
+        sharded_state_kv_batches: &mut ShardedStateKvSchemaBatch,
     ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["put_stats_and_indices"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_stats_and_indices"]);
 
-        let num_versions = value_state_sets.len();
+        Self::put_stale_state_value_index(
+            state_update_refs,
+            sharded_state_kv_batches,
+            self.state_kv_db.enabled_sharding(),
+            state_reads,
+            latest_state.usage().is_untracked() || current_state.version().is_none(), // ignore_state_cache_miss
+        );
 
-        let base_version = first_version.checked_sub(1);
-        let mut usage = self.get_usage(base_version)?;
-        let base_version_usage = usage;
-
-        let mut state_cache_with_version = &ShardedStateCache::default();
-        if let Some(base_version) = base_version {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["put_stats_and_indices__total_get"])
-                .start_timer();
-            if let Some(sharded_state_cache) = sharded_state_cache {
-                // For some entries the base value version is None, here is to fiil those in.
-                // See `ShardedStateCache`.
-                self.prepare_version_in_cache(base_version, sharded_state_cache)?;
-                state_cache_with_version = sharded_state_cache;
-            } else {
-                let key_set = value_state_sets
-                    .iter()
-                    .flat_map(|sharded_states| sharded_states.iter().flatten())
-                    .map(|(key, _)| key)
-                    .collect::<HashSet<_>>();
-                THREAD_MANAGER.get_high_pri_io_pool().scope(|s| {
-                    for key in key_set {
-                        let cache = state_cache_with_version.shard(key.get_shard_id());
-                        s.spawn(move |_| {
-                            let _timer = OTHER_TIMERS_SECONDS
-                                .with_label_values(&["put_stats_and_indices__get_state_value"])
-                                .start_timer();
-                            let version_and_value = self
-                                .state_db
-                                .get_state_value_with_version_by_version(key, base_version)
-                                .expect("Must succeed.");
-                            if let Some((version, value)) = version_and_value {
-                                cache.insert(key.clone(), (Some(version), Some(value)));
-                            } else {
-                                cache.insert(key.clone(), (Some(base_version), None));
-                            }
-                        });
-                    }
-                });
+        {
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_stats_and_indices__put_usage"]);
+            if latest_state.last_checkpoint().next_version() > current_state.next_version() {
+                // has a checkpoint in the chunk
+                Self::put_usage(latest_state.last_checkpoint(), batch)?;
             }
+            if !latest_state.is_checkpoint() {
+                // latest state isn't a checkpoint
+                Self::put_usage(latest_state, batch)?;
+            }
+            STATE_ITEMS.set(latest_state.usage().items() as i64);
+            TOTAL_STATE_BYTES.set(latest_state.usage().bytes() as i64);
         }
 
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["put_stats_and_indices__calculate_total_size"])
-            .start_timer();
+        Ok(())
+    }
+
+    fn put_stale_state_value_index(
+        state_update_refs: &PerVersionStateUpdateRefs,
+        sharded_state_kv_batches: &mut ShardedStateKvSchemaBatch,
+        enable_sharding: bool,
+        sharded_state_cache: &ShardedStateCache,
+        ignore_state_cache_miss: bool,
+    ) {
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_stale_kv_index"]);
+
         // calculate total state size in bytes
-        let usage_deltas: Vec<Vec<_>> = state_cache_with_version
+        sharded_state_cache
+            .shards
             .par_iter()
+            .zip_eq(state_update_refs.shards.par_iter())
+            .zip_eq(sharded_state_kv_batches.par_iter_mut())
             .enumerate()
-            .map(|(shard_id, cache)| {
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&[&format!(
-                        "put_stats_and_indices__calculate_total_size__shard_{shard_id}"
-                    )])
-                    .start_timer();
-                let mut usage_delta = Vec::with_capacity(num_versions);
-                for (idx, kvs) in value_state_sets.iter().enumerate() {
-                    let version = first_version + idx as Version;
-                    let mut items_delta = 0;
-                    let mut bytes_delta = 0;
-
-                    for (key, value) in kvs[shard_id].iter() {
-                        if let Some(value) = value {
-                            items_delta += 1;
-                            bytes_delta += (key.size() + value.size()) as i64;
-                        } else {
-                            // Update the stale index of the tombstone at current version to
-                            // current version.
-                            if enable_sharding {
-                                sharded_state_kv_batches[shard_id]
-                                    .put::<StaleStateValueIndexByKeyHashSchema>(
-                                        &StaleStateValueByKeyHashIndex {
-                                            stale_since_version: version,
-                                            version,
-                                            state_key_hash: key.hash(),
-                                        },
-                                        &(),
-                                    )
-                                    .unwrap();
-                            } else {
-                                sharded_state_kv_batches[shard_id]
-                                    .put::<StaleStateValueIndexSchema>(
-                                        &StaleStateValueIndex {
-                                            stale_since_version: version,
-                                            version,
-                                            state_key: key.clone(),
-                                        },
-                                        &(),
-                                    )
-                                    .unwrap();
-                            }
-                        }
-
-                        let old_version_and_value_opt = if let Some((old_version, old_value_opt)) =
-                            cache.insert(key.clone(), (Some(version), value.clone()))
-                        {
-                            old_value_opt.map(|value| (old_version, value))
-                        } else {
-                            None
-                        };
-
-                        if let Some((old_version, old_value)) = old_version_and_value_opt {
-                            let old_version = old_version
-                                .context("Must have old version in cache.")
-                                .unwrap();
-                            items_delta -= 1;
-                            bytes_delta -= (key.size() + old_value.size()) as i64;
-                            // stale index of the old value at its version.
-                            if enable_sharding {
-                                sharded_state_kv_batches[shard_id]
-                                    .put::<StaleStateValueIndexByKeyHashSchema>(
-                                        &StaleStateValueByKeyHashIndex {
-                                            stale_since_version: version,
-                                            version: old_version,
-                                            state_key_hash: key.hash(),
-                                        },
-                                        &(),
-                                    )
-                                    .unwrap();
-                            } else {
-                                sharded_state_kv_batches[shard_id]
-                                    .put::<StaleStateValueIndexSchema>(
-                                        &StaleStateValueIndex {
-                                            stale_since_version: version,
-                                            version: old_version,
-                                            state_key: key.clone(),
-                                        },
-                                        &(),
-                                    )
-                                    .unwrap();
-                            }
-                        }
-                    }
-                    usage_delta.push((items_delta, bytes_delta));
-                }
-
-                usage_delta
+            .for_each(|(shard_id, ((cache, updates), batch))| {
+                Self::put_stale_state_value_index_for_shard(
+                    shard_id,
+                    state_update_refs.first_version,
+                    state_update_refs.num_versions,
+                    cache,
+                    updates,
+                    batch,
+                    enable_sharding,
+                    ignore_state_cache_miss,
+                );
             })
-            .collect();
+    }
 
-        for i in 0..num_versions {
-            let mut items_delta = 0;
-            let mut bytes_delta = 0;
-            for usage_delta in usage_deltas.iter() {
-                items_delta += usage_delta[i].0;
-                bytes_delta += usage_delta[i].1;
-            }
-            usage = StateStorageUsage::new(
-                (usage.items() as i64 + items_delta) as usize,
-                (usage.bytes() as i64 + bytes_delta) as usize,
-            );
-            let should_write_index_for_version =
-                (i == num_versions - 1) || Some(i) == last_checkpoint_index;
-            if !skip_usage || should_write_index_for_version {
-                let version = first_version + i as u64;
-                if should_write_index_for_version {
-                    info!("Write usage at version {version}, {usage:?}, skip_usage: {skip_usage}.");
+    fn put_stale_state_value_index_for_shard<'kv>(
+        shard_id: usize,
+        first_version: Version,
+        num_versions: usize,
+        cache: &StateCacheShard,
+        updates: &[(&'kv StateKey, StateUpdateRef<'kv>)],
+        batch: &mut NativeBatch,
+        enable_sharding: bool,
+        ignore_state_cache_miss: bool,
+    ) {
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&[&format!("put_stale_kv_index__{shard_id}")]);
+
+        let mut iter = updates.iter();
+        for version in first_version..first_version + num_versions as Version {
+            let ver_iter = iter.take_while_ref(|(_k, u)| u.version == version);
+
+            for (key, update) in ver_iter {
+                if update.value.is_none() {
+                    // This is a tome stone, can be pruned once this `version` goes out of
+                    // the pruning window.
+                    Self::put_state_kv_index(batch, enable_sharding, version, version, key);
                 }
-                batch
-                    .put::<VersionDataSchema>(&version, &usage.into())
-                    .unwrap();
+
+                // TODO(aldenhu): cache changes here, should consume it.
+                let old_entry = cache
+                    .insert(
+                        (*key).clone(),
+                        StateCacheEntry::from_state_update_ref(update),
+                    )
+                    .unwrap_or_else(|| {
+                        // n.b. all updated state items must be read and recorded in the state cache,
+                        // otherwise we can't calculate the correct usage. The is_untracked() hack
+                        // is to allow some db tests without real execution layer to pass.
+                        assert!(ignore_state_cache_miss, "Must cache read.");
+                        StateCacheEntry::NonExistent
+                    });
+
+                if let StateCacheEntry::Value {
+                    version: old_version,
+                    value: _,
+                } = old_entry
+                {
+                    // The value at `old_version` can be pruned once the pruning window hits
+                    // this `version`.
+                    Self::put_state_kv_index(batch, enable_sharding, version, old_version, key)
+                }
             }
         }
+    }
 
-        if !expected_usage.is_untracked() {
-            ensure!(
-                expected_usage == usage,
-                "Calculated state db usage at version {} not expected. expected: {:?}, calculated: {:?}, base version: {:?}, base version usage: {:?}",
-                first_version + value_state_sets.len() as u64 - 1,
-                expected_usage,
-                usage,
-                base_version,
-                base_version_usage,
-            );
+    fn put_state_kv_index(
+        batch: &mut NativeBatch,
+        enable_sharding: bool,
+        stale_since_version: Version,
+        version: Version,
+        key: &StateKey,
+    ) {
+        if enable_sharding {
+            batch
+                .put::<StaleStateValueIndexByKeyHashSchema>(
+                    &StaleStateValueByKeyHashIndex {
+                        stale_since_version,
+                        version,
+                        state_key_hash: key.hash(),
+                    },
+                    &(),
+                )
+                .unwrap();
+        } else {
+            batch
+                .put::<StaleStateValueIndexSchema>(
+                    &StaleStateValueIndex {
+                        stale_since_version,
+                        version,
+                        state_key: (*key).clone(),
+                    },
+                    &(),
+                )
+                .unwrap();
         }
+    }
 
-        STATE_ITEMS.set(usage.items() as i64);
-        TOTAL_STATE_BYTES.set(usage.bytes() as i64);
+    fn put_usage(state: &State, batch: &mut SchemaBatch) -> Result<()> {
+        if let Some(version) = state.version() {
+            let usage = state.usage();
+            info!("Write usage at version {version}, {usage:?}.");
+            batch.put::<VersionDataSchema>(&version, &usage.into())?;
+        } else {
+            assert_eq!(state.usage().items(), 0);
+            assert_eq!(state.usage().bytes(), 0);
+        }
 
         Ok(())
     }
 
     pub(crate) fn shard_state_value_batch(
         &self,
-        sharded_batch: &ShardedStateKvSchemaBatch,
+        sharded_batch: &mut ShardedStateKvSchemaBatch,
         values: &StateValueBatch,
         enable_sharding: bool,
     ) -> Result<()> {
@@ -1002,27 +954,6 @@ impl StateStore {
             }
         });
         Ok(())
-    }
-
-    /// Merklize the results generated by `value_state_sets` to `batch` and return the result root
-    /// hashes for each write set.
-    #[cfg(test)]
-    pub fn merklize_value_set(
-        &self,
-        value_set: Vec<(HashValue, Option<&(HashValue, StateKey)>)>,
-        version: Version,
-        base_version: Option<Version>,
-    ) -> Result<HashValue> {
-        let (top_levels_batch, sharded_batch, root_hash) =
-            self.state_merkle_db.merklize_value_set(
-                value_set,
-                version,
-                base_version,
-                /*previous_epoch_ending_version=*/ None,
-            )?;
-        self.state_merkle_db
-            .commit(version, top_levels_batch, sharded_batch)?;
-        Ok(root_hash)
     }
 
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
@@ -1151,41 +1082,36 @@ impl StateStore {
         Ok(keys)
     }
 
-    fn prepare_version_in_cache(
-        &self,
-        base_version: Version,
-        sharded_state_cache: &ShardedStateCache,
-    ) -> Result<()> {
-        THREAD_MANAGER.get_high_pri_io_pool().scope(|s| {
-            sharded_state_cache.par_iter().for_each(|shard| {
-                shard.iter_mut().for_each(|mut entry| {
-                    match entry.value() {
-                        (None, Some(_)) => s.spawn(move |_| {
-                            let _timer = OTHER_TIMERS_SECONDS
-                                .with_label_values(&["put_stats_and_indices__get_state_value"])
-                                .start_timer();
-                            let version_and_value = self
-                                .state_db
-                                .get_state_value_with_version_by_version(entry.key(), base_version)
-                                .expect("Must succeed.");
-                            if let Some((version, _)) = version_and_value {
-                                entry.0 = Some(version);
-                            } else {
-                                unreachable!();
-                            }
-                        }),
-                        _ => {
-                            // I just want a counter.
-                            let _timer = OTHER_TIMERS_SECONDS
-                                .with_label_values(&["put_stats_and_indices__skip"])
-                                .start_timer();
-                        },
-                    };
-                })
-            });
-        });
+    pub fn init_state_ignoring_summary(&self, version: Option<Version>) -> Result<()> {
+        let usage = self.get_usage(version)?;
+        let state = State::new_at_version(version, usage);
+        let ledger_state = LedgerState::new(state.clone(), state);
+        self.set_state_ignoring_summary(ledger_state);
 
         Ok(())
+    }
+
+    pub fn set_state_ignoring_summary(&self, ledger_state: LedgerState) {
+        let smt = SparseMerkleTree::new(*CORRUPTION_SENTINEL);
+        let last_checkpoint_summary =
+            StateSummary::new_at_version(ledger_state.last_checkpoint().version(), smt.clone());
+        let summary = StateSummary::new_at_version(ledger_state.version(), smt.clone());
+
+        let last_checkpoint = StateWithSummary::new(
+            ledger_state.last_checkpoint().clone(),
+            last_checkpoint_summary.clone(),
+        );
+        let latest = StateWithSummary::new(ledger_state.latest().clone(), summary);
+        let current = LedgerStateWithSummary::from_latest_and_last_checkpoint(
+            latest,
+            last_checkpoint.clone(),
+        );
+
+        self.persisted_state_locked().set(last_checkpoint.clone());
+        *self.current_state_locked() = current;
+        self.buffered_state
+            .lock()
+            .force_last_snapshot(last_checkpoint);
     }
 }
 
@@ -1200,8 +1126,8 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["state_value_writer_write_chunk"])
             .start_timer();
-        let batch = SchemaBatch::new();
-        let sharded_schema_batch = new_sharded_kv_schema_batch();
+        let mut batch = SchemaBatch::new();
+        let mut sharded_schema_batch = self.state_kv_db.new_sharded_native_batches();
 
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::StateSnapshotKvRestoreProgress(version),
@@ -1222,19 +1148,19 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
                 .write_keys_to_indexer_db(&keys, version, progress)?;
         }
         self.shard_state_value_batch(
-            &sharded_schema_batch,
+            &mut sharded_schema_batch,
             node_batch,
             self.state_kv_db.enabled_sharding(),
         )?;
         self.state_kv_db
-            .commit(version, batch, sharded_schema_batch)
+            .commit(version, Some(batch), sharded_schema_batch)
     }
 
     fn kv_finish(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
         self.ledger_db.metadata_db().put_usage(version, usage)?;
         if let Some(internal_indexer_db) = self.internal_indexer_db.as_ref() {
             if version > 0 {
-                let batch = SchemaBatch::new();
+                let mut batch = SchemaBatch::new();
                 batch.put::<InternalIndexerMetadataSchema>(
                     &MetadataKey::LatestVersion,
                     &MetadataValue::Version(version - 1),
@@ -1290,11 +1216,11 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
             match (main_db_progress, progress_opt) {
                 (None, None) => (),
                 (None, Some(_)) => (),
-                (Some(main_progres), Some(indexer_progress)) => {
-                    if main_progres.key_hash > indexer_progress.key_hash {
+                (Some(main_progress), Some(indexer_progress)) => {
+                    if main_progress.key_hash > indexer_progress.key_hash {
                         bail!(
                             "Inconsistent restore progress between main db and internal indexer db. main db: {:?}, internal indexer db: {:?}",
-                            main_progres,
+                            main_progress,
                             indexer_progress,
                         );
                     }
@@ -1310,5 +1236,96 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
         }
 
         Ok(main_db_progress)
+    }
+}
+
+#[cfg(test)]
+mod test_only {
+    use crate::state_store::StateStore;
+    use aptos_crypto::HashValue;
+    use aptos_schemadb::batch::SchemaBatch;
+    use aptos_storage_interface::state_store::{
+        state_summary::ProvableStateSummary, state_update_refs::StateUpdateRefs,
+        state_with_summary::LedgerStateWithSummary,
+    };
+    use aptos_types::{
+        state_store::{state_key::StateKey, state_value::StateValue},
+        transaction::Version,
+    };
+    use itertools::Itertools;
+
+    impl StateStore {
+        /// assumes state checkpoint at the last version
+        pub fn commit_block_for_test<
+            UpdateIter: IntoIterator<Item = (StateKey, Option<StateValue>)>,
+            VersionIter: IntoIterator<Item = UpdateIter>,
+        >(
+            &self,
+            first_version: Version,
+            updates_by_version: VersionIter,
+        ) -> HashValue {
+            assert_eq!(first_version, self.current_state_locked().next_version());
+
+            let updates_by_version = updates_by_version
+                .into_iter()
+                .map(|updates| updates.into_iter().collect_vec())
+                .collect_vec();
+            let num_versions = updates_by_version.len();
+            assert!(num_versions > 0);
+            let last_version = first_version + num_versions as Version - 1;
+
+            let state_update_refs = StateUpdateRefs::index(
+                first_version,
+                updates_by_version
+                    .iter()
+                    .map(|updates| updates.iter().map(|(k, v)| (k, v.as_ref()))),
+                num_versions,
+                Some(num_versions - 1),
+            );
+
+            let mut ledger_batch = SchemaBatch::new();
+            let mut sharded_state_kv_batches = self.state_kv_db.new_sharded_native_batches();
+
+            let new_ledger_state = self
+                .calculate_state_and_put_updates(
+                    &state_update_refs,
+                    &mut ledger_batch,
+                    &mut sharded_state_kv_batches,
+                )
+                .unwrap();
+
+            self.ledger_db
+                .metadata_db()
+                .write_schemas(ledger_batch)
+                .unwrap();
+            self.state_kv_db
+                .commit(last_version, None, sharded_state_kv_batches)
+                .unwrap();
+
+            let current = self.current_state_locked().ledger_state_summary();
+            let persisted = self.persisted_state_locked().summary().clone();
+
+            let new_state_summary = current
+                .update(
+                    &ProvableStateSummary::new(persisted, self.state_db.as_ref()),
+                    &state_update_refs,
+                )
+                .unwrap();
+            let root_hash = new_state_summary.root_hash();
+
+            self.buffered_state
+                .lock()
+                .update(
+                    LedgerStateWithSummary::from_state_and_summary(
+                        new_ledger_state,
+                        new_state_summary,
+                    ),
+                    0,    /* estimated_items, doesn't matter since we sync-commit */
+                    true, /* sync_commit */
+                )
+                .unwrap();
+
+            root_hash
+        }
     }
 }

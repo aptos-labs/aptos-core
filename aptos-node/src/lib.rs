@@ -16,6 +16,7 @@ pub mod utils;
 #[cfg(test)]
 mod tests;
 
+use crate::utils::ensure_max_open_files_limit;
 use anyhow::anyhow;
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
@@ -236,6 +237,12 @@ pub fn start_and_report_ports(
 
     // Instantiate the global logger
     let (remote_log_receiver, logger_filter_update) = logger::create_logger(&config, log_file);
+
+    // Ensure `ulimit -n`.
+    ensure_max_open_files_limit(
+        config.storage.ensure_rlimit_nofile,
+        config.storage.assert_rlimit_nofile,
+    );
 
     assert!(
         !cfg!(feature = "testing") && !cfg!(feature = "fuzzing"),

@@ -4,7 +4,8 @@
 use crate::{assert_move_abort, assert_success, assert_vm_status, tests::common, MoveHarness};
 use aptos_framework::{
     chunked_publish::{
-        chunk_package_and_create_payloads, PublishType, LARGE_PACKAGES_MODULE_ADDRESS,
+        chunk_package_and_create_payloads, PublishType, CHUNK_SIZE_IN_BYTES,
+        LARGE_PACKAGES_MODULE_ADDRESS,
     },
     natives::{
         code::{PackageMetadata, PackageRegistry, UpgradePolicy},
@@ -144,6 +145,7 @@ impl LargePackageTestContext {
             publish_type,
             Some(self.object_address),
             AccountAddress::from_str(LARGE_PACKAGES_MODULE_ADDRESS).unwrap(),
+            CHUNK_SIZE_IN_BYTES,
         )
     }
 }

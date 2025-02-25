@@ -8,20 +8,32 @@ use crate::{
         Resolver, Script,
     },
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
-    ModuleStorage,
+    storage::ty_tag_converter::TypeTagConverter,
+    LayoutConverter, ModuleStorage, StorageLayoutConverter,
 };
+use better_any::{Tid, TidAble, TidExt};
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     errors::{PartialVMError, PartialVMResult},
-    file_format::{AbilitySet, Bytecode, CompiledModule, FunctionDefinitionIndex, Visibility},
+    file_format::{Bytecode, CompiledModule, FunctionDefinitionIndex, Visibility},
 };
-use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
-use move_vm_types::loaded_data::{
-    runtime_access_specifier::AccessSpecifier,
-    runtime_types::{StructIdentifier, Type},
+use move_core_types::{
+    ability::{Ability, AbilitySet},
+    function::ClosureMask,
+    identifier::{IdentStr, Identifier},
+    language_storage::{ModuleId, TypeTag},
+    value::MoveTypeLayout,
+    vm_status::StatusCode,
 };
-use std::{fmt::Debug, sync::Arc};
+use move_vm_types::{
+    loaded_data::{
+        runtime_access_specifier::AccessSpecifier,
+        runtime_types::{StructIdentifier, Type},
+    },
+    values::{AbstractFunction, SerializedFunctionData},
+};
+use std::{cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc, sync::Arc};
 
 /// A runtime function definition representation.
 pub struct Function {
@@ -43,12 +55,14 @@ pub struct Function {
 }
 
 /// For loaded function representation, specifies the owner: a script or a module.
+#[derive(Clone)]
 pub(crate) enum LoadedFunctionOwner {
     Script(Arc<Script>),
     Module(Arc<Module>),
 }
 
 /// A loaded runtime function representation along with type arguments used to instantiate it.
+#[derive(Clone)]
 pub struct LoadedFunction {
     pub(crate) owner: LoadedFunctionOwner,
     // A set of verified type arguments provided for this definition. If
@@ -58,16 +72,245 @@ pub struct LoadedFunction {
     pub(crate) function: Arc<Function>,
 }
 
+/// A lazy loaded function, which can either be unresolved (as resulting
+/// from deserialization) or resolved, and then forwarding to a
+/// `LoadedFunction`. This is wrapped into a Rc so one can clone the
+/// function while sharing the loading state.
+#[derive(Clone, Tid)]
+pub(crate) struct LazyLoadedFunction(pub(crate) Rc<RefCell<LazyLoadedFunctionState>>);
+
+#[derive(Clone)]
+pub(crate) enum LazyLoadedFunctionState {
+    Unresolved {
+        data: SerializedFunctionData,
+    },
+    Resolved {
+        fun: Rc<LoadedFunction>,
+        // For a resolved function, we need to store the type argument tags,
+        // even though we have the resolved `Type` for the arguments in `fun.ty_args`.
+        // This is needed so we can compare with deterministic results an unresolved and
+        // resolved function context free (i.e. wo/ converter from Type to TypeTag). For the
+        // unresolved case, the type argument tags are stored with the serialized data.
+        ty_args: Vec<TypeTag>,
+        mask: ClosureMask,
+    },
+}
+
+impl LazyLoadedFunction {
+    pub(crate) fn new_unresolved(data: SerializedFunctionData) -> Self {
+        Self(Rc::new(RefCell::new(LazyLoadedFunctionState::Unresolved {
+            data,
+        })))
+    }
+
+    pub(crate) fn new_resolved(
+        converter: &TypeTagConverter,
+        fun: Rc<LoadedFunction>,
+        mask: ClosureMask,
+    ) -> PartialVMResult<Self> {
+        let ty_args = fun
+            .ty_args
+            .iter()
+            .map(|t| converter.ty_to_ty_tag(t))
+            .collect::<PartialVMResult<Vec<_>>>()?;
+        Ok(Self(Rc::new(RefCell::new(
+            LazyLoadedFunctionState::Resolved { fun, ty_args, mask },
+        ))))
+    }
+
+    pub(crate) fn expect_this_impl(
+        fun: &dyn AbstractFunction,
+    ) -> PartialVMResult<&LazyLoadedFunction> {
+        fun.downcast_ref::<LazyLoadedFunction>().ok_or_else(|| {
+            PartialVMError::new_invariant_violation("unexpected abstract function implementation")
+        })
+    }
+
+    /// Access name components independent of resolution state. Since RefCell is in the play,
+    /// the accessor is passed in as a function.
+    ///
+    /// Notice if no module id is given to the action, the function being processed stems from
+    /// a script.
+    pub(crate) fn with_name_and_ty_args<T>(
+        &self,
+        action: impl FnOnce(Option<&ModuleId>, &IdentStr, &[TypeTag]) -> T,
+    ) -> T {
+        match &*self.0.borrow() {
+            LazyLoadedFunctionState::Unresolved {
+                data:
+                    SerializedFunctionData {
+                        module_id,
+                        fun_id,
+                        ty_args,
+                        ..
+                    },
+                ..
+            } => action(Some(module_id), fun_id, ty_args),
+            LazyLoadedFunctionState::Resolved { fun, ty_args, .. } => {
+                action(fun.module_id(), fun.name_id(), ty_args)
+            },
+        }
+    }
+
+    /// Executed an action with the resolved loaded function. If the function hasn't been
+    /// loaded yet, it will be loaded now.
+    #[allow(unused)]
+    pub(crate) fn with_resolved_function<T>(
+        &self,
+        storage: &dyn ModuleStorage,
+        action: impl FnOnce(Rc<LoadedFunction>) -> PartialVMResult<T>,
+    ) -> PartialVMResult<T> {
+        let mut state = self.0.borrow_mut();
+        match &mut *state {
+            LazyLoadedFunctionState::Resolved { fun, .. } => action(fun.clone()),
+            LazyLoadedFunctionState::Unresolved {
+                data:
+                    SerializedFunctionData {
+                        module_id,
+                        fun_id,
+                        ty_args,
+                        mask,
+                        captured_layouts,
+                    },
+            } => {
+                let fun =
+                    Self::resolve(storage, module_id, fun_id, ty_args, *mask, captured_layouts)?;
+                let result = action(fun.clone());
+                *state = LazyLoadedFunctionState::Resolved {
+                    fun,
+                    ty_args: ty_args.clone(),
+                    mask: *mask,
+                };
+                result
+            },
+        }
+    }
+
+    /// Resolves a function into a loaded function. This verifies existence of the named
+    /// function as well as whether it has the type used for deserializing the captured values.
+    fn resolve(
+        module_storage: &dyn ModuleStorage,
+        module_id: &ModuleId,
+        fun_id: &IdentStr,
+        ty_args: &[TypeTag],
+        mask: ClosureMask,
+        captured_layouts: &[MoveTypeLayout],
+    ) -> PartialVMResult<Rc<LoadedFunction>> {
+        let (module, function) = module_storage
+            .fetch_function_definition(module_id.address(), module_id.name(), fun_id)
+            .map_err(|err| err.to_partial())?;
+        let ty_args = ty_args
+            .iter()
+            .map(|t| module_storage.fetch_ty(t))
+            .collect::<PartialVMResult<Vec<_>>>()?;
+        Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)?;
+
+        // Verify that the function argument types match the layouts used for deserialization.
+        // This is only done in paranoid mode. Since integrity of storage
+        // and guarantee of public function, this should not able to fail.
+        if module_storage
+            .runtime_environment()
+            .vm_config()
+            .paranoid_type_checks
+        {
+            // TODO(#15664): Determine whether we need to charge gas here.
+            let captured_arg_types = mask.extract(function.param_tys(), true);
+            let converter = StorageLayoutConverter::new(module_storage);
+            if captured_arg_types.len() != captured_layouts.len() {
+                return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                    .with_message(
+                        "captured argument count does not match declared parameters".to_string(),
+                    ));
+            }
+            for (actual_arg_ty, serialized_layout) in
+                captured_arg_types.into_iter().zip(captured_layouts)
+            {
+                // Note that the below call returns a runtime layout, so we can directly
+                // compare it without desugaring.
+                let actual_arg_layout = converter.type_to_type_layout(actual_arg_ty)?;
+                if !serialized_layout.is_compatible_with(&actual_arg_layout) {
+                    return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                        .with_message(
+                            "stored captured argument layout does not match declared parameters"
+                                .to_string(),
+                        ));
+                }
+            }
+        }
+        Ok(Rc::new(LoadedFunction {
+            owner: LoadedFunctionOwner::Module(module),
+            ty_args,
+            function,
+        }))
+    }
+}
+
+impl AbstractFunction for LazyLoadedFunction {
+    fn closure_mask(&self) -> ClosureMask {
+        let state = self.0.borrow();
+        match &*state {
+            LazyLoadedFunctionState::Resolved { mask, .. } => *mask,
+            LazyLoadedFunctionState::Unresolved {
+                data: SerializedFunctionData { mask, .. },
+                ..
+            } => *mask,
+        }
+    }
+
+    fn cmp_dyn(&self, other: &dyn AbstractFunction) -> PartialVMResult<Ordering> {
+        let other = LazyLoadedFunction::expect_this_impl(other)?;
+        self.with_name_and_ty_args(|mid1, fid1, inst1| {
+            other.with_name_and_ty_args(|mid2, fid2, inst2| {
+                Ok(mid1
+                    .cmp(&mid2)
+                    .then_with(|| fid1.cmp(fid2))
+                    .then_with(|| inst1.cmp(inst2)))
+            })
+        })
+    }
+
+    fn clone_dyn(&self) -> PartialVMResult<Box<dyn AbstractFunction>> {
+        Ok(Box::new(self.clone()))
+    }
+
+    fn to_stable_string(&self) -> String {
+        self.with_name_and_ty_args(|module_id, fun_id, ty_args| {
+            let prefix = if let Some(m) = module_id {
+                format!("0x{}::{}::", m.address(), m.name())
+            } else {
+                "".to_string()
+            };
+            let ty_args_str = if ty_args.is_empty() {
+                "".to_string()
+            } else {
+                format!(
+                    "<{}>",
+                    ty_args
+                        .iter()
+                        .map(|t| t.to_canonical_string())
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
+            };
+            format!("{}::{}:{}", prefix, fun_id, ty_args_str)
+        })
+    }
+}
+
 impl LoadedFunction {
     /// Returns type arguments used to instantiate the loaded function.
     pub fn ty_args(&self) -> &[Type] {
         &self.ty_args
     }
 
+    pub fn abilities(&self) -> AbilitySet {
+        self.function.abilities()
+    }
+
     /// Returns the corresponding module id of this function, i.e., its address and module name.
     pub fn module_id(&self) -> Option<&ModuleId> {
         match &self.owner {
-            LoadedFunctionOwner::Module(m) => Some(m.self_id()),
+            LoadedFunctionOwner::Module(m) => Some(Module::self_id(m)),
             LoadedFunctionOwner::Script(_) => None,
         }
     }
@@ -77,9 +320,20 @@ impl LoadedFunction {
         self.function.name()
     }
 
+    /// Returns the id of this function's name.
+    pub fn name_id(&self) -> &IdentStr {
+        self.function.name_id()
+    }
+
     /// Returns true if the loaded function has friend or private visibility.
     pub fn is_friend_or_private(&self) -> bool {
         self.function.is_friend_or_private()
+    }
+
+    /// Returns true if the loaded function has public visibility. This is the
+    /// opposite of the above (for better readability).
+    pub fn is_public(&self) -> bool {
+        !self.function.is_friend_or_private()
     }
 
     /// Returns true if the loaded function is an entry function.
@@ -123,6 +377,10 @@ impl LoadedFunction {
 
     pub(crate) fn code(&self) -> &[Bytecode] {
         &self.function.code
+    }
+
+    pub(crate) fn code_size(&self) -> usize {
+        self.function.code.len()
     }
 
     pub(crate) fn access_specifier(&self) -> &AccessSpecifier {
@@ -248,6 +506,10 @@ impl Function {
         self.name.as_str()
     }
 
+    pub(crate) fn name_id(&self) -> &IdentStr {
+        &self.name
+    }
+
     pub fn ty_param_abilities(&self) -> &[AbilitySet] {
         &self.ty_param_abilities
     }
@@ -262,6 +524,28 @@ impl Function {
 
     pub fn param_tys(&self) -> &[Type] {
         &self.param_tys
+    }
+
+    /// Creates the function type instance for this function. This requires cloning
+    /// the parameter and result types.
+    pub fn create_function_type(&self) -> Type {
+        Type::Function {
+            args: self.param_tys.clone(),
+            results: self.return_tys.clone(),
+            abilities: self.abilities(),
+        }
+    }
+
+    /// Returns the abilities associated with this function, without consideration of any captured
+    /// closure arguments. By default, this is copy and drop, and if the function is
+    /// immutable (public), also store.
+    pub fn abilities(&self) -> AbilitySet {
+        let result = AbilitySet::singleton(Ability::Copy).add(Ability::Drop);
+        if !self.is_friend_or_private {
+            result.add(Ability::Store)
+        } else {
+            result
+        }
     }
 
     pub fn is_native(&self) -> bool {

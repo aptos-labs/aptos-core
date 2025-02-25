@@ -7,6 +7,7 @@
 pub use crate::protocols::rpc::error::RpcError;
 use crate::{
     error::NetworkError,
+    peer::DisconnectReason,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::wire::messaging::v1::{IncomingRequest, NetworkMessage},
     ProtocolId,
@@ -377,8 +378,14 @@ impl<TMessage> NetworkSender<TMessage> {
 
     /// Request that a given Peer be disconnected and synchronously wait for the request to be
     /// performed.
-    pub async fn disconnect_peer(&self, peer: PeerId) -> Result<(), NetworkError> {
-        self.connection_reqs_tx.disconnect_peer(peer).await?;
+    pub async fn disconnect_peer(
+        &self,
+        peer: PeerId,
+        disconnect_reason: DisconnectReason,
+    ) -> Result<(), NetworkError> {
+        self.connection_reqs_tx
+            .disconnect_peer(peer, disconnect_reason)
+            .await?;
         Ok(())
     }
 }

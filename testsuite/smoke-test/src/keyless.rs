@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::SwarmBuilder;
+use crate::{smoke_test_environment::SwarmBuilder, utils::get_on_chain_resource};
 use aptos::{common::types::GasOptions, test::CliTestFramework};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
@@ -31,7 +31,7 @@ use aptos_types::{
         },
         AnyKeylessPublicKey, Configuration, EphemeralCertificate, Groth16ProofAndStatement,
         Groth16VerificationKey, KeylessPublicKey, KeylessSignature, TransactionAndProof,
-        DEVNET_VERIFICATION_KEY, KEYLESS_ACCOUNT_MODULE_NAME,
+        KEYLESS_ACCOUNT_MODULE_NAME, VERIFICATION_KEY_FOR_TESTING,
     },
     on_chain_config::{FeatureFlag, Features},
     transaction::{
@@ -55,7 +55,7 @@ async fn test_keyless_oidc_txn_verifies() {
     let result = swarm
         .aptos_public_info()
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if let Err(e) = result {
@@ -83,7 +83,7 @@ async fn test_keyless_rotate_vk() {
     info!("Submitting keyless Groth16 transaction w.r.t. to initial VK; should succeed");
     let result = info
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if let Err(e) = result {
@@ -104,7 +104,7 @@ async fn test_keyless_rotate_vk() {
     info!("Submitting keyless Groth16 transaction w.r.t. to upgraded VK; should fail");
     let result = info
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if result.is_ok() {
@@ -121,7 +121,7 @@ async fn test_keyless_rotate_vk() {
     info!("Submitting keyless Groth16 transaction w.r.t. to old VK; should fail");
     let result = info
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if result.is_ok() {
@@ -133,7 +133,7 @@ async fn test_keyless_rotate_vk() {
     info!("Submitting keyless Groth16 transaction w.r.t. to upgraded VK; should succeed");
     let result = info
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if let Err(e) = result {
@@ -184,7 +184,7 @@ async fn test_keyless_oidc_txn_with_bad_jwt_sig() {
     info!("Submit OpenID transaction with bad JWT signature");
     let result = info
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if result.is_ok() {
@@ -205,7 +205,7 @@ async fn test_keyless_oidc_txn_with_expired_epk() {
     info!("Submit OpenID transaction with expired EPK");
     let result = info
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if result.is_ok() {
@@ -221,7 +221,7 @@ async fn test_keyless_groth16_verifies() {
     let result = swarm
         .aptos_public_info()
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if let Err(e) = result {
@@ -324,15 +324,22 @@ script {{
     let esk = EphemeralPrivateKey::Ed25519 {
         inner_private_key: get_sample_esk(),
     };
-    let ephemeral_key_pair =
-        EphemeralKeyPair::new(esk, get_sample_exp_date(), get_sample_epk_blinder()).unwrap();
+    let rest_cli = swarm.validators().next().unwrap().rest_client();
+    let config = get_on_chain_resource(&rest_cli).await;
+    let ephemeral_key_pair = EphemeralKeyPair::new_with_keyless_config(
+        &config,
+        esk,
+        get_sample_exp_date(),
+        get_sample_epk_blinder(),
+    )
+    .unwrap();
     let federated_keyless_account = FederatedKeylessAccount::new_from_jwt(
         &get_sample_jwt_token(),
         ephemeral_key_pair,
         root_addr,
         None,
-        Some(get_sample_pepper()),
-        Some(get_sample_zk_sig()),
+        get_sample_pepper(),
+        get_sample_zk_sig(),
     )
     .unwrap();
 
@@ -380,7 +387,7 @@ script {{
     let result = swarm
         .aptos_public_info()
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
     debug!("result={:?}", result);
     assert_eq!(expect_txn_succeed, result.is_ok());
@@ -395,7 +402,7 @@ async fn test_keyless_no_extra_field_groth16_verifies() {
     let result = swarm
         .aptos_public_info()
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if let Err(e) = result {
@@ -418,7 +425,7 @@ async fn test_keyless_no_training_wheels_groth16_verifies() {
     info!("Submit keyless Groth16 transaction");
     let result = info
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if let Err(e) = result {
@@ -430,11 +437,19 @@ async fn test_keyless_no_training_wheels_groth16_verifies() {
 async fn test_keyless_groth16_verifies_using_rust_sdk() {
     let (_tw_sk, _, _, swarm, mut cli, root_idx) = setup_local_net().await;
 
+    let rest_cli = swarm.validators().next().unwrap().rest_client();
+    let config = get_on_chain_resource(&rest_cli).await;
+
     let esk = EphemeralPrivateKey::Ed25519 {
         inner_private_key: get_sample_esk(),
     };
-    let ephemeral_key_pair =
-        EphemeralKeyPair::new(esk, get_sample_exp_date(), get_sample_epk_blinder()).unwrap();
+    let ephemeral_key_pair = EphemeralKeyPair::new_with_keyless_config(
+        &config,
+        esk,
+        get_sample_exp_date(),
+        get_sample_epk_blinder(),
+    )
+    .unwrap();
 
     let mut info = swarm.aptos_public_info();
     let keyless_account = KeylessAccount::new(
@@ -478,7 +493,7 @@ async fn test_keyless_groth16_verifies_using_rust_sdk() {
     let result = swarm
         .aptos_public_info()
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if let Err(e) = result {
@@ -489,20 +504,28 @@ async fn test_keyless_groth16_verifies_using_rust_sdk() {
 #[tokio::test]
 async fn test_keyless_groth16_verifies_using_rust_sdk_from_jwt() {
     let (_tw_sk, _, _, swarm, mut cli, root_idx) = setup_local_net().await;
+    let rest_cli = swarm.validators().next().unwrap().rest_client();
+    let config = get_on_chain_resource(&rest_cli).await;
 
     let esk = EphemeralPrivateKey::Ed25519 {
         inner_private_key: get_sample_esk(),
     };
-    let ephemeral_key_pair =
-        EphemeralKeyPair::new(esk, get_sample_exp_date(), get_sample_epk_blinder()).unwrap();
+
+    let ephemeral_key_pair = EphemeralKeyPair::new_with_keyless_config(
+        &config,
+        esk,
+        get_sample_exp_date(),
+        get_sample_epk_blinder(),
+    )
+    .unwrap();
 
     let mut info = swarm.aptos_public_info();
     let keyless_account = KeylessAccount::new_from_jwt(
         &get_sample_jwt_token(),
         ephemeral_key_pair,
         None,
-        Some(get_sample_pepper()),
-        Some(get_sample_zk_sig()),
+        get_sample_pepper(),
+        get_sample_zk_sig(),
     )
     .unwrap();
     let addr = info
@@ -535,7 +558,7 @@ async fn test_keyless_groth16_verifies_using_rust_sdk_from_jwt() {
     let result = swarm
         .aptos_public_info()
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if let Err(e) = result {
@@ -555,7 +578,7 @@ async fn test_keyless_groth16_with_mauled_proof() {
     info!("Submit keyless Groth16 transaction");
     let result = info
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if result.is_ok() {
@@ -585,7 +608,7 @@ async fn test_keyless_groth16_with_bad_tw_signature() {
     info!("Submit keyless Groth16 transaction");
     let result = info
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if result.is_ok() {
@@ -868,6 +891,25 @@ pub(crate) async fn spawn_network_and_execute_gov_proposals(
         .await
         .expect("Epoch 2 taking too long to come!");
 
+    let vk_for_testing = Groth16VerificationKey::from(VERIFICATION_KEY_FOR_TESTING.clone());
+    let script = get_rotate_vk_governance_script(&vk_for_testing);
+
+    let gas_options = GasOptions {
+        gas_unit_price: Some(100),
+        max_gas: Some(2000000),
+        expiration_secs: 60,
+    };
+    let txn_summary = cli
+        .run_script_with_gas_options(root_idx, &script, Some(gas_options.clone()))
+        .await
+        .unwrap();
+    debug!("txn_summary={:?}", txn_summary);
+
+    let mut info = swarm.aptos_public_info();
+
+    // Increment sequence number since we installed the VK
+    info.root_account().increment_sequence_number();
+
     let vk = print_account_resource::<Groth16VerificationKey>(
         &client,
         AccountAddress::ONE,
@@ -877,10 +919,7 @@ pub(crate) async fn spawn_network_and_execute_gov_proposals(
     )
     .await;
 
-    assert_eq!(
-        vk,
-        Groth16VerificationKey::from(DEVNET_VERIFICATION_KEY.clone())
-    );
+    assert_eq!(vk, vk_for_testing);
 
     let old_config = print_account_resource::<Configuration>(
         &client,
@@ -939,11 +978,6 @@ fun main(core_resources: &signer) {{
         hex::encode(training_wheels_pk.to_bytes())
     );
 
-    let gas_options = GasOptions {
-        gas_unit_price: Some(100),
-        max_gas: Some(2000000),
-        expiration_secs: 60,
-    };
     let txn_summary = cli
         .run_script_with_gas_options(root_idx, &script, Some(gas_options))
         .await
@@ -975,8 +1009,6 @@ fun main(core_resources: &signer) {{
     assert_ne!(old_config, new_config);
     assert_eq!(new_config.max_exp_horizon_secs, max_exp_horizon_secs);
 
-    let mut info = swarm.aptos_public_info();
-
     // Increment sequence number since we patched a JWK
     info.root_account().increment_sequence_number();
 
@@ -991,12 +1023,7 @@ async fn get_latest_jwkset(rest_client: &Client) -> PatchedJWKs {
     response.into_inner()
 }
 
-async fn rotate_vk_by_governance<'a>(
-    cli: &mut CliTestFramework,
-    info: &mut AptosPublicInfo,
-    vk: &Groth16VerificationKey,
-    root_idx: usize,
-) {
+fn get_rotate_vk_governance_script(vk: &Groth16VerificationKey) -> String {
     let script = format!(
         r#"
 script {{
@@ -1021,6 +1048,17 @@ script {{
         KEYLESS_ACCOUNT_MODULE_NAME
     );
     debug!("Move script for changing VK follows below:\n{:?}", script);
+
+    script
+}
+
+async fn rotate_vk_by_governance<'a>(
+    cli: &mut CliTestFramework,
+    info: &mut AptosPublicInfo,
+    vk: &Groth16VerificationKey,
+    root_idx: usize,
+) {
+    let script = get_rotate_vk_governance_script(vk);
 
     print_account_resource::<Groth16VerificationKey>(
         info.client(),

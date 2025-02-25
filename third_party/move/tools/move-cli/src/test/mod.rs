@@ -106,7 +106,7 @@ fn collect_coverage(
     }
 
     // collect filtered trace
-    let coverage_map = CoverageMap::from_trace_file(trace_file)
+    let coverage_map = CoverageMap::from_trace_file(&trace_file)?
         .to_unified_exec_map()
         .into_coverage_map_with_modules(filter);
 

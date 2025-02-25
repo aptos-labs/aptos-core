@@ -9,10 +9,10 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     control_flow_graph::{ControlFlowGraph, VMControlFlowGraph},
     file_format::{
-        Ability, AbilitySet, Bytecode, CodeUnit, FieldDefinition, FunctionDefinition,
-        FunctionDefinitionIndex, FunctionHandle, ModuleHandle, Signature, SignatureIndex,
-        SignatureToken, StructDefinition, StructDefinitionIndex, StructFieldInformation,
-        StructTypeParameter, StructVariantHandleIndex, TableIndex, VariantIndex, Visibility,
+        Bytecode, CodeUnit, FieldDefinition, FunctionDefinition, FunctionDefinitionIndex,
+        FunctionHandle, ModuleHandle, Signature, SignatureIndex, SignatureToken, StructDefinition,
+        StructDefinitionIndex, StructFieldInformation, StructTypeParameter,
+        StructVariantHandleIndex, TableIndex, VariantIndex, Visibility,
     },
     views::FieldOrVariantIndex,
 };
@@ -21,7 +21,12 @@ use move_bytecode_source_map::{
     source_map::{FunctionSourceMap, SourceName, StructSourceMap},
 };
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule, NamedCompiledScript};
-use move_core_types::{ident_str, identifier::IdentStr, language_storage::ModuleId};
+use move_core_types::{
+    ability::{Ability, AbilitySet},
+    ident_str,
+    identifier::IdentStr,
+    language_storage::ModuleId,
+};
 use move_coverage::coverage_map::{ExecCoverageMap, FunctionCoverage};
 use move_ir_types::location::Loc;
 use std::collections::HashMap;
@@ -569,7 +574,20 @@ impl<'a> Disassembler<'a> {
         sig_tok: SignatureToken,
         type_param_context: &[SourceName],
     ) -> Result<String> {
+        let list = |toks: Vec<SignatureToken>| {
+            toks.into_iter()
+                .map(|tok| self.disassemble_sig_tok(tok, type_param_context))
+                .collect::<Result<Vec<_>>>()
+        };
         Ok(match sig_tok {
+            SignatureToken::Function(args, results, abilities) => {
+                format!(
+                    "|{}|{}{}",
+                    list(args)?.join(","),
+                    list(results)?.join(","),
+                    abilities.display_postfix()
+                )
+            },
             SignatureToken::Bool => "bool".to_string(),
             SignatureToken::U8 => "u8".to_string(),
             SignatureToken::U16 => "u16".to_string(),
@@ -590,10 +608,7 @@ impl<'a> Disassembler<'a> {
                 )
                 .to_string(),
             SignatureToken::StructInstantiation(struct_handle_idx, instantiation) => {
-                let instantiation = instantiation
-                    .into_iter()
-                    .map(|tok| self.disassemble_sig_tok(tok, type_param_context))
-                    .collect::<Result<Vec<_>>>()?;
+                let instantiation = list(instantiation)?;
                 let formatted_instantiation = Self::format_type_params(&instantiation);
                 let name = self
                     .source_mapper
@@ -621,14 +636,15 @@ impl<'a> Disassembler<'a> {
             ),
             SignatureToken::TypeParameter(ty_param_index) => type_param_context
                 .get(ty_param_index as usize)
+                .map(|s| s.0.to_string())
                 .ok_or_else(|| {
                     format_err!(
                         "Type parameter index {} out of bounds while disassembling type signature",
                         ty_param_index
                     )
-                })?
-                .0
-                .to_string(),
+                })
+                // Do not actually bail for better debuggability, but print error
+                .unwrap_or_else(|e| format!("<error: {}>", e)),
         })
     }
 
@@ -1045,7 +1061,19 @@ impl<'a> Disassembler<'a> {
                     struct_idx, name, ty_params
                 ))
             },
-            Bytecode::Call(method_idx) => {
+            Bytecode::CallClosure(sign_idx) => {
+                let closure_sign = self.source_mapper.bytecode.signature_at(*sign_idx);
+                let type_str = if closure_sign.len() != 1 {
+                    "<error: invalid closure signature>".to_string()
+                } else {
+                    self.disassemble_sig_tok(
+                        closure_sign.0[0].clone(),
+                        &function_source_map.type_parameters,
+                    )?
+                };
+                Ok(format!("CallClosure({})", type_str))
+            },
+            Bytecode::Call(method_idx) | Bytecode::PackClosure(method_idx, _) => {
                 let function_handle = self.source_mapper.bytecode.function_handle_at(*method_idx);
                 let module_handle = self
                     .source_mapper
@@ -1069,14 +1097,20 @@ impl<'a> Disassembler<'a> {
                     .iter()
                     .map(|sig_tok| self.disassemble_sig_tok(sig_tok.clone(), &[]))
                     .collect::<Result<Vec<String>>>()?;
+                let op_name = if let Bytecode::PackClosure(_, mask) = instruction {
+                    format!("PackClosure#{}", mask)
+                } else {
+                    "Call".to_string()
+                };
                 Ok(format!(
-                    "Call {}({}){}",
+                    "{} {}({}){}",
+                    op_name,
                     fcall_name,
                     type_arguments,
                     Self::format_ret_type(&type_rets)
                 ))
             },
-            Bytecode::CallGeneric(method_idx) => {
+            Bytecode::CallGeneric(method_idx) | Bytecode::PackClosureGeneric(method_idx, _) => {
                 let func_inst = self
                     .source_mapper
                     .bytecode
@@ -1123,8 +1157,14 @@ impl<'a> Disassembler<'a> {
                     .iter()
                     .map(|sig_tok| self.disassemble_sig_tok(sig_tok.clone(), &ty_params))
                     .collect::<Result<Vec<String>>>()?;
+                let op_name = if let Bytecode::PackClosureGeneric(_, mask) = instruction {
+                    format!("PackClosureGeneric#{}", mask)
+                } else {
+                    "Call".to_string()
+                };
                 Ok(format!(
-                    "Call {}{}({}){}",
+                    "{} {}{}({}){}",
+                    op_name,
                     fcall_name,
                     Self::format_type_params(
                         &ty_params.into_iter().map(|(s, _)| s).collect::<Vec<_>>()

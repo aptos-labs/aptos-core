@@ -38,7 +38,7 @@ use aptos_types::{
     transaction::{Transaction, TransactionInfo, TransactionListWithProof, Version},
     write_set::WriteSet,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM};
 use clap::Parser;
 use futures::{
     future,
@@ -513,6 +513,8 @@ impl TransactionRestoreBatchController {
         >,
     ) -> Result<()> {
         let (first_version, _) = self.replay_from_version.unwrap();
+        restore_handler.force_state_version_for_kv_restore(first_version.checked_sub(1))?;
+
         let mut base_version = first_version;
         let mut offset = 0u64;
         let replay_start = Instant::now();
@@ -592,7 +594,7 @@ impl TransactionRestoreBatchController {
         restore_handler.reset_state_store();
         let replay_start = Instant::now();
         let db = DbReaderWriter::from_arc(Arc::clone(&restore_handler.aptosdb));
-        let chunk_replayer = Arc::new(ChunkExecutor::<AptosVM>::new(db));
+        let chunk_replayer = Arc::new(ChunkExecutor::<AptosVMBlockExecutor>::new(db));
         let ledger_update_stream = txns_to_execute_stream
             .try_chunks(BATCH_SIZE)
             .err_into::<anyhow::Error>()

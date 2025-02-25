@@ -4,6 +4,7 @@
 
 use anyhow::{bail, format_err, Result};
 use aptos_api_types::AsConverter;
+use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     hash::HashValue,
@@ -14,11 +15,9 @@ use aptos_language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEA
 use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
 use aptos_types::{
     account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
-    block_executor::config::BlockExecutorConfigFromOnchain,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
-    on_chain_config::BlockGasLimitType,
     state_store::{state_key::StateKey, table::TableHandle, TStateView},
     transaction::{
         signature_verified_transaction::into_signature_verified_block,
@@ -27,7 +26,7 @@ use aptos_types::{
     },
     AptosCoinType,
 };
-use aptos_vm::{AptosVM, VMExecutor};
+use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
 use aptos_vm_genesis::GENESIS_KEYPAIR;
 use clap::Parser;
@@ -35,10 +34,8 @@ use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
 use move_bytecode_verifier::verify_module;
 use move_command_line_common::{
-    address::ParsedAddress,
-    env::{get_move_compiler_block_v1_from_env, get_move_compiler_v2_from_env},
-    files::verify_and_create_named_address_mapping,
-    testing::{EXP_EXT, EXP_EXT_V2},
+    address::ParsedAddress, env::get_move_compiler_block_v1_from_env,
+    files::verify_and_create_named_address_mapping, testing::EXP_EXT,
 };
 use move_compiler::{
     self,
@@ -517,14 +514,9 @@ impl<'a> AptosTestAdapter<'a> {
     fn run_transaction(&mut self, txn: Transaction) -> Result<TransactionOutput> {
         let txn_block = vec![txn];
         let sig_verified_block = into_signature_verified_block(txn_block);
-        let onchain_config = BlockExecutorConfigFromOnchain {
-            // TODO fetch values from state?
-            // Or should we just use execute_block_no_limit ?
-            block_gas_limit_type: BlockGasLimitType::Limit(30000),
-        };
-        let (mut outputs, _) =
-            AptosVM::execute_block(&sig_verified_block, &self.storage.clone(), onchain_config)?
-                .into_inner();
+        let txn_provider = DefaultTxnProvider::new(sig_verified_block);
+        let mut outputs = AptosVMBlockExecutor::new()
+            .execute_block_no_limit(&txn_provider, &self.storage.clone())?;
 
         assert_eq!(outputs.len(), 1);
 
@@ -1120,22 +1112,17 @@ fn precompiled_v2_stdlib_if_needed(
 }
 
 pub fn run_aptos_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    run_aptos_test_with_config(path, TestRunConfig::CompilerV1)
+    run_aptos_test_with_config(path, TestRunConfig::CompilerV2 {
+        language_version: LanguageVersion::default(),
+        v2_experiments: vec![("attach-compiled-module".to_owned(), true)],
+    })
 }
 
 pub fn run_aptos_test_with_config(
     path: &Path,
     config: TestRunConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (suffix, config) =
-        if get_move_compiler_v2_from_env() && !matches!(config, TestRunConfig::CompilerV2 { .. }) {
-            (Some(EXP_EXT_V2.to_owned()), TestRunConfig::CompilerV2 {
-                language_version: LanguageVersion::default(),
-                v2_experiments: vec![("attach-compiled-module".to_owned(), true)],
-            })
-        } else {
-            (Some(EXP_EXT.to_owned()), config)
-        };
+    let suffix = Some(EXP_EXT.to_owned());
     let v1_lib = precompiled_v1_stdlib_if_needed(&config);
     let v2_lib = precompiled_v2_stdlib_if_needed(&config);
     set_paranoid_type_checks(true);

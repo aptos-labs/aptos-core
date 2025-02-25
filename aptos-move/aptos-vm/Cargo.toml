@@ -46,6 +46,7 @@ derive_more = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
+itertools = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-unit-test = { workspace = true, optional = true }
@@ -63,7 +64,7 @@ serde = { workspace = true }
 aptos-aggregator = { workspace = true, features = ["testing"] }
 aptos-block-executor = { workspace = true, features = ["testing"] }
 aptos-language-e2e-tests = { workspace = true }
-aptos-types = { workspace = true, features = ["fuzzing"] }
+aptos-types = { workspace = true, features = ["fuzzing", "testing"] }
 claims = { workspace = true }
 move-vm-types = { workspace = true, features = ["testing"] }
 proptest = { workspace = true }

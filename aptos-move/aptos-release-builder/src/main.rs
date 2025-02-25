@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, ValidCryptoMaterialStringExt};
 use aptos_framework::natives::code::PackageRegistry;
 use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
@@ -69,13 +69,22 @@ impl NetworkSelection {
 pub enum Commands {
     /// Generate sets of governance proposals based on the release_config file passed in
     GenerateProposals {
+        /// Path to the release config.
         #[clap(short, long)]
         release_config: PathBuf,
+
+        /// Output directory to store the generated artifacts.
         #[clap(short, long)]
         output_dir: PathBuf,
 
+        /// If set, simulate the governance proposals after generation.
         #[clap(long)]
         simulate: Option<NetworkSelection>,
+
+        /// Set this flag to enable the gas profiler.
+        /// Can only be used in combination with `--simulate`.
+        #[clap(long)]
+        profile_gas: Option<bool>,
     },
     /// Simulate a multi-step proposal on the specified network, using its current states.
     /// The simulation will execute the governance scripts, as if the proposal is already
@@ -91,6 +100,10 @@ pub enum Commands {
         /// Possible values: devnet, testnet, mainnet, <url to rest endpoint>
         #[clap(long)]
         network: NetworkSelection,
+
+        /// Set this flag to enable the gas profiler
+        #[clap(long, default_value_t = false)]
+        profile_gas: bool,
     },
     /// Generate sets of governance proposals with default release config.
     WriteDefault {
@@ -184,6 +197,7 @@ async fn main() -> anyhow::Result<()> {
             release_config,
             output_dir,
             simulate,
+            profile_gas,
         } => {
             aptos_release_builder::ReleaseConfig::load_config(release_config.as_path())
                 .with_context(|| "Failed to load release config".to_string())?
@@ -191,15 +205,28 @@ async fn main() -> anyhow::Result<()> {
                 .await
                 .with_context(|| "Failed to generate release proposal scripts".to_string())?;
 
-            if let Some(network) = simulate {
-                let remote_endpoint = network.to_url()?;
-                simulate_all_proposals(remote_endpoint, output_dir.as_path()).await?;
+            match simulate {
+                Some(network) => {
+                    let profile_gas = profile_gas.unwrap_or(false);
+                    let remote_endpoint = network.to_url()?;
+                    simulate_all_proposals(remote_endpoint, output_dir.as_path(), profile_gas)
+                        .await?;
+                },
+                None => {
+                    if profile_gas.is_some() {
+                        bail!("--profile-gas can only be set in combination with --simulate")
+                    }
+                },
             }
 
             Ok(())
         },
-        Commands::Simulate { network, path } => {
-            simulate_all_proposals(network.to_url()?, &path).await?;
+        Commands::Simulate {
+            network,
+            path,
+            profile_gas,
+        } => {
+            simulate_all_proposals(network.to_url()?, &path, profile_gas).await?;
             Ok(())
         },
         Commands::WriteDefault { output_path } => {

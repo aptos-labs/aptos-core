@@ -1,199 +1,23 @@
-// -- Model dump before env processor pipeline:
+// -- Model dump before bytecode pipeline
 module 0x42::Test {
     private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
         Add<u64>((f)(x, _y), (g)(x, _y))
     }
     public fun test() {
-        if Eq<u64>(Test::foo(|(x: u64, _: u64): (u64, u64)| x, |(_: u64, y: u64): (u64, u64)| y, 10, 100), 110) {
+        if Eq<u64>(Test::foo(closure#0Test::__lambda__1__test(), closure#0Test::__lambda__2__test(), 10, 100), 110) {
           Tuple()
         } else {
           Abort(0)
         };
         Tuple()
     }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor unused checks:
-module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
-        Add<u64>((f)(x, _y), (g)(x, _y))
-    }
-    public fun test() {
-        if Eq<u64>(Test::foo(|(x: u64, _: u64): (u64, u64)| x, |(_: u64, y: u64): (u64, u64)| y, 10, 100), 110) {
-          Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor type parameter check:
-module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
-        Add<u64>((f)(x, _y), (g)(x, _y))
-    }
-    public fun test() {
-        if Eq<u64>(Test::foo(|(x: u64, _: u64): (u64, u64)| x, |(_: u64, y: u64): (u64, u64)| y, 10, 100), 110) {
-          Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor check recursive struct definition:
-module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
-        Add<u64>((f)(x, _y), (g)(x, _y))
-    }
-    public fun test() {
-        if Eq<u64>(Test::foo(|(x: u64, _: u64): (u64, u64)| x, |(_: u64, y: u64): (u64, u64)| y, 10, 100), 110) {
-          Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor check cyclic type instantiation:
-module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
-        Add<u64>((f)(x, _y), (g)(x, _y))
-    }
-    public fun test() {
-        if Eq<u64>(Test::foo(|(x: u64, _: u64): (u64, u64)| x, |(_: u64, y: u64): (u64, u64)| y, 10, 100), 110) {
-          Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor unused struct params check:
-module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
-        Add<u64>((f)(x, _y), (g)(x, _y))
-    }
-    public fun test() {
-        if Eq<u64>(Test::foo(|(x: u64, _: u64): (u64, u64)| x, |(_: u64, y: u64): (u64, u64)| y, 10, 100), 110) {
-          Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor access and use check before inlining:
-module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
-        Add<u64>((f)(x, _y), (g)(x, _y))
-    }
-    public fun test() {
-        if Eq<u64>(Test::foo(|(x: u64, _: u64): (u64, u64)| x, |(_: u64, y: u64): (u64, u64)| y, 10, 100), 110) {
-          Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor inlining:
-module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
-        Add<u64>((f)(x, _y), (g)(x, _y))
-    }
-    public fun test() {
-        if Eq<u64>(Test::foo(|(x: u64, _: u64): (u64, u64)| x, |(_: u64, y: u64): (u64, u64)| y, 10, 100), 110) {
-          Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor access and use check after inlining:
-module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
-        Add<u64>((f)(x, _y), (g)(x, _y))
-    }
-    public fun test() {
-        if Eq<u64>(Test::foo(|(x: u64, _: u64): (u64, u64)| x, |(_: u64, y: u64): (u64, u64)| y, 10, 100), 110) {
-          Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor acquires check:
-module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
-        Add<u64>((f)(x, _y), (g)(x, _y))
-    }
-    public fun test() {
-        if Eq<u64>(Test::foo(|(x: u64, _: u64): (u64, u64)| x, |(_: u64, y: u64): (u64, u64)| y, 10, 100), 110) {
-          Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor simplifier:
-module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
-        Add<u64>((f)(x, _y), (g)(x, _y))
-    }
-    public fun test() {
-        if Eq<u64>(Test::foo(|(x: u64, _: u64): (u64, u64)| x, |(_: u64, y: u64): (u64, u64)| y, 10, 100), 110) {
-          Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor lambda-lifting:
-module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
-        Add<u64>((f)(x, _y), (g)(x, _y))
-    }
-    public fun test() {
-        if Eq<u64>(Test::foo(closure Test::test$lambda$1(), closure Test::test$lambda$2(), 10, 100), 110) {
-          Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
-    }
-    private fun test$lambda$1(x: u64,param$1: u64): u64 {
+    private fun __lambda__1__test(x: u64,param$1: u64): u64 {
         {
           let _: u64 = param$1;
           x
         }
     }
-    private fun test$lambda$2(param$0: u64,y: u64): u64 {
+    private fun __lambda__2__test(param$0: u64,y: u64): u64 {
         {
           let _: u64 = param$0;
           y
@@ -201,85 +25,223 @@ module 0x42::Test {
     }
 } // end 0x42::Test
 
-
-// -- Model dump after env processor specification checker:
+// -- Sourcified model before bytecode pipeline
 module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
-        Add<u64>((f)(x, _y), (g)(x, _y))
+    fun foo(f: |(u64, u64)|u64, g: |(u64, u64)|u64, x: u64, _y: u64): u64 {
+        f(x, _y) + g(x, _y)
     }
     public fun test() {
-        if Eq<u64>(Test::foo(closure Test::test$lambda$1(), closure Test::test$lambda$2(), 10, 100), 110) {
-          Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
+        if (foo(|(arg0,arg1)| __lambda__1__test(arg0, arg1), |(arg0,arg1)| __lambda__2__test(arg0, arg1), 10, 100) == 110) () else abort 0;
     }
-    private fun test$lambda$1(x: u64,param$1: u64): u64 {
-        {
-          let _: u64 = param$1;
-          x
-        }
+    fun __lambda__1__test(x: u64, param$1: u64): u64 {
+        let _ = param$1;
+        x
     }
-    private fun test$lambda$2(param$0: u64,y: u64): u64 {
-        {
-          let _: u64 = param$0;
-          y
-        }
+    fun __lambda__2__test(param$0: u64, y: u64): u64 {
+        let _ = param$0;
+        y
     }
-} // end 0x42::Test
+}
+
+============ initial bytecode ================
+
+[variant baseline]
+fun Test::foo($t0: |(u64, u64)|u64, $t1: |(u64, u64)|u64, $t2: u64, $t3: u64): u64 {
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+  0: $t6 := infer($t2)
+  1: $t7 := infer($t3)
+  2: $t5 := invoke($t6, $t7, $t0)
+  3: $t9 := infer($t2)
+  4: $t10 := infer($t3)
+  5: $t8 := invoke($t9, $t10, $t1)
+  6: $t4 := +($t5, $t8)
+  7: return $t4
+}
 
 
-// -- Model dump after env processor specification rewriter:
-module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
-        Add<u64>((f)(x, _y), (g)(x, _y))
-    }
-    public fun test() {
-        if Eq<u64>(Test::foo(closure Test::test$lambda$1(), closure Test::test$lambda$2(), 10, 100), 110) {
-          Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
-    }
-    private fun test$lambda$1(x: u64,param$1: u64): u64 {
-        {
-          let _: u64 = param$1;
-          x
-        }
-    }
-    private fun test$lambda$2(param$0: u64,y: u64): u64 {
-        {
-          let _: u64 = param$0;
-          y
-        }
-    }
-} // end 0x42::Test
+[variant baseline]
+public fun Test::test() {
+     var $t0: bool
+     var $t1: u64
+     var $t2: |(u64, u64)|u64
+     var $t3: |(u64, u64)|u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t2 := closure#0 Test::__lambda__1__test()
+  1: $t3 := closure#0 Test::__lambda__2__test()
+  2: $t4 := 10
+  3: $t5 := 100
+  4: $t1 := Test::foo($t2, $t3, $t4, $t5)
+  5: $t6 := 110
+  6: $t0 := ==($t1, $t6)
+  7: if ($t0) goto 8 else goto 10
+  8: label L0
+  9: goto 13
+ 10: label L1
+ 11: $t7 := 0
+ 12: abort($t7)
+ 13: label L2
+ 14: return ()
+}
 
 
+[variant baseline]
+fun Test::__lambda__1__test($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+  0: $t3 := infer($t1)
+  1: $t2 := infer($t0)
+  2: return $t2
+}
 
-Diagnostics:
-error: Calls to function values other than inline function parameters not yet supported
-  ┌─ tests/lambda/inline-parity/bug_10991.move:4:9
-  │
-4 │         f(x, _y) + g(x, _y)
-  │         ^
 
-error: Calls to function values other than inline function parameters not yet supported
-  ┌─ tests/lambda/inline-parity/bug_10991.move:4:20
-  │
-4 │         f(x, _y) + g(x, _y)
-  │                    ^
+[variant baseline]
+fun Test::__lambda__2__test($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+  0: $t3 := infer($t0)
+  1: $t2 := infer($t1)
+  2: return $t2
+}
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
-  ┌─ tests/lambda/inline-parity/bug_10991.move:8:21
-  │
-8 │         assert!(foo(|x, _| x, |_, y| y, 10, 100) == 110, 0);
-  │                     ^^^^^^^^
+============ after LiveVarAnalysisProcessor: ================
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
-  ┌─ tests/lambda/inline-parity/bug_10991.move:8:31
-  │
-8 │         assert!(foo(|x, _| x, |_, y| y, 10, 100) == 110, 0);
-  │                               ^^^^^^^^
+[variant baseline]
+fun Test::foo($t0: |(u64, u64)|u64, $t1: |(u64, u64)|u64, $t2: u64, $t3: u64): u64 {
+     var $t4: u64 [unused]
+     var $t5: u64 [unused]
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     var $t10: u64 [unused]
+     # live vars: $t0, $t1, $t2, $t3
+  0: $t6 := copy($t2)
+     # live vars: $t0, $t1, $t2, $t3, $t6
+  1: $t7 := copy($t3)
+     # live vars: $t0, $t1, $t2, $t3, $t6, $t7
+  2: $t6 := invoke($t6, $t7, $t0)
+     # live vars: $t1, $t2, $t3, $t6
+  3: $t2 := move($t2)
+     # live vars: $t1, $t2, $t3, $t6
+  4: $t3 := move($t3)
+     # live vars: $t1, $t2, $t3, $t6
+  5: $t2 := invoke($t2, $t3, $t1)
+     # live vars: $t2, $t6
+  6: $t2 := +($t6, $t2)
+     # live vars: $t2
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun Test::test() {
+     var $t0: bool
+     var $t1: u64 [unused]
+     var $t2: |(u64, u64)|u64
+     var $t3: |(u64, u64)|u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64 [unused]
+     var $t7: u64 [unused]
+     # live vars:
+  0: $t2 := closure#0 Test::__lambda__1__test()
+     # live vars: $t2
+  1: $t3 := closure#0 Test::__lambda__2__test()
+     # live vars: $t2, $t3
+  2: $t4 := 10
+     # live vars: $t2, $t3, $t4
+  3: $t5 := 100
+     # live vars: $t2, $t3, $t4, $t5
+  4: $t4 := Test::foo($t2, $t3, $t4, $t5)
+     # live vars: $t4
+  5: $t5 := 110
+     # live vars: $t4, $t5
+  6: $t0 := ==($t4, $t5)
+     # live vars: $t0
+  7: if ($t0) goto 8 else goto 10
+     # live vars:
+  8: label L0
+     # live vars:
+  9: return ()
+     # live vars:
+ 10: label L1
+     # live vars:
+ 11: $t4 := 0
+     # live vars: $t4
+ 12: abort($t4)
+}
+
+
+[variant baseline]
+fun Test::__lambda__1__test($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     # live vars: $t0, $t1
+  0: return $t0
+}
+
+
+[variant baseline]
+fun Test::__lambda__2__test($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     # live vars: $t0, $t1
+  0: return $t1
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module 42.Test {
+
+
+foo(f: |u64,u64|u64, g: |u64,u64|u64, x: u64, _y: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: CopyLoc[2](x: u64)
+	1: CopyLoc[3](_y: u64)
+	2: MoveLoc[0](f: |u64,u64|u64)
+	3: CallClosure(|u64,u64|u64)
+	4: MoveLoc[2](x: u64)
+	5: MoveLoc[3](_y: u64)
+	6: MoveLoc[1](g: |u64,u64|u64)
+	7: CallClosure(|u64,u64|u64)
+	8: Add
+	9: Ret
+}
+public test() /* def_idx: 1 */ {
+B0:
+	0: PackClosure#0 __lambda__1__test(u64, u64): u64
+	1: PackClosure#0 __lambda__2__test(u64, u64): u64
+	2: LdU64(10)
+	3: LdU64(100)
+	4: Call foo(|u64,u64|u64, |u64,u64|u64, u64, u64): u64
+	5: LdU64(110)
+	6: Eq
+	7: BrFalse(9)
+B1:
+	8: Ret
+B2:
+	9: LdU64(0)
+	10: Abort
+}
+__lambda__1__test(x: u64, param$1: u64): u64 /* def_idx: 2 */ {
+B0:
+	0: MoveLoc[0](x: u64)
+	1: Ret
+}
+__lambda__2__test(param$0: u64, y: u64): u64 /* def_idx: 3 */ {
+B0:
+	0: MoveLoc[1](y: u64)
+	1: Ret
+}
+}
+============ bytecode verification succeeded ========

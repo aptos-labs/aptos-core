@@ -378,7 +378,7 @@ Removes capabilities from the account to be stored or destroyed elsewhere
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_strict;
+<b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 

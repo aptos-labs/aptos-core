@@ -40,17 +40,17 @@ pub(crate) fn individual_workload_tests(test_name: String) -> ForgeConfig {
                     creation_balance: 200_000_000,
                 };
                 let write_type = TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::BytesMakeOrChange {
+                    entry_point: Box::new(EntryPoints::BytesMakeOrChange {
                         data_length: Some(32),
-                    },
+                    }),
                     num_modules: 1,
                     use_account_pool: true,
                 };
                 job.transaction_mix_per_phase(vec![
                     // warmup
+                    vec![(account_creation_type.clone(), 1)],
                     vec![(account_creation_type, 1)],
-                    vec![(account_creation_type, 1)],
-                    vec![(write_type, 1)],
+                    vec![(write_type.clone(), 1)],
                     // cooldown
                     vec![(write_type, 1)],
                 ])

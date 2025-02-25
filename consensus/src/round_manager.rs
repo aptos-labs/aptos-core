@@ -112,7 +112,7 @@ impl UnverifiedEvent {
             //TODO: no need to sign and verify the proposal
             UnverifiedEvent::ProposalMsg(p) => {
                 if !self_message {
-                    p.verify(validator, proof_cache, quorum_store_enabled)?;
+                    p.verify(peer_id, validator, proof_cache, quorum_store_enabled)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["proposal"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -121,7 +121,7 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::VoteMsg(v) => {
                 if !self_message {
-                    v.verify(validator)?;
+                    v.verify(peer_id, validator)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["vote"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -139,7 +139,7 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::OrderVoteMsg(v) => {
                 if !self_message {
-                    v.verify_order_vote(validator)?;
+                    v.verify_order_vote(peer_id, validator)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["order_vote"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -355,9 +355,13 @@ impl RoundManager {
         &mut self,
         new_round_event: NewRoundEvent,
     ) -> anyhow::Result<()> {
+        let new_round = new_round_event.round;
         let is_current_proposer = self
             .proposer_election
-            .is_valid_proposer(self.proposal_generator.author(), new_round_event.round);
+            .is_valid_proposer(self.proposal_generator.author(), new_round);
+        let prev_proposer = self
+            .proposer_election
+            .get_valid_proposer(new_round.saturating_sub(1));
 
         counters::CURRENT_ROUND.set(new_round_event.round as i64);
         counters::ROUND_TIMEOUT_MS.set(new_round_event.timeout.as_millis() as i64);
@@ -368,7 +372,11 @@ impl RoundManager {
             NewRoundReason::Timeout(ref reason) => {
                 counters::TIMEOUT_ROUNDS_COUNT.inc();
                 counters::AGGREGATED_ROUND_TIMEOUT_REASON
-                    .with_label_values(&[&reason.to_string(), &is_current_proposer.to_string()])
+                    .with_label_values(&[
+                        &reason.to_string(),
+                        prev_proposer.short_str().as_str(),
+                        &is_current_proposer.to_string(),
+                    ])
                     .inc();
                 if is_current_proposer {
                     if let RoundTimeoutReason::PayloadUnavailable { missing_authors } = reason {
@@ -1127,6 +1135,20 @@ impl RoundManager {
 
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
         let proposal_round = proposal.round();
+        let sync_info = self.block_store.sync_info();
+
+        if proposal_round <= sync_info.highest_round() {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(1)),
+                warn!(
+                    sync_info = sync_info,
+                    proposal = proposal,
+                    "Ignoring proposal. SyncInfo round is higher than proposal round."
+                )
+            );
+            return Ok(());
+        }
+
         let vote = self.create_vote(proposal).await?;
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());

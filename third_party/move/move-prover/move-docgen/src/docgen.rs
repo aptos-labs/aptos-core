@@ -8,14 +8,14 @@ use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 use move_compiler::parser::keywords::{BUILTINS, CONTEXTUAL_KEYWORDS, KEYWORDS};
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{ability::AbilitySet, account_address::AccountAddress};
 use move_model::{
     ast::{Address, Attribute, AttributeValue, ModuleName, SpecBlockInfo, SpecBlockTarget},
     code_writer::{CodeWriter, CodeWriterLabel},
     emit, emitln,
     model::{
-        AbilitySet, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, NamedConstantEnv,
-        Parameter, QualifiedId, StructEnv, TypeParameter,
+        FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, NamedConstantEnv, Parameter,
+        QualifiedId, StructEnv, TypeParameter,
     },
     symbol::Symbol,
     ty::TypeDisplayContext,
@@ -925,9 +925,9 @@ impl<'env> Docgen<'env> {
             let curr_env = self.env.get_function(id);
             let curr_name = name_of(&curr_env);
             let next_list = if is_forward {
-                curr_env.get_called_functions().cloned().unwrap_or_default()
+                curr_env.get_used_functions().cloned().unwrap_or_default()
             } else {
-                curr_env.get_calling_functions().unwrap_or_default()
+                curr_env.get_using_functions().unwrap_or_default()
             };
 
             if fun_env.module_env.get_id() == curr_env.module_env.get_id() {

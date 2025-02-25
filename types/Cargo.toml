@@ -18,7 +18,6 @@ aptos-bitvec = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-dkg = { workspace = true }
-aptos-experimental-runtimes = { workspace = true }
 aptos-infallible = { workspace = true }
 arbitrary = { workspace = true, features = ["derive"], optional = true }
 ark-bn254 = { workspace = true }
@@ -28,7 +27,6 @@ ark-groth16 = { workspace = true }
 ark-relations = { workspace = true }
 ark-serialize = { workspace = true }
 ark-std = { workspace = true }
-arr_macro = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
@@ -73,7 +71,6 @@ tracing = { workspace = true }
 ahash = { workspace = true }
 aptos-crypto = { workspace = true, features = ["fuzzing", "testing"] }
 aptos-proptest-helpers = { workspace = true }
-ark-crypto-primitives = { workspace = true }
 async-trait = { workspace = true }
 ciborium = { workspace = true }
 claims = { workspace = true }
@@ -86,7 +83,6 @@ passkey-authenticator = { workspace = true }
 passkey-client = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
-regex = { workspace = true }
 reqwest = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
@@ -94,7 +90,7 @@ url = { workspace = true }
 
 [features]
 default = []
-testing = []
+testing = ["aptos-crypto/fuzzing"]
 fuzzing = ["proptest", "proptest-derive", "aptos-crypto/fuzzing", "move-core-types/fuzzing", "arbitrary"]
 
 [[bench]]

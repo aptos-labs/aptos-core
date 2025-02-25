@@ -221,8 +221,11 @@ impl Execution {
             if compiled_cache.failed_packages_v2.contains(&package_info) {
                 v2_failed = true;
             } else {
-                let compiled_res_v2 =
-                    compile_package(package_dir, &package_info, Some(CompilerVersion::V2_0));
+                let compiled_res_v2 = compile_package(
+                    package_dir,
+                    &package_info,
+                    Some(CompilerVersion::latest_stable()),
+                );
                 if let Ok(compiled_res) = compiled_res_v2 {
                     generate_compiled_blob(
                         &package_info,
@@ -359,7 +362,7 @@ impl Execution {
         // Update features if needed to the correct binary format used by V2 compiler.
         let mut features = Features::fetch_config(&state).unwrap_or_default();
         if v2_flag {
-            features.enable(FeatureFlag::VM_BINARY_FORMAT_V7);
+            features.enable(FeatureFlag::VM_BINARY_FORMAT_V8);
         } else {
             features.enable(FeatureFlag::VM_BINARY_FORMAT_V6);
         }

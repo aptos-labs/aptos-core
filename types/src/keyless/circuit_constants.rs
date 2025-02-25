@@ -3,10 +3,15 @@
 
 //! These constants are from commit 125522b4b226f8ece3e3162cecfefe915d13bc30 of keyless-circuit.
 
-use crate::keyless::bn254_circom::{g1_projective_str_to_affine, g2_projective_str_to_affine};
+use crate::keyless::{
+    bn254_circom::{g1_projective_str_to_affine, g2_projective_str_to_affine},
+    proof_simulation::{Groth16SimulatorBn254, Trapdoor},
+};
 use aptos_crypto::poseidon_bn254;
 use ark_bn254::Bn254;
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
+use once_cell::sync::Lazy;
+use rand::{prelude::StdRng, SeedableRng};
 
 pub(crate) const MAX_AUD_VAL_BYTES: usize = 120;
 pub(crate) const MAX_UID_KEY_BYTES: usize = 30;
@@ -22,7 +27,7 @@ pub(crate) const MAX_COMMITED_EPK_BYTES: u16 =
 
 /// This function uses the decimal uncompressed point serialization which is outputted by circom.
 /// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
-pub fn devnet_prepared_vk() -> PreparedVerifyingKey<Bn254> {
+pub fn prepared_vk_for_testing() -> PreparedVerifyingKey<Bn254> {
     // Convert the projective points to affine.
     let alpha_g1 = g1_projective_str_to_affine(
         "20491192805390485299153009773594534940189261866228447918068658471970481763042",
@@ -92,3 +97,19 @@ pub fn devnet_prepared_vk() -> PreparedVerifyingKey<Bn254> {
 
     PreparedVerifyingKey::from(vk)
 }
+
+pub struct Groth16TrapdoorSetup {
+    pub simulation_pk: Trapdoor<Bn254>,
+    pub prepared_vk: PreparedVerifyingKey<Bn254>,
+}
+
+pub static TEST_GROTH16_SETUP: Lazy<Groth16TrapdoorSetup> = Lazy::new(|| {
+    let mut rng = StdRng::seed_from_u64(999);
+    let (simulation_pk, vk) =
+        Groth16SimulatorBn254::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
+    let prepared_vk = PreparedVerifyingKey::from(vk.clone());
+    Groth16TrapdoorSetup {
+        simulation_pk,
+        prepared_vk,
+    }
+});

@@ -87,12 +87,6 @@ pub struct Test {
     /// Collect coverage information for later use with the various `move coverage` subcommands
     #[clap(long = "coverage")]
     pub compute_coverage: bool,
-
-    /// Use the EVM-based execution backend.
-    /// Does not work with --stackless.
-    #[cfg(feature = "evm-backend")]
-    #[clap(long = "evm")]
-    pub evm: bool,
 }
 
 impl Test {
@@ -116,8 +110,6 @@ impl Test {
             check_stackless_vm,
             verbose_mode,
             compute_coverage,
-            #[cfg(feature = "evm-backend")]
-            evm,
         } = self;
         let unit_test_config = UnitTestingConfig {
             filter,
@@ -128,9 +120,6 @@ impl Test {
             check_stackless_vm,
             verbose: verbose_mode,
             ignore_compile_warnings,
-            #[cfg(feature = "evm-backend")]
-            evm,
-
             ..UnitTestingConfig::default()
         };
         let result = run_move_unit_tests(
@@ -241,9 +230,10 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
     // Move package system, to first grab the compilation env, construct the test plan from it, and
     // then save it, before resuming the rest of the compilation and returning the results and
     // control back to the Move package system.
-    let (_compiled_package, model_opt) = build_plan.compile_with_driver(
+    let (compiled_package, model_opt) = build_plan.compile_with_driver(
         writer,
         &build_config.compiler_config,
+        vec![],
         |compiler| {
             let (files, comments_and_compiler_res) = compiler.run::<PASS_CFGIR>().unwrap();
             let (_, compiler) =
@@ -305,7 +295,12 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
     files.extend(dep_file_map);
     let test_plan = test_plan.unwrap();
     let no_tests = test_plan.is_empty();
-    let test_plan = TestPlan::new(test_plan, files, units);
+    let test_plan = TestPlan::new(
+        test_plan,
+        files,
+        units,
+        compiled_package.bytecode_deps.into_values().collect(),
+    );
 
     let trace_path = pkg_path.join(".trace");
     let coverage_map_path = pkg_path
@@ -342,9 +337,10 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
             let buf_writer = &mut *LOGGING_FILE_WRITER.lock().unwrap();
             buf_writer.flush().unwrap();
         }
-        let coverage_map = CoverageMap::from_trace_file(trace_path);
-        output_map_to_file(coverage_map_path, &coverage_map).unwrap();
+        let coverage_map = CoverageMap::from_trace_file(&trace_path)?;
+        output_map_to_file(&coverage_map_path, &coverage_map)?;
     }
+    cleanup_trace();
     Ok(UnitTestResult::Success)
 }
 

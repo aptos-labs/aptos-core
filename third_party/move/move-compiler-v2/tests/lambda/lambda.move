@@ -1,7 +1,7 @@
 module 0x8675309::M {
     use 0x1::XVector;
 
-    public inline fun foreach<T>(v: &vector<T>, action: |&T|) { // expected to be not implemented
+    public fun foreach<T>(v: &vector<T>, action: |&T|) {
         let i = 0;
         while (i < XVector::length(v)) {
             action(XVector::borrow(v, i));
@@ -9,7 +9,7 @@ module 0x8675309::M {
         }
     }
 
-    public inline fun reduce<R, T>(v: vector<T>, accu: R, reducer: |T, R|R): R {
+    public fun reduce<R, T>(v: vector<T>, accu: R, reducer: |T, R|R): R {
         while (!XVector::is_empty(&v)) {
             accu = reducer(XVector::pop_back(&mut v), accu);
         };
@@ -31,10 +31,10 @@ module 0x8675309::M {
     public fun corrected_nested() {
         let v = vector[vector[1,2], vector[3]];
         let sum = 0;
-        foreach(&v, |e| sum = sum + reduce!(*e, 0, |t, r| t + r));
+        foreach(&v, |e| sum = sum + reduce(*e, 0, |t, r| t + r));
     }
 
-    public inline fun wrong_local_call_arg_count<T>(v: &vector<T>, action: |&T|) {
+    public fun wrong_local_call_arg_count<T>(v: &vector<T>, action: |&T|) {
         let i = 0;
         while (i < XVector::length(v)) {
             action(XVector::borrow(v, i), i); // expected to have wrong argument count
@@ -42,7 +42,7 @@ module 0x8675309::M {
         }
     }
 
-    public inline fun wrong_local_call_arg_type<T>(v: &vector<T>, action: |&T|) {
+    public fun wrong_local_call_arg_type<T>(v: &vector<T>, action: |&T|) {
         let i = 0;
         while (i < XVector::length(v)) {
             action(i); // expected to have wrong argument type
@@ -50,7 +50,7 @@ module 0x8675309::M {
         }
     }
 
-    public inline fun wrong_local_call_result_type<T>(v: &vector<T>, action: |&T|) {
+    public fun wrong_local_call_result_type<T>(v: &vector<T>, action: |&T|) {
         let i = 0;
         while (i < XVector::length(v)) {
             i = i + action(XVector::borrow(v, i)); // expected to have wrong result type
@@ -64,32 +64,14 @@ module 0x8675309::M {
     public fun wrong_lambda_inferred_type() {
         let v = vector[1, 2, 3];
         let sum = 0;
-        foreach(&v, |e| sum = sum + e) // expected to cannot infer type
+        foreach(&v, |e| sum = sum + e)
     }
 
     public fun wrong_lambda_result_type() {
         let v = vector[1, 2, 3];
-        let sum = 0;
+        let sum = 0u64;
         foreach(&v, |e| { sum = sum + *e; *e }) // expected to have wrong result type of lambda
     }
-
-    public fun lambda_not_allowed() {
-        let _x = |i| i + 1; // expected lambda not allowed
-    }
-
-    struct FieldFunNotAllowed {
-        f: |u64|u64, // expected lambda not allowed
-    }
-
-    public fun fun_arg_lambda_not_allowed(x: |u64|) {} // expected lambda not allowed
-
-    public inline fun macro_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
-        abort (1)
-    }
-    public fun fun_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
-        abort (1)
-    }
-
 }
 
 module 0x1::XVector {

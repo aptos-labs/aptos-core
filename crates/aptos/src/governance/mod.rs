@@ -30,6 +30,7 @@ use aptos_rest_client::{
 use aptos_sdk::move_types::language_storage::CORE_CODE_ADDRESS;
 use aptos_types::{
     account_address::AccountAddress,
+    account_config::is_aptos_governance_create_proposal_event,
     event::EventHandle,
     governance::VotingRecords,
     stake_pool::StakePool,
@@ -42,7 +43,10 @@ use move_core_types::{
     ident_str, language_storage::ModuleId, parser::parse_type_tag,
     transaction_argument::TransactionArgument,
 };
-use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_model::metadata::{
+    CompilerVersion, LanguageVersion, LATEST_STABLE_COMPILER_VERSION,
+    LATEST_STABLE_LANGUAGE_VERSION,
+};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -444,20 +448,21 @@ async fn get_metadata_from_url(metadata_url: &Url) -> CliTypedResult<Vec<u8>> {
 fn extract_proposal_id(txn: &Transaction) -> CliTypedResult<Option<u64>> {
     if let Transaction::UserTransaction(inner) = txn {
         // Find event with proposal id
-        let proposal_id = if let Some(event) = inner.events.iter().find(|event| {
-            event.typ.to_string().as_str() == "0x1::aptos_governance::CreateProposalEvent"
-        }) {
-            let data: CreateProposalEvent =
-                serde_json::from_value(event.data.clone()).map_err(|_| {
-                    CliError::UnexpectedError(
-                        "Failed to parse Proposal event to get ProposalId".to_string(),
-                    )
-                })?;
-            Some(data.proposal_id.0)
-        } else {
-            warn!("No proposal event found to find proposal id");
-            None
-        };
+        let proposal_id =
+            if let Some(event) = inner.events.iter().find(|event| {
+                is_aptos_governance_create_proposal_event(event.typ.to_string().as_str())
+            }) {
+                let data: CreateProposalEvent = serde_json::from_value(event.data.clone())
+                    .map_err(|_| {
+                        CliError::UnexpectedError(
+                            "Failed to parse Proposal event to get ProposalId".to_string(),
+                        )
+                    })?;
+                Some(data.proposal_id.0)
+            } else {
+                warn!("No proposal event found to find proposal id");
+                None
+            };
 
         return Ok(proposal_id);
     }
@@ -473,7 +478,7 @@ struct CreateProposalEvent {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ProposalSubmissionSummary {
-    proposal_id: Option<u64>,
+    pub proposal_id: Option<u64>,
     #[serde(flatten)]
     transaction: TransactionSummary,
 }
@@ -910,17 +915,29 @@ pub struct CompileScriptFunction {
     #[clap(long, default_value_if("move_2", "true", "7"))]
     pub bytecode_version: Option<u32>,
 
+    /// Specify the version of the compiler.
+    /// Defaults to the latest stable compiler version (at least 2)
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
-           default_value_if("move_2", "true", "2.0"))]
+           default_value = LATEST_STABLE_COMPILER_VERSION,
+           default_value_if("move_2", "true", LATEST_STABLE_COMPILER_VERSION),
+           default_value_if("move_1", "true", "1"),)]
     pub compiler_version: Option<CompilerVersion>,
 
+    /// Specify the language version to be supported.
+    /// Defaults to the latest stable language version (at least 2)
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
-           default_value_if("move_2", "true", "2.0"))]
+           default_value = LATEST_STABLE_LANGUAGE_VERSION,
+           default_value_if("move_2", "true", LATEST_STABLE_LANGUAGE_VERSION),
+           default_value_if("move_1", "true", "1"),)]
     pub language_version: Option<LanguageVersion>,
 
     /// Select bytecode, language, compiler for Move 2
-    #[clap(long)]
+    #[clap(long, default_value_t = true)]
     pub move_2: bool,
+
+    /// Select bytecode, language, and compiler versions for Move 1.
+    #[clap(long, default_value_t = false)]
+    pub move_1: bool,
 }
 
 impl CompileScriptFunction {
@@ -966,8 +983,10 @@ impl CompileScriptFunction {
             &self.framework_package_args,
             prompt_options,
             self.bytecode_version,
-            self.language_version,
-            self.compiler_version,
+            self.language_version
+                .or_else(|| Some(LanguageVersion::latest_stable())),
+            self.compiler_version
+                .or_else(|| Some(CompilerVersion::latest_stable())),
         )
     }
 }

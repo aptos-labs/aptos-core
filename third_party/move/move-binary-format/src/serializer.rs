@@ -18,7 +18,8 @@
 use crate::{file_format::*, file_format_common::*};
 use anyhow::{anyhow, bail, Result};
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, metadata::Metadata,
+    ability::AbilitySet, account_address::AccountAddress, function::ClosureMask,
+    identifier::Identifier, metadata::Metadata,
 };
 
 impl CompiledScript {
@@ -158,6 +159,10 @@ fn serialize_struct_def_inst_index(
     idx: &StructDefInstantiationIndex,
 ) -> Result<()> {
     write_as_uleb128(binary, idx.0, STRUCT_DEF_INST_INDEX_MAX)
+}
+
+fn serialize_closure_mask(binary: &mut BinaryData, mask: &ClosureMask) -> Result<()> {
+    write_as_uleb128(binary, mask.bits(), u64::MAX)
 }
 
 fn seiralize_table_offset(binary: &mut BinaryData, offset: u32) -> Result<()> {
@@ -800,6 +805,12 @@ fn serialize_signature_token_single_node_impl(
             binary.push(SerializedType::TYPE_PARAMETER as u8)?;
             serialize_type_parameter_index(binary, *idx)?;
         },
+        SignatureToken::Function(args, results, abilities) => {
+            binary.push(SerializedType::FUNCTION as u8)?;
+            serialize_ability_set(binary, *abilities)?;
+            serialize_signature_size(binary, args.len())?;
+            serialize_signature_size(binary, results.len())?;
+        },
     }
     Ok(())
 }
@@ -1091,6 +1102,20 @@ fn serialize_instruction_inner(
         Bytecode::TestVariantGeneric(class_idx) => {
             binary.push(Opcodes::TEST_VARIANT_GENERIC as u8)?;
             serialize_struct_variant_inst_index(binary, class_idx)
+        },
+        Bytecode::PackClosure(idx, mask) => {
+            binary.push(Opcodes::PACK_CLOSURE as u8)?;
+            serialize_function_handle_index(binary, idx)?;
+            serialize_closure_mask(binary, mask)
+        },
+        Bytecode::PackClosureGeneric(idx, mask) => {
+            binary.push(Opcodes::PACK_CLOSURE_GENERIC as u8)?;
+            serialize_function_inst_index(binary, idx)?;
+            serialize_closure_mask(binary, mask)
+        },
+        Bytecode::CallClosure(idx) => {
+            binary.push(Opcodes::CALL_CLOSURE as u8)?;
+            serialize_signature_index(binary, idx)
         },
         Bytecode::ReadRef => binary.push(Opcodes::READ_REF as u8),
         Bytecode::WriteRef => binary.push(Opcodes::WRITE_REF as u8),

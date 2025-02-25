@@ -238,6 +238,14 @@ impl ForgeConfig {
                 ["enable_storage_sharding"] = true.into();
             helm_values["validator"]["config"]["indexer_db_config"]["enable_event"] = true.into();
             helm_values["fullnode"]["config"]["indexer_db_config"]["enable_event"] = true.into();
+
+            // enable optqs
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["enable_opt_quorum_store"] = true.into();
+
+            helm_values["validator"]["config"]["consensus"]["enable_pipeline"] = true.into();
+            helm_values["fullnode"]["config"]["consensus_observer"]["enable_pipeline"] =
+                true.into();
         }))
     }
 

@@ -5,10 +5,7 @@ use crate::{
     config::VMConfig,
     loader::check_natives,
     native_functions::{NativeFunction, NativeFunctions},
-    storage::{
-        struct_name_index_map::StructNameIndexMap, ty_cache::StructInfoCache,
-        verified_module_cache::VERIFIED_MODULES_V2,
-    },
+    storage::{ty_tag_converter::TypeTagCache, verified_module_cache::VERIFIED_MODULES_V2},
     Module, Script,
 };
 use ambassador::delegatable_trait;
@@ -25,7 +22,12 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
-use move_vm_types::sha3_256;
+use move_vm_metrics::{Timer, VM_TIMER};
+use move_vm_types::loaded_data::struct_name_indexing::StructNameIndexMap;
+#[cfg(any(test, feature = "testing"))]
+use move_vm_types::loaded_data::{
+    runtime_types::StructIdentifier, struct_name_indexing::StructNameIndex,
+};
 use std::sync::Arc;
 
 /// [MoveVM] runtime environment encapsulating different configurations. Shared between the VM and
@@ -50,24 +52,9 @@ pub struct RuntimeEnvironment {
     ///   We wrap the index map into an [Arc] so that on republishing these clones are cheap.
     struct_name_index_map: Arc<StructNameIndexMap>,
 
-    /// Type cache for struct layouts, tags and depths, shared across multiple threads.
-    ///
-    /// SAFETY:
-    /// Here we informally show that it is safe to share type cache across multiple threads.
-    ///   1) Struct has been already published.
-    ///      In this case, it is fine to have multiple transactions concurrently accessing and
-    ///      caching struct tags, layouts and depth formulas. Even if transaction failed due to
-    ///      speculation, and is re-executed later, the speculative aborted execution cached a non-
-    ///      speculative existing struct information. It is safe for other threads to access it.
-    ///  2) Struct is being published with a module.
-    ///     The design of V2 loader ensures that when modules are published, i.e., staged on top of
-    ///     the existing module storage, the runtime environment is cloned. Hence, it is not even
-    ///     possible to mutate this global cache speculatively.
-    ///  Importantly, this SHOULD NOT be mutated by speculative module publish.
-    // TODO(loader_v2):
-    //   Provide a generic (trait) implementation for clients to implement their own type caching
-    //   logic.
-    ty_cache: StructInfoCache,
+    /// Caches struct tags for instantiated types. This cache can be used concurrently and
+    /// speculatively because type tag information does not change with module publishes.
+    ty_tag_cache: Arc<TypeTagCache>,
 }
 
 impl RuntimeEnvironment {
@@ -96,7 +83,7 @@ impl RuntimeEnvironment {
             vm_config,
             natives,
             struct_name_index_map: Arc::new(StructNameIndexMap::empty()),
-            ty_cache: StructInfoCache::empty(),
+            ty_tag_cache: Arc::new(TypeTagCache::empty()),
         }
     }
 
@@ -151,6 +138,10 @@ impl RuntimeEnvironment {
         module_hash: &[u8; 32],
     ) -> VMResult<LocallyVerifiedModule> {
         if !VERIFIED_MODULES_V2.contains(module_hash) {
+            let _timer = VM_TIMER.timer_with_label(
+                "LoaderV2::build_locally_verified_module [verification cache miss]",
+            );
+
             // For regular execution, we cache already verified modules. Note that this even caches
             // verification for the published modules. This should be ok because as long as the
             // hash is the same, the deployed bytecode and any dependencies are the same, and so
@@ -190,21 +181,15 @@ impl RuntimeEnvironment {
         result.map_err(|e| e.finish(Location::Undefined))
     }
 
-    /// Deserializes bytes into a compiled module, also returning its size and hash.
-    pub fn deserialize_into_compiled_module(
-        &self,
-        bytes: &Bytes,
-    ) -> VMResult<(CompiledModule, usize, [u8; 32])> {
-        let compiled_module =
-            CompiledModule::deserialize_with_config(bytes, &self.vm_config().deserializer_config)
-                .map_err(|err| {
+    /// Deserializes bytes into a compiled module.
+    pub fn deserialize_into_compiled_module(&self, bytes: &Bytes) -> VMResult<CompiledModule> {
+        CompiledModule::deserialize_with_config(bytes, &self.vm_config().deserializer_config)
+            .map_err(|err| {
                 let msg = format!("Deserialization error: {:?}", err);
                 PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
                     .with_message(msg)
                     .finish(Location::Undefined)
-            })?;
-
-        Ok((compiled_module, bytes.len(), sha3_256(bytes)))
+            })
     }
 
     /// Deserializes bytes into a compiled script.
@@ -259,10 +244,10 @@ impl RuntimeEnvironment {
         &self.struct_name_index_map
     }
 
-    /// Returns the type cache owned by this runtime environment which stores information about
-    /// struct layouts, tags and depth formulae.
-    pub(crate) fn ty_cache(&self) -> &StructInfoCache {
-        &self.ty_cache
+    /// Returns the type tag cache used by this environment to store already constructed struct
+    /// tags.
+    pub(crate) fn ty_tag_cache(&self) -> &TypeTagCache {
+        &self.ty_tag_cache
     }
 
     /// Returns the size of the struct name re-indexing cache. Can be used to bound the size of the
@@ -271,30 +256,39 @@ impl RuntimeEnvironment {
         self.struct_name_index_map.checked_len()
     }
 
-    /// Flushes the struct information (type) cache. Flushing this cache does not invalidate struct
-    /// name index map or module cache.
-    pub fn flush_struct_info_cache(&self) {
-        self.ty_cache.flush();
+    /// Flushes the global caches with struct name indices and struct tags. Note that when calling
+    /// this function, modules that still store indices into struct name cache must also be flushed.
+    pub fn flush_struct_name_and_tag_caches(&self) {
+        self.ty_tag_cache.flush();
+        self.struct_name_index_map.flush();
     }
 
-    /// Flushes the global caches with struct name indices and the struct information. Note that
-    /// when calling this function, modules that still store indices into struct name cache must
-    /// also be invalidated.
-    pub fn flush_struct_name_and_info_caches(&self) {
-        self.flush_struct_info_cache();
-        self.struct_name_index_map.flush();
+    /// Test-only function to be able to populate [StructNameIndexMap] outside of this crate.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn struct_name_to_idx_for_test(
+        &self,
+        struct_name: StructIdentifier,
+    ) -> PartialVMResult<StructNameIndex> {
+        self.struct_name_index_map.struct_name_to_idx(&struct_name)
+    }
+
+    /// Test-only function to be able to check cached struct names.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn idx_to_struct_name_for_test(
+        &self,
+        idx: StructNameIndex,
+    ) -> PartialVMResult<StructIdentifier> {
+        self.struct_name_index_map.idx_to_struct_name(idx)
     }
 }
 
 impl Clone for RuntimeEnvironment {
-    /// Returns the cloned environment. Struct re-indexing map and type caches are cloned and no
-    /// longer shared with the original environment.
     fn clone(&self) -> Self {
         Self {
             vm_config: self.vm_config.clone(),
             natives: self.natives.clone(),
-            struct_name_index_map: self.struct_name_index_map.clone(),
-            ty_cache: self.ty_cache.clone(),
+            struct_name_index_map: Arc::clone(&self.struct_name_index_map),
+            ty_tag_cache: Arc::clone(&self.ty_tag_cache),
         }
     }
 }

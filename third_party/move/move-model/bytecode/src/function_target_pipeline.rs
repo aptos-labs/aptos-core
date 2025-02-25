@@ -368,7 +368,7 @@ impl FunctionTargetPipeline {
             let src_idx = nodes.get(&fun_id).unwrap();
             let fun_env = env.get_function(fun_id);
             for callee in fun_env
-                .get_called_functions()
+                .get_used_functions()
                 .expect("called functions must be computed")
             {
                 let dst_idx = nodes

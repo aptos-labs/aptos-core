@@ -1,10 +1,19 @@
 
 Diagnostics:
-error: unexpected token
-   ┌─ tests/lambda/storable/return_func.move:14:41
+error: expected function of type `|integer|_` but found `u64`
+   ┌─ tests/lambda/storable/return_func.move:85:37
    │
-14 │     fun multiply_by_x(x: u64): |u64|u64 has store {
-   │                                         ^^^
-   │                                         │
-   │                                         Unexpected 'has'
-   │                                         Expected '{'
+85 │         vector::push_back(&mut sum, f(5));
+   │                                     ^^^^
+
+error: expected function of type `|integer|_` but found `u64`
+   ┌─ tests/lambda/storable/return_func.move:86:37
+   │
+86 │         vector::push_back(&mut sum, g(7));
+   │                                     ^^^^
+
+error: expected function of type `|integer|_` but found `u64`
+   ┌─ tests/lambda/storable/return_func.move:87:37
+   │
+87 │         vector::push_back(&mut sum, h(6));
+   │                                     ^^^^

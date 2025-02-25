@@ -87,7 +87,6 @@ module std::bit_vector {
 
     /// Shift the `self` left by `amount`. If `amount` is greater than the
     /// bitvector's length the bitvector will be zeroed out.
-    /* !!!!!! TODO: currently crashes astifier
     public fun shift_left(self: &mut BitVector, amount: u64) {
         if (amount >= self.length) {
             vector::for_each_mut(&mut self.bit_field, |elem| {
@@ -114,7 +113,6 @@ module std::bit_vector {
         // TODO: set to false because data invariant cannot be proved with inline function. Will remove it once inline is supported
         pragma verify = false;
     }
-    */
 
     /// Return the value of the bit at `bit_index` in the `self`. `true`
     /// represents "1" and `false` represents a 0

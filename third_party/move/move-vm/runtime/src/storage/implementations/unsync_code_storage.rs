@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    loader::{Module, Script},
+    loader::{Function, Module, Script},
     storage::{
         code_storage::{ambassador_impl_CodeStorage, CodeStorage},
         environment::{
@@ -14,10 +14,18 @@ use crate::{
 };
 use ambassador::Delegate;
 use bytes::Bytes;
-use move_binary_format::{errors::VMResult, file_format::CompiledScript, CompiledModule};
-use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
-use move_vm_types::code::{
-    ambassador_impl_ScriptCache, Code, ModuleBytesStorage, ScriptCache, UnsyncScriptCache,
+use move_binary_format::{
+    errors::{PartialVMResult, VMResult},
+    file_format::CompiledScript,
+    CompiledModule,
+};
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, language_storage::TypeTag,
+    metadata::Metadata,
+};
+use move_vm_types::{
+    code::{ambassador_impl_ScriptCache, Code, ModuleBytesStorage, ScriptCache, UnsyncScriptCache},
+    loaded_data::runtime_types::{StructType, Type},
 };
 use std::sync::Arc;
 
@@ -29,9 +37,14 @@ use std::sync::Arc;
 pub struct UnsyncCodeStorage<M>(UnsyncCodeStorageImpl<M>);
 
 impl<M: ModuleStorage> UnsyncCodeStorage<M> {
-    /// Returns the underlying module storage used by this code storage.
+    /// Returns the reference to the underlying module storage used by this code storage.
     pub fn module_storage(&self) -> &M {
         &self.0.module_storage
+    }
+
+    /// Returns the underlying module storage used by this code storage.
+    pub fn into_module_storage(self) -> M {
+        self.0.module_storage
     }
 
     /// Test-only method that checks the state of the script cache.

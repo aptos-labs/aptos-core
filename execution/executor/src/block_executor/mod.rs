@@ -7,8 +7,9 @@
 use crate::{
     logging::{LogEntry, LogSchema},
     metrics::{
-        COMMIT_BLOCKS, CONCURRENCY_GAUGE, EXECUTE_BLOCK, OTHER_TIMERS, SAVE_TRANSACTIONS,
-        TRANSACTIONS_SAVED, UPDATE_LEDGER, VM_EXECUTE_BLOCK,
+        BLOCK_EXECUTION_WORKFLOW_WHOLE, COMMIT_BLOCKS, CONCURRENCY_GAUGE,
+        GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING, OTHER_TIMERS, SAVE_TRANSACTIONS,
+        TRANSACTIONS_SAVED, UPDATE_LEDGER,
     },
     types::partial_state_compute_result::PartialStateComputeResult,
     workflow::{
@@ -19,55 +20,32 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    execution_output::ExecutionOutput, state_compute_result::StateComputeResult,
-    BlockExecutorTrait, ExecutorError, ExecutorResult,
+    state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorError, ExecutorResult,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::{
-    async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
+    state_store::{
+        state_summary::ProvableStateSummary, state_view::cached_state_view::CachedStateView,
+    },
+    DbReaderWriter,
 };
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfigFromOnchain,
-        partitioner::{ExecutableBlock, ExecutableTransactions},
+        config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock,
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     ledger_info::LedgerInfoWithSignatures,
     state_store::StateViewId,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::VMBlockExecutor;
 use block_tree::BlockTree;
 use fail::fail_point;
-use std::{marker::PhantomData, sync::Arc};
+use std::sync::Arc;
 
 pub mod block_tree;
-
-pub trait TransactionBlockExecutor: Send + Sync {
-    fn execute_transaction_block(
-        transactions: ExecutableTransactions,
-        state_view: CachedStateView,
-        onchain_config: BlockExecutorConfigFromOnchain,
-        append_state_checkpoint_to_block: Option<HashValue>,
-    ) -> Result<ExecutionOutput>;
-}
-
-impl TransactionBlockExecutor for AptosVM {
-    fn execute_transaction_block(
-        transactions: ExecutableTransactions,
-        state_view: CachedStateView,
-        onchain_config: BlockExecutorConfigFromOnchain,
-        append_state_checkpoint_to_block: Option<HashValue>,
-    ) -> Result<ExecutionOutput> {
-        DoGetExecutionOutput::by_transaction_execution::<AptosVM>(
-            transactions,
-            state_view,
-            onchain_config,
-            append_state_checkpoint_to_block,
-        )
-    }
-}
 
 pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
@@ -76,7 +54,7 @@ pub struct BlockExecutor<V> {
 
 impl<V> BlockExecutor<V>
 where
-    V: TransactionBlockExecutor,
+    V: VMBlockExecutor,
 {
     pub fn new(db: DbReaderWriter) -> Self {
         Self {
@@ -95,7 +73,7 @@ where
 
 impl<V> BlockExecutorTrait for BlockExecutor<V>
 where
-    V: TransactionBlockExecutor,
+    V: VMBlockExecutor,
 {
     fn committed_block_id(&self) -> HashValue {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "committed_block_id"]);
@@ -115,7 +93,7 @@ where
         Ok(())
     }
 
-    fn execute_and_state_checkpoint(
+    fn execute_and_update_state(
         &self,
         block: ExecutableBlock,
         parent_block_id: HashValue,
@@ -128,7 +106,7 @@ where
             .read()
             .as_ref()
             .expect("BlockExecutor is not reset")
-            .execute_and_state_checkpoint(block, parent_block_id, onchain_config)
+            .execute_and_update_state(block, parent_block_id, onchain_config)
     }
 
     fn ledger_update(
@@ -176,38 +154,38 @@ where
 struct BlockExecutorInner<V> {
     db: DbReaderWriter,
     block_tree: BlockTree,
-    phantom: PhantomData<V>,
+    block_executor: V,
 }
 
 impl<V> BlockExecutorInner<V>
 where
-    V: TransactionBlockExecutor,
+    V: VMBlockExecutor,
 {
     pub fn new(db: DbReaderWriter) -> Result<Self> {
         let block_tree = BlockTree::new(&db.reader)?;
         Ok(Self {
             db,
             block_tree,
-            phantom: PhantomData,
+            block_executor: V::new(),
         })
     }
 }
 
 impl<V> BlockExecutorInner<V>
 where
-    V: TransactionBlockExecutor,
+    V: VMBlockExecutor,
 {
     fn committed_block_id(&self) -> HashValue {
         self.block_tree.root_block().id
     }
 
-    fn execute_and_state_checkpoint(
+    fn execute_and_update_state(
         &self,
         block: ExecutableBlock,
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<()> {
-        let _timer = EXECUTE_BLOCK.start_timer();
+        let _timer = BLOCK_EXECUTION_WORKFLOW_WHOLE.start_timer();
         let ExecutableBlock {
             block_id,
             transactions,
@@ -226,64 +204,42 @@ where
             "execute_block"
         );
         let committed_block_id = self.committed_block_id();
-        let (execution_output, state_checkpoint_output) =
+        let execution_output =
             if parent_block_id != committed_block_id && parent_output.has_reconfiguration() {
                 // ignore reconfiguration suffix, even if the block is non-empty
                 info!(
                     LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
                     "reconfig_descendant_block_received"
                 );
-                (
-                    parent_output.execution_output.reconfig_suffix(),
-                    parent_output
-                        .expect_state_checkpoint_output()
-                        .reconfig_suffix(),
-                )
+                parent_output.execution_output.reconfig_suffix()
             } else {
                 let state_view = {
-                    let _timer = OTHER_TIMERS.timer_with(&["verified_state_view"]);
-
+                    let _timer = OTHER_TIMERS.timer_with(&["get_state_view"]);
                     CachedStateView::new(
                         StateViewId::BlockExecution { block_id },
                         Arc::clone(&self.db.reader),
-                        parent_output.execution_output.next_version(),
-                        parent_output.expect_result_state().current.clone(),
-                        Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
+                        parent_output.result_state().latest().clone(),
                     )?
                 };
 
-                let execution_output = {
-                    let _timer = VM_EXECUTE_BLOCK.start_timer();
-                    fail_point!("executor::vm_execute_block", |_| {
-                        Err(ExecutorError::from(anyhow::anyhow!(
-                            "Injected error in vm_execute_block"
-                        )))
-                    });
-                    V::execute_transaction_block(
-                        transactions,
-                        state_view,
-                        onchain_config.clone(),
-                        Some(block_id),
-                    )?
-                };
+                let _timer = GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.start_timer();
+                fail_point!("executor::block_executor_execute_block", |_| {
+                    Err(ExecutorError::from(anyhow::anyhow!(
+                        "Injected error in block_executor_execute_block"
+                    )))
+                });
 
-                let _timer = OTHER_TIMERS.timer_with(&["state_checkpoint"]);
-
-                let state_checkpoint_output = THREAD_MANAGER.get_exe_cpu_pool().install(|| {
-                    fail_point!("executor::block_state_checkpoint", |_| {
-                        Err(anyhow::anyhow!("Injected error in block state checkpoint."))
-                    });
-                    DoStateCheckpoint::run(
-                        &execution_output,
-                        parent_output.expect_result_state(),
-                        Option::<Vec<_>>::None,
-                    )
-                })?;
-                (execution_output, state_checkpoint_output)
+                DoGetExecutionOutput::by_transaction_execution(
+                    &self.block_executor,
+                    transactions,
+                    parent_output.result_state(),
+                    state_view,
+                    onchain_config.clone(),
+                    TransactionSliceMetadata::block(parent_block_id, block_id),
+                )?
             };
-        let output = PartialStateComputeResult::new(execution_output);
-        output.set_state_checkpoint_output(state_checkpoint_output);
 
+        let output = PartialStateComputeResult::new(execution_output);
         let _ = self
             .block_tree
             .add_block(parent_block_id, block_id, output)?;
@@ -311,33 +267,53 @@ where
         // At this point of time two things must happen
         // 1. The block tree must also have the current block id with or without the ledger update output.
         // 2. We must have the ledger update output of the parent block.
-        let parent_output = parent_block.output.expect_ledger_update_output();
-        let parent_accumulator = parent_output.txn_accumulator();
         let block = block_vec.pop().expect("Must exist").unwrap();
-        let output = &block.output;
         parent_block.ensure_has_child(block_id)?;
+        let output = &block.output;
+        let parent_out = &parent_block.output;
+
+        // TODO(aldenhu): remove, assuming no retries.
         if let Some(complete_result) = block.output.get_complete_result() {
+            info!(block_id = block_id, "ledger_update already done.");
             return Ok(complete_result);
         }
 
-        let output =
-            if parent_block_id != committed_block_id && parent_block.output.has_reconfiguration() {
-                info!(
-                    LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
-                    "reconfig_descendant_block_received"
-                );
-                parent_output.reconfig_suffix()
-            } else {
-                THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
-                    DoLedgerUpdate::run(
-                        &output.execution_output,
-                        output.expect_state_checkpoint_output(),
-                        parent_accumulator.clone(),
-                    )
-                })?
-            };
+        if parent_block_id != committed_block_id && parent_out.has_reconfiguration() {
+            info!(block_id = block_id, "ledger_update for reconfig suffix.");
 
-        block.output.set_ledger_update_output(output);
+            // Parent must have done all state checkpoint and ledger update since this method
+            // is being called.
+            output.set_state_checkpoint_output(
+                parent_out
+                    .expect_state_checkpoint_output()
+                    .reconfig_suffix(),
+            );
+            output.set_ledger_update_output(
+                parent_out.expect_ledger_update_output().reconfig_suffix(),
+            );
+        } else {
+            THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
+                // TODO(aldenhu): remove? no known strategy to recover from this failure
+                fail_point!("executor::block_state_checkpoint", |_| {
+                    Err(anyhow::anyhow!("Injected error in block state checkpoint."))
+                });
+                output.set_state_checkpoint_output(DoStateCheckpoint::run(
+                    &output.execution_output,
+                    parent_block.output.expect_result_state_summary(),
+                    &ProvableStateSummary::new_persisted(self.db.reader.as_ref())?,
+                    None,
+                )?);
+                output.set_ledger_update_output(DoLedgerUpdate::run(
+                    &output.execution_output,
+                    output.expect_state_checkpoint_output(),
+                    parent_out
+                        .expect_ledger_update_output()
+                        .transaction_accumulator
+                        .clone(),
+                )?);
+                Result::<_>::Ok(())
+            })?;
+        }
 
         Ok(block.output.expect_complete_result())
     }

@@ -31,7 +31,10 @@ use move_model::{
     ast::{Attribute, TempIndex, TraceKind},
     code_writer::CodeWriter,
     emit, emitln,
-    model::{FieldEnv, FieldId, GlobalEnv, Loc, NodeId, QualifiedInstId, StructEnv, StructId},
+    model::{
+        FieldEnv, FieldId, FunctionEnv, GlobalEnv, Loc, NodeId, QualifiedInstId, StructEnv,
+        StructId,
+    },
     pragmas::{
         ADDITION_OVERFLOW_UNCHECKED_PRAGMA, SEED_PRAGMA, TIMEOUT_PRAGMA,
         VERIFY_DURATION_ESTIMATE_PRAGMA,
@@ -56,11 +59,15 @@ use move_stackless_bytecode::{
         Operation, PropKind,
     },
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    hash::{DefaultHasher, Hash, Hasher},
+};
 
 pub struct BoogieTranslator<'env> {
     env: &'env GlobalEnv,
     options: &'env BoogieOptions,
+    for_shard: Option<usize>,
     writer: &'env CodeWriter,
     spec_translator: SpecTranslator<'env>,
     targets: &'env FunctionTargetsHolder,
@@ -82,12 +89,14 @@ impl<'env> BoogieTranslator<'env> {
     pub fn new(
         env: &'env GlobalEnv,
         options: &'env BoogieOptions,
+        for_shard: Option<usize>,
         targets: &'env FunctionTargetsHolder,
         writer: &'env CodeWriter,
     ) -> Self {
         Self {
             env,
             options,
+            for_shard,
             targets,
             writer,
             spec_translator: SpecTranslator::new(writer, env, options),
@@ -110,7 +119,24 @@ impl<'env> BoogieTranslator<'env> {
             .unwrap_or(default_timeout)
     }
 
-    pub fn is_not_verified_timeout(&self, fun_target: &FunctionTarget) -> bool {
+    /// Checks whether the given function is a verification target.
+    fn is_verified(&self, fun_variant: &FunctionVariant, fun_target: &FunctionTarget) -> bool {
+        if !fun_variant.is_verified() {
+            return false;
+        }
+        if let Some(shard) = self.for_shard {
+            // Check whether the shard is included.
+            if self.options.only_shard.is_some() && self.options.only_shard != Some(shard + 1) {
+                return false;
+            }
+            // Check whether it is part of the shard.
+            let mut hasher = DefaultHasher::new();
+            fun_target.func_env.get_full_name_str().hash(&mut hasher);
+            if (hasher.finish() as usize) % self.options.shards != shard {
+                return false;
+            }
+        }
+        // Check whether the estimated duration is too large for configured timeout
         let options = self.options;
         let estimate_timeout_opt = fun_target
             .func_env
@@ -120,9 +146,9 @@ impl<'env> BoogieTranslator<'env> {
                 .func_env
                 .get_num_pragma(TIMEOUT_PRAGMA)
                 .unwrap_or(options.vc_timeout);
-            estimate_timeout > timeout
+            estimate_timeout <= timeout
         } else {
-            false
+            true
         }
     }
 
@@ -276,8 +302,12 @@ impl<'env> BoogieTranslator<'env> {
                     continue;
                 }
                 for (variant, ref fun_target) in self.targets.get_targets(fun_env) {
-                    if variant.is_verified() && !self.is_not_verified_timeout(fun_target) {
+                    if self.is_verified(&variant, fun_target) {
                         verified_functions_count += 1;
+                        debug!(
+                            "will verify primary function `{}`",
+                            env.display(&module_env.get_id().qualified(fun_target.get_id()))
+                        );
                         // Always produce a verified functions with an empty instantiation such that
                         // there is at least one top-level entry points for a VC.
                         FunctionTranslator {
@@ -289,28 +319,45 @@ impl<'env> BoogieTranslator<'env> {
 
                         // There maybe more verification targets that needs to be produced as we
                         // defer the instantiation of verified functions to this stage
-                        for type_inst in mono_info
-                            .funs
-                            .get(&(fun_target.func_env.get_qualified_id(), variant))
-                            .unwrap_or(empty)
-                        {
-                            // Skip the none instantiation (i.e., each type parameter is
-                            // instantiated to itself as a concrete type). This has the same
-                            // effect as `type_inst: &[]` and is already captured above.
-                            let is_none_inst = type_inst.iter().enumerate().all(
-                                |(i, t)| matches!(t, Type::TypeParameter(idx) if *idx == i as u16),
-                            );
-                            if is_none_inst {
-                                continue;
-                            }
+                        if !self.options.skip_instance_check {
+                            for type_inst in mono_info
+                                .funs
+                                .get(&(fun_target.func_env.get_qualified_id(), variant))
+                                .unwrap_or(empty)
+                            {
+                                // Skip redundant instantiations. Those are any permutation of
+                                // type parameters. We can simple test this by the same number
+                                // of disjoint type parameters equals the count of type parameters.
+                                // Verifying a disjoint set of type parameters is the same
+                                // as the `&[]` verification already done above.
+                                let type_params_in_inst = type_inst
+                                    .iter()
+                                    .filter(|t| matches!(t, Type::TypeParameter(_)))
+                                    .cloned()
+                                    .collect::<BTreeSet<_>>();
+                                if type_params_in_inst.len() == type_inst.len() {
+                                    continue;
+                                }
 
-                            verified_functions_count += 1;
-                            FunctionTranslator {
-                                parent: self,
-                                fun_target,
-                                type_inst,
+                                verified_functions_count += 1;
+                                let tctx = &fun_env.get_type_display_ctx();
+                                debug!(
+                                    "will verify function instantiation `{}`<{}>",
+                                    env.display(
+                                        &module_env.get_id().qualified(fun_target.get_id())
+                                    ),
+                                    type_inst
+                                        .iter()
+                                        .map(|t| t.display(tctx).to_string())
+                                        .join(", ")
+                                );
+                                FunctionTranslator {
+                                    parent: self,
+                                    fun_target,
+                                    type_inst,
+                                }
+                                .translate();
                             }
-                            .translate();
                         }
                     } else {
                         // This variant is inlined, so translate for all type instantiations.
@@ -339,7 +386,15 @@ impl<'env> BoogieTranslator<'env> {
         }
         // Emit any finalization items required by spec translation.
         self.spec_translator.finalize();
-        info!("{} verification conditions", verified_functions_count);
+        let shard_info = if let Some(shard) = self.for_shard {
+            format!(" (for shard #{} of {})", shard + 1, self.options.shards)
+        } else {
+            "".to_string()
+        };
+        info!(
+            "{} verification conditions{}",
+            verified_functions_count, shard_info
+        );
     }
 }
 
@@ -445,7 +500,12 @@ impl<'env> StructTranslator<'env> {
             "", // not inlined!
             &format!("$IsValid'{}'(s: {}): bool", suffix_variant, struct_name),
             || {
-                if struct_env.is_intrinsic() || struct_env.get_field_count() == 0 {
+                if struct_env.is_intrinsic()
+                    || struct_env
+                        .get_fields_of_variant(variant)
+                        .collect_vec()
+                        .is_empty()
+                {
                     emitln!(writer, "true")
                 } else {
                     let mut sep = "";
@@ -544,6 +604,9 @@ impl<'env> StructTranslator<'env> {
                 struct_variant_name, struct_variant_name
             );
             emitln!(writer, "{} if {} then", else_symbol, match_condition);
+            if equal_statement.is_empty() {
+                equal_statement = "true".to_string();
+            }
             emitln!(writer, "{}", equal_statement);
             if else_symbol.is_empty() {
                 else_symbol = "else";
@@ -1074,7 +1137,7 @@ impl<'env> FunctionTranslator<'env> {
         }
 
         // Initial assumptions
-        if variant.is_verified() && !self.parent.is_not_verified_timeout(fun_target) {
+        if self.parent.is_verified(variant, fun_target) {
             self.translate_verify_entry_assumptions(fun_target);
         }
 
@@ -1332,6 +1395,10 @@ impl<'env> FunctionTranslator<'env> {
             Call(_, dests, oper, srcs, aa) => {
                 use Operation::*;
                 match oper {
+                    Closure(..) | Invoke => {
+                        // TODO(#15664): implement closures for prover
+                        panic!("closures not yet supported")
+                    },
                     TestVariant(mid, sid, variant, inst) => {
                         let inst = &self.inst_slice(inst);
                         let src_type = self.get_local_type(srcs[0]);
@@ -1459,80 +1526,13 @@ impl<'env> FunctionTranslator<'env> {
                             )
                             .join(",");
 
-                        // special casing for type reflection
-                        let mut processed = false;
-
-                        // TODO(mengxu): change it to a better address name instead of extlib
-                        if env.get_extlib_address() == *module_env.get_name().addr() {
-                            let qualified_name = format!(
-                                "{}::{}",
-                                module_env.get_name().name().display(env.symbol_pool()),
-                                callee_env.get_name().display(env.symbol_pool()),
-                            );
-                            if qualified_name == TYPE_NAME_MOVE {
-                                assert_eq!(inst.len(), 1);
-                                if dest_str.is_empty() {
-                                    emitln!(
-                                        writer,
-                                        "{}",
-                                        boogie_reflection_type_name(env, &inst[0], false)
-                                    );
-                                } else {
-                                    emitln!(
-                                        writer,
-                                        "{} := {};",
-                                        dest_str,
-                                        boogie_reflection_type_name(env, &inst[0], false)
-                                    );
-                                }
-                                processed = true;
-                            } else if qualified_name == TYPE_INFO_MOVE {
-                                assert_eq!(inst.len(), 1);
-                                let (flag, info) = boogie_reflection_type_info(env, &inst[0]);
-                                emitln!(writer, "if (!{}) {{", flag);
-                                writer.with_indent(|| emitln!(writer, "call $ExecFailureAbort();"));
-                                emitln!(writer, "}");
-                                if !dest_str.is_empty() {
-                                    emitln!(writer, "else {");
-                                    writer.with_indent(|| {
-                                        emitln!(writer, "{} := {};", dest_str, info)
-                                    });
-                                    emitln!(writer, "}");
-                                }
-                                processed = true;
-                            }
-                        }
-
-                        if env.get_stdlib_address() == *module_env.get_name().addr() {
-                            let qualified_name = format!(
-                                "{}::{}",
-                                module_env.get_name().name().display(env.symbol_pool()),
-                                callee_env.get_name().display(env.symbol_pool()),
-                            );
-                            if qualified_name == TYPE_NAME_GET_MOVE {
-                                assert_eq!(inst.len(), 1);
-                                if dest_str.is_empty() {
-                                    emitln!(
-                                        writer,
-                                        "{}",
-                                        boogie_reflection_type_name(env, &inst[0], true)
-                                    );
-                                } else {
-                                    emitln!(
-                                        writer,
-                                        "{} := {};",
-                                        dest_str,
-                                        boogie_reflection_type_name(env, &inst[0], true)
-                                    );
-                                }
-                                processed = true;
-                            }
-                        }
-
-                        // regular path
-                        if !processed {
+                        if self.try_reflection_call(writer, env, inst, &callee_env, &dest_str) {
+                            // Special case of reflection call, code is generated
+                        } else {
+                            // regular path
                             let targeted = self.fun_target.module_env().is_target();
-                            // If the callee has been generated from a native interface, return an error
+                            // If the callee has been generated from a native interface, return
+                            // an error
                             if callee_env.is_native() && targeted {
                                 for attr in callee_env.get_attributes() {
                                     if let Attribute::Apply(_, name, _) = attr {
@@ -2066,7 +2066,7 @@ impl<'env> FunctionTranslator<'env> {
                             | Type::Struct(_, _, _)
                             | Type::TypeParameter(_)
                             | Type::Reference(_, _)
-                            | Type::Fun(_, _)
+                            | Type::Fun(..)
                             | Type::TypeDomain(_)
                             | Type::ResourceDomain(_, _, _)
                             | Type::Error
@@ -2103,7 +2103,7 @@ impl<'env> FunctionTranslator<'env> {
                                 | Type::Struct(_, _, _)
                                 | Type::TypeParameter(_)
                                 | Type::Reference(_, _)
-                                | Type::Fun(_, _)
+                                | Type::Fun(..)
                                 | Type::TypeDomain(_)
                                 | Type::ResourceDomain(_, _, _)
                                 | Type::Error
@@ -2160,7 +2160,7 @@ impl<'env> FunctionTranslator<'env> {
                             | Type::Struct(_, _, _)
                             | Type::TypeParameter(_)
                             | Type::Reference(_, _)
-                            | Type::Fun(_, _)
+                            | Type::Fun(..)
                             | Type::TypeDomain(_)
                             | Type::ResourceDomain(_, _, _)
                             | Type::Error
@@ -2197,7 +2197,7 @@ impl<'env> FunctionTranslator<'env> {
                                 | Type::Struct(_, _, _)
                                 | Type::TypeParameter(_)
                                 | Type::Reference(_, _)
-                                | Type::Fun(_, _)
+                                | Type::Fun(..)
                                 | Type::TypeDomain(_)
                                 | Type::ResourceDomain(_, _, _)
                                 | Type::Error
@@ -2237,7 +2237,7 @@ impl<'env> FunctionTranslator<'env> {
                                 | Type::Struct(_, _, _)
                                 | Type::TypeParameter(_)
                                 | Type::Reference(_, _)
-                                | Type::Fun(_, _)
+                                | Type::Fun(..)
                                 | Type::TypeDomain(_)
                                 | Type::ResourceDomain(_, _, _)
                                 | Type::Error
@@ -2278,7 +2278,7 @@ impl<'env> FunctionTranslator<'env> {
                                 | Type::Struct(_, _, _)
                                 | Type::TypeParameter(_)
                                 | Type::Reference(_, _)
-                                | Type::Fun(_, _)
+                                | Type::Fun(..)
                                 | Type::TypeDomain(_)
                                 | Type::ResourceDomain(_, _, _)
                                 | Type::Error
@@ -2309,7 +2309,7 @@ impl<'env> FunctionTranslator<'env> {
                                 | Type::Struct(_, _, _)
                                 | Type::TypeParameter(_)
                                 | Type::Reference(_, _)
-                                | Type::Fun(_, _)
+                                | Type::Fun(..)
                                 | Type::TypeDomain(_)
                                 | Type::ResourceDomain(_, _, _)
                                 | Type::Error
@@ -2349,7 +2349,7 @@ impl<'env> FunctionTranslator<'env> {
                                     | Type::Struct(_, _, _)
                                     | Type::TypeParameter(_)
                                     | Type::Reference(_, _)
-                                    | Type::Fun(_, _)
+                                    | Type::Fun(..)
                                     | Type::TypeDomain(_)
                                     | Type::ResourceDomain(_, _, _)
                                     | Type::Error
@@ -2443,7 +2443,7 @@ impl<'env> FunctionTranslator<'env> {
                                     | Type::Struct(_, _, _)
                                     | Type::TypeParameter(_)
                                     | Type::Reference(_, _)
-                                    | Type::Fun(_, _)
+                                    | Type::Fun(..)
                                     | Type::TypeDomain(_)
                                     | Type::ResourceDomain(_, _, _)
                                     | Type::Error
@@ -2594,6 +2594,81 @@ impl<'env> FunctionTranslator<'env> {
             },
         }
         emitln!(writer);
+    }
+
+    fn try_reflection_call(
+        &self,
+        writer: &CodeWriter,
+        env: &GlobalEnv,
+        inst: &[Type],
+        callee_env: &FunctionEnv,
+        dest_str: &String,
+    ) -> bool {
+        let module_env = &callee_env.module_env;
+        let mk_qualified_name = || {
+            format!(
+                "{}::{}",
+                module_env.get_name().name().display(env.symbol_pool()),
+                callee_env.get_name().display(env.symbol_pool()),
+            )
+        };
+        if env.get_extlib_address() == *module_env.get_name().addr() {
+            let qualified_name = mk_qualified_name();
+            if qualified_name == TYPE_NAME_MOVE {
+                assert_eq!(inst.len(), 1);
+                if dest_str.is_empty() {
+                    emitln!(
+                        writer,
+                        "{}",
+                        boogie_reflection_type_name(env, &inst[0], false)
+                    );
+                } else {
+                    emitln!(
+                        writer,
+                        "{} := {};",
+                        dest_str,
+                        boogie_reflection_type_name(env, &inst[0], false)
+                    );
+                }
+                return true;
+            } else if qualified_name == TYPE_INFO_MOVE {
+                assert_eq!(inst.len(), 1);
+                let (flag, info) = boogie_reflection_type_info(env, &inst[0]);
+                emitln!(writer, "if (!{}) {{", flag);
+                writer.with_indent(|| emitln!(writer, "call $ExecFailureAbort();"));
+                emitln!(writer, "}");
+                if !dest_str.is_empty() {
+                    emitln!(writer, "else {");
+                    writer.with_indent(|| emitln!(writer, "{} := {};", dest_str, info));
+                    emitln!(writer, "}");
+                }
+                return true;
+            }
+        }
+
+        if env.get_stdlib_address() == *module_env.get_name().addr() {
+            let qualified_name = mk_qualified_name();
+            if qualified_name == TYPE_NAME_GET_MOVE {
+                assert_eq!(inst.len(), 1);
+                if dest_str.is_empty() {
+                    emitln!(
+                        writer,
+                        "{}",
+                        boogie_reflection_type_name(env, &inst[0], true)
+                    );
+                } else {
+                    emitln!(
+                        writer,
+                        "{} := {};",
+                        dest_str,
+                        boogie_reflection_type_name(env, &inst[0], true)
+                    );
+                }
+                return true;
+            }
+        }
+
+        false
     }
 
     fn translate_write_back(&self, dest: &BorrowNode, edge: &BorrowEdge, src: TempIndex) {
@@ -3012,7 +3087,7 @@ pub fn has_native_equality(env: &GlobalEnv, options: &BoogieOptions, ty: &Type) 
         | Type::Tuple(_)
         | Type::TypeParameter(_)
         | Type::Reference(_, _)
-        | Type::Fun(_, _)
+        | Type::Fun(..)
         | Type::TypeDomain(_)
         | Type::ResourceDomain(_, _, _)
         | Type::Error

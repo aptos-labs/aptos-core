@@ -2,19 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[macro_export]
-macro_rules! panic_error {
-    ($msg:expr) => {{
-        println!("[Error] panic detected: {}", $msg);
-        move_binary_format::errors::PartialVMError::new(
-            move_core_types::vm_status::StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR,
-        )
-        .with_message(format!("Panic detected: {:?}", $msg))
-    }};
-}
-
-#[macro_export]
 macro_rules! module_storage_error {
-    ($addr:ident, $name:ident, $err:ident) => {
+    ($addr:expr, $name:expr, $err:ident) => {
         move_binary_format::errors::PartialVMError::new(
             move_core_types::vm_status::StatusCode::STORAGE_ERROR,
         )
@@ -26,9 +15,9 @@ macro_rules! module_storage_error {
     };
 }
 
-// TODO(loader_v2):
-//   The error message is formatted in the same way as V1, to ensure that replay and tests work in
-//   the same way, but ideally we should use proper formatting here.
+// Note:
+//   The error message is formatted in the same way as by the legacy loader implementation, to
+//   ensure that replay and tests work in the same way.
 #[macro_export]
 macro_rules! module_linker_error {
     ($addr:expr, $name:expr) => {

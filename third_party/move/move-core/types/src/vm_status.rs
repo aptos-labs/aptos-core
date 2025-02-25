@@ -565,9 +565,14 @@ pub enum StatusCode {
     SEQUENCE_NUMBER_TOO_BIG = 24,
     // The gas currency is not registered as a TransactionFee currency
     BAD_TRANSACTION_FEE_CURRENCY = 25,
-    // DEPRECATED. The feature requested is intended for a future Diem version instead of the current
-    // This code is deprecated as it is discarded. Use the verification error code
-    // FEATURE_NOT_ENABLED instead.
+    // Discards a transaction, because newly added code path hasn't yet been enabled,
+    // and transactions were discarded before the feature was introduced.
+    // To be used for example when new variants in the transaction - like new payload or authenticator
+    // types are introduced, that wouldn't be deserialized successfully by the previous binary.
+    //
+    // When the feature is "double" gated, i.e. new bytecode version introduces new things,
+    // but we don't want all the be enabled at the same time, such that it is safe to abort,
+    // use the verification error code FEATURE_NOT_ENABLED instead.
     FEATURE_UNDER_GATING = 26,
     // The number of secondary signer addresses is different from the number of secondary
     // public keys provided.
@@ -589,9 +594,8 @@ pub enum StatusCode {
     GAS_PARAMS_MISSING = 38,
     REQUIRED_DEPOSIT_INCONSISTENT_WITH_TXN_MAX_GAS = 39,
     MULTISIG_TRANSACTION_PAYLOAD_DOES_NOT_MATCH = 40,
-
+    ACCOUNT_AUTHENTICATION_GAS_LIMIT_EXCEEDED = 41,
     // Reserved error code for future use
-    RESERVED_VALIDATION_ERROR_6 = 41,
     RESERVED_VALIDATION_ERROR_7 = 42,
     RESERVED_VALIDATION_ERROR_8 = 43,
     RESERVED_VALIDATION_ERROR_9 = 44,
@@ -732,14 +736,24 @@ pub enum StatusCode {
     TEST_VARIANT_TYPE_MISMATCH_ERROR = 1129,
     // A variant list is empty
     ZERO_VARIANTS_ERROR = 1130,
-    // A feature is not enabled.
+    // A feature is not enabled, and transaction will abort and be committed on chain.
+    // Use only when there is no backward incompatibility concern - as it is
+    // double-gated by an additional flag, i.e. new bytecode version introduces new things,
+    // but we don't want all the be enabled at the same time, such that it is safe to abort.
+    //
+    // If we are introducing code, that previous binary would discard such a transaction,
+    // you need to use FEATURE_UNDER_GATING flag instead.
     FEATURE_NOT_ENABLED = 1131,
+    // Closure mask invalid
+    INVALID_CLOSURE_MASK = 1132,
+    // Closure eval type is not a function
+    CLOSURE_CALL_REQUIRES_FUNCTION = 1133,
 
     // Reserved error code for future use
-    RESERVED_VERIFICATION_ERROR_2 = 1132,
-    RESERVED_VERIFICATION_ERROR_3 = 1133,
-    RESERVED_VERIFICATION_ERROR_4 = 1134,
-    RESERVED_VERIFICATION_ERROR_5 = 1135,
+    RESERVED_VERIFICATION_ERROR_2 = 1134,
+    RESERVED_VERIFICATION_ERROR_3 = 1135,
+    RESERVED_VERIFICATION_ERROR_4 = 1136,
+    RESERVED_VERIFICATION_ERROR_5 = 1137,
 
     // These are errors that the VM might raise if a violation of internal
     // invariants takes place.
@@ -858,11 +872,14 @@ pub enum StatusCode {
     // Struct variant not matching. This error appears on an attempt to unpack or borrow a
     // field from a value which is not of the expected variant.
     STRUCT_VARIANT_MISMATCH = 4038,
+    // An unimplemented functionality in the VM.
+    UNIMPLEMENTED_FUNCTIONALITY = 4039,
+
     // Reserved error code for future use. Always keep this buffer of well-defined new codes.
-    RESERVED_RUNTIME_ERROR_1 = 4039,
-    RESERVED_RUNTIME_ERROR_2 = 4040,
-    RESERVED_RUNTIME_ERROR_3 = 4041,
-    RESERVED_RUNTIME_ERROR_4 = 4042,
+    RESERVED_RUNTIME_ERROR_1 = 4040,
+    RESERVED_RUNTIME_ERROR_2 = 4041,
+    RESERVED_RUNTIME_ERROR_3 = 4042,
+    RESERVED_RUNTIME_ERROR_4 = 4043,
 
     // A reserved status to represent an unknown vm status.
     // this is std::u64::MAX, but we can't pattern match on that, so put the hardcoded value in

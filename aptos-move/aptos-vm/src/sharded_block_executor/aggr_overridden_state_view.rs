@@ -3,13 +3,13 @@
 
 use aptos_types::{
     state_store::{
-        errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
+        errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
         state_value::StateValue, StateView, TStateView,
     },
     write_set::TOTAL_SUPPLY_STATE_KEY,
 };
 
-type Result<T, E = StateviewError> = std::result::Result<T, E>;
+type Result<T, E = StateViewError> = std::result::Result<T, E>;
 
 pub const TOTAL_SUPPLY_AGGR_BASE_VAL: u128 = u128::MAX >> 1;
 #[derive(Clone)]

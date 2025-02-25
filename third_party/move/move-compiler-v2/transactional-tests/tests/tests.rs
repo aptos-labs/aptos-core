@@ -27,6 +27,7 @@ struct TestConfig {
     name: &'static str,
     runner: fn(&Path) -> datatest_stable::Result<()>,
     experiments: &'static [(&'static str, bool)],
+    /// Run the tests with specified language version.
     language_version: LanguageVersion,
     /// Path substrings for tests to include. If empty, all tests are included.
     include: &'static [&'static str],
@@ -35,29 +36,39 @@ struct TestConfig {
     exclude: &'static [&'static str],
 }
 
+/// Note that any config which has different output for a test directory
+/// *must* be added to the `SEPARATE_BASELINE` array below, so that a
+/// special output file `test.foo.exp` will be generated for the output
+/// of `test.move` for config `foo`.
 const TEST_CONFIGS: &[TestConfig] = &[
+    // Matches all default experiments
+    TestConfig {
+        name: "baseline",
+        runner: |p| run(p, get_config_by_name("baseline")),
+        experiments: &[],
+        language_version: LanguageVersion::latest_stable(),
+        include: &[],
+        exclude: &["/operator_eval/", "/access_control/", "/closures/"],
+    },
+    // Test optimize/no-optimize/etc., except for `/access_control/`
     TestConfig {
         name: "optimize",
         runner: |p| run(p, get_config_by_name("optimize")),
         experiments: &[
             (Experiment::OPTIMIZE, true),
             (Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true),
-            (Experiment::ACQUIRES_CHECK, false),
         ],
-        language_version: LanguageVersion::V2_1,
+        language_version: LanguageVersion::latest_stable(),
         include: &[], // all tests except those excluded below
-        exclude: &["/operator_eval/"],
+        exclude: &["/operator_eval/", "/access_control/", "/closures/"],
     },
     TestConfig {
         name: "no-optimize",
         runner: |p| run(p, get_config_by_name("no-optimize")),
-        experiments: &[
-            (Experiment::OPTIMIZE, false),
-            (Experiment::ACQUIRES_CHECK, false),
-        ],
-        language_version: LanguageVersion::V2_1,
+        experiments: &[(Experiment::OPTIMIZE, false)],
+        language_version: LanguageVersion::latest_stable(),
         include: &[], // all tests except those excluded below
-        exclude: &["/operator_eval/"],
+        exclude: &["/operator_eval/", "/access_control/", "/closures/"],
     },
     TestConfig {
         name: "optimize-no-simplify",
@@ -66,12 +77,12 @@ const TEST_CONFIGS: &[TestConfig] = &[
             (Experiment::OPTIMIZE, true),
             (Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true),
             (Experiment::AST_SIMPLIFY, false),
-            (Experiment::ACQUIRES_CHECK, false),
         ],
-        language_version: LanguageVersion::V2_1,
+        language_version: LanguageVersion::latest_stable(),
         include: &[], // all tests except those excluded below
-        exclude: &["/operator_eval/"],
+        exclude: &["/operator_eval/", "/access_control/", "/closures/"],
     },
+    // Test `/operator_eval/` with language version 1 and 2
     TestConfig {
         name: "operator-eval-lang-1",
         runner: |p| run(p, get_config_by_name("operator-eval-lang-1")),
@@ -84,14 +95,71 @@ const TEST_CONFIGS: &[TestConfig] = &[
         name: "operator-eval-lang-2",
         runner: |p| run(p, get_config_by_name("operator-eval-lang-2")),
         experiments: &[(Experiment::OPTIMIZE, true)],
-        language_version: LanguageVersion::V2_1,
+        language_version: LanguageVersion::latest_stable(),
         include: &["/operator_eval/"],
+        exclude: &[],
+    },
+    // Test `/closures/` with function values enabled
+    TestConfig {
+        name: "closures",
+        runner: |p| run(p, get_config_by_name("closures")),
+        experiments: &[(Experiment::FUNCTION_VALUES, true)],
+        language_version: LanguageVersion::V2_2,
+        include: &["/closures/"],
+        exclude: &[],
+    },
+    // Test optimize/no-optimize/etc., just for `/access_control/`, which
+    // needs to disable `ACQUIRES_CHECK`.
+    TestConfig {
+        name: "optimize-no-acquires-check",
+        runner: |p| run(p, get_config_by_name("optimize-no-acquires-check")),
+        experiments: &[
+            (Experiment::OPTIMIZE, true),
+            (Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true),
+            (Experiment::ACQUIRES_CHECK, false),
+        ],
+        language_version: LanguageVersion::latest_stable(),
+        include: &["/access_control/"],
+        exclude: &[],
+    },
+    TestConfig {
+        name: "no-optimize-no-acquires-check",
+        runner: |p| run(p, get_config_by_name("no-optimize-no-acquires-check")),
+        experiments: &[
+            (Experiment::OPTIMIZE, false),
+            (Experiment::ACQUIRES_CHECK, false),
+        ],
+        language_version: LanguageVersion::latest_stable(),
+        include: &["/access_control/"],
+        exclude: &[],
+    },
+    TestConfig {
+        name: "optimize-no-simplify-no-acquires-check",
+        runner: |p| {
+            run(
+                p,
+                get_config_by_name("optimize-no-simplify-no-acquires-check"),
+            )
+        },
+        experiments: &[
+            (Experiment::OPTIMIZE, true),
+            (Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true),
+            (Experiment::AST_SIMPLIFY, false),
+            (Experiment::ACQUIRES_CHECK, false),
+        ],
+        language_version: LanguageVersion::latest_stable(),
+        include: &["/access_control/"],
         exclude: &[],
     },
 ];
 
 /// Test files which must use separate baselines because their result
 /// is different.
+///
+/// Note that each config named "foo" above will compare the output of compiling `test.move` with
+/// the same baseline file `test.exp` *unless* there is an entry in this array matching the path of
+// `test.move`.  If there is such an entry, then each config "foo" will have a
+/// separate baseline output file `test.foo.exp`.
 const SEPARATE_BASELINE: &[&str] = &[
     // Runs into too-many-locals or stack overflow if not optimized
     "inlining/deep_exp.move",
@@ -107,6 +175,8 @@ const SEPARATE_BASELINE: &[&str] = &[
     "no-v1-comparison/assert_one.move",
     // Flaky redundant unused assignment error
     "no-v1-comparison/enum/enum_scoping.move",
+    // Needs ACQUIRES_CHECK disabled to function; baseline checks expected errors
+    "/access_control/",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {

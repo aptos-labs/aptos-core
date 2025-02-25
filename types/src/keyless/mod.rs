@@ -21,8 +21,8 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-mod bn254_circom;
-mod circuit_constants;
+pub mod bn254_circom;
+pub mod circuit_constants;
 pub mod circuit_testcases;
 mod configuration;
 mod groth16_sig;
@@ -32,7 +32,7 @@ pub mod proof_simulation;
 pub mod test_utils;
 mod zkp_sig;
 
-use crate::keyless::circuit_constants::devnet_prepared_vk;
+use crate::keyless::circuit_constants::prepared_vk_for_testing;
 pub use bn254_circom::{
     g1_projective_str_to_affine, g2_projective_str_to_affine, get_public_inputs_hash, G1Bytes,
     G2Bytes, G1_PROJECTIVE_COMPRESSED_NUM_BYTES, G2_PROJECTIVE_COMPRESSED_NUM_BYTES,
@@ -47,9 +47,9 @@ pub use zkp_sig::ZKP;
 /// The name of the Move module for keyless accounts deployed at 0x1.
 pub const KEYLESS_ACCOUNT_MODULE_NAME: &str = "keyless_account";
 
-/// The devnet VK that is initialized during genesis.
-pub static DEVNET_VERIFICATION_KEY: Lazy<PreparedVerifyingKey<Bn254>> =
-    Lazy::new(devnet_prepared_vk);
+/// A VK that we use often for keyless e2e tests and smoke tests.
+pub static VERIFICATION_KEY_FOR_TESTING: Lazy<PreparedVerifyingKey<Bn254>> =
+    Lazy::new(prepared_vk_for_testing);
 
 #[macro_export]
 macro_rules! invalid_signature {
@@ -420,7 +420,7 @@ pub fn get_authenticators(
     Ok(authenticators)
 }
 
-pub(crate) fn base64url_encode_str(data: &str) -> String {
+pub fn base64url_encode_str(data: &str) -> String {
     base64::encode_config(data.as_bytes(), URL_SAFE_NO_PAD)
 }
 

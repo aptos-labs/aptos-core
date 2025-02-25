@@ -1,10 +1,7 @@
 
 Diagnostics:
-error: unexpected token
-  ┌─ tests/more-v1/parser/invalid_call_lhs_return.move:3:20
+error: function values outside of inline functions not supported in this language version
+  ┌─ tests/more-v1/parser/invalid_call_lhs_return.move:3:9
   │
 3 │         (return ())(0, 1);
-  │                    ^
-  │                    │
-  │                    Unexpected '('
-  │                    Expected ';'
+  │         ^^^^^^^^^^^^^^^^^

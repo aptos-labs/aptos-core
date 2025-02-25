@@ -6,8 +6,10 @@ use crate::{metrics::NUM_TXNS, pipeline::CommitBlockMessage};
 use aptos_crypto::hash::HashValue;
 use aptos_db::metrics::API_LATENCY_SECONDS;
 use aptos_executor::{
-    block_executor::{BlockExecutor, TransactionBlockExecutor},
-    metrics::{COMMIT_BLOCKS, EXECUTE_BLOCK, VM_EXECUTE_BLOCK},
+    block_executor::BlockExecutor,
+    metrics::{
+        BLOCK_EXECUTION_WORKFLOW_WHOLE, COMMIT_BLOCKS, GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING,
+    },
 };
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::prelude::*;
@@ -17,6 +19,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::Version,
 };
+use aptos_vm::VMBlockExecutor;
 use std::{
     sync::{mpsc, Arc},
     time::{Duration, Instant},
@@ -52,7 +55,7 @@ pub struct TransactionCommitter<V> {
 
 impl<V> TransactionCommitter<V>
 where
-    V: TransactionBlockExecutor,
+    V: VMBlockExecutor,
 {
     pub fn new(
         executor: Arc<BlockExecutor<V>>,
@@ -132,18 +135,18 @@ fn report_block(
         total_versions / first_block_start_time.elapsed().as_secs_f64(),
     );
     info!(
-            "Accumulative total: VM time: {:.0} secs, executor time: {:.0} secs, commit time: {:.0} secs, DB commit time: {:.0} secs",
-            VM_EXECUTE_BLOCK.get_sample_sum(),
-            EXECUTE_BLOCK.get_sample_sum() - VM_EXECUTE_BLOCK.get_sample_sum(),
+            "Accumulative total: BlockSTM+VM time: {:.0} secs, executor time: {:.0} secs, commit time: {:.0} secs, DB commit time: {:.0} secs",
+            GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum(),
+            BLOCK_EXECUTION_WORKFLOW_WHOLE.get_sample_sum() - GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum(),
             COMMIT_BLOCKS.get_sample_sum(),
             API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum(),
         );
     const NANOS_PER_SEC: f64 = 1_000_000_000.0;
     info!(
-            "Accumulative per transaction: VM time: {:.0} ns, executor time: {:.0} ns, commit time: {:.0} ns, DB commit time: {:.0} ns",
-            VM_EXECUTE_BLOCK.get_sample_sum() * NANOS_PER_SEC
+            "Accumulative per transaction: BlockSTM+VM time: {:.0} ns, executor time: {:.0} ns, commit time: {:.0} ns, DB commit time: {:.0} ns",
+            GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum() * NANOS_PER_SEC
                 / total_versions,
-            (EXECUTE_BLOCK.get_sample_sum() - VM_EXECUTE_BLOCK.get_sample_sum()) * NANOS_PER_SEC
+            (BLOCK_EXECUTION_WORKFLOW_WHOLE.get_sample_sum() - GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum()) * NANOS_PER_SEC
                 / total_versions,
             COMMIT_BLOCKS.get_sample_sum() * NANOS_PER_SEC
                 / total_versions,

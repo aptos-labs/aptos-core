@@ -1,16 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::utils::{explorer_transaction_link, fund_account};
+use super::utils::{explorer_transaction_link, fund_account, strip_private_key_prefix};
 use crate::{
     common::{
         init::Network,
         local_simulation,
         utils::{
-            check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
-            get_account_with_state, get_auth_key, get_sequence_number, parse_json_file,
-            prompt_yes_with_override, read_from_file, start_logger, to_common_result,
-            to_common_success_result, write_to_file, write_to_file_with_opts,
+            check_if_file_exists, create_dir_if_not_exist, deserialize_private_key_with_prefix,
+            dir_default_to_current, get_account_with_state, get_auth_key, get_sequence_number,
+            parse_json_file, prompt_yes_with_override, read_from_file, start_logger,
+            to_common_result, to_common_success_result, write_to_file, write_to_file_with_opts,
             write_to_user_only_file,
         },
     },
@@ -25,7 +25,7 @@ use aptos_crypto::{
     encoding_type::{EncodingError, EncodingType},
     x25519, PrivateKey, ValidCryptoMaterialStringExt,
 };
-use aptos_framework::chunked_publish::LARGE_PACKAGES_MODULE_ADDRESS;
+use aptos_framework::chunked_publish::{CHUNK_SIZE_IN_BYTES, LARGE_PACKAGES_MODULE_ADDRESS};
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_logger::Level;
@@ -48,12 +48,16 @@ use aptos_types::{
 };
 use aptos_vm_types::output::VMOutput;
 use async_trait::async_trait;
-use clap::{Parser, ValueEnum};
+use clap::{ArgGroup, Parser, ValueEnum};
 use hex::FromHexError;
+use indoc::indoc;
 use move_core_types::{
     account_address::AccountAddress, language_storage::TypeTag, vm_status::VMStatus,
 };
-use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_model::metadata::{
+    CompilerVersion, LanguageVersion, LATEST_STABLE_COMPILER_VERSION,
+    LATEST_STABLE_LANGUAGE_VERSION,
+};
 use move_package::source_package::std_lib::StdVersion;
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
@@ -75,6 +79,18 @@ const ACCEPTED_CLOCK_SKEW_US: u64 = 5 * US_IN_SECS;
 pub const DEFAULT_EXPIRATION_SECS: u64 = 30;
 pub const DEFAULT_PROFILE: &str = "default";
 pub const GIT_IGNORE: &str = ".gitignore";
+
+pub const APTOS_FOLDER_GIT_IGNORE: &str = indoc! {"
+    *
+    testnet/
+    config.yaml
+"};
+pub const MOVE_FOLDER_GIT_IGNORE: &str = indoc! {"
+  .aptos/
+  build/
+  .coverage_map.mvcov
+  .trace"
+};
 
 // Custom header value to identify the client
 const X_APTOS_CLIENT_VALUE: &str = concat!("aptos-cli/", env!("CARGO_PKG_VERSION"));
@@ -247,7 +263,11 @@ pub struct ProfileConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub network: Option<Network>,
     /// Private key for commands.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "deserialize_private_key_with_prefix"
+    )]
     pub private_key: Option<Ed25519PrivateKey>,
     /// Public key for commands
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -385,7 +405,7 @@ impl CliConfig {
             write_to_user_only_file(
                 aptos_folder.join(GIT_IGNORE).as_path(),
                 GIT_IGNORE,
-                "*\ntestnet/\nconfig.yaml".as_bytes(),
+                APTOS_FOLDER_GIT_IGNORE.as_bytes(),
             )?;
         }
 
@@ -688,7 +708,7 @@ pub trait ParsePrivateKey {
                 encoding.load_key("--private-key-file", file.as_path())?,
             ))
         } else if let Some(ref key) = private_key {
-            let key = key.as_bytes().to_vec();
+            let key = strip_private_key_prefix(key)?.as_bytes().to_vec();
             Ok(Some(encoding.decode_key("--private-key", key)?))
         } else {
             Ok(None)
@@ -1090,6 +1110,7 @@ impl FromStr for OptimizationLevel {
 
 /// Options for compiling a move package dir
 #[derive(Debug, Clone, Parser)]
+#[clap(group = ArgGroup::new("move-version").args(&["move_1", "move_2"]).required(false))]
 pub struct MovePackageDir {
     /// Path to a move package (the folder with a Move.toml file).  Defaults to current directory.
     #[clap(long, value_parser)]
@@ -1153,38 +1174,41 @@ pub struct MovePackageDir {
 
     /// ...or --bytecode BYTECODE_VERSION
     /// Specify the version of the bytecode the compiler is going to emit.
-    /// Defaults to `6`, or `7` if language version 2 is selected
-    /// (through `--move-2` or `--language_version=2`), .
-    #[clap(
-        long,
-        default_value_if("move_2", "true", "7"),
-        alias = "bytecode",
-        verbatim_doc_comment
-    )]
+    /// Defaults to `7`.
+    #[clap(long, alias = "bytecode", verbatim_doc_comment)]
     pub bytecode_version: Option<u32>,
 
     /// ...or --compiler COMPILER_VERSION
     /// Specify the version of the compiler.
-    /// Defaults to `1`, or `2` if `--move-2` is selected.
+    /// Defaults to the latest stable compiler version (at least 2)
+    /// Note: `aptos move prove` does not support v1
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
            alias = "compiler",
-           default_value_if("move_2", "true", "2.0"),
+           default_value = LATEST_STABLE_COMPILER_VERSION,
+           default_value_if("move_2", "true", LATEST_STABLE_COMPILER_VERSION),
+           default_value_if("move_1", "true", "1"),
            verbatim_doc_comment)]
     pub compiler_version: Option<CompilerVersion>,
 
     /// ...or --language LANGUAGE_VERSION
     /// Specify the language version to be supported.
-    /// Currently, defaults to `1`, unless `--move-2` is selected.
+    /// Defaults to the latest stable language version (at least 2)
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
            alias = "language",
-           default_value_if("move_2", "true", "2.1"),
+           default_value = LATEST_STABLE_LANGUAGE_VERSION,
+           default_value_if("move_2", "true", LATEST_STABLE_LANGUAGE_VERSION),
+           default_value_if("move_1", "true", "1"),
            verbatim_doc_comment)]
     pub language_version: Option<LanguageVersion>,
 
-    /// Select bytecode, language version, and compiler to support Move 2:
-    /// Same as `--bytecode_version=7 --language_version=2.1 --compiler_version=2.0`
+    /// Select bytecode, language, and compiler versions to support the latest Move 2.
     #[clap(long, verbatim_doc_comment)]
     pub move_2: bool,
+
+    /// Select bytecode, language, and compiler versions for Move 1.
+    /// Note: `aptos move prove` does not support v1
+    #[clap(long, verbatim_doc_comment)]
+    pub move_1: bool,
 }
 
 impl Default for MovePackageDir {
@@ -1203,11 +1227,12 @@ impl MovePackageDir {
             override_std: None,
             skip_fetch_latest_git_deps: true,
             bytecode_version: None,
-            compiler_version: None,
-            language_version: None,
+            compiler_version: Some(CompilerVersion::latest_stable()),
+            language_version: Some(LanguageVersion::latest_stable()),
             skip_attribute_checks: false,
             check_test_code: false,
-            move_2: false,
+            move_2: true,
+            move_1: false,
             optimize: None,
             experiments: vec![],
         }
@@ -1514,12 +1539,12 @@ pub struct ChangeSummary {
 pub struct FaucetOptions {
     /// URL for the faucet endpoint e.g. `https://faucet.devnet.aptoslabs.com`
     #[clap(long)]
-    faucet_url: Option<reqwest::Url>,
+    pub faucet_url: Option<reqwest::Url>,
 
     /// Auth token to bypass faucet ratelimits. You can also set this as an environment
     /// variable with FAUCET_AUTH_TOKEN.
     #[clap(long, env)]
-    faucet_auth_token: Option<String>,
+    pub faucet_auth_token: Option<String>,
 }
 
 impl FaucetOptions {
@@ -1530,19 +1555,38 @@ impl FaucetOptions {
         }
     }
 
-    fn faucet_url(&self, profile: &ProfileOptions) -> CliTypedResult<reqwest::Url> {
+    fn faucet_url(&self, profile_options: &ProfileOptions) -> CliTypedResult<reqwest::Url> {
         if let Some(ref faucet_url) = self.faucet_url {
-            Ok(faucet_url.clone())
-        } else if let Some(Some(url)) = CliConfig::load_profile(
-            profile.profile_name(),
+            return Ok(faucet_url.clone());
+        }
+        let profile = CliConfig::load_profile(
+            profile_options.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
-        )?
-        .map(|profile| profile.faucet_url)
-        {
-            reqwest::Url::parse(&url)
-                .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string()))
-        } else {
-            Err(CliError::CommandArgumentError("No faucet given. Please add --faucet-url or add a faucet URL to the .aptos/config.yaml for the current profile".to_string()))
+        )?;
+        let profile = match profile {
+            Some(profile) => profile,
+            None => {
+                return Err(CliError::CommandArgumentError(format!(
+                    "Profile \"{}\" not found.",
+                    profile_options.profile_name().unwrap_or(DEFAULT_PROFILE)
+                )))
+            },
+        };
+
+        match profile.faucet_url {
+            Some(url) => reqwest::Url::parse(&url)
+                .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string())),
+            None => match profile.network {
+                Some(Network::Mainnet) => {
+                    Err(CliError::CommandArgumentError("There is no faucet for mainnet. Please create and fund the account by transferring funds from another account. If you are confident you want to use a faucet, set --faucet-url or add a faucet URL to .aptos/config.yaml for the current profile".to_string()))
+                },
+                Some(Network::Testnet) => {
+                    Err(CliError::CommandArgumentError(format!("To get testnet APT you must visit {}. If you are confident you want to use a faucet programmatically, set --faucet-url or add a faucet URL to .aptos/config.yaml for the current profile", get_mint_site_url(None))))
+                },
+                _ => {
+                    Err(CliError::CommandArgumentError("No faucet given. Please set --faucet-url or add a faucet URL to .aptos/config.yaml for the current profile".to_string()))
+                },
+            },
         }
     }
 
@@ -1566,7 +1610,7 @@ impl FaucetOptions {
 }
 
 /// Gas price options for manipulating how to prioritize transactions
-#[derive(Debug, Eq, Parser, PartialEq)]
+#[derive(Debug, Clone, Eq, Parser, PartialEq)]
 pub struct GasOptions {
     /// Gas multiplier per unit of gas
     ///
@@ -1863,11 +1907,29 @@ impl TransactionOptions {
             .await
             .map_err(|err| CliError::ApiError(err.to_string()))?;
         let transaction_hash = transaction.clone().committed_hash();
-        let network = self
-            .profile_options
-            .profile()
-            .ok()
-            .and_then(|profile| profile.network);
+        let network = self.profile_options.profile().ok().and_then(|profile| {
+            if let Some(network) = profile.network {
+                Some(network)
+            } else {
+                // Approximate network from URL
+                match profile.rest_url {
+                    None => None,
+                    Some(url) => {
+                        if url.contains("mainnet") {
+                            Some(Network::Mainnet)
+                        } else if url.contains("testnet") {
+                            Some(Network::Testnet)
+                        } else if url.contains("devnet") {
+                            Some(Network::Devnet)
+                        } else if url.contains("localhost") || url.contains("127.0.0.1") {
+                            Some(Network::Local)
+                        } else {
+                            None
+                        }
+                    },
+                }
+            }
+        });
         eprintln!(
             "Transaction submitted: {}",
             explorer_transaction_link(transaction_hash, network)
@@ -2355,8 +2417,25 @@ pub struct ChunkedPublishOption {
     /// Address of the `large_packages` move module for chunked publishing
     ///
     /// By default, on the module is published at `0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7`
-    /// on Testnet and Mainnet.  On any other network, you will need to first publish it from the framework
+    /// on Testnet and Mainnet. On any other network, you will need to first publish it from the framework
     /// under move-examples/large_packages.
     #[clap(long, default_value = LARGE_PACKAGES_MODULE_ADDRESS, value_parser = crate::common::types::load_account_arg)]
     pub(crate) large_packages_module_address: AccountAddress,
+
+    /// Size of the code chunk in bytes for splitting bytecode and metadata of large packages
+    ///
+    /// By default, the chunk size is set to `CHUNK_SIZE_IN_BYTES`. A smaller chunk size will result
+    /// in more transactions required to publish a package, while a larger chunk size might cause
+    /// transaction to fail due to exceeding the execution gas limit.
+    #[clap(long, default_value_t = CHUNK_SIZE_IN_BYTES)]
+    pub(crate) chunk_size: usize,
+}
+
+/// For minting testnet APT.
+pub fn get_mint_site_url(address: Option<AccountAddress>) -> String {
+    let params = match address {
+        Some(address) => format!("?address={}", address.to_standard_string()),
+        None => "".to_string(),
+    };
+    format!("https://aptos.dev/network/faucet{}", params)
 }

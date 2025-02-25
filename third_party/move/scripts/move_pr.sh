@@ -98,6 +98,7 @@ MOVE_CRATES="\
   -p move-compiler-v2\
   -p move-compiler-v2-transactional-tests\
   -p move-ir-compiler-transactional-tests\
+  -p move-linter\
   -p move-prover-boogie-backend\
   -p move-prover\
   -p move-transactional-test-runner\
@@ -117,7 +118,6 @@ MOVE_CRATES_V2_ENV_DEPENDENT="\
   -p move-package \
   -p move-prover-bytecode-pipeline \
   -p move-stackless-bytecode \
-  -p move-to-yul \
   -p move-transactional-test-runner \
   -p move-unit-test \
   -p move-vm-transactional-tests \
@@ -196,10 +196,10 @@ if [ ! -z "$COMPILER_V2_TEST" ]; then
   echo "*************** [move-pr] Running integration tests with compiler v2"
   (
     cd $BASE
-    MVC_DOCGEN_OUTPUT_DIR=tests/compiler-v2-doc MOVE_COMPILER_V2=true cargo build $CARGO_OP_PARAMS \
+    MVC_DOCGEN_OUTPUT_DIR=tests/compiler-v2-doc MOVE_COMPILER_V2=true MOVE_LANGUAGE_V2=true cargo build $CARGO_OP_PARAMS \
        $MOVE_CRATES_V2_ENV_DEPENDENT
     MVC_DOCGEN_OUTPUT_DIR=tests/compiler-v2-doc \
-       MOVE_COMPILER_V2=true cargo nextest run $CARGO_NEXTEST_PARAMS \
+       MOVE_COMPILER_V2=true MOVE_LANGUAGE_V2=true cargo nextest run $CARGO_NEXTEST_PARAMS \
        $MOVE_CRATES_V2_ENV_DEPENDENT
   )
 fi

@@ -162,9 +162,29 @@ fn build_test_info(
 
     let mut arguments = Vec::new();
     for param in function.get_parameters_ref() {
-        let Parameter(var, _ty, var_loc) = &param;
+        let Parameter(var, ty, var_loc) = &param;
 
         match test_annotation_params.get(var) {
+            Some(MoveValue::Address(addr)) => match ty {
+                Type::Primitive(PrimitiveType::Signer) => arguments.push(MoveValue::Signer(*addr)),
+                Type::Reference(_, inner) if **inner == Type::Primitive(PrimitiveType::Signer) => {
+                    arguments.push(MoveValue::Signer(*addr));
+                },
+                Type::Primitive(PrimitiveType::Address) => {
+                    arguments.push(MoveValue::Address(*addr))
+                },
+                _ => {
+                    let err_msg = "Unexpected argument type: expect an address or a signer";
+                    let invalid_test = "unable to generate test";
+                    env.error_with_labels(&fn_id_loc, invalid_test, vec![
+                        (test_attribute_loc.clone(), err_msg.to_string()),
+                        (
+                            var_loc.clone(),
+                            "Corresponding to this parameter".to_string(),
+                        ),
+                    ]);
+                },
+            },
             Some(value) => arguments.push(value.clone()),
             None => {
                 let missing_param_msg = "Missing test parameter assignment in test. Expected a \
@@ -503,9 +523,16 @@ fn get_assigned_attribute(
 fn convert_location(env: &GlobalEnv, attr: Attribute) -> Option<ModuleId> {
     let (loc, value) = get_assigned_attribute(env, TestingAttribute::ERROR_LOCATION, attr)?;
     match value {
-        AttributeValue::Name(id, opt_module_name, _sym) => {
+        AttributeValue::Name(id, opt_module_name, sym) => {
             let vloc = env.get_node_loc(id);
-            convert_module_id(env, vloc, opt_module_name)
+            let module_id_opt = convert_module_id(env, vloc.clone(), opt_module_name);
+            if !sym.display(env.symbol_pool()).to_string().is_empty() || module_id_opt.is_none() {
+                env.error_with_labels(&loc, "invalid attribute value", vec![(
+                    vloc,
+                    "Expected a module identifier, e.g. 'std::vector'".to_string(),
+                )]);
+            }
+            module_id_opt
         },
         AttributeValue::Value(id, _val) => {
             let vloc = env.get_node_loc(id);

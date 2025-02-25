@@ -16,6 +16,7 @@ use move_coverage::{
     summary::summarize_inst_cov,
 };
 use move_disassembler::disassembler::Disassembler;
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{compilation::compiled_package::CompiledPackage, BuildConfig, CompilerConfig};
 
 /// Display a coverage summary for all modules in a package
@@ -118,13 +119,20 @@ impl CliCommand<()> for SourceCoverage {
         let (coverage_map, package) = compile_coverage(self.move_options)?;
         let unit = package.get_module_by_name_from_root(&self.module_name)?;
         let source_path = &unit.source_path;
-        let (module, source_map) = match &unit.unit {
-            CompiledUnit::Module(NamedCompiledModule {
-                module, source_map, ..
-            }) => (module, source_map),
+        let source_map = match &unit.unit {
+            CompiledUnit::Module(NamedCompiledModule { source_map, .. }) => source_map,
             _ => panic!("Should all be modules"),
         };
-        let source_coverage = SourceCoverageBuilder::new(module, &coverage_map, source_map);
+        let root_modules: Vec<_> = package
+            .root_modules()
+            .map(|unit| match &unit.unit {
+                CompiledUnit::Module(NamedCompiledModule {
+                    module, source_map, ..
+                }) => (module, source_map),
+                _ => unreachable!("Should all be modules"),
+            })
+            .collect();
+        let source_coverage = SourceCoverageBuilder::new(&coverage_map, source_map, root_modules);
         let source_coverage = source_coverage.compute_source_coverage(source_path);
         let output_result =
             source_coverage.output_source_coverage(&mut std::io::stdout(), self.color, self.tag);
@@ -175,8 +183,12 @@ fn compile_coverage(
                 move_options.bytecode_version,
                 move_options.language_version,
             ),
-            compiler_version: move_options.compiler_version,
-            language_version: move_options.language_version,
+            compiler_version: move_options
+                .compiler_version
+                .or_else(|| Some(CompilerVersion::latest_stable())),
+            language_version: move_options
+                .language_version
+                .or_else(|| Some(LanguageVersion::latest_stable())),
             experiments: experiments_from_opt_level(&move_options.optimize),
         },
         ..Default::default()
@@ -184,7 +196,7 @@ fn compile_coverage(
 
     let path = move_options.get_package_path()?;
     let coverage_map =
-        CoverageMap::from_binary_file(path.join(".coverage_map.mvcov")).map_err(|err| {
+        CoverageMap::from_binary_file(&path.join(".coverage_map.mvcov")).map_err(|err| {
             CliError::UnexpectedError(format!("Failed to retrieve coverage map {}", err))
         })?;
     let package = config

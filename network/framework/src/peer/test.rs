@@ -368,13 +368,13 @@ fn peers_send_message_concurrent() {
         // Check that we received both shutdown events
         assert_disconnected_event(
             remote_peer_id_a,
-            DisconnectReason::Requested,
+            DisconnectReason::RequestedByPeerManager,
             &mut connection_notifs_rx_a,
         )
         .await;
         assert_disconnected_event(
             remote_peer_id_b,
-            DisconnectReason::ConnectionLost,
+            DisconnectReason::ConnectionClosed,
             &mut connection_notifs_rx_b,
         )
         .await;
@@ -905,7 +905,7 @@ fn peer_disconnect_request() {
         drop(peer_handle);
         assert_disconnected_event(
             remote_peer_id,
-            DisconnectReason::Requested,
+            DisconnectReason::RequestedByPeerManager,
             &mut connection_notifs_rx,
         )
         .await;
@@ -932,7 +932,7 @@ fn peer_disconnect_connection_lost() {
         connection.close().await.unwrap();
         assert_disconnected_event(
             remote_peer_id,
-            DisconnectReason::ConnectionLost,
+            DisconnectReason::ConnectionClosed,
             &mut connection_notifs_rx,
         )
         .await;
@@ -1019,13 +1019,13 @@ fn peers_send_multiplex() {
         // Check that we received both shutdown events
         assert_disconnected_event(
             remote_peer_id_a,
-            DisconnectReason::Requested,
+            DisconnectReason::RequestedByPeerManager,
             &mut connection_notifs_rx_a,
         )
         .await;
         assert_disconnected_event(
             remote_peer_id_b,
-            DisconnectReason::ConnectionLost,
+            DisconnectReason::ConnectionClosed,
             &mut connection_notifs_rx_b,
         )
         .await;
