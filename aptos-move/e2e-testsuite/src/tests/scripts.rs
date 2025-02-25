@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use aptos_language_e2e_tests::{current_function_name, executor::FakeExecutor, feature_flags_for_orderless};
 use aptos_types::{
     account_address::AccountAddress,

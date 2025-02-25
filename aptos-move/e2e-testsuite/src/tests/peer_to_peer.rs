@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use aptos_language_e2e_tests::{
     account::Account, common_transactions::peer_to_peer_txn, executor::FakeExecutor, feature_flags_for_orderless,
 };
@@ -37,7 +38,7 @@ fn single_peer_to_peer_with_event(sender_stateless_account: bool, receiver_state
     executor.add_account_data(&receiver);
 
     let transfer_amount = 1_000;
-    let txn = peer_to_peer_txn(sender.account(), receiver.account(), Some(10), transfer_amount, 0, use_txn_payload_v2_format, use_orderless_transactions);
+    let txn = peer_to_peer_txn(sender.account(), receiver.account(), Some(0), transfer_amount, 0, use_txn_payload_v2_format, use_orderless_transactions);
 
     // execute transaction
     let output = executor.execute_transaction(txn);
@@ -70,7 +71,7 @@ fn single_peer_to_peer_with_event(sender_stateless_account: bool, receiver_state
         let updated_sender = executor
             .read_account_resource(sender.account())
             .expect("sender must exist");
-        assert_eq!(1, updated_sender.sequence_number());
+        assert_eq!(if use_orderless_transactions { 0 } else { 1 }, updated_sender.sequence_number());
     }
     if receiver_stateless_account {
         assert!(executor
@@ -173,7 +174,7 @@ fn few_peer_to_peer_with_event(sender_stateless_account: bool, receiver_stateles
             let updated_sender = executor
                 .read_account_resource(sender.account())
                 .expect("sender must exist");
-            assert_eq!(1 + idx as u64, updated_sender.sequence_number());
+            assert_eq!(if use_orderless_transactions { 0 } else { 1 + idx } as u64, updated_sender.sequence_number());
         }
         if receiver_stateless_account {
             assert!(executor
@@ -300,6 +301,7 @@ pub(crate) fn check_and_apply_transfer_output(
     executor: &mut FakeExecutor,
     txn_args: &[TxnInfo],
     output: &[TransactionOutput],
+    use_orderless_transactions: bool,
 ) {
     let count = output.len();
     for i in 0..count {
@@ -312,10 +314,10 @@ pub(crate) fn check_and_apply_transfer_output(
             .expect("sender balance must exist");
         let sender_initial_balance = sender_balance.coin();
         
-        let sender_resource = executor
+        let sender_seq_num = executor
             .read_account_resource(sender)
-            .expect("sender must exist");
-        let sender_seq_num = sender_resource.sequence_number();
+            .map_or(0, |resource| resource.sequence_number());
+        
         let receiver_initial_balance = executor
             .read_apt_coin_store_resource(receiver)
             .expect("receiver balance must exist")
@@ -347,7 +349,7 @@ pub(crate) fn check_and_apply_transfer_output(
             let updated_sender = executor
                 .read_account_resource(sender)
                 .expect("sender must exist");
-            assert_eq!(sender_seq_num + 1, updated_sender.sequence_number());
+            assert_eq!(if use_orderless_transactions { sender_seq_num } else { sender_seq_num + 1 }, updated_sender.sequence_number());
         }
     }
 }
@@ -399,7 +401,7 @@ fn cycle_peer_to_peer(stateless_account: bool, use_txn_payload_v2_format: bool, 
     }
     assert_eq!(accounts.len(), output.len());
 
-    check_and_apply_transfer_output(&mut executor, &txns_info, &output);
+    check_and_apply_transfer_output(&mut executor, &txns_info, &output, use_orderless_transactions);
     print_accounts(&executor, &accounts);
 }
 
@@ -450,7 +452,7 @@ fn cycle_peer_to_peer_multi_block(stateless_account: bool, use_txn_payload_v2_fo
             );
         }
         assert_eq!(cycle, output.len());
-        check_and_apply_transfer_output(&mut executor, &txns_info, &output);
+        check_and_apply_transfer_output(&mut executor, &txns_info, &output, use_orderless_transactions);
         range_left = (range_left + cycle) % account_size;
     }
     println!("EXECUTION TIME: {}", execution_time);
@@ -504,7 +506,7 @@ fn one_to_many_peer_to_peer(stateless_account: bool, use_txn_payload_v2_format: 
             );
         }
         assert_eq!(cycle - 1, output.len());
-        check_and_apply_transfer_output(&mut executor, &txns_info, &output);
+        check_and_apply_transfer_output(&mut executor, &txns_info, &output, use_orderless_transactions);
         range_left = (range_left + cycle) % account_size;
     }
     println!("EXECUTION TIME: {}", execution_time);
@@ -558,7 +560,7 @@ fn many_to_one_peer_to_peer(stateless_account: bool, use_txn_payload_v2_format: 
             );
         }
         assert_eq!(cycle - 1, output.len());
-        check_and_apply_transfer_output(&mut executor, &txns_info, &output);
+        check_and_apply_transfer_output(&mut executor, &txns_info, &output, use_orderless_transactions);
         range_left = (range_left + cycle) % account_size;
     }
     println!("EXECUTION TIME: {}", execution_time);
