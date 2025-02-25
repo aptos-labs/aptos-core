@@ -1078,7 +1078,7 @@ impl<'env> ModuleContext<'env> {
                 if fun.is_inline() {
                     continue;
                 }
-                if let Some(callees) = fun.get_used_functions() {
+                if let Some(callees) = fun.get_called_functions() {
                     let mut usage = usage_map[&fun.get_id()].clone();
                     let count = usage.len();
                     // Extend usage by that of callees from the same module. Acquires is only

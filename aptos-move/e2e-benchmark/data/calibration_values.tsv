@@ -16,7 +16,7 @@ ResourceGroupsSenderWriteTag { string_length: 1024 }	10	0.922	1.031	21.9
 ResourceGroupsSenderMultiChange { string_length: 1024 }	10	0.968	1.071	38.9
 TokenV1MintAndTransferFT	10	0.972	1.059	646.3
 TokenV1MintAndTransferNFTSequential	10	0.934	1.027	968.7
-TokenV2AmbassadorMint { numbered: true }	10	0.915	1.042	675.1
+TokenV2AmbassadorMint { numbered: true }	10	0.915	1.042	735.1
 LiquidityPoolSwap { is_stable: true }	10	0.925	1.009	912.4
 LiquidityPoolSwap { is_stable: false }	10	0.965	1.037	837.8
 CoinInitAndMint	10	0.944	1.037	319.6
