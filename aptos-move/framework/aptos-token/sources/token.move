@@ -648,11 +648,11 @@ module aptos_token::token {
 
         // The property should be explicitly set in the property_map for creator to burn the token
         assert!(
-            property_map::contains_key(&token_data.default_properties, &string::utf8(BURNABLE_BY_CREATOR)),
+            token_data.default_properties.contains_key(&string::utf8(BURNABLE_BY_CREATOR)),
             error::permission_denied(ECREATOR_CANNOT_BURN_TOKEN)
         );
 
-        let burn_by_creator_flag = property_map::read_bool(&token_data.default_properties, &string::utf8(BURNABLE_BY_CREATOR));
+        let burn_by_creator_flag = token_data.default_properties.read_bool(&string::utf8(BURNABLE_BY_CREATOR));
         assert!(burn_by_creator_flag, error::permission_denied(ECREATOR_CANNOT_BURN_TOKEN));
 
         // Burn the tokens.
@@ -713,10 +713,10 @@ module aptos_token::token {
         let token_data = collections.token_data.borrow_mut(token_id.token_data_id);
 
         assert!(
-            property_map::contains_key(&token_data.default_properties, &string::utf8(BURNABLE_BY_OWNER)),
+            token_data.default_properties.contains_key(&string::utf8(BURNABLE_BY_OWNER)),
             error::permission_denied(EOWNER_CANNOT_BURN_TOKEN)
         );
-        let burn_by_owner_flag = property_map::read_bool(&token_data.default_properties, &string::utf8(BURNABLE_BY_OWNER));
+        let burn_by_owner_flag = token_data.default_properties.read_bool(&string::utf8(BURNABLE_BY_OWNER));
         assert!(burn_by_owner_flag, error::permission_denied(EOWNER_CANNOT_BURN_TOKEN));
 
         // Burn the tokens.
@@ -882,8 +882,8 @@ module aptos_token::token {
         assert_non_standard_reserved_property(&keys);
         for (i in 0..keys.length()){
             let key = keys.borrow(i);
-            let old_pv = if (property_map::contains_key(&token_data.default_properties, key)) {
-                option::some(*property_map::borrow(&token_data.default_properties, key))
+            let old_pv = if (token_data.default_properties.contains_key(key)) {
+                option::some(*token_data.default_properties.borrow(key))
             } else {
                 option::none<PropertyValue>()
             };
@@ -891,9 +891,9 @@ module aptos_token::token {
             let new_pv = property_map::create_property_value_raw(values[i], types[i]);
             new_values.push_back(new_pv);
             if (old_pv.is_some()) {
-                property_map::update_property_value(&mut token_data.default_properties, key, new_pv);
+                token_data.default_properties.update_property_value(key, new_pv);
             } else {
-                property_map::add(&mut token_data.default_properties, *key, new_pv);
+                token_data.default_properties.add(*key, new_pv);
             };
         };
         token_event_store::emit_default_property_mutate_event(creator, token_data_id.collection, token_data_id.name, keys, old_values, new_values);
@@ -923,11 +923,11 @@ module aptos_token::token {
         // we only need to check TOKEN_PROPERTY_MUTABLE when default property is immutable
         if (!token_data.mutability_config.properties) {
             assert!(
-                property_map::contains_key(&token_data.default_properties, &string::utf8(TOKEN_PROPERTY_MUTABLE)),
+                token_data.default_properties.contains_key(&string::utf8(TOKEN_PROPERTY_MUTABLE)),
                 error::permission_denied(EFIELD_NOT_MUTABLE)
             );
 
-            let token_prop_mutable = property_map::read_bool(&token_data.default_properties, &string::utf8(TOKEN_PROPERTY_MUTABLE));
+            let token_prop_mutable = token_data.default_properties.read_bool(&string::utf8(TOKEN_PROPERTY_MUTABLE));
             assert!(token_prop_mutable, error::permission_denied(EFIELD_NOT_MUTABLE));
         };
 
@@ -1813,7 +1813,7 @@ module aptos_token::token {
 
         let value = &mut tokens.borrow_mut(token_id).token_properties;
         assert_non_standard_reserved_property(&keys);
-        property_map::update_property_map(value, keys, values, types);
+        value.update_property_map(keys, values, types);
     }
 
     /// Deposit the token balance into the recipients account and emit an event.
@@ -2165,7 +2165,7 @@ module aptos_token::token {
             string::utf8(b"u64"), string::utf8(b"u64")
         ];
         let pm = get_property_map(signer::address_of(creator), token_id);
-        assert!(property_map::length(&pm) == 2, 1);
+        assert!(pm.length() == 2, 1);
         let new_token_id = mutate_one_token(
             creator,
             signer::address_of(creator),
@@ -2175,16 +2175,12 @@ module aptos_token::token {
             new_types,
         );
         let updated_pm = get_property_map(signer::address_of(creator), new_token_id);
-        assert!(property_map::length(&updated_pm) == 2, 1);
-        property_map::update_property_value(
-            &mut updated_pm,
-            &string::utf8(b"attack"),
-            property_map::create_property_value<u64>(&2),
-        );
+        assert!(updated_pm.length() == 2, 1);
+        updated_pm.update_property_value(&string::utf8(b"attack"), property_map::create_property_value<u64>(&2));
 
-        assert!(property_map::read_u64(&updated_pm, &string::utf8(b"attack")) == 2, 1);
+        assert!(updated_pm.read_u64(&string::utf8(b"attack")) == 2, 1);
         let og_pm = get_property_map(signer::address_of(creator), new_token_id);
-        assert!(property_map::read_u64(&og_pm, &string::utf8(b"attack")) == 1, 1);
+        assert!(og_pm.read_u64(&string::utf8(b"attack")) == 1, 1);
     }
 
     #[test(framework = @0x1, creator = @0xcafe)]
@@ -2528,7 +2524,7 @@ module aptos_token::token {
         let all_token_data = &Collections[signer::address_of(creator)].token_data;
         assert!(all_token_data.contains(token_id.token_data_id), 1);
         let props = &all_token_data.borrow(token_id.token_data_id).default_properties;
-        assert!(property_map::read_u64(props, &string::utf8(b"attack")) == 1, 1);
+        assert!(props.read_u64(&string::utf8(b"attack")) == 1, 1);
     }
 
     #[test(creator = @0xcafe)]
@@ -2693,7 +2689,7 @@ module aptos_token::token {
         let creator_props = &TokenStore[signer::address_of(creator)].tokens;
         let token = creator_props.borrow(new_id_1);
 
-        assert!(property_map::length(&token.token_properties) == 2, property_map::length(&token.token_properties));
+        assert!(token.token_properties.length() == 2, token.token_properties.length());
         // mutate token with property_version > 0 should not generate new property_version
         mutate_token_properties(
             creator,
@@ -2714,7 +2710,7 @@ module aptos_token::token {
         let props = &TokenStore[signer::address_of(owner)].tokens;
         assert!(props.contains(new_id_1), 1);
         let token = props.borrow(new_id_1);
-        assert!(property_map::length(&token.token_properties) == 2, property_map::length(&token.token_properties));
+        assert!(token.token_properties.length() == 2, token.token_properties.length());
     }
 
     #[test(creator = @0xcafe)]
