@@ -1,16 +1,25 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_success, MoveHarness};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::account_address::AccountAddress;
 use move_core_types::{u256::U256, value::MoveValue};
+use rstest::rstest;
 
-#[test]
-fn use_new_integer_types() {
-    let mut h = MoveHarness::new();
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn use_new_integer_types(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
     let mut builder = PackageBuilder::new("test");
     builder.add_source(
         "test",
@@ -40,11 +49,18 @@ module 0xcafe::test {
     ));
 }
 
-#[test]
-fn new_integer_types_as_txn_arguments() {
-    let mut h = MoveHarness::new();
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn new_integer_types_as_txn_arguments(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
     let mut builder = PackageBuilder::new("test");
     builder.add_source(
         "test",

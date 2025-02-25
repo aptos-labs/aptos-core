@@ -3,7 +3,7 @@
 
 use crate::transaction::{
     signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction, Transaction,
-    TransactionPayload,
+    TransactionExecutable, TransactionPayloadInner, TransactionPayloadWrapper
 };
 use move_core_types::account_address::AccountAddress;
 
@@ -39,10 +39,11 @@ impl UseCaseAwareTransaction for SignedTransaction {
     }
 
     fn parse_use_case(&self) -> UseCaseKey {
-        use crate::transaction::TransactionPayload::*;
+        use crate::transaction::TransactionPayloadWrapper::*;
         use UseCaseKey::*;
 
         match self.payload() {
+            // Question: MultiSig contains an entry function too. Why isn't it handled like the entry function?
             Script(_) | ModuleBundle(_) | Multisig(_) => Others,
             EntryFunction(entry_fun) => {
                 let module_id = entry_fun.module();
@@ -52,6 +53,18 @@ impl UseCaseAwareTransaction for SignedTransaction {
                     ContractAddress(*module_id.address())
                 }
             },
+            Payload(TransactionPayloadInner::V1 {
+                executable: TransactionExecutable::EntryFunction(entry_fun),
+                extra_config: _,
+            }) => {
+                let module_id = entry_fun.module();
+                if module_id.address().is_special() {
+                    Platform
+                } else {
+                    ContractAddress(*module_id.address())
+                }
+            },
+            _ => Others,
         }
     }
 }
@@ -63,10 +76,10 @@ impl UseCaseAwareTransaction for SignatureVerifiedTransaction {
     }
 
     fn parse_use_case(&self) -> UseCaseKey {
-        use crate::transaction::TransactionPayload::*;
+        use crate::transaction::TransactionPayloadWrapper::*;
         use UseCaseKey::*;
 
-        let payload: Option<&TransactionPayload> = match self {
+        let payload: Option<&TransactionPayloadWrapper> = match self {
             SignatureVerifiedTransaction::Valid(txn) => match txn {
                 Transaction::UserTransaction(signed_txn) => Some(signed_txn.payload()),
                 Transaction::GenesisTransaction(_)
@@ -93,6 +106,19 @@ impl UseCaseAwareTransaction for SignatureVerifiedTransaction {
                     ContractAddress(*module_id.address())
                 }
             },
+            Payload(TransactionPayloadInner::V1 {
+                executable: TransactionExecutable::EntryFunction(entry_fun),
+                extra_config: _,
+            }) => {
+                let module_id = entry_fun.module();
+                if module_id.address().is_special() {
+                    Platform
+                } else {
+                    ContractAddress(*module_id.address())
+                }
+            },
+            _ => Others,
         }
     }
 }
+
