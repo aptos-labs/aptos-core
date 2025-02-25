@@ -2567,11 +2567,11 @@ The token is owned at address owner
 
     // The property should be explicitly set in the <a href="property_map.md#0x3_property_map">property_map</a> for creator <b>to</b> burn the <a href="token.md#0x3_token">token</a>
     <b>assert</b>!(
-        <a href="property_map.md#0x3_property_map_contains_key">property_map::contains_key</a>(&token_data.default_properties, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(<a href="token.md#0x3_token_BURNABLE_BY_CREATOR">BURNABLE_BY_CREATOR</a>)),
+        token_data.default_properties.contains_key(&<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(<a href="token.md#0x3_token_BURNABLE_BY_CREATOR">BURNABLE_BY_CREATOR</a>)),
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="token.md#0x3_token_ECREATOR_CANNOT_BURN_TOKEN">ECREATOR_CANNOT_BURN_TOKEN</a>)
     );
 
-    <b>let</b> burn_by_creator_flag = <a href="property_map.md#0x3_property_map_read_bool">property_map::read_bool</a>(&token_data.default_properties, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(<a href="token.md#0x3_token_BURNABLE_BY_CREATOR">BURNABLE_BY_CREATOR</a>));
+    <b>let</b> burn_by_creator_flag = token_data.default_properties.read_bool(&<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(<a href="token.md#0x3_token_BURNABLE_BY_CREATOR">BURNABLE_BY_CREATOR</a>));
     <b>assert</b>!(burn_by_creator_flag, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="token.md#0x3_token_ECREATOR_CANNOT_BURN_TOKEN">ECREATOR_CANNOT_BURN_TOKEN</a>));
 
     // <a href="token.md#0x3_token_Burn">Burn</a> the tokens.
@@ -2652,10 +2652,10 @@ Burn a token by the token owner
     <b>let</b> token_data = collections.token_data.borrow_mut(token_id.token_data_id);
 
     <b>assert</b>!(
-        <a href="property_map.md#0x3_property_map_contains_key">property_map::contains_key</a>(&token_data.default_properties, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(<a href="token.md#0x3_token_BURNABLE_BY_OWNER">BURNABLE_BY_OWNER</a>)),
+        token_data.default_properties.contains_key(&<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(<a href="token.md#0x3_token_BURNABLE_BY_OWNER">BURNABLE_BY_OWNER</a>)),
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="token.md#0x3_token_EOWNER_CANNOT_BURN_TOKEN">EOWNER_CANNOT_BURN_TOKEN</a>)
     );
-    <b>let</b> burn_by_owner_flag = <a href="property_map.md#0x3_property_map_read_bool">property_map::read_bool</a>(&token_data.default_properties, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(<a href="token.md#0x3_token_BURNABLE_BY_OWNER">BURNABLE_BY_OWNER</a>));
+    <b>let</b> burn_by_owner_flag = token_data.default_properties.read_bool(&<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(<a href="token.md#0x3_token_BURNABLE_BY_OWNER">BURNABLE_BY_OWNER</a>));
     <b>assert</b>!(burn_by_owner_flag, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="token.md#0x3_token_EOWNER_CANNOT_BURN_TOKEN">EOWNER_CANNOT_BURN_TOKEN</a>));
 
     // <a href="token.md#0x3_token_Burn">Burn</a> the tokens.
@@ -2975,8 +2975,8 @@ Allow creator to mutate the default properties in TokenData
     <a href="token.md#0x3_token_assert_non_standard_reserved_property">assert_non_standard_reserved_property</a>(&keys);
     for (i in 0..keys.length()){
         <b>let</b> key = keys.borrow(i);
-        <b>let</b> old_pv = <b>if</b> (<a href="property_map.md#0x3_property_map_contains_key">property_map::contains_key</a>(&token_data.default_properties, key)) {
-            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*<a href="property_map.md#0x3_property_map_borrow">property_map::borrow</a>(&token_data.default_properties, key))
+        <b>let</b> old_pv = <b>if</b> (token_data.default_properties.contains_key(key)) {
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*token_data.default_properties.borrow(key))
         } <b>else</b> {
             <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;PropertyValue&gt;()
         };
@@ -2984,9 +2984,9 @@ Allow creator to mutate the default properties in TokenData
         <b>let</b> new_pv = <a href="property_map.md#0x3_property_map_create_property_value_raw">property_map::create_property_value_raw</a>(values[i], types[i]);
         new_values.push_back(new_pv);
         <b>if</b> (old_pv.is_some()) {
-            <a href="property_map.md#0x3_property_map_update_property_value">property_map::update_property_value</a>(&<b>mut</b> token_data.default_properties, key, new_pv);
+            token_data.default_properties.update_property_value(key, new_pv);
         } <b>else</b> {
-            <a href="property_map.md#0x3_property_map_add">property_map::add</a>(&<b>mut</b> token_data.default_properties, *key, new_pv);
+            token_data.default_properties.add(*key, new_pv);
         };
     };
     <a href="token_event_store.md#0x3_token_event_store_emit_default_property_mutate_event">token_event_store::emit_default_property_mutate_event</a>(creator, token_data_id.collection, token_data_id.name, keys, old_values, new_values);
@@ -3036,11 +3036,11 @@ Mutate the token_properties of one token.
     // we only need <b>to</b> check <a href="token.md#0x3_token_TOKEN_PROPERTY_MUTABLE">TOKEN_PROPERTY_MUTABLE</a> when default property is immutable
     <b>if</b> (!token_data.mutability_config.properties) {
         <b>assert</b>!(
-            <a href="property_map.md#0x3_property_map_contains_key">property_map::contains_key</a>(&token_data.default_properties, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(<a href="token.md#0x3_token_TOKEN_PROPERTY_MUTABLE">TOKEN_PROPERTY_MUTABLE</a>)),
+            token_data.default_properties.contains_key(&<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(<a href="token.md#0x3_token_TOKEN_PROPERTY_MUTABLE">TOKEN_PROPERTY_MUTABLE</a>)),
             <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="token.md#0x3_token_EFIELD_NOT_MUTABLE">EFIELD_NOT_MUTABLE</a>)
         );
 
-        <b>let</b> token_prop_mutable = <a href="property_map.md#0x3_property_map_read_bool">property_map::read_bool</a>(&token_data.default_properties, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(<a href="token.md#0x3_token_TOKEN_PROPERTY_MUTABLE">TOKEN_PROPERTY_MUTABLE</a>));
+        <b>let</b> token_prop_mutable = token_data.default_properties.read_bool(&<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(<a href="token.md#0x3_token_TOKEN_PROPERTY_MUTABLE">TOKEN_PROPERTY_MUTABLE</a>));
         <b>assert</b>!(token_prop_mutable, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="token.md#0x3_token_EFIELD_NOT_MUTABLE">EFIELD_NOT_MUTABLE</a>));
     };
 
@@ -5143,7 +5143,7 @@ return if the collection maximum is mutable with collection mutability config
 
     <b>let</b> value = &<b>mut</b> tokens.borrow_mut(token_id).token_properties;
     <a href="token.md#0x3_token_assert_non_standard_reserved_property">assert_non_standard_reserved_property</a>(&keys);
-    <a href="property_map.md#0x3_property_map_update_property_map">property_map::update_property_map</a>(value, keys, values, types);
+    value.update_property_map(keys, values, types);
 }
 </code></pre>
 
