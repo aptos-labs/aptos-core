@@ -180,11 +180,12 @@ impl DataManager {
                 "Requesting transactions from fullnodes, starting_version: {}.",
                 request.starting_version.unwrap()
             );
-            let mut fullnode_client = self.metadata_manager.get_fullnode_for_request(&request);
+            let (address, mut fullnode_client) =
+                self.metadata_manager.get_fullnode_for_request(&request);
             let response = fullnode_client.get_transactions_from_node(request).await;
             if response.is_err() {
                 warn!(
-                    "Error when getting transactions from fullnode: {}",
+                    "Error when getting transactions from fullnode ({address}): {}",
                     response.err().unwrap()
                 );
                 tokio::time::sleep(Duration::from_millis(100)).await;
@@ -258,7 +259,7 @@ impl DataManager {
                         transactions_count: Some(5000),
                     };
 
-                    let mut fullnode_client =
+                    let (_, mut fullnode_client) =
                         self.metadata_manager.get_fullnode_for_request(&request);
                     let response = fullnode_client.get_transactions_from_node(request).await?;
                     let mut response = response.into_inner();
