@@ -58,6 +58,14 @@ impl BorrowInfo {
             .unwrap_or_default()
     }
 
+    /// Gets the children of this node with edges
+    fn get_children_with_edge(&self, node: &BorrowNode) -> Vec<(&BorrowNode, &BorrowEdge)> {
+        self.borrowed_by
+            .get(node)
+            .map(|s| s.iter().map(|(n, e)| (n, e)).collect_vec())
+            .unwrap_or_default()
+    }
+
     /// Gets the parents (together with the edges) of this node.
     fn get_incoming(&self, node: &BorrowNode) -> Vec<(&BorrowNode, &BorrowEdge)> {
         self.borrows_from
@@ -76,6 +84,13 @@ impl BorrowInfo {
                 .iter()
                 .any(|child| self.is_in_use(child))
         }
+    }
+
+    /// Checks whether `node` is being borrowed by at least one live node
+    pub fn has_borrow(&self, node: &BorrowNode) -> bool {
+        self.get_children(node)
+            .iter()
+            .any(|child| self.is_in_use(child))
     }
 
     /// Returns nodes which are dying from this to the next state. This includes those which
@@ -146,6 +161,44 @@ impl BorrowInfo {
             },
             BorrowNode::ReturnPlaceholder(..) => {
                 unreachable!("placeholder node type is not expected here");
+            },
+        }
+    }
+
+    /// Start from this node and follow-up the borrow chain until reaching a descendant that is not being borrowed.
+    /// After collecting possible paths (from this node to a live descendant) in the DFS order,
+    /// we need to reverse them so that `trees` will take the same form as `collect_dying_ancestor_trees_recursive`
+    pub fn collect_ancestor_trees_recursive_reverse(
+        &self,
+        node: &BorrowNode,
+        order: Vec<WriteBackAction>,
+        trees: &mut Vec<Vec<WriteBackAction>>,
+    ) {
+        match node {
+            BorrowNode::ReturnPlaceholder(..) => {
+                unreachable!("placeholder node type is not expected here");
+            },
+            _ => {
+                let outgoing = self.get_children_with_edge(node);
+                if outgoing.is_empty() {
+                    let mut order = order;
+                    order.reverse();
+                    trees.push(order);
+                } else {
+                    for (child, edge) in outgoing {
+                        if let BorrowNode::Reference(temp_index) = child {
+                            let mut appended = order.clone();
+                            appended.push(WriteBackAction {
+                                src: *temp_index,
+                                dst: node.clone(),
+                                edge: edge.clone(),
+                            });
+                            self.collect_ancestor_trees_recursive_reverse(child, appended, trees);
+                        } else {
+                            unreachable!("node must be reference");
+                        }
+                    }
+                }
             },
         }
     }

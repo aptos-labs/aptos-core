@@ -3575,6 +3575,11 @@ pub struct StructEnv<'env> {
 }
 
 impl<'env> StructEnv<'env> {
+    /// Shortcut to access the env
+    pub fn env(&self) -> &GlobalEnv {
+        self.module_env.env
+    }
+
     /// Returns the name of this struct.
     pub fn get_name(&self) -> Symbol {
         self.data.name
@@ -4314,6 +4319,11 @@ pub struct FunctionEnv<'env> {
 }
 
 impl<'env> FunctionEnv<'env> {
+    /// Shortcut to access the env
+    pub fn env(&self) -> &GlobalEnv {
+        self.module_env.env
+    }
+
     /// Returns the name of this function.
     pub fn get_name(&self) -> Symbol {
         self.data.name
