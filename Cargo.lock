@@ -11641,6 +11641,7 @@ dependencies = [
  "hex",
  "lazy_static",
  "lru 0.7.8",
+ "mockall",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-compiler",
