@@ -601,7 +601,7 @@ where
             };
 
             if let Ok(path) = env::var("INSTALL_KEYLESS_GROTH16_VK_FROM_PATH") {
-                let file_content = fs::read_to_string(&path).expect(&format!("Failed to read verification key file: {}", path));
+                let file_content = fs::read_to_string(&path).unwrap_or_else(|_| panic!("Failed to read verification key file: {}", path));
                 let json: Value = serde_json::from_str(&file_content).expect("Failed to parse JSON");
                 configure_keyless_with_vk(genesis_config, json).unwrap();
             };
