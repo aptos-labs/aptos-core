@@ -681,6 +681,10 @@ impl From<TypeTag> for MoveType {
                 items: Box::new(MoveType::from(*v)),
             },
             TypeTag::Struct(v) => MoveType::Struct((*v).into()),
+            TypeTag::Function(..) => {
+                // TODO(#15664): support function values
+                MoveType::Unparsable("Function types are not supported".to_string())
+            },
         }
     }
 }
@@ -701,6 +705,10 @@ impl From<&TypeTag> for MoveType {
                 items: Box::new(MoveType::from(v.as_ref())),
             },
             TypeTag::Struct(v) => MoveType::Struct((&**v).into()),
+            TypeTag::Function(..) => {
+                // TODO(#15664): support function values
+                MoveType::Unparsable("Function types are not supported".to_string())
+            },
         }
     }
 }

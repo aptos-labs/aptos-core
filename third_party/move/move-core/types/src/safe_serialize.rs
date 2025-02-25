@@ -4,9 +4,6 @@
 
 //! Custom serializers which track recursion nesting with a thread local,
 //! and otherwise delegate to the derived serializers.
-//!
-//! This is currently only implemented for type tags, but can be easily
-//! generalized, as the only type-tag specific thing is the allowed nesting.
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cell::RefCell;

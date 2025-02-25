@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    payload::{OptQuorumStorePayload, PayloadExecutionLimit},
+    payload::{OptBatches, OptQuorumStorePayload, PayloadExecutionLimit},
     proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
 };
 use anyhow::ensure;
@@ -295,7 +295,9 @@ impl Payload {
                     .sum::<usize>()) as u64)
                 .min(max_txns_to_execute.unwrap_or(u64::MAX)),
             Payload::OptQuorumStore(opt_qs_payload) => {
-                opt_qs_payload.max_txns_to_execute().unwrap_or(u64::MAX)
+                let num_txns = opt_qs_payload.num_txns() as u64;
+                let max_txns_to_execute = opt_qs_payload.max_txns_to_execute().unwrap_or(u64::MAX);
+                num_txns.min(max_txns_to_execute)
             },
         }
     }
@@ -456,24 +458,40 @@ impl Payload {
         Ok(())
     }
 
+    pub fn verify_opt_batches(
+        verifier: &ValidatorVerifier,
+        opt_batches: &OptBatches,
+    ) -> anyhow::Result<()> {
+        let authors = verifier.address_to_validator_index();
+        for batch in &opt_batches.batch_summary {
+            ensure!(
+                authors.contains_key(&batch.author()),
+                "Invalid author {} for batch {}",
+                batch.author(),
+                batch.digest()
+            );
+        }
+        Ok(())
+    }
+
     pub fn verify(
         &self,
-        validator: &ValidatorVerifier,
+        verifier: &ValidatorVerifier,
         proof_cache: &ProofCache,
         quorum_store_enabled: bool,
     ) -> anyhow::Result<()> {
         match (quorum_store_enabled, self) {
             (false, Payload::DirectMempool(_)) => Ok(()),
             (true, Payload::InQuorumStore(proof_with_status)) => {
-                Self::verify_with_cache(&proof_with_status.proofs, validator, proof_cache)
+                Self::verify_with_cache(&proof_with_status.proofs, verifier, proof_cache)
             },
             (true, Payload::InQuorumStoreWithLimit(proof_with_status)) => Self::verify_with_cache(
                 &proof_with_status.proof_with_data.proofs,
-                validator,
+                verifier,
                 proof_cache,
             ),
             (true, Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)) => {
-                Self::verify_with_cache(&proof_with_data.proofs, validator, proof_cache)?;
+                Self::verify_with_cache(&proof_with_data.proofs, verifier, proof_cache)?;
                 Self::verify_inline_batches(
                     inline_batches.iter().map(|(info, txns)| (info, txns)),
                 )?;
@@ -481,13 +499,14 @@ impl Payload {
             },
             (true, Payload::OptQuorumStore(opt_quorum_store)) => {
                 let proof_with_data = opt_quorum_store.proof_with_data();
-                Self::verify_with_cache(&proof_with_data.batch_summary, validator, proof_cache)?;
+                Self::verify_with_cache(&proof_with_data.batch_summary, verifier, proof_cache)?;
                 Self::verify_inline_batches(
                     opt_quorum_store
                         .inline_batches()
                         .iter()
                         .map(|batch| (batch.info(), batch.transactions())),
                 )?;
+                Self::verify_opt_batches(verifier, opt_quorum_store.opt_batches())?;
                 Ok(())
             },
             (_, _) => Err(anyhow::anyhow!(

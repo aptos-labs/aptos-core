@@ -275,6 +275,10 @@ impl From<&TypeTag> for FatType {
             TypeTag::Vector(inner) => Vector(Box::new(inner.as_ref().into())),
             TypeTag::Struct(inner) => Struct(Box::new(inner.as_ref().into())),
             TypeTag::U256 => U256,
+            TypeTag::Function(..) => {
+                // TODO(#15664): implement functions for fat types
+                todo!("functions not supported by fat types")
+            },
         }
     }
 }

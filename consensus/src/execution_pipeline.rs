@@ -440,6 +440,7 @@ fn log_failed_to_send_result<T>(
                 e,
                 &counters::PIPELINE_DISCARDED_EXECUTOR_ERROR_COUNT,
                 block_id,
+                false,
             );
         }
     }

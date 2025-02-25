@@ -2366,9 +2366,9 @@ dependencies = [
  "async-trait",
  "backtrace",
  "clap 4.5.21",
+ "figment",
  "prometheus",
  "serde",
- "serde_yaml 0.8.26",
  "tempfile",
  "tokio",
  "toml 0.7.8",
@@ -3317,6 +3317,7 @@ dependencies = [
  "once_cell",
  "procfs",
  "prometheus",
+ "rlimit",
  "sysinfo",
 ]
 
@@ -5323,6 +5324,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.87",
+]
+
+[[package]]
+name = "atomic"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d818003e740b63afc82337e3160717f4f63078720a810b7b903e70a5d1d2994"
+dependencies = [
+ "bytemuck",
 ]
 
 [[package]]
@@ -8042,6 +8052,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "figment"
+version = "0.10.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8cb01cd46b0cf372153850f4c6c272d9cbea2da513e07538405148f95bd789f3"
+dependencies = [
+ "atomic",
+ "pear",
+ "serde",
+ "serde_yaml 0.9.30",
+ "uncased",
+ "version_check",
+]
+
+[[package]]
 name = "file_diff"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9697,6 +9721,12 @@ dependencies = [
  "rgb",
  "str_stack",
 ]
+
+[[package]]
+name = "inlinable_string"
+version = "0.1.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8fae54786f62fb2918dcfae3d568594e50eb9b5c25bf04371af6fe7516452fb"
 
 [[package]]
 name = "inout"
@@ -11658,6 +11688,7 @@ version = "0.1.0"
 dependencies = [
  "ambassador",
  "bcs 0.1.4",
+ "better_any",
  "bytes",
  "claims",
  "crossbeam",
@@ -11665,6 +11696,7 @@ dependencies = [
  "derivative",
  "hashbrown 0.14.3",
  "itertools 0.13.0",
+ "mockall",
  "move-binary-format",
  "move-core-types",
  "parking_lot 0.12.1",
@@ -12553,6 +12585,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "pear"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bdeeaa00ce488657faba8ebf44ab9361f9365a97bd39ffb8a60663f57ff4b467"
+dependencies = [
+ "inlinable_string",
+ "pear_codegen",
+ "yansi 1.0.0-rc.1",
+]
+
+[[package]]
+name = "pear_codegen"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4bab5b985dc082b345f812b7df84e1bef27e7207b39e448439ba8bd69c93f147"
+dependencies = [
+ "proc-macro2",
+ "proc-macro2-diagnostics",
+ "quote",
+ "syn 2.0.87",
+]
+
+[[package]]
 name = "pem"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13307,6 +13362,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f139b0662de085916d1fb67d2b4169d1addddda1919e696f3252b740b629986e"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "proc-macro2-diagnostics"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af066a9c399a26e020ada66a034357a868728e72cd426f3adcd35f80d88d88c8"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+ "version_check",
+ "yansi 1.0.0-rc.1",
 ]
 
 [[package]]

@@ -2661,12 +2661,11 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
         PE::While(label, pb, ploop) => EE::While(label, exp(context, *pb), exp(context, *ploop)),
         PE::Loop(label, ploop) => EE::Loop(label, exp(context, *ploop)),
         PE::Block(seq) => EE::Block(sequence(context, loc, seq)),
-        PE::Lambda(pbs, pe, capture_kind, abilities_vec) => {
+        PE::Lambda(pbs, pe, capture_kind) => {
             let tbs_opt = typed_bind_list(context, pbs);
             let e = exp_(context, *pe);
-            let abilities = ability_set(context, "lambda expression", abilities_vec);
             match tbs_opt {
-                Some(tbs) => EE::Lambda(tbs, Box::new(e), capture_kind, abilities),
+                Some(tbs) => EE::Lambda(tbs, Box::new(e), capture_kind),
                 None => {
                     assert!(context.env.has_errors());
                     EE::UnresolvedError
@@ -3393,7 +3392,7 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
         EE::Loop(_, eloop) => unbound_names_exp(unbound, eloop),
 
         EE::Block(seq) => unbound_names_sequence(unbound, seq),
-        EE::Lambda(ls, er, _capture_kind, _abilities) => {
+        EE::Lambda(ls, er, _capture_kind) => {
             unbound_names_exp(unbound, er);
             // remove anything in `ls`
             unbound_names_typed_binds(unbound, ls);

@@ -17,11 +17,11 @@ pub mod plan_builder;
 use crate::{
     diagnostics::Emitter,
     env_pipeline::{
-        acquires_checker, ast_simplifier, cyclic_instantiation_checker, flow_insensitive_checkers,
-        function_checker, inliner, lambda_lifter, lambda_lifter::LambdaLiftingOptions,
-        model_ast_lints, recursive_struct_checker, rewrite_target::RewritingScope,
-        seqs_in_binop_checker, spec_checker, spec_rewriter, unused_params_checker,
-        EnvProcessorPipeline,
+        acquires_checker, ast_simplifier, closure_checker, cyclic_instantiation_checker,
+        flow_insensitive_checkers, function_checker, inliner, lambda_lifter,
+        lambda_lifter::LambdaLiftingOptions, model_ast_lints, recursive_struct_checker,
+        rewrite_target::RewritingScope, seqs_in_binop_checker, spec_checker, spec_rewriter,
+        unused_params_checker, EnvProcessorPipeline,
     },
     pipeline::{
         ability_processor::AbilityProcessor,
@@ -266,8 +266,8 @@ pub fn run_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
         let data = bytecode_generator::generate_bytecode(env, id);
         targets.insert_target_data(&id, FunctionVariant::Baseline, data);
         for callee in func_env
-            .get_called_functions()
-            .expect("called functions available")
+            .get_used_functions()
+            .expect("used functions available")
         {
             if !done.contains(callee) {
                 todo.insert(*callee);
@@ -386,6 +386,11 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
                 },
                 env,
             )
+        });
+    }
+    if options.experiment_on(Experiment::FUNCTION_VALUES) {
+        env_pipeline.add("closure-ability-checker", |env: &mut GlobalEnv| {
+            closure_checker::check_closures(env)
         });
     }
 
