@@ -9,10 +9,13 @@ use crate::{
 };
 use aptos_config::config::transaction_filter_type::Filter;
 use aptos_consensus_notifications::{ConsensusNotificationSender, Error};
-use aptos_consensus_types::{block::Block, block_data::BlockData};
+use aptos_consensus_types::{
+    block::Block, block_data::BlockData, pipelined_block::ExecutedTransactions,
+};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorResult,
+    state_compute_result::StateComputeResult, transactions_with_output::TransactionsWithOutput,
+    BlockExecutorTrait, ExecutorResult,
 };
 use aptos_infallible::Mutex;
 use aptos_types::{
@@ -117,9 +120,9 @@ impl BlockExecutorTrait for DummyBlockExecutor {
         block: ExecutableBlock,
         _parent_block_id: HashValue,
         _onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> ExecutorResult<()> {
+    ) -> ExecutorResult<TransactionsWithOutput> {
         self.blocks_received.lock().push(block);
-        Ok(())
+        Ok(TransactionsWithOutput::new_empty())
     }
 
     fn ledger_update(
@@ -199,7 +202,15 @@ async fn should_see_and_notify_validator_txns() {
 
     // Ensure the dummy executor has received the txns.
     let _ = execution_policy
-        .schedule_compute(&block, None, HashValue::zero(), None, None, dummy_guard())
+        .schedule_compute(
+            &block,
+            None,
+            Arc::new(ExecutedTransactions::new()),
+            HashValue::zero(),
+            None,
+            None,
+            dummy_guard(),
+        )
         .await
         .await
         .unwrap();

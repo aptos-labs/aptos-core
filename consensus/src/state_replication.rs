@@ -10,7 +10,7 @@ use crate::{
 use anyhow::Result;
 use aptos_consensus_types::{
     block::Block,
-    pipelined_block::{OrderedBlockWindow, PipelinedBlock},
+    pipelined_block::{ExecutedTransactionsWriter, OrderedBlockWindow, PipelinedBlock},
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
@@ -34,6 +34,7 @@ pub trait StateComputer: Send + Sync {
         // The block that will be computed.
         _block: &Block,
         _block_window: Option<&OrderedBlockWindow>,
+        _executed_transactions_writer: Arc<dyn ExecutedTransactionsWriter>,
         // The parent block root hash.
         _parent_block_id: HashValue,
         _randomness: Option<Randomness>,
