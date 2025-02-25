@@ -124,10 +124,15 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
                 }
             },
             (SpecFun(id), Def(exp)) => {
-                let mut converter = SpecConverter::new(env, &function_mapping, true)
-                    .symbolized_parameters(get_param_names(&env.get_spec_fun(*id).params));
+                let paras = get_param_names(&env.get_spec_fun(*id).params);
+                let mut converter =
+                    SpecConverter::new(env, &function_mapping, true).symbolized_parameters(paras);
                 let new_exp = converter.rewrite_exp(exp.clone());
-                if !ExpData::ptr_eq(&new_exp, &exp) {
+                if converter.contains_imperative_expression {
+                    let spec_fun = converter.env.get_spec_fun_mut(*id);
+                    spec_fun.uninterpreted = true;
+                    spec_fun.body = None;
+                } else if !ExpData::ptr_eq(&new_exp, &exp) {
                     *targets.state_mut(&target) = Def(new_exp)
                 }
             },
@@ -265,7 +270,7 @@ fn derive_spec_fun(env: &mut GlobalEnv, fun_id: QualifiedId<FunId>) -> Qualified
 /// The expression converter takes a Move expression and converts it to a
 /// specification expression. It expects the expression to be checked to be pure.
 struct SpecConverter<'a> {
-    env: &'a GlobalEnv,
+    env: &'a mut GlobalEnv,
     /// Whether we are in a specification expression. Conversion applies only if.
     in_spec: bool,
     /// The mapping from Move function to spec function ids.
@@ -277,11 +282,13 @@ struct SpecConverter<'a> {
     /// reasons nodes which fetch temporaries should not be stripped as the reference
     /// info is needed for correct treatment of the `old(..)` expression.
     reference_strip_exempted: BTreeSet<NodeId>,
+    /// Set true if the expression contains imperative expressions that currently cannot be translated into a spec function
+    contains_imperative_expression: bool,
 }
 
 impl<'a> SpecConverter<'a> {
     fn new(
-        env: &'a GlobalEnv,
+        env: &'a mut GlobalEnv,
         function_mapping: &'a BTreeMap<QualifiedId<FunId>, QualifiedId<SpecFunId>>,
         in_spec: bool,
     ) -> Self {
@@ -291,6 +298,7 @@ impl<'a> SpecConverter<'a> {
             function_mapping,
             symbolized_parameters: vec![],
             reference_strip_exempted: Default::default(),
+            contains_imperative_expression: false,
         }
     }
 
@@ -409,9 +417,13 @@ impl<'a> ExpRewriterFunctions for SpecConverter<'a> {
                         if reduced_exps.len() == 1 {
                             reduced_exps.pop().unwrap()
                         } else {
+                            self.contains_imperative_expression = true;
                             Sequence(*id, reduced_exps).into_exp()
                         }
                     } else {
+                        if reduced_exps.len() != 1 {
+                            self.contains_imperative_expression = true;
+                        }
                         exp.clone()
                     }
                 },
@@ -447,6 +459,14 @@ impl<'a> ExpRewriterFunctions for SpecConverter<'a> {
                         )
                         .into_exp();
                     }
+                    exp.clone()
+                },
+                ExpData::Return(..)
+                | ExpData::Loop(..)
+                | ExpData::Assign(..)
+                | ExpData::Mutate(..)
+                | ExpData::LoopCont(..) => {
+                    self.contains_imperative_expression = true;
                     exp.clone()
                 },
                 _ => exp.clone(),
