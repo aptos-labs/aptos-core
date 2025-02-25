@@ -113,7 +113,7 @@ module aptos_framework::coin {
     //
 
     const MAX_COIN_NAME_LENGTH: u64 = 32;
-    const MAX_COIN_SYMBOL_LENGTH: u64 = 10;
+    const MAX_COIN_SYMBOL_LENGTH: u64 = 32;
 
     /// Core data structures
 

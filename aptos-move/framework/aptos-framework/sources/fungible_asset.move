@@ -100,7 +100,7 @@ module aptos_framework::fungible_asset {
     //
 
     const MAX_NAME_LENGTH: u64 = 32;
-    const MAX_SYMBOL_LENGTH: u64 = 10;
+    const MAX_SYMBOL_LENGTH: u64 = 32;
     const MAX_DECIMALS: u8 = 32;
     const MAX_URI_LENGTH: u64 = 512;
 
