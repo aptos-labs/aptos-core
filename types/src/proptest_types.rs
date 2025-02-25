@@ -615,19 +615,20 @@ impl Arbitrary for EntryFunction {
         // XXX This should eventually be an actually valid program, maybe?
         (
             any::<AccountAddress>(), // module address
-            any::<String>(),         // module name
-            any::<String>(),         // function name
+            // TODO: This isn't generating valid module and function names. So, hardcoding them for now.
+            // vec(any::<u8>(), 1..100).prop_map(|v| String::from_utf8(v).unwrap_or("module".to_string())), // module name
+            // vec(any::<u8>(), 1..100).prop_map(|v| String::from_utf8(v).unwrap_or("function".to_string())), // function name
             vec(any::<TypeTag>(), 0..4),
             vec(vec(any::<u8>(), 0..100), 0..4),
         )
             .prop_map(
-                |(module_address, module_name, func_name, type_tags, args)| {
+                |(module_address, type_tags, args)| {
                     EntryFunction::new(
                         ModuleId::new(
                             module_address,
-                            Identifier::new(module_name.into_boxed_str()).unwrap(),
+                            Identifier::new("module".to_string()).unwrap(),
                         ),
-                        Identifier::new(func_name.into_boxed_str()).unwrap(),
+                        Identifier::new("function".to_string()).unwrap(),
                         type_tags,
                         args,
                     )
