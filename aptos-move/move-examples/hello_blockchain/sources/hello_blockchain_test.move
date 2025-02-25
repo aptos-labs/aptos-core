@@ -2,13 +2,12 @@
 module hello_blockchain::message_tests {
     use std::signer;
     use std::unit_test;
-    use std::vector;
     use std::string;
 
     use hello_blockchain::message;
 
     fun get_account(): signer {
-        vector::pop_back(&mut unit_test::create_signers_for_testing(1))
+        unit_test::create_signers_for_testing(1).pop_back()
     }
 
     #[test]

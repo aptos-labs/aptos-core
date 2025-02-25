@@ -756,10 +756,10 @@ Emit the event and update height and global timestamp
     <b>if</b> (<b>exists</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(@aptos_framework)) {
         <b>let</b> commit_history_ref = <b>borrow_global_mut</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(@aptos_framework);
         <b>let</b> idx = commit_history_ref.next_idx;
-        <b>if</b> (<a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_contains">table_with_length::contains</a>(&commit_history_ref.<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>, idx)) {
-            <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> commit_history_ref.<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>, idx);
+        <b>if</b> (commit_history_ref.<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>.contains(idx)) {
+            commit_history_ref.<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>.remove(idx);
         };
-        <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> commit_history_ref.<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>, idx, <b>copy</b> new_block_event);
+        commit_history_ref.<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>.add(idx, <b>copy</b> new_block_event);
         <b>spec</b> {
             <b>assume</b> idx + 1 &lt;= MAX_U32;
         };

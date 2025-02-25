@@ -235,7 +235,7 @@ module std::fixed_point32 {
 
     /// Rounds up the given FixedPoint32 to the next largest integer.
     public fun ceil(self: FixedPoint32): u64 {
-        let floored_num = floor(self) << 32;
+        let floored_num = self.floor() << 32;
         if (self.value == floored_num) {
             return floored_num >> 32
         };
@@ -260,12 +260,12 @@ module std::fixed_point32 {
 
     /// Returns the value of a FixedPoint32 to the nearest integer.
     public fun round(self: FixedPoint32): u64 {
-        let floored_num = floor(self) << 32;
+        let floored_num = self.floor() << 32;
         let boundary = floored_num + ((1 << 32) / 2);
         if (self.value < boundary) {
             floored_num >> 32
         } else {
-            ceil(self)
+            self.ceil()
         }
     }
     spec round {

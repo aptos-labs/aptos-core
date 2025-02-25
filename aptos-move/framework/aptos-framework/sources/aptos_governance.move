@@ -204,7 +204,7 @@ module aptos_framework::aptos_governance {
         };
 
         let signer_caps = &mut borrow_global_mut<GovernanceResponsbility>(@aptos_framework).signer_caps;
-        simple_map::add(signer_caps, signer_address, signer_cap);
+        signer_caps.add(signer_address, signer_cap);
     }
 
     /// Initializes the state for Aptos Governance. Can only be called during Genesis with a signer
@@ -311,7 +311,7 @@ module aptos_framework::aptos_governance {
         // If a stake pool has already voted on a proposal before partial governance voting is enabled,
         // there is a record in VotingRecords.
         let voting_records = borrow_global<VotingRecords>(@aptos_framework);
-        table::contains(&voting_records.votes, record_key)
+        voting_records.votes.contains(record_key)
     }
 
     #[view]
@@ -346,7 +346,7 @@ module aptos_framework::aptos_governance {
         let used_voting_power = 0u64;
         if (features::partial_governance_voting_enabled()) {
             let voting_records_v2 = borrow_global<VotingRecordsV2>(@aptos_framework);
-            used_voting_power = *smart_table::borrow_with_default(&voting_records_v2.votes, record_key, &0);
+            used_voting_power = *voting_records_v2.votes.borrow_with_default(record_key, &0);
         };
         get_voting_power(stake_pool) - used_voting_power
     }

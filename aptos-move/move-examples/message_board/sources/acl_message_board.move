@@ -38,7 +38,7 @@ module message_board::acl_based_mb {
             participants: acl::empty(),
             pinned_post: vector::empty<u8>()
         };
-        acl::add(&mut board.participants, signer::address_of(account));
+        board.participants.add(signer::address_of(account));
         move_to(account, board);
     }
 
@@ -50,14 +50,14 @@ module message_board::acl_based_mb {
     /// board owner control adding new participants
     public entry fun add_participant(account: &signer, participant: address) acquires ACLBasedMB {
         let board = borrow_global_mut<ACLBasedMB>(signer::address_of(account));
-        acl::add(&mut board.participants, participant);
+        board.participants.add(participant);
     }
 
     /// remove a participant from the ACL
     public entry fun remove_participant(account: signer, participant: address) acquires ACLBasedMB {
         let board = borrow_global_mut<ACLBasedMB>(signer::address_of(&account));
         assert!(signer::address_of(&account) != participant, ECANNOT_REMOVE_ADMIN_FROM_ACL);
-        acl::remove(&mut board.participants, participant);
+        board.participants.remove(participant);
     }
 
     /// an account publish the message to update the notice
@@ -65,7 +65,7 @@ module message_board::acl_based_mb {
         account: &signer, board_addr: address, message: vector<u8>
     ) acquires ACLBasedMB {
         let board = borrow_global<ACLBasedMB>(board_addr);
-        assert!(acl::contains(&board.participants, signer::address_of(account)), EACCOUNT_NOT_IN_ACL);
+        assert!(board.participants.contains(signer::address_of(account)), EACCOUNT_NOT_IN_ACL);
 
         let board = borrow_global_mut<ACLBasedMB>(board_addr);
         board.pinned_post = message;
@@ -95,7 +95,6 @@ module message_board::acl_based_mb {
 #[test_only]
 module message_board::MessageBoardTests {
     use std::unit_test;
-    use std::vector;
     use std::signer;
 
     use message_board::acl_based_mb;
@@ -152,7 +151,7 @@ module message_board::MessageBoardTests {
     #[test_only]
     fun create_two_signers(): (signer, signer) {
         let signers = &mut unit_test::create_signers_for_testing(2);
-        let (alice, bob) = (vector::pop_back(signers), vector::pop_back(signers));
+        let (alice, bob) = (signers.pop_back(), signers.pop_back());
         aptos_framework::account::create_account_for_test(signer::address_of(&alice));
         aptos_framework::account::create_account_for_test(signer::address_of(&bob));
         (alice, bob)

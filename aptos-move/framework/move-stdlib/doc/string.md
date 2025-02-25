@@ -185,7 +185,7 @@ Checks whether this string is empty.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="string.md#0x1_string_is_empty">is_empty</a>(self: &<a href="string.md#0x1_string_String">String</a>): bool {
-    <a href="vector.md#0x1_vector_is_empty">vector::is_empty</a>(&self.bytes)
+    self.bytes.<a href="string.md#0x1_string_is_empty">is_empty</a>()
 }
 </code></pre>
 
@@ -210,7 +210,7 @@ Returns the length of this string, in bytes.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="string.md#0x1_string_length">length</a>(self: &<a href="string.md#0x1_string_String">String</a>): u64 {
-    <a href="vector.md#0x1_vector_length">vector::length</a>(&self.bytes)
+    self.bytes.<a href="string.md#0x1_string_length">length</a>()
 }
 </code></pre>
 
@@ -235,7 +235,7 @@ Appends a string.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="string.md#0x1_string_append">append</a>(self: &<b>mut</b> <a href="string.md#0x1_string_String">String</a>, r: <a href="string.md#0x1_string_String">String</a>) {
-    <a href="vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> self.bytes, r.bytes)
+    self.bytes.<a href="string.md#0x1_string_append">append</a>(r.bytes)
 }
 </code></pre>
 
@@ -260,7 +260,7 @@ Appends bytes which must be in valid utf8 format.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="string.md#0x1_string_append_utf8">append_utf8</a>(self: &<b>mut</b> <a href="string.md#0x1_string_String">String</a>, bytes: <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
-    <a href="string.md#0x1_string_append">append</a>(self, <a href="string.md#0x1_string_utf8">utf8</a>(bytes))
+    self.<a href="string.md#0x1_string_append">append</a>(<a href="string.md#0x1_string_utf8">utf8</a>(bytes))
 }
 </code></pre>
 
@@ -287,12 +287,12 @@ boundary.
 
 <pre><code><b>public</b> <b>fun</b> <a href="string.md#0x1_string_insert">insert</a>(self: &<b>mut</b> <a href="string.md#0x1_string_String">String</a>, at: u64, o: <a href="string.md#0x1_string_String">String</a>) {
     <b>let</b> bytes = &self.bytes;
-    <b>assert</b>!(at &lt;= <a href="vector.md#0x1_vector_length">vector::length</a>(bytes) && <a href="string.md#0x1_string_internal_is_char_boundary">internal_is_char_boundary</a>(bytes, at), <a href="string.md#0x1_string_EINVALID_INDEX">EINVALID_INDEX</a>);
-    <b>let</b> l = <a href="string.md#0x1_string_length">length</a>(self);
-    <b>let</b> front = <a href="string.md#0x1_string_sub_string">sub_string</a>(self, 0, at);
-    <b>let</b> end = <a href="string.md#0x1_string_sub_string">sub_string</a>(self, at, l);
-    <a href="string.md#0x1_string_append">append</a>(&<b>mut</b> front, o);
-    <a href="string.md#0x1_string_append">append</a>(&<b>mut</b> front, end);
+    <b>assert</b>!(at &lt;= bytes.<a href="string.md#0x1_string_length">length</a>() && <a href="string.md#0x1_string_internal_is_char_boundary">internal_is_char_boundary</a>(bytes, at), <a href="string.md#0x1_string_EINVALID_INDEX">EINVALID_INDEX</a>);
+    <b>let</b> l = self.<a href="string.md#0x1_string_length">length</a>();
+    <b>let</b> front = self.<a href="string.md#0x1_string_sub_string">sub_string</a>(0, at);
+    <b>let</b> end = self.<a href="string.md#0x1_string_sub_string">sub_string</a>(at, l);
+    front.<a href="string.md#0x1_string_append">append</a>(o);
+    front.<a href="string.md#0x1_string_append">append</a>(end);
     *self = front;
 }
 </code></pre>
@@ -321,7 +321,7 @@ guaranteeing that the result is valid utf8.
 
 <pre><code><b>public</b> <b>fun</b> <a href="string.md#0x1_string_sub_string">sub_string</a>(self: &<a href="string.md#0x1_string_String">String</a>, i: u64, j: u64): <a href="string.md#0x1_string_String">String</a> {
     <b>let</b> bytes = &self.bytes;
-    <b>let</b> l = <a href="vector.md#0x1_vector_length">vector::length</a>(bytes);
+    <b>let</b> l = bytes.<a href="string.md#0x1_string_length">length</a>();
     <b>assert</b>!(
         j &lt;= l && i &lt;= j && <a href="string.md#0x1_string_internal_is_char_boundary">internal_is_char_boundary</a>(bytes, i) && <a href="string.md#0x1_string_internal_is_char_boundary">internal_is_char_boundary</a>(bytes, j),
         <a href="string.md#0x1_string_EINVALID_INDEX">EINVALID_INDEX</a>

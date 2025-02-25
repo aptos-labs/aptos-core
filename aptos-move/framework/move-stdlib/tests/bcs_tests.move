@@ -1,7 +1,6 @@
 #[test_only]
 module std::bcs_tests {
     use std::bcs;
-    use std::vector;
     use std::option;
     use std::signer;
 
@@ -19,7 +18,7 @@ module std::bcs_tests {
         let actual_bytes = bcs::to_bytes(&true);
         assert!(actual_bytes == expected_bytes, 0);
 
-        let expected_size = vector::length(&actual_bytes);
+        let expected_size = actual_bytes.length();
         let actual_size = bcs::serialized_size(&true);
         assert!(actual_size == expected_size, 1);
 
@@ -32,7 +31,7 @@ module std::bcs_tests {
         let actual_bytes = bcs::to_bytes(&1u8);
         assert!(actual_bytes == expected_bytes, 0);
 
-        let expected_size = vector::length(&actual_bytes);
+        let expected_size = actual_bytes.length();
         let actual_size = bcs::serialized_size(&1u8);
         assert!(actual_size == expected_size, 1);
 
@@ -45,7 +44,7 @@ module std::bcs_tests {
         let actual_bytes = bcs::to_bytes(&1);
         assert!(actual_bytes == expected_bytes, 0);
 
-        let expected_size = vector::length(&actual_bytes);
+        let expected_size = actual_bytes.length();
         let actual_size = bcs::serialized_size(&1);
         assert!(actual_size == expected_size, 1);
 
@@ -58,7 +57,7 @@ module std::bcs_tests {
         let actual_bytes = bcs::to_bytes(&1u128);
         assert!(actual_bytes == expected_bytes, 0);
 
-        let expected_size = vector::length(&actual_bytes);
+        let expected_size = actual_bytes.length();
         let actual_size = bcs::serialized_size(&1u128);
         assert!(actual_size == expected_size, 1);
 
@@ -73,7 +72,7 @@ module std::bcs_tests {
         let actual_bytes = bcs::to_bytes(&v);
         assert!(actual_bytes == expected_bytes, 0);
 
-        let expected_size = vector::length(&actual_bytes);
+        let expected_size = actual_bytes.length();
         let actual_size = bcs::serialized_size(&v);
         assert!(actual_size == expected_size, 1);
 
@@ -88,7 +87,7 @@ module std::bcs_tests {
         let actual_bytes = bcs::to_bytes(&v);
         assert!(actual_bytes == expected_bytes, 0);
 
-        let expected_size = vector::length(&actual_bytes);
+        let expected_size = actual_bytes.length();
         let actual_size = bcs::serialized_size(&v);
         assert!(actual_size == expected_size, 1);
 
@@ -124,7 +123,7 @@ module std::bcs_tests {
         let box = box127(true);
 
         let bytes = bcs::to_bytes(&box);
-        let expected_size = vector::length(&bytes);
+        let expected_size = bytes.length();
 
         let actual_size = bcs::serialized_size(&box);
         assert!(actual_size == expected_size, 0);

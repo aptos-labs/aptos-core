@@ -197,7 +197,7 @@ module mint_nft::create_nft_getting_production_ready {
 
         // hardcoded public key - we will update it to the real one by calling `set_public_key` from the admin account
         let pk_bytes = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
-        let public_key = std::option::extract(&mut ed25519::new_validated_public_key_from_bytes(pk_bytes));
+        let public_key = ed25519::new_validated_public_key_from_bytes(pk_bytes).extract();
         move_to(resource_signer, ModuleData {
             public_key,
             signer_cap: resource_signer_cap,
@@ -278,7 +278,7 @@ module mint_nft::create_nft_getting_production_ready {
         let caller_address = signer::address_of(caller);
         assert!(caller_address == @admin_addr, error::permission_denied(ENOT_AUTHORIZED));
         let module_data = borrow_global_mut<ModuleData>(@mint_nft);
-        module_data.public_key = std::option::extract(&mut ed25519::new_validated_public_key_from_bytes(pk_bytes));
+        module_data.public_key = ed25519::new_validated_public_key_from_bytes(pk_bytes).extract();
     }
 
     /// Verify that the collection token minter intends to mint the given token_data_id to the receiver
@@ -515,8 +515,8 @@ module mint_nft::create_nft_getting_production_ready {
         let sig_bytes = ed25519::signature_to_bytes(&sig);
 
         // Pollute signature.
-        let first_sig_byte = vector::borrow_mut(&mut sig_bytes, 0);
-        *first_sig_byte = *first_sig_byte + 1;
+        let first_sig_byte = sig_bytes.borrow_mut(0);
+        *first_sig_byte += 1;
 
         mint_event_ticket(&nft_receiver, sig_bytes);
     }

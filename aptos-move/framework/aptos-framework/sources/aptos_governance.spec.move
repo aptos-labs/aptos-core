@@ -740,8 +740,8 @@ spec aptos_framework::aptos_governance {
         metadata_location: vector<u8>;
         metadata_hash: vector<u8>;
 
-        aborts_if string::length(utf8(metadata_location)) > 256;
-        aborts_if string::length(utf8(metadata_hash)) > 256;
+        aborts_if utf8(metadata_location).length() > 256;
+        aborts_if utf8(metadata_hash).length() > 256;
         aborts_if !string::spec_internal_check_utf8(metadata_location);
         aborts_if !string::spec_internal_check_utf8(metadata_hash);
         aborts_if !string::spec_internal_check_utf8(METADATA_LOCATION_KEY);

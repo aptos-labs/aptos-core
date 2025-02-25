@@ -1,5 +1,4 @@
 module aa::single_key {
-    use std::option;
     use std::signer;
     use aptos_std::bls12381::{Self, PublicKey};
     use aptos_framework::auth_data::{Self, AbstractionAuthData};
@@ -18,13 +17,13 @@ module aa::single_key {
     public entry fun update_public_key(admin: &signer, key: vector<u8>) acquires BLSPublicKey {
         let addr = signer::address_of(admin);
         let pubkey_opt = bls12381::public_key_from_bytes(key);
-        assert!(option::is_some(&pubkey_opt), EINVALID_PUBLIC_KEY);
+        assert!(pubkey_opt.is_some(), EINVALID_PUBLIC_KEY);
         if (exists<BLSPublicKey>(addr)) {
             let pubkey = &mut borrow_global_mut<BLSPublicKey>(addr).key;
-            *pubkey = option::destroy_some(pubkey_opt);
+            *pubkey = pubkey_opt.destroy_some();
         } else {
             move_to(admin, BLSPublicKey {
-                key: option::destroy_some(pubkey_opt)
+                key: pubkey_opt.destroy_some()
             })
         };
     }

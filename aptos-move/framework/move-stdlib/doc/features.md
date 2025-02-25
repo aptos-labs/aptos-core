@@ -3559,10 +3559,10 @@ Update feature flags directly. Only used in genesis/tests.
         <b>move_to</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework, <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[] })
     };
     <b>let</b> <a href="features.md#0x1_features">features</a> = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>;
-    <a href="vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&enable, |feature| {
+    enable.for_each_ref(|feature| {
         <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *feature, <b>true</b>);
     });
-    <a href="vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&disable, |feature| {
+    disable.for_each_ref(|feature| {
         <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *feature, <b>false</b>);
     });
 }
@@ -3700,14 +3700,14 @@ Helper to include or exclude a feature flag.
 <pre><code><b>fun</b> <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, feature: u64, <b>include</b>: bool) {
     <b>let</b> byte_index = feature / 8;
     <b>let</b> bit_mask = 1 &lt;&lt; ((feature % 8) <b>as</b> u8);
-    <b>while</b> (<a href="vector.md#0x1_vector_length">vector::length</a>(<a href="features.md#0x1_features">features</a>) &lt;= byte_index) {
-        <a href="vector.md#0x1_vector_push_back">vector::push_back</a>(<a href="features.md#0x1_features">features</a>, 0)
+    <b>while</b> (<a href="features.md#0x1_features">features</a>.length() &lt;= byte_index) {
+        <a href="features.md#0x1_features">features</a>.push_back(0)
     };
-    <b>let</b> entry = <a href="vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(<a href="features.md#0x1_features">features</a>, byte_index);
+    <b>let</b> entry = <a href="features.md#0x1_features">features</a>.borrow_mut(byte_index);
     <b>if</b> (<b>include</b>)
-        *entry = *entry | bit_mask
+        *entry |= bit_mask
     <b>else</b>
-        *entry = *entry & (0xff ^ bit_mask)
+        *entry &= (0xff ^ bit_mask)
 }
 </code></pre>
 
@@ -3734,7 +3734,7 @@ Helper to check whether a feature flag is enabled.
 <pre><code><b>fun</b> <a href="features.md#0x1_features_contains">contains</a>(<a href="features.md#0x1_features">features</a>: &<a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, feature: u64): bool {
     <b>let</b> byte_index = feature / 8;
     <b>let</b> bit_mask = 1 &lt;&lt; ((feature % 8) <b>as</b> u8);
-    byte_index &lt; <a href="vector.md#0x1_vector_length">vector::length</a>(<a href="features.md#0x1_features">features</a>) && (*<a href="vector.md#0x1_vector_borrow">vector::borrow</a>(<a href="features.md#0x1_features">features</a>, byte_index) & bit_mask) != 0
+    byte_index &lt; <a href="features.md#0x1_features">features</a>.length() && (<a href="features.md#0x1_features">features</a>[byte_index] & bit_mask) != 0
 }
 </code></pre>
 
@@ -3758,10 +3758,10 @@ Helper to check whether a feature flag is enabled.
 
 
 <pre><code><b>fun</b> <a href="features.md#0x1_features_apply_diff">apply_diff</a>(<a href="features.md#0x1_features">features</a>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;) {
-    <a href="vector.md#0x1_vector_for_each">vector::for_each</a>(enable, |feature| {
+    enable.for_each(|feature| {
         <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, feature, <b>true</b>);
     });
-    <a href="vector.md#0x1_vector_for_each">vector::for_each</a>(disable, |feature| {
+    disable.for_each(|feature| {
         <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, feature, <b>false</b>);
     });
 }

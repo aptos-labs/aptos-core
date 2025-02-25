@@ -108,7 +108,7 @@ module drand::lottery {
 
         // Update the Lottery resource with the (future) lottery drawing time, effectively 'starting' the lottery.
         let lottery = borrow_global_mut<Lottery>(@drand);
-        assert!(option::is_none(&lottery.draw_at), error::permission_denied(E_LOTTERY_ALREADY_STARTED));
+        assert!(lottery.draw_at.is_none(), error::permission_denied(E_LOTTERY_ALREADY_STARTED));
         lottery.draw_at = option::some(end_time_secs);
 
         //debug::print(&string::utf8(b"Started a lottery that will draw at time: "));
@@ -121,7 +121,7 @@ module drand::lottery {
         let lottery = borrow_global_mut<Lottery>(@drand);
 
         // Make sure the lottery has been 'started' but has NOT been 'drawn' yet
-        let draw_at = *option::borrow(&lottery.draw_at);
+        let draw_at = *lottery.draw_at.borrow();
         assert!(timestamp::now_seconds() < draw_at, error::out_of_range(E_LOTTERY_HAS_CLOSED));
 
         // Get the address of the resource account that stores the coin bounty
@@ -131,7 +131,7 @@ module drand::lottery {
         coin::transfer<AptosCoin>(user, rsrc_acc_addr, TICKET_PRICE);
 
         // ...and issue a ticket for that user
-        vector::push_back(&mut lottery.tickets, signer::address_of(user))
+        lottery.tickets.push_back(signer::address_of(user))
     }
 
     /// Allows anyone to close the lottery (if enough time has elapsed) and to decide the winner, by uploading
@@ -142,14 +142,14 @@ module drand::lottery {
         let lottery = borrow_global_mut<Lottery>(@drand);
 
         // Make sure the lottery has been 'started' and enough time has elapsed before the drawing can start
-        let draw_at = *option::borrow(&lottery.draw_at);
+        let draw_at = *lottery.draw_at.borrow();
         assert!(timestamp::now_seconds() >= draw_at, error::out_of_range(E_LOTTERY_DRAW_IS_TOO_EARLY));
 
         // It could be that no one signed up...
-        if(vector::is_empty(&lottery.tickets)) {
+        if(lottery.tickets.is_empty()) {
             // It's time to draw, but nobody signed up => nobody won.
             // Close the lottery (even if the randomness might be incorrect).
-            option::extract(&mut lottery.draw_at);
+            lottery.draw_at.extract();
             return
         };
 
@@ -166,13 +166,13 @@ module drand::lottery {
         // Use the bytes to pick a number at random from 0 to `|lottery.tickets| - 1` and select the winner
         let winner_idx = drand::random_number(
             option::extract(&mut randomness),
-            vector::length(&lottery.tickets)
+            lottery.tickets.length()
         );
 
         // Pay the winner
         let (rsrc_acc_signer, rsrc_acc_addr) = get_rsrc_acc(lottery);
         let balance = coin::balance<AptosCoin>(rsrc_acc_addr);
-        let winner_addr = *vector::borrow(&lottery.tickets, winner_idx);
+        let winner_addr = lottery.tickets[winner_idx];
 
         coin::transfer<AptosCoin>(
             &rsrc_acc_signer,
@@ -180,7 +180,7 @@ module drand::lottery {
             balance);
 
         // Close the lottery
-        option::extract(&mut lottery.draw_at);
+        lottery.draw_at.extract();
         lottery.tickets = vector::empty<address>();
         lottery.winner = option::some(winner_addr);
     }

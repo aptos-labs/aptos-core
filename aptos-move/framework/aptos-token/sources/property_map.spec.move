@@ -17,8 +17,8 @@ spec aptos_token::property_map {
         let length = len(keys);
 
         aborts_if !(length <= MAX_PROPERTY_MAP_SIZE);
-        aborts_if !(length == vector::length(values));
-        aborts_if !(length == vector::length(types));
+        aborts_if !(length == len(values));
+        aborts_if !(length == len(types));
     }
 
     spec new_with_key_and_property_value (
@@ -27,7 +27,7 @@ spec aptos_token::property_map {
     ): PropertyMap {
         // TODO: Can't handle abort in loop.
         pragma aborts_if_is_partial;
-        let length = vector::length(keys);
+        let length = len(keys);
         aborts_if !(length <= MAX_PROPERTY_MAP_SIZE);
         aborts_if !(length == len(values));
     }

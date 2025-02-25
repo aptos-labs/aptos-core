@@ -11,7 +11,6 @@ module aptos_framework::aptos_account {
     use std::error;
     use std::features;
     use std::signer;
-    use std::vector;
     use aptos_framework::object::Object;
 
     friend aptos_framework::genesis;
@@ -60,14 +59,14 @@ module aptos_framework::aptos_account {
 
     /// Batch version of APT transfer.
     public entry fun batch_transfer(source: &signer, recipients: vector<address>, amounts: vector<u64>) {
-        let recipients_len = vector::length(&recipients);
+        let recipients_len = recipients.length();
         assert!(
-            recipients_len == vector::length(&amounts),
+            recipients_len == amounts.length(),
             error::invalid_argument(EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH),
         );
 
-        vector::enumerate_ref(&recipients, |i, to| {
-            let amount = *vector::borrow(&amounts, i);
+        recipients.enumerate_ref(|i, to| {
+            let amount = amounts[i];
             transfer(source, *to, amount);
         });
     }
@@ -94,14 +93,14 @@ module aptos_framework::aptos_account {
     /// Batch version of transfer_coins.
     public entry fun batch_transfer_coins<CoinType>(
         from: &signer, recipients: vector<address>, amounts: vector<u64>) acquires DirectTransferConfig {
-        let recipients_len = vector::length(&recipients);
+        let recipients_len = recipients.length();
         assert!(
-            recipients_len == vector::length(&amounts),
+            recipients_len == amounts.length(),
             error::invalid_argument(EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH),
         );
 
-        vector::enumerate_ref(&recipients, |i, to| {
-            let amount = *vector::borrow(&amounts, i);
+        recipients.enumerate_ref(|i, to| {
+            let amount = amounts[i];
             transfer_coins<CoinType>(from, *to, amount);
         });
     }
@@ -140,14 +139,14 @@ module aptos_framework::aptos_account {
         recipients: vector<address>,
         amounts: vector<u64>
     ) {
-        let recipients_len = vector::length(&recipients);
+        let recipients_len = recipients.length();
         assert!(
-            recipients_len == vector::length(&amounts),
+            recipients_len == amounts.length(),
             error::invalid_argument(EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH),
         );
 
-        vector::enumerate_ref(&recipients, |i, to| {
-            let amount = *vector::borrow(&amounts, i);
+        recipients.enumerate_ref(|i, to| {
+            let amount = amounts[i];
             transfer_fungible_assets(from, metadata, *to, amount);
         });
     }
