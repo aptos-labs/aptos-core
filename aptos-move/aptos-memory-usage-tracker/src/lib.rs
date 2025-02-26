@@ -490,6 +490,6 @@ where
 
         fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;
 
-        fn charge_keyless(&mut self) -> VMResult<()>;
+        fn charge_keyless(&mut self, num_authenticators: u8) -> VMResult<()>;
     }
 }
