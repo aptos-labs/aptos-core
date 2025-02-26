@@ -104,7 +104,7 @@
 ///
 /// [BAZB20] Zether: Towards Privacy in a Smart Contract World; by Bunz, Benedikt and Agrawal, Shashank and Zamani,
 /// Mahdi and Boneh, Dan; in Financial Cryptography and Data Security; 2020
-module veiled_coin::veiled_coin {
+module framework_experimental::veiled_coin {
     use std::error;
     use std::option::Option;
     use std::signer;
@@ -122,8 +122,8 @@ module veiled_coin::veiled_coin {
     use aptos_framework::coin::{Self, Coin};
     use aptos_framework::event;
 
-    use veiled_coin::helpers;
-    use veiled_coin::sigma_protos;
+    use framework_experimental::helpers;
+    use framework_experimental::sigma_protos;
 
     //
     // Errors
@@ -713,7 +713,7 @@ module veiled_coin::veiled_coin {
 
     /// Returns a signer for the resource account storing all the normal coins that have been veiled.
     fun get_resource_account_signer(): signer acquires VeiledCoinMinter {
-        account::create_signer_with_capability(&borrow_global<VeiledCoinMinter>(@veiled_coin).signer_cap)
+        account::create_signer_with_capability(&borrow_global<VeiledCoinMinter>(@framework_experimental).signer_cap)
     }
 
     /// Mints a veiled coin from a normal coin, shelving the normal coin into the resource account's coin store.

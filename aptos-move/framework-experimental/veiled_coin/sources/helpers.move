@@ -1,4 +1,4 @@
-module veiled_coin::helpers {
+module framework_experimental::helpers {
     use std::vector;
     use std::error;
 
