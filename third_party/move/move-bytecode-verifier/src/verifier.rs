@@ -42,6 +42,7 @@ pub struct VerifierConfig {
     pub sig_checker_v2_fix_script_ty_param_count: bool,
     pub enable_enum_types: bool,
     pub enable_resource_access_control: bool,
+    pub enable_function_values: bool,
 }
 
 /// Helper for a "canonical" verification of a module.
@@ -240,6 +241,7 @@ impl Default for VerifierConfig {
 
             enable_enum_types: true,
             enable_resource_access_control: true,
+            enable_function_values: true,
         }
     }
 }
@@ -284,6 +286,7 @@ impl VerifierConfig {
 
             enable_enum_types: true,
             enable_resource_access_control: true,
+            enable_function_values: true,
         }
     }
 }

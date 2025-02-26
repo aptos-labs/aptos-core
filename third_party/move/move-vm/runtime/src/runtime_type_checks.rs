@@ -100,7 +100,7 @@ pub fn verify_pack_closure(
     {
         with_instantiation(resolver, func, expected, |expected| {
             // Intersect the captured type with the accumulated abilities
-            abilities = abilities.intersect(expected.abilities()?);
+            abilities = abilities.intersect(given.abilities()?);
             given.paranoid_check_assignable(expected)
         })?
     }
