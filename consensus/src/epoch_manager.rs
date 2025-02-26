@@ -1263,7 +1263,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             )
             .await
         } else {
-            self.start_new_epoch_with_joltean(
+            self.start_new_epoch_with_jolteon(
                 loaded_consensus_key.clone(),
                 epoch_state,
                 consensus_config,
@@ -1317,7 +1317,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         )
     }
 
-    async fn start_new_epoch_with_joltean(
+    async fn start_new_epoch_with_jolteon(
         &mut self,
         consensus_key: Arc<PrivateKey>,
         epoch_state: Arc<EpochState>,
