@@ -17,6 +17,7 @@ pub const COMMITTED_BLOCKS_LABEL: &str = "committed_blocks";
 pub const CREATED_SUBSCRIPTION_LABEL: &str = "created_subscription";
 pub const ORDERED_BLOCK_ENTRIES_LABEL: &str = "ordered_block_entries";
 pub const ORDERED_BLOCK_LABEL: &str = "ordered_block";
+pub const ORDERED_BLOCK_WITH_WINDOW_LABEL: &str = "ordered_block_with_window";
 pub const PENDING_BLOCK_ENTRIES_LABEL: &str = "pending_block_entries";
 pub const PENDING_BLOCKS_LABEL: &str = "pending_blocks";
 pub const STORED_PAYLOADS_LABEL: &str = "stored_payloads";
