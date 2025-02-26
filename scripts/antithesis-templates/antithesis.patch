@@ -1,0 +1,93 @@
+diff --git a/crates/aptos-faucet/core/src/server/run.rs b/crates/aptos-faucet/core/src/server/run.rs
+index d210eceb3f..702b642dd8 100644
+--- a/crates/aptos-faucet/core/src/server/run.rs
++++ b/crates/aptos-faucet/core/src/server/run.rs
+@@ -27,6 +27,8 @@ use reqwest::Url;
+ use serde::{Deserialize, Serialize};
+ use std::{fs::File, io::BufReader, path::PathBuf, pin::Pin, str::FromStr, sync::Arc};
+ use tokio::{net::TcpListener, sync::Semaphore, task::JoinSet};
++use std::time::Duration;
++use std::future::Future;
+ 
+ #[derive(Clone, Debug, Deserialize, Serialize)]
+ pub struct HandlerConfig {
+@@ -88,12 +90,10 @@ impl RunConfig {
+             .max_concurrent_requests
+             .map(|v| Arc::new(Semaphore::new(v)));
+ 
+-        // Build Funder.
+-        let funder = self
+-            .funder_config
+-            .build()
+-            .await
+-            .context("Failed to build Funder")?;
++        // Build Funder with retries
++        let funder_config = self.funder_config.clone();
++        let funder = retry_with_backoff(|| funder_config.clone().build()).await
++            .context("Failed to build Funder after multiple attempts")?;
+ 
+         // Build basic API.
+         let basic_api = BasicApi {
+@@ -348,6 +348,10 @@ pub struct RunSimple {
+     #[clap(long, default_value_t = 8081)]
+     pub listen_port: u16,
+ 
++    /// How long to wait for outstanding transactions
++    #[clap(long, default_value_t = 35)]
++    wait_for_outstanding_txns_secs: u64,
++
+     #[clap(long)]
+     do_not_delegate: bool,
+ }
+@@ -358,7 +362,7 @@ impl RunSimple {
+             .api_connection_config
+             .get_key()
+             .context("Failed to load private key")?;
+-        let run_config = RunConfig::build_for_cli(
++        let mut run_config = RunConfig::build_for_cli(
+             self.api_connection_config.node_url.clone(),
+             self.listen_address.clone(),
+             self.listen_port,
+@@ -366,10 +370,42 @@ impl RunSimple {
+             self.do_not_delegate,
+             Some(self.api_connection_config.chain_id),
+         );
++
++        // Update the wait_for_outstanding_txns_secs if using MintFunder
++        if let FunderConfig::MintFunder(ref mut mint_config) = run_config.funder_config {
++            mint_config.transaction_submission_config.wait_for_outstanding_txns_secs = self.wait_for_outstanding_txns_secs;
++        }
++
+         run_config.run().await
+     }
+ }
+ 
++/// Retries an async operation with exponential backoff
++/// reusing the same transaction factory
++async fn retry_with_backoff<F, Fut, T>(f: F) -> Result<T>
++where
++    F: Fn() -> Fut,
++    Fut: Future<Output = Result<T>>,
++{
++    const MAX_RETRIES: u32 = 5;
++    const INITIAL_BACKOFF_MS: u64 = 300;
++
++    let mut backoff_ms = INITIAL_BACKOFF_MS;
++
++    for attempt in 0..MAX_RETRIES {
++        match f().await {
++            Ok(result) => return Ok(result),
++            Err(e) if attempt < MAX_RETRIES - 1 => {
++                info!("Funder build attempt {} failed, retrying in {}ms: {}", attempt + 1, backoff_ms, e);
++                tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
++                backoff_ms *= 2;
++            }
++            Err(e) => return Err(e),
++        }
++    }
++    unreachable!()
++}
++
+ // We hide these tests behind a feature flag because these are not standard unit tests,
+ // these are integration tests that rely on a variety of outside pieces such as a local
+ // testnet and a running Redis instance.

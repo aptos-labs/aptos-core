@@ -12,8 +12,8 @@ if [ "$ROLE" = "faucet" ]; then
          --node-url "${NODE_URL}" \
          --chain-id "${CHAIN_ID}" || true
     
-    echo "Faucet service exited, restarting in 10 seconds..."
-    sleep 10
+    echo "Faucet service exited, restarting in 60 seconds..."
+    sleep 60
   done
 elif [ "$ROLE" = "validator" ]; then
   echo "Starting aptos-node with config: ${CONFIG_PATH}"

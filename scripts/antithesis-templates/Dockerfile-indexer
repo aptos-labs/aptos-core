@@ -1,0 +1,30 @@
+FROM hasura/graphql-engine:v2.42.0
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    postgresql postgresql-contrib \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV POSTGRES_USER=postgres
+ENV POSTGRES_PASSWORD=your_password
+ENV POSTGRES_DB=indexer
+ENV PGDATA=/var/lib/postgresql/data
+
+RUN mkdir -p $PGDATA && chown -R postgres:postgres $PGDATA
+
+USER postgres
+
+RUN initdb -D $PGDATA
+
+USER root
+
+COPY indexer-processor-rust /usr/local/bin/indexer-processor-rust
+RUN chmod +x /usr/local/bin/indexer-processor-rust
+
+COPY indexer-config.yaml /opt/aptos/indexer-config.yaml
+
+CMD service postgresql start && \
+    sleep 5 && \
+    PGPASSWORD=$POSTGRES_PASSWORD psql -U $POSTGRES_USER -d $POSTGRES_DB -c "SELECT 1;" && \
+    indexer-processor-rust --config /opt/aptos/indexer-config.yaml

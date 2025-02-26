@@ -1,0 +1,8 @@
+health_check_port: 8084
+server_config:
+  processor_config:
+    type: default_processor
+  postgres_connection_string: postgresql://postgres:@localhost:5432/indexer
+  indexer_grpc_data_service_address: 127.0.0.1:50051
+  indexer_grpc_http2_ping_interval_in_secs: 60
+  indexer_grpc_http2_ping_timeout_in_secs: 30

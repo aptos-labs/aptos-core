@@ -138,3 +138,4 @@ ecosystem/indexer-grpc/indexer-transaction-generator/*.yaml
 
 # Antithesis generated files
 genesis_antithesis/
+genesis_antithesis_*/

@@ -8,8 +8,8 @@ LAYOUT_FILE="layout.yaml"
 GENESIS_DIR="genesis_antithesis"
 CHAIN_ID=8
 ROOT_KEY=""
-NETWORK_IP="127.0.0.0"
-NODE_COUNT=1
+NETWORK_IP="192.168.5.0"
+NODE_COUNT=4
 FULLNODE_NODES=()
 APTOS_BRANCH="main"
 # Print usage
@@ -17,8 +17,8 @@ function usage() {
   echo "Usage: $0 [options]"
   echo "Options:"
   echo "  -b APTOS_BRANCH        Aptos branch (default: $APTOS_BRANCH)"
-  echo "  -f FRAMEWORK_DIR       Directory for Aptos framework release (default: $FRAMEWORK_DIR)"
-  echo "  -r ROOT_KEY            Root key for genesis (default: $ROOT_KEY)"
+  echo "  -d GENESIS_DIR         Directory for genesis (default: $GENESIS_DIR)"
+  echo "  -r ROOT_KEY            Root key for genesis (default new key)"
   echo "  -c CHAIN_ID            Chain ID (default: $CHAIN_ID)"
   echo "  -i NETWORK_IP          Network IP address for nodes (default: $NETWORK_IP)"
   echo "  -n NODE_COUNT          Number of nodes (default: $NODE_COUNT)"
@@ -27,10 +27,10 @@ function usage() {
 }
 
 # Parse command-line arguments
-while getopts "b:f:r:c:i:n:x:h" opt; do
+while getopts "b:d:r:c:i:n:x:h" opt; do
   case $opt in
     b) APTOS_BRANCH="$OPTARG" ;;
-    f) FRAMEWORK_DIR="$OPTARG" ;;
+    d) GENESIS_DIR="$OPTARG" ;;
     r) ROOT_KEY="$OPTARG" ;;
     c) CHAIN_ID="$OPTARG" ;;
     i) NETWORK_IP="$OPTARG" ;;
@@ -67,6 +67,15 @@ if [ -z "$ROOT_KEY" ]; then
       echo "Please provide the private root key in the $GENESIS_DIR/mint.key file before running docker-compose up"
 fi
 
+# Add version parsing after APTOS_BRANCH is set
+DOCKER_TAG="latest"
+if [[ $APTOS_BRANCH =~ ^aptos-node-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+    DOCKER_TAG="${BASH_REMATCH[1]}"
+    echo "Using version $DOCKER_TAG from branch $APTOS_BRANCH"
+else
+    echo "Using default 'latest' tag for docker images"
+fi
+
 # Build the Aptos framework, node, genesis and all the configs and identities
 echo "Building Aptos framework, node and genesis, it may take a while..."
 docker build \
@@ -101,7 +110,7 @@ for i in $(seq 1 "$NODE_COUNT"); do
     if [ "$i" -gt 1 ]; then
         SERVICES="$SERVICES |"
     fi
-    SERVICES="$SERVICES .services.validator_$i.image = \"aptos-node:latest\" |"
+    SERVICES="$SERVICES .services.validator_$i.image = \"aptos-node:$DOCKER_TAG\" |"
     SERVICES="$SERVICES .services.validator_$i.container_name = \"validator_$i\" |"
     SERVICES="$SERVICES .services.validator_$i.hostname = \"validator_$i\" |"
     SERVICES="$SERVICES .services.validator_$i.environment.ROLE = \"validator\" |"
@@ -113,7 +122,7 @@ for i in $(seq 1 "$NODE_COUNT"); do
 
     if [[ "${FULLNODE_NODES[*]}" =~ "$i" ]]; then
       SERVICES="$SERVICES |"
-      SERVICES="$SERVICES .services.fullnode_$i.image = \"aptos-node:latest\" |"
+      SERVICES="$SERVICES .services.fullnode_$i.image = \"aptos-node:$DOCKER_TAG\" |"
       SERVICES="$SERVICES .services.fullnode_$i.container_name = \"fullnode_$i\" |"
       SERVICES="$SERVICES .services.fullnode_$i.hostname = \"fullnode_$i\" |"
       SERVICES="$SERVICES .services.fullnode_$i.environment.ROLE = \"full_node\" |"
@@ -128,7 +137,7 @@ done
 
 # NODE_URL is the first validator node for the faucet to connect to
 yq eval -n "
-  .services.faucet.image = \"aptos-node:latest\" |
+  .services.faucet.image = \"aptos-node:$DOCKER_TAG\" |
   .services.faucet.container_name = \"faucet\" |
   .services.faucet.hostname = \"faucet\" |
   .services.faucet.environment.ROLE = \"faucet\" |
@@ -139,7 +148,7 @@ yq eval -n "
   .services.faucet.networks.custom_network.ipv4_address = \"$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+30)}')\" |
   .services.faucet.restart = \"unless-stopped\" |
   .services.faucet.expose = [8081] |
-  .services.healthcheck.image = \"aptos-node:latest\" |
+  .services.healthcheck.image = \"aptos-node:$DOCKER_TAG\" |
   .services.healthcheck.container_name = \"healthcheck\" |
   .services.healthcheck.hostname = \"healthcheck\" |
   .services.healthcheck.environment.ROLE = \"healthcheck\" |
@@ -148,12 +157,12 @@ yq eval -n "
   .services.healthcheck.environment.NODE_URL = \"http://$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+11)}'):8080\" |
   .services.healthcheck.volumes = [\"./healthcheck.sh:/usr/local/bin/healthcheck.sh\"] |
   .services.healthcheck.networks.custom_network.ipv4_address = \"$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+50)}')\" |
-  .services.client.image = \"aptos-client:latest\" |
+  .services.client.image = \"aptos-client:$DOCKER_TAG\" |
   .services.client.container_name = \"client\" |
   .services.client.hostname = \"client\" |
   .services.client.environment.FAUCET_URL = \"http://$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+30)}'):8081\" |
-  .services.client.environment.FULLNODE_URL = \"http://$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+11)}'):8080\" |
-  .services.client.environment.APTOS_NETWORK = \"custom\" |
+  .services.client.environment.FULLNODE_URL = \"http://$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+11)}'):8080/v1\" |
+  .services.client.environment.APTOS_NETWORK = \"local\" |
   .services.client.environment.NETWORK_IP = \"$NETWORK_IP\" |
   .services.client.environment.CHAIN_ID = \"$CHAIN_ID\" |
   .services.client.networks.custom_network.ipv4_address = \"$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+60)}')\" |
@@ -166,8 +175,8 @@ yq eval -n "
 wget https://storage.googleapis.com/antithesis-aptos/libvoidstar.so -O $GENESIS_DIR/libvoidstar.so
 
 echo "Enter $GENESIS_DIR and run:"
-echo "docker build -f Dockerfile-node -t aptos-node:latest ."
-echo "docker build -f Dockerfile-config -t config:latest ."
-echo "docker build -f Dockerfile-client -t aptos-client:latest ."
+echo "docker build -f Dockerfile-node -t aptos-node:$DOCKER_TAG ."
+echo "docker build -f Dockerfile-config -t config:$DOCKER_TAG ."
+echo "docker build -f Dockerfile-client -t aptos-client:$DOCKER_TAG ."
 echo "If you want to test locally run: docker compose up --force-recreate"
 echo "Then push images to antithesis infra"

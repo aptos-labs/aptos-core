@@ -10,10 +10,19 @@ ENV APTOS_NETWORK="none"
 RUN npm install -g pnpm
 
 COPY ./libvoidstar.so /usr/lib/libvoidstar.so
-
-# TODO: Once test client is in a public repo git clone it and install dependencies. We also need anthesis-ts-sdk to be published on NPM.
-COPY ./antithesis-ts-test.tar /antithesis-ts-test.tar
-RUN tar -xf /antithesis-ts-test.tar -C /usr/local/opt/
+COPY ./aptos /usr/local/bin/aptos
+ENV PATH="/usr/local/bin:$PATH"
 
 COPY ./antithesis-tests/ /opt/antithesis/test/v1/
-RUN chmod +x /**/*.sh
+RUN find /opt/antithesis/ -type f -name "*.sh" -exec chmod +x {} \;
+
+# TODO: Once test client is in a public repo git clone it and install dependencies. We also need anthesis-ts-sdk to be published on NPM.
+COPY ./antithesis-ts-test.tar.gz /antithesis-ts-test.tar.gz
+RUN tar -xzf /antithesis-ts-test.tar.gz -C /opt/
+WORKDIR /opt/antithesis-ts-test
+RUN rm -rf node_modules
+RUN pnpm install
+RUN rm /antithesis-ts-test.tar.gz
+WORKDIR /
+
+ENTRYPOINT ["sleep", "infinity"]
