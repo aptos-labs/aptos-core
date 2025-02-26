@@ -16,12 +16,14 @@ use itertools::Itertools;
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        Bytecode as MoveBytecode, CodeOffset, CompiledModule, FieldHandleIndex, SignatureIndex,
-        VariantFieldHandleIndex,
+        Bytecode as MoveBytecode, CodeOffset, CompiledModule, FieldHandleIndex,
+        FunctionHandleIndex, SignatureIndex, SignatureToken, VariantFieldHandleIndex,
     },
-    views::{FunctionHandleView, ViewInternals},
+    views::{FunctionHandleView, ModuleView, ViewInternals},
 };
 use move_core_types::{
+    ability::AbilitySet,
+    function::ClosureMask,
     language_storage::{self, CORE_CODE_ADDRESS},
     value::MoveValue,
 };
@@ -293,12 +295,6 @@ impl<'a> StacklessBytecodeGenerator<'a> {
         };
 
         match bytecode {
-            MoveBytecode::PackClosure(..)
-            | MoveBytecode::PackClosureGeneric(..)
-            | MoveBytecode::CallClosure(..) => {
-                // TODO(#15664): implement for closures
-                unimplemented!("stackless bytecode generation for closure opcodes")
-            },
             MoveBytecode::Pop => {
                 let temp_index = self.temp_stack.pop().unwrap();
                 self.code
@@ -630,11 +626,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     .module_env
                     .get_constant(*idx)
                     .expect(COMPILED_MODULE_AVAILABLE);
-                let ty = self
-                    .func_env
-                    .module_env
-                    .globalize_signature(&constant.type_)
-                    .expect(COMPILED_MODULE_AVAILABLE);
+                let ty = self.to_type(&constant.type_);
                 let value = Self::translate_value(
                     &ty,
                     &self.func_env.module_env.get_constant_value(constant),
@@ -744,11 +736,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 }
                 for return_type_view in function_handle_view.return_tokens() {
                     let return_temp_index = self.temp_count;
-                    let return_type = self
-                        .func_env
-                        .module_env
-                        .globalize_signature(return_type_view.as_inner())
-                        .expect(COMPILED_MODULE_AVAILABLE);
+                    let return_type = self.to_type(return_type_view.as_inner());
                     return_temp_indices.push(return_temp_index);
                     self.temp_stack.push(return_temp_index);
                     self.local_types.push(return_type);
@@ -787,10 +775,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     let return_temp_index = self.temp_count;
                     // instantiate type parameters
                     let return_type = self
-                        .func_env
-                        .module_env
-                        .globalize_signature(return_type_view.as_inner())
-                        .expect(COMPILED_MODULE_AVAILABLE)
+                        .to_type(return_type_view.as_inner())
                         .instantiate(&type_sigs);
                     return_temp_indices.push(return_temp_index);
                     self.temp_stack.push(return_temp_index);
@@ -812,6 +797,14 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     return_temp_indices,
                     arg_temp_indices,
                 ))
+            },
+
+            MoveBytecode::CallClosure(sidx) => self.call_closure(attr_id, *sidx),
+            MoveBytecode::PackClosure(idx, mask) => self.pack_closure(attr_id, *idx, vec![], *mask),
+            MoveBytecode::PackClosureGeneric(idx, mask) => {
+                let func_instantiation = self.module.function_instantiation_at(*idx);
+                let type_args = self.get_type_params(func_instantiation.type_parameters);
+                self.pack_closure(attr_id, func_instantiation.handle, type_args, *mask)
             },
 
             MoveBytecode::Pack(idx) => {
@@ -1672,6 +1665,107 @@ impl<'a> StacklessBytecodeGenerator<'a> {
         }
     }
 
+    fn call_closure(&mut self, attr: AttrId, _sig_idx: SignatureIndex) {
+        // Note: we are decompiling verified code
+        let fun = self.temp_stack.pop().unwrap();
+        let Type::Fun(arg, res, _) = &self.local_types[fun] else {
+            panic!("unexpected non-function type")
+        };
+        let mut arg_temp_indices = vec![];
+        for _ in 0..arg.clone().flatten().len() {
+            arg_temp_indices.push(self.temp_stack.pop().unwrap());
+        }
+        arg_temp_indices.reverse();
+        arg_temp_indices.push(fun);
+        let result_temps = res
+            .clone()
+            .flatten()
+            .into_iter()
+            .map(|t| {
+                let temp = self.new_temp(t);
+                self.temp_stack.push(temp);
+                temp
+            })
+            .collect();
+        self.code.push(Bytecode::Call(
+            attr,
+            result_temps,
+            Operation::Invoke,
+            arg_temp_indices,
+            None,
+        ))
+    }
+
+    fn pack_closure(
+        &mut self,
+        attr: AttrId,
+        function_idx: FunctionHandleIndex,
+        arg_tys: Vec<Type>,
+        mask: ClosureMask,
+    ) {
+        let env = self.func_env.module_env.env;
+        let module_view = ModuleView::new(self.module);
+        let function_handle = self.module.function_handle_at(function_idx);
+        let name = self.module.identifier_at(function_handle.name);
+        let mut abilities = if module_view
+            .function_definition(name)
+            .map(|fdef| fdef.visibility().is_public())
+            // TODO(#15664): need knowledge of public external functions. It is not
+            //   known to CompiledModule whether an external function is public or friend.
+            .unwrap_or(false)
+        {
+            AbilitySet::PUBLIC_FUNCTIONS
+        } else {
+            AbilitySet::PRIVATE_FUNCTIONS
+        };
+        let function_handle_view = FunctionHandleView::new(self.module, function_handle);
+        let mut arg_temp_indices = vec![];
+        let mut curried_arg_tys = vec![];
+        for (i, tok) in function_handle_view.arg_tokens().enumerate() {
+            let mut ty = self.to_type(tok.signature_token());
+            if !arg_tys.is_empty() {
+                ty = ty.instantiate(&arg_tys)
+            }
+            if mask.is_captured(i) {
+                let arg_temp_index = self.temp_stack.pop().unwrap();
+                arg_temp_indices.push(arg_temp_index);
+                abilities = abilities
+                    .intersect(env.type_abilities(&ty, self.func_env.get_type_parameters_ref()))
+            } else {
+                curried_arg_tys.push(ty)
+            }
+        }
+        arg_temp_indices.reverse();
+        let result_tys = function_handle_view
+            .return_tokens()
+            .map(|t| self.to_type(t.signature_token()))
+            .collect();
+
+        let result_temp = self.new_temp(Type::function(
+            Type::tuple(curried_arg_tys),
+            Type::tuple(result_tys),
+            abilities,
+        ));
+        self.temp_stack.push(result_temp);
+        let callee_env = self
+            .func_env
+            .module_env
+            .get_used_function(function_idx)
+            .expect(COMPILED_MODULE_AVAILABLE);
+        self.code.push(Bytecode::Call(
+            attr,
+            vec![result_temp],
+            Operation::Closure(
+                callee_env.module_env.get_id(),
+                callee_env.get_id(),
+                arg_tys,
+                mask,
+            ),
+            arg_temp_indices,
+            None,
+        ))
+    }
+
     fn translate_value(ty: &Type, value: &MoveValue) -> Constant {
         match (ty, &value) {
             (Type::Vector(inner), MoveValue::Vector(vs)) => match **inner {
@@ -1775,6 +1869,20 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 .push(Bytecode::Prop(attr_id, kind, cond.exp.clone()));
         }
         update_map
+    }
+
+    fn to_type(&self, token: &SignatureToken) -> Type {
+        self.func_env
+            .module_env
+            .globalize_signature(token)
+            .expect(COMPILED_MODULE_AVAILABLE)
+    }
+
+    fn new_temp(&mut self, ty: Type) -> TempIndex {
+        self.local_types.push(ty);
+        let temp = self.temp_count;
+        self.temp_count += 1;
+        temp
     }
 }
 

@@ -166,7 +166,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             runner: |p| run_test(p, get_config_by_name("lambda")),
             include: vec!["/lambda/", "/lambda-lifting/"],
             exclude: vec![],
-            exp_suffix: Some("lambda.exp"),
+            exp_suffix: None,
             options: opts
                 .clone()
                 // .set_experiment(Experiment::AST_SIMPLIFY, true)

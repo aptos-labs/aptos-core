@@ -9,10 +9,12 @@ use crate::{
     parser::{parse_module_id, parse_struct_tag, parse_type_tag},
     safe_serialize,
 };
+use once_cell::sync::Lazy;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::{
+    borrow::ToOwned,
     fmt::{Display, Formatter},
     str::FromStr,
 };
@@ -320,6 +322,21 @@ impl From<ModuleId> for (AccountAddress, Identifier) {
     fn from(module_id: ModuleId) -> Self {
         (module_id.address, module_id.name)
     }
+}
+
+static SCRIPT_MODULE_ID: Lazy<ModuleId> = Lazy::new(|| ModuleId {
+    address: AccountAddress::from_str_strict(
+        // This is generated using sha256sum on 10k of bytes from /dev/urandom
+        "0x8bd18359a7ebb84407b6defa7bc5da9aca34a3d1ce764ddfb4d0adcc663430b4",
+    )
+    .expect("parsing of script address constant"),
+    name: Identifier::new("__script__").expect("valid identifier for script"),
+});
+
+/// Returns a pseudo module id which can be used for scripts and is distinct
+/// from regular module ids.
+pub fn pseudo_script_module_id() -> &'static ModuleId {
+    &SCRIPT_MODULE_ID
 }
 
 impl FromStr for ModuleId {

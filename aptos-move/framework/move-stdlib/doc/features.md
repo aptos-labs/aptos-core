@@ -571,6 +571,19 @@ The provided signer has not a framework address.
 
 
 
+<a id="0x1_features_ENABLE_FUNCTION_VALUES"></a>
+
+Whether function values are enabled.
+Lifetime: transient
+
+We do not expect use from Move, so for now only for documentation purposes here
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_ENABLE_FUNCTION_VALUES">ENABLE_FUNCTION_VALUES</a>: u64 = 89;
+</code></pre>
+
+
+
 <a id="0x1_features_FEE_PAYER_ACCOUNT_OPTIONAL"></a>
 
 
@@ -983,6 +996,19 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_VM_BINARY_FORMAT_V7">VM_BINARY_FORMAT_V7</a>: u64 = 40;
+</code></pre>
+
+
+
+<a id="0x1_features_VM_BINARY_FORMAT_V8"></a>
+
+Whether bytecode version v8 is enabled.
+Lifetime: transient
+
+We do not expect use from Move, so for now only for documentation purposes here
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_VM_BINARY_FORMAT_V8">VM_BINARY_FORMAT_V8</a>: u64 = 86;
 </code></pre>
 
 

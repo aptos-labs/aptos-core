@@ -6,11 +6,15 @@ use anyhow::{Context, Result};
 use aptos_system_utils::profiling::start_cpu_profiling;
 use backtrace::Backtrace;
 use clap::Parser;
+use figment::{
+    providers::{Env, Format, Yaml},
+    Figment,
+};
 use prometheus::{Encoder, TextEncoder};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[cfg(target_os = "linux")]
 use std::convert::Infallible;
-use std::{fs::File, io::Read, panic::PanicInfo, path::PathBuf, process};
+use std::{panic::PanicInfo, path::PathBuf, process};
 use tracing::error;
 use tracing_subscriber::EnvFilter;
 use warp::{http::Response, reply::Reply, Filter};
@@ -124,12 +128,11 @@ pub trait RunnableConfig: Clone + DeserializeOwned + Send + Sync + 'static {
 
 /// Parse a yaml file into a struct.
 pub fn load<T: for<'de> Deserialize<'de>>(path: &PathBuf) -> Result<T> {
-    let mut file =
-        File::open(path).with_context(|| format!("failed to open the file at path: {:?}", path))?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)
-        .with_context(|| format!("failed to read the file at path: {:?}", path))?;
-    serde_yaml::from_str::<T>(&contents).context("Unable to parse yaml file")
+    Figment::new()
+        .merge(Yaml::file(path))
+        .merge(Env::raw().split("__"))
+        .extract()
+        .map_err(anyhow::Error::msg)
 }
 
 #[derive(Debug, Serialize)]
@@ -263,7 +266,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
+    use std::{fs::File, io::Write};
     use tempfile::tempdir;
 
     #[derive(Clone, Debug, Deserialize, Serialize)]

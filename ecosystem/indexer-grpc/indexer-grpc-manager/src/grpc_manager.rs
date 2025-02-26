@@ -51,6 +51,11 @@ impl GrpcManager {
             config.self_advertised_address.clone(),
             config.grpc_manager_addresses.clone(),
             config.fullnode_addresses.clone(),
+            if config.is_master {
+                Some(config.self_advertised_address.clone())
+            } else {
+                None
+            },
         ));
 
         info!(
@@ -99,7 +104,11 @@ impl GrpcManager {
             s.spawn(async move {
                 self.metadata_manager.start().await.unwrap();
             });
-            s.spawn(async move { self.data_manager.start().await });
+            s.spawn(async move {
+                self.data_manager
+                    .start(/*watch_file_store_version=*/ !self.is_master)
+                    .await
+            });
             if self.is_master {
                 s.spawn(async move {
                     self.file_store_uploader
@@ -109,8 +118,6 @@ impl GrpcManager {
                         .await
                         .unwrap();
                 });
-            } else {
-                // TODO(grao): Start a task to periodically update the file store version.
             }
             s.spawn(async move {
                 info!("Starting GrpcManager at {}.", service_config.listen_address);
