@@ -4166,9 +4166,7 @@ Add new owners, remove owners to remove, update signatures required.
 
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(creator);
-<b>let</b> owner_nonce = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(creator).sequence_number;
+<pre><code><b>let</b> owner_nonce = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(creator).sequence_number;
 </code></pre>
 
 

@@ -131,6 +131,7 @@ spec aptos_framework::genesis {
     }
 
     spec create_initialize_validator {
+        pragma verify_duration_estimate = 120;
         include stake::ResourceRequirement;
     }
 
