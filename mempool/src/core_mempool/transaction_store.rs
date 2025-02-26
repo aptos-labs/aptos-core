@@ -51,7 +51,8 @@ pub fn sender_bucket(
 /// TransactionStore is in-memory storage for all transactions in mempool.
 pub struct TransactionStore {
     // main DS
-    transactions: HashMap<AccountAddress, AccountTransactions>,
+    // TODO[Orderless]: Remove pub
+    pub(crate) transactions: HashMap<AccountAddress, AccountTransactions>,
 
     // Sequence numbers for accounts with transactions
     account_sequence_numbers: HashMap<AccountAddress, u64>,
@@ -59,7 +60,9 @@ pub struct TransactionStore {
     // indexes
     // Transactions in this index are "ready" for broadcast to consensus, i.e., quorum store
     // can pull these transactions and create batches.
-    priority_index: PriorityIndex,
+
+    // TODO[Orderless]: Remove pub
+    pub(crate) priority_index: PriorityIndex,
     // TTLIndex based on client-specified expiration time
     expiration_time_index: TTLIndex,
     // TTLIndex based on system expiration time
@@ -232,6 +235,7 @@ impl TransactionStore {
         let address = txn.get_sender();
         let txn_replay_protector = txn.sequence_info.transaction_replay_protector;
         let account_sequence_number = txn.sequence_info.account_sequence_number;
+        // info!("mempool insert txn: (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?}), priority: {:?}, ranking_score: {:?}", txn.txn.sender(), txn.txn.replay_protector(), txn.txn.expiration_timestamp_secs(), txn.priority_of_sender, txn.ranking_score);
         // If the transaction is already in Mempool, we only allow the user to
         // increase the gas unit price to speed up a transaction, but not the max gas.
         //
@@ -647,6 +651,10 @@ impl TransactionStore {
         account: &AccountAddress,
         replay_protector: ReplayProtector,
     ) {
+        info!(
+            "mempool committed txn: (address: {:?}, replay_protector: {:?})",
+            account, replay_protector
+        );
         match replay_protector {
             ReplayProtector::SequenceNumber(txn_sequence_number) => {
                 let current_account_seq_number =

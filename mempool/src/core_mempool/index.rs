@@ -16,6 +16,7 @@ use std::{
     collections::{btree_map::RangeMut, btree_set::Iter, BTreeMap, BTreeSet, HashMap},
     hash::Hash,
     iter::Rev,
+    mem,
     ops::{Bound, RangeBounds},
     time::{Duration, Instant, SystemTime},
 };
@@ -90,7 +91,7 @@ impl AccountTransactions {
             sequence_number_transactions: self
                 .sequence_number_transactions
                 .split_off(&sequence_number),
-            nonce_transactions: BTreeMap::new(),
+            nonce_transactions: mem::take(&mut self.nonce_transactions),
         }
     }
 
@@ -181,21 +182,24 @@ impl PartialOrd for OrderedQueueKey {
 
 impl Ord for OrderedQueueKey {
     fn cmp(&self, other: &OrderedQueueKey) -> Ordering {
+        // Higher gas preferred
         match self.gas_ranking_score.cmp(&other.gas_ranking_score) {
             Ordering::Equal => {},
             ordering => return ordering,
         }
+        // Lower insertion time preferred
         match self.insertion_time.cmp(&other.insertion_time).reverse() {
             Ordering::Equal => {},
             ordering => return ordering,
         }
+        // Higher address preferred
         match self.address.cmp(&other.address) {
             Ordering::Equal => {},
             ordering => return ordering,
         }
-        // Question: Orderless transactions with Nonce are always prioritized over regular sequence number transactions.
+        // Question[Orderless]: Orderless transactions with Nonce are always prioritized over regular sequence number transactions.
         // Is it okay?
-        match self.replay_protector.cmp(&other.replay_protector) {
+        match self.replay_protector.cmp(&other.replay_protector).reverse() {
             Ordering::Equal => {},
             ordering => return ordering,
         }

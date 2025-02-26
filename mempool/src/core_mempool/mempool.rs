@@ -36,7 +36,9 @@ use std::{
 
 pub struct Mempool {
     // Stores the metadata of all transactions in mempool (of all states).
-    transactions: TransactionStore,
+    
+    // TODO[Orderless]: Remove pub
+    pub(crate) transactions: TransactionStore,
 
     pub system_transaction_timeout: Duration,
 }
@@ -434,12 +436,12 @@ impl Mempool {
         let exclude_size = exclude_transactions.len();
         let mut inserted = HashSet::new();
 
-        for txn_summary in exclude_transactions.keys() {
-            info!(
-                "get_batch_excluded_transactions (address: {:?}, replay_protector: {:?})",
-                txn_summary.sender, txn_summary.replay_protector
-            );
-        }
+        // for txn_summary in exclude_transactions.keys() {
+        //     info!(
+        //         "get_batch_excluded_transactions (address: {:?}, replay_protector: {:?})",
+        //         txn_summary.sender, txn_summary.replay_protector
+        //     );
+        // }
         let gas_end_time = start_time.elapsed();
 
         let mut result = vec![];
@@ -546,14 +548,14 @@ impl Mempool {
         let block_end_time = start_time.elapsed();
         let block_time = block_end_time.saturating_sub(result_end_time);
 
-        for txn in &block {
-            info!(
-                "get_batch (address: {:?}, replay_protector: {:?}, expiration_time_secs: {:?})",
-                txn.sender(),
-                txn.replay_protector(),
-                txn.expiration_timestamp_secs()
-            );
-        }
+        // for txn in &block {
+        //     info!(
+        //         "get_batch (address: {:?}, replay_protector: {:?}, expiration_time_secs: {:?})",
+        //         txn.sender(),
+        //         txn.replay_protector(),
+        //         txn.expiration_timestamp_secs()
+        //     );
+        // }
         if result_size > 0 {
             debug!(
                 LogSchema::new(LogEntry::GetBlock),

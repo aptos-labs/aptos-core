@@ -72,6 +72,53 @@ fn test_transaction_ordering_only_seqnos() {
 }
 
 #[test]
+fn test_transaction_ordering_seqnos_and_nonces() {
+    let (mut mempool, mut consensus) = setup_mempool();
+
+    // Default ordering: gas price
+    add_txns_to_mempool(&mut mempool, vec![
+        TestTransaction::new(0, ReplayProtector::Nonce(150), 3),
+        TestTransaction::new(0, ReplayProtector::SequenceNumber(0), 3),
+        TestTransaction::new(0, ReplayProtector::SequenceNumber(1), 5),
+        TestTransaction::new(0, ReplayProtector::Nonce(100), 2),
+        TestTransaction::new(0, ReplayProtector::Nonce(200), 7),
+    ]);
+
+    assert_eq!(mempool.transactions.priority_index.size(), 5);
+    assert_eq!(mempool.transactions.transactions.iter().map(|(_, account_txns)| account_txns.len()).sum::<usize>(), 5);
+    
+    // Expected transaction order in priority queue
+    let ordered_transactions = vec![
+        TestTransaction::new(0, ReplayProtector::Nonce(200), 7),
+        TestTransaction::new(0, ReplayProtector::SequenceNumber(1), 5),
+        TestTransaction::new(0, ReplayProtector::Nonce(150), 3),
+        TestTransaction::new(0, ReplayProtector::SequenceNumber(0), 3),
+        TestTransaction::new(0, ReplayProtector::Nonce(100), 2),
+    ];
+
+    for (i, ordered_key) in mempool.transactions.priority_index.iter().enumerate() {
+        assert_eq!(ordered_transactions[i].replay_protector, ordered_key.replay_protector);
+        assert_eq!(ordered_transactions[i].gas_price, ordered_key.gas_ranking_score);
+    }
+
+    // Expected order of retrieval in consensus
+    let retrieved_transactions = vec![
+        TestTransaction::new(0, ReplayProtector::Nonce(200), 7),
+        TestTransaction::new(0, ReplayProtector::Nonce(150), 3),
+        TestTransaction::new(0, ReplayProtector::SequenceNumber(0), 3),
+        TestTransaction::new(0, ReplayProtector::SequenceNumber(1), 5),
+        TestTransaction::new(0, ReplayProtector::Nonce(100), 2),
+    ];
+
+    for transaction in &retrieved_transactions {
+        let txn = consensus.get_block(&mut mempool, 1, 1024);
+        assert_eq!(txn[0].replay_protector(), transaction.replay_protector);
+        assert_eq!(txn[0].gas_unit_price(), transaction.gas_price);
+    }
+}
+
+
+#[test]
 fn test_transaction_metrics() {
     let (mut mempool, _) = setup_mempool();
 
