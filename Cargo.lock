@@ -3263,6 +3263,7 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "tokio",
+ "ureq",
  "url",
 ]
 
