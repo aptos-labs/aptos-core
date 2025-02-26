@@ -8,23 +8,16 @@ use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorag
 use move_binary_format::errors::VMResult;
 
 pub(crate) fn get_randomness_annotation(
-    resolver: &impl AptosMoveResolver,
+    _resolver: &impl AptosMoveResolver,
     module_storage: &impl AptosModuleStorage,
-    session: &mut SessionExt,
+    _session: &mut SessionExt,
     entry_fn: &EntryFunction,
 ) -> VMResult<Option<RandomnessAnnotation>> {
-    let module = if module_storage.is_enabled() {
-        // TODO(loader_v2): Enhance this further by querying RuntimeModuleMetadataV1 directly.
-        module_storage.fetch_existing_deserialized_module(
-            entry_fn.module().address(),
-            entry_fn.module().name(),
-        )?
-    } else {
-        #[allow(deprecated)]
-        session
-            .get_move_vm()
-            .load_module(entry_fn.module(), resolver)?
-    };
+    // TODO(loader_v2): Enhance this further by querying RuntimeModuleMetadataV1 directly.
+    let module = module_storage.fetch_existing_deserialized_module(
+        entry_fn.module().address(),
+        entry_fn.module().name(),
+    )?;
 
     let metadata = aptos_framework::get_metadata_from_compiled_module(&module);
     if let Some(metadata) = metadata {

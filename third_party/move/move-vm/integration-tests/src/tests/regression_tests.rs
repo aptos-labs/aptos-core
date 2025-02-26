@@ -114,7 +114,7 @@ fn script_large_ty() {
         ..Default::default()
     };
     let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
-    let move_vm = MoveVM::new_with_runtime_environment(&runtime_environment);
+    let move_vm = MoveVM::new();
 
     let module_address = AccountAddress::from_hex_literal("0x42").unwrap();
     let module_identifier = Identifier::new("pwn").unwrap();

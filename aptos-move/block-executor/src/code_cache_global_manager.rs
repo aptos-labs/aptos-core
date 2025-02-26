@@ -199,10 +199,7 @@ impl AptosModuleCacheManager {
         // cached is not possible for block execution (as long as the config enables the framework
         // prefetch).
         let environment = guard.environment();
-        if environment.features().is_loader_v2_enabled()
-            && guard.module_cache().num_modules() == 0
-            && config.prefetch_framework_code
-        {
+        if guard.module_cache().num_modules() == 0 && config.prefetch_framework_code {
             let code_storage = state_view.as_aptos_code_storage(environment.clone());
             prefetch_aptos_framework(code_storage, guard.module_cache_mut()).map_err(|err| {
                 alert_or_println!("Failed to load Aptos framework to module cache: {:?}", err);

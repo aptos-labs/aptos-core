@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    config::VMConfig,
     loader::{Function, Module},
     storage::{
         environment::{
@@ -9,6 +10,7 @@ use crate::{
         },
         module_storage::{ambassador_impl_ModuleStorage, ModuleStorage},
     },
+    LoadedFunction,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
@@ -27,7 +29,10 @@ use move_vm_types::{
         ambassador_impl_ModuleCache, ModuleBytesStorage, ModuleCache, ModuleCode,
         ModuleCodeBuilder, UnsyncModuleCache, WithBytes, WithHash,
     },
-    loaded_data::runtime_types::{StructType, Type},
+    loaded_data::{
+        runtime_types::{StructType, Type, TypeBuilder},
+        struct_name_indexing::StructNameIndex,
+    },
     sha3_256,
 };
 use std::{borrow::Borrow, ops::Deref, sync::Arc};
