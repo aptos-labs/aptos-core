@@ -546,7 +546,7 @@ impl ModuleGenerator {
             None
         };
         let attributes = if self.gen_function_attributes {
-            ctx.function_attributes(fun_env, true)
+            ctx.function_attributes(fun_env)
         } else {
             vec![]
         };
@@ -1138,19 +1138,9 @@ impl<'env> ModuleContext<'env> {
     }
 
     /// Delivers the function attributes which are relevant for execution for the given
-    /// function.
-    ///
-    /// If `add_derived` is true, attributes derived from the function definition
-    /// will be added as well. Currently, a public function derives
-    /// `Persistent`.
-    ///
-    /// This maybe called multiple times, so if attributes become more complex, the
-    /// result may need to be memoized.
-    pub(crate) fn function_attributes(
-        &self,
-        fun_env: &FunctionEnv,
-        add_derived: bool,
-    ) -> Vec<FF::FunctionAttribute> {
+    /// function. This includes annotated ones as well as ones which are derived.
+    /// Currently, a public function derives `Persistent`.
+    pub(crate) fn function_attributes(&self, fun_env: &FunctionEnv) -> Vec<FF::FunctionAttribute> {
         let mut result = vec![];
         let mut has_persistent = false;
         for attr in fun_env.get_attributes() {
@@ -1161,6 +1151,12 @@ impl<'env> ModuleContext<'env> {
                             self.error(
                                 fun_env.get_id_loc(),
                                 format!("attribute `{}` cannot have arguments", attr),
+                            )
+                        }
+                        if fun_env.module_env.is_script_module() {
+                            self.error(
+                                fun_env.get_id_loc(),
+                                format!("attribute `{}` cannot be on script functions", attr),
                             )
                         }
                     };
@@ -1180,12 +1176,21 @@ impl<'env> ModuleContext<'env> {
                         },
                     }
                 },
-                Attribute::Assign(_, _, _) => {
-                    // skip
+                Attribute::Assign(_, name, _) => {
+                    let name = fun_env.symbol_pool().string(*name);
+                    if matches!(
+                        name.as_str(),
+                        well_known::PERSISTENT_ATTRIBUTE | well_known::MODULE_LOCK_ATTRIBUTE
+                    ) {
+                        self.error(
+                            fun_env.get_id_loc(),
+                            format!("attribute `{}` cannot be assigned to", name),
+                        )
+                    }
                 },
             }
         }
-        if add_derived && !has_persistent && fun_env.visibility() == Visibility::Public {
+        if !has_persistent && fun_env.visibility() == Visibility::Public {
             // For a public function, derive the persistent attribute
             result.push(FF::FunctionAttribute::Persistent)
         }

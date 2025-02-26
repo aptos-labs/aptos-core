@@ -347,7 +347,6 @@ pub struct FunctionHandle {
     /// A list of attributes the referenced function definition had at compilation time.
     /// Depending on the attribute kind, those need to be also present in the actual
     /// function definition, which is checked in the dependency verifier.
-    /// #[cfg(any(test, feature = "fuzzing"))]
     #[cfg_attr(
         any(test, feature = "fuzzing"),
         proptest(strategy = "vec(any::<FunctionAttribute>(), 0..8)")

@@ -143,11 +143,13 @@ impl Compatibility {
         //
         // - old module's public functions are a subset of the new module's public functions
         //   (i.e. we cannot remove or change public functions)
-        // - old module's script functions are a subset of the new module's script functions
-        //   (i.e. we cannot remove or change script functions)
+        // - old module's entry functions are a subset of the new module's entry functions
+        //   (i.e. we cannot remove or change entry functions). This can be turned off by
+        //   `!self.check_friend_linking`.
         // - for any friend function that is removed or changed in the old module
         //   - if the function visibility is upgraded to public, it is OK
         //   - otherwise, it is considered as incompatible.
+        // - moreover, a function marked as `#[persistent]` is treated as a public function.
         //
         for old_func in old_view.functions() {
             let old_is_persistent = old_func
@@ -189,7 +191,8 @@ impl Compatibility {
             if !old_is_persistent
                 && matches!(old_func.visibility(), Visibility::Friend)
                 && !self.check_friend_linking
-                // Above: We want to skip linking checks for public(friend) if self.check_friend_linking is set to false.
+                // Above: We want to skip linking checks for public(friend) if
+                // self.check_friend_linking is set to false.
                 && !(old_func.is_entry() && self.treat_entry_as_public)
             // However, public(friend) entry function still needs to be checked.
             {
