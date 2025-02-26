@@ -3,7 +3,7 @@
 
 use crate::{
     cli_build_information,
-    common::types::{CliCommand, CliError, CliTypedResult},
+    common::types::{CliCommand, CliError, CliTypedResult, PromptOptions},
     update::{
         get_additional_binaries_dir, prover_dependency_installer::DependencyInstaller,
         update_binary,
@@ -61,6 +61,9 @@ pub struct ProverDependencyInstaller {
     /// given we will put it in a standard location for your OS.
     #[clap(long)]
     install_dir: Option<PathBuf>,
+
+    #[clap(flatten)]
+    pub prompt_options: PromptOptions,
 }
 
 impl ProverDependencyInstaller {
@@ -192,6 +195,7 @@ impl ProverDependencyInstaller {
             target_version: version.to_string(),
             install_dir: Some(install_dir.clone()),
             check: false,
+            assume_yes: self.prompt_options.assume_yes,
         };
         let result = update_binary(installer).await?;
 
