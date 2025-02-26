@@ -166,7 +166,7 @@ overflows.
     <b>let</b> product = unscaled_product &gt;&gt; 32;
     // Check whether the value is too large.
     <b>assert</b>!(product &lt;= <a href="fixed_point32.md#0x1_fixed_point32_MAX_U64">MAX_U64</a>, <a href="fixed_point32.md#0x1_fixed_point32_EMULTIPLICATION">EMULTIPLICATION</a>);
-    (product <b>as</b> u64)
+    product <b>as</b> u64
 }
 </code></pre>
 
@@ -461,7 +461,7 @@ Rounds up the given FixedPoint32 to the next largest integer.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_ceil">ceil</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 {
-    <b>let</b> floored_num = <a href="fixed_point32.md#0x1_fixed_point32_floor">floor</a>(self) &lt;&lt; 32;
+    <b>let</b> floored_num = self.<a href="fixed_point32.md#0x1_fixed_point32_floor">floor</a>() &lt;&lt; 32;
     <b>if</b> (self.value == floored_num) {
         <b>return</b> floored_num &gt;&gt; 32
     };
@@ -491,12 +491,12 @@ Returns the value of a FixedPoint32 to the nearest integer.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_round">round</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 {
-    <b>let</b> floored_num = <a href="fixed_point32.md#0x1_fixed_point32_floor">floor</a>(self) &lt;&lt; 32;
+    <b>let</b> floored_num = self.<a href="fixed_point32.md#0x1_fixed_point32_floor">floor</a>() &lt;&lt; 32;
     <b>let</b> boundary = floored_num + ((1 &lt;&lt; 32) / 2);
     <b>if</b> (self.value &lt; boundary) {
         floored_num &gt;&gt; 32
     } <b>else</b> {
-        <a href="fixed_point32.md#0x1_fixed_point32_ceil">ceil</a>(self)
+        self.<a href="fixed_point32.md#0x1_fixed_point32_ceil">ceil</a>()
     }
 }
 </code></pre>
