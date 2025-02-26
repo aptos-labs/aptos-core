@@ -1,12 +1,12 @@
 
 Diagnostics:
-warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+warning: Unused assignment/binding to `r`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_r`), or binding to `_`
   ┌─ tests/more-v1/locals/assign_resource.move:5:17
   │
 5 │         let r = R{};
   │                 ^^^
 
-warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+warning: Unused assignment/binding to `r`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_r`), or binding to `_`
    ┌─ tests/more-v1/locals/assign_resource.move:29:17
    │
 29 │         let r = R{};
