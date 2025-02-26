@@ -18,8 +18,9 @@
 //! which operates in mode (2), which will override the more relaxed behavior of (1)
 //! until it is exited.
 
+use crate::LoadedFunction;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{identifier::IdentStr, language_storage::ModuleId, vm_status::StatusCode};
+use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_types::loaded_data::runtime_types::StructIdentifier;
 use std::collections::{btree_map::Entry, BTreeMap};
 
@@ -49,14 +50,17 @@ impl ReentrancyChecker {
     pub fn enter_function(
         &mut self,
         caller_module: Option<&ModuleId>,
-        callee_module: &ModuleId,
-        fun_name: &IdentStr,
+        callee: &LoadedFunction,
         call_type: CallType,
     ) -> PartialVMResult<()> {
-        if call_type == CallType::NativeDynamicDispatch {
-            // If we enter a native dispatch function, also enter module locking mode
+        if call_type == CallType::NativeDynamicDispatch
+            || callee.function.has_module_reentrancy_lock
+        {
+            // If we enter a native dispatch function, or a function which has marked for locking,
+            // also enter module locking mode
             self.enter_module_lock()
         }
+        let callee_module = callee.module_or_script_id();
         if Some(callee_module) != caller_module {
             // Cross module call.
             // When module lock is active, and we have already called into this module, this
@@ -67,8 +71,9 @@ impl ReentrancyChecker {
                         return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
                             .with_message(format!(
                                 "Reentrancy disallowed: reentering `{}` via function `{}` \
-                     (module locking is active)",
-                                callee_module, fun_name
+                     (module lock is active)",
+                                callee_module,
+                                callee.name()
                             )));
                     }
                     *e.get_mut() += 1
@@ -95,10 +100,10 @@ impl ReentrancyChecker {
     pub fn exit_function(
         &mut self,
         caller_module: &ModuleId,
-        callee_module: &ModuleId,
-        _fun_name: &IdentStr,
+        callee: &LoadedFunction,
         call_type: CallType,
     ) -> PartialVMResult<()> {
+        let callee_module = callee.module_or_script_id();
         if caller_module != callee_module || call_type == CallType::ClosureDynamicDispatch {
             // If this is an exit from cross-module call, or exit from closure dispatch,
             // decrement counter.
@@ -118,7 +123,7 @@ impl ReentrancyChecker {
                 },
             }
         }
-        if call_type == CallType::NativeDynamicDispatch {
+        if call_type == CallType::NativeDynamicDispatch || callee.function.has_module_lock() {
             // If this is native dispatch, exit module lock.
             self.exit_module_lock()?
         }
