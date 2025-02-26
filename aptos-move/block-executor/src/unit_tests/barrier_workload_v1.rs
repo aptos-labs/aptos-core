@@ -241,7 +241,7 @@ impl ExecutorTask for MockTask {
     type Output = TestOutput;
     type Txn = TestTransaction;
 
-    fn init(_env: AptosEnvironment, _state_view: &impl TStateView<Key = TestKey>) -> Self {
+    fn init(_env: &AptosEnvironment, _state_view: &impl TStateView<Key = TestKey>) -> Self {
         Self::new()
     }
 

@@ -26,6 +26,8 @@ If no smaller transaction has written to a location, then the read
 (e.g. all reads by tx_1) is resolved from storage based on the state before
 the block execution.
 
+TODO: update documentation below.
+
 For each incarnation, parallel execution maintains a write-set and a read-set
 in 'txn_last_input_output.rs'. The read-set contains the memory locations that
 are read during the incarnation, and the corresponding versions. The write-set
@@ -154,6 +156,7 @@ pub mod proptest_types;
 mod scheduler;
 mod scheduler_status;
 mod scheduler_v2;
+mod scheduler_wrapper;
 pub mod task;
 pub mod txn_commit_hook;
 pub mod txn_last_input_output;
@@ -163,3 +166,4 @@ pub mod types;
 mod unit_tests;
 mod value_exchange;
 pub mod view;
+mod view_profiler;
