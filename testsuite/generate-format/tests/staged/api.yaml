@@ -20,13 +20,6 @@ AbstractionAuthData:
         STRUCT:
           - signing_message_digest: BYTES
           - authenticator: BYTES
-    1:
-      DomainV1:
-        STRUCT:
-          - signing_message_digest: BYTES
-          - authenticator: BYTES
-          - account:
-              TYPENAME: DomainAccount
 AccessPath:
   STRUCT:
     - address:
@@ -250,12 +243,6 @@ DKGTranscriptMetadata:
 DepositEvent:
   STRUCT:
     - amount: U64
-DomainAccount:
-  ENUM:
-    0:
-      V1:
-        STRUCT:
-          - account_identity: BYTES
 DeprecatedPayload:
   STRUCT:
     - dummy_value: U64
@@ -518,7 +505,7 @@ RawTransaction:
         TYPENAME: AccountAddress
     - sequence_number: U64
     - payload:
-        TYPENAME: TransactionPayload
+        TYPENAME: TransactionPayloadWrapper
     - max_gas_amount: U64
     - gas_unit_price: U64
     - expiration_timestamp_secs: U64
@@ -724,6 +711,28 @@ TransactionData:
       Pending:
         NEWTYPE:
           TYPENAME: SignedTransaction
+TransactionExecutable:
+  ENUM:
+    0:
+      Script:
+        NEWTYPE:
+          TYPENAME: Script
+    1:
+      EntryFunction:
+        NEWTYPE:
+          TYPENAME: EntryFunction
+    2:
+      Empty: UNIT
+TransactionExtraConfig:
+  ENUM:
+    0:
+      V1:
+        STRUCT:
+          - multisig_address:
+              OPTION:
+                TYPENAME: AccountAddress
+          - replay_protection_nonce:
+              OPTION: U64
 TransactionInfo:
   ENUM:
     0:
@@ -761,7 +770,16 @@ TransactionOnChainData:
         TYPENAME: HashValue
     - changes:
         TYPENAME: WriteSet
-TransactionPayload:
+TransactionPayloadInner:
+  ENUM:
+    0:
+      V1:
+        STRUCT:
+          - executable:
+              TYPENAME: TransactionExecutable
+          - extra_config:
+              TYPENAME: TransactionExtraConfig
+TransactionPayloadWrapper:
   ENUM:
     0:
       Script:
@@ -779,6 +797,10 @@ TransactionPayload:
       Multisig:
         NEWTYPE:
           TYPENAME: Multisig
+    4:
+      Payload:
+        NEWTYPE:
+          TYPENAME: TransactionPayloadInner
 TypeTag:
   ENUM:
     0:

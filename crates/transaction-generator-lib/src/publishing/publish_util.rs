@@ -11,7 +11,7 @@ use aptos_sdk::{
     transaction_builder::aptos_stdlib,
     types::{
         account_address::AccountAddress,
-        transaction::{Script, TransactionPayload},
+        transaction::{Script, TransactionPayloadWrapper},
     },
 };
 use move_binary_format::{
@@ -132,7 +132,7 @@ impl Package {
         Self::Simple(modules, metadata, script)
     }
 
-    pub fn script(&self, publisher: AccountAddress) -> TransactionPayload {
+    pub fn script(&self, publisher: AccountAddress) -> TransactionPayloadWrapper {
         match self {
             Self::Simple(_, _, script_opt) => {
                 let mut script = script_opt
@@ -151,7 +151,7 @@ impl Package {
 
                 let mut code = vec![];
                 script.serialize(&mut code).expect("Script must serialize");
-                TransactionPayload::Script(Script::new(code, vec![], vec![]))
+                TransactionPayloadWrapper::Script(Script::new(code, vec![], vec![]))
             },
         }
     }
@@ -200,7 +200,7 @@ impl Package {
     }
 
     // Return a transaction payload to publish the current package
-    pub fn publish_transaction_payload(&self) -> TransactionPayload {
+    pub fn publish_transaction_payload(&self) -> TransactionPayloadWrapper {
         let (metadata_serialized, code) = self.get_publish_args();
         aptos_stdlib::code_publish_package_txn(metadata_serialized, code)
     }
