@@ -77,6 +77,8 @@ pub(crate) enum DependencyResolution {
     // Transaction is executing and the caller has high priority: recommended to wait.
     // The provided conditional variable will be notified after the prescribed wait.
     Wait(DependencyCondvar),
+    // The scheduler has been halted, waiting is disabled
+    Halted,
     // Above conditions not met, the exact resolution deferred to the caller: this might
     // involve calling resolve_dependency again with an updated instruction.
     None,
@@ -176,7 +178,10 @@ pub(crate) struct ExecutionStatus {
     // wait, then a new condvar is stored in the queue and returned to the caller. When the
     // shortcut changes from wait / executing, the queue is drained, notifying the waiting
     // workers (after execution finishes, status changes, and shortcut is updated).
-    waiting_queue: CachePadded<Mutex<Vec<DependencyCondvar>>>,
+    //
+    // The bool indicates whether scheduler has been halted, in which case adding to the
+    // waiting queue is disabled.
+    waiting_queue: CachePadded<Mutex<(Vec<DependencyCondvar>, bool)>>,
 
     // The proxy allows hooks to add or remove the corresponding transaction to the scheduler's
     // execution queue. Removing is needed after a stall, while after an unstall or creating a
@@ -193,7 +198,7 @@ impl ExecutionStatus {
             num_stalls: CachePadded::new(AtomicU32::new(0)),
             dependency_shortcut: AtomicU8::new(DEPENDENCY_DEFER_FLAG),
             abort_incarnation_shortcut: AtomicU32::new(0),
-            waiting_queue: CachePadded::new(Mutex::new(Vec::new())),
+            waiting_queue: CachePadded::new(Mutex::new((Vec::new(), false))),
             scheduler_proxy,
             txn_idx,
         }
@@ -232,7 +237,7 @@ impl ExecutionStatus {
         finished_incarnation: Incarnation,
     ) -> Result<bool, PanicError> {
         defer! {
-            self.notify_waiting_workers();
+            self.notify_waiting_workers(false);
         }
 
         {
@@ -328,6 +333,12 @@ impl ExecutionStatus {
         }
     }
 
+    // Wake up any suspended workers and disallow further waiting. Useful when the scheduler
+    // is halted before committing all transactions to avoid race conditions / deadlocks.
+    pub(crate) fn halt(&self) {
+        self.notify_waiting_workers(true);
+    }
+
     // If DependencyResolution::Wait(condvar) is returned, the caller is expected to make
     // another call after the condvar is notified to get an updated resolution. When the
     // resolution is SAFE_TO_PROCEED, this call has succeeded in providing a cheap decision.
@@ -353,6 +364,10 @@ impl ExecutionStatus {
                         Arc::new((Mutex::new(DependencyStatus::Unresolved), Condvar::new()));
 
                     let mut waiting = self.waiting_queue.lock();
+                    if waiting.1 {
+                        return Ok(DependencyResolution::Halted);
+                    }
+
                     // Re-check after acquiring the waiting queue lock to avoid lost wake-ups.
                     // Suppose the check below observes an 'executing' status. Then we must show
                     // that the corresponding finish_execution has not yet locked the queue and
@@ -377,7 +392,7 @@ impl ExecutionStatus {
                         // Try again - has to return.
                         continue;
                     }
-                    waiting.push(dep_condvar.clone());
+                    waiting.0.push(dep_condvar.clone());
 
                     return Ok(DependencyResolution::Wait(dep_condvar));
                 },
@@ -475,7 +490,7 @@ impl ExecutionStatus {
                         .add_to_schedule(incarnation == 1, self.txn_idx);
                 } else if inner_status.is_executed() {
                     defer! {
-                        self.notify_waiting_workers();
+                        self.notify_waiting_workers(false);
                     }
 
                     // Status is Executed so the dependency shortcut flag may not be
@@ -525,14 +540,18 @@ impl ExecutionStatus {
 
 // Private interfaces.
 impl ExecutionStatus {
-    fn notify_waiting_workers(&self) {
+    fn notify_waiting_workers(&self, halt: bool) {
         // Notify all workers that might be waiting, which will trigger a follow-up call
         // from the scheduler to re-attempt processing the dependency for the worker,
         // at which point the inner status mutex is already released and flag updated.
         let waiting: Vec<DependencyCondvar> = {
             let mut stored = self.waiting_queue.lock();
+            if halt {
+                stored.1 = true;
+            }
+
             // Holding the lock, take the vector.
-            std::mem::take(&mut *stored)
+            std::mem::take(&mut stored.0)
         };
         for condvar in waiting {
             let (lock, cvar) = &*condvar;
@@ -597,7 +616,7 @@ impl ExecutionStatus {
             num_stalls: CachePadded::new(AtomicU32::new(num_stalls)),
             dependency_shortcut: AtomicU8::new(shortcut),
             abort_incarnation_shortcut: AtomicU32::new(incarnation),
-            waiting_queue: CachePadded::new(Mutex::new(Vec::new())),
+            waiting_queue: CachePadded::new(Mutex::new((Vec::new(), false))),
             scheduler_proxy: proxy.clone(),
             txn_idx,
         }
@@ -628,7 +647,7 @@ mod tests {
             status.abort_incarnation_shortcut.load(Ordering::Relaxed),
             exp_incarnation
         );
-        assert_eq!(status.waiting_queue.lock().len(), 0);
+        assert_eq!(status.waiting_queue.lock().0.len(), 0);
 
         use DependencyInstruction::*;
         match exp_dependency_shortcut {
@@ -807,6 +826,8 @@ mod tests {
     #[test_case(0)]
     #[test_case(1)]
     #[test_case(2)]
+    #[test_case(3)]
+    #[test_case(4)]
     fn status_waiting_queue(finish_scenario: u8) {
         let txn_idx = 10;
         let proxy = Arc::new(SchedulerProxy::new_for_test(txn_idx));
@@ -823,7 +844,7 @@ mod tests {
             status.resolve_dependency(DependencyInstruction::Default),
             Ok(DependencyResolution::None)
         );
-        assert_eq!(status.waiting_queue.lock().len(), 0);
+        assert_eq!(status.waiting_queue.lock().0.len(), 0);
 
         let barrier = AtomicU8::new(0);
         let case = AtomicBool::new(false);
@@ -858,7 +879,8 @@ mod tests {
             if finish_scenario == 0 {
                 assert_ok_eq!(status.try_abort(5), true);
             }
-            assert_eq!(status.waiting_queue.lock().len(), 2);
+            assert_eq!(status.waiting_queue.lock().0.len(), 2);
+            assert!(!status.waiting_queue.lock().1);
 
             match finish_scenario {
                 0 => {
@@ -870,9 +892,23 @@ mod tests {
                 2 => {
                     assert_err!(status.finish_execution(6));
                 },
+                3 => {
+                    status.num_stalls.store(1, Ordering::Relaxed);
+                    assert_ok_eq!(status.unstall(), true);
+                    assert_eq!(status.waiting_queue.lock().0.len(), 2);
+
+                    status.num_stalls.store(1, Ordering::Relaxed);
+                    *status.inner_status.lock() = InnerStatus::Executed(5);
+                    assert_err!(status.unstall());
+                },
+                4 => {
+                    status.halt();
+                    assert!(status.waiting_queue.lock().1);
+                },
                 _ => unreachable!("Unsupported test scenario"),
             };
-            assert_eq!(status.waiting_queue.lock().len(), 0);
+
+            assert_eq!(status.waiting_queue.lock().0.len(), 0);
         });
     }
 

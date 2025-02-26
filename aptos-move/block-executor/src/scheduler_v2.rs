@@ -117,10 +117,18 @@ impl AbortedDependencies {
     }
 }
 
+// Returned from next task interface, representing instruction to the executor using SchedulerV2.
 pub(crate) enum TaskKind {
+    // Execute transaction with a given index and incarnation (0-indexed).
     Execute(TxnIndex, Incarnation),
-    Commit(TxnIndex),
+    // Execute any post-commit hook, if applicable. CommitHook task is dispatched exactly once
+    // per transaction index after the transaction is committed from the scheduler point of view.
+    CommitHook(TxnIndex),
+    // A task was not readily available. Can be viewed as a None variant if Option<TaskKind> was
+    // returned. Gives the control back to the caller of next task / executor, even though the
+    // most common use might be to call next_task again in a loop.
     NextTask,
+    // Scheduling is complete, the executor can terminate the worker.
     Done,
 }
 
@@ -196,6 +204,7 @@ pub(crate) struct SchedulerV2 {
     /// a shared flag, set when all txns are committed or execution is halted.
     next_to_commit_idx: CachePadded<AtomicU32>,
     is_done: CachePadded<AtomicBool>,
+    is_halted: CachePadded<AtomicBool>,
     /// Tasks queue for post commit tasks with a fixed capacity of number of transactions.
     /// committed_marker is for implementation details: breaking symmetry between two kinds of
     /// commit for index i (direct finish execution of i and try_commit traversal from i-1).
@@ -223,6 +232,7 @@ impl SchedulerV2 {
                 .collect(),
             next_to_commit_idx: CachePadded::new(AtomicU32::new(0)),
             is_done: CachePadded::new(AtomicBool::new(false)),
+            is_halted: CachePadded::new(AtomicBool::new(false)),
             post_commit_task_queue: CachePadded::new(ConcurrentQueue::<TxnIndex>::bounded(
                 num_txns as usize,
             )),
@@ -236,13 +246,13 @@ impl SchedulerV2 {
     // TODO: take worker ID, dedicate some workers to scan high priority tasks (can use armed lock).
     // We can also have different versions (e.g. for testing) of next_task.
     pub(crate) fn next_task(&self) -> Result<TaskKind, PanicError> {
-        if self.is_done() && self.post_commit_task_queue.is_empty() {
+        if self.is_halted() || (self.is_done() && self.post_commit_task_queue.is_empty()) {
             return Ok(TaskKind::Done);
         }
 
         match self.post_commit_task_queue.pop() {
             Ok(txn_idx) => {
-                return Ok(TaskKind::Commit(txn_idx));
+                return Ok(TaskKind::CommitHook(txn_idx));
             },
             Err(PopError::Empty) => {},
             Err(PopError::Closed) => {
@@ -257,6 +267,13 @@ impl SchedulerV2 {
         }
 
         Ok(TaskKind::NextTask)
+    }
+
+    pub(crate) fn halt(&self) {
+        self.is_halted.store(true, Ordering::SeqCst);
+        for txn_idx in 0..self.num_txns {
+            self.txn_status[txn_idx as usize].halt();
+        }
     }
 
     // Called when a transaction observes a read-write dependency, i.e. reads a value written by
@@ -276,14 +293,15 @@ impl SchedulerV2 {
             )));
         }
 
+        use DependencyResolution::*;
         match self.txn_status[dep_txn_idx as usize]
             .resolve_dependency(DependencyInstruction::Default)?
         {
-            DependencyResolution::SafeToProceed => Ok(true),
-            DependencyResolution::Wait(_) => {
+            SafeToProceed => Ok(true),
+            Wait(_) => {
                 unreachable!("Wait resolution for Default instruction")
             },
-            DependencyResolution::None => Ok(false),
+            None | Halted => Ok(false),
         }
     }
 
@@ -386,6 +404,9 @@ impl SchedulerV2 {
                 DependencyResolution::Wait(dep_condition) => {
                     Self::wait(dep_condition);
                     // Next iteration of the loop will try to resolve again.
+                },
+                DependencyResolution::Halted => {
+                    return Ok(false);
                 },
             }
         }
@@ -502,7 +523,13 @@ impl SchedulerV2 {
 
                 // Increments cause cache invalidations, but finish_execution / try_commit
                 // performs only a relaxed read to check (see above).
-                self.next_to_commit_idx.store(idx + 1, Ordering::Relaxed);
+                let prev_value = self.next_to_commit_idx.swap(idx + 1, Ordering::Relaxed);
+                if prev_value != idx {
+                    return Err(code_invariant_error(format!(
+                        "Scheduler committing {idx}, stored next to commit idx = {prev_value}"
+                    )));
+                }
+
                 idx += 1;
             }
             if idx == self.num_txns {
@@ -568,6 +595,10 @@ impl SchedulerV2 {
 
     fn is_done(&self) -> bool {
         self.is_done.load(Ordering::Acquire)
+    }
+
+    fn is_halted(&self) -> bool {
+        self.is_halted.load(Ordering::Acquire)
     }
 }
 
@@ -821,6 +852,9 @@ mod tests {
     // succeed due to the algorithm ensuring all prior transactions have finished
     // the first incarnation prior to scheduling. The test utilizes next_task method,
     // and also confirms that the block execution finishes / commits successfully.
+    //
+    // The test is internally executed 6 times, with a different seed. One of the seeds
+    // halts the scheduler before all transactions are committed.
     fn dependency_graph_single_reexecution(num_workers: u32) {
         if num_workers as usize > num_cpus::get() {
             // Ideally, we would want:
@@ -828,8 +862,9 @@ mod tests {
             return;
         }
 
-        for seed in 0..5 {
-            let num_txns: u32 = 100;
+        // Seed 5 is reserved as a basic halting test.
+        for seed in 0..6 {
+            let num_txns: u32 = if seed == 5 { 1000 } else { 100 };
             let scheduler = SchedulerV2::new(num_txns, num_workers);
             let num_committed = AtomicU32::new(0);
 
@@ -884,8 +919,12 @@ mod tests {
                                 ));
                                 observed_executed[txn_idx as usize].store(true, Ordering::Relaxed);
                             },
-                            TaskKind::Commit(_) => {
-                                num_committed.fetch_add(1, Ordering::Relaxed);
+                            TaskKind::CommitHook(_) => {
+                                if num_committed.fetch_add(1, Ordering::Relaxed) == num_txns / 2 {
+                                    if seed == 5 {
+                                        scheduler.halt();
+                                    }
+                                }
                             },
                             TaskKind::NextTask => {},
                             TaskKind::Done => {
@@ -896,8 +935,11 @@ mod tests {
                 }
             });
 
-            assert_eq!(num_committed.load(Ordering::Relaxed), num_txns);
-            for i in 0..num_txns {
+            let num_committed = num_committed.load(Ordering::Relaxed);
+            if seed < 5 {
+                assert_eq!(num_committed, num_txns);
+            }
+            for i in 0..num_committed {
                 assert!(
                     observed_executed[i as usize].load(Ordering::Relaxed),
                     "Transaction {i} did not observe executed dependency status"
@@ -1112,7 +1154,7 @@ mod tests {
                                     invalidated_versions,
                                 ));
                             },
-                            TaskKind::Commit(txn_idx) => {
+                            TaskKind::CommitHook(txn_idx) => {
                                 // On commit, perform a read, and assert it is equal to the
                                 // latest recorded read, as well as baseline.
                                 let key_entries =

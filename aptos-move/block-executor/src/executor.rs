@@ -15,7 +15,7 @@ use crate::{
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
-    scheduler_v2::SchedulerV2,
+    scheduler_v2::{SchedulerV2, TaskKind},
     task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::{KeyKind, TxnLastInputOutput},
@@ -79,6 +79,24 @@ pub struct BlockExecutor<T, E, S, L, TP> {
     executor_thread_pool: Arc<rayon::ThreadPool>,
     transaction_commit_hook: Option<L>,
     phantom: PhantomData<(T, E, S, L, TP)>,
+}
+
+struct SharedSyncParams<'a, T, E, S>
+where
+    T: Transaction,
+    E: ExecutorTask<Txn = T>,
+    S: TStateView<Key = T::Key> + Sync,
+{
+    // TODO: should not need to pass base view.
+    base_view: &'a S,
+    scheduler: &'a SchedulerV2,
+    versioned_cache: &'a MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+    global_module_cache:
+        &'a GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+    last_input_output: &'a TxnLastInputOutput<T, E::Output, E::Error>,
+    delayed_field_id_counter: &'a AtomicU32,
+    shared_commit_state: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
+    final_results: &'a ExplicitSyncWrapper<Vec<E::Output>>,
 }
 
 impl<T, E, S, L, TP> BlockExecutor<T, E, S, L, TP>
@@ -1097,6 +1115,34 @@ where
         }
     }
 
+    pub(crate) fn worker_loop_v2(
+        &self,
+        block: &TP,
+        environment: &AptosEnvironment,
+        _worker_id: u32,
+        num_workers: u32,
+        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
+        start_delayed_field_id_counter: u32,
+    ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
+        let init_timer = VM_INIT_SECONDS.start_timer();
+        let executor = E::init(environment.clone(), shared_sync_params.base_view);
+        drop(init_timer);
+
+        loop {
+            // TODO: pass worker_id to next_task.
+            match shared_sync_params.scheduler.next_task()? {
+                TaskKind::Execute(txn_idx, incarnation) => {},
+                TaskKind::CommitHook(txn_idx) => {},
+                TaskKind::NextTask => {},
+                TaskKind::Done => {
+                    break;
+                },
+            }
+        }
+
+        Ok(())
+    }
+
     pub(crate) fn execute_transactions_parallel_v2(
         &self,
         signature_verified_block: &TP,
@@ -1113,37 +1159,99 @@ where
             "Must use sequential execution"
         );
 
-        let start_shared_counter = gen_id_start_value(false);
-        let shared_counter = AtomicU32::new(start_shared_counter);
-
         let num_txns = signature_verified_block.num_txns();
         if num_txns == 0 {
             return Ok(BlockOutput::new(vec![], self.empty_block_end_info()));
         }
-
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2) as u32;
-        let shared_maybe_error = AtomicBool::new(false);
-
         let final_results = ExplicitSyncWrapper::new(Vec::with_capacity(num_txns));
-
         {
             final_results
                 .acquire()
                 .resize_with(num_txns, E::Output::skip_output);
         }
-
+        let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
+            self.config.onchain.block_gas_limit_type.clone(),
+            num_txns,
+        ));
         let num_txns = num_txns as u32;
 
-        // let last_input_output = TxnLastInputOutput::new(num_txns);
+        let start_delayed_field_id_counter = gen_id_start_value(false);
+        let delayed_field_id_counter = AtomicU32::new(start_delayed_field_id_counter);
+
+        let shared_maybe_error = AtomicBool::new(false);
+        let last_input_output = TxnLastInputOutput::new(num_txns);
+        let mut versioned_cache = MVHashMap::new();
         let scheduler = SchedulerV2::new(num_txns, num_workers);
 
-        // TODO:
-        // let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
-        //     self.config.onchain.block_gas_limit_type.clone(),
-        //     num_txns,
-        // ));
+        let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
+            base_view,
+            scheduler: &scheduler,
+            versioned_cache: &versioned_cache,
+            global_module_cache: module_cache_manager_guard.module_cache(),
+            last_input_output: &last_input_output,
+            delayed_field_id_counter: &delayed_field_id_counter,
+            shared_commit_state: &shared_commit_state,
+            final_results: &final_results,
+        };
+        let worker_ids: Vec<u32> = (0..num_workers).collect();
 
-        Err(())
+        let timer = RAYON_EXECUTION_SECONDS.start_timer();
+        self.executor_thread_pool.scope(|s| {
+            for worker_id in &worker_ids {
+                s.spawn(|_| {
+                    if let Err(err) = self.worker_loop_v2(
+                        signature_verified_block,
+                        module_cache_manager_guard.environment(),
+                        *worker_id,
+                        num_workers,
+                        &shared_sync_params,
+                        start_delayed_field_id_counter,
+                    ) {
+                        // If there are multiple errors, they all get logged:
+                        // ModulePathReadWriteError and FatalVMError variant is logged at construction,
+                        // and below we log CodeInvariantErrors.
+                        if let PanicOr::CodeInvariantError(err_msg) = err {
+                            alert!(
+                                "[BlockSTMv2] worker loop: CodeInvariantError({:?})",
+                                err_msg
+                            );
+                        }
+                        shared_maybe_error.store(true, Ordering::SeqCst);
+
+                        // Make sure to halt the scheduler if it hasn't already been halted.
+                        scheduler.halt();
+                    }
+                });
+            }
+        });
+        drop(timer);
+
+        counters::update_state_counters(versioned_cache.stats(), true);
+        module_cache_manager_guard
+            .module_cache_mut()
+            .insert_verified(versioned_cache.take_modules_iter())
+            .map_err(|err| {
+                alert!("[BlockSTM] Encountered panic error: {:?}", err);
+            })?;
+
+        // Explicit async drops.
+        DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
+
+        let block_end_info = if self
+            .config
+            .onchain
+            .block_gas_limit_type
+            .add_block_limit_outcome_onchain()
+        {
+            Some(shared_commit_state.into_inner().get_block_end_info())
+        } else {
+            None
+        };
+
+        (!shared_maybe_error.load(Ordering::SeqCst))
+            .then(|| BlockOutput::new(final_results.into_inner(), block_end_info))
+            .ok_or(())
     }
 
     pub(crate) fn execute_transactions_parallel(
