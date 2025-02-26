@@ -86,13 +86,10 @@ fn test_function_value_extension() {
     assert_eq!(
         foo_ty,
         ty_builder
-            .create_ref_ty(
-                &ty_builder.create_struct_ty(
-                    StructNameIndex::new(0),
-                    AbilityInfo::struct_(AbilitySet::EMPTY)
-                ),
-                false
-            )
+            .create_ref_ty::<false>(&ty_builder.create_struct_ty(
+                StructNameIndex::new(0),
+                AbilityInfo::struct_(AbilitySet::EMPTY)
+            ),)
             .unwrap()
     );
     let u64_ty = types.pop().unwrap();
