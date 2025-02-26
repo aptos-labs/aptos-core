@@ -3,6 +3,8 @@
 
 #[cfg(test)]
 use crate::types::InputOutputKey;
+#[cfg(feature = "blockstm-profiling")]
+use crate::view_profiler::{ViewKind, ViewProfiler, ViewProfilerGuard};
 use crate::{
     captured_reads::{
         CapturedReads, DataRead, DelayedFieldRead, DelayedFieldReadKind, GroupRead, ReadKind,
@@ -10,7 +12,8 @@ use crate::{
     },
     code_cache_global::GlobalModuleCache,
     counters,
-    scheduler::{DependencyResult, DependencyStatus, Scheduler, TWaitForDependency},
+    scheduler::{DependencyResult, DependencyStatus, TWaitForDependency},
+    scheduler_wrapper::SchedulerWrapper,
     value_exchange::TemporaryValueToIdentifierMapping,
 };
 use aptos_aggregator::{
@@ -23,8 +26,8 @@ use aptos_aggregator::{
 use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{
-        GroupReadResult, MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError,
-        StorageVersion, TxnIndex, UnknownOrLayout, UnsyncGroupError, ValueWithLayout,
+        GroupReadResult, Incarnation, MVDataError, MVDataOutput, MVDelayedFieldsError,
+        MVGroupError, StorageVersion, TxnIndex, UnknownOrLayout, UnsyncGroupError, ValueWithLayout,
     },
     unsync_map::UnsyncMap,
     versioned_delayed_fields::TVersionedDelayedFieldView,
@@ -159,9 +162,10 @@ trait ResourceGroupState<T: Transaction> {
 
 pub(crate) struct ParallelState<'a, T: Transaction> {
     pub(crate) versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
-    scheduler: &'a Scheduler,
+    scheduler: SchedulerWrapper<'a>,
     start_counter: u32,
     counter: &'a AtomicU32,
+    incarnation: Incarnation,
     pub(crate) captured_reads:
         RefCell<CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>>,
 }
@@ -266,11 +270,14 @@ fn compute_delayed_field_try_add_delta_outcome_from_history(
         true
     };
 
-    Ok((result, DelayedFieldRead::HistoryBounded {
-        restriction: history,
-        max_value,
-        inner_aggregator_value: base_aggregator_value,
-    }))
+    Ok((
+        result,
+        DelayedFieldRead::HistoryBounded {
+            restriction: history,
+            max_value,
+            inner_aggregator_value: base_aggregator_value,
+        },
+    ))
 }
 
 fn compute_delayed_field_try_add_delta_outcome_first_time(
@@ -298,11 +305,14 @@ fn compute_delayed_field_try_add_delta_outcome_first_time(
         true
     };
 
-    Ok((result, DelayedFieldRead::HistoryBounded {
-        restriction: history,
-        max_value,
-        inner_aggregator_value: base_aggregator_value,
-    }))
+    Ok((
+        result,
+        DelayedFieldRead::HistoryBounded {
+            restriction: history,
+            max_value,
+            inner_aggregator_value: base_aggregator_value,
+        },
+    ))
 }
 // TODO[agg_v2](cleanup): see about the split with CapturedReads,
 // and whether anything should be moved there.
@@ -447,15 +457,17 @@ fn wait_for_dependency(
 impl<'a, T: Transaction> ParallelState<'a, T> {
     pub(crate) fn new(
         shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
-        shared_scheduler: &'a Scheduler,
+        shared_scheduler: SchedulerWrapper<'a>,
         start_shared_counter: u32,
         shared_counter: &'a AtomicU32,
+        incarnation: Incarnation,
     ) -> Self {
         Self {
             versioned_map: shared_map,
             scheduler: shared_scheduler,
             start_counter: start_shared_counter,
             counter: shared_counter,
+            incarnation,
             captured_reads: RefCell::new(CapturedReads::new()),
         }
     }
@@ -504,7 +516,7 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
                     unreachable!("Reading group size does not require a specific tag look-up");
                 },
                 Err(Dependency(dep_idx)) => {
-                    if !wait_for_dependency(self.scheduler, txn_idx, dep_idx)? {
+                    if !wait_for_dependency(&self.scheduler, txn_idx, dep_idx)? {
                         return Err(PartialVMError::new(
                             StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                         )
@@ -626,7 +638,7 @@ impl<'a, T: Transaction> ResourceState<T> for ParallelState<'a, T> {
                     return ReadResult::Uninitialized;
                 },
                 Err(Dependency(dep_idx)) => {
-                    match wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
+                    match wait_for_dependency(&self.scheduler, txn_idx, dep_idx) {
                         Err(e) => {
                             error!("Error {:?} in wait for dependency", e);
                             self.captured_reads.borrow_mut().mark_incorrect_use();
@@ -753,7 +765,7 @@ impl<'a, T: Transaction> ResourceGroupState<T> for ParallelState<'a, T> {
                     return Ok(GroupReadResult::Value(None, None));
                 },
                 Err(Dependency(dep_idx)) => {
-                    if !wait_for_dependency(self.scheduler, txn_idx, dep_idx)? {
+                    if !wait_for_dependency(&self.scheduler, txn_idx, dep_idx)? {
                         // TODO[agg_v2](cleanup): consider changing from PartialVMResult<GroupReadResult> to GroupReadResult
                         // like in ReadResult for resources.
                         return Err(PartialVMError::new(
@@ -980,6 +992,8 @@ pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>> {
     pub(crate) runtime_environment: &'a RuntimeEnvironment,
     pub(crate) latest_view: ViewState<'a, T>,
     pub(crate) txn_idx: TxnIndex,
+    #[cfg(feature = "blockstm-profiling")]
+    pub(crate) view_profiler: RefCell<ViewProfiler>,
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
@@ -1001,7 +1015,27 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             runtime_environment,
             latest_view,
             txn_idx,
+            #[cfg(feature = "blockstm-profiling")]
+            view_profiler: RefCell::new(ViewProfiler::new()),
         }
+    }
+
+    #[cfg(feature = "blockstm-profiling")]
+    pub(crate) fn get_profiler_guard(&self, kind: ViewKind) -> ViewProfilerGuard {
+        ViewProfilerGuard::new(&self.view_profiler, kind)
+    }
+
+    #[cfg(feature = "blockstm-profiling")]
+    pub(crate) fn view_profiler_log_info(&self, incarnation: Incarnation, worker_id: usize) {
+        if let ViewState::Sync(state) = &self.latest_view {
+            assert_eq!(
+                incarnation, state.incarnation,
+                "Incarnations provided by executor must match"
+            );
+        }
+        self.view_profiler
+            .borrow()
+            .log_info(self.txn_idx, incarnation, worker_id);
     }
 
     #[cfg(test)]
@@ -1435,7 +1469,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> BlockSynchronizationKillSw
 {
     fn interrupt_requested(&self) -> bool {
         match &self.latest_view {
-            ViewState::Sync(state) => state.scheduler.has_halted(),
+            ViewState::Sync(state) => state
+                .scheduler
+                .interrupt_requested(self.txn_idx, state.incarnation),
             ViewState::Unsync(_) => false,
         }
     }
@@ -1450,6 +1486,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestVi
         state_key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
     ) -> PartialVMResult<Option<StateValue>> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::ResourceView);
+
         self.get_resource_state_value_impl(
             state_key,
             UnknownOrLayout::Known(maybe_layout),
@@ -1462,6 +1501,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestVi
         &self,
         state_key: &Self::Key,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::ResourceView);
+
         self.get_resource_state_value_impl(state_key, UnknownOrLayout::Unknown, ReadKind::Metadata)
             .map(|res| {
                 if let ReadResult::Metadata(v) = res {
@@ -1473,6 +1515,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestVi
     }
 
     fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::ResourceView);
+
         self.get_resource_state_value_impl(state_key, UnknownOrLayout::Unknown, ReadKind::Exists)
             .map(|res| {
                 if let ReadResult::Exists(v) = res {
@@ -1493,6 +1538,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for Lat
         &self,
         group_key: &Self::GroupKey,
     ) -> PartialVMResult<ResourceGroupSize> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::GroupView);
+
         let mut group_read = match &self.latest_view {
             ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
             ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key),
@@ -1516,6 +1564,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for Lat
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
     ) -> PartialVMResult<Option<Bytes>> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::GroupView);
+
         let mut group_read = self
             .latest_view
             .get_resource_group_state()
@@ -1552,10 +1603,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for Lat
     }
 
     fn is_resource_groups_split_in_change_set_capable(&self) -> bool {
-        match &self.latest_view {
-            ViewState::Sync(_) => true,
-            ViewState::Unsync(_) => true,
-        }
+        true
     }
 }
 
@@ -1583,6 +1631,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TAggregatorV1View for Late
         &self,
         state_key: &Self::Identifier,
     ) -> PartialVMResult<Option<StateValue>> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::AggregatorV1View);
+
         // TODO[agg_v1](cleanup):
         // Integrate aggregators V1. That is, we can lift the u128 value
         // from the state item by passing the right layout here. This can
@@ -1601,11 +1652,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for Late
         &self,
         id: &Self::Identifier,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::DelayedFieldView);
+
         match &self.latest_view {
             ViewState::Sync(state) => get_delayed_field_value_impl(
                 &state.captured_reads,
                 state.versioned_map.delayed_fields(),
-                state.scheduler,
+                &state.scheduler,
                 id,
                 self.txn_idx,
             ),
@@ -1625,11 +1679,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for Late
         delta: &SignedU128,
         max_value: u128,
     ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::DelayedFieldView);
+
         match &self.latest_view {
             ViewState::Sync(state) => delayed_field_try_add_delta_outcome_impl(
                 &state.captured_reads,
                 state.versioned_map.delayed_fields(),
-                state.scheduler,
+                &state.scheduler,
                 id,
                 base_delta,
                 delta,
@@ -1656,6 +1713,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for Late
     }
 
     fn generate_delayed_field_id(&self, width: u32) -> Self::Identifier {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::DelayedFieldView);
+
         let index = match &self.latest_view {
             ViewState::Sync(state) => state.counter.fetch_add(1, Ordering::SeqCst),
             ViewState::Unsync(state) => {
@@ -1670,6 +1730,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for Late
     }
 
     fn validate_delayed_field_id(&self, id: &Self::Identifier) -> Result<(), PanicError> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::DelayedFieldView);
+
         let unique_index = id.extract_unique_index();
 
         let start_counter = match &self.latest_view {
@@ -1700,6 +1763,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for Late
         BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
         PanicError,
     > {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::DelayedFieldView);
+
         match &self.latest_view {
             ViewState::Sync(state) => state
                 .captured_reads
@@ -1722,6 +1788,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for Late
         delayed_write_set_ids: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
     ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::DelayedFieldView);
+
         match &self.latest_view {
             ViewState::Sync(state) => {
                 self.get_group_reads_needing_exchange_parallel(state, delayed_write_set_ids, skip)
@@ -1778,7 +1847,11 @@ mod test {
         },
         values::{Struct, Value},
     };
-    use std::{cell::RefCell, collections::HashMap, sync::atomic::AtomicU32};
+    use std::{
+        cell::RefCell,
+        collections::HashMap,
+        sync::atomic::{AtomicBool, AtomicU32},
+    };
     use test_case::test_case;
 
     #[derive(Default)]
@@ -2678,6 +2751,7 @@ mod test {
         empty_global_module_cache:
             GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
         runtime_environment: RuntimeEnvironment,
+        skip_module_validation: AtomicBool,
     }
 
     impl Holder {
@@ -2686,12 +2760,14 @@ mod test {
             let counter = RefCell::new(start_counter);
             let base_view = MockStateView::new(data);
             let runtime_environment = RuntimeEnvironment::new(vec![]);
+            let skip_module_validation = AtomicBool::new(true);
             Self {
                 unsync_map,
                 counter,
                 base_view,
                 empty_global_module_cache: GlobalModuleCache::empty(),
                 runtime_environment,
+                skip_module_validation,
             }
         }
     }
@@ -2750,9 +2826,10 @@ mod test {
                     &self.runtime_environment,
                     ViewState::Sync(ParallelState::new(
                         &self.versioned_map,
-                        &self.scheduler,
+                        SchedulerWrapper::V1(&self.scheduler, &self.holder.skip_module_validation),
                         self.start_counter,
                         &self.counter,
+                        0,
                     )),
                     1,
                 );
