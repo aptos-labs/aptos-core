@@ -6,7 +6,7 @@ These Rust Secure Coding Guidelines are essential for anyone contributing to Apt
 
 ### Rustup
 
-Utilize Rustup for managing Rust toolchains. However, keep in mind that, from a security perspective, Rustup performs all downloads over HTTPS, but it does not yet validate signatures of downloads. Security is shifted to [crates.io](http://crates.io) and GitHub repository hosting the code [[rustup]](https://www.rust-lang.org/tools/install).
+Utilize Rustup for managing Rust toolchains. However, keep in mind that, from a security perspective, Rustup performs all downloads over HTTPS, but it does not yet validate the signatures of downloads. Security is shifted to [crates.io](http://crates.io) and GitHub repository hosting the code [[rustup]](https://www.rust-lang.org/tools/install).
 
 ### Stable Toolchain
 
@@ -44,7 +44,7 @@ Assess and monitor the quality and maintenance of crates that are being introduc
 
 ### Minimize Use of Feature Flags
 
-As a general practice, avoid using feature flags in your crates unless absolutely necessary. Feature flags can introduce complexity and unexpected behaviours, making the codebase harder to audit for security vulnerabilities.
+As a general practice, avoid using feature flags in your crates unless absolutely necessary. Feature flags can introduce complexity and unexpected behaviors, making the codebase harder to audit for security vulnerabilities.
 
 ### Understanding Feature Unification
 
@@ -84,7 +84,7 @@ Use `Result<T, E>` and `Option<T>` for error handling instead of _unwrapping_ or
 
 Prefer using `Result` and context-rich error handling over Rust's `assert!`, `assert_eq!`, and `assert_ne!` macros for enforcing invariants, reserving assertions for development and unrecoverable error scenarios.
 
-## Types Systems and Data Structures
+## Types of Systems and Data Structures
 
 ### Drop Trait
 
@@ -93,7 +93,7 @@ Implement the `Drop` trait selectively, only when necessary for specific destruc
 In a Rust secure development, the implementation of the `std::ops::Drop` trait
 must not panic.
 
-Do not rely on `Drop` trait in security material treatment after the use, use [zeroize](https://docs.rs/zeroize/latest/zeroize/#) to explicit destroy security material, e.g. private keys.
+Do not rely on `Drop` trait in security material treatment after the use, use [zeroize](https://docs.rs/zeroize/latest/zeroize/#) to explicitly destroy security material, e.g. private keys.
 
 ### Send and Sync Traits
 
