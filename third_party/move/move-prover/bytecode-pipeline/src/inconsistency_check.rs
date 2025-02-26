@@ -82,7 +82,7 @@ impl FunctionTargetProcessor for InconsistencyCheckInstrumenter {
                 let loc = builder.fun_env.get_spec_loc();
                 builder.set_loc_and_vc_info(loc, EXPECTED_TO_FAIL);
                 let exp = builder.mk_bool_const(false);
-                builder.emit_with(|id| Bytecode::Prop(id, PropKind::Assert, exp));
+                builder.emit_with(|id| Bytecode::Prop(id, PropKind::Assert(None), exp));
             }
             builder.emit(bc);
         }
