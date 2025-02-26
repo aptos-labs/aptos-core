@@ -36,6 +36,7 @@ impl InputOutputDiffGenerator {
         debugger: AptosDebugger,
         override_config: OverrideConfig,
         txn_blocks: Vec<TransactionBlock>,
+        assert_no_out_of_gas: bool,
     ) -> anyhow::Result<Vec<ReadSet>> {
         let generator = Arc::new(Self {
             debugger,
@@ -52,7 +53,7 @@ impl InputOutputDiffGenerator {
                 let num_generated = num_generated.clone();
                 move || {
                     let start_time = Instant::now();
-                    let inputs = generator.generate_inputs(txn_block);
+                    let inputs = generator.generate_inputs(txn_block, assert_no_out_of_gas);
                     let time = start_time.elapsed().as_secs();
                     println!(
                         "Generated inputs for block {}/{} in {}s",
@@ -79,7 +80,7 @@ impl InputOutputDiffGenerator {
     ///
     /// Note: transaction execution is sequential, so that multiple inputs can be constructed in
     /// parallel.
-    fn generate_inputs(&self, txn_block: TransactionBlock) -> ReadSet {
+    fn generate_inputs(&self, txn_block: TransactionBlock, assert_no_out_of_gas: bool) -> ReadSet {
         let state_view = self.debugger.state_view_at_version(txn_block.begin_version);
         let state_override = self.override_config.get_state_override(&state_view);
         let workload = Workload::from(txn_block);
@@ -95,12 +96,26 @@ impl InputOutputDiffGenerator {
             .begin_version()
             .expect("Transaction metadata must be a chunk");
         for (idx, on_chain_output) in onchain_outputs.iter().enumerate() {
+            let version = begin + idx as Version;
+
+            if assert_no_out_of_gas
+                && on_chain_output
+                    .status()
+                    .as_kept_status()
+                    .expect("All on-chain statuses are kept")
+                    .is_out_of_gas()
+            {
+                panic!(
+                    "Transaction {} runs out of gas, violating the assertion",
+                    version
+                );
+            }
+
             for (state_key, _) in on_chain_output.write_set() {
                 if state_override.contains_key(state_key) {
                     error!(
                         "Transaction {} writes to overridden state value for {:?}",
-                        begin + idx as Version,
-                        state_key
+                        version, state_key
                     );
                 }
             }
