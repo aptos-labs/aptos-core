@@ -157,6 +157,9 @@ module aptos_framework::aptos_coin {
     use aptos_framework::fungible_asset::FungibleAsset;
 
     #[test_only]
+    friend aptos_framework::transaction_fee;
+
+    #[test_only]
     public fun mint_apt_fa_for_test(amount: u64): FungibleAsset acquires MintCapStore {
         ensure_initialized_with_apt_fa_metadata_for_test();
         coin::coin_to_fungible_asset(
