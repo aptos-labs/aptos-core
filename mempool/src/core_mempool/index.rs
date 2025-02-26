@@ -4,11 +4,11 @@
 
 /// This module provides various indexes used by Mempool.
 use crate::{
-    core_mempool::transaction::{MempoolTransaction, TimelineState},
-    shared_mempool::types::{MultiBucketTimelineIndexIds, TimelineIndexIdentifier},
+    core_mempool::transaction::{MempoolTransaction, TimelineState}, counters, logging::{LogEntry, LogSchema}, shared_mempool::types::{MultiBucketTimelineIndexIds, TimelineIndexIdentifier}
 };
 use aptos_consensus_types::common::TransactionSummary;
 use aptos_crypto::HashValue;
+use aptos_logger::error;
 use aptos_types::{account_address::AccountAddress, transaction::ReplayProtector};
 use rand::seq::SliceRandom;
 use std::{
@@ -516,32 +516,64 @@ impl MultiBucketTimelineIndex {
 /// can't be included in the next block because their sequence number is too high.
 /// We keep a separate index to be able to efficiently evict them when Mempool is full.
 pub struct ParkingLotIndex {
-    data: HashMap<AccountAddress, BTreeSet<(u64, HashValue)>>,
+    // DS invariants:
+    // 1. for each entry (account, txns) in `data`, `txns` is never empty
+    // 2. for all accounts, data.get(account_indices.get(`account`)) == (account, sequence numbers of account's txns)
+    data: Vec<(AccountAddress, BTreeSet<(u64, HashValue)>)>,
+    account_indices: HashMap<AccountAddress, usize>,
+    size: usize,
 }
 
 impl ParkingLotIndex {
     pub(crate) fn new() -> Self {
         Self {
-            data: HashMap::new(),
+            data: vec![],
+            account_indices: HashMap::new(),
+            size: 0,
         }
     }
 
     pub(crate) fn insert(&mut self, txn: &mut MempoolTransaction) {
         // Orderless transactions are always in the "ready" state and are not stored in the parking lot.
         match txn.sequence_info.transaction_replay_protector {
-            ReplayProtector::SequenceNumber(sequence_num) => {
+            ReplayProtector::SequenceNumber(sequence_number) => {
                 if txn.insertion_info.park_time.is_none() {
                     txn.insertion_info.park_time = Some(SystemTime::now());
                 }
                 txn.was_parked = true;
-
-                self.data
-                    .entry(txn.txn.sender())
-                    .or_default()
-                    .insert((sequence_num, txn.get_committed_hash()));
+        
+                let sender = &txn.txn.sender();
+                let hash = txn.get_committed_hash();
+                let is_new_entry = match self.account_indices.get(sender) {
+                    Some(index) => {
+                        if let Some((_account, seq_nums)) = self.data.get_mut(*index) {
+                            seq_nums.insert((sequence_number, hash))
+                        } else {
+                            counters::CORE_MEMPOOL_INVARIANT_VIOLATION_COUNT.inc();
+                            error!(
+                                LogSchema::new(LogEntry::InvariantViolated),
+                                "Parking lot invariant violated: for account {}, account index exists but missing entry in data",
+                                sender
+                            );
+                            return;
+                        }
+                    },
+                    None => {
+                        let entry = [(sequence_number, hash)]
+                            .iter()
+                            .cloned()
+                            .collect::<BTreeSet<_>>();
+                        self.data.push((*sender, entry));
+                        self.account_indices.insert(*sender, self.data.len() - 1);
+                        true
+                    },
+                };
+                if is_new_entry {
+                    self.size += 1;
+                }
             },
             ReplayProtector::Nonce(_) => {},
-        }
+        }        
     }
 
     pub(crate) fn remove(&mut self, txn: &MempoolTransaction) {
@@ -549,11 +581,23 @@ impl ParkingLotIndex {
         match txn.sequence_info.transaction_replay_protector {
             ReplayProtector::SequenceNumber(sequence_number) => {
                 let sender = &txn.txn.sender();
-                if let Some(txns) = self.data.get_mut(sender) {
-                    txns.remove(&(sequence_number, txn.get_committed_hash()));
+                if let Some(index) = self.account_indices.get(sender).cloned() {
+                    if let Some((_account, txns)) = self.data.get_mut(index) {
+                        if txns.remove(&(sequence_number, txn.get_committed_hash())) {
+                            self.size -= 1;
+                        }
 
-                    if txns.is_empty() {
-                        self.data.remove(sender);
+                        // maintain DS invariant
+                        if txns.is_empty() {
+                            // remove account with no more txns
+                            self.data.swap_remove(index);
+                            self.account_indices.remove(sender);
+
+                            // update DS for account that was swapped in `swap_remove`
+                            if let Some((swapped_account, _)) = self.data.get(index) {
+                                self.account_indices.insert(*swapped_account, index);
+                            }
+                        }
                     }
                 }
             },
@@ -569,22 +613,23 @@ impl ParkingLotIndex {
     ) -> bool {
         // Orderless transactions are always in the "ready" state and are not stored in the parking lot.
         match replay_protector {
-            ReplayProtector::SequenceNumber(seq_num) => self
-                .data
-                .get(account)
-                .map_or(false, |txns| txns.contains(&(seq_num, hash))),
+            ReplayProtector::SequenceNumber(seq_num) => {
+                self.account_indices
+                    .get(account)
+                    .and_then(|idx| self.data.get(*idx))
+                    .map_or(false, |(_account, txns)| txns.contains(&(seq_num, hash)))
+            },
             ReplayProtector::Nonce(_) => false,
         }
     }
 
+
     /// Returns a random "non-ready" transaction (with highest sequence number for that account).
     pub(crate) fn get_poppable(&self) -> Option<TxnPointer> {
         let mut rng = rand::thread_rng();
-        let addresses = self.data.keys().collect::<Vec<_>>();
-        let sender = addresses.choose(&mut rng)?;
-        self.data.get(sender).and_then(|txns| {
+        self.data.choose(&mut rng).and_then(|(sender, txns)| {
             txns.iter().next_back().map(|(seq_num, hash)| TxnPointer {
-                sender: **sender,
+                sender: *sender,
                 replay_protector: ReplayProtector::SequenceNumber(*seq_num),
                 hash: *hash,
             })
@@ -592,7 +637,7 @@ impl ParkingLotIndex {
     }
 
     pub(crate) fn size(&self) -> usize {
-        self.data.len()
+        self.size
     }
 
     pub(crate) fn get_addresses(&self) -> Vec<(AccountAddress, u64)> {

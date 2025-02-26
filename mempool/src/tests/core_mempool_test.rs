@@ -1101,8 +1101,8 @@ fn test_parking_lot_eviction_benchmark() {
     );
     assert!(
         time_to_evict_ms < 300,
-        "Parking lot eviction of {} should take less than 300 ms on a reasonable machine",
-        num_expected_evicted
+        "Parking lot eviction of {} should take less than 300 ms on a reasonable machine. Took {} ms",
+        num_expected_evicted, time_to_evict_ms
     );
 }
 
