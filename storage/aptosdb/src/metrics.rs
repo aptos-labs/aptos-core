@@ -156,44 +156,18 @@ pub static ROCKSDB_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub(crate) static STATE_KV_DB_PROPERTIES_METRIC_VECTOR: Lazy<Vec<IntGaugeVec>> = Lazy::new(|| {
-    (0..16)
-        .map(|shard_id| {
-            register_int_gauge_vec!(
-                // metric name
-                &format!("aptos_state_kv_db_properties_{}", shard_id),
-                // metric description
-                &format!(
-                    "StateKvDb rocksdb integer properties for shard {}",
-                    shard_id
-                ),
-                // metric labels (dimensions)
-                &["cf_name", "property_name"]
-            )
-            .unwrap()
-        })
-        .collect()
+/// Rocksdb metrics
+pub static ROCKSDB_SHARD_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        // metric name
+        "aptos_rocksdb_shard_properties",
+        // metric description
+        "sharded rocksdb integer properties",
+        // metric labels (dimensions)
+        &["shard_id", "cf_name", "property_name",]
+    )
+    .unwrap()
 });
-
-pub(crate) static STATE_MERKLE_DB_PROPERTIES_METRIC_VECTOR: Lazy<Vec<IntGaugeVec>> =
-    Lazy::new(|| {
-        (0..16)
-            .map(|shard_id| {
-                register_int_gauge_vec!(
-                    // metric name
-                    &format!("aptos_state_merkle_db_properties_{}", shard_id),
-                    // metric description
-                    &format!(
-                        "StateMerkleDb rocksdb integer properties for shard {}",
-                        shard_id
-                    ),
-                    // metric labels (dimensions)
-                    &["cf_name", "property_name"]
-                )
-                .unwrap()
-            })
-            .collect()
-    });
 
 // Async committer gauges:
 pub(crate) static LATEST_SNAPSHOT_VERSION: Lazy<IntGauge> = Lazy::new(|| {

@@ -11,18 +11,14 @@ use crate::{
         write_set_db_column_families,
     },
     ledger_db::LedgerDb,
-    metrics::{
-        OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES, STATE_KV_DB_PROPERTIES_METRIC_VECTOR,
-        STATE_MERKLE_DB_PROPERTIES_METRIC_VECTOR,
-    },
+    metrics::{OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES, ROCKSDB_SHARD_PROPERTIES},
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
 };
 use anyhow::Result;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_metrics_core::IntGaugeVec;
-use aptos_schemadb::DB;
+use aptos_schemadb::{ColumnFamilyName, DB};
 use aptos_storage_interface::state_store::NUM_STATE_SHARDS;
 use once_cell::sync::Lazy;
 use std::{
@@ -84,16 +80,19 @@ fn set_property(cf_name: &str, db: &DB) -> Result<()> {
     Ok(())
 }
 
-fn set_shard_property(
-    cf_name: &str,
-    db: &DB,
-    db_shard_id: usize,
-    metrics: &Lazy<Vec<IntGaugeVec>>,
-) -> Result<()> {
+const SHARD_NAME_BY_ID: [&str; NUM_STATE_SHARDS] = [
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
+];
+
+fn set_shard_property(cf_name: ColumnFamilyName, db: &DB, shard: usize) -> Result<()> {
     if !skip_reporting_cf(cf_name) {
         for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
-            metrics[db_shard_id]
-                .with_label_values(&[cf_name, aptos_rocksdb_property_name])
+            ROCKSDB_SHARD_PROPERTIES
+                .with_label_values(&[
+                    SHARD_NAME_BY_ID[shard],
+                    cf_name,
+                    aptos_rocksdb_property_name,
+                ])
                 .set(db.get_property(cf_name, rockdb_property_name)? as i64);
         }
     }
@@ -144,12 +143,7 @@ fn update_rocksdb_properties(
             for cf in state_kv_db_new_key_column_families() {
                 set_property(cf, state_kv_db.metadata_db())?;
                 for shard in 0..NUM_STATE_SHARDS {
-                    set_shard_property(
-                        cf,
-                        state_kv_db.db_shard(shard as u8),
-                        shard,
-                        &STATE_KV_DB_PROPERTIES_METRIC_VECTOR,
-                    )?;
+                    set_shard_property(cf, state_kv_db.db_shard(shard as u8), shard)?;
                 }
             }
         }
@@ -163,12 +157,7 @@ fn update_rocksdb_properties(
         set_property(cf_name, state_merkle_db.metadata_db())?;
         if state_merkle_db.sharding_enabled() {
             for shard in 0..NUM_STATE_SHARDS {
-                set_shard_property(
-                    cf_name,
-                    state_merkle_db.db_shard(shard as u8),
-                    shard,
-                    &STATE_MERKLE_DB_PROPERTIES_METRIC_VECTOR,
-                )?;
+                set_shard_property(cf_name, state_merkle_db.db_shard(shard as u8), shard)?;
             }
         }
     }
