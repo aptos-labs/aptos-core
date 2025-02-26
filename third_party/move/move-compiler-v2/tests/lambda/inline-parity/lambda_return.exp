@@ -38,11 +38,9 @@ module 0x42::LambdaReturn {
 [variant baseline]
 public fun LambdaReturn::inline_apply2($t0: |u64|u64, $t1: u64): u64 {
      var $t2: u64
-     var $t3: u64
-  0: $t3 := infer($t1)
-  1: $t2 := invoke($t3, $t0)
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
   2: return $t2
-  3: return $t2
 }
 
 
@@ -84,13 +82,10 @@ fun LambdaReturn::__lambda__1__test_lambda_symbol_param($t0: u64): u64 {
 [variant baseline]
 public fun LambdaReturn::inline_apply2($t0: |u64|u64, $t1: u64): u64 {
      var $t2: u64 [unused]
-     var $t3: u64 [unused]
      # live vars: $t0, $t1
-  0: $t1 := move($t1)
-     # live vars: $t0, $t1
-  1: $t1 := invoke($t1, $t0)
+  0: $t1 := invoke($t1, $t0)
      # live vars: $t1
-  2: return $t1
+  1: return $t1
 }
 
 

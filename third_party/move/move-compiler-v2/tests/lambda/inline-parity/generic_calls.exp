@@ -44,10 +44,8 @@ fun m::id<#0>($t0: 0x42::m::S<#0>): 0x42::m::S<#0> {
 [variant baseline]
 fun m::inlined<#0>($t0: |0x42::m::S<#0>|0x42::m::S<#0>, $t1: 0x42::m::S<#0>) {
      var $t2: 0x42::m::S<#0>
-     var $t3: 0x42::m::S<#0>
-  0: $t3 := infer($t1)
-  1: $t2 := invoke($t3, $t0)
-  2: return ()
+  0: $t2 := invoke($t1, $t0)
+  1: return ()
 }
 
 
@@ -72,13 +70,10 @@ fun m::id<#0>($t0: 0x42::m::S<#0>): 0x42::m::S<#0> {
 [variant baseline]
 fun m::inlined<#0>($t0: |0x42::m::S<#0>|0x42::m::S<#0>, $t1: 0x42::m::S<#0>) {
      var $t2: 0x42::m::S<#0> [unused]
-     var $t3: 0x42::m::S<#0> [unused]
      # live vars: $t0, $t1
-  0: $t1 := move($t1)
-     # live vars: $t0, $t1
-  1: $t1 := invoke($t1, $t0)
+  0: $t1 := invoke($t1, $t0)
      # live vars:
-  2: return ()
+  1: return ()
 }
 
 
