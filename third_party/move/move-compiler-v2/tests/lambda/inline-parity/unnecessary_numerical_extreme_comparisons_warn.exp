@@ -186,10 +186,8 @@ module 0xc0ffee::no_warn {
 [variant baseline]
 fun m::apply($t0: |u8|bool, $t1: u8): bool {
      var $t2: bool
-     var $t3: u8
-  0: $t3 := infer($t1)
-  1: $t2 := invoke($t3, $t0)
-  2: return $t2
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
 }
 
 
@@ -511,13 +509,10 @@ public fun no_warn::test($t0: u8) {
 [variant baseline]
 fun m::apply($t0: |u8|bool, $t1: u8): bool {
      var $t2: bool
-     var $t3: u8 [unused]
      # live vars: $t0, $t1
-  0: $t1 := move($t1)
-     # live vars: $t0, $t1
-  1: $t2 := invoke($t1, $t0)
+  0: $t2 := invoke($t1, $t0)
      # live vars: $t2
-  2: return $t2
+  1: return $t2
 }
 
 

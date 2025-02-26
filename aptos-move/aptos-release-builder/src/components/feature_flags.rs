@@ -140,6 +140,7 @@ pub enum FeatureFlag {
     VMBinaryFormatV8,
     BulletproofsBatchNatives,
     DomainAccountAbstraction,
+    EnableFunctionValues,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -371,6 +372,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::AccountAbstraction => AptosFeatureFlag::ACCOUNT_ABSTRACTION,
             FeatureFlag::BulletproofsBatchNatives => AptosFeatureFlag::BULLETPROOFS_BATCH_NATIVES,
             FeatureFlag::DomainAccountAbstraction => AptosFeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION,
+            FeatureFlag::EnableFunctionValues => AptosFeatureFlag::ENABLE_FUNCTION_VALUES,
         }
     }
 }
@@ -529,6 +531,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ACCOUNT_ABSTRACTION => FeatureFlag::AccountAbstraction,
             AptosFeatureFlag::BULLETPROOFS_BATCH_NATIVES => FeatureFlag::BulletproofsBatchNatives,
             AptosFeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION => FeatureFlag::DomainAccountAbstraction,
+            AptosFeatureFlag::ENABLE_FUNCTION_VALUES => FeatureFlag::EnableFunctionValues,
         }
     }
 }

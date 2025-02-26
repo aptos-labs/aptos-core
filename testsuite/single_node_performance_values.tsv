@@ -8,7 +8,7 @@ account-resource32-b	1	VM	59	0.844	1.035	29195.5
 modify-global-resource	1	VM	59	0.790	1.019	1937.3
 modify-global-resource	100	VM	59	0.904	1.038	26666.4
 publish-package	1	VM	59	0.873	1.014	1132.4
-mix_publish_transfer	1	VM	59	0.895	1.028	17569.3
+mix_publish_transfer	1	VM	59	0.895	1.028	16669.3
 batch100-transfer	1	VM	59	0.850	1.057	626.5
 batch100-transfer	1	NativeVM	59	0.816	1.170	1442.7
 vector-picture30k	1	VM	59	0.904	1.039	128.0
@@ -39,7 +39,7 @@ liquidity-pool-swap	100	VM	59	0.928	1.054	7914.9
 liquidity-pool-swap-stable	1	VM	59	0.865	1.014	600.3
 liquidity-pool-swap-stable	100	VM	59	0.916	1.041	7793.9
 deserialize-u256	1	VM	59	0.911	1.039	29963.1
-no-op-fee-payer	1	VM	59	0.911	1.023	1611.0
+no-op-fee-payer	1	VM	59	0.911	1.023	1511.0
 no-op-fee-payer	100	VM	59	0.867	1.034	24831.3
 simple-script	1	VM	59	0.861	1.031	31235.5
 vector-trim-append-len3000-size1	1	VM	59	0.837	1.052	631.1

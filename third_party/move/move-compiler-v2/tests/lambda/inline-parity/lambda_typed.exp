@@ -46,7 +46,7 @@ module 0x42::LambdaTest2 {
         }, 2)
     }
     public inline fun inline_apply3(g: |u64|u64,c: u64): u64 {
-        Add<u64>(LambdaTest1::inline_apply1(g, LambdaTest1::inline_mul(c, LambdaTest1::inline_apply(closure#0LambdaTest2::__lambda__2__inline_apply3(), 3))), 4)
+        Add<u64>(LambdaTest1::inline_apply1(g, LambdaTest1::inline_mul(c, LambdaTest1::inline_apply(|x: u64| LambdaTest1::inline_apply(|y: u64| y, x), 3))), 4)
     }
     public fun test_inline_lambda() {
         {
@@ -74,12 +74,6 @@ module 0x42::LambdaTest2 {
           };
           Tuple()
         }
-    }
-    private fun __lambda__1__inline_apply3(y: u64): u64 {
-        y
-    }
-    private fun __lambda__2__inline_apply3(x: u64): u64 {
-        LambdaTest1::inline_apply(closure#0LambdaTest2::__lambda__1__inline_apply3(), x)
     }
 } // end 0x42::LambdaTest2
 module 0x42::LambdaTest {
@@ -136,7 +130,7 @@ module 0x42::LambdaTest2 {
         } + 2
     }
     public inline fun inline_apply3(g: |u64|u64, c: u64): u64 {
-        LambdaTest1::inline_apply1(g, LambdaTest1::inline_mul(c, LambdaTest1::inline_apply(|arg0| __lambda__2__inline_apply3(arg0), 3))) + 4
+        LambdaTest1::inline_apply1(g, LambdaTest1::inline_mul(c, LambdaTest1::inline_apply(|x| LambdaTest1::inline_apply(|y| y, x), 3))) + 4
     }
     public fun test_inline_lambda() {
         let product = 1;
@@ -154,12 +148,6 @@ module 0x42::LambdaTest2 {
                 i = i + 1;
             }
         };
-    }
-    fun __lambda__1__inline_apply3(y: u64): u64 {
-        y
-    }
-    fun __lambda__2__inline_apply3(x: u64): u64 {
-        LambdaTest1::inline_apply(|arg0| __lambda__1__inline_apply3(arg0), x)
     }
 }
 module 0x42::LambdaTest {
@@ -229,24 +217,6 @@ public fun LambdaTest2::test_inline_lambda() {
  28: goto 5
  29: label L1
  30: return ()
-}
-
-
-[variant baseline]
-fun LambdaTest2::__lambda__1__inline_apply3($t0: u64): u64 {
-     var $t1: u64
-  0: $t1 := infer($t0)
-  1: return $t1
-}
-
-
-[variant baseline]
-fun LambdaTest2::__lambda__2__inline_apply3($t0: u64): u64 {
-     var $t1: u64
-     var $t2: |u64|u64
-  0: $t2 := closure#0 LambdaTest2::__lambda__1__inline_apply3()
-  1: $t1 := LambdaTest1::inline_apply($t2, $t0)
-  2: return $t1
 }
 
 
@@ -342,27 +312,6 @@ public fun LambdaTest2::test_inline_lambda() {
 
 
 [variant baseline]
-fun LambdaTest2::__lambda__1__inline_apply3($t0: u64): u64 {
-     var $t1: u64 [unused]
-     # live vars: $t0
-  0: return $t0
-}
-
-
-[variant baseline]
-fun LambdaTest2::__lambda__2__inline_apply3($t0: u64): u64 {
-     var $t1: u64 [unused]
-     var $t2: |u64|u64
-     # live vars: $t0
-  0: $t2 := closure#0 LambdaTest2::__lambda__1__inline_apply3()
-     # live vars: $t0, $t2
-  1: $t0 := LambdaTest1::inline_apply($t2, $t0)
-     # live vars: $t0
-  2: return $t0
-}
-
-
-[variant baseline]
 fun LambdaTest::test_lambda() {
      var $t0: bool
      var $t1: u64
@@ -391,9 +340,6 @@ module 42.LambdaTest1 {
 
 }// Move bytecode v8
 module 42.LambdaTest2 {
-use 0000000000000000000000000000000000000000000000000000000000000042::LambdaTest1;
-
-
 
 
 public test_inline_lambda() /* def_idx: 0 */ {
@@ -438,18 +384,6 @@ B3:
 	27: MoveLoc[2]($t2: &vector<u64>)
 	28: Pop
 	29: Ret
-}
-__lambda__1__inline_apply3(y: u64): u64 /* def_idx: 1 */ {
-B0:
-	0: MoveLoc[0](y: u64)
-	1: Ret
-}
-__lambda__2__inline_apply3(x: u64): u64 /* def_idx: 2 */ {
-B0:
-	0: PackClosure#0 __lambda__1__inline_apply3(u64): u64
-	1: MoveLoc[0](x: u64)
-	2: Call LambdaTest1::inline_apply(|u64|u64, u64): u64
-	3: Ret
 }
 }// Move bytecode v8
 module 42.LambdaTest {

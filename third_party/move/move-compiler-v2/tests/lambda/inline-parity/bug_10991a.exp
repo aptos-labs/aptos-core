@@ -70,26 +70,18 @@ fun Test::foo($t0: |(u64, u64)|u64, $t1: |(u64, u64)|u64, $t2: |(u64, u64)|u64, 
      var $t14: u64
      var $t15: u64
      var $t16: u64
-     var $t17: u64
-     var $t18: u64
-     var $t19: u64
-     var $t20: u64
   0: $t10 := infer($t4)
-  1: $t11 := infer($t5)
-  2: $t9 := invoke($t10, $t11, $t0)
-  3: $t13 := infer($t4)
-  4: $t14 := infer($t5)
-  5: $t12 := invoke($t13, $t14, $t1)
-  6: $t8 := +($t9, $t12)
-  7: $t16 := infer($t4)
-  8: $t17 := infer($t5)
-  9: $t15 := invoke($t16, $t17, $t2)
- 10: $t7 := +($t8, $t15)
- 11: $t19 := infer($t4)
- 12: $t20 := infer($t5)
- 13: $t18 := invoke($t19, $t20, $t3)
- 14: $t6 := +($t7, $t18)
- 15: return $t6
+  1: $t9 := invoke($t10, $t5, $t0)
+  2: $t12 := infer($t4)
+  3: $t11 := invoke($t12, $t5, $t1)
+  4: $t8 := +($t9, $t11)
+  5: $t14 := infer($t4)
+  6: $t13 := invoke($t14, $t5, $t2)
+  7: $t7 := +($t8, $t13)
+  8: $t16 := infer($t4)
+  9: $t15 := invoke($t16, $t5, $t3)
+ 10: $t6 := +($t7, $t15)
+ 11: return $t6
 }
 
 
@@ -169,48 +161,36 @@ fun Test::foo($t0: |(u64, u64)|u64, $t1: |(u64, u64)|u64, $t2: |(u64, u64)|u64, 
      var $t8: u64 [unused]
      var $t9: u64 [unused]
      var $t10: u64
-     var $t11: u64
-     var $t12: u64 [unused]
+     var $t11: u64 [unused]
+     var $t12: u64
      var $t13: u64 [unused]
-     var $t14: u64
+     var $t14: u64 [unused]
      var $t15: u64 [unused]
      var $t16: u64 [unused]
-     var $t17: u64 [unused]
-     var $t18: u64 [unused]
-     var $t19: u64 [unused]
-     var $t20: u64 [unused]
      # live vars: $t0, $t1, $t2, $t3, $t4, $t5
   0: $t10 := copy($t4)
      # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t10
-  1: $t11 := copy($t5)
-     # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t10, $t11
-  2: $t10 := invoke($t10, $t11, $t0)
+  1: $t10 := invoke($t10, $t5, $t0)
      # live vars: $t1, $t2, $t3, $t4, $t5, $t10
-  3: $t11 := copy($t4)
-     # live vars: $t1, $t2, $t3, $t4, $t5, $t10, $t11
-  4: $t14 := copy($t5)
-     # live vars: $t1, $t2, $t3, $t4, $t5, $t10, $t11, $t14
-  5: $t11 := invoke($t11, $t14, $t1)
-     # live vars: $t2, $t3, $t4, $t5, $t10, $t11
-  6: $t10 := +($t10, $t11)
+  2: $t12 := copy($t4)
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t10, $t12
+  3: $t12 := invoke($t12, $t5, $t1)
+     # live vars: $t2, $t3, $t4, $t5, $t10, $t12
+  4: $t10 := +($t10, $t12)
      # live vars: $t2, $t3, $t4, $t5, $t10
-  7: $t11 := copy($t4)
-     # live vars: $t2, $t3, $t4, $t5, $t10, $t11
-  8: $t14 := copy($t5)
-     # live vars: $t2, $t3, $t4, $t5, $t10, $t11, $t14
-  9: $t11 := invoke($t11, $t14, $t2)
-     # live vars: $t3, $t4, $t5, $t10, $t11
- 10: $t10 := +($t10, $t11)
+  5: $t12 := copy($t4)
+     # live vars: $t2, $t3, $t4, $t5, $t10, $t12
+  6: $t12 := invoke($t12, $t5, $t2)
+     # live vars: $t3, $t4, $t5, $t10, $t12
+  7: $t10 := +($t10, $t12)
      # live vars: $t3, $t4, $t5, $t10
- 11: $t4 := move($t4)
+  8: $t4 := move($t4)
      # live vars: $t3, $t4, $t5, $t10
- 12: $t5 := move($t5)
-     # live vars: $t3, $t4, $t5, $t10
- 13: $t4 := invoke($t4, $t5, $t3)
+  9: $t4 := invoke($t4, $t5, $t3)
      # live vars: $t4, $t10
- 14: $t4 := +($t10, $t4)
+ 10: $t4 := +($t10, $t4)
      # live vars: $t4
- 15: return $t4
+ 11: return $t4
 }
 
 

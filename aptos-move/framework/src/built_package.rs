@@ -16,7 +16,7 @@ use codespan_reporting::{
     term::termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor},
 };
 use itertools::Itertools;
-use move_binary_format::{file_format_common::VERSION_7, CompiledModule};
+use move_binary_format::{file_format_common, file_format_common::VERSION_7, CompiledModule};
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_compiler::{
     compiled_unit::{CompiledUnit, NamedCompiledModule},
@@ -153,6 +153,15 @@ impl BuildOptions {
     pub fn with_experiment(mut self, exp: &str) -> Self {
         self.experiments.push(exp.to_string());
         self
+    }
+
+    pub fn set_latest_language(self) -> Self {
+        BuildOptions {
+            language_version: Some(LanguageVersion::latest()),
+            bytecode_version: Some(file_format_common::VERSION_MAX),
+            ..self
+        }
+        .with_experiment(Experiment::FUNCTION_VALUES)
     }
 }
 

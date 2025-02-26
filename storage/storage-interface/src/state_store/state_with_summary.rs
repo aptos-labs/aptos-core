@@ -49,6 +49,12 @@ impl StateWithSummary {
     pub fn is_descendant_of(&self, other: &Self) -> bool {
         self.state.is_descendant_of(&other.state) && self.summary.is_descendant_of(&other.summary)
     }
+
+    pub fn into_inner(self) -> (State, StateSummary) {
+        let Self { state, summary } = self;
+
+        (state, summary)
+    }
 }
 
 #[derive(Clone, Debug, Deref, DerefMut)]

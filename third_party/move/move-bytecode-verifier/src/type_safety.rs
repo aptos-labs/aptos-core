@@ -353,10 +353,10 @@ fn clos_pack(
     // Check the captured arguments on the stack
     let param_sgn = verifier.resolver.signature_at(func_handle.parameters);
     let captured_param_tys = mask.extract(&param_sgn.0, true);
-    let mut abilities = AbilitySet::ALL;
+    let mut abilities = AbilitySet::MAXIMAL_FUNCTIONS;
     for ty in captured_param_tys.into_iter().rev() {
-        abilities = abilities.intersect(verifier.abilities(ty)?);
         let arg = safe_unwrap!(verifier.stack.pop());
+        abilities = abilities.intersect(verifier.abilities(&arg)?);
         // For captured param type to argument, use assignability
         if (type_actuals.is_empty() && !ty.is_assignable_from(&arg))
             || (!type_actuals.is_empty() && !instantiate(ty, type_actuals).is_assignable_from(&arg))
@@ -393,7 +393,6 @@ fn clos_pack(
     if !is_storable {
         abilities.remove(Ability::Store);
     }
-    abilities.remove(Ability::Key);
 
     // Construct the resulting function type
     let not_captured_param_tys = mask
