@@ -134,7 +134,8 @@ module 0x66::work {
     }
 
     entry fun exec(s: &signer, x: u64, r: u64) acquires Work {
-        // TODO: should be able to write `Work[x](y)`
+        // TODO: should be able to omit the parentheses in
+        // `(Work[x])(y)` and instead write `Work[x](y)`
         assert!((Work[address_of(s)])(x) == r)
     }
 }
