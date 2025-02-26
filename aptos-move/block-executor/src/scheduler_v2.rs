@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    scheduler::{DependencyCondvar, DependencyStatus},
+    scheduler::{ArmedLock, DependencyCondvar, DependencyStatus},
     scheduler_status::{DependencyInstruction, DependencyResolution, ExecutionStatus},
 };
 use aptos_infallible::Mutex;
@@ -13,7 +13,7 @@ use crossbeam::utils::CachePadded;
 use std::{
     collections::BTreeSet,
     sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
+        atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering},
         Arc,
     },
 };
@@ -25,7 +25,9 @@ represented by a node in an abstract graph that the scheduler maintains. The pri
 incarnation aborting is a precondition for the next incarnation to exist.
 
 PanicError returned from APIs indicates scheduler internal invariant failure.
- **/
+
+TODO: proper documentation.
+**/
 
 // Execution priority determined based on the proximity to the committed prefix.
 #[derive(Clone, Copy)]
@@ -76,7 +78,7 @@ impl AbortedDependencies {
     fn stall(
         &mut self,
         statuses: &[CachePadded<ExecutionStatus>],
-        propagation_queue: &mut BTreeSet<TxnIndex>,
+        propagation_queue: &mut BTreeSet<usize>,
     ) -> Result<(), PanicError> {
         for idx in &self.not_stalled_deps {
             // Assert the invariant in tests.
@@ -84,7 +86,7 @@ impl AbortedDependencies {
 
             if statuses[*idx as usize].stall()? {
                 // May require recursive stalling.
-                propagation_queue.insert(*idx);
+                propagation_queue.insert(*idx as usize);
             }
         }
 
@@ -99,7 +101,7 @@ impl AbortedDependencies {
     fn unstall(
         &mut self,
         statuses: &[CachePadded<ExecutionStatus>],
-        propagation_queue: &mut BTreeSet<TxnIndex>,
+        propagation_queue: &mut BTreeSet<usize>,
     ) -> Result<(), PanicError> {
         for idx in &self.stalled_deps {
             // Assert the invariant in tests.
@@ -107,7 +109,7 @@ impl AbortedDependencies {
 
             if statuses[*idx as usize].unstall()? {
                 // May require recursive unstalling.
-                propagation_queue.insert(*idx);
+                propagation_queue.insert(*idx as usize);
             }
         }
 
@@ -117,10 +119,20 @@ impl AbortedDependencies {
     }
 }
 
+// Returned from next task interface, representing instruction to the executor using SchedulerV2.
+#[derive(PartialEq, Debug)]
 pub(crate) enum TaskKind {
+    // Execute transaction with a given index and incarnation (0-indexed).
     Execute(TxnIndex, Incarnation),
-    Commit(TxnIndex),
+    // Execute any post-commit processing, if applicable. Dispatched to the executor exactly once
+    // per transaction index after the transaction is committed and the corresponding sequential
+    // commit hook is completed (from scheduler pov assumed to be embarassingly parallelizable).
+    PostCommitProcessing(TxnIndex),
+    // A task was not readily available. Can be viewed as a None variant if Option<TaskKind> was
+    // returned. Gives the control back to the caller of next task / executor, even though the
+    // most common use might be to call next_task again in a loop.
     NextTask,
+    // Scheduling is complete, the executor can terminate the worker.
     Done,
 }
 
@@ -180,6 +192,11 @@ impl SchedulerProxy {
     }
 }
 
+// Const flag values that may be stored as committed marker for a transaction.
+const NOT_COMMITTED: u8 = 0;
+const PENDING_COMMIT_HOOK: u8 = 1;
+const COMMITTED: u8 = 2;
+
 pub(crate) struct SchedulerV2 {
     /// Number of transactions to execute, and number of workers: immutable.
     num_txns: TxnIndex,
@@ -196,11 +213,13 @@ pub(crate) struct SchedulerV2 {
     /// a shared flag, set when all txns are committed or execution is halted.
     next_to_commit_idx: CachePadded<AtomicU32>,
     is_done: CachePadded<AtomicBool>,
+    is_halted: CachePadded<AtomicBool>,
     /// Tasks queue for post commit tasks with a fixed capacity of number of transactions.
-    /// committed_marker is for implementation details: breaking symmetry between two kinds of
-    /// commit for index i (direct finish execution of i and try_commit traversal from i-1).
-    post_commit_task_queue: CachePadded<ConcurrentQueue<TxnIndex>>,
-    committed_marker: Vec<CachePadded<AtomicBool>>,
+    /// committed_marker supports sequential commit hooks by the executor, i.e. when the hook
+    /// is complete for index i-1, it can be marked as committed, allowing the hook for i.
+    queueing_commits_lock: CachePadded<ArmedLock>,
+    post_commit_processing_queue: CachePadded<ConcurrentQueue<TxnIndex>>,
+    committed_marker: Vec<CachePadded<AtomicU8>>,
 
     proxy: Arc<SchedulerProxy>,
 }
@@ -223,28 +242,152 @@ impl SchedulerV2 {
                 .collect(),
             next_to_commit_idx: CachePadded::new(AtomicU32::new(0)),
             is_done: CachePadded::new(AtomicBool::new(false)),
-            post_commit_task_queue: CachePadded::new(ConcurrentQueue::<TxnIndex>::bounded(
+            is_halted: CachePadded::new(AtomicBool::new(false)),
+            queueing_commits_lock: CachePadded::new(ArmedLock::new()),
+            post_commit_processing_queue: CachePadded::new(ConcurrentQueue::<TxnIndex>::bounded(
                 num_txns as usize,
             )),
             committed_marker: (0..num_txns)
-                .map(|_| CachePadded::new(AtomicBool::new(false)))
+                .map(|_| CachePadded::new(AtomicU8::new(NOT_COMMITTED)))
                 .collect(),
             proxy,
         }
     }
 
+    // Marks the transaction as (fully) committed, i.e. indicates that the caller (executor) has
+    // successfully performed the sequential (clint-side) commit hook logic. The transaction index
+    // must have previously been obtained via try_sequential_commit_hook method call, while
+    // holding the lock (commit_hooks_try_lock / commit_hooks_unlock).
+    //
+    // Also schedules the corresponding task for parallel post-processing of the transaction.
+    pub(crate) fn commit_hook_performed(&self, txn_idx: TxnIndex) -> Result<(), PanicError> {
+        // Allows next sequential commit hook to be processed.
+        if self.committed_marker[txn_idx as usize].swap(COMMITTED, Ordering::Relaxed)
+            != PENDING_COMMIT_HOOK
+        {
+            return Err(code_invariant_error(format!(
+                "Marking txn {} as COMMITTED, but previous marker != PENDING_COMMIT_HOOK",
+                txn_idx
+            )));
+        }
+
+        if self.post_commit_processing_queue.push(txn_idx).is_err() {
+            return Err(code_invariant_error(format!(
+                "Error adding {txn_idx} to commit queue, len {}",
+                self.post_commit_processing_queue.len()
+            )));
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn commit_hooks_unlock(&self) {
+        let next_to_commit_idx = self.next_to_commit_idx.load(Ordering::Relaxed);
+        if next_to_commit_idx < self.num_txns
+            && !self.is_halted()
+            && self.txn_status[next_to_commit_idx as usize].is_executed()
+        {
+            self.queueing_commits_lock.arm();
+        }
+
+        self.queueing_commits_lock.unlock();
+    }
+
+    pub(crate) fn commit_hooks_try_lock(&self) -> bool {
+        self.queueing_commits_lock.try_lock()
+    }
+
+    // Should be called (i.e. in a while loop until None) after a successful should_perform_commit_hooks
+    // call. Completing the hooks should be followed by a commit_hook_performed call.
+    pub(crate) fn try_get_sequential_commit_hook(
+        &self,
+    ) -> Result<Option<(TxnIndex, Incarnation)>, PanicError> {
+        // Relaxed ordering due to armed lock acq-rel.
+        let next_to_commit_idx = self.next_to_commit_idx.load(Ordering::Relaxed) as usize;
+
+        assert!(next_to_commit_idx <= self.num_txns as usize);
+        if self.is_halted() || next_to_commit_idx == self.num_txns as usize {
+            // All sequential commit hooks are already dispatched.
+            return Ok(None);
+        }
+
+        if next_to_commit_idx > 0
+            && self.committed_marker[next_to_commit_idx - 1].load(Ordering::Relaxed) != COMMITTED
+        {
+            // Must wait for the previous hook to complete.
+            return Ok(None);
+        }
+
+        if self.txn_status[next_to_commit_idx as usize].is_executed() {
+            // All prior transactions are committed and the latest incarnation of the transaction
+            // at next_to_commit_idx has finished but has not been aborted. If any of its read was
+            // incorrect, it would have been invalidated by the respective transaction's last
+            // (committed) (re-)execution, and led to an abort in the corresponding finish execution
+            // (which, inductively, must occur before the transaction is committed). Hence, it
+            // must also be safe to commit the current transaction.
+
+            if self.committed_marker[next_to_commit_idx as usize]
+                .swap(PENDING_COMMIT_HOOK, Ordering::Relaxed)
+                != NOT_COMMITTED
+            {
+                return Err(code_invariant_error(format!(
+                    "Marking {} as PENDING_COMMIT_HOOK, but previous marker != NOT_COMMITTED",
+                    self.post_commit_processing_queue.len()
+                )));
+            }
+
+            // Transaction might be executed despite a stalled status, e.g. intentionally,
+            // due to having a high priority, or simply if it gets stalled after the
+            // execution task is picked up. Hence, a transaction can be committed while
+            // stalled, and in this case its aborted dependencies need to be unstalled.
+            let mut aborted_dependency_guard =
+                self.aborted_dependencies[next_to_commit_idx as usize].lock();
+            let mut propagation_queue = BTreeSet::new();
+            if aborted_dependency_guard.is_stalled {
+                aborted_dependency_guard.unstall(&self.txn_status, &mut propagation_queue)?;
+            }
+            self.propagate(propagation_queue)?;
+
+            // Increments cause cache invalidations, but finish_execution / try_commit
+            // performs only a relaxed read to check (see above).
+            let prev_idx = self
+                .next_to_commit_idx
+                .swap(next_to_commit_idx as u32 + 1, Ordering::Relaxed);
+            if prev_idx != next_to_commit_idx as u32 {
+                return Err(code_invariant_error(format!(
+                    "Scheduler committing {}, stored next to commit idx = {}",
+                    next_to_commit_idx, prev_idx
+                )));
+            }
+
+            return Ok(Some((
+                next_to_commit_idx as u32,
+                self.txn_status[next_to_commit_idx].last_incarnation(),
+            )));
+        }
+
+        Ok(None)
+    }
+
     // TODO: take worker ID, dedicate some workers to scan high priority tasks (can use armed lock).
     // We can also have different versions (e.g. for testing) of next_task.
     pub(crate) fn next_task(&self) -> Result<TaskKind, PanicError> {
-        if self.is_done() && self.post_commit_task_queue.is_empty() {
+        if self.is_done() {
             return Ok(TaskKind::Done);
         }
 
-        match self.post_commit_task_queue.pop() {
+        match self.post_commit_processing_queue.pop() {
             Ok(txn_idx) => {
-                return Ok(TaskKind::Commit(txn_idx));
+                if txn_idx == self.num_txns - 1 {
+                    self.is_done.store(true, Ordering::SeqCst);
+                }
+                return Ok(TaskKind::PostCommitProcessing(txn_idx));
             },
-            Err(PopError::Empty) => {},
+            Err(PopError::Empty) => {
+                if self.is_halted() {
+                    return Ok(TaskKind::Done);
+                }
+            },
             Err(PopError::Closed) => {
                 return Err(code_invariant_error("Commit queue should never be closed"));
             },
@@ -257,6 +400,16 @@ impl SchedulerV2 {
         }
 
         Ok(TaskKind::NextTask)
+    }
+
+    pub(crate) fn halt(&self) -> bool {
+        if !self.is_halted.swap(true, Ordering::SeqCst) {
+            for txn_idx in 0..self.num_txns {
+                self.txn_status[txn_idx as usize].halt();
+            }
+            return true;
+        }
+        false
     }
 
     // Called when a transaction observes a read-write dependency, i.e. reads a value written by
@@ -276,14 +429,15 @@ impl SchedulerV2 {
             )));
         }
 
+        use DependencyResolution::*;
         match self.txn_status[dep_txn_idx as usize]
             .resolve_dependency(DependencyInstruction::Default)?
         {
-            DependencyResolution::SafeToProceed => Ok(true),
-            DependencyResolution::Wait(_) => {
+            SafeToProceed => Ok(true),
+            Wait(_) => {
                 unreachable!("Wait resolution for Default instruction")
             },
-            DependencyResolution::None => Ok(false),
+            None | Halted => Ok(false),
         }
     }
 
@@ -387,6 +541,9 @@ impl SchedulerV2 {
                     Self::wait(dep_condition);
                     // Next iteration of the loop will try to resolve again.
                 },
+                DependencyResolution::Halted => {
+                    return Ok(false);
+                },
             }
         }
     }
@@ -408,15 +565,25 @@ impl SchedulerV2 {
                 .record_dependencies(invalidated_versions.iter().map(|(idx, _)| *idx));
         }
 
-        let mut propagation_queue = BTreeSet::from([txn_idx]);
+        let mut propagation_queue = BTreeSet::new();
         for (invalidated_idx, invalidated_incarnation) in invalidated_versions {
             let mut to_propagate = self.try_abort(invalidated_idx, invalidated_incarnation)?;
             propagation_queue.append(&mut to_propagate);
         }
+
         if self.txn_status[txn_idx as usize].finish_execution(incarnation)? {
-            // After updating the status, check if more transactions can be committed. Important to
-            // be called after finish execution.
-            self.try_commit(txn_idx)?;
+            propagation_queue.insert(txn_idx as usize);
+
+            if txn_idx == 0
+                || self.committed_marker[txn_idx as usize - 1].load(Ordering::Relaxed)
+                    != NOT_COMMITTED
+            {
+                // If the committed marker is NOT_COMMITTED by the time the last execution of a
+                // transaction finishes, then considering the lowest such index, arming will occur
+                // either because txn_idx = 0 (base case), or after the marker is set, in the
+                // commits_hooks_unlock method (which checks the executed status).
+                self.queueing_commits_lock.arm();
+            }
         }
 
         if incarnation == 0 {
@@ -424,7 +591,23 @@ impl SchedulerV2 {
         }
 
         // Handle recursive propagation of stall / unstall.
-        self.propagate(propagation_queue)
+        self.propagate(propagation_queue)?;
+
+        Ok(())
+    }
+
+    pub(crate) fn is_halted_or_aborted(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> bool {
+        if self.is_halted() {
+            return true;
+        }
+
+        if incarnation == 0 {
+            // Never interrupt the 0-th incarnation due to an early abort to get the first output
+            // estimation (even if it is based on invalidated reads).
+            return false;
+        }
+
+        self.txn_status[txn_idx as usize].shortcut_already_aborted(incarnation)
     }
 }
 
@@ -438,22 +621,26 @@ impl SchedulerV2 {
         }
     }
 
-    fn propagate(&self, mut propagation_queue: BTreeSet<TxnIndex>) -> Result<(), PanicError> {
+    fn propagate(&self, mut propagation_queue: BTreeSet<usize>) -> Result<(), PanicError> {
         while let Some(task_idx) = propagation_queue.pop_first() {
+            // Make sure the conditions are checked under dependency lock.
+            let mut aborted_deps_guard = self.aborted_dependencies[task_idx].lock();
+
+            if self.committed_marker[task_idx].load(Ordering::Relaxed) != NOT_COMMITTED {
+                // Already committed & dealt with after setting PENDING_COMMIT_HOOK marker.
+                continue;
+            }
+
             // checks the current status to determine whether to propagate 'stall' (or 'unstall'),
             // calling which only affects its currently not_stalled (or stalled) dependencies.
             // Allows to store indices in propagation queue (not stall or unstall commands) & avoids
             // handling corner cases such as merging commands (as propagation process is not atomic).
-            if self.txn_status[task_idx as usize].shortcut_executed_and_not_stalled() {
+            if self.txn_status[task_idx].shortcut_executed_and_not_stalled() {
                 // Still makes sense to propagate 'unstall'
-                self.aborted_dependencies[task_idx as usize]
-                    .lock()
-                    .unstall(&self.txn_status, &mut propagation_queue)?;
+                aborted_deps_guard.unstall(&self.txn_status, &mut propagation_queue)?;
             } else {
                 // Not executed or stalled - still makes sense to propagate 'stall'.
-                self.aborted_dependencies[task_idx as usize]
-                    .lock()
-                    .stall(&self.txn_status, &mut propagation_queue)?;
+                aborted_deps_guard.stall(&self.txn_status, &mut propagation_queue)?;
             }
         }
         Ok(())
@@ -463,54 +650,17 @@ impl SchedulerV2 {
         &self,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-    ) -> Result<BTreeSet<TxnIndex>, PanicError> {
+    ) -> Result<BTreeSet<usize>, PanicError> {
         let mut ret = BTreeSet::new();
+        let mut aborted_deps_guard = self.aborted_dependencies[txn_idx as usize].lock();
         if self.txn_status[txn_idx as usize].try_abort(incarnation)? {
-            self.aborted_dependencies[txn_idx as usize]
-                .lock()
-                .stall(&self.txn_status, &mut ret)?;
+            aborted_deps_guard.stall(&self.txn_status, &mut ret)?;
         }
         Ok(ret)
     }
 
     fn try_start_executing(&self, txn_idx: TxnIndex) -> Option<Incarnation> {
         self.txn_status[txn_idx as usize].try_start_executing()
-    }
-
-    fn try_commit(&self, txn_idx: TxnIndex) -> Result<(), PanicError> {
-        // Synchronization occurs on the transaction status locks:
-        // (a) finish_execution sets the status before try_commit is called for the index,
-        // followed by the next_to_commit_idx check, and
-        // (b) is_executed call below internally also acquires the lock, and follows the
-        // increment to next_to_commit_idx in the prior loop iteration.
-        // Hence (by classic flags principle), in case is_executed check fails, the
-        // check after finish_execution is guarateed to succeed. This allows relaxed reads
-        // on next_to_commit_idx in each try_commit call.
-        if self.next_to_commit_idx.load(Ordering::Relaxed) == txn_idx {
-            let mut idx = txn_idx;
-            while idx < self.num_txns && self.txn_status[idx as usize].is_executed() {
-                if self.committed_marker[idx as usize].swap(true, Ordering::Relaxed) {
-                    break;
-                }
-
-                if self.post_commit_task_queue.push(idx).is_err() {
-                    return Err(code_invariant_error(format!(
-                        "Error adding {idx} to commit queue, len {}",
-                        self.post_commit_task_queue.len()
-                    )));
-                }
-
-                // Increments cause cache invalidations, but finish_execution / try_commit
-                // performs only a relaxed read to check (see above).
-                self.next_to_commit_idx.store(idx + 1, Ordering::Relaxed);
-                idx += 1;
-            }
-            if idx == self.num_txns {
-                self.is_done.store(true, Ordering::SeqCst);
-            }
-        }
-
-        Ok(())
     }
 
     fn try_increase_executed_idx(&self, txn_idx: TxnIndex) {
@@ -524,18 +674,19 @@ impl SchedulerV2 {
         if self.proxy.executed_idx.load(Ordering::Relaxed) == txn_idx {
             let mut idx = txn_idx;
             while idx < self.num_txns && self.txn_status[idx as usize].ever_executed() {
-                // TODO: acquire the status lock once instead of twice.
-                if self.txn_status[idx as usize].requires_execution() {
-                    self.proxy.execution_queue.lock().insert(idx);
-                }
                 // A successful check of ever_executed holds idx-th status lock and follows an
                 // increment of executed_idx to idx in the prior loop iteration. A stall can
                 // only remove idx from the execution queue while holding the idx-th status
                 // lock, which would have to be after ever_executed, and the corresponding
                 // unstall would hence acquire the same lock even later, and hence be guaranteed
                 // to observe executed_idx >= idx. TODO: confirm carefully.
-
                 self.proxy.executed_idx.store(idx + 1, Ordering::Relaxed);
+
+                // Note: Should we keep the lock from ever_executed instead of re-acquiring.
+                if self.txn_status[idx as usize].pending_scheduling_and_not_stalled() {
+                    self.proxy.execution_queue.lock().insert(idx);
+                }
+
                 idx += 1;
             }
         }
@@ -569,14 +720,18 @@ impl SchedulerV2 {
     fn is_done(&self) -> bool {
         self.is_done.load(Ordering::Acquire)
     }
+
+    fn is_halted(&self) -> bool {
+        self.is_halted.load(Ordering::Acquire)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scheduler_status::InnerStatus;
+    use crate::scheduler_status::{InnerStatus, StatusEnum};
     use arc_swap::ArcSwapOption;
-    use claims::{assert_err, assert_lt, assert_ok, assert_ok_eq, assert_some_eq};
+    use claims::{assert_err, assert_lt, assert_none, assert_ok, assert_ok_eq, assert_some_eq};
     use dashmap::DashMap;
     use num_cpus;
     use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -629,18 +784,34 @@ mod tests {
         // Status 1 on which stall returns err, but also ignored (not in not_stalled).
         statuses.push(CachePadded::new(ExecutionStatus::new(proxy.clone(), 1)));
 
-        let status_to_stall =
-            ExecutionStatus::new_for_test(InnerStatus::RequiresExecution(1), 0, &proxy, 2);
+        let status_to_stall = ExecutionStatus::new_for_test(
+            InnerStatus::new_for_test(StatusEnum::PendingScheduling, 1),
+            0,
+            &proxy,
+            2,
+        );
         statuses.push(CachePadded::new(status_to_stall));
-        let executing_status_to_stall =
-            ExecutionStatus::new_for_test(InnerStatus::Executing(1), 0, &proxy, 3);
+        let executing_status_to_stall = ExecutionStatus::new_for_test(
+            InnerStatus::new_for_test(StatusEnum::Executing, 1),
+            0,
+            &proxy,
+            3,
+        );
         statuses.push(CachePadded::new(executing_status_to_stall));
-        let executed_status_to_stall =
-            ExecutionStatus::new_for_test(InnerStatus::Executed(1), 0, &proxy, 4);
+        let executed_status_to_stall = ExecutionStatus::new_for_test(
+            InnerStatus::new_for_test(StatusEnum::Executed, 1),
+            0,
+            &proxy,
+            4,
+        );
         statuses.push(CachePadded::new(executed_status_to_stall));
 
-        let already_stalled_status =
-            ExecutionStatus::new_for_test(InnerStatus::RequiresExecution(1), 1, &proxy, 5);
+        let already_stalled_status = ExecutionStatus::new_for_test(
+            InnerStatus::new_for_test(StatusEnum::PendingScheduling, 1),
+            1,
+            &proxy,
+            5,
+        );
         statuses.push(CachePadded::new(already_stalled_status));
 
         // Successful stall when status requires execution must remove 2 from execution
@@ -680,10 +851,18 @@ mod tests {
         let mut propagation_queue = BTreeSet::new();
 
         // One err status because of num_stalls = 0, another because of incarnation = 0.
-        let err_status =
-            ExecutionStatus::new_for_test(InnerStatus::RequiresExecution(1), 0, &proxy, 0);
-        let err_status_1 =
-            ExecutionStatus::new_for_test(InnerStatus::RequiresExecution(0), 1, &proxy, 0);
+        let err_status = ExecutionStatus::new_for_test(
+            InnerStatus::new_for_test(StatusEnum::PendingScheduling, 1),
+            0,
+            &proxy,
+            0,
+        );
+        let err_status_1 = ExecutionStatus::new_for_test(
+            InnerStatus::new_for_test(StatusEnum::PendingScheduling, 0),
+            1,
+            &proxy,
+            0,
+        );
 
         let mut statuses = vec![CachePadded::new(err_status)];
         let mut deps = AbortedDependencies::new();
@@ -705,32 +884,48 @@ mod tests {
 
         // All incarnations are 1, but executed_idx >= (2,3,4). Only 4 should be add to execution
         // queue, as 2 and 3 do not require execution. All should be added to propagation queue.
-        let executing_status_to_unstall =
-            ExecutionStatus::new_for_test(InnerStatus::Executing(1), 1, &proxy, 2);
+        let executing_status_to_unstall = ExecutionStatus::new_for_test(
+            InnerStatus::new_for_test(StatusEnum::Executing, 1),
+            1,
+            &proxy,
+            2,
+        );
         statuses.push(CachePadded::new(executing_status_to_unstall));
-        let executed_status_to_unstall =
-            ExecutionStatus::new_for_test(InnerStatus::Executed(1), 1, &proxy, 3);
+        let executed_status_to_unstall = ExecutionStatus::new_for_test(
+            InnerStatus::new_for_test(StatusEnum::Executed, 1),
+            1,
+            &proxy,
+            3,
+        );
         statuses.push(CachePadded::new(executed_status_to_unstall));
-        let status_to_unstall =
-            ExecutionStatus::new_for_test(InnerStatus::RequiresExecution(1), 1, &proxy, 4);
+        let status_to_unstall = ExecutionStatus::new_for_test(
+            InnerStatus::new_for_test(StatusEnum::PendingScheduling, 1),
+            1,
+            &proxy,
+            4,
+        );
         statuses.push(CachePadded::new(status_to_unstall));
 
         // For below statuses, executed_idx < their indices: we test is_first_incarnation behavior.
         statuses.push(CachePadded::new(ExecutionStatus::new_for_test(
-            InnerStatus::RequiresExecution(1),
+            InnerStatus::new_for_test(StatusEnum::PendingScheduling, 1),
             1,
             &proxy,
             5,
         )));
         statuses.push(CachePadded::new(ExecutionStatus::new_for_test(
-            InnerStatus::RequiresExecution(2),
+            InnerStatus::new_for_test(StatusEnum::PendingScheduling, 2),
             1,
             &proxy,
             6,
         )));
         // Should not be added to the queues, as num_stalls = 2 (status remains stalled after call).
-        let still_stalled_status =
-            ExecutionStatus::new_for_test(InnerStatus::RequiresExecution(2), 2, &proxy, 7);
+        let still_stalled_status = ExecutionStatus::new_for_test(
+            InnerStatus::new_for_test(StatusEnum::PendingScheduling, 2),
+            2,
+            &proxy,
+            7,
+        );
         statuses.push(CachePadded::new(still_stalled_status));
 
         proxy.execution_queue.lock().clear();
@@ -755,6 +950,105 @@ mod tests {
         for i in 2..8 {
             assert!(deps.not_stalled_deps.contains(&i));
         }
+    }
+
+    #[test_case(1)]
+    #[test_case(2)]
+    fn propagate(commit_flag: u8) {
+        let scheduler = SchedulerV2::new(10, 2);
+
+        let test_indices = [0, 2, 4];
+        for idx in test_indices {
+            assert!(!scheduler.aborted_dependencies[idx].lock().is_stalled);
+            assert!(!scheduler.txn_status[idx].is_stalled());
+        }
+        scheduler
+            .propagate(BTreeSet::from(test_indices.clone()))
+            .unwrap();
+        for idx in test_indices {
+            assert!(scheduler.aborted_dependencies[idx].lock().is_stalled);
+            // Propagate does not call stall for the status itself, only
+            // propagates to aborted dependencies based on the status (assumption
+            // being the status is already updated, e.g. due to propagation).
+            assert!(!scheduler.txn_status[0].is_stalled());
+        }
+
+        scheduler.aborted_dependencies[0].lock().is_stalled = false;
+        scheduler.committed_marker[0].store(commit_flag, Ordering::Relaxed);
+        scheduler.propagate(BTreeSet::from([0])).unwrap();
+        // Already committed, should early return and not update is_stalled.
+        assert!(!scheduler.aborted_dependencies[0].lock().is_stalled);
+
+        // Add 4 as dependency of 2 and get it unstalled.
+        scheduler.aborted_dependencies[2]
+            .lock()
+            .stalled_deps
+            .insert(4);
+        assert_some_eq!(scheduler.try_start_executing(2), 0);
+        assert_some_eq!(scheduler.try_start_executing(4), 0);
+        assert_ok!(scheduler.txn_status[2].finish_execution(0));
+        assert_ok!(scheduler.txn_status[4].finish_execution(0));
+        // Propagate starts at 2 (does not call unstall), but will call unstall on 4.
+        assert_ok_eq!(scheduler.txn_status[4].stall(), true);
+        assert!(scheduler.txn_status[4].is_stalled());
+        scheduler.propagate(BTreeSet::from([2])).unwrap();
+        assert!(!scheduler.aborted_dependencies[2].lock().is_stalled);
+        assert!(!scheduler.aborted_dependencies[4].lock().is_stalled);
+        assert!(!scheduler.txn_status[4].is_stalled());
+    }
+
+    fn stall_and_add_dependency(
+        scheduler: &SchedulerV2,
+        idx: TxnIndex,
+        dep_idx: TxnIndex,
+        num_stalls: usize,
+    ) {
+        assert!(num_stalls > 0);
+
+        assert_some_eq!(scheduler.try_start_executing(dep_idx), 0);
+        assert_ok!(scheduler.finish_execution(dep_idx, 0, BTreeSet::new()));
+        assert_ok_eq!(scheduler.txn_status[dep_idx as usize].stall(), true);
+        assert!(scheduler.txn_status[dep_idx as usize].is_stalled());
+        for _ in 1..num_stalls {
+            assert_ok_eq!(scheduler.txn_status[dep_idx as usize].stall(), false);
+        }
+        assert!(scheduler.txn_status[dep_idx as usize].is_stalled());
+
+        scheduler.aborted_dependencies[dep_idx as usize]
+            .lock()
+            .is_stalled = true;
+        scheduler.aborted_dependencies[idx as usize]
+            .lock()
+            .stalled_deps
+            .insert(dep_idx);
+    }
+
+    #[test]
+    fn finish_execution_unstall() {
+        let scheduler = SchedulerV2::new(10, 2);
+        assert_some_eq!(scheduler.try_start_executing(0), 0);
+
+        scheduler.aborted_dependencies[0].lock().is_stalled = true;
+        stall_and_add_dependency(&scheduler, 0, 2, 1);
+        stall_and_add_dependency(&scheduler, 0, 3, 2);
+
+        assert_ok!(scheduler.finish_execution(0, 0, BTreeSet::new()));
+
+        assert!(!scheduler.aborted_dependencies[0].lock().is_stalled);
+        assert!(!scheduler.aborted_dependencies[2].lock().is_stalled);
+        assert!(scheduler.aborted_dependencies[3].lock().is_stalled);
+        assert!(!scheduler.txn_status[0].is_stalled());
+        assert!(!scheduler.txn_status[2].is_stalled());
+        assert!(scheduler.txn_status[3].is_stalled());
+        assert_ok_eq!(scheduler.txn_status[3].unstall(), true);
+
+        for i in 0..3 {
+            assert_eq!(
+                scheduler.committed_marker[i].load(Ordering::Relaxed),
+                NOT_COMMITTED
+            );
+        }
+        assert_eq!(scheduler.next_to_commit_idx.load(Ordering::Relaxed), 0);
     }
 
     #[test_case(1)]
@@ -789,21 +1083,131 @@ mod tests {
             }
         });
 
-        assert!(scheduler.is_done());
-        assert_eq!(
-            scheduler.next_to_commit_idx.load(Ordering::Relaxed),
-            num_txns
-        );
+        assert!(!scheduler.is_done());
+        assert_eq!(scheduler.next_to_commit_idx.load(Ordering::Relaxed), 0);
         assert_eq!(
             scheduler.proxy.executed_idx.load(Ordering::Relaxed),
             num_txns
         );
-        assert_eq!(scheduler.post_commit_task_queue.len(), num_txns as usize);
+        assert_eq!(scheduler.post_commit_processing_queue.len(), 0);
+
         for i in 0..num_txns {
             assert!(scheduler.txn_status[i as usize].is_executed());
-            assert!(scheduler.committed_marker[i as usize].load(Ordering::Relaxed));
-            assert_ok_eq!(scheduler.post_commit_task_queue.pop(), i);
+
+            assert_eq!(
+                scheduler.committed_marker[i as usize].load(Ordering::Relaxed),
+                NOT_COMMITTED
+            );
+            assert_err!(scheduler.commit_hook_performed(i));
+            // Reset it back, as the call w. error swaps the status.
+            scheduler.committed_marker[i as usize].store(NOT_COMMITTED, Ordering::Relaxed);
+
+            assert_some_eq!(scheduler.try_get_sequential_commit_hook().unwrap(), (i, 0));
+            assert_eq!(
+                scheduler.committed_marker[i as usize].load(Ordering::Relaxed),
+                PENDING_COMMIT_HOOK
+            );
+
+            // Commit hook needs to complete for next one to be dispatched.
+            assert_ok_eq!(scheduler.try_get_sequential_commit_hook(), None);
+            assert_ok!(scheduler.commit_hook_performed(i));
+            assert_eq!(
+                scheduler.committed_marker[i as usize].load(Ordering::Relaxed),
+                COMMITTED
+            );
+
+            assert_err!(scheduler.commit_hook_performed(i));
+            // Reset again.
+            scheduler.committed_marker[i as usize].store(COMMITTED, Ordering::Relaxed);
         }
+
+        assert_eq!(
+            scheduler.post_commit_processing_queue.len(),
+            num_txns as usize
+        );
+
+        assert!(scheduler.txn_status[0].is_executed());
+        assert_ok_eq!(scheduler.post_commit_processing_queue.pop(), 0);
+
+        for i in 1..num_txns {
+            assert!(!scheduler.is_done());
+            assert_ok_eq!(scheduler.next_task(), TaskKind::PostCommitProcessing(i));
+        }
+        assert!(scheduler.is_done());
+    }
+
+    #[test]
+    fn try_get_sequential_commit_hook_simple() {
+        let mut scheduler = SchedulerV2::new(10, 1);
+
+        // Test txn index 0.
+        assert_eq!(scheduler.next_to_commit_idx.load(Ordering::Relaxed), 0);
+        assert_none!(scheduler.try_get_sequential_commit_hook().unwrap());
+        // Next task should start executing (0, 0).
+        assert_ok_eq!(scheduler.next_task(), TaskKind::Execute(0, 0));
+        assert_none!(scheduler.try_get_sequential_commit_hook().unwrap());
+        // After execution is finished, commit hook can be dispatched.
+        assert_ok!(scheduler.finish_execution(0, 0, BTreeSet::new()));
+        assert_eq!(
+            scheduler.committed_marker[0].load(Ordering::Relaxed),
+            NOT_COMMITTED
+        );
+
+        assert_some_eq!(scheduler.try_get_sequential_commit_hook().unwrap(), (0, 0));
+        assert_eq!(scheduler.next_to_commit_idx.load(Ordering::Relaxed), 1);
+        assert_eq!(
+            scheduler.committed_marker[0].load(Ordering::Relaxed),
+            PENDING_COMMIT_HOOK
+        );
+
+        assert_none!(scheduler.try_get_sequential_commit_hook().unwrap());
+        scheduler.next_to_commit_idx.store(3, Ordering::Relaxed);
+        assert_none!(scheduler.try_get_sequential_commit_hook().unwrap());
+        scheduler.committed_marker[2].store(COMMITTED, Ordering::Relaxed);
+        assert_none!(scheduler.try_get_sequential_commit_hook().unwrap());
+
+        scheduler.txn_status[3] = CachePadded::new(ExecutionStatus::new_for_test(
+            InnerStatus::new_for_test(StatusEnum::Executed, 5),
+            1,
+            &scheduler.proxy,
+            2,
+        ));
+        assert!(scheduler.txn_status[3].is_stalled());
+        assert_eq!(
+            scheduler.committed_marker[3].load(Ordering::Relaxed),
+            NOT_COMMITTED
+        );
+        scheduler.aborted_dependencies[3].lock().is_stalled = true;
+        stall_and_add_dependency(&scheduler, 3, 5, 1);
+        stall_and_add_dependency(&scheduler, 5, 7, 1);
+        stall_and_add_dependency(&scheduler, 3, 8, 2);
+        stall_and_add_dependency(&scheduler, 3, 6, 1);
+        stall_and_add_dependency(&scheduler, 6, 9, 1);
+        assert_ok_eq!(scheduler.txn_status[6].try_abort(0), true);
+
+        assert_some_eq!(scheduler.try_get_sequential_commit_hook().unwrap(), (3, 5));
+        assert_eq!(scheduler.next_to_commit_idx.load(Ordering::Relaxed), 4);
+        assert_eq!(
+            scheduler.committed_marker[3].load(Ordering::Relaxed),
+            PENDING_COMMIT_HOOK,
+        );
+
+        assert!(scheduler.txn_status[3].is_stalled());
+        assert!(!scheduler.txn_status[5].is_stalled());
+        assert!(!scheduler.txn_status[7].is_stalled());
+        assert!(scheduler.txn_status[8].is_stalled());
+        assert!(!scheduler.txn_status[6].is_stalled());
+        assert!(scheduler.txn_status[9].is_stalled());
+        assert!(!scheduler.aborted_dependencies[0].lock().is_stalled);
+        assert!(!scheduler.aborted_dependencies[5].lock().is_stalled);
+        assert!(!scheduler.aborted_dependencies[7].lock().is_stalled);
+        assert!(scheduler.aborted_dependencies[8].lock().is_stalled);
+        assert!(scheduler.aborted_dependencies[6].lock().is_stalled);
+        assert!(scheduler.aborted_dependencies[9].lock().is_stalled);
+
+        scheduler.next_to_commit_idx.store(10, Ordering::Relaxed);
+        scheduler.committed_marker[9].store(COMMITTED, Ordering::Relaxed);
+        assert_none!(scheduler.try_get_sequential_commit_hook().unwrap());
     }
 
     #[test_case(1)]
@@ -821,6 +1225,9 @@ mod tests {
     // succeed due to the algorithm ensuring all prior transactions have finished
     // the first incarnation prior to scheduling. The test utilizes next_task method,
     // and also confirms that the block execution finishes / commits successfully.
+    //
+    // The test is internally executed multiple times, with a different seed. Some seeds
+    // halts the scheduler before all transactions are committed.
     fn dependency_graph_single_reexecution(num_workers: u32) {
         if num_workers as usize > num_cpus::get() {
             // Ideally, we would want:
@@ -828,18 +1235,18 @@ mod tests {
             return;
         }
 
-        for seed in 0..5 {
-            let num_txns: u32 = 100;
+        // TODO: Seed divisible by 8 is reserved as a basic halting test.
+        for seed in 0..10000 {
+            let num_txns: u32 = if seed & 7 == 0 { 1000 } else { 100 };
             let scheduler = SchedulerV2::new(num_txns, num_workers);
             let num_committed = AtomicU32::new(0);
+            let num_processed = AtomicU32::new(0);
 
             let mut r = StdRng::seed_from_u64(seed);
             let txn_deps: Vec<Option<usize>> = (0..num_txns)
                 .map(|idx| {
                     let diff: u32 = r.gen_range(0, min(idx, 16) + 1);
-                    // self dependency (diff = 0) works for this test and makes aborts more likely,
-                    // and as such, the test stronger.
-                    (diff <= idx).then_some((idx - diff) as usize)
+                    (diff > 0 && diff <= idx).then_some((idx - diff) as usize)
                 })
                 .collect();
             let hooks = Mutex::new(BTreeSet::new());
@@ -849,6 +1256,42 @@ mod tests {
             rayon::scope(|s| {
                 for _ in 0..num_workers {
                     s.spawn(|_| loop {
+                        while scheduler.commit_hooks_try_lock() {
+                            while let Some((txn_idx, incarnation)) =
+                                scheduler.try_get_sequential_commit_hook().unwrap()
+                            {
+                                assert!(incarnation < 2);
+                                assert!(
+                                    !scheduler.aborted_dependencies[txn_idx as usize]
+                                        .lock()
+                                        .is_stalled
+                                );
+                                assert!(scheduler.txn_status[txn_idx as usize].is_executed());
+
+                                assert_eq!(
+                                    scheduler.committed_marker[txn_idx as usize]
+                                        .load(Ordering::Relaxed),
+                                    PENDING_COMMIT_HOOK
+                                );
+                                scheduler.commit_hook_performed(txn_idx).unwrap();
+
+                                if num_committed.fetch_add(1, Ordering::Relaxed) == num_txns / 2
+                                    && seed & 7 == 0
+                                {
+                                    // Halt must occur after commit_hook_performed call (so we
+                                    // do not miss a post-processing task in next_task).
+                                    scheduler.halt();
+                                }
+                                assert_eq!(
+                                    scheduler.committed_marker[txn_idx as usize]
+                                        .load(Ordering::Relaxed),
+                                    COMMITTED
+                                );
+                            }
+
+                            scheduler.commit_hooks_unlock();
+                        }
+
                         match scheduler.next_task().unwrap() {
                             TaskKind::Execute(txn_idx, incarnation) => {
                                 assert!(incarnation < 2);
@@ -860,32 +1303,42 @@ mod tests {
                                     .into_iter()
                                     .collect();
 
+                                let mut dep_ok = true;
                                 if let Some(dep_idx) = txn_deps[txn_idx as usize] {
                                     if !scheduler.txn_status[dep_idx].ever_executed() {
                                         hooks.lock().insert((txn_idx, incarnation));
                                         if hooks_taken[dep_idx].load(Ordering::Relaxed) {
                                             // Hook is not guaraneed to be executed - call abort itself.
                                             assert_ok!(scheduler.try_abort(txn_idx, incarnation));
-                                        }
-
-                                        assert_ok!(scheduler.finish_execution(
-                                            txn_idx,
-                                            incarnation,
-                                            invalidated,
-                                        ));
-                                        continue;
+                                        };
+                                        dep_ok = false;
                                     }
                                 }
 
+                                if dep_ok {
+                                    observed_executed[txn_idx as usize]
+                                        .store(true, Ordering::Relaxed);
+                                }
                                 assert_ok!(scheduler.finish_execution(
                                     txn_idx,
                                     incarnation,
                                     invalidated,
                                 ));
-                                observed_executed[txn_idx as usize].store(true, Ordering::Relaxed);
                             },
-                            TaskKind::Commit(_) => {
-                                num_committed.fetch_add(1, Ordering::Relaxed);
+                            TaskKind::PostCommitProcessing(txn_idx) => {
+                                num_processed.fetch_add(1, Ordering::Relaxed);
+
+                                assert_eq!(
+                                    scheduler.committed_marker[txn_idx as usize]
+                                        .load(Ordering::Relaxed),
+                                    COMMITTED
+                                );
+                                assert!(scheduler.txn_status[txn_idx as usize].is_executed());
+                                assert!(
+                                    !scheduler.aborted_dependencies[txn_idx as usize]
+                                        .lock()
+                                        .is_stalled
+                                );
                             },
                             TaskKind::NextTask => {},
                             TaskKind::Done => {
@@ -896,15 +1349,28 @@ mod tests {
                 }
             });
 
-            assert_eq!(num_committed.load(Ordering::Relaxed), num_txns);
-            for i in 0..num_txns {
+            let num_committed = num_committed.load(Ordering::Relaxed);
+            assert_eq!(num_committed, num_processed.load(Ordering::Relaxed));
+            assert_eq!(
+                num_committed,
+                if seed & 7 != 0 {
+                    num_txns
+                } else {
+                    num_txns / 2 + 1
+                }
+            );
+            for i in 0..num_committed {
                 assert!(
                     observed_executed[i as usize].load(Ordering::Relaxed),
                     "Transaction {i} did not observe executed dependency status"
                 );
 
                 assert!(scheduler.txn_status[i as usize].is_executed());
-                assert!(scheduler.committed_marker[i as usize].load(Ordering::Relaxed));
+                assert!(!scheduler.aborted_dependencies[i as usize].lock().is_stalled);
+                assert_eq!(
+                    scheduler.committed_marker[i as usize].load(Ordering::Relaxed),
+                    COMMITTED
+                );
             }
         }
     }
@@ -1015,6 +1481,15 @@ mod tests {
             rayon::scope(|s| {
                 for _ in 0..num_workers {
                     s.spawn(|_| loop {
+                        while scheduler.commit_hooks_try_lock() {
+                            while let Some((txn_idx, _)) =
+                                scheduler.try_get_sequential_commit_hook().unwrap()
+                            {
+                                scheduler.commit_hook_performed(txn_idx).unwrap();
+                            }
+                            scheduler.commit_hooks_unlock();
+                        }
+
                         match scheduler.next_task().unwrap() {
                             TaskKind::Execute(txn_idx, incarnation) => {
                                 if mock_execution_time_us > 0 {
@@ -1112,8 +1587,15 @@ mod tests {
                                     invalidated_versions,
                                 ));
                             },
-                            TaskKind::Commit(txn_idx) => {
-                                // On commit, perform a read, and assert it is equal to the
+                            TaskKind::PostCommitProcessing(txn_idx) => {
+                                assert_eq!(
+                                    scheduler.committed_marker[txn_idx as usize]
+                                        .load(Ordering::Relaxed),
+                                    COMMITTED
+                                );
+                                assert!(scheduler.txn_status[txn_idx as usize].is_executed());
+
+                                // Past commit, perform a read, and assert it is equal to the
                                 // latest recorded read, as well as baseline.
                                 let key_entries =
                                     mv_hashmap.get(&txn_read_keys[txn_idx as usize]).unwrap();
@@ -1153,7 +1635,10 @@ mod tests {
             // basic checks on scheduler state.
             for i in 0..num_txns {
                 assert!(scheduler.txn_status[i as usize].is_executed());
-                assert!(scheduler.committed_marker[i as usize].load(Ordering::Relaxed));
+                assert_eq!(
+                    scheduler.committed_marker[i as usize].load(Ordering::Relaxed),
+                    COMMITTED
+                );
             }
         }
 

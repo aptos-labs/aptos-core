@@ -64,6 +64,7 @@ rand = { workspace = true }
 test-case = { workspace = true }
 
 [features]
+blockstm-profiling = []
 testing = []
 fuzzing = ["criterion", "proptest", "proptest-derive"]
 
