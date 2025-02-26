@@ -44,11 +44,9 @@ module 0xcafe::m {
 fun m::consume<#0>($t0: 0xcafe::m::S<#0>, $t1: #0, $t2: |(0xcafe::m::S<#0>, #0)|#0): #0 {
      var $t3: #0
      var $t4: 0xcafe::m::S<#0>
-     var $t5: #0
   0: $t4 := infer($t0)
-  1: $t5 := infer($t1)
-  2: $t3 := invoke($t4, $t5, $t2)
-  3: return $t3
+  1: $t3 := invoke($t4, $t1, $t2)
+  2: return $t3
 }
 
 
@@ -85,15 +83,12 @@ fun m::__lambda__1__pattern($t0: 0xcafe::m::S<u64>, $t1: u64): u64 {
 fun m::consume<#0>($t0: 0xcafe::m::S<#0>, $t1: #0, $t2: |(0xcafe::m::S<#0>, #0)|#0): #0 {
      var $t3: #0 [unused]
      var $t4: 0xcafe::m::S<#0> [unused]
-     var $t5: #0 [unused]
      # live vars: $t0, $t1, $t2
   0: $t0 := move($t0)
      # live vars: $t0, $t1, $t2
-  1: $t1 := move($t1)
-     # live vars: $t0, $t1, $t2
-  2: $t1 := invoke($t0, $t1, $t2)
+  1: $t1 := invoke($t0, $t1, $t2)
      # live vars: $t1
-  3: return $t1
+  2: return $t1
 }
 
 

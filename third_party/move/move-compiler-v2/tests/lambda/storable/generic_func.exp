@@ -192,8 +192,7 @@ public fun mod3::test_items($t0: signer, $t1: bool) {
      var $t15: bool
      var $t16: bool
      var $t17: bool
-     var $t18: address
-     var $t19: u64
+     var $t18: u64
   0: $t3 := 3
   1: $t2 := pack 0x42::mod3::MyStruct1($t3)
   2: $t4 := closure#0 mod2::item_exists<0x42::mod3::MyStruct1>()
@@ -223,17 +222,16 @@ public fun mod3::test_items($t0: signer, $t1: bool) {
  26: label L5
  27: $t14 := mod2::get_item<|address|bool with copy+store>($t6)
  28: $t16 := infer($t1)
- 29: $t18 := infer($t6)
- 30: $t17 := invoke($t18, $t14)
- 31: $t15 := ==($t16, $t17)
- 32: if ($t15) goto 33 else goto 35
- 33: label L6
- 34: goto 38
- 35: label L7
- 36: $t19 := 14566554180833181696
- 37: abort($t19)
- 38: label L8
- 39: return ()
+ 29: $t17 := invoke($t6, $t14)
+ 30: $t15 := ==($t16, $t17)
+ 31: if ($t15) goto 32 else goto 34
+ 32: label L6
+ 33: goto 37
+ 34: label L7
+ 35: $t18 := 14566554180833181696
+ 36: abort($t18)
+ 37: label L8
+ 38: return ()
 }
 
 ============ after LiveVarAnalysisProcessor: ================
@@ -327,8 +325,7 @@ public fun mod3::test_items($t0: signer, $t1: bool) {
      var $t15: bool [unused]
      var $t16: bool [unused]
      var $t17: bool
-     var $t18: address
-     var $t19: u64 [unused]
+     var $t18: u64 [unused]
      # live vars: $t0, $t1
   0: $t3 := 3
      # live vars: $t0, $t1, $t3
@@ -350,7 +347,7 @@ public fun mod3::test_items($t0: signer, $t1: bool) {
      # live vars: $t0, $t1, $t2, $t4, $t5, $t6, $t7
   9: move_to<0x42::mod3::MyStruct1>($t7, $t2)
      # live vars: $t0, $t1, $t4, $t5, $t6
- 10: if ($t1) goto 11 else goto 32
+ 10: if ($t1) goto 11 else goto 31
      # live vars: $t0, $t1, $t4, $t5, $t6
  11: label L0
      # live vars: $t0, $t1, $t4, $t6
@@ -362,7 +359,7 @@ public fun mod3::test_items($t0: signer, $t1: bool) {
      # live vars: $t1, $t6
  15: $t12 := mod2::item_exists<|address|bool with copy+store>($t6)
      # live vars: $t1, $t6, $t12
- 16: if ($t12) goto 17 else goto 29
+ 16: if ($t12) goto 17 else goto 28
      # live vars: $t1, $t6
  17: label L3
      # live vars: $t1, $t6
@@ -370,37 +367,35 @@ public fun mod3::test_items($t0: signer, $t1: bool) {
      # live vars: $t1, $t6, $t14
  19: $t12 := move($t1)
      # live vars: $t6, $t12, $t14
- 20: $t18 := move($t6)
-     # live vars: $t12, $t14, $t18
- 21: $t17 := invoke($t18, $t14)
+ 20: $t17 := invoke($t6, $t14)
      # live vars: $t12, $t17
- 22: $t12 := ==($t12, $t17)
+ 21: $t12 := ==($t12, $t17)
      # live vars: $t12
- 23: if ($t12) goto 24 else goto 26
+ 22: if ($t12) goto 23 else goto 25
      # live vars:
- 24: label L6
+ 23: label L6
      # live vars:
- 25: return ()
+ 24: return ()
      # live vars:
- 26: label L7
+ 25: label L7
      # live vars:
- 27: $t3 := 14566554180833181696
+ 26: $t3 := 14566554180833181696
      # live vars: $t3
- 28: abort($t3)
+ 27: abort($t3)
      # live vars: $t1, $t6
- 29: label L4
+ 28: label L4
      # live vars:
- 30: $t3 := 14566554180833181696
+ 29: $t3 := 14566554180833181696
      # live vars: $t3
- 31: abort($t3)
+ 30: abort($t3)
      # live vars: $t0, $t1, $t4, $t5, $t6
- 32: label L1
+ 31: label L1
      # live vars: $t0, $t1, $t5, $t6
- 33: $t7 := borrow_local($t0)
+ 32: $t7 := borrow_local($t0)
      # live vars: $t1, $t5, $t6, $t7
- 34: mod2::save_item<|address|bool with copy+store>($t7, $t5)
+ 33: mod2::save_item<|address|bool with copy+store>($t7, $t5)
      # live vars: $t1, $t6
- 35: goto 14
+ 34: goto 14
 }
 
 
@@ -465,7 +460,9 @@ L2:	struct1: MyStruct1
 L3:	f1: |address|bool has copy + drop + store
 L4:	f2: |address|bool has copy + drop + store
 L5:	addr: address
-L6:	found_f: |address|bool has copy + store
+L6:	$t12: bool
+L7:	found_f: |address|bool has copy + store
+L8:	$t17: bool
 B0:
 	0: LdU64(3)
 	1: Pack[0](MyStruct1)
@@ -484,7 +481,7 @@ B0:
 	14: MoveLoc[2](struct1: MyStruct1)
 	15: MoveTo[0](MyStruct1)
 	16: CopyLoc[1](use_1: bool)
-	17: BrFalse(38)
+	17: BrFalse(42)
 B1:
 	18: ImmBorrowLoc[0](owner: signer)
 	19: MoveLoc[3](f1: |address|bool has copy + drop + store)
@@ -492,30 +489,34 @@ B1:
 B2:
 	21: CopyLoc[5](addr: address)
 	22: Call mod2::item_exists<|address|bool has copy + store>(address): bool
-	23: BrFalse(36)
+	23: BrFalse(40)
 B3:
 	24: CopyLoc[5](addr: address)
 	25: Call mod2::get_item<|address|bool has copy + store>(address): |address|bool has copy + store
-	26: StLoc[6](found_f: |address|bool has copy + store)
-	27: MoveLoc[1](use_1: bool)
-	28: MoveLoc[5](addr: address)
-	29: MoveLoc[6](found_f: |address|bool has copy + store)
-	30: CallClosure(|address|bool has copy + store)
-	31: Eq
-	32: BrFalse(34)
+	26: MoveLoc[1](use_1: bool)
+	27: StLoc[6]($t12: bool)
+	28: StLoc[7](found_f: |address|bool has copy + store)
+	29: MoveLoc[5](addr: address)
+	30: MoveLoc[7](found_f: |address|bool has copy + store)
+	31: CallClosure(|address|bool has copy + store)
+	32: StLoc[8]($t17: bool)
+	33: MoveLoc[6]($t12: bool)
+	34: MoveLoc[8]($t17: bool)
+	35: Eq
+	36: BrFalse(38)
 B4:
-	33: Ret
+	37: Ret
 B5:
-	34: LdU64(14566554180833181696)
-	35: Abort
+	38: LdU64(14566554180833181696)
+	39: Abort
 B6:
-	36: LdU64(14566554180833181696)
-	37: Abort
+	40: LdU64(14566554180833181696)
+	41: Abort
 B7:
-	38: ImmBorrowLoc[0](owner: signer)
-	39: MoveLoc[4](f2: |address|bool has copy + drop + store)
-	40: Call mod2::save_item<|address|bool has copy + drop + store>(&signer, |address|bool has copy + drop + store)
-	41: Branch(21)
+	42: ImmBorrowLoc[0](owner: signer)
+	43: MoveLoc[4](f2: |address|bool has copy + drop + store)
+	44: Call mod2::save_item<|address|bool has copy + drop + store>(&signer, |address|bool has copy + drop + store)
+	45: Branch(21)
 }
 }
 ============ bytecode verification succeeded ========
