@@ -17,17 +17,23 @@ use std::sync::{
 };
 
 /**
-In BlockSTMv2 scheduler, a transaction can be `stalled' and `unstalled'. A successful call
-to the stall method requires a commitment from the caller to eventually perform the
-corresponding `unstall' (remove the stall).
+In BlockSTMv2 scheduler, a transaction (or we may also say its respective status)
+can be `stalled', which means there have been more add_stall than remove_stall calls
+on its status. A successful call to the add_stall method requires a commitment from
+the caller to eventually perform the corresponding remove_stall (and remove_stall
+may not be called without a prior add_stall).
 
-The intended use for the stall mechanism (as the name suggests, and similar to typical uses)
-is for the caller to record that the given transaction has (a chain of) dependencies that
-are likely to cause re-execution (e.g. have previously aborted and changed a value). This
-information can then be used to (a) not reschedule the transaction for re-execution until
-stall is cleared (corresponding unstalls have occurred), or (b) help determine the right
-handling when another transaction observes a dependency during execution. In both cases,
-the goal is to constraint optimistic concurrency by limiting the impact of cascading aborts.
+We say that the status gets "unstalled" after a successful remove_stall call which
+balances the number of add_stall and remove_stalls. Another way of thinking about
+add_stall and remove_stall is to consider open '(' and close ')' brackets, respectively.
+
+The intended use for the stall mechanism is for the caller to record that the given
+transaction has (a chain of) dependencies that are likely to cause re-execution (e.g.
+have previously aborted and changed a value). This information can then be used to (a)
+not reschedule the transaction for re-execution until the stalls have been removed, or
+(b) help determine the right handling when another transaction observes a dependency
+during execution. In both cases, the goal is to constraint optimistic concurrency by
+limiting the impact of cascading aborts.
 
 The mechanism is best-effort, i.e. the caller can decide to incarnate / re-execute a
 transaction even in the stalled state, which can be useful e.g. if the transaction has a
@@ -47,7 +53,7 @@ const DEPENDENCY_SAFE_FLAG: u8 = 0;
 const DEPENDENCY_EXECUTING_FLAG: u8 = 1;
 // - DEFER flag means that values written by the dependency are not safe, but if they were
 // to change, the new incarnation has not yet started executing. This state can occur when
-// status is Aborted or RequiresExecution (i.e. not yet re-scheduled for re-execution), or
+// status is Aborted or PendingScheduling (i.e. not yet re-scheduled for re-execution), or
 // when status is Executed but stalled - i.e. there is an active dependency chain that has
 // already triggered an abort earlier (and may again do so).
 const DEPENDENCY_DEFER_FLAG: u8 = 2;
@@ -60,8 +66,8 @@ pub(crate) enum DependencyInstruction {
     // SafeToProceed resolution is returned. This is to speed up the good-case path, i.e.
     // not require the caller to query and provide additional information (via instruction).
     Default,
-    // If the shortcut is not SAFE, return the wait resolution (condvar that notifies when
-    // the next incarnation finishes execution, or a finished execution unstalls).
+    // If the shortcut is not SAFE, return the wait resolution (condvar notifying when the
+    // next incarnation finishes execution, or a finished execution removed the last stall).
     Wait,
     // If the shortcut is EXECUTING, return the wait resolution.
     WaitForExecuting,
@@ -77,63 +83,79 @@ pub(crate) enum DependencyResolution {
     // Transaction is executing and the caller has high priority: recommended to wait.
     // The provided conditional variable will be notified after the prescribed wait.
     Wait(DependencyCondvar),
+    // The scheduler has been halted, waiting is disabled
+    Halted,
     // Above conditions not met, the exact resolution deferred to the caller: this might
     // involve calling resolve_dependency again with an updated instruction.
     None,
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum InnerStatus {
-    RequiresExecution(Incarnation),
-    Executing(Incarnation),
-    Aborted(Incarnation),
-    Executed(Incarnation),
+pub(crate) enum StatusEnum {
+    PendingScheduling,
+    Executing,
+    Aborted,
+    Executed,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct InnerStatus {
+    status: StatusEnum,
+    incarnation: Incarnation,
 }
 
 impl InnerStatus {
-    fn incarnation(&self) -> Incarnation {
-        use InnerStatus::*;
-        match self {
-            RequiresExecution(incarnation)
-            | Executing(incarnation)
-            | Aborted(incarnation)
-            | Executed(incarnation) => *incarnation,
+    fn new() -> Self {
+        Self {
+            status: StatusEnum::PendingScheduling,
+            incarnation: 0,
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn new_for_test(status: StatusEnum, incarnation: Incarnation) -> Self {
+        Self {
+            status,
+            incarnation,
+        }
+    }
+
+    fn try_start_executing(&mut self) -> Option<Incarnation> {
+        if self.status == StatusEnum::PendingScheduling {
+            self.status = StatusEnum::Executing;
+            return Some(self.incarnation);
+        }
+        None
+    }
+
+    fn incarnation(&self) -> Incarnation {
+        self.incarnation
     }
 
     fn never_started_execution(&self, incarnation: Incarnation) -> bool {
-        let status_incarnation = self.incarnation();
-
-        if status_incarnation < incarnation
-            || (status_incarnation == incarnation
-                && matches!(self, InnerStatus::RequiresExecution(_)))
-        {
-            return true;
-        }
-        false
+        self.incarnation < incarnation
+            || (self.incarnation == incarnation && self.status == StatusEnum::PendingScheduling)
     }
 
     fn already_aborted(&self, incarnation: Incarnation) -> bool {
-        let status_incarnation = self.incarnation();
-
-        if status_incarnation > incarnation
-            || (status_incarnation == incarnation && matches!(self, InnerStatus::Aborted(_)))
-        {
-            return true;
-        }
-        false
+        self.incarnation > incarnation
+            || (self.incarnation == incarnation && self.status == StatusEnum::Aborted)
     }
 
-    fn requires_execution(&self) -> Option<Incarnation> {
-        use InnerStatus::*;
-        match self {
-            RequiresExecution(incarnation) => Some(*incarnation),
-            Executing(_) | Aborted(_) | Executed(_) => None,
-        }
+    fn pending_scheduling(&self) -> Option<Incarnation> {
+        (self.status == StatusEnum::PendingScheduling).then_some(self.incarnation)
     }
 
     fn is_executed(&self) -> bool {
-        matches!(self, InnerStatus::Executed(_))
+        self.status == StatusEnum::Executed
+    }
+
+    fn ever_executed(&self) -> bool {
+        use StatusEnum::*;
+        match self.status {
+            PendingScheduling | Executing | Aborted => self.incarnation > 0,
+            Executed => true,
+        }
     }
 }
 
@@ -144,7 +166,7 @@ pub(crate) struct ExecutionStatus {
     //
     // Inner status transition diagram:
     //
-    // RequiresExecution(i)
+    // PendingScheduling(i)
     //     |
     //     | try_start_executing
     //     |
@@ -154,11 +176,11 @@ pub(crate) struct ExecutionStatus {
     //     | try_abort(i)                             | try_abort(i)
     //     |                                          |
     //     ↓           finish_execution               ↓
-    // Aborted(i) ---------------------------> RequiresExecution(i+1)
+    // Aborted(i) ---------------------------> PendingScheduling(i+1)
     //
     inner_status: CachePadded<Mutex<InnerStatus>>,
 
-    // It is guaranteed that each stall has a corresponding unstall, which occurs later.
+    // It is guaranteed that each stall has a corresponding remove_stall, which occurs later.
     num_stalls: CachePadded<AtomicU32>,
 
     // Precomputated often-evaluated predicate provides a lock-free common path for the caller
@@ -168,19 +190,23 @@ pub(crate) struct ExecutionStatus {
     // between resolve dependency & finish_execution, relies on ordering with respect to the
     // waiting_queue mutex (below) acquisitions as well.
     dependency_shortcut: AtomicU8,
-    // Abort incarnation shortcut is monotonically increasing, updated after inner status, and
-    // allows lock-free fast-path for outdated aborts (on an already aborted version).
+    // Abort incarnation shortcut is monotonically increasing, updated after an abort (unlike the
+    // inner status, which gets incremented at PendingScheduling), and allows lock-free fast-path
+    // for outdated aborts (on an already aborted version).
     abort_incarnation_shortcut: AtomicU32,
 
     // waiting queue is tied to the dependency shortcut. If a dependency resolution is to
     // wait, then a new condvar is stored in the queue and returned to the caller. When the
     // shortcut changes from wait / executing, the queue is drained, notifying the waiting
     // workers (after execution finishes, status changes, and shortcut is updated).
-    waiting_queue: CachePadded<Mutex<Vec<DependencyCondvar>>>,
+    //
+    // The bool indicates whether scheduler has been halted, in which case adding to the
+    // waiting queue is disabled.
+    waiting_queue: CachePadded<Mutex<(Vec<DependencyCondvar>, bool)>>,
 
     // The proxy allows hooks to add or remove the corresponding transaction to the scheduler's
-    // execution queue. Removing is needed after a stall, while after an unstall or creating a
-    // new incarnation, the transaction is rescheduled for (re-)execution.
+    // execution queue. Removing may be needed after adding a stall, while after removing a stall
+    // or creating a new incarnation, the transaction can be rescheduled for (re-)execution.
     // TODO: share add/remove implementation generically w. the scheduler.
     scheduler_proxy: Arc<SchedulerProxy>,
     txn_idx: TxnIndex,
@@ -189,27 +215,26 @@ pub(crate) struct ExecutionStatus {
 impl ExecutionStatus {
     pub(crate) fn new(scheduler_proxy: Arc<SchedulerProxy>, txn_idx: TxnIndex) -> Self {
         Self {
-            inner_status: CachePadded::new(Mutex::new(InnerStatus::RequiresExecution(0))),
+            inner_status: CachePadded::new(Mutex::new(InnerStatus::new())),
             num_stalls: CachePadded::new(AtomicU32::new(0)),
             dependency_shortcut: AtomicU8::new(DEPENDENCY_DEFER_FLAG),
             abort_incarnation_shortcut: AtomicU32::new(0),
-            waiting_queue: CachePadded::new(Mutex::new(Vec::new())),
+            waiting_queue: CachePadded::new(Mutex::new((Vec::new(), false))),
             scheduler_proxy,
             txn_idx,
         }
     }
 
-    // Does not check num_stalled, and tries updates RequiresExecution(incarnation) status
+    // Does not check num_stalled, and tries updates PendingScheduling(incarnation) status
     // If successful, return Some(incarnation), o.w. None.
     // We do not provide incarnation as try_start_executing is assumed to be issued
-    // sequentially: its precondition is RequiresExecution inner status, which itself
+    // sequentially: its precondition is PendingScheduling inner status, which itself
     // requires previous execution to have started and then aborted.
     pub(crate) fn try_start_executing(&self) -> Option<Incarnation> {
-        let mut inner_status = self.inner_status.lock();
-        if let InnerStatus::RequiresExecution(incarnation) = *inner_status {
-            *inner_status = InnerStatus::Executing(incarnation);
+        let ret = self.inner_status.lock().try_start_executing();
 
-            // When status is RequiresExecution the dependency shortcut flag ought to be
+        if ret.is_some() {
+            // When status is PendingScheduling the dependency shortcut flag ought to be
             // DEFER (default or set by abort under the inner status lock).
             assert_eq!(
                 self.dependency_shortcut
@@ -217,22 +242,21 @@ impl ExecutionStatus {
                 DEPENDENCY_DEFER_FLAG,
                 "Incorrect dependency shortcut flag in try_start_executing"
             );
-
-            return Some(incarnation);
         }
-        None
+
+        ret
     }
 
     // Called once per transaction incarnation after its execution finishes. Does appropriate
     // checks and updates inner status (from Executing) to Executed, returning Ok(true), or
-    // from Aborted to RequiresExecution (for the next incarnation), returning Ok(false).
+    // from Aborted to PendingScheduling (for the next incarnation), returning Ok(false).
     // Waiting dependencies are notified in all cases.
     pub(crate) fn finish_execution(
         &self,
         finished_incarnation: Incarnation,
     ) -> Result<bool, PanicError> {
         defer! {
-            self.notify_waiting_workers();
+            self.notify_waiting_workers(false);
         }
 
         {
@@ -250,9 +274,9 @@ impl ExecutionStatus {
                 )));
             }
 
-            match inner_status {
-                InnerStatus::Executing(incarnation) => {
-                    *inner_status = InnerStatus::Executed(*incarnation);
+            match inner_status.status {
+                StatusEnum::Executing => {
+                    inner_status.status = StatusEnum::Executed;
 
                     assert_eq!(
                         self.dependency_shortcut.swap(
@@ -268,11 +292,11 @@ impl ExecutionStatus {
                     );
                     Ok(true)
                 },
-                InnerStatus::Aborted(_incarnation) => {
+                StatusEnum::Aborted => {
                     self.incarnate(inner_status, finished_incarnation + 1);
                     Ok(false)
                 },
-                InnerStatus::RequiresExecution(_) | InnerStatus::Executed(_) => {
+                StatusEnum::PendingScheduling | StatusEnum::Executed => {
                     Err(code_invariant_error(format!(
                         "Status update to Executed failed, previous inner status {:?}",
                         inner_status
@@ -284,7 +308,7 @@ impl ExecutionStatus {
 
     // Returns whether the abort succeeded (the first try_abort), or PanicError.
     pub(crate) fn try_abort(&self, aborted_incarnation: Incarnation) -> Result<bool, PanicError> {
-        if self.abort_incarnation_shortcut.load(Ordering::Relaxed) > aborted_incarnation {
+        if self.shortcut_already_aborted(aborted_incarnation) {
             // Shortcut path: already aborted.
             return Ok(false);
         }
@@ -296,15 +320,26 @@ impl ExecutionStatus {
             }
             if inner_status.never_started_execution(aborted_incarnation) {
                 return Err(code_invariant_error(format!(
-                    "Status flag update to RequiresExecution failed, previous flag {:?}",
-                    inner_status
+                    "Try abort of incarnation {}, but inner status {:?}",
+                    aborted_incarnation, inner_status
                 )));
             }
 
-            match inner_status {
-                InnerStatus::Executing(incarnation) => {
-                    assert_eq!(*incarnation, aborted_incarnation);
-                    *inner_status = InnerStatus::Aborted(*incarnation);
+            let new_incarnation = aborted_incarnation + 1;
+            let prev_shortcut = self
+                .abort_incarnation_shortcut
+                .swap(new_incarnation, Ordering::Relaxed);
+            // Assert (not PanicError) due to the earlier checks under lock above.
+            assert!(
+                new_incarnation > prev_shortcut,
+                "New abort incarnation shortcut {} must be > {} (previous)",
+                new_incarnation,
+                prev_shortcut,
+            );
+
+            match inner_status.status {
+                StatusEnum::Executing => {
+                    inner_status.status = StatusEnum::Aborted;
                     assert_eq!(
                         self.dependency_shortcut
                             .swap(DEPENDENCY_DEFER_FLAG, Ordering::Relaxed),
@@ -313,19 +348,24 @@ impl ExecutionStatus {
                     );
                     Ok(true)
                 },
-                InnerStatus::Executed(incarnation) => {
-                    assert_eq!(*incarnation, aborted_incarnation);
-                    self.incarnate(inner_status, aborted_incarnation + 1);
+                StatusEnum::Executed => {
+                    self.incarnate(inner_status, new_incarnation);
                     Ok(true)
                 },
-                InnerStatus::RequiresExecution(_) | InnerStatus::Aborted(_) => {
+                StatusEnum::PendingScheduling | StatusEnum::Aborted => {
                     Err(code_invariant_error(format!(
-                        "Status update to Executed failed, previous inner status {:?}",
+                        "Status update to Aborted failed, previous inner status {:?}",
                         inner_status
                     )))
                 },
             }
         }
+    }
+
+    // Wake up any suspended workers and disallow further waiting. Useful when the scheduler
+    // is halted before committing all transactions to avoid race conditions / deadlocks.
+    pub(crate) fn halt(&self) {
+        self.notify_waiting_workers(true);
     }
 
     // If DependencyResolution::Wait(condvar) is returned, the caller is expected to make
@@ -338,81 +378,86 @@ impl ExecutionStatus {
         instruction: DependencyInstruction,
     ) -> Result<DependencyResolution, PanicError> {
         let mut shortcut = self.dependency_shortcut.load(Ordering::Relaxed);
-        for _ in 0..2 {
-            use DependencyInstruction::*;
 
-            match (shortcut, instruction) {
-                (DEPENDENCY_SAFE_FLAG, Default | Wait | WaitForExecuting) => {
-                    // Shortcut path: default proceed.
+        use DependencyInstruction::*;
+        match (shortcut, instruction) {
+            (DEPENDENCY_SAFE_FLAG, Default | Wait | WaitForExecuting) => {
+                // Shortcut path: default proceed.
+                Ok(DependencyResolution::SafeToProceed)
+            },
+            (DEPENDENCY_EXECUTING_FLAG, Wait | WaitForExecuting)
+            | (DEPENDENCY_DEFER_FLAG, Wait) => {
+                // Create a condvar and push to the local queue for later notifying.
+                let dep_condvar =
+                    Arc::new((Mutex::new(DependencyStatus::Unresolved), Condvar::new()));
+
+                let mut waiting = self.waiting_queue.lock();
+                if waiting.1 {
+                    return Ok(DependencyResolution::Halted);
+                }
+
+                // Re-check after acquiring the waiting queue lock to avoid lost wake-ups.
+                // Suppose the check below observes an 'executing' status. Then we must show
+                // that the corresponding finish_execution has not yet locked the queue and
+                // woken up contained dependencies.
+                //   - If finish_execution updates the status from 'executing', it does so
+                //   before locking the waiting queue, giving the desired contradiction.
+                //   - Otherwise, it must observe an already aborted state by another worker.
+                //   Since the observation & updates happen while holding the inner status
+                //   mutex, their ordering is transitive and the load below may not observe
+                //   already changed 'executing' status.
+                // If the status is Aborted or PendingScheduling, then the next incarnation
+                // has not even started executing (finish execution will happen afterwards).
+                // Finally, if status is executed but stalled (corresponding to DEFER flag),
+                // then an remove_stall must occur afterwards and will wake up dependencies.
+                shortcut = self.dependency_shortcut.load(Ordering::Relaxed);
+
+                if matches!(shortcut, DEPENDENCY_SAFE_FLAG) {
                     return Ok(DependencyResolution::SafeToProceed);
-                },
-                (DEPENDENCY_EXECUTING_FLAG, Wait | WaitForExecuting)
-                | (DEPENDENCY_DEFER_FLAG, Wait) => {
-                    // Create a condvar and push to the local queue for later notifying.
-                    let dep_condvar =
-                        Arc::new((Mutex::new(DependencyStatus::Unresolved), Condvar::new()));
+                }
 
-                    let mut waiting = self.waiting_queue.lock();
-                    // Re-check after acquiring the waiting queue lock to avoid lost wake-ups.
-                    // Suppose the check below observes an 'executing' status. Then we must show
-                    // that the corresponding finish_execution has not yet locked the queue and
-                    // woken up contained dependencies.
-                    //   - If finish_execution updates the status from 'executing', it does so
-                    //   before locking the waiting queue, giving the desired contradiction.
-                    //   - Otherwise, it must observe an already aborted state by another worker.
-                    //   Since the observation & updates happen while holding the inner status
-                    //   mutex, their ordering is transitive and the load below may not observe
-                    //   already changed 'executing' status.
-                    // If the status is Aborted or RequiresExecution, then the next incarnation
-                    // has not even started executing (finish execution will happen afterwards).
-                    // Finally, if status is executed but stalled (corresponding to DEFER flag),
-                    // then an unstall must occur afterwards and will wake up dependencies.
-                    shortcut = self.dependency_shortcut.load(Ordering::Relaxed);
-                    if matches!(shortcut, DEPENDENCY_SAFE_FLAG)
-                        || matches!(
-                            (shortcut, instruction),
-                            (DEPENDENCY_DEFER_FLAG, WaitForExecuting)
-                        )
-                    {
-                        // Try again - has to return.
-                        continue;
-                    }
-                    waiting.push(dep_condvar.clone());
+                if matches!(
+                    (shortcut, instruction),
+                    (DEPENDENCY_DEFER_FLAG, WaitForExecuting)
+                ) {
+                    return Ok(DependencyResolution::None);
+                }
+                waiting.0.push(dep_condvar.clone());
 
-                    return Ok(DependencyResolution::Wait(dep_condvar));
-                },
-                (DEPENDENCY_EXECUTING_FLAG, Default)
-                | (DEPENDENCY_DEFER_FLAG, Default | WaitForExecuting) => {
-                    return Ok(DependencyResolution::None)
-                },
-                (3..=u8::MAX, _) => {
-                    return Err(code_invariant_error(format!(
-                        "Incorrect value in dependency shortcut {}",
-                        shortcut
-                    )))
-                },
-            }
+                Ok(DependencyResolution::Wait(dep_condvar))
+            },
+            (DEPENDENCY_EXECUTING_FLAG, Default)
+            | (DEPENDENCY_DEFER_FLAG, Default | WaitForExecuting) => Ok(DependencyResolution::None),
+            (3..=u8::MAX, _) => Err(code_invariant_error(format!(
+                "Incorrect value in dependency shortcut {}",
+                shortcut
+            ))),
         }
-        unreachable!("Must return from loop in 2 iterations");
     }
 
-    // Returns true if this stall call changed the state, i.e. incremented num_stalls
+    // Returns true if this add_stall call changed the state, i.e. incremented num_stalls
     // from 0 to 1. Additionally, the scheduling hook is invoked on proxy status requires execution.
-    // The corresponding unstall may not be called until the method returns.
-    pub(crate) fn stall(&self) -> Result<bool, PanicError> {
+    // The corresponding remove_stall may not be called until the method returns.
+    pub(crate) fn add_stall(&self) -> Result<bool, PanicError> {
         if self.num_stalls.fetch_add(1, Ordering::SeqCst) == 0 {
             // Acquire write lock for (non-monitor) shortcut modifications.
             let inner_status = self.inner_status.lock();
 
+            // num_stalls updates are not under the lock, so need to re-check (otherwise
+            // a different remove_stall might have already decremented the count).
+            if self.num_stalls.load(Ordering::Relaxed) == 0 {
+                return Ok(false);
+            }
+
             match (
-                inner_status.requires_execution(),
+                inner_status.pending_scheduling(),
                 self.dependency_shortcut.load(Ordering::Relaxed),
             ) {
                 (Some(0), DEPENDENCY_DEFER_FLAG) => {
-                    // Impossible stalling a status requires it to be recorded in aborted depedencies,
+                    // Adding a stall requires being recorded in aborted depedencies in scheduler_v2,
                     // which in turn only happens in the scheduler after a successful abort (that must
                     // increment the incarnation of the status).
-                    return Err(code_invariant_error("0-th incarnation may not be stalled"));
+                    return Err(code_invariant_error("0-th incarnation in add_stall"));
                 },
                 (Some(_), DEPENDENCY_DEFER_FLAG) => {
                     self.scheduler_proxy.remove_from_schedule(self.txn_idx);
@@ -421,7 +466,7 @@ impl ExecutionStatus {
                 (None, DEPENDENCY_SAFE_FLAG) => {
                     // May not update SAFE flag at a future incorrect time (i.e. ABA), as observing
                     // num_stalls = 0 under status is required to set SAFE flag, but impossible
-                    // until the corresponding unstall (that starts only after this stall finishes).
+                    // until the corresponding remove_stall (that starts only after add_stall finishes).
                     self.dependency_shortcut
                         .store(DEPENDENCY_DEFER_FLAG, Ordering::Relaxed);
                 },
@@ -430,12 +475,12 @@ impl ExecutionStatus {
                 },
                 (Some(_), DEPENDENCY_SAFE_FLAG | DEPENDENCY_EXECUTING_FLAG) => {
                     return Err(code_invariant_error(
-                        "Inconsistent status and dependency shortcut in stall",
+                        "Inconsistent status and dependency shortcut in add_stall",
                     ));
                 },
                 (_, unsupported_flag_value) => {
                     return Err(code_invariant_error(format!(
-                        "Unsupported flag value {unsupported_flag_value} in stall",
+                        "Unsupported flag value {unsupported_flag_value} in add_stall",
                     )));
                 },
             }
@@ -445,13 +490,15 @@ impl ExecutionStatus {
         Ok(false)
     }
 
-    // Returns true if this unstall call changed the state, i.e. decreased num_stalls to 0.
+    // Returns true if this remove_stall call changed the state, i.e. decreased num_stalls to 0.
     // If so, scheduling hook is also invoked on the proxy.
-    pub(crate) fn unstall(&self) -> Result<bool, PanicError> {
+    pub(crate) fn remove_stall(&self) -> Result<bool, PanicError> {
         let prev_num_stalls = self.num_stalls.fetch_sub(1, Ordering::SeqCst);
 
         if prev_num_stalls == 0 {
-            return Err(code_invariant_error("unstall called when num_stalls == 0"));
+            return Err(code_invariant_error(
+                "remove_stall called when num_stalls == 0",
+            ));
         }
 
         if prev_num_stalls == 1 {
@@ -459,44 +506,43 @@ impl ExecutionStatus {
             let inner_status = self.inner_status.lock();
 
             // num_stalls updates are not under the lock, so need to re-check (otherwise
-            // a different stall might have already incremented the count.
-            let not_stalled = self.num_stalls.load(Ordering::Relaxed) == 0;
+            // a different add_stall might have already incremented the count).
+            if self.num_stalls.load(Ordering::Relaxed) > 0 {
+                return Ok(false);
+            }
 
-            if not_stalled {
-                if let Some(incarnation) = inner_status.requires_execution() {
-                    if incarnation == 0 {
-                        // Invariant due to scheduler logic: for a successful unstall there must
-                        // have been a stall for incarnation 0, which is impossible (see above).
-                        return Err(code_invariant_error(
-                            "0-th incarnation may not be unstalled",
-                        ));
-                    }
-                    self.scheduler_proxy
-                        .add_to_schedule(incarnation == 1, self.txn_idx);
-                } else if inner_status.is_executed() {
-                    defer! {
-                        self.notify_waiting_workers();
-                    }
+            if let Some(incarnation) = inner_status.pending_scheduling() {
+                if incarnation == 0 {
+                    // Invariant due to scheduler logic: for a successful remove_stall there
+                    // must have been an add_stall for incarnation 0, which is impossible.
+                    return Err(code_invariant_error("0-th incarnation in remove_stall"));
+                }
+                self.scheduler_proxy
+                    .add_to_schedule(incarnation == 1, self.txn_idx);
+            } else if inner_status.is_executed() {
+                defer! {
+                    self.notify_waiting_workers(false);
+                }
 
-                    // Status is Executed so the dependency shortcut flag may not be
-                    // EXECUTING (finish_execution sets Executed status and DEFER or SAFE flag).
-                    let prev_flag = self
-                        .dependency_shortcut
-                        .swap(DEPENDENCY_SAFE_FLAG, Ordering::Relaxed);
-                    if prev_flag != DEPENDENCY_SAFE_FLAG && prev_flag != DEPENDENCY_DEFER_FLAG {
-                        return Err(code_invariant_error(format!(
-                            "Incorrect flag value {prev_flag} in unstall",
-                        )));
-                    }
+                // Status is Executed so the dependency shortcut flag may not be
+                // EXECUTING (finish_execution sets Executed status and DEFER or SAFE flag).
+                let prev_flag = self
+                    .dependency_shortcut
+                    .swap(DEPENDENCY_SAFE_FLAG, Ordering::Relaxed);
+                if prev_flag != DEPENDENCY_SAFE_FLAG && prev_flag != DEPENDENCY_DEFER_FLAG {
+                    return Err(code_invariant_error(format!(
+                        "Incorrect flag value {prev_flag} in remove_stall",
+                    )));
                 }
             }
-            return Ok(not_stalled);
+
+            return Ok(true);
         }
         Ok(false)
     }
 
     // Returns true if dependency shortcut is SAFE, i.e. executed & not stalled, and false
-    // otherwise. This is useful to the caller for controlling recursive stalling / unstalling.
+    // otherwise. This is useful to the caller for controlling recursive stalling.
     pub(crate) fn shortcut_executed_and_not_stalled(&self) -> bool {
         matches!(
             self.dependency_shortcut.load(Ordering::Relaxed),
@@ -508,31 +554,39 @@ impl ExecutionStatus {
         self.inner_status.lock().is_executed()
     }
 
-    pub(crate) fn requires_execution(&self) -> bool {
-        matches!(*self.inner_status.lock(), InnerStatus::RequiresExecution(_))
+    pub(crate) fn pending_scheduling_and_not_stalled(&self) -> bool {
+        let guard = self.inner_status.lock();
+        guard.pending_scheduling().is_some() && self.num_stalls.load(Ordering::Relaxed) == 0
     }
 
     pub(crate) fn ever_executed(&self) -> bool {
-        use InnerStatus::*;
-        match *self.inner_status.lock() {
-            RequiresExecution(incarnation) | Executing(incarnation) | Aborted(incarnation) => {
-                incarnation > 0
-            },
-            Executed(_) => true,
-        }
+        self.inner_status.lock().ever_executed()
+    }
+
+    pub(crate) fn last_incarnation(&self) -> Incarnation {
+        self.inner_status.lock().incarnation()
+    }
+
+    // Optimistic check based on the shortuct (has the incarnation already been aborted?).
+    pub(crate) fn shortcut_already_aborted(&self, incarnation: Incarnation) -> bool {
+        self.abort_incarnation_shortcut.load(Ordering::Relaxed) > incarnation
     }
 }
 
 // Private interfaces.
 impl ExecutionStatus {
-    fn notify_waiting_workers(&self) {
+    fn notify_waiting_workers(&self, halt: bool) {
         // Notify all workers that might be waiting, which will trigger a follow-up call
         // from the scheduler to re-attempt processing the dependency for the worker,
         // at which point the inner status mutex is already released and flag updated.
         let waiting: Vec<DependencyCondvar> = {
             let mut stored = self.waiting_queue.lock();
+            if halt {
+                stored.1 = true;
+            }
+
             // Holding the lock, take the vector.
-            std::mem::take(&mut *stored)
+            std::mem::take(&mut stored.0)
         };
         for condvar in waiting {
             let (lock, cvar) = &*condvar;
@@ -546,24 +600,16 @@ impl ExecutionStatus {
     // asserting that new incarnation > previously stored abort shortcut.
     fn incarnate(&self, inner_status: &mut InnerStatus, new_incarnation: Incarnation) {
         // Update inner status.
-        *inner_status = InnerStatus::RequiresExecution(new_incarnation);
+        inner_status.status = StatusEnum::PendingScheduling;
+        inner_status.incarnation = new_incarnation;
 
         // Under the lock, update the shortcuts.
         self.dependency_shortcut
             .store(DEPENDENCY_DEFER_FLAG, Ordering::Relaxed);
-        let prev_incarnation = self
-            .abort_incarnation_shortcut
-            .swap(new_incarnation, Ordering::Relaxed);
-        assert!(
-            new_incarnation > prev_incarnation,
-            "incarnate called for {}, but abort incarnation shortcut = {}",
-            new_incarnation,
-            prev_incarnation,
-        );
 
         if self.num_stalls.load(Ordering::Relaxed) == 0 {
             // Need to schedule the transaction for re-execution. If num_stalls > 0, then
-            // scheduling is deferred to the unstall.
+            // scheduling is deferred to the remove_stall.
             self.scheduler_proxy
                 .add_to_schedule(new_incarnation == 1, self.txn_idx);
         }
@@ -580,11 +626,11 @@ impl ExecutionStatus {
         txn_idx: TxnIndex,
     ) -> Self {
         let incarnation = inner_status.incarnation();
-        use InnerStatus::*;
-        let shortcut = match inner_status {
-            RequiresExecution(_) | Aborted(_) => DEPENDENCY_DEFER_FLAG,
-            Executing(_) => DEPENDENCY_EXECUTING_FLAG,
-            Executed(_) => {
+        use StatusEnum::*;
+        let shortcut = match inner_status.status {
+            PendingScheduling | Aborted => DEPENDENCY_DEFER_FLAG,
+            Executing => DEPENDENCY_EXECUTING_FLAG,
+            Executed => {
                 if num_stalls == 0 {
                     DEPENDENCY_SAFE_FLAG
                 } else {
@@ -597,10 +643,15 @@ impl ExecutionStatus {
             num_stalls: CachePadded::new(AtomicU32::new(num_stalls)),
             dependency_shortcut: AtomicU8::new(shortcut),
             abort_incarnation_shortcut: AtomicU32::new(incarnation),
-            waiting_queue: CachePadded::new(Mutex::new(Vec::new())),
+            waiting_queue: CachePadded::new(Mutex::new((Vec::new(), false))),
             scheduler_proxy: proxy.clone(),
             txn_idx,
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn is_stalled(&self) -> bool {
+        self.num_stalls.load(Ordering::Relaxed) > 0
     }
 }
 
@@ -619,6 +670,7 @@ mod tests {
         exp_incarnation: Incarnation,
         exp_dependency_shortcut: u8,
     ) {
+        assert_eq!(status.inner_status.lock().incarnation, exp_incarnation);
         assert_eq!(status.num_stalls.load(Ordering::Relaxed), exp_num_stalls);
         assert_eq!(
             status.dependency_shortcut.load(Ordering::Relaxed),
@@ -628,7 +680,7 @@ mod tests {
             status.abort_incarnation_shortcut.load(Ordering::Relaxed),
             exp_incarnation
         );
-        assert_eq!(status.waiting_queue.lock().len(), 0);
+        assert_eq!(status.waiting_queue.lock().0.len(), 0);
 
         use DependencyInstruction::*;
         match exp_dependency_shortcut {
@@ -672,8 +724,8 @@ mod tests {
         stall_before_finish: bool,
     ) {
         assert_eq!(
-            *status.inner_status.lock(),
-            InnerStatus::RequiresExecution(expected_incarnation)
+            status.inner_status.lock().status,
+            StatusEnum::PendingScheduling
         );
         assert_simple_status_state(
             &status,
@@ -683,7 +735,7 @@ mod tests {
         );
 
         if stall_before_finish {
-            assert_ok_eq!(status.unstall(), true);
+            assert_ok_eq!(status.remove_stall(), true);
         }
         proxy.assert_execution_queue(&vec![status.txn_idx]);
     }
@@ -696,8 +748,8 @@ mod tests {
         let status = ExecutionStatus::new(proxy.clone(), txn_idx);
 
         assert_eq!(
-            *status.inner_status.lock(),
-            InnerStatus::RequiresExecution(0)
+            status.inner_status.lock().status,
+            StatusEnum::PendingScheduling
         );
         assert_simple_status_state(&status, 0, 0, DEPENDENCY_DEFER_FLAG);
 
@@ -708,7 +760,7 @@ mod tests {
         }
         assert_some_eq!(status.try_start_executing(), 0);
 
-        assert_eq!(*status.inner_status.lock(), InnerStatus::Executing(0));
+        assert_eq!(status.inner_status.lock().status, StatusEnum::Executing);
         assert_simple_status_state(&status, 0, 0, DEPENDENCY_EXECUTING_FLAG);
 
         // Compatible with finish(0) & try_abort(0) only. Here, we test finish.
@@ -716,11 +768,11 @@ mod tests {
         assert_err!(status.try_abort(1));
         assert_err!(status.finish_execution(1));
         if stall_before_finish {
-            assert_ok_eq!(status.stall(), true);
+            assert_ok_eq!(status.add_stall(), true);
         }
         assert_ok!(status.finish_execution(0));
 
-        assert_eq!(*status.inner_status.lock(), InnerStatus::Executed(0));
+        assert_eq!(status.inner_status.lock().status, StatusEnum::Executed);
         assert_simple_status_state(
             &status,
             if stall_before_finish { 1 } else { 0 },
@@ -741,7 +793,7 @@ mod tests {
         proxy.assert_execution_queue(&vec![]);
         assert_ok_eq!(status.try_abort(0), true);
         if stall_before_finish {
-            // Not rescheduled - deferred for unstall.
+            // Not rescheduled - deferred for remove_stall.
             proxy.assert_execution_queue(&vec![]);
         }
 
@@ -755,7 +807,7 @@ mod tests {
         let txn_idx = 50;
         let proxy = Arc::new(SchedulerProxy::new_for_test(txn_idx));
         let status = ExecutionStatus::new(proxy.clone(), txn_idx);
-        *status.inner_status.lock() = InnerStatus::RequiresExecution(5);
+        *status.inner_status.lock() = InnerStatus::new_for_test(StatusEnum::PendingScheduling, 5);
         status
             .abort_incarnation_shortcut
             .store(5, Ordering::Relaxed);
@@ -773,7 +825,10 @@ mod tests {
         }
         assert_some_eq!(status.try_start_executing(), 5);
 
-        assert_eq!(*status.inner_status.lock(), InnerStatus::Executing(5));
+        assert_eq!(
+            *status.inner_status.lock(),
+            InnerStatus::new_for_test(StatusEnum::Executing, 5)
+        );
         assert_simple_status_state(&status, 0, 5, DEPENDENCY_EXECUTING_FLAG);
 
         // Compatible with finish(5) & try_abort(5) only. Here, we test abort.
@@ -783,11 +838,17 @@ mod tests {
         assert_err!(status.finish_execution(6));
         assert_err!(status.try_abort(6));
 
+        assert_eq!(status.abort_incarnation_shortcut.load(Ordering::Relaxed), 5);
         assert_ok_eq!(status.try_abort(5), true);
+        assert_eq!(status.abort_incarnation_shortcut.load(Ordering::Relaxed), 6);
+        assert_eq!(status.inner_status.lock().incarnation(), 5);
         // Not re-scheduled because finish_execution has not happened.
         proxy.assert_execution_queue(&vec![]);
 
-        assert_eq!(*status.inner_status.lock(), InnerStatus::Aborted(5));
+        assert_eq!(
+            *status.inner_status.lock(),
+            InnerStatus::new_for_test(StatusEnum::Aborted, 5)
+        );
         // Compatible w. finish_execution(5) only.
         assert_none!(status.try_start_executing());
         assert_ok_eq!(status.try_abort(5), false);
@@ -796,10 +857,11 @@ mod tests {
         assert_err!(status.try_abort(6));
 
         if stall_before_finish {
-            assert_ok_eq!(status.stall(), true);
+            assert_ok_eq!(status.add_stall(), true);
         }
         // Finish execution from aborted, must return Ok(false).
         assert_ok_eq!(status.finish_execution(5), false);
+        assert_eq!(status.inner_status.lock().incarnation(), 6);
 
         check_after_finish_and_abort(&status, 6, &proxy, stall_before_finish);
     }
@@ -807,11 +869,17 @@ mod tests {
     #[test_case(0)]
     #[test_case(1)]
     #[test_case(2)]
+    #[test_case(3)]
+    #[test_case(4)]
     fn status_waiting_queue(finish_scenario: u8) {
         let txn_idx = 10;
         let proxy = Arc::new(SchedulerProxy::new_for_test(txn_idx));
-        let status =
-            ExecutionStatus::new_for_test(InnerStatus::RequiresExecution(5), 0, &proxy, txn_idx);
+        let status = ExecutionStatus::new_for_test(
+            InnerStatus::new_for_test(StatusEnum::PendingScheduling, 5),
+            0,
+            &proxy,
+            txn_idx,
+        );
 
         assert_some_eq!(status.try_start_executing(), 5);
         assert_eq!(
@@ -823,7 +891,7 @@ mod tests {
             status.resolve_dependency(DependencyInstruction::Default),
             Ok(DependencyResolution::None)
         );
-        assert_eq!(status.waiting_queue.lock().len(), 0);
+        assert_eq!(status.waiting_queue.lock().0.len(), 0);
 
         let barrier = AtomicU8::new(0);
         let case = AtomicBool::new(false);
@@ -858,7 +926,8 @@ mod tests {
             if finish_scenario == 0 {
                 assert_ok_eq!(status.try_abort(5), true);
             }
-            assert_eq!(status.waiting_queue.lock().len(), 2);
+            assert_eq!(status.waiting_queue.lock().0.len(), 2);
+            assert!(!status.waiting_queue.lock().1);
 
             match finish_scenario {
                 0 => {
@@ -870,18 +939,33 @@ mod tests {
                 2 => {
                     assert_err!(status.finish_execution(6));
                 },
+                3 => {
+                    status.num_stalls.store(1, Ordering::Relaxed);
+                    assert_ok_eq!(status.remove_stall(), true);
+                    assert_eq!(status.waiting_queue.lock().0.len(), 2);
+
+                    status.num_stalls.store(1, Ordering::Relaxed);
+                    *status.inner_status.lock() =
+                        InnerStatus::new_for_test(StatusEnum::Executed, 5);
+                    assert_err!(status.remove_stall());
+                },
+                4 => {
+                    status.halt();
+                    assert!(status.waiting_queue.lock().1);
+                },
                 _ => unreachable!("Unsupported test scenario"),
             };
-            assert_eq!(status.waiting_queue.lock().len(), 0);
+
+            assert_eq!(status.waiting_queue.lock().0.len(), 0);
         });
     }
 
     #[test]
     fn inner_status() {
-        let status = InnerStatus::RequiresExecution(5);
+        let status = InnerStatus::new_for_test(StatusEnum::PendingScheduling, 5);
         assert_eq!(status.incarnation(), 5);
         assert!(!status.is_executed());
-        assert_some_eq!(status.requires_execution(), 5);
+        assert_some_eq!(status.pending_scheduling(), 5);
         assert!(status.already_aborted(4));
         assert!(status.already_aborted(1));
         assert!(!status.already_aborted(5));
@@ -890,10 +974,10 @@ mod tests {
         assert!(!status.never_started_execution(0));
         assert!(!status.never_started_execution(4));
 
-        let status = InnerStatus::Executing(6);
+        let status = InnerStatus::new_for_test(StatusEnum::Executing, 6);
         assert_eq!(status.incarnation(), 6);
         assert!(!status.is_executed());
-        assert_none!(status.requires_execution());
+        assert_none!(status.pending_scheduling());
         assert!(status.already_aborted(5));
         assert!(status.already_aborted(0));
         assert!(!status.already_aborted(6));
@@ -901,10 +985,10 @@ mod tests {
         assert!(!status.never_started_execution(6));
         assert!(!status.never_started_execution(0));
 
-        let status = InnerStatus::Executed(7);
+        let status = InnerStatus::new_for_test(StatusEnum::Executed, 7);
         assert_eq!(status.incarnation(), 7);
         assert!(status.is_executed());
-        assert_none!(status.requires_execution());
+        assert_none!(status.pending_scheduling());
         assert!(status.already_aborted(6));
         assert!(status.already_aborted(2));
         assert!(!status.already_aborted(7));
@@ -912,10 +996,10 @@ mod tests {
         assert!(!status.never_started_execution(7));
         assert!(!status.never_started_execution(0));
 
-        let status = InnerStatus::Aborted(8);
+        let status = InnerStatus::new_for_test(StatusEnum::Aborted, 8);
         assert_eq!(status.incarnation(), 8);
         assert!(!status.is_executed());
-        assert_none!(status.requires_execution());
+        assert_none!(status.pending_scheduling());
         assert!(status.already_aborted(8));
         assert!(status.already_aborted(3));
         assert!(!status.already_aborted(9));
@@ -927,8 +1011,12 @@ mod tests {
     #[test]
     fn stall_executed_status() {
         let proxy = Arc::new(SchedulerProxy::new_for_test(10));
-        let executed_status =
-            ExecutionStatus::new_for_test(InnerStatus::Executed(5), 0, &proxy, 10);
+        let executed_status = ExecutionStatus::new_for_test(
+            InnerStatus::new_for_test(StatusEnum::Executed, 5),
+            0,
+            &proxy,
+            10,
+        );
 
         // Assert correct starting state - provided by new_for_test.
         executed_status
@@ -936,7 +1024,7 @@ mod tests {
             .store(DEPENDENCY_SAFE_FLAG, Ordering::Relaxed);
         assert_eq!(executed_status.num_stalls.load(Ordering::Relaxed), 0);
 
-        assert_ok_eq!(executed_status.stall(), true);
+        assert_ok_eq!(executed_status.add_stall(), true);
         assert_eq!(
             executed_status.dependency_shortcut.load(Ordering::Relaxed),
             DEPENDENCY_DEFER_FLAG
@@ -944,47 +1032,47 @@ mod tests {
         assert_eq!(executed_status.num_stalls.load(Ordering::Relaxed), 1);
 
         // Adding stalls to an on already stalled status: return false.
-        assert_ok_eq!(executed_status.stall(), false);
-        assert_ok_eq!(executed_status.stall(), false);
-        assert_ok_eq!(executed_status.stall(), false);
+        assert_ok_eq!(executed_status.add_stall(), false);
+        assert_ok_eq!(executed_status.add_stall(), false);
+        assert_ok_eq!(executed_status.add_stall(), false);
         assert_eq!(executed_status.num_stalls.load(Ordering::Relaxed), 4);
 
-        assert_ok_eq!(executed_status.unstall(), false);
-        assert_ok_eq!(executed_status.unstall(), false);
+        assert_ok_eq!(executed_status.remove_stall(), false);
+        assert_ok_eq!(executed_status.remove_stall(), false);
         assert_eq!(executed_status.num_stalls.load(Ordering::Relaxed), 2);
         assert_eq!(
             executed_status.dependency_shortcut.load(Ordering::Relaxed),
             DEPENDENCY_DEFER_FLAG
         );
-        assert_ok_eq!(executed_status.unstall(), false);
-        assert_ok_eq!(executed_status.unstall(), true);
+        assert_ok_eq!(executed_status.remove_stall(), false);
+        assert_ok_eq!(executed_status.remove_stall(), true);
         assert_eq!(
             executed_status.dependency_shortcut.load(Ordering::Relaxed),
             DEPENDENCY_SAFE_FLAG
         );
         assert_eq!(executed_status.num_stalls.load(Ordering::Relaxed), 0);
 
-        assert_ok_eq!(executed_status.stall(), true);
+        assert_ok_eq!(executed_status.add_stall(), true);
         assert_eq!(
             executed_status.dependency_shortcut.load(Ordering::Relaxed),
             DEPENDENCY_DEFER_FLAG
         );
         assert_eq!(executed_status.num_stalls.load(Ordering::Relaxed), 1);
-        assert_ok_eq!(executed_status.unstall(), true);
+        assert_ok_eq!(executed_status.remove_stall(), true);
         assert_eq!(
             executed_status.dependency_shortcut.load(Ordering::Relaxed),
             DEPENDENCY_SAFE_FLAG
         );
-        assert_ok_eq!(executed_status.stall(), true);
-        assert_ok_eq!(executed_status.stall(), false);
+        assert_ok_eq!(executed_status.add_stall(), true);
+        assert_ok_eq!(executed_status.add_stall(), false);
         assert_eq!(
             executed_status.dependency_shortcut.load(Ordering::Relaxed),
             DEPENDENCY_DEFER_FLAG
         );
         assert_eq!(executed_status.num_stalls.load(Ordering::Relaxed), 2);
-        assert_ok_eq!(executed_status.unstall(), false);
-        assert_ok_eq!(executed_status.unstall(), true);
-        assert_err!(executed_status.unstall());
+        assert_ok_eq!(executed_status.remove_stall(), false);
+        assert_ok_eq!(executed_status.remove_stall(), true);
+        assert_err!(executed_status.remove_stall());
     }
 
     #[test_case(false)]
@@ -993,64 +1081,82 @@ mod tests {
         let proxy = Arc::new(SchedulerProxy::new_for_test(10));
         let (status, expected_flag) = if case {
             (
-                ExecutionStatus::new_for_test(InnerStatus::Executing(5), 0, &proxy, 10),
+                ExecutionStatus::new_for_test(
+                    InnerStatus::new_for_test(StatusEnum::Executing, 5),
+                    0,
+                    &proxy,
+                    10,
+                ),
                 DEPENDENCY_EXECUTING_FLAG,
             )
         } else {
             (
-                ExecutionStatus::new_for_test(InnerStatus::Aborted(5), 0, &proxy, 10),
+                ExecutionStatus::new_for_test(
+                    InnerStatus::new_for_test(StatusEnum::Aborted, 5),
+                    0,
+                    &proxy,
+                    10,
+                ),
                 DEPENDENCY_DEFER_FLAG,
             )
         };
 
-        // Stalls work normally, but without changing dependency shortcut flag.
-        assert_ok_eq!(status.stall(), true);
+        // add_stalls work normally, but without changing dependency shortcut flag.
+        assert_ok_eq!(status.add_stall(), true);
         assert_eq!(
             status.dependency_shortcut.load(Ordering::Relaxed),
             expected_flag
         );
         assert_eq!(status.num_stalls.load(Ordering::Relaxed), 1);
-        assert_ok_eq!(status.stall(), false);
-        assert_ok_eq!(status.stall(), false);
+        assert_ok_eq!(status.add_stall(), false);
+        assert_ok_eq!(status.add_stall(), false);
         assert_eq!(status.num_stalls.load(Ordering::Relaxed), 3);
         assert_eq!(
             status.dependency_shortcut.load(Ordering::Relaxed),
             expected_flag
         );
 
-        // Same with unstall.
-        assert_ok_eq!(status.unstall(), false);
-        assert_ok_eq!(status.unstall(), false);
+        // Same with remove_stall.
+        assert_ok_eq!(status.remove_stall(), false);
+        assert_ok_eq!(status.remove_stall(), false);
         assert_eq!(status.num_stalls.load(Ordering::Relaxed), 1);
         assert_eq!(
             status.dependency_shortcut.load(Ordering::Relaxed),
             expected_flag
         );
-        assert_ok_eq!(status.unstall(), true);
+        assert_ok_eq!(status.remove_stall(), true);
         assert_eq!(status.num_stalls.load(Ordering::Relaxed), 0);
         assert_eq!(
             status.dependency_shortcut.load(Ordering::Relaxed),
             expected_flag
         );
 
-        assert_err!(status.unstall());
+        assert_err!(status.remove_stall());
     }
 
     #[test]
-    fn stall_unstall_simple_scheduling() {
+    fn add_remove_stall_simple_scheduling() {
         let proxy = Arc::new(SchedulerProxy::new_for_test(10));
-        let status =
-            ExecutionStatus::new_for_test(InnerStatus::RequiresExecution(0), 0, &proxy, 10);
-        assert_err!(status.stall());
-        let status =
-            ExecutionStatus::new_for_test(InnerStatus::RequiresExecution(1), 1, &proxy, 11);
-        assert_ok_eq!(status.unstall(), true);
+        let status = ExecutionStatus::new_for_test(
+            InnerStatus::new_for_test(StatusEnum::PendingScheduling, 0),
+            0,
+            &proxy,
+            10,
+        );
+        assert_err!(status.add_stall());
+        let status = ExecutionStatus::new_for_test(
+            InnerStatus::new_for_test(StatusEnum::PendingScheduling, 1),
+            1,
+            &proxy,
+            11,
+        );
+        assert_ok_eq!(status.remove_stall(), true);
         // Should not have been re-scheduled (new incarnation = 1 with idx > 10)
         proxy.assert_execution_queue(&vec![]);
 
         proxy.add_to_schedule(false, 11);
         proxy.assert_execution_queue(&vec![11]);
-        assert_ok_eq!(status.stall(), true);
+        assert_ok_eq!(status.add_stall(), true);
         proxy.assert_execution_queue(&vec![]);
     }
 
@@ -1059,18 +1165,18 @@ mod tests {
     #[test_case(2, 8)]
     #[test_case(2, 12)]
     #[test_case(2, 10)]
-    fn stall_requires_execution(incarnation: Incarnation, txn_idx: TxnIndex) {
+    fn stall_pending_scheduling(incarnation: Incarnation, txn_idx: TxnIndex) {
         let proxy = Arc::new(SchedulerProxy::new_for_test(10));
         let status = ExecutionStatus::new_for_test(
-            InnerStatus::RequiresExecution(incarnation),
+            InnerStatus::new_for_test(StatusEnum::PendingScheduling, incarnation),
             0,
             &proxy,
             txn_idx,
         );
-        // Stalls work normally, but without changing dependency shortcut flag.
+        // add_stalls work normally, but without changing dependency shortcut flag.
         proxy.add_to_schedule(false, txn_idx);
         proxy.assert_execution_queue(&vec![txn_idx]);
-        assert_ok_eq!(status.stall(), true);
+        assert_ok_eq!(status.add_stall(), true);
         proxy.assert_execution_queue(&vec![]);
 
         assert_eq!(
@@ -1078,17 +1184,17 @@ mod tests {
             DEPENDENCY_DEFER_FLAG
         );
         assert_eq!(status.num_stalls.load(Ordering::Relaxed), 1);
-        assert_ok_eq!(status.stall(), false);
-        assert_ok_eq!(status.stall(), false);
+        assert_ok_eq!(status.add_stall(), false);
+        assert_ok_eq!(status.add_stall(), false);
         assert_eq!(status.num_stalls.load(Ordering::Relaxed), 3);
         assert_eq!(
             status.dependency_shortcut.load(Ordering::Relaxed),
             DEPENDENCY_DEFER_FLAG
         );
 
-        // Unstalls work normally, but w.o. changing the dependency shortcut flag.
-        assert_ok_eq!(status.unstall(), false);
-        assert_ok_eq!(status.unstall(), false);
+        // remove_stalls work normally, but w.o. changing the dependency shortcut flag.
+        assert_ok_eq!(status.remove_stall(), false);
+        assert_ok_eq!(status.remove_stall(), false);
         assert_eq!(status.num_stalls.load(Ordering::Relaxed), 1);
         assert_eq!(
             status.dependency_shortcut.load(Ordering::Relaxed),
@@ -1096,15 +1202,15 @@ mod tests {
         );
         proxy.assert_execution_queue(&vec![]);
 
-        // Similar (inverted) test flow for unstalls.
-        assert_ok_eq!(status.unstall(), true);
+        // Similar (inverted) test flow for remove_stalls.
+        assert_ok_eq!(status.remove_stall(), true);
         assert_eq!(status.num_stalls.load(Ordering::Relaxed), 0);
         assert_eq!(
             status.dependency_shortcut.load(Ordering::Relaxed),
             DEPENDENCY_DEFER_FLAG
         );
         proxy.assert_execution_queue(&vec![txn_idx]);
-        assert_err!(status.unstall());
+        assert_err!(status.remove_stall());
     }
 
     fn set_shortcut_to_safe_or_provided(
@@ -1127,7 +1233,7 @@ mod tests {
     #[test_case(true)]
     fn assert_set_executing_flag(case: bool) {
         let status = ExecutionStatus::new(Arc::new(SchedulerProxy::new_for_test(10)), 10);
-        // Breaking the invariant, not changing status from RequiresExecution
+        // Breaking the invariant, not changing status from PendingScheduling
         // but updating dependency shortcut flag.
         set_shortcut_to_safe_or_provided(&status, case, DEPENDENCY_EXECUTING_FLAG);
 
@@ -1150,22 +1256,33 @@ mod tests {
         // - new_incarnation = 1 with idx > 10.
         let proxy = Arc::new(SchedulerProxy::new_for_test(txn_idx));
         for status in [
-            ExecutionStatus::new_for_test(InnerStatus::Executed(0), 1, &proxy, 9),
-            ExecutionStatus::new_for_test(InnerStatus::Executed(0), 0, &proxy, 12),
+            ExecutionStatus::new_for_test(
+                InnerStatus::new_for_test(StatusEnum::Executed, 0),
+                1,
+                &proxy,
+                9,
+            ),
+            ExecutionStatus::new_for_test(
+                InnerStatus::new_for_test(StatusEnum::Executed, 0),
+                0,
+                &proxy,
+                12,
+            ),
         ] {
-            assert!(!status.requires_execution());
-            assert_eq!(status.abort_incarnation_shortcut.load(Ordering::Relaxed), 0);
+            assert!(!status.pending_scheduling_and_not_stalled());
             assert_eq!(status.inner_status.lock().incarnation(), 0);
 
             status.incarnate(&mut *status.inner_status.lock(), 1);
 
             assert_eq!(status.inner_status.lock().incarnation(), 1);
-            assert_eq!(status.abort_incarnation_shortcut.load(Ordering::Relaxed), 1);
             assert_eq!(
                 status.dependency_shortcut.load(Ordering::Relaxed),
                 DEPENDENCY_DEFER_FLAG
             );
-            assert!(status.requires_execution());
+            assert_eq!(
+                status.pending_scheduling_and_not_stalled(),
+                !status.is_stalled()
+            );
             proxy.assert_execution_queue(&vec![]);
         }
 
@@ -1176,9 +1293,24 @@ mod tests {
         let proxy = Arc::new(SchedulerProxy::new_for_test(txn_idx));
         let mut expected_queue = vec![];
         for status in [
-            ExecutionStatus::new_for_test(InnerStatus::Executed(5), 0, &proxy, 8),
-            ExecutionStatus::new_for_test(InnerStatus::Executed(5), 0, &proxy, 13),
-            ExecutionStatus::new_for_test(InnerStatus::Executed(0), 0, &proxy, 10),
+            ExecutionStatus::new_for_test(
+                InnerStatus::new_for_test(StatusEnum::Executed, 5),
+                0,
+                &proxy,
+                8,
+            ),
+            ExecutionStatus::new_for_test(
+                InnerStatus::new_for_test(StatusEnum::Executed, 5),
+                0,
+                &proxy,
+                13,
+            ),
+            ExecutionStatus::new_for_test(
+                InnerStatus::new_for_test(StatusEnum::Executed, 0),
+                0,
+                &proxy,
+                10,
+            ),
         ] {
             // Double-check expected state - provided by new_for_test
             assert!(status.is_executed());
@@ -1186,21 +1318,20 @@ mod tests {
                 status.dependency_shortcut.load(Ordering::Relaxed),
                 DEPENDENCY_SAFE_FLAG
             );
-            assert!(!status.requires_execution());
+            assert!(!status.pending_scheduling_and_not_stalled());
 
             let new_incarnation = status.abort_incarnation_shortcut.load(Ordering::Relaxed) + 1;
             status.incarnate(&mut *status.inner_status.lock(), new_incarnation);
 
             assert_eq!(status.inner_status.lock().incarnation(), new_incarnation);
             assert_eq!(
-                status.abort_incarnation_shortcut.load(Ordering::Relaxed),
-                new_incarnation
-            );
-            assert_eq!(
                 status.dependency_shortcut.load(Ordering::Relaxed),
                 DEPENDENCY_DEFER_FLAG
             );
-            assert!(status.requires_execution());
+            assert_eq!(
+                status.pending_scheduling_and_not_stalled(),
+                !status.is_stalled()
+            );
 
             expected_queue.push(status.txn_idx);
             proxy.assert_execution_queue(&expected_queue);
@@ -1229,31 +1360,44 @@ mod tests {
     }
 
     #[test]
-    fn unstall_err_senarios() {
+    fn remove_stall_err_senarios() {
         let proxy = Arc::new(SchedulerProxy::new_for_test(10));
 
         for wrong_shortcut in [DEPENDENCY_EXECUTING_FLAG, 100] {
-            let status = ExecutionStatus::new_for_test(InnerStatus::Executed(0), 2, &proxy, 10);
-            // Unstall succeeds as it should.
-            assert_ok_eq!(status.unstall(), false);
+            let status = ExecutionStatus::new_for_test(
+                InnerStatus::new_for_test(StatusEnum::Executed, 0),
+                2,
+                &proxy,
+                10,
+            );
+            // remove_stall succeeds as it should.
+            assert_ok_eq!(status.remove_stall(), false);
             assert_eq!(status.num_stalls.load(Ordering::Relaxed), 1);
 
             status
                 .dependency_shortcut
                 .store(wrong_shortcut, Ordering::Relaxed);
-            // Normal unstall that would otherwise succeed should now return an error.
-            assert_err!(status.unstall());
+            // Normal removal that would otherwise succeed should now return an error.
+            assert_err!(status.remove_stall());
         }
 
-        let status =
-            ExecutionStatus::new_for_test(InnerStatus::RequiresExecution(1), 0, &proxy, 10);
+        let status = ExecutionStatus::new_for_test(
+            InnerStatus::new_for_test(StatusEnum::PendingScheduling, 1),
+            0,
+            &proxy,
+            10,
+        );
         // Number of stalls = 0.
-        assert_err!(status.unstall());
+        assert_err!(status.remove_stall());
 
-        let status =
-            ExecutionStatus::new_for_test(InnerStatus::RequiresExecution(0), 1, &proxy, 10);
-        // Incarnation 0 may not be unstalled.
-        assert_err!(status.unstall());
+        let status = ExecutionStatus::new_for_test(
+            InnerStatus::new_for_test(StatusEnum::PendingScheduling, 0),
+            1,
+            &proxy,
+            10,
+        );
+        // Incarnation 0 / err.
+        assert_err!(status.remove_stall());
     }
 
     #[test_case(false)]
@@ -1265,7 +1409,12 @@ mod tests {
         // the main thread simply locks the waiting queue then updates the shortcut.
 
         let proxy = Arc::new(SchedulerProxy::new_for_test(10));
-        let status = ExecutionStatus::new_for_test(InnerStatus::Executing(0), 0, &proxy, 10);
+        let status = ExecutionStatus::new_for_test(
+            InnerStatus::new_for_test(StatusEnum::Executing, 0),
+            0,
+            &proxy,
+            10,
+        );
         rayon::scope(|s| {
             // lock waiting queue, Executing status.
             let queue_guard = status.waiting_queue.lock();
@@ -1291,18 +1440,23 @@ mod tests {
     }
 
     #[test]
-    fn unstall_recheck() {
+    fn remove_stall_recheck() {
         // Executed and stalled status.
         let proxy = Arc::new(SchedulerProxy::new_for_test(10));
-        let status = ExecutionStatus::new_for_test(InnerStatus::Executed(0), 1, &proxy, 10);
+        let status = ExecutionStatus::new_for_test(
+            InnerStatus::new_for_test(StatusEnum::Executed, 0),
+            1,
+            &proxy,
+            10,
+        );
 
         rayon::scope(|s| {
-            // Acquire the lock to stop unstall call.
+            // Acquire the lock to stop remove_stall call.
             let inner_status_guard = status.inner_status.lock();
 
             s.spawn(|_| {
                 // false due to the main thread incrementing stall count below.
-                assert_ok_eq!(status.unstall(), false);
+                assert_ok_eq!(status.remove_stall(), false);
             });
 
             while status.num_stalls.load(Ordering::Relaxed) != 0 {}

@@ -713,6 +713,7 @@ dependencies = [
  "concurrent-queue",
  "criterion",
  "crossbeam",
+ "dashmap",
  "derivative",
  "fail",
  "hashbrown 0.14.3",
