@@ -844,12 +844,38 @@ impl<'env> Generator<'env> {
                         .get_function(mid.qualified(*fid))
                         .get_type_parameter_count(),
                 );
-                self.gen_op_call(
-                    targets,
-                    id,
-                    BytecodeOperation::Closure(*mid, *fid, inst, *mask),
-                    args,
-                )
+                let target_ty = self.temp_type(targets[0]).clone();
+                if let Type::Struct(wrapper_mid, wrapper_sid, wrapper_inst) = target_ty {
+                    // Implicitly convert to a function wrapper.
+                    let fun_ty = self
+                        .env()
+                        .get_struct(wrapper_mid.qualified(wrapper_sid))
+                        .get_function_wrapper_type(&wrapper_inst)
+                        .expect("function wrapper type");
+                    let temp = self.new_temp(fun_ty);
+                    self.gen_op_call(
+                        vec![temp],
+                        id,
+                        BytecodeOperation::Closure(*mid, *fid, inst, *mask),
+                        args,
+                    );
+                    self.emit_with(id, |attr| {
+                        Bytecode::Call(
+                            attr,
+                            targets,
+                            BytecodeOperation::Pack(wrapper_mid, wrapper_sid, wrapper_inst),
+                            vec![temp],
+                            None,
+                        )
+                    })
+                } else {
+                    self.gen_op_call(
+                        targets,
+                        id,
+                        BytecodeOperation::Closure(*mid, *fid, inst, *mask),
+                        args,
+                    )
+                }
             },
             Operation::TestVariants(mid, sid, variants) => {
                 self.gen_test_variants(targets, id, mid.qualified(*sid), variants, args)

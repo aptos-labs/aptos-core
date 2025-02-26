@@ -3893,6 +3893,19 @@ impl<'env> StructEnv<'env> {
             ..self.module_env.get_type_display_ctx()
         }
     }
+
+    /// If this is a function type wrapper (`struct W(|T|R)`), get the underlying
+    /// function type, instantiated.
+    pub fn get_function_wrapper_type(&self, inst: &[Type]) -> Option<Type> {
+        if self.get_field_count() == 1 {
+            let field = self.get_fields().next().unwrap();
+            let ty = field.get_type();
+            if field.is_positional() && ty.is_function() {
+                return Some(ty.instantiate(inst));
+            }
+        }
+        None
+    }
 }
 
 // =================================================================================================
