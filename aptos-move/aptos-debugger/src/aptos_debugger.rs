@@ -14,9 +14,9 @@ use aptos_types::{
     contract_event::ContractEvent,
     state_store::TStateView,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
-        SignedTransaction, Transaction, TransactionInfo, TransactionOutput, TransactionPayload,
-        Version,
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, ReplayProtector,
+        SignedTransaction, Transaction, TransactionExecutable, TransactionInfo, TransactionOutput,
+        TransactionPayloadInner, TransactionPayloadWrapper, Version,
     },
     vm_status::VMStatus,
 };
@@ -124,7 +124,7 @@ impl AptosDebugger {
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
 
         // Module bundle is deprecated!
-        if let TransactionPayload::ModuleBundle(_) = txn.payload() {
+        if let TransactionPayloadWrapper::ModuleBundle(_) = txn.payload() {
             bail!("Module bundle payload has been removed")
         }
 
@@ -140,17 +140,35 @@ impl AptosDebugger {
             &log_context,
             |gas_meter| {
                 let gas_profiler = match txn.payload() {
-                    TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
-                    TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
+                    TransactionPayloadWrapper::Script(_) => GasProfiler::new_script(gas_meter),
+                    TransactionPayloadWrapper::EntryFunction(entry_func) => GasProfiler::new_function(
                         gas_meter,
                         entry_func.module().clone(),
                         entry_func.function().to_owned(),
                         entry_func.ty_args().to_vec(),
                     ),
-                    TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
-
+                    TransactionPayloadWrapper::Multisig(..) => unimplemented!("not supported yet"),
+                    TransactionPayloadWrapper::Payload(TransactionPayloadInner::V1 {executable, extra_config: _}) => {
+                        // Question: Is this correct? Should we add new call frame for orderless transactions?
+                        match executable {
+                            TransactionExecutable::EntryFunction(entry_func) => {
+                                GasProfiler::new_function(
+                                    gas_meter,
+                                    entry_func.module().clone(),
+                                    entry_func.function().to_owned(),
+                                    entry_func.ty_args().to_vec(),
+                                )
+                            },
+                            TransactionExecutable::Script(_) => {
+                                GasProfiler::new_script(gas_meter)
+                            },
+                            TransactionExecutable::Empty => {
+                                unimplemented!("not supported yet")
+                            },
+                        }
+                    },
                     // Deprecated.
-                    TransactionPayload::ModuleBundle(..) => {
+                    TransactionPayloadWrapper::ModuleBundle(..) => {
                         unreachable!("Module bundle payload has already been checked because before this function is called")
                     },
                 };
@@ -341,6 +359,16 @@ impl AptosDebugger {
             .await
     }
 
+    pub async fn get_version_by_replay_protector(
+        &self,
+        account: AccountAddress,
+        replay_protector: ReplayProtector,
+    ) -> anyhow::Result<Option<Version>> {
+        self.debugger
+            .get_version_by_replay_protector(account, replay_protector)
+            .await
+    }
+
     pub async fn get_committed_transaction_at_version(
         &self,
         version: Version,
@@ -382,14 +410,28 @@ fn print_transaction_stats(sig_verified_txns: &[SignatureVerifiedTransaction], v
             txn.expect_valid()
                 .try_as_signed_user_txn()
                 .map(|txn| match &txn.payload() {
-                    TransactionPayload::EntryFunction(txn) => format!(
+                    TransactionPayloadWrapper::EntryFunction(txn) => format!(
                         "entry: {:?}::{:?}",
                         txn.module().name.as_str(),
                         txn.function().as_str()
                     ),
-                    TransactionPayload::Script(_) => "script".to_string(),
-                    TransactionPayload::ModuleBundle(_) => panic!("deprecated module bundle"),
-                    TransactionPayload::Multisig(_) => "multisig".to_string(),
+                    TransactionPayloadWrapper::Script(_) => "script".to_string(),
+                    TransactionPayloadWrapper::ModuleBundle(_) => {
+                        panic!("deprecated module bundle")
+                    },
+                    TransactionPayloadWrapper::Multisig(_) => "multisig".to_string(),
+                    TransactionPayloadWrapper::Payload(TransactionPayloadInner::V1 {
+                        executable,
+                        extra_config: _,
+                    }) => match executable {
+                        TransactionExecutable::EntryFunction(txn) => format!(
+                            "entry: {:?}::{:?}",
+                            txn.module().name.as_str(),
+                            txn.function().as_str()
+                        ),
+                        TransactionExecutable::Script(_) => "script".to_string(),
+                        TransactionExecutable::Empty => "empty".to_string(),
+                    },
                 })
         })
         // Count number of instances for each (irrsepsecitve of order)

@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{
     aggregator_v2::AggV2TestHarness,
     tests::aggregator_v2::{AggregatorMode, EAGGREGATOR_OVERFLOW},
@@ -12,7 +13,7 @@ use claims::{assert_none, assert_ok, assert_some};
 use move_core_types::{language_storage::TypeTag, parser::parse_struct_tag};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use test_case::test_case;
+use rstest::rstest;
 
 #[derive(Deserialize, Serialize)]
 struct Aggregator {
@@ -63,11 +64,14 @@ fn create_test_txn(h: &mut AggV2TestHarness, account: &Account, name: &str) -> S
         ])
 }
 
-fn run(data: Vec<(u64, String, Option<u64>)>) -> AggV2TestHarness {
+fn run(data: Vec<(u64, String, Option<u64>)>, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) -> AggV2TestHarness {
     let mut h = crate::tests::aggregator_v2::setup(
         ExecutorMode::BothComparison,
         AggregatorMode::BothComparison,
         data.len(),
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
 
     let account = h.account.clone();
@@ -153,9 +157,22 @@ macro_rules! increment_counter_emit_event {
     };
 }
 
-#[test_case(1)]
-#[test_case(2)]
-fn test_events_with_snapshots(event_version: u64) {
+#[rstest(event_version, stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(1, true, false, false),
+    case(1, true, true, false),
+    case(1, true, true, true),
+    case(1, false, false, false),
+    case(1, false, true, false),
+    case(1, false, true, true),
+
+    case(2, true, false, false),
+    case(2, true, true, false),
+    case(2, true, true, true),
+    case(2, false, false, false),
+    case(2, false, true, false),
+    case(2, false, true, true),
+)]
+fn test_events_with_snapshots(event_version: u64, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let data = vec![
         increment_counter!(),
         increment_counter!(),
@@ -168,13 +185,26 @@ fn test_events_with_snapshots(event_version: u64) {
         increment_counter!(),
         increment_counter!(),
     ];
-    let h = run(data);
+    let h = run(data, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
     assert_counter_value_eq!(h, 8);
 }
 
-#[test_case(1)]
-#[test_case(2)]
-fn test_events_with_snapshots_not_emitted_on_abort(event_version: u64) {
+#[rstest(event_version, stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(1, true, false, false),
+    case(1, true, true, false),
+    case(1, true, true, true),
+    case(1, false, false, false),
+    case(1, false, true, false),
+    case(1, false, true, true),
+
+    case(2, true, false, false),
+    case(2, true, true, false),
+    case(2, true, true, true),
+    case(2, false, false, false),
+    case(2, false, true, false),
+    case(2, false, true, true),
+)]
+fn test_events_with_snapshots_not_emitted_on_abort(event_version: u64, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let data = vec![
         increment_counter!(),
         increment_counter!(),
@@ -189,6 +219,6 @@ fn test_events_with_snapshots_not_emitted_on_abort(event_version: u64) {
         increment_counter_emit_event!(EAGGREGATOR_OVERFLOW, event_version, None),
     ];
 
-    let h = run(data);
+    let h = run(data, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
     assert_counter_value_eq!(h, 10);
 }

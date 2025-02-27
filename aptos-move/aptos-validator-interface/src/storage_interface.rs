@@ -14,7 +14,7 @@ use aptos_storage_interface::DbReader;
 use aptos_types::{
     account_address::AccountAddress,
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{Transaction, TransactionInfo, Version},
+    transaction::{ReplayProtector, Transaction, TransactionInfo, Version},
 };
 use move_core_types::language_storage::ModuleId;
 use std::{collections::HashMap, path::Path, sync::Arc};
@@ -106,7 +106,26 @@ impl AptosValidatorInterface for DBDebuggerInterface {
     ) -> Result<Option<Version>> {
         let ledger_version = self.get_latest_ledger_info_version().await?;
         self.0
-            .get_account_transaction(account, seq, false, ledger_version)
+            .get_account_transaction(
+                account,
+                ReplayProtector::SequenceNumber(seq),
+                false,
+                ledger_version,
+            )
+            .map_or_else(
+                |e| Err(anyhow::Error::from(e)),
+                |tp| Ok(tp.map(|e| e.version)),
+            )
+    }
+
+    async fn get_version_by_replay_protector(
+        &self,
+        account: AccountAddress,
+        replay_protector: ReplayProtector,
+    ) -> Result<Option<Version>> {
+        let ledger_version = self.get_latest_ledger_info_version().await?;
+        self.0
+            .get_account_transaction(account, replay_protector, false, ledger_version)
             .map_or_else(
                 |e| Err(anyhow::Error::from(e)),
                 |tp| Ok(tp.map(|e| e.version)),

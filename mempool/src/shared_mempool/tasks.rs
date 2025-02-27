@@ -5,7 +5,7 @@
 //! Tasks that are executed by coordinators (short-lived compared to coordinators)
 use super::types::MempoolMessageId;
 use crate::{
-    core_mempool::{CoreMempool, TimelineState},
+    core_mempool::{AccountSequenceNumberInfo, CoreMempool, TimelineState},
     counters,
     logging::{LogEntry, LogEvent, LogSchema},
     network::{BroadcastError, BroadcastPeerPriority, MempoolSyncMsg},
@@ -33,7 +33,7 @@ use aptos_types::{
     account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},
     on_chain_config::{OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig},
-    transaction::SignedTransaction,
+    transaction::{ReplayProtector, SignedTransaction},
     vm_status::{DiscardedVMStatus, StatusCode},
 };
 use aptos_vm_validator::vm_validator::{get_account_sequence_number, TransactionValidation};
@@ -122,6 +122,7 @@ pub(crate) async fn process_client_transaction_submission<NetworkClient, Transac
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation + 'static,
 {
+    info!("process_client_transaction_submission (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?})", transaction.sender(), transaction.replay_protector(), transaction.expiration_timestamp_secs());
     timer.stop_and_record();
     let _timer = counters::process_txn_submit_latency_timer_client();
     let ineligible_for_broadcast =
@@ -212,6 +213,9 @@ pub(crate) async fn process_transaction_broadcast<NetworkClient, TransactionVali
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation,
 {
+    for txn in &transactions {
+        info!("process_transaction_broadcast peer: {:?} (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?})", peer, txn.0.sender(), txn.0.replay_protector(), txn.0.expiration_timestamp_secs());
+    }
     timer.stop_and_record();
     let _timer = counters::process_txn_submit_latency_timer(peer.network_id());
     let results = process_incoming_transactions(&smp, transactions, timeline_state, false);
@@ -302,6 +306,9 @@ where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation,
 {
+    for txn in &transactions {
+        info!("process_incoming_transactions client_submitted {:?} timeline_state {:?} (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?})", client_submitted, timeline_state, txn.0.sender(), txn.0.replay_protector(), txn.0.expiration_timestamp_secs());
+    }
     let mut statuses = vec![];
 
     let start_storage_read = Instant::now();
@@ -311,18 +318,24 @@ where
         .expect("Failed to get latest state checkpoint view.");
 
     // Track latency: fetching seq number
-    let seq_numbers = IO_POOL.install(|| {
+    let account_seq_numbers = IO_POOL.install(|| {
         transactions
             .par_iter()
-            .map(|(t, _, _)| {
-                get_account_sequence_number(&state_view, t.sender()).map_err(|e| {
-                    error!(LogSchema::new(LogEntry::DBError).error(&e));
-                    counters::DB_ERROR.inc();
-                    e
-                })
+            .map(|(t, _, _)| match t.replay_protector() {
+                ReplayProtector::Nonce(_) => Ok(AccountSequenceNumberInfo::NotRequired),
+                ReplayProtector::SequenceNumber(_) => {
+                    get_account_sequence_number(&state_view, t.sender())
+                        .map(AccountSequenceNumberInfo::Required)
+                        .map_err(|e| {
+                            error!(LogSchema::new(LogEntry::DBError).error(&e));
+                            counters::DB_ERROR.inc();
+                            e
+                        })
+                },
             })
             .collect::<Vec<_>>()
     });
+
     // Track latency for storage read fetching sequence number
     let storage_read_latency = start_storage_read.elapsed();
     counters::PROCESS_TXN_BREAKDOWN_LATENCY
@@ -333,17 +346,34 @@ where
         .into_iter()
         .enumerate()
         .filter_map(|(idx, (t, ready_time_at_sender, priority))| {
-            if let Ok(sequence_num) = seq_numbers[idx] {
-                if t.sequence_number() >= sequence_num {
-                    return Some((t, sequence_num, ready_time_at_sender, priority));
-                } else {
-                    statuses.push((
-                        t,
-                        (
-                            MempoolStatus::new(MempoolStatusCode::VmError),
-                            Some(DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD),
-                        ),
-                    ));
+            if let Ok(account_sequence_num) = account_seq_numbers[idx] {
+                match account_sequence_num {
+                    AccountSequenceNumberInfo::Required(sequence_num) => {
+                        if t.sequence_number() >= sequence_num {
+                            return Some((
+                                t,
+                                AccountSequenceNumberInfo::Required(sequence_num),
+                                ready_time_at_sender,
+                                priority,
+                            ));
+                        } else {
+                            statuses.push((
+                                t,
+                                (
+                                    MempoolStatus::new(MempoolStatusCode::VmError),
+                                    Some(DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD),
+                                ),
+                            ));
+                        }
+                    },
+                    AccountSequenceNumberInfo::NotRequired => {
+                        return Some((
+                            t,
+                            AccountSequenceNumberInfo::NotRequired,
+                            ready_time_at_sender,
+                            priority,
+                        ));
+                    },
                 }
             } else {
                 // Failed to get transaction
@@ -376,7 +406,7 @@ where
 fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     transactions: Vec<(
         SignedTransaction,
-        u64,
+        AccountSequenceNumberInfo,
         Option<u64>,
         Option<BroadcastPeerPriority>,
     )>,
@@ -397,6 +427,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
             .par_iter()
             .map(|t| {
                 let result = smp.validator.read().validate_transaction(t.0.clone());
+                info!("validate_and_add_transactions client_submitted {:?} timeline_state {:?} (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?}), result: {:?}", client_submitted, timeline_state, t.0.sender(), t.0.replay_protector(), t.0.expiration_timestamp_secs(), result);
                 // Pre-compute the hash and length if the transaction is valid, before locking mempool
                 if result.is_ok() {
                     t.0.committed_hash();
@@ -409,7 +440,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     vm_validation_timer.stop_and_record();
     {
         let mut mempool = smp.mempool.lock();
-        for (idx, (transaction, sequence_info, ready_time_at_sender, priority)) in
+        for (idx, (transaction, account_sequence_info, ready_time_at_sender, priority)) in
             transactions.into_iter().enumerate()
         {
             if let Ok(validation_result) = &validation_results[idx] {
@@ -419,7 +450,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
                         let mempool_status = mempool.add_txn(
                             transaction.clone(),
                             ranking_score,
-                            sequence_info,
+                            account_sequence_info,
                             timeline_state,
                             client_submitted,
                             ready_time_at_sender,
@@ -631,13 +662,13 @@ pub(crate) fn process_committed_transactions(
     for transaction in transactions {
         pool.log_commit_transaction(
             &transaction.sender,
-            transaction.sequence_number,
+            transaction.replay_protector,
             tracking_usecases
                 .get(&transaction.use_case)
                 .map(|name| (transaction.use_case.clone(), name)),
             block_timestamp,
         );
-        pool.commit_transaction(&transaction.sender, transaction.sequence_number);
+        pool.commit_transaction(&transaction.sender, transaction.replay_protector);
     }
 
     if block_timestamp_usecs > 0 {
@@ -654,7 +685,7 @@ pub(crate) fn process_rejected_transactions(
     for transaction in transactions {
         pool.reject_transaction(
             &transaction.sender,
-            transaction.sequence_number,
+            transaction.replay_protector,
             &transaction.hash,
             &transaction.reason,
         );

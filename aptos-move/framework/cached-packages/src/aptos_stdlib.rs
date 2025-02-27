@@ -11,16 +11,81 @@ use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
     account_address::AccountAddress,
-    transaction::{EntryFunction, TransactionPayload},
+    transaction::{
+        EntryFunction, TransactionExecutable, TransactionExtraConfig, TransactionPayloadInner,
+        TransactionPayloadWrapper,
+    },
     AptosCoinType, CoinType,
 };
-use move_core_types::{ident_str, language_storage::ModuleId};
+use move_core_types::{
+    ident_str,
+    language_storage::{ModuleId, TypeTag},
+};
 
-pub fn aptos_coin_transfer(to: AccountAddress, amount: u64) -> TransactionPayload {
+pub fn aptos_coin_transfer(to: AccountAddress, amount: u64) -> TransactionPayloadWrapper {
     coin_transfer(AptosCoinType::type_tag(), to, amount)
 }
 
-pub fn publish_module_source(module_name: &str, module_src: &str) -> TransactionPayload {
+pub fn coin_transfer_v2(
+    coin_type: TypeTag,
+    to: AccountAddress,
+    amount: u64,
+    replay_protection_nonce: Option<u64>,
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::Payload(TransactionPayloadInner::V1 {
+        executable: TransactionExecutable::EntryFunction(EntryFunction::new(
+            ModuleId::new(
+                AccountAddress::new([
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 1,
+                ]),
+                ident_str!("coin").to_owned(),
+            ),
+            ident_str!("transfer").to_owned(),
+            vec![coin_type],
+            vec![bcs::to_bytes(&to).unwrap(), bcs::to_bytes(&amount).unwrap()],
+        )),
+        extra_config: TransactionExtraConfig::V1 {
+            replay_protection_nonce,
+            multisig_address: None,
+        },
+    })
+}
+
+pub fn aptos_account_fungible_transfer_only_v2(
+    to: AccountAddress,
+    amount: u64,
+    replay_protection_nonce: Option<u64>,
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::Payload(TransactionPayloadInner::V1 {
+        executable: TransactionExecutable::EntryFunction(EntryFunction::new(
+            ModuleId::new(
+                AccountAddress::new([
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 1,
+                ]),
+                ident_str!("aptos_account").to_owned(),
+            ),
+            ident_str!("fungible_transfer_only").to_owned(),
+            vec![],
+            vec![bcs::to_bytes(&to).unwrap(), bcs::to_bytes(&amount).unwrap()],
+        )),
+        extra_config: TransactionExtraConfig::V1 {
+            replay_protection_nonce,
+            multisig_address: None,
+        },
+    })
+}
+
+pub fn aptos_coin_transfer_v2(
+    to: AccountAddress,
+    amount: u64,
+    nonce: Option<u64>,
+) -> TransactionPayloadWrapper {
+    coin_transfer_v2(AptosCoinType::type_tag(), to, amount, nonce)
+}
+
+pub fn publish_module_source(module_name: &str, module_src: &str) -> TransactionPayloadWrapper {
     let mut builder = PackageBuilder::new("tmp");
     builder.add_source(module_name, module_src);
 
@@ -42,8 +107,8 @@ pub fn object_code_deployment_upgrade(
     metadata_serialized: Vec<u8>,
     code: Vec<Vec<u8>>,
     code_object: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -65,8 +130,8 @@ pub fn object_code_deployment_upgrade(
 /// when auto generating move transaction payloads. Will address in separate PR.
 pub fn object_code_deployment_freeze_code_object(
     code_object: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

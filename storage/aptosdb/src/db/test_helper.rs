@@ -626,7 +626,7 @@ fn verify_account_txns(
             let limit = last_seq_num + 1;
 
             let acct_txns_with_proof = db
-                .get_account_transactions(
+                .get_ordered_account_transactions(
                     account,
                     first_seq_num,
                     limit,
@@ -794,7 +794,7 @@ pub fn verify_committed_transactions(
                 .unwrap();
 
             let txn_with_proof = db
-                .get_account_transaction(txn.sender(), txn.sequence_number(), true, ledger_version)
+                .get_account_transaction(txn.sender(), txn.replay_protector(), true, ledger_version)
                 .unwrap()
                 .expect("Should exist.");
             txn_with_proof
@@ -802,7 +802,7 @@ pub fn verify_committed_transactions(
                 .unwrap();
 
             let acct_txns_with_proof = db
-                .get_account_transactions(
+                .get_ordered_account_transactions(
                     txn.sender(),
                     txn.sequence_number(),
                     1,
