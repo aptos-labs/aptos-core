@@ -124,20 +124,25 @@ pub struct PipelineInputRx {
 #[derive(Clone)]
 pub struct OrderedBlockWindow {
     blocks: Vec<Weak<PipelinedBlock>>,
+    window_start_round: Round,
 }
 
 impl OrderedBlockWindow {
-    pub fn new(blocks: Vec<Arc<PipelinedBlock>>) -> Self {
+    pub fn new(blocks: Vec<Arc<PipelinedBlock>>, window_start_round: Round) -> Self {
         Self {
             blocks: blocks
                 .iter()
                 .map(Arc::downgrade)
                 .collect::<Vec<Weak<PipelinedBlock>>>(),
+            window_start_round,
         }
     }
 
-    pub fn empty() -> Self {
-        Self { blocks: vec![] }
+    pub fn empty(window_start_round: Round) -> Self {
+        Self {
+            blocks: vec![],
+            window_start_round,
+        }
     }
 
     /// The blocks stored in `OrderedBlockWindow` use [`Weak`](Weak) pointers
@@ -170,6 +175,10 @@ impl OrderedBlockWindow {
         }
         blocks
     }
+
+    pub fn window_start_round(&self) -> Round {
+        self.window_start_round
+    }
 }
 
 /// A representation of a block that has been added to the execution pipeline. It might either be in ordered
@@ -182,7 +191,7 @@ pub struct PipelinedBlock {
     block: Block,
     /// A window of blocks that are needed for execution with the execution pool, EXCLUDING the current block
     #[derivative(PartialEq = "ignore")]
-    block_window: OrderedBlockWindow,
+    block_window: Option<OrderedBlockWindow>,
     /// Input transactions in the order of execution
     input_transactions: Vec<SignedTransaction>,
     /// The state_compute_result is calculated for all the pending blocks prior to insertion to
@@ -373,7 +382,7 @@ impl PipelinedBlock {
     ) -> Self {
         Self {
             block,
-            block_window: OrderedBlockWindow::empty(),
+            block_window: None,
             input_transactions,
             state_compute_result,
             randomness: OnceCell::new(),
@@ -387,7 +396,7 @@ impl PipelinedBlock {
         }
     }
 
-    pub fn new_ordered(block: Block, window: OrderedBlockWindow) -> Self {
+    pub fn new_ordered(block: Block, window: Option<OrderedBlockWindow>) -> Self {
         let input_transactions = Vec::new();
         let state_compute_result = StateComputeResult::new_dummy();
         Self {
@@ -400,8 +409,8 @@ impl PipelinedBlock {
         &self.block
     }
 
-    pub fn block_window(&self) -> &OrderedBlockWindow {
-        &self.block_window
+    pub fn block_window(&self) -> Option<&OrderedBlockWindow> {
+        self.block_window.as_ref()
     }
 
     pub fn id(&self) -> HashValue {

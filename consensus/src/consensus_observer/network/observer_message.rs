@@ -951,7 +951,6 @@ mod test {
             BatchPointer, InlineBatch, OptBatches, OptQuorumStorePayload, PayloadExecutionLimit,
             ProofBatches,
         },
-        pipelined_block::OrderedBlockWindow,
         proof_of_store::BatchId,
         quorum_cert::QuorumCert,
     };
@@ -1846,10 +1845,7 @@ mod test {
             BlockType::Genesis,
         );
         let block = Block::new_for_testing(block_info.id(), block_data, None);
-        Arc::new(PipelinedBlock::new_ordered(
-            block,
-            OrderedBlockWindow::empty(),
-        ))
+        Arc::new(PipelinedBlock::new_ordered(block, None))
     }
 
     /// Creates and returns a new pipelined block with the given block info and parent ID
@@ -1879,10 +1875,7 @@ mod test {
 
         // Create the pipelined block
         let block = Block::new_for_testing(block_info.id(), block_data, None);
-        Arc::new(PipelinedBlock::new_ordered(
-            block,
-            OrderedBlockWindow::empty(),
-        ))
+        Arc::new(PipelinedBlock::new_ordered(block, None))
     }
 
     /// Creates a returns multiple signed transactions
