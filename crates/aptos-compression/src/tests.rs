@@ -162,6 +162,7 @@ fn create_test_transaction(sequence_number: u64) -> Transaction {
     let private_key = Ed25519PrivateKey::generate_for_testing();
     let public_key = private_key.public_key();
 
+    // TODO[Orderless]: Change this to payload v2 format.
     let transaction_payload = TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
     let raw_transaction = RawTransaction::new(
         AccountAddress::random(),
