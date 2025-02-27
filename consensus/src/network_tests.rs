@@ -535,7 +535,10 @@ mod tests {
     };
     use aptos_config::network_id::{NetworkId, PeerNetworkId};
     use aptos_consensus_types::{
-        block_retrieval::{BlockRetrievalRequestV1, BlockRetrievalResponse, BlockRetrievalStatus},
+        block_retrieval::{
+            BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse,
+            BlockRetrievalStatus,
+        },
         common::Payload,
     };
     use aptos_crypto::HashValue;
@@ -831,8 +834,8 @@ mod tests {
                     },
                     // TODO @bchocho @hariria fix after release, this is a sanity check to make sure
                     // we're not making new BlockRetrievalRequest network requests anywhere
-                    IncomingRpcRequest::BlockRetrieval(_request) => {
-                        panic!("Unexpected IncomingRpcRequest::BlockRetrieval branch triggered")
+                    IncomingRpcRequest::BlockRetrieval(request) => {
+                        request.response_sender.send(Ok(bytes)).unwrap()
                     },
                     request => panic!("test_rpc unexpected message {:?}", request),
                 }
@@ -843,7 +846,7 @@ mod tests {
         timed_block_on(&runtime, async {
             let response = nodes[0]
                 .request_block(
-                    BlockRetrievalRequestV1::new(HashValue::zero(), 1),
+                    BlockRetrievalRequest::V1(BlockRetrievalRequestV1::new(HashValue::zero(), 1)),
                     peer,
                     Duration::from_secs(5),
                 )
