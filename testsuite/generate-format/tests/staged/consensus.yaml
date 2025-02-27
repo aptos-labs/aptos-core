@@ -8,13 +8,6 @@ AbstractionAuthData:
         STRUCT:
           - signing_message_digest: BYTES
           - authenticator: BYTES
-    1:
-      DomainV1:
-        STRUCT:
-          - signing_message_digest: BYTES
-          - authenticator: BYTES
-          - account:
-              TYPENAME: DomainAccount
 AccessPath:
   STRUCT:
     - address:
@@ -508,12 +501,6 @@ DKGTranscriptMetadata:
 DeprecatedPayload:
   STRUCT:
     - dummy_value: U64
-DomainAccount:
-  ENUM:
-    0:
-      V1:
-        STRUCT:
-          - account_identity: BYTES
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
@@ -1141,7 +1128,38 @@ TransactionAuthenticator:
         STRUCT:
           - sender:
               TYPENAME: AccountAuthenticator
-TransactionPayload:
+TransactionExecutable:
+  ENUM:
+    0:
+      Script:
+        NEWTYPE:
+          TYPENAME: Script
+    1:
+      EntryFunction:
+        NEWTYPE:
+          TYPENAME: EntryFunction
+    2:
+      Empty: UNIT
+TransactionExtraConfig:
+  ENUM:
+    0:
+      V1:
+        STRUCT:
+          - multisig_address:
+              OPTION:
+                TYPENAME: AccountAddress
+          - replay_protection_nonce:
+              OPTION: U64
+TransactionPayloadInner:
+  ENUM:
+    0:
+      V1:
+        STRUCT:
+          - executable:
+              TYPENAME: TransactionExecutable
+          - extra_config:
+              TYPENAME: TransactionExtraConfig
+TransactionPayloadWrapper:
   ENUM:
     0:
       Script:
@@ -1159,6 +1177,10 @@ TransactionPayload:
       Multisig:
         NEWTYPE:
           TYPENAME: Multisig
+    4:
+      Payload:
+        NEWTYPE:
+          TYPENAME: TransactionPayloadInner
 TwoChainTimeout:
   STRUCT:
     - epoch: U64

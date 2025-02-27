@@ -7,7 +7,7 @@ use generate_format::Corpus;
 use serde_reflection::Registry;
 use std::collections::{btree_map::Entry, BTreeMap};
 
-// Note: When format of some of the data structures change, 
+// Note: When format of some of the data structures change,
 // run `cargo run -p generate-format -- --corpus API --record` (change the corpus name appropriately) to update the yaml files.
 
 #[test]

@@ -26,6 +26,8 @@ pub const TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG: BlockExecutorConfigFromOnchain =
 
 static EMPTY_SCRIPT: &[u8] = include_bytes!("empty_script.mv");
 
+// TODO[Orderless]: Update below functions to support transaction payload v2 and orderless transactions
+
 // Create an expiration time 'seconds' after now
 fn expiration_time(seconds: u64) -> u64 {
     std::time::SystemTime::now()

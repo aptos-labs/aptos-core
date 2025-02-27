@@ -3,7 +3,7 @@
 
 use crate::transaction::{
     signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction, Transaction,
-    TransactionPayload,
+    TransactionExecutable, TransactionPayloadInner, TransactionPayloadWrapper,
 };
 use move_core_types::account_address::AccountAddress;
 
@@ -53,6 +53,18 @@ impl UseCaseAwareTransaction for SignedTransaction {
                     ContractAddress(*module_id.address())
                 }
             },
+            Payload(TransactionPayloadInner::V1 {
+                executable: TransactionExecutable::EntryFunction(entry_fun),
+                extra_config: _,
+            }) => {
+                let module_id = entry_fun.module();
+                if module_id.address().is_special() {
+                    Platform
+                } else {
+                    ContractAddress(*module_id.address())
+                }
+            },
+            _ => Others,
         }
     }
 }
@@ -94,6 +106,18 @@ impl UseCaseAwareTransaction for SignatureVerifiedTransaction {
                     ContractAddress(*module_id.address())
                 }
             },
+            Payload(TransactionPayloadInner::V1 {
+                executable: TransactionExecutable::EntryFunction(entry_fun),
+                extra_config: _,
+            }) => {
+                let module_id = entry_fun.module();
+                if module_id.address().is_special() {
+                    Platform
+                } else {
+                    ContractAddress(*module_id.address())
+                }
+            },
+            _ => Others,
         }
     }
 }

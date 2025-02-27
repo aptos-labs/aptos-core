@@ -103,7 +103,10 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<BlockEpiloguePayload>(&samples)?;
     tracer.trace_type::<transaction::Transaction>(&samples)?;
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
-    tracer.trace_type::<transaction::TransactionPayload>(&samples)?;
+    tracer.trace_type::<transaction::TransactionPayloadWrapper>(&samples)?;
+    tracer.trace_type::<transaction::TransactionPayloadInner>(&samples)?;
+    tracer.trace_type::<transaction::TransactionExecutable>(&samples)?;
+    tracer.trace_type::<transaction::TransactionExtraConfig>(&samples)?;
     tracer.trace_type::<transaction::WriteSetPayload>(&samples)?;
     tracer.trace_type::<transaction::BlockEpiloguePayload>(&samples)?;
     tracer.trace_type::<StateKey>(&samples)?;
@@ -117,8 +120,6 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::authenticator::AnySignature>(&samples)?;
     tracer.trace_type::<transaction::webauthn::AssertionSignature>(&samples)?;
     tracer.trace_type::<aptos_types::keyless::EphemeralCertificate>(&samples)?;
-    tracer.trace_type::<transaction::authenticator::AbstractionAuthData>(&samples)?;
-    tracer.trace_type::<transaction::authenticator::DomainAccount>(&samples)?;
 
     // events
     tracer.trace_type::<WithdrawEvent>(&samples)?;
