@@ -2,21 +2,29 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
     loader::Module,
     storage::environment::{RuntimeEnvironment, WithRuntimeEnvironment},
-    ModuleStorage,
+    Function, ModuleStorage,
 };
+use ambassador::Delegate;
 use bytes::Bytes;
-use move_binary_format::{errors::VMResult, CompiledModule};
+use move_binary_format::{
+    errors::{PartialVMResult, VMResult},
+    CompiledModule,
+};
 use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
+    account_address::AccountAddress,
+    identifier::IdentStr,
+    language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
 };
 use move_vm_types::{
     code::{
-        ModuleBytesStorage, ModuleCache, ModuleCode, ModuleCodeBuilder, UnsyncModuleCache,
-        WithBytes, WithHash,
+        ambassador_impl_ModuleCache, ModuleBytesStorage, ModuleCache, ModuleCode,
+        ModuleCodeBuilder, UnsyncModuleCache, WithBytes, WithHash,
     },
+    loaded_data::runtime_types::{StructType, Type},
     sha3_256,
 };
 use std::{borrow::Borrow, ops::Deref, sync::Arc};
@@ -74,6 +82,12 @@ struct NoVersion;
 
 /// Private implementation of module storage based on non-[Sync] module cache and the baseline
 /// storage.
+#[derive(Delegate)]
+#[delegate(
+    ModuleCache,
+    target = "module_cache",
+    where = "Ctx: ModuleBytesStorage + WithRuntimeEnvironment"
+)]
 struct UnsyncModuleStorageImpl<'ctx, Ctx> {
     /// Module cache with deserialized or verified modules.
     module_cache: UnsyncModuleCache<ModuleId, CompiledModule, Module, BytesWithHash, NoVersion>,
@@ -111,61 +125,6 @@ where
     }
 }
 
-impl<'ctx, Ctx> ModuleCache for UnsyncModuleStorageImpl<'ctx, Ctx>
-where
-    Ctx: ModuleBytesStorage + WithRuntimeEnvironment,
-{
-    type Deserialized = CompiledModule;
-    type Extension = BytesWithHash;
-    type Key = ModuleId;
-    type Verified = Module;
-    type Version = NoVersion;
-
-    fn insert_deserialized_module(
-        &self,
-        key: Self::Key,
-        deserialized_code: Self::Deserialized,
-        extension: Arc<Self::Extension>,
-        version: Self::Version,
-    ) -> VMResult<Arc<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
-        self.module_cache
-            .insert_deserialized_module(key, deserialized_code, extension, version)
-    }
-
-    fn insert_verified_module(
-        &self,
-        key: Self::Key,
-        verified_code: Self::Verified,
-        extension: Arc<Self::Extension>,
-        version: Self::Version,
-    ) -> VMResult<Arc<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
-        self.module_cache
-            .insert_verified_module(key, verified_code, extension, version)
-    }
-
-    fn get_module_or_build_with(
-        &self,
-        key: &Self::Key,
-        builder: &dyn ModuleCodeBuilder<
-            Key = Self::Key,
-            Deserialized = Self::Deserialized,
-            Verified = Self::Verified,
-            Extension = Self::Extension,
-        >,
-    ) -> VMResult<
-        Option<(
-            Arc<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>,
-            Self::Version,
-        )>,
-    > {
-        self.module_cache.get_module_or_build_with(key, builder)
-    }
-
-    fn num_modules(&self) -> usize {
-        self.module_cache.num_modules()
-    }
-}
-
 impl<'ctx, Ctx> ModuleCodeBuilder for UnsyncModuleStorageImpl<'ctx, Ctx>
 where
     Ctx: ModuleBytesStorage + WithRuntimeEnvironment,
@@ -195,69 +154,16 @@ where
 }
 
 /// Implementation of (not thread-safe) module storage used for Move unit tests, and externally.
+#[derive(Delegate)]
+#[delegate(
+    WithRuntimeEnvironment,
+    where = "Ctx: ModuleBytesStorage + WithRuntimeEnvironment"
+)]
+#[delegate(
+    ModuleStorage,
+    where = "Ctx: ModuleBytesStorage + WithRuntimeEnvironment"
+)]
 pub struct UnsyncModuleStorage<'ctx, Ctx>(UnsyncModuleStorageImpl<'ctx, Ctx>);
-
-impl<'ctx, Ctx> ModuleStorage for UnsyncModuleStorage<'ctx, Ctx>
-where
-    Ctx: ModuleBytesStorage + WithRuntimeEnvironment,
-{
-    fn check_module_exists(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<bool> {
-        self.0.check_module_exists(address, module_name)
-    }
-
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
-        self.0.fetch_module_bytes(address, module_name)
-    }
-
-    fn fetch_module_size_in_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<usize>> {
-        self.0.fetch_module_size_in_bytes(address, module_name)
-    }
-
-    fn fetch_module_metadata(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Vec<Metadata>>> {
-        self.0.fetch_module_metadata(address, module_name)
-    }
-
-    fn fetch_deserialized_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Arc<CompiledModule>>> {
-        self.0.fetch_deserialized_module(address, module_name)
-    }
-
-    fn fetch_verified_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Arc<Module>>> {
-        self.0.fetch_verified_module(address, module_name)
-    }
-}
-
-impl<'ctx, Ctx> WithRuntimeEnvironment for UnsyncModuleStorage<'ctx, Ctx>
-where
-    Ctx: ModuleBytesStorage + WithRuntimeEnvironment,
-{
-    fn runtime_environment(&self) -> &RuntimeEnvironment {
-        self.0.runtime_environment()
-    }
-}
 
 impl<'ctx, Ctx> UnsyncModuleStorage<'ctx, Ctx>
 where

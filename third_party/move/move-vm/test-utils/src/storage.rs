@@ -107,10 +107,10 @@ impl ModuleBytesStorage for InMemoryStorage {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Bytes>> {
-        if let Some(account_storage) = self.accounts.get(address) {
-            return Ok(account_storage.modules.get(module_name).cloned());
-        }
-        Ok(None)
+        Ok(self
+            .accounts
+            .get(address)
+            .and_then(|account_storage| account_storage.modules.get(module_name).cloned()))
     }
 }
 impl WithRuntimeEnvironment for InMemoryStorage {

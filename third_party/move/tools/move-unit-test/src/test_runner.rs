@@ -246,6 +246,8 @@ impl SharedTestingConfig {
         VMResult<Vec<Vec<u8>>>,
         TestRunInfo,
     ) {
+        // Note: While Move unit tests run concurrently, there is no publishing involved. To keep
+        // things simple, we create a new VM instance for each test.
         let move_vm =
             MoveVM::new_with_runtime_environment(self.starting_storage_state.runtime_environment());
         let module_storage = self.starting_storage_state.as_unsync_module_storage();
