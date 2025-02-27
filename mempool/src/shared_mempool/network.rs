@@ -471,6 +471,10 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                             }
                         })
                         .collect::<Vec<_>>();
+                    info!(
+                        "Rebroadcasting message_id: {:?} to peer {:?}",
+                        message_id, peer
+                    );
                     (message_id.clone(), txns, metric_label)
                 },
                 None => {
@@ -479,6 +483,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                     // If the peer doesn't have any sender_buckets assigned, let's not broadcast to the peer
                     let mut sender_buckets: Vec<(MempoolSenderBucket, BroadcastPeerPriority)> =
                         if self.node_type.is_validator() {
+                            // vec![]
                             (0..self.mempool_config.num_sender_buckets)
                                 .map(|sender_bucket| {
                                     (sender_bucket, BroadcastPeerPriority::Primary)
@@ -507,7 +512,10 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                             std::cmp::Ordering::Greater
                         }
                     });
-
+                    info!(
+                        "Broadcasting buckets {:?} to peer {:?}",
+                        sender_buckets, peer
+                    );
                     let max_txns = self.mempool_config.shared_mempool_batch_size;
                     let mut output_txns = vec![];
                     let mut output_updates = vec![];
@@ -541,7 +549,6 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                                 .push((sender_bucket, (old_timeline_id.clone(), new_timeline_id)));
                         }
                     }
-
                     (
                         MempoolMessageId::from_timeline_ids(output_updates),
                         output_txns,
