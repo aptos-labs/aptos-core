@@ -1096,7 +1096,6 @@ fn precompiled_v1_stdlib_if_needed(
 ) -> Option<&'static (FullyCompiledProgram, Vec<PackagePaths>)> {
     match config {
         TestRunConfig::CompilerV1 { .. } => PRECOMPILED_APTOS_FRAMEWORK_V1.as_ref(),
-        TestRunConfig::ComparisonV1V2 { .. } => PRECOMPILED_APTOS_FRAMEWORK_V1.as_ref(),
         TestRunConfig::CompilerV2 { .. } => None,
     }
 }
@@ -1106,7 +1105,6 @@ fn precompiled_v2_stdlib_if_needed(
 ) -> Option<&'static PrecompiledFilesModules> {
     match config {
         TestRunConfig::CompilerV1 { .. } => None,
-        TestRunConfig::ComparisonV1V2 { .. } => Some(&*PRECOMPILED_APTOS_FRAMEWORK_V2),
         TestRunConfig::CompilerV2 { .. } => Some(&*PRECOMPILED_APTOS_FRAMEWORK_V2),
     }
 }

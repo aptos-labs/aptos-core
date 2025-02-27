@@ -22,10 +22,7 @@ use move_command_line_common::{
     address::ParsedAddress,
     env::read_bool_env_var,
     files::{MOVE_EXTENSION, MOVE_IR_EXTENSION},
-    testing::{
-        add_update_baseline_fix, format_diff, format_diff_no_color, read_env_update_baseline,
-        EXP_EXT,
-    },
+    testing::{add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT},
     types::ParsedType,
     values::{ParsableValue, ParsedValue},
 };
@@ -51,8 +48,6 @@ use move_model::{
 use move_symbol_pool::Symbol;
 use move_vm_runtime::session::SerializedReturnValues;
 use move_vm_types::value_serde::ValueSerDeContext;
-use once_cell::sync::Lazy;
-use regex::Regex;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     fmt::{Debug, Write as FmtWrite},
@@ -994,108 +989,54 @@ where
         SyntaxChoice::Source
     };
 
-    // Construct a sequence of compiler runs based on the given config.
-    let (runs, comparison_mode) = if let TestRunConfig::ComparisonV1V2 {
-        language_version,
-        v2_experiments,
-    } = config.clone()
-    {
-        (
-            vec![TestRunConfig::CompilerV1, TestRunConfig::CompilerV2 {
-                language_version,
-                v2_experiments,
-            }],
-            true,
-        )
-    } else {
-        (vec![config.clone()], false) // either V1 or V2
+    let mut output = String::new();
+    let mut tasks = taskify::<
+        TaskCommand<
+            Adapter::ExtraInitArgs,
+            Adapter::ExtraPublishArgs,
+            Adapter::ExtraValueArgs,
+            Adapter::ExtraRunArgs,
+            Adapter::Subcommand,
+        >,
+    >(path)?
+    .into_iter()
+    .collect::<VecDeque<_>>();
+    assert!(!tasks.is_empty());
+    let num_tasks = tasks.len();
+    writeln!(
+        &mut output,
+        "processed {} task{}",
+        num_tasks,
+        if num_tasks > 1 { "s" } else { "" }
+    )
+    .unwrap();
+    let first_task = tasks.pop_front().unwrap();
+    let init_opt = match &first_task.command {
+        TaskCommand::Init(_, _) => Some(first_task.map(|known| match known {
+            TaskCommand::Init(command, extra_args) => (command, extra_args),
+            _ => unreachable!(),
+        })),
+        _ => {
+            tasks.push_front(first_task);
+            None
+        },
     };
-    let mut last_output = String::new();
-    let mut bytecode_print_output = BTreeMap::<TestRunConfig, String>::new();
-    for run_config in runs {
-        let mut output = String::new();
-        let mut tasks = taskify::<
-            TaskCommand<
-                Adapter::ExtraInitArgs,
-                Adapter::ExtraPublishArgs,
-                Adapter::ExtraValueArgs,
-                Adapter::ExtraRunArgs,
-                Adapter::Subcommand,
-            >,
-        >(path)?
-        .into_iter()
-        .collect::<VecDeque<_>>();
-        assert!(!tasks.is_empty());
-        let num_tasks = tasks.len();
-        writeln!(
-            &mut output,
-            "processed {} task{}",
-            num_tasks,
-            if num_tasks > 1 { "s" } else { "" }
-        )
-        .unwrap();
-        let first_task = tasks.pop_front().unwrap();
-        let init_opt = match &first_task.command {
-            TaskCommand::Init(_, _) => Some(first_task.map(|known| match known {
-                TaskCommand::Init(command, extra_args) => (command, extra_args),
-                _ => unreachable!(),
-            })),
-            _ => {
-                tasks.push_front(first_task);
-                None
-            },
-        };
-        let (mut adapter, result_opt) = Adapter::init(
-            default_syntax,
-            comparison_mode,
-            run_config.clone(),
-            pre_compiled_deps_v1,
-            pre_compiled_deps_v2,
-            init_opt,
-        );
-        if let Some(result) = result_opt {
-            writeln!(output, "\ninit:\n{}", result)?;
-        }
-        for task in tasks {
-            handle_known_task(&mut output, &mut adapter, task);
-        }
-        // Extract any bytecode outputs, they should not be part of the diff.
-        static BYTECODE_REX: Lazy<Regex> = Lazy::new(|| {
-            Regex::new("(?m)== BEGIN Bytecode ==(.|\n|\r)*== END Bytecode ==").unwrap()
-        });
-        while let Some(m) = BYTECODE_REX.find(&output) {
-            bytecode_print_output
-                .entry(run_config.clone())
-                .or_default()
-                .push_str(&output.drain(m.range()).collect::<String>());
-        }
+    let (mut adapter, result_opt) = Adapter::init(
+        default_syntax,
+        false,
+        config.clone(),
+        pre_compiled_deps_v1,
+        pre_compiled_deps_v2,
+        init_opt,
+    );
+    if let Some(result) = result_opt {
+        writeln!(output, "\ninit:\n{}", result)?;
+    }
+    for task in tasks {
+        handle_known_task(&mut output, &mut adapter, task);
+    }
 
-        // If there is a previous output, compare to that one
-        if !last_output.is_empty() && last_output != output {
-            let diff = format_diff_no_color(&last_output, &output);
-            let output = format!("comparison between v1 and v2 failed:\n{}", diff);
-            handle_expected_output(path, output, exp_suffix)?;
-            return Ok(());
-        }
-        last_output = output
-    }
-    if matches!(config, TestRunConfig::ComparisonV1V2 { .. }) {
-        // Indicate in output that we passed comparison test
-        last_output += "\n==> Compiler v2 delivered same results!\n"
-    }
-    // Dump printed bytecode at last
-    for (config, out) in bytecode_print_output {
-        last_output += &format!(
-            "\n>>> {} {{\n{}\n}}\n",
-            match config {
-                TestRunConfig::CompilerV1 => "V1 Compiler",
-                TestRunConfig::CompilerV2 { .. } => "V2 Compiler",
-                _ => panic!("unexpected test config"),
-            },
-            out
-        );
-    }
-    handle_expected_output(path, last_output, exp_suffix)?;
+    handle_expected_output(path, output, exp_suffix)?;
     Ok(())
 }
 

@@ -11028,11 +11028,9 @@ version = "0.1.0"
 dependencies = [
  "datatest-stable",
  "itertools 0.13.0",
- "move-command-line-common",
  "move-compiler-v2",
  "move-model",
  "move-transactional-test-runner",
- "once_cell",
  "walkdir",
 ]
 
