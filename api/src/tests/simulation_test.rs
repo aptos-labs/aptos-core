@@ -131,6 +131,7 @@ async fn test_simulate_txn_with_aggregator() {
     let txn = account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
     context.commit_block(&vec![txn]).await;
 
+    // TODO[Orderless]: Change this to payload v2 format.
     let payload = TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(account.address(), ident_str!("counter").to_owned()),
         ident_str!("increment_counter").to_owned(),
