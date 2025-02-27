@@ -11162,16 +11162,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-explain"
-version = "0.1.0"
-dependencies = [
- "bcs 0.1.4",
- "clap 4.5.21",
- "move-command-line-common",
- "move-core-types",
-]
-
-[[package]]
 name = "move-ir-compiler"
 version = "0.1.0"
 dependencies = [
