@@ -212,7 +212,8 @@ pub fn create_transaction() -> Transaction {
     let private_key = Ed25519PrivateKey::generate_for_testing();
     let public_key = private_key.public_key();
 
-    let transaction_payload = TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
+    let transaction_payload =
+        TransactionPayloadWrapper::Script(Script::new(vec![], vec![], vec![]));
     let raw_transaction = RawTransaction::new(
         AccountAddress::random(),
         0,

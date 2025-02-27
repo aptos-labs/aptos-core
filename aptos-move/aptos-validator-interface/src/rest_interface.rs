@@ -17,7 +17,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         EntryFunction, ExecutionStatus::MiscellaneousError, Transaction, TransactionInfo,
-        TransactionPayload, Version,
+        TransactionPayloadWrapper, Version,
     },
 };
 use async_recursion::async_recursion;
@@ -279,16 +279,16 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                 let version = start + idx as u64;
                 (version, txn, txn_info)
             });
-        let extract_entry_fun = |payload: &TransactionPayload| -> Option<EntryFunction> {
+        let extract_entry_fun = |payload: &TransactionPayloadWrapper| -> Option<EntryFunction> {
             match payload {
-                TransactionPayload::Multisig(multi_sig)
+                TransactionPayloadWrapper::Multisig(multi_sig)
                     if multi_sig.transaction_payload.is_some() =>
                 {
                     let aptos_types::transaction::MultisigTransactionPayload::EntryFunction(e) =
                         multi_sig.transaction_payload.clone().unwrap();
                     Some(e.clone())
                 },
-                TransactionPayload::EntryFunction(e) => Some(e.clone()),
+                TransactionPayloadWrapper::EntryFunction(e) => Some(e.clone()),
                 _ => None,
             }
         };

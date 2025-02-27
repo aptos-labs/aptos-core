@@ -21,7 +21,7 @@ use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{
         authenticator::{AnyPublicKey, AuthenticationKey},
-        EntryFunction, RawTransaction, Script, SignedTransaction, TransactionPayload,
+        EntryFunction, RawTransaction, Script, SignedTransaction, TransactionPayloadWrapper,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
     AptosCoinType,
@@ -228,7 +228,7 @@ pub struct TransactionBuilder {
     pub secondary_signers: Vec<Account>,
     pub fee_payer: Option<Account>,
     pub sequence_number: Option<u64>,
-    pub program: Option<TransactionPayload>,
+    pub program: Option<TransactionPayloadWrapper>,
     pub max_gas_amount: Option<u64>,
     pub gas_unit_price: Option<u64>,
     pub chain_id: Option<ChainId>,
@@ -270,18 +270,18 @@ impl TransactionBuilder {
         self
     }
 
-    pub fn payload(mut self, payload: TransactionPayload) -> Self {
+    pub fn payload(mut self, payload: TransactionPayloadWrapper) -> Self {
         self.program = Some(payload);
         self
     }
 
     pub fn script(mut self, s: Script) -> Self {
-        self.program = Some(TransactionPayload::Script(s));
+        self.program = Some(TransactionPayloadWrapper::Script(s));
         self
     }
 
     pub fn entry_function(mut self, f: EntryFunction) -> Self {
-        self.program = Some(TransactionPayload::EntryFunction(f));
+        self.program = Some(TransactionPayloadWrapper::EntryFunction(f));
         self
     }
 

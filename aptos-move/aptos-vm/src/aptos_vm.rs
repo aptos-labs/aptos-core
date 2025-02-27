@@ -2744,7 +2744,7 @@ impl AptosVM {
         resolver: &impl AptosMoveResolver,
         module_storage: &impl ModuleStorage,
         serialized_signers: &SerializedSigners,
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
         is_approved_gov_script: bool,

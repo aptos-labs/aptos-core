@@ -39,10 +39,11 @@ impl UseCaseAwareTransaction for SignedTransaction {
     }
 
     fn parse_use_case(&self) -> UseCaseKey {
-        use crate::transaction::TransactionPayload::*;
+        use crate::transaction::TransactionPayloadWrapper::*;
         use UseCaseKey::*;
 
         match self.payload() {
+            // Question: MultiSig contains an entry function too. Why isn't it handled like the entry function?
             Script(_) | ModuleBundle(_) | Multisig(_) => Others,
             EntryFunction(entry_fun) => {
                 let module_id = entry_fun.module();
@@ -63,10 +64,10 @@ impl UseCaseAwareTransaction for SignatureVerifiedTransaction {
     }
 
     fn parse_use_case(&self) -> UseCaseKey {
-        use crate::transaction::TransactionPayload::*;
+        use crate::transaction::TransactionPayloadWrapper::*;
         use UseCaseKey::*;
 
-        let payload: Option<&TransactionPayload> = match self {
+        let payload: Option<&TransactionPayloadWrapper> = match self {
             SignatureVerifiedTransaction::Valid(txn) => match txn {
                 Transaction::UserTransaction(signed_txn) => Some(signed_txn.payload()),
                 Transaction::GenesisTransaction(_)

@@ -22,7 +22,7 @@ use aptos_types::{
     account_address::create_multisig_account_address,
     chain_id::ChainId,
     on_chain_config::{FeatureFlag, Features},
-    transaction::{authenticator::AuthenticationKey, TransactionPayload},
+    transaction::{authenticator::AuthenticationKey, TransactionPayloadWrapper},
 };
 use itertools::Itertools;
 use move_core_types::{account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS};
@@ -497,7 +497,7 @@ pub fn start_logger(level: Level) {
 
 /// For transaction payload and options, either get gas profile or submit for execution.
 pub async fn profile_or_submit(
-    payload: TransactionPayload,
+    payload: TransactionPayloadWrapper,
     txn_options_ref: &TransactionOptions,
 ) -> CliTypedResult<TransactionSummary> {
     if txn_options_ref.profile_gas && txn_options_ref.benchmark {

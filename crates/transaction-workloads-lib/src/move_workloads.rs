@@ -12,7 +12,7 @@ use aptos_sdk::{
     },
     types::{
         serde_helper::bcs_utils::bcs_size_of_byte_array,
-        transaction::{EntryFunction, Script, TransactionPayload},
+        transaction::{EntryFunction, Script, TransactionPayloadWrapper},
     },
 };
 use aptos_transaction_generator_lib::{
@@ -380,7 +380,7 @@ impl EntryPointTrait for EntryPoints {
         module_name: &str,
         rng: Option<&mut StdRng>,
         other: Option<&AccountAddress>,
-    ) -> TransactionPayload {
+    ) -> TransactionPayloadWrapper {
         let module_id = package.get_module_id(module_name);
         match self {
             EntryPoints::Republish => {
@@ -931,7 +931,7 @@ impl EntryPointTrait for EntryPoints {
 // Entry points payload
 //
 
-fn get_from_random_const(module_id: ModuleId, idx: u64) -> TransactionPayload {
+fn get_from_random_const(module_id: ModuleId, idx: u64) -> TransactionPayloadWrapper {
     get_payload(
         module_id,
         ident_str!("get_from_random_const").to_owned(),
@@ -939,14 +939,14 @@ fn get_from_random_const(module_id: ModuleId, idx: u64) -> TransactionPayload {
     )
 }
 
-fn set_id(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
+fn set_id(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayloadWrapper {
     let id: u64 = rng.gen();
     get_payload(module_id, ident_str!("set_id").to_owned(), vec![
         bcs::to_bytes(&id).unwrap(),
     ])
 }
 
-fn set_name(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
+fn set_name(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayloadWrapper {
     let len = rng.gen_range(0usize, 1000usize);
     let name: String = rand_string(rng, len);
     get_payload(module_id, ident_str!("set_name").to_owned(), vec![
@@ -954,13 +954,13 @@ fn set_name(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
     ])
 }
 
-fn maximize(module_id: ModuleId, other: &AccountAddress) -> TransactionPayload {
+fn maximize(module_id: ModuleId, other: &AccountAddress) -> TransactionPayloadWrapper {
     get_payload(module_id, ident_str!("maximize").to_owned(), vec![
         bcs::to_bytes(other).unwrap(),
     ])
 }
 
-fn minimize(module_id: ModuleId, other: &AccountAddress) -> TransactionPayload {
+fn minimize(module_id: ModuleId, other: &AccountAddress) -> TransactionPayloadWrapper {
     get_payload(module_id, ident_str!("minimize").to_owned(), vec![
         bcs::to_bytes(other).unwrap(),
     ])
@@ -984,7 +984,7 @@ fn make_or_change(
     module_id: ModuleId,
     str_len: usize,
     data_len: usize,
-) -> TransactionPayload {
+) -> TransactionPayloadWrapper {
     let id: u64 = rng.gen();
     let name: String = rand_string(rng, str_len);
     let mut bytes = Vec::<u8>::with_capacity(data_len);
@@ -1000,7 +1000,7 @@ fn bytes_make_or_change(
     rng: &mut StdRng,
     module_id: ModuleId,
     data_len: usize,
-) -> TransactionPayload {
+) -> TransactionPayloadWrapper {
     let mut bytes = Vec::<u8>::with_capacity(data_len);
     rng.fill_bytes(&mut bytes);
     get_payload(
@@ -1010,6 +1010,6 @@ fn bytes_make_or_change(
     )
 }
 
-fn get_payload_void(module_id: ModuleId, func: Identifier) -> TransactionPayload {
+fn get_payload_void(module_id: ModuleId, func: Identifier) -> TransactionPayloadWrapper {
     get_payload(module_id, func, vec![])
 }

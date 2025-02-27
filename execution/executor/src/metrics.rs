@@ -431,12 +431,12 @@ pub fn update_counters_for_processed_chunk<T>(
             }
 
             match user_txn.payload() {
-                aptos_types::transaction::TransactionPayload::Script(_script) => {
+                aptos_types::transaction::TransactionPayloadWrapper::Script(_script) => {
                     PROCESSED_USER_TXNS_BY_PAYLOAD
                         .with_label_values(&[process_type, "script", state])
                         .inc();
                 },
-                aptos_types::transaction::TransactionPayload::EntryFunction(function) => {
+                aptos_types::transaction::TransactionPayloadWrapper::EntryFunction(function) => {
                     PROCESSED_USER_TXNS_BY_PAYLOAD
                         .with_label_values(&[process_type, "function", state])
                         .inc();

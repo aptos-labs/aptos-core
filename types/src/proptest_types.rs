@@ -293,7 +293,7 @@ impl Arbitrary for AccountInfoUniverse {
 
 #[derive(Arbitrary, Debug)]
 pub struct RawTransactionGen {
-    payload: TransactionPayload,
+    payload: TransactionPayloadWrapper,
     max_gas_amount: u64,
     gas_unit_price: u64,
     expiration_time_secs: u64,

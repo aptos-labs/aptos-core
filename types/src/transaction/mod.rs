@@ -110,7 +110,7 @@ pub struct RawTransaction {
     sequence_number: u64,
 
     /// The transaction payload, e.g., a script to execute.
-    payload: TransactionPayload,
+    payload: TransactionPayloadWrapper,
 
     /// Maximal total gas to spend for this transaction.
     max_gas_amount: u64,
@@ -137,7 +137,7 @@ impl RawTransaction {
     pub fn new(
         sender: AccountAddress,
         sequence_number: u64,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
         max_gas_amount: u64,
         gas_unit_price: u64,
         expiration_timestamp_secs: u64,
@@ -169,7 +169,7 @@ impl RawTransaction {
         RawTransaction {
             sender,
             sequence_number,
-            payload: TransactionPayload::Script(script),
+            payload: TransactionPayloadWrapper::Script(script),
             max_gas_amount,
             gas_unit_price,
             expiration_timestamp_secs,
@@ -190,7 +190,7 @@ impl RawTransaction {
         RawTransaction {
             sender,
             sequence_number,
-            payload: TransactionPayload::EntryFunction(entry_function),
+            payload: TransactionPayloadWrapper::EntryFunction(entry_function),
             max_gas_amount,
             gas_unit_price,
             expiration_timestamp_secs,
@@ -211,7 +211,7 @@ impl RawTransaction {
         RawTransaction {
             sender,
             sequence_number,
-            payload: TransactionPayload::Multisig(multisig),
+            payload: TransactionPayloadWrapper::Multisig(multisig),
             max_gas_amount,
             gas_unit_price,
             expiration_timestamp_secs,
@@ -519,7 +519,7 @@ pub struct DeprecatedPayload {
 
 /// Different kinds of transactions.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub enum TransactionPayload {
+pub enum TransactionPayloadWrapper {
     /// A transaction that executes code.
     Script(Script),
     /// Deprecated.

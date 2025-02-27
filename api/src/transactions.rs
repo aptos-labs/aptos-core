@@ -33,7 +33,8 @@ use aptos_types::{
     mempool_status::MempoolStatusCode,
     transaction::{
         EntryFunction, ExecutionStatus, MultisigTransactionPayload, RawTransaction,
-        RawTransactionWithData, SignedTransaction, TransactionPayload,
+        RawTransactionWithData, Script, SignedTransaction, TransactionExecutable,
+        TransactionPayloadInner, TransactionPayloadWrapper,
     },
     vm_status::StatusCode,
     AptosCoinType, CoinType,
@@ -1401,15 +1402,17 @@ impl TransactionsApi {
         );
 
         let stats_key = match txn.payload() {
-            TransactionPayload::Script(_) => {
+            TransactionPayloadWrapper::Script(_) => {
                 format!("Script::{}", txn.committed_hash()).to_string()
             },
-            TransactionPayload::ModuleBundle(_) => "ModuleBundle::unknown".to_string(),
-            TransactionPayload::EntryFunction(entry_function) => FunctionStats::function_to_key(
-                entry_function.module(),
-                &entry_function.function().into(),
-            ),
-            TransactionPayload::Multisig(multisig) => {
+            TransactionPayloadWrapper::ModuleBundle(_) => "ModuleBundle::unknown".to_string(),
+            TransactionPayloadWrapper::EntryFunction(entry_function) => {
+                FunctionStats::function_to_key(
+                    entry_function.module(),
+                    &entry_function.function().into(),
+                )
+            },
+            TransactionPayloadWrapper::Multisig(multisig) => {
                 if let Some(payload) = &multisig.transaction_payload {
                     match payload {
                         MultisigTransactionPayload::EntryFunction(entry_function) => {

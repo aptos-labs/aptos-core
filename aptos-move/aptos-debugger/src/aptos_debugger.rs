@@ -124,7 +124,7 @@ impl AptosDebugger {
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
 
         // Module bundle is deprecated!
-        if let TransactionPayload::ModuleBundle(_) = txn.payload() {
+        if let TransactionPayloadWrapper::ModuleBundle(_) = txn.payload() {
             bail!("Module bundle payload has been removed")
         }
 

@@ -38,7 +38,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     stake_pool::{SetOperatorEvent, StakePool},
     state_store::state_key::{inner::StateKeyInner, StateKey},
-    transaction::{EntryFunction, TransactionPayload},
+    transaction::{EntryFunction, TransactionPayloadWrapper},
     write_set::{WriteOp, WriteSet},
 };
 use itertools::Itertools;
@@ -1035,10 +1035,10 @@ fn parse_failed_operations_from_txn_payload(
     currencies: &HashSet<Currency>,
     operation_index: u64,
     sender: AccountAddress,
-    payload: &TransactionPayload,
+    payload: &TransactionPayloadWrapper,
 ) -> Vec<Operation> {
     let mut operations = vec![];
-    if let TransactionPayload::EntryFunction(inner) = payload {
+    if let TransactionPayloadWrapper::EntryFunction(inner) = payload {
         match (
             *inner.module().address(),
             inner.module().name().as_str(),
@@ -1437,7 +1437,7 @@ fn preprocess_write_set<'a>(
     server_context: &RosettaContext,
     state_key: &'a StateKey,
     write_op: &'a WriteOp,
-    _maybe_payload: Option<&TransactionPayload>,
+    _maybe_payload: Option<&TransactionPayloadWrapper>,
     version: u64,
     object_to_owner: &mut HashMap<AccountAddress, AccountAddress>,
     store_to_currency: &mut HashMap<AccountAddress, Currency>,
@@ -2572,7 +2572,10 @@ impl InternalOperation {
 
     pub fn payload(
         &self,
-    ) -> ApiResult<(aptos_types::transaction::TransactionPayload, AccountAddress)> {
+    ) -> ApiResult<(
+        aptos_types::transaction::TransactionPayloadWrapper,
+        AccountAddress,
+    )> {
         Ok(match self {
             InternalOperation::CreateAccount(create_account) => (
                 aptos_stdlib::aptos_account_create_account(create_account.new_account),
@@ -2611,7 +2614,7 @@ impl InternalOperation {
                             let fa_address = AccountAddress::from_str(fa_address_str)?;
 
                             (
-                                TransactionPayload::EntryFunction(EntryFunction::new(
+                                TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
                                     ModuleId::new(
                                         AccountAddress::ONE,
                                         ident_str!("primary_fungible_store").to_owned(),
