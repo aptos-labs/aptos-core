@@ -245,7 +245,7 @@ impl NetworkSender {
     /// returns a future that is fulfilled with BlockRetrievalResponse.
     pub async fn request_block(
         &self,
-        retrieval_request: BlockRetrievalRequestV1,
+        retrieval_request: BlockRetrievalRequest,
         from: Author,
         timeout: Duration,
     ) -> anyhow::Result<BlockRetrievalResponse> {
@@ -257,9 +257,7 @@ impl NetworkSender {
         });
 
         ensure!(from != self.author, "Retrieve block from self");
-        // TODO @bchocho @hariria change in new release once new ConsensusMsg is available (ConsensusMsg::BlockRetrievalRequest)
-        let msg =
-            ConsensusMsg::DeprecatedBlockRetrievalRequest(Box::new(retrieval_request.clone()));
+        let msg = ConsensusMsg::BlockRetrievalRequest(Box::new(retrieval_request.clone()));
         counters::CONSENSUS_SENT_MSGS
             .with_label_values(&[msg.name()])
             .inc();
@@ -269,10 +267,7 @@ impl NetworkSender {
             _ => return Err(anyhow!("Invalid response to request")),
         };
         response
-            .verify(
-                BlockRetrievalRequest::V1(retrieval_request),
-                &self.validators,
-            )
+            .verify(retrieval_request, &self.validators)
             .map_err(|e| {
                 error!(
                     SecurityEvent::InvalidRetrievedBlock,
