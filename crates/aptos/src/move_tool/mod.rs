@@ -8,9 +8,9 @@ use crate::{
         types::{
             load_account_arg, ArgWithTypeJSON, ChunkedPublishOption, CliConfig, CliError,
             CliTypedResult, ConfigSearchMode, EntryFunctionArguments, EntryFunctionArgumentsJSON,
-            MoveManifestAccountWrapper, MovePackageDir, OptimizationLevel, OverrideSizeCheckOption,
-            ProfileOptions, PromptOptions, RestOptions, SaveFile, ScriptFunctionArguments,
-            TransactionOptions, TransactionSummary, GIT_IGNORE,
+            MoveManifestAccountWrapper, MovePackageDir, OverrideSizeCheckOption, ProfileOptions,
+            PromptOptions, RestOptions, SaveFile, ScriptFunctionArguments, TransactionOptions,
+            TransactionSummary, GIT_IGNORE,
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
@@ -60,7 +60,6 @@ use colored::Colorize;
 use itertools::Itertools;
 use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
-use move_compiler_v2::Experiment;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, u256::U256};
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
@@ -582,7 +581,7 @@ impl CliCommand<&'static str> for TestPackage {
                     .move_options
                     .language_version
                     .or_else(|| Some(LanguageVersion::latest_stable())),
-                experiments: experiments_from_opt_level(&self.move_options.optimize),
+                experiments: self.move_options.compute_experiments(),
             },
             ..Default::default()
         };
@@ -886,19 +885,6 @@ impl FromStr for IncludedArtifacts {
     }
 }
 
-pub fn experiments_from_opt_level(optlevel: &Option<OptimizationLevel>) -> Vec<String> {
-    match optlevel {
-        None | Some(OptimizationLevel::Default) => {
-            vec![format!("{}=on", Experiment::OPTIMIZE.to_string())]
-        },
-        Some(OptimizationLevel::None) => vec![format!("{}=off", Experiment::OPTIMIZE.to_string())],
-        Some(OptimizationLevel::Extra) => vec![
-            format!("{}=on", Experiment::OPTIMIZE_EXTRA.to_string()),
-            format!("{}=on", Experiment::OPTIMIZE.to_string()),
-        ],
-    }
-}
-
 impl IncludedArtifacts {
     pub(crate) fn build_options(
         self,
@@ -927,9 +913,7 @@ impl IncludedArtifacts {
             .or_else(|| Some(LanguageVersion::latest_stable()));
         let skip_attribute_checks = move_options.skip_attribute_checks;
         let check_test_code = move_options.check_test_code;
-        let optimize = move_options.optimize.clone();
-        let mut experiments = experiments_from_opt_level(&optimize);
-        experiments.append(&mut move_options.experiments.clone());
+        let mut experiments = move_options.compute_experiments();
         experiments.append(&mut more_experiments);
 
         let base_options = BuildOptions {

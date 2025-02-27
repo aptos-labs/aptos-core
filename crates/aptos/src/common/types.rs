@@ -51,6 +51,7 @@ use async_trait::async_trait;
 use clap::{Parser, ValueEnum};
 use hex::FromHexError;
 use indoc::indoc;
+use move_compiler_v2::Experiment;
 use move_core_types::{
     account_address::AccountAddress, language_storage::TypeTag, vm_status::VMStatus,
 };
@@ -1194,6 +1195,10 @@ pub struct MovePackageDir {
            default_value = LATEST_STABLE_LANGUAGE_VERSION,
            verbatim_doc_comment)]
     pub language_version: Option<LanguageVersion>,
+
+    /// Fail the compilation if there are any warnings.
+    #[clap(long)]
+    pub fail_on_warning: bool,
 }
 
 impl Default for MovePackageDir {
@@ -1217,6 +1222,7 @@ impl MovePackageDir {
             skip_attribute_checks: false,
             check_test_code: false,
             optimize: None,
+            fail_on_warning: false,
             experiments: vec![],
         }
     }
@@ -1237,6 +1243,30 @@ impl MovePackageDir {
     pub fn add_named_address(&mut self, key: String, value: String) {
         self.named_addresses
             .insert(key, AccountAddressWrapper::from_str(&value).unwrap());
+    }
+
+    /// Compute the experiments to be used for the compiler.
+    pub fn compute_experiments(&self) -> Vec<String> {
+        let mut experiments = self.experiments.clone();
+        let mut set = |k: &str, v: bool| {
+            experiments.push(format!("{}={}", k, if v { "on" } else { "off" }));
+        };
+        match self.optimize {
+            None | Some(OptimizationLevel::Default) => {
+                set(Experiment::OPTIMIZE, true);
+            },
+            Some(OptimizationLevel::None) => {
+                set(Experiment::OPTIMIZE, false);
+            },
+            Some(OptimizationLevel::Extra) => {
+                set(Experiment::OPTIMIZE_EXTRA, true);
+                set(Experiment::OPTIMIZE, true);
+            },
+        }
+        if self.fail_on_warning {
+            set(Experiment::FAIL_ON_WARNING, true);
+        }
+        experiments
     }
 }
 
