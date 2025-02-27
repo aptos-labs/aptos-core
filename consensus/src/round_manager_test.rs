@@ -14,9 +14,7 @@ use crate::{
         round_state::{ExponentialTimeInterval, RoundState},
     },
     metrics_safety_rules::MetricsSafetyRules,
-    network::{
-        DeprecatedIncomingBlockRetrievalRequest, IncomingBlockRetrievalRequest, NetworkSender,
-    },
+    network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::{CommitMessage, ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::DirectMempoolPayloadManager,
@@ -518,18 +516,21 @@ impl NodeSetup {
     /// NOTE: [`IncomingBlockRetrievalRequest`](DeprecatedIncomingBlockRetrievalRequest) is being phased out over two releases
     /// After the first release, this can be deleted
     /// TODO @bchocho @hariria to fix after BlockRetrievalRequest enum is merged
-    pub async fn poll_block_retrieval(
-        &mut self,
-    ) -> Option<DeprecatedIncomingBlockRetrievalRequest> {
+    pub async fn poll_block_retrieval(&mut self) -> Option<IncomingBlockRetrievalRequest> {
         match self.poll_next_network_event() {
             Some(Event::RpcRequest(_, msg, protocol, response_sender)) => match msg {
                 ConsensusMsg::DeprecatedBlockRetrievalRequest(v) => {
-                    Some(DeprecatedIncomingBlockRetrievalRequest {
-                        req: *v,
+                    Some(IncomingBlockRetrievalRequest {
+                        req: BlockRetrievalRequest::V1(*v),
                         protocol,
                         response_sender,
                     })
                 },
+                ConsensusMsg::BlockRetrievalRequest(v) => Some(IncomingBlockRetrievalRequest {
+                    req: *v,
+                    protocol,
+                    response_sender,
+                }),
                 msg => panic!(
                     "Unexpected Consensus Message: {:?} on node {}",
                     msg,
@@ -625,7 +626,7 @@ fn start_replying_to_block_retreival(nodes: Vec<NodeSetup>) -> ReplyingRPCHandle
                         node.identity_desc()
                     );
                     let wrapped_request = IncomingBlockRetrievalRequest {
-                        req: BlockRetrievalRequest::V1(request.req),
+                        req: request.req,
                         protocol: request.protocol,
                         response_sender: request.response_sender,
                     };
