@@ -17,7 +17,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, session::Session, AsUnsyncCodeStorage, ModuleStorage,
-    RuntimeEnvironment, StagingModuleStorage,
+    RuntimeEnvironment, StagingModuleStorage, WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -115,9 +115,10 @@ fn instantiation_err() {
         ..VMConfig::default()
     };
     let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
-    let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
+    let storage: InMemoryStorage =
+        InMemoryStorage::new_with_runtime_environment(runtime_environment);
+    let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
 
-    let storage: InMemoryStorage = InMemoryStorage::new();
     let mut session = vm.new_session(&storage);
     let mut mod_bytes = vec![];
     cm.serialize(&mut mod_bytes).unwrap();
@@ -133,7 +134,7 @@ fn instantiation_err() {
         }));
     }
 
-    let module_storage = storage.as_unsync_code_storage(runtime_environment);
+    let module_storage = storage.as_unsync_code_storage();
 
     // Publish (must succeed!) and then load the function.
     if vm.vm_config().use_loader_v2 {

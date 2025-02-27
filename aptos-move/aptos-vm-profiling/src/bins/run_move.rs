@@ -15,6 +15,7 @@ use move_ir_compiler::Compiler;
 use move_vm_runtime::{
     module_traversal::*, move_vm::MoveVM, native_extensions::NativeContextExtensions,
     native_functions::NativeFunction, AsUnsyncCodeStorage, RuntimeEnvironment,
+    WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
@@ -160,8 +161,8 @@ fn main() -> Result<()> {
     ));
 
     let runtime_environment = RuntimeEnvironment::new(natives);
-    let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
-    let mut storage = InMemoryStorage::new();
+    let mut storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
+    let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
 
     let test_modules = compile_test_modules();
     for module in &test_modules {
@@ -188,7 +189,7 @@ fn main() -> Result<()> {
     let mut sess = vm.new_session_with_extensions(&storage, extensions);
 
     let traversal_storage = TraversalStorage::new();
-    let code_storage = storage.as_unsync_code_storage(runtime_environment);
+    let code_storage = storage.as_unsync_code_storage();
 
     let args: Vec<Vec<u8>> = vec![];
     match entrypoint {
