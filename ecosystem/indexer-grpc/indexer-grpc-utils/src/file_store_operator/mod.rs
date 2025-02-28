@@ -7,8 +7,6 @@ use crate::compression_util::{
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::Transaction;
 
-pub mod gcs;
-pub use gcs::*;
 pub mod local;
 use crate::counters::TRANSACTION_STORE_FETCH_RETRIES;
 pub use local::*;
