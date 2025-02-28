@@ -36,8 +36,6 @@ mod runtime_type_checks;
 mod storage;
 
 pub use loader::{Function, LoadedFunction, Module, Script};
-#[cfg(any(test, feature = "testing"))]
-pub use storage::implementations::unreachable_code_storage;
 pub use storage::{
     code_storage::{ambassador_impl_CodeStorage, CodeStorage},
     dependencies_gas_charging::{

@@ -20,7 +20,6 @@ use move_vm_runtime::{
     RuntimeEnvironment, StagingModuleStorage, WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
-use move_vm_types::gas::UnmeteredGasMeter;
 
 #[test]
 fn instantiation_err() {
@@ -138,18 +137,10 @@ fn instantiation_err() {
     let module_storage = storage.as_unsync_code_storage();
 
     // Publish (must succeed!) and then load the function.
-    if vm.vm_config().use_loader_v2 {
-        let new_module_storage =
-            StagingModuleStorage::create(&addr, &module_storage, vec![mod_bytes.into()])
-                .expect("Module must publish");
-        load_function(&mut session, &new_module_storage, &cm.self_id(), &[ty_arg])
-    } else {
-        #[allow(deprecated)]
-        session
-            .publish_module(mod_bytes, addr, &mut UnmeteredGasMeter)
+    let new_module_storage =
+        StagingModuleStorage::create(&addr, &module_storage, vec![mod_bytes.into()])
             .expect("Module must publish");
-        load_function(&mut session, &module_storage, &cm.self_id(), &[ty_arg])
-    }
+    load_function(&mut session, &new_module_storage, &cm.self_id(), &[ty_arg])
 }
 
 fn load_function(
