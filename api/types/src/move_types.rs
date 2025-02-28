@@ -545,12 +545,17 @@ impl VerifyInputWithRecursion for MoveType {
 }
 
 impl MoveType {
-    // Returns corresponding JSON data type for the value of `MoveType`
+    /// Returns corresponding JSON data type for the value of `MoveType`
+    ///
+    /// This type notation here, is just to explain to the user in error messages the type that needs
+    /// to be passed in to represent the value.  So it is represented as `JsonType<MoveType>`, where
+    /// `JsonType` is the value to be passed in as JSON, and `MoveType` is the move type it is converting
+    /// into.
     pub fn json_type_name(&self) -> String {
         match self {
-            MoveType::U8 => "integer".to_owned(),
-            MoveType::U16 => "string<u16>".to_owned(),
-            MoveType::U32 => "string<u32>".to_owned(),
+            MoveType::U8 => "integer<u8>".to_owned(),
+            MoveType::U16 => "integer<u16>".to_owned(),
+            MoveType::U32 => "integer<u32>".to_owned(),
             MoveType::U64 => "string<u64>".to_owned(),
             MoveType::U128 => "string<u128>".to_owned(),
             MoveType::U256 => "string<u256>".to_owned(),
