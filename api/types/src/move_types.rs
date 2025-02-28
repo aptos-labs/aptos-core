@@ -420,7 +420,7 @@ impl From<StructTag> for MoveStructTag {
             address: tag.address.into(),
             module: tag.module.into(),
             name: tag.name.into(),
-            generic_type_params: tag.type_args.into_iter().map(MoveType::from).collect(),
+            generic_type_params: tag.type_args.iter().map(MoveType::from).collect(),
         }
     }
 }
@@ -623,7 +623,7 @@ impl FromStr for MoveType {
         // return a serialized version of an object and not be able to
         // deserialize it using that same object.
         let inner = match parse_type_tag(s) {
-            Ok(inner) => inner.into(),
+            Ok(inner) => (&inner).into(),
             Err(_e) => MoveType::Unparsable(s.to_string()),
         };
         if is_ref {
@@ -665,30 +665,6 @@ impl MoveType {
     }
 }
 
-impl From<TypeTag> for MoveType {
-    fn from(tag: TypeTag) -> Self {
-        match tag {
-            TypeTag::Bool => MoveType::Bool,
-            TypeTag::U8 => MoveType::U8,
-            TypeTag::U16 => MoveType::U16,
-            TypeTag::U32 => MoveType::U32,
-            TypeTag::U64 => MoveType::U64,
-            TypeTag::U256 => MoveType::U256,
-            TypeTag::U128 => MoveType::U128,
-            TypeTag::Address => MoveType::Address,
-            TypeTag::Signer => MoveType::Signer,
-            TypeTag::Vector(v) => MoveType::Vector {
-                items: Box::new(MoveType::from(*v)),
-            },
-            TypeTag::Struct(v) => MoveType::Struct((*v).into()),
-            TypeTag::Function(..) => {
-                // TODO(#15664): support function values
-                MoveType::Unparsable("Function types are not supported".to_string())
-            },
-        }
-    }
-}
-
 impl From<&TypeTag> for MoveType {
     fn from(tag: &TypeTag) -> Self {
         match tag {
@@ -704,7 +680,7 @@ impl From<&TypeTag> for MoveType {
             TypeTag::Vector(v) => MoveType::Vector {
                 items: Box::new(MoveType::from(v.as_ref())),
             },
-            TypeTag::Struct(v) => MoveType::Struct((&**v).into()),
+            TypeTag::Struct(v) => MoveType::Struct(v.as_ref().into()),
             TypeTag::Function(..) => {
                 // TODO(#15664): support function values
                 MoveType::Unparsable("Function types are not supported".to_string())
@@ -1245,7 +1221,7 @@ mod tests {
     fn test_serialize_move_type_tag() {
         use TypeTag::*;
         fn assert_serialize(t: TypeTag, expected: Value) {
-            let value = to_value(MoveType::from(t)).unwrap();
+            let value = to_value(MoveType::from(&t)).unwrap();
             assert_json(value, expected)
         }
         assert_serialize(Bool, json!("bool"));
