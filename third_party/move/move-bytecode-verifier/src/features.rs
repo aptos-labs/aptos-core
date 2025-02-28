@@ -102,12 +102,19 @@ impl<'a> FeatureVerifier<'a> {
     }
 
     fn verify_function_handles(&self) -> PartialVMResult<()> {
-        if !self.config.enable_resource_access_control {
+        if !self.config.enable_resource_access_control || !self.config.enable_function_values {
             for (idx, function_handle) in self.code.function_handles().iter().enumerate() {
-                if function_handle.access_specifiers.is_some() {
+                if !self.config.enable_resource_access_control
+                    && function_handle.access_specifiers.is_some()
+                {
                     return Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED)
                         .at_index(IndexKind::FunctionHandle, idx as u16)
                         .with_message("resource access control feature not enabled".to_string()));
+                }
+                if !self.config.enable_function_values && !function_handle.attributes.is_empty() {
+                    return Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED)
+                        .at_index(IndexKind::FunctionDefinition, idx as u16)
+                        .with_message("function value feature not enabled".to_string()));
                 }
             }
         }

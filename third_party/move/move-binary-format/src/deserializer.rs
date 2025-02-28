@@ -1036,8 +1036,8 @@ fn load_signature_tokens(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Vec
 fn load_function_attributes(
     cursor: &mut VersionedCursor,
 ) -> BinaryLoaderResult<Vec<FunctionAttribute>> {
-    let mut attributes = Vec::new();
     let count = read_uleb_internal(cursor, ATTRIBUTE_COUNT_MAX)?;
+    let mut attributes = Vec::with_capacity(count);
     for _ in 0..count {
         attributes.push(load_attribute(cursor)?);
     }
@@ -1045,11 +1045,13 @@ fn load_function_attributes(
 }
 
 fn load_attribute(cursor: &mut VersionedCursor) -> BinaryLoaderResult<FunctionAttribute> {
-    use SerializedAttribute::*;
-    Ok(match SerializedAttribute::from_u8(load_u8(cursor)?)? {
-        PERSISTENT => FunctionAttribute::Persistent,
-        MODULE_LOCK => FunctionAttribute::ModuleLock,
-    })
+    use SerializedFunctionAttribute::*;
+    Ok(
+        match SerializedFunctionAttribute::from_u8(load_u8(cursor)?)? {
+            PERSISTENT => FunctionAttribute::Persistent,
+            MODULE_LOCK => FunctionAttribute::ModuleLock,
+        },
+    )
 }
 
 fn load_access_specifiers(
@@ -2146,9 +2148,9 @@ impl SerializedBool {
     }
 }
 
-impl SerializedAttribute {
+impl SerializedFunctionAttribute {
     fn from_u8(value: u8) -> BinaryLoaderResult<Self> {
-        use SerializedAttribute::*;
+        use SerializedFunctionAttribute::*;
         match value {
             0x1 => Ok(PERSISTENT),
             0x2 => Ok(MODULE_LOCK),

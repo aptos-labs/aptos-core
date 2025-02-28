@@ -208,11 +208,12 @@ pub enum SerializedNativeStructFlag {
     DECLARED_VARIANTS       = 0x3,
 }
 
+/// List of function attributes.
 #[rustfmt::skip]
 #[allow(non_camel_case_types)]
 #[repr(u8)]
 #[derive(Clone, Copy, Debug)]
-pub enum SerializedAttribute {
+pub enum SerializedFunctionAttribute {
     PERSISTENT   = 0x1,
     MODULE_LOCK  = 0x2,
 }

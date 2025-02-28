@@ -285,8 +285,8 @@ fn verify_imported_functions(context: &Context) -> PartialVMResult<()> {
             .func_id_to_index_map
             .get(&(owner_module_id.clone(), function_name.to_owned()))
         {
-            Some((def_handle_idx, def_def_idx)) => {
-                let def_handle = owner_module.function_handle_at(*def_handle_idx);
+            Some((owner_handle_idx, owner_def_idx)) => {
+                let def_handle = owner_module.function_handle_at(*owner_handle_idx);
                 // compatible type parameter constraints
                 if !compatible_fun_type_parameters(
                     &function_handle.type_parameters,
@@ -348,7 +348,8 @@ fn verify_imported_functions(context: &Context) -> PartialVMResult<()> {
                     // it's compiled for < Move 2.2. Synthesize the
                     // `persistent` attribute from Public visibility, which we find
                     // in the definition.
-                    if owner_module.function_def_at(*def_def_idx).visibility == Visibility::Public {
+                    if owner_module.function_def_at(*owner_def_idx).visibility == Visibility::Public
+                    {
                         def_attrs = &[FunctionAttribute::Persistent]
                     }
                 }

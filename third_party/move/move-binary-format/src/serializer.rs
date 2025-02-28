@@ -882,8 +882,8 @@ fn serialize_function_attribute(
 ) -> Result<()> {
     use FunctionAttribute::*;
     match attribute {
-        Persistent => binary.push(SerializedAttribute::PERSISTENT as u8),
-        ModuleLock => binary.push(SerializedAttribute::MODULE_LOCK as u8),
+        Persistent => binary.push(SerializedFunctionAttribute::PERSISTENT as u8),
+        ModuleLock => binary.push(SerializedFunctionAttribute::MODULE_LOCK as u8),
     }
 }
 
