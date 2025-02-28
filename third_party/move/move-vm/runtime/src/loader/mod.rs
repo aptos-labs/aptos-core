@@ -221,66 +221,6 @@ impl Loader {
         }
     }
 
-    pub(crate) fn check_script_dependencies_and_check_gas(
-        &self,
-        module_store: &LegacyModuleStorageAdapter,
-        data_store: &mut TransactionDataCache,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        script_blob: &[u8],
-        code_storage: &impl CodeStorage,
-    ) -> VMResult<()> {
-        match self {
-            Self::V1(loader) => loader.check_script_dependencies_and_check_gas(
-                module_store,
-                data_store,
-                gas_meter,
-                traversal_context,
-                script_blob,
-            ),
-            Self::V2(loader) => loader.check_script_dependencies_and_check_gas(
-                code_storage,
-                gas_meter,
-                traversal_context,
-                script_blob,
-            ),
-        }
-    }
-
-    pub(crate) fn check_dependencies_and_charge_gas<'a, I>(
-        &self,
-        module_store: &LegacyModuleStorageAdapter,
-        data_store: &mut TransactionDataCache,
-        gas_meter: &mut impl GasMeter,
-        visited: &mut BTreeMap<(&'a AccountAddress, &'a IdentStr), ()>,
-        referenced_modules: &'a Arena<Arc<CompiledModule>>,
-        ids: I,
-        module_storage: &dyn ModuleStorage,
-    ) -> VMResult<()>
-    where
-        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
-        I::IntoIter: DoubleEndedIterator,
-    {
-        let _timer = VM_TIMER.timer_with_label("Loader::check_dependencies_and_charge_gas");
-        match self {
-            Self::V1(loader) => loader.check_dependencies_and_charge_gas(
-                module_store,
-                data_store,
-                gas_meter,
-                visited,
-                referenced_modules,
-                ids,
-            ),
-            Self::V2(loader) => loader.check_dependencies_and_charge_gas(
-                module_storage,
-                gas_meter,
-                visited,
-                referenced_modules,
-                ids,
-            ),
-        }
-    }
-
     pub(crate) fn load_script(
         &self,
         script_blob: &[u8],
@@ -423,6 +363,7 @@ impl LoaderV1 {
     // Script verification and loading
     //
 
+    #[allow(dead_code)]
     pub(crate) fn check_script_dependencies_and_check_gas(
         &self,
         module_store: &LegacyModuleStorageAdapter,
@@ -822,6 +763,7 @@ impl LoaderV1 {
     /// performance.
     ///
     /// TODO: Revisit the order of traversal. Consider switching to alphabetical order.
+    #[allow(dead_code)]
     pub(crate) fn check_dependencies_and_charge_gas<'a, I>(
         &self,
         module_store: &LegacyModuleStorageAdapter,
