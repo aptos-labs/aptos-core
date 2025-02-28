@@ -9,7 +9,7 @@ use crate::common::utils::read_from_file;
 use crate::{
     common::{
         types::{
-            CliError, CliTypedResult, MovePackageDir, PoolAddressArgs, ProfileOptions,
+            CliError, CliTypedResult, MovePackageOptions, PoolAddressArgs, ProfileOptions,
             PromptOptions, RestOptions, TransactionOptions, TransactionSummary,
         },
         utils::prompt_yes_with_override,
@@ -1008,7 +1008,7 @@ pub struct GenerateUpgradeProposal {
     pub(crate) next_execution_hash: String,
 
     #[clap(flatten)]
-    pub(crate) move_options: MovePackageDir,
+    pub(crate) move_options: MovePackageOptions,
 }
 
 #[async_trait]

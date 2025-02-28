@@ -127,7 +127,7 @@ impl Default for BuildOptions {
             compiler_version: None,
             language_version: None,
             skip_attribute_checks: false,
-            check_test_code: false,
+            check_test_code: true,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             experiments: vec![],
         }
