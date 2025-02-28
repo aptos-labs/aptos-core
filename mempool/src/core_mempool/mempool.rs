@@ -431,7 +431,7 @@ impl Mempool {
 
         counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, block.len());
         counters::MEMPOOL_SERVICE_BYTES_GET_BLOCK.observe(total_bytes as f64);
-        for transaction in &block {
+        for (transaction, _) in &block {
             self.log_consensus_pulled_latency(transaction.sender(), transaction.sequence_number());
         }
         block
