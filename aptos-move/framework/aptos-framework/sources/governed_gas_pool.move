@@ -1,4 +1,7 @@
 module aptos_framework::governed_gas_pool {
+
+    friend aptos_framework::transaction_validation;
+
     use std::vector;
     use aptos_framework::account::{Self, SignerCapability, create_signer_with_capability};
     use aptos_framework::system_addresses::{Self};
@@ -138,7 +141,7 @@ module aptos_framework::governed_gas_pool {
     /// Deposits gas fees into the governed gas pool.
     /// @param gas_payer The address of the account that paid the gas fees.
     /// @param gas_fee The amount of gas fees to be deposited.
-    public fun deposit_gas_fee(gas_payer: address, gas_fee: u64) acquires GovernedGasPool {
+    public(friend) fun deposit_gas_fee(gas_payer: address, gas_fee: u64) acquires GovernedGasPool {
         if (features::operations_default_to_fa_apt_store_enabled()) {
             deposit_from_fungible_store(gas_payer, gas_fee);
         } else {
