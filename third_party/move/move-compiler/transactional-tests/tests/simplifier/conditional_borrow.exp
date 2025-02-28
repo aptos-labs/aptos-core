@@ -2,15 +2,6 @@ processed 3 tasks
 
 task 0 'publish'. lines 1-52:
 
-
-
-task 1 'run'. lines 54-54:
-return values: 11
-
-task 2 'run'. lines 56-56:
-return values: 11
-
->>> V1 Compiler {
 == BEGIN Bytecode ==
 // Move bytecode v7
 module 8675.M {
@@ -253,4 +244,9 @@ B0:
 }
 }
 == END Bytecode ==
-}
+
+task 1 'run'. lines 54-54:
+return values: 11
+
+task 2 'run'. lines 56-56:
+return values: 11

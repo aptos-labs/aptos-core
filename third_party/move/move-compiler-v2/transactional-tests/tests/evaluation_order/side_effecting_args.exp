@@ -11,5 +11,3 @@ return values: 7
 
 task 4 'run'. lines 39-39:
 return values: 9
-
-==> Compiler v2 delivered same results!

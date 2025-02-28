@@ -1,0 +1,17 @@
+processed 1 task
+
+task 0 'publish'. lines 1-14:
+
+== BEGIN Bytecode ==
+// Move bytecode v8
+module cafe.vectors {
+
+
+entry public guess_flips_break2(Arg0: vector<u8>): u64 /* def_idx: 0 */ {
+B0:
+	0: ImmBorrowLoc[0](Arg0: vector<u8>)
+	1: VecLen(2)
+	2: Ret
+}
+}
+== END Bytecode ==
