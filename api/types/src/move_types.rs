@@ -467,17 +467,17 @@ impl<'de> Deserialize<'de> for MoveStructTag {
     }
 }
 
-impl TryFrom<MoveStructTag> for StructTag {
+impl TryFrom<&MoveStructTag> for StructTag {
     type Error = anyhow::Error;
 
-    fn try_from(tag: MoveStructTag) -> anyhow::Result<Self> {
+    fn try_from(tag: &MoveStructTag) -> anyhow::Result<Self> {
         Ok(Self {
-            address: tag.address.into(),
-            module: tag.module.into(),
-            name: tag.name.into(),
+            address: (&tag.address).into(),
+            module: (&tag.module).into(),
+            name: (&tag.name).into(),
             type_args: tag
                 .generic_type_params
-                .into_iter()
+                .iter()
                 .map(|p| p.try_into())
                 .collect::<anyhow::Result<Vec<TypeTag>>>()?,
         })
@@ -694,10 +694,10 @@ impl From<&TypeTag> for MoveType {
     }
 }
 
-impl TryFrom<MoveType> for TypeTag {
+impl TryFrom<&MoveType> for TypeTag {
     type Error = anyhow::Error;
 
-    fn try_from(tag: MoveType) -> anyhow::Result<Self> {
+    fn try_from(tag: &MoveType) -> anyhow::Result<Self> {
         let ret = match tag {
             MoveType::Bool => TypeTag::Bool,
             MoveType::U8 => TypeTag::U8,
@@ -708,7 +708,7 @@ impl TryFrom<MoveType> for TypeTag {
             MoveType::U256 => TypeTag::U256,
             MoveType::Address => TypeTag::Address,
             MoveType::Signer => TypeTag::Signer,
-            MoveType::Vector { items } => TypeTag::Vector(Box::new((*items).try_into()?)),
+            MoveType::Vector { items } => TypeTag::Vector(Box::new(items.as_ref().try_into()?)),
             MoveType::Struct(v) => TypeTag::Struct(Box::new(v.try_into()?)),
             MoveType::GenericTypeParam { index: _ } => TypeTag::Address, // Dummy type, allows for Object<T>
             _ => {
