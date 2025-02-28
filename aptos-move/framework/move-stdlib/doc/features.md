@@ -3341,10 +3341,12 @@ Deprecated to prevent validator set changes during DKG.
 
 Genesis/tests should use <code><a href="features.md#0x1_features_change_feature_flags_internal">change_feature_flags_internal</a>()</code> for feature vec initialization.
 
+This can be used on testnet prior to successful DKG.
+
 Governance proposals should use <code><a href="features.md#0x1_features_change_feature_flags_for_next_epoch">change_feature_flags_for_next_epoch</a>()</code> to enable/disable features.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags">change_feature_flags</a>(_framework: &<a href="signer.md#0x1_signer">signer</a>, _enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, _disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags">change_feature_flags</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -3353,8 +3355,8 @@ Governance proposals should use <code><a href="features.md#0x1_features_change_f
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags">change_feature_flags</a>(_framework: &<a href="signer.md#0x1_signer">signer</a>, _enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, _disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;) {
-    <b>abort</b> (<a href="error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="features.md#0x1_features_EAPI_DISABLED">EAPI_DISABLED</a>))
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags">change_feature_flags</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;) <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_change_feature_flags_internal">change_feature_flags_internal</a>(framework, enable, disable)
 }
 </code></pre>
 
