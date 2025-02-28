@@ -127,6 +127,8 @@ use move_core_types::{
 };
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_runtime::{
+    check_dependencies_and_charge_gas, check_script_dependencies_and_check_gas,
+    check_type_tag_dependencies_and_charge_gas,
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
     ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
@@ -806,7 +808,7 @@ impl AptosVM {
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
         if self.gas_feature_version() >= RELEASE_V1_10 {
-            session.check_script_dependencies_and_check_gas(
+            check_script_dependencies_and_check_gas(
                 code_storage,
                 gas_meter,
                 traversal_context,
@@ -814,7 +816,7 @@ impl AptosVM {
             )?;
         }
         if self.gas_feature_version() >= RELEASE_V1_27 {
-            session.check_type_tag_dependencies_and_charge_gas(
+            check_type_tag_dependencies_and_charge_gas(
                 code_storage,
                 gas_meter,
                 traversal_context,
@@ -886,16 +888,14 @@ impl AptosVM {
             let module_id = traversal_context
                 .referenced_module_ids
                 .alloc(entry_fn.module().clone());
-            session.check_dependencies_and_charge_gas(
-                module_storage,
-                gas_meter,
-                traversal_context,
-                [(module_id.address(), module_id.name())],
-            )?;
+            check_dependencies_and_charge_gas(module_storage, gas_meter, traversal_context, [(
+                module_id.address(),
+                module_id.name(),
+            )])?;
         }
 
         if self.gas_feature_version() >= RELEASE_V1_27 {
-            session.check_type_tag_dependencies_and_charge_gas(
+            check_type_tag_dependencies_and_charge_gas(
                 module_storage,
                 gas_meter,
                 traversal_context,
@@ -1659,21 +1659,19 @@ impl AptosVM {
                 .map(|module| (module.self_addr(), module.self_name()))
                 .collect::<BTreeSet<_>>();
 
-            session.execute(|session| {
-                session.check_dependencies_and_charge_gas(
-                    module_storage,
-                    gas_meter,
-                    traversal_context,
-                    modules
-                        .iter()
-                        .flat_map(|module| {
-                            module
-                                .immediate_dependencies_iter()
-                                .chain(module.immediate_friends_iter())
-                        })
-                        .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
-                )
-            })?;
+            check_dependencies_and_charge_gas(
+                module_storage,
+                gas_meter,
+                traversal_context,
+                modules
+                    .iter()
+                    .flat_map(|module| {
+                        module
+                            .immediate_dependencies_iter()
+                            .chain(module.immediate_friends_iter())
+                    })
+                    .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
+            )?;
 
             // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
         }
