@@ -2141,7 +2141,7 @@ impl TryInto<Vec<TypeTag>> for TypeArgVec {
 
     fn try_into(self) -> Result<Vec<TypeTag>, Self::Error> {
         let mut type_tags: Vec<TypeTag> = vec![];
-        for type_arg in self.type_args {
+        for type_arg in self.type_args.iter() {
             type_tags.push(
                 TypeTag::try_from(type_arg)
                     .map_err(|err| CliError::UnableToParse("type argument", err.to_string()))?,

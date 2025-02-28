@@ -604,7 +604,7 @@ impl Account {
         field_name: Identifier,
     ) -> Result<EventKey, BasicErrorWith404> {
         // Parse the struct tag
-        let struct_tag: StructTag = struct_tag
+        let struct_tag: StructTag = (&struct_tag)
             .try_into()
             .context("Given event handle was invalid")
             .map_err(|err| {
