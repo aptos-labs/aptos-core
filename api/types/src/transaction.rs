@@ -862,13 +862,13 @@ impl From<(&ContractEvent, serde_json::Value)> for Event {
             ContractEvent::V1(v1) => Self {
                 guid: (*v1.key()).into(),
                 sequence_number: v1.sequence_number().into(),
-                typ: v1.type_tag().clone().into(),
+                typ: v1.type_tag().into(),
                 data,
             },
             ContractEvent::V2(v2) => Self {
                 guid: *DUMMY_GUID,
                 sequence_number: *DUMMY_SEQUENCE_NUMBER,
-                typ: v2.type_tag().clone().into(),
+                typ: v2.type_tag().into(),
                 data,
             },
         }
@@ -897,14 +897,14 @@ impl From<(&EventWithVersion, serde_json::Value)> for VersionedEvent {
                 version: event.transaction_version.into(),
                 guid: (*v1.key()).into(),
                 sequence_number: v1.sequence_number().into(),
-                typ: v1.type_tag().clone().into(),
+                typ: v1.type_tag().into(),
                 data,
             },
             ContractEvent::V2(v2) => Self {
                 version: event.transaction_version.into(),
                 guid: *DUMMY_GUID,
                 sequence_number: *DUMMY_SEQUENCE_NUMBER,
-                typ: v2.type_tag().clone().into(),
+                typ: v2.type_tag().into(),
                 data,
             },
         }
@@ -1000,7 +1000,7 @@ impl TryFrom<Script> for ScriptPayload {
         let (code, ty_args, args) = script.into_inner();
         Ok(Self {
             code: MoveScriptBytecode::new(code).try_parse_abi(),
-            type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
+            type_arguments: ty_args.iter().map(|arg| arg.into()).collect(),
             arguments: args
                 .into_iter()
                 .map(|arg| MoveValue::from(arg).json())
