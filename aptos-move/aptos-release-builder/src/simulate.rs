@@ -177,6 +177,7 @@ fn add_simple_native_function(
         return_,
         type_parameters: vec![],
         access_specifiers: None,
+        attributes: vec![],
     };
     let func_handle_idx = FunctionHandleIndex(m.function_handles.len() as u16);
     m.function_handles.push(func_handle);

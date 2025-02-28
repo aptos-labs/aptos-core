@@ -280,6 +280,7 @@ fn load_phantom_module() {
         return_: SignatureIndex(0),
         type_parameters: vec![],
         access_specifiers: None,
+        attributes: vec![],
     });
     module.function_defs.push(FunctionDefinition {
         function: FunctionHandleIndex(0),
@@ -346,6 +347,7 @@ fn load_with_extra_ability() {
         return_: SignatureIndex(0),
         type_parameters: vec![],
         access_specifiers: None,
+        attributes: vec![],
     });
     module.function_defs.push(FunctionDefinition {
         function: FunctionHandleIndex(0),

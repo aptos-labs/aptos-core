@@ -109,6 +109,7 @@ fn make_script_with_non_linking_structs(parameters: Signature) -> Vec<u8> {
             return_: SignatureIndex(0),
             type_parameters: vec![],
             access_specifiers: None,
+            attributes: vec![],
         }],
 
         function_instantiations: vec![],
@@ -183,6 +184,7 @@ fn make_module_with_function(
             return_: return_idx,
             type_parameters,
             access_specifiers: None,
+            attributes: vec![],
         }],
         field_handles: vec![],
         friend_decls: vec![],

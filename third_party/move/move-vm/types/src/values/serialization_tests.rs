@@ -210,7 +210,7 @@ mod tests {
         MoveTypeLayout::Function(MoveFunctionLayout(
             vec![],
             vec![],
-            AbilitySet::MAXIMAL_FUNCTIONS,
+            AbilitySet::PUBLIC_FUNCTIONS,
         ))
     }
 
@@ -226,7 +226,7 @@ mod tests {
                     type_args: vec![TypeTag::Signer],
                 }))],
                 results: vec![TypeTag::Address],
-                abilities: AbilitySet::MAXIMAL_FUNCTIONS,
+                abilities: AbilitySet::PUBLIC_FUNCTIONS,
             })),
         ]
     }
