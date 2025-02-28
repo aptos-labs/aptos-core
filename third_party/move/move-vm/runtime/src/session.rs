@@ -9,11 +9,8 @@ use crate::{
     module_traversal::TraversalContext,
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
-    storage::{
-        module_storage::ModuleStorage, ty_layout_converter::LoaderLayoutConverter,
-        ty_tag_converter::TypeTagConverter,
-    },
-    CodeStorage, LayoutConverter,
+    storage::{module_storage::ModuleStorage, ty_tag_converter::TypeTagConverter},
+    CodeStorage, LayoutConverter, StorageLayoutConverter,
 };
 use bytes::Bytes;
 use move_binary_format::{compatibility::Compatibility, errors::*, file_format::LocalIndex};
@@ -323,13 +320,7 @@ impl<'r, 'l> Session<'r, 'l> {
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
-        self.data_cache.load_resource(
-            self.move_vm.runtime.loader(),
-            module_storage,
-            addr,
-            ty,
-            &self.module_store,
-        )
+        self.data_cache.load_resource(module_storage, addr, ty)
     }
 
     /// DO NOT USE THIS API!
@@ -420,13 +411,9 @@ impl<'r, 'l> Session<'r, 'l> {
         ty: &Type,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<MoveTypeLayout> {
-        LoaderLayoutConverter::new(
-            self.move_vm.runtime.loader(),
-            &self.module_store,
-            module_storage,
-        )
-        .type_to_type_layout(ty)
-        .map_err(|e| e.finish(Location::Undefined))
+        StorageLayoutConverter::new(module_storage)
+            .type_to_type_layout(ty)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 
     pub fn get_fully_annotated_type_layout_from_ty(
@@ -434,13 +421,9 @@ impl<'r, 'l> Session<'r, 'l> {
         ty: &Type,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<MoveTypeLayout> {
-        LoaderLayoutConverter::new(
-            self.move_vm.runtime.loader(),
-            &self.module_store,
-            module_storage,
-        )
-        .type_to_fully_annotated_layout(ty)
-        .map_err(|e| e.finish(Location::Undefined))
+        StorageLayoutConverter::new(module_storage)
+            .type_to_fully_annotated_layout(ty)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 
     /// Gets the underlying native extensions.
