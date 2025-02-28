@@ -117,7 +117,7 @@ def main():
             line = line.strip()
             if "}" in line:
                 parts = line.split("}")
-                res = [parts[0] + "}"] + parts[1].split(", ")[1:]
+                res = ["}".join(parts[:-1]) + "}"] + parts[-1].split(", ")[1:]
                 return res
             else:
                 return line.split(", ")
@@ -178,7 +178,9 @@ def main():
 
         output_file_name = "testsuite/single_node_performance_values.tsv"
 
+    print(query_string)
     response_text = query_humio(query_string, time_interval=args.time_interval)
+    print(response_text)
 
     parsed = [
         {
@@ -190,6 +192,7 @@ def main():
 
     with open(output_file_name, "w") as f:
         for line in parsed:
+            print(line)
             f.write("\t".join([line[column] for column in columns]))
             f.write("\n")
 
