@@ -170,8 +170,6 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             options: opts
                 .clone()
                 // .set_experiment(Experiment::AST_SIMPLIFY, true)
-                .set_experiment(Experiment::FUNCTION_VALUES, true)
-                .set_experiment(Experiment::LAMBDA_LIFTING, true)
                 .set_language_version(LanguageVersion::V2_LAMBDA),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,
