@@ -595,7 +595,7 @@ impl BlockMetadataExtension {
             BlockMetadataExt::V1(payload) => Self::V1(BlockMetadataExtensionRandomness {
                 randomness: payload
                     .randomness
-                    .clone()
+                    .as_ref()
                     .map(|pr| HexEncodedBytes::from(pr.randomness_cloned())),
             }),
         }
@@ -1597,8 +1597,8 @@ impl TryFrom<Signature> for AnySignature {
     }
 }
 
-impl From<AnySignature> for Signature {
-    fn from(signature: AnySignature) -> Self {
+impl From<&AnySignature> for Signature {
+    fn from(signature: &AnySignature) -> Self {
         match signature {
             AnySignature::Ed25519 { signature } => {
                 Signature::Ed25519(Ed25519::new(signature.to_bytes().to_vec().into()))
@@ -1647,8 +1647,8 @@ impl TryFrom<PublicKey> for AnyPublicKey {
     }
 }
 
-impl From<AnyPublicKey> for PublicKey {
-    fn from(key: AnyPublicKey) -> Self {
+impl From<&AnyPublicKey> for PublicKey {
+    fn from(key: &AnyPublicKey) -> Self {
         match key {
             AnyPublicKey::Ed25519 { public_key } => {
                 PublicKey::Ed25519(Ed25519::new(public_key.to_bytes().to_vec().into()))
@@ -2138,8 +2138,8 @@ impl From<&AccountAuthenticator> for AccountSignature {
                 signature,
             } => Self::MultiEd25519Signature((public_key, signature).into()),
             SingleKey { authenticator } => Self::SingleKeySignature(SingleKeySignature {
-                public_key: authenticator.public_key().clone().into(),
-                signature: authenticator.signature().clone().into(),
+                public_key: authenticator.public_key().into(),
+                signature: authenticator.signature().into(),
             }),
             MultiKey { authenticator } => {
                 let public_keys = authenticator.public_keys();
@@ -2149,13 +2149,13 @@ impl From<&AccountAuthenticator> for AccountSignature {
                     public_keys: public_keys
                         .public_keys()
                         .iter()
-                        .map(|pk| pk.clone().into())
+                        .map(|pk| pk.into())
                         .collect(),
                     signatures: signatures
                         .into_iter()
                         .map(|(index, signature)| IndexedSignature {
                             index,
-                            signature: signature.clone().into(),
+                            signature: signature.into(),
                         })
                         .collect(),
                     signatures_required: public_keys.signatures_required(),
