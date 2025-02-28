@@ -40,7 +40,7 @@ use move_vm_types::{
 };
 use parking_lot::{Mutex, RwLock};
 use std::{
-    collections::{btree_map, BTreeMap, BTreeSet, HashMap},
+    collections::{btree_map, BTreeMap, BTreeSet},
     hash::Hash,
     sync::Arc,
 };
@@ -60,7 +60,7 @@ use crate::{
         loader::LoaderV2,
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::LoaderLayoutConverter,
-        ty_tag_converter::{PricedStructTag, TypeTagCache, TypeTagConverter},
+        ty_tag_converter::{PricedStructTag, TypeTagCache},
     },
 };
 pub use function::{Function, LoadedFunction};
@@ -71,15 +71,12 @@ pub(crate) use function::{
 pub use modules::Module;
 pub(crate) use modules::{LegacyModuleCache, LegacyModuleStorage, LegacyModuleStorageAdapter};
 use move_binary_format::file_format::{
-    StructVariantHandleIndex, StructVariantInstantiationIndex, TypeParameterIndex,
-    VariantFieldHandleIndex, VariantFieldInstantiationIndex, VariantIndex,
+    StructVariantHandleIndex, StructVariantInstantiationIndex, VariantFieldHandleIndex,
+    VariantFieldInstantiationIndex, VariantIndex,
 };
 use move_core_types::language_storage::FunctionTag;
 use move_vm_types::{
-    loaded_data::{
-        runtime_types::{DepthFormula, StructLayout, TypeBuilder},
-        struct_name_indexing::StructNameIndexMap,
-    },
+    loaded_data::{runtime_types::TypeBuilder, struct_name_indexing::StructNameIndexMap},
     values::{AbstractFunction, SerializedFunctionData},
 };
 pub use script::Script;
@@ -1808,177 +1805,6 @@ impl LoaderV1 {
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!("No type tag for {:?}", ty)),
                 );
-            },
-        })
-    }
-}
-
-impl Loader {
-    pub(crate) fn type_to_type_tag(
-        &self,
-        ty: &Type,
-        module_storage: &dyn ModuleStorage,
-    ) -> PartialVMResult<TypeTag> {
-        match self {
-            Loader::V1(loader) => {
-                let mut gas_context = PseudoGasContext::new(self.vm_config());
-                loader.type_to_type_tag_impl(ty, &mut gas_context)
-            },
-            Loader::V2(_) => {
-                let ty_tag_builder = TypeTagConverter::new(module_storage.runtime_environment());
-                ty_tag_builder.ty_to_ty_tag(ty)
-            },
-        }
-    }
-
-    pub(crate) fn calculate_depth_of_struct(
-        &self,
-        struct_name_idx: StructNameIndex,
-        module_store: &LegacyModuleStorageAdapter,
-        module_storage: &dyn ModuleStorage,
-        visited_cache: &mut HashMap<StructNameIndex, DepthFormula>,
-    ) -> PartialVMResult<DepthFormula> {
-        if let Some(depth_formula) = visited_cache.get(&struct_name_idx) {
-            return Ok(depth_formula.clone());
-        }
-
-        let struct_type =
-            self.fetch_struct_ty_by_idx(struct_name_idx, module_store, module_storage)?;
-        let formulas = match &struct_type.layout {
-            StructLayout::Single(fields) => fields
-                .iter()
-                .map(|(_, field_ty)| {
-                    self.calculate_depth_of_type(
-                        field_ty,
-                        module_store,
-                        module_storage,
-                        visited_cache,
-                    )
-                })
-                .collect::<PartialVMResult<Vec<_>>>()?,
-            StructLayout::Variants(variants) => variants
-                .iter()
-                .flat_map(|variant| variant.1.iter().map(|(_, ty)| ty))
-                .map(|field_ty| {
-                    self.calculate_depth_of_type(
-                        field_ty,
-                        module_store,
-                        module_storage,
-                        visited_cache,
-                    )
-                })
-                .collect::<PartialVMResult<Vec<_>>>()?,
-        };
-
-        let formula = DepthFormula::normalize(formulas);
-        if visited_cache
-            .insert(struct_name_idx, formula.clone())
-            .is_some()
-        {
-            // Same thread has put this entry previously, which means there is a recursion.
-            let struct_name = self
-                .struct_name_index_map(module_storage)
-                .idx_to_struct_name_ref(struct_name_idx)?;
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
-                    format!(
-                        "Depth formula for struct '{}' is already cached by the same thread",
-                        struct_name.as_ref(),
-                    ),
-                ),
-            );
-        }
-        Ok(formula)
-    }
-
-    fn calculate_depth_of_type(
-        &self,
-        ty: &Type,
-        module_store: &LegacyModuleStorageAdapter,
-        module_storage: &dyn ModuleStorage,
-        visited_cache: &mut HashMap<StructNameIndex, DepthFormula>,
-    ) -> PartialVMResult<DepthFormula> {
-        Ok(match ty {
-            Type::Bool
-            | Type::U8
-            | Type::U64
-            | Type::U128
-            | Type::Address
-            | Type::Signer
-            | Type::U16
-            | Type::U32
-            | Type::U256 => DepthFormula::constant(1),
-            Type::Vector(ty) => {
-                let mut inner =
-                    self.calculate_depth_of_type(ty, module_store, module_storage, visited_cache)?;
-                inner.scale(1);
-                inner
-            },
-            Type::Reference(ty) | Type::MutableReference(ty) => {
-                let mut inner =
-                    self.calculate_depth_of_type(ty, module_store, module_storage, visited_cache)?;
-                inner.scale(1);
-                inner
-            },
-            Type::TyParam(ty_idx) => DepthFormula::type_parameter(*ty_idx),
-            Type::Struct { idx, .. } => {
-                let mut struct_formula = self.calculate_depth_of_struct(
-                    *idx,
-                    module_store,
-                    module_storage,
-                    visited_cache,
-                )?;
-                debug_assert!(struct_formula.terms.is_empty());
-                struct_formula.scale(1);
-                struct_formula
-            },
-            Type::StructInstantiation { idx, ty_args, .. } => {
-                let ty_arg_map = ty_args
-                    .iter()
-                    .enumerate()
-                    .map(|(idx, ty)| {
-                        let var = idx as TypeParameterIndex;
-                        Ok((
-                            var,
-                            self.calculate_depth_of_type(
-                                ty,
-                                module_store,
-                                module_storage,
-                                visited_cache,
-                            )?,
-                        ))
-                    })
-                    .collect::<PartialVMResult<BTreeMap<_, _>>>()?;
-                let struct_formula = self.calculate_depth_of_struct(
-                    *idx,
-                    module_store,
-                    module_storage,
-                    visited_cache,
-                )?;
-                let mut subst_struct_formula = struct_formula.subst(ty_arg_map)?;
-                subst_struct_formula.scale(1);
-                subst_struct_formula
-            },
-            Type::Function {
-                args,
-                results,
-                abilities: _,
-            } => {
-                let mut inner = DepthFormula::normalize(
-                    args.iter()
-                        .chain(results)
-                        .map(|arg_ty| {
-                            self.calculate_depth_of_type(
-                                arg_ty,
-                                module_store,
-                                module_storage,
-                                visited_cache,
-                            )
-                        })
-                        .collect::<PartialVMResult<Vec<_>>>()?,
-                );
-                inner.scale(1);
-                inner
             },
         })
     }
