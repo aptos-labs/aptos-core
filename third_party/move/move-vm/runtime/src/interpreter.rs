@@ -14,7 +14,9 @@ use crate::{
     native_functions::NativeContext,
     reentrancy_checker::{CallType, ReentrancyChecker},
     runtime_type_checks::{FullRuntimeTypeCheck, NoRuntimeTypeCheck, RuntimeTypeCheck},
-    storage::ty_tag_converter::TypeTagConverter,
+    storage::{
+        depth_formula_calculator::DepthFormulaCalculator, ty_tag_converter::TypeTagConverter,
+    },
     trace, LoadedFunction, ModuleStorage,
 };
 use fail::fail_point;
@@ -50,7 +52,7 @@ use move_vm_types::{
 use std::{
     cell::RefCell,
     cmp::min,
-    collections::{btree_map, BTreeSet, HashMap, VecDeque},
+    collections::{btree_map, BTreeSet, VecDeque},
     fmt::Write,
     rc::Rc,
 };
@@ -98,10 +100,9 @@ struct TypeWithLoader<'a, 'b, 'c> {
 
 impl<'a, 'b, 'c> TypeView for TypeWithLoader<'a, 'b, 'c> {
     fn to_type_tag(&self) -> TypeTag {
-        self.resolver
-            .loader()
-            .type_to_type_tag(self.ty, self.resolver.module_storage())
-            .unwrap()
+        let ty_tag_builder =
+            TypeTagConverter::new(self.resolver.module_storage().runtime_environment());
+        ty_tag_builder.ty_to_ty_tag(self.ty).unwrap()
     }
 }
 
@@ -1422,11 +1423,10 @@ impl InterpreterImpl {
         if !ty_args.is_empty() {
             let mut ty_tags = vec![];
             for ty in ty_args {
-                ty_tags.push(
-                    resolver
-                        .loader()
-                        .type_to_type_tag(ty, resolver.module_storage())?,
-                );
+                let ty_tag_builder =
+                    TypeTagConverter::new(resolver.module_storage().runtime_environment());
+                let tag = ty_tag_builder.ty_to_ty_tag(ty)?;
+                ty_tags.push(tag);
             }
             debug_write!(buf, "<")?;
             let mut it = ty_tags.iter();
@@ -1768,12 +1768,8 @@ fn check_depth_of_type_impl(
         },
         Type::Vector(ty) => check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(1))?,
         Type::Struct { idx, .. } => {
-            let formula = resolver.loader().calculate_depth_of_struct(
-                *idx,
-                resolver.module_store(),
-                resolver.module_storage(),
-                &mut HashMap::new(),
-            )?;
+            let formula = DepthFormulaCalculator::new(resolver.module_storage())
+                .calculate_depth_of_struct(idx)?;
             check_depth!(formula.solve(&[]))
         },
         // NB: substitution must be performed before calling this function
@@ -1786,12 +1782,8 @@ fn check_depth_of_type_impl(
                     check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(0))
                 })
                 .collect::<PartialVMResult<Vec<_>>>()?;
-            let formula = resolver.loader().calculate_depth_of_struct(
-                *idx,
-                resolver.module_store(),
-                resolver.module_storage(),
-                &mut HashMap::new(),
-            )?;
+            let formula = DepthFormulaCalculator::new(resolver.module_storage())
+                .calculate_depth_of_struct(idx)?;
             check_depth!(formula.solve(&ty_arg_depths))
         },
         Type::Function { args, results, .. } => {
