@@ -141,13 +141,20 @@ module aptos_framework::governed_gas_pool {
     /// Deposits gas fees into the governed gas pool.
     /// @param gas_payer The address of the account that paid the gas fees.
     /// @param gas_fee The amount of gas fees to be deposited.
-    public(friend) fun deposit_gas_fee(gas_payer: address, gas_fee: u64) acquires GovernedGasPool {
-        if (features::operations_default_to_fa_apt_store_enabled()) {
+    public fun deposit_gas_fee(gas_payer: address, gas_fee: u64) acquires GovernedGasPool {
+        // get the sender to preserve the signature but do nothing
+        governed_gas_pool_address();
+    }
+
+    /// Deposits gas fees into the governed gas pool.
+    /// @param gas_payer The address of the account that paid the gas fees.
+    /// @param gas_fee The amount of gas fees to be deposited.
+    public(friend) fun deposit_gas_fee_v2(gas_payer: address, gas_fee: u64) acquires GovernedGasPool {
+       if (features::operations_default_to_fa_apt_store_enabled()) {
             deposit_from_fungible_store(gas_payer, gas_fee);
         } else {
             deposit_from<AptosCoin>(gas_payer, gas_fee);
         };
-
     }
 
     #[view]
@@ -280,7 +287,7 @@ module aptos_framework::governed_gas_pool {
         let governed_gas_pool_balance = coin::balance<AptosCoin>(governed_gas_pool_address());
 
         // deposit some coin into the governed gas pool as gas fees
-        deposit_gas_fee(signer::address_of(depositor), 100);
+        deposit_gas_fee_v2(signer::address_of(depositor), 100);
 
         // check the balances after the deposit
         assert!(coin::balance<AptosCoin>(signer::address_of(depositor)) == depositor_balance - 100, 1);
@@ -323,7 +330,7 @@ module aptos_framework::governed_gas_pool {
         let governed_gas_pool_balance = coin::balance<AptosCoin>(governed_gas_pool_address());
 
         // collect gas fees from the depositor
-        deposit_gas_fee(signer::address_of(depositor), 100);
+        deposit_gas_fee_v2(signer::address_of(depositor), 100);
 
         // check the balances after the deposit
         assert!(coin::balance<AptosCoin>(signer::address_of(depositor)) == depositor_balance - 100, 1);

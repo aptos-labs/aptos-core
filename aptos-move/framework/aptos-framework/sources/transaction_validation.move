@@ -321,7 +321,7 @@ module aptos_framework::transaction_validation {
         if (amount_to_burn > storage_fee_refunded) {
             let burn_amount = amount_to_burn - storage_fee_refunded;
             if (features::governed_gas_pool_enabled()) {
-                governed_gas_pool::deposit_gas_fee(gas_payer, burn_amount);
+                governed_gas_pool::deposit_gas_fee_v2(gas_payer, burn_amount);
             } else {
                 transaction_fee::burn_fee(gas_payer, burn_amount);
             }
