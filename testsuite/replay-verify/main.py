@@ -145,7 +145,8 @@ class WorkerPod:
                 return True
         except Exception as e:
             logger.error(f"Failed to get pod status: {e}")
-        return False    
+        return False
+
     def is_failed(self) -> bool:
         self.update_status()
         if self.status and self.status.status.phase == "Failed":
@@ -466,7 +467,7 @@ class ReplayScheduler:
                     self.task_stats[worker_pod.name] = TaskStats(worker_pod.name)
 
                 if self.current_workers[i] is not None:
-                    try: 
+                    try:
                         phase = self.current_workers[i].get_phase()
                         logger.info(
                             f"Checking worker {i}: {self.current_workers[i].name}: {phase}"
