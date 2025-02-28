@@ -297,7 +297,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 };
                 TransactionPayload::ScriptPayload(ScriptPayload {
                     code: MoveScriptBytecode::new(code).try_parse_abi(),
-                    type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
+                    type_arguments: ty_args.iter().map(|arg| arg.into()).collect(),
                     arguments: json_args,
                 })
             },
@@ -324,7 +324,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                         module: module.into(),
                         name: function.into(),
                     },
-                    type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
+                    type_arguments: ty_args.iter().map(|arg| arg.into()).collect(),
                 })
             },
             Multisig(multisig) => {
@@ -355,10 +355,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                         module: module.into(),
                                         name: function.into(),
                                     },
-                                    type_arguments: ty_args
-                                        .into_iter()
-                                        .map(|arg| arg.into())
-                                        .collect(),
+                                    type_arguments: ty_args.iter().map(|arg| arg.into()).collect(),
                                 },
                             ))
                         },
