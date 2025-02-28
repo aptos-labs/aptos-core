@@ -4,8 +4,7 @@
 
 use crate::{
     config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
-    module_traversal::TraversalContext, storage::module_storage::ModuleStorage, CodeStorage,
-    LayoutConverter,
+    module_traversal::TraversalContext, storage::module_storage::ModuleStorage, LayoutConverter,
 };
 use hashbrown::Equivalent;
 use lazy_static::lazy_static;
@@ -221,20 +220,6 @@ impl Loader {
         }
     }
 
-    pub(crate) fn load_script(
-        &self,
-        script_blob: &[u8],
-        ty_args: &[TypeTag],
-        data_store: &mut TransactionDataCache,
-        module_store: &LegacyModuleStorageAdapter,
-        code_storage: &impl CodeStorage,
-    ) -> VMResult<LoadedFunction> {
-        match self {
-            Self::V1(loader) => loader.load_script(script_blob, ty_args, data_store, module_store),
-            Self::V2(loader) => loader.load_script(code_storage, script_blob, ty_args),
-        }
-    }
-
     fn load_function_without_type_args(
         &self,
         module_id: &ModuleId,
@@ -397,6 +382,7 @@ impl LoaderV1 {
     // Entry point for script execution (`MoveVM::execute_script`).
     // Verifies the script if it is not in the cache of scripts loaded.
     // Type parameters are checked as well after every type is loaded.
+    #[allow(dead_code)]
     pub(crate) fn load_script(
         &self,
         script_blob: &[u8],

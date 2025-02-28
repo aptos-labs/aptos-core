@@ -25,9 +25,9 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     ambassador_impl_CodeStorage, ambassador_impl_ModuleStorage,
-    ambassador_impl_WithRuntimeEnvironment, AsUnsyncCodeStorage, CodeStorage, Function, Module,
-    ModuleStorage, RuntimeEnvironment, Script, UnsyncCodeStorage, UnsyncModuleStorage,
-    WithRuntimeEnvironment,
+    ambassador_impl_WithRuntimeEnvironment, AsUnsyncCodeStorage, CodeStorage, Function,
+    LoadedFunction, Module, ModuleStorage, RuntimeEnvironment, Script, UnsyncCodeStorage,
+    UnsyncModuleStorage, WithRuntimeEnvironment,
 };
 use move_vm_types::{
     code::{ModuleBytesStorage, ModuleCode},
