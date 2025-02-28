@@ -3,7 +3,7 @@
 
 use crate::{
     common::types::{CliCommand, CliError, CliResult, CliTypedResult, MovePackageDir},
-    move_tool::{experiments_from_opt_level, fix_bytecode_version},
+    move_tool::fix_bytecode_version,
 };
 use aptos_framework::extended_checks;
 use async_trait::async_trait;
@@ -189,7 +189,7 @@ fn compile_coverage(
             language_version: move_options
                 .language_version
                 .or_else(|| Some(LanguageVersion::latest_stable())),
-            experiments: experiments_from_opt_level(&move_options.optimize),
+            experiments: move_options.compute_experiments(),
         },
         ..Default::default()
     };
