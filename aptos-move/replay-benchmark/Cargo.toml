@@ -29,7 +29,6 @@ claims = { workspace = true }
 clap = { workspace = true }
 colored = { workspace = true }
 move-core-types = { workspace = true }
-move-vm-runtime = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
