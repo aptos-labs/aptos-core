@@ -361,7 +361,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::CollectionOwner => AptosFeatureFlag::COLLECTION_OWNER,
             FeatureFlag::NativeMemoryOperations => AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS,
-            FeatureFlag::EnableLoaderV2 => AptosFeatureFlag::ENABLE_LOADER_V2,
+            FeatureFlag::EnableLoaderV2 => AptosFeatureFlag::_ENABLE_LOADER_V2,
             FeatureFlag::DisallowInitModuleToPublishModules => {
                 AptosFeatureFlag::_DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES
             },
@@ -520,7 +520,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::COLLECTION_OWNER => FeatureFlag::CollectionOwner,
             AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS => FeatureFlag::NativeMemoryOperations,
-            AptosFeatureFlag::ENABLE_LOADER_V2 => FeatureFlag::EnableLoaderV2,
+            AptosFeatureFlag::_ENABLE_LOADER_V2 => FeatureFlag::EnableLoaderV2,
             AptosFeatureFlag::_DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES => {
                 FeatureFlag::DisallowInitModuleToPublishModules
             },
