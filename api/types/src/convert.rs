@@ -594,13 +594,14 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         txn: UserTransactionRequest,
         chain_id: ChainId,
     ) -> Result<SignedTransaction> {
-        let signature = txn
+        let auth = txn
             .signature
-            .clone()
-            .ok_or_else(|| format_err!("missing signature"))?;
+            .as_ref()
+            .ok_or_else(|| format_err!("missing signature"))?
+            .try_into();
         Ok(SignedTransaction::new_signed_transaction(
             self.try_into_raw_transaction(txn, chain_id)?,
-            signature.try_into()?,
+            auth?,
         ))
     }
 
@@ -609,12 +610,17 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         submit_transaction_request: SubmitTransactionRequest,
         chain_id: ChainId,
     ) -> Result<SignedTransaction> {
+        let SubmitTransactionRequest {
+            user_transaction_request,
+            signature,
+        } = submit_transaction_request;
+
         Ok(SignedTransaction::new_signed_transaction(
             self.try_into_raw_transaction_poem(
-                submit_transaction_request.user_transaction_request,
+                user_transaction_request,
                 chain_id,
             )?,
-            submit_transaction_request.signature.try_into().context("Failed to parse transaction when building SignedTransaction from SubmitTransactionRequest")?,
+            (&signature).try_into().context("Failed to parse transaction when building SignedTransaction from SubmitTransactionRequest")?,
         ))
     }
 
