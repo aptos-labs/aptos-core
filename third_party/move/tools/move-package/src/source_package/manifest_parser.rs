@@ -110,7 +110,7 @@ pub fn parse_package_info(tval: TV) -> Result<PM::PackageInfo> {
         TV::Table(mut table) => {
             check_for_required_field_names(&table, &["name", "version"])?;
             let hook_names = package_hooks::custom_package_info_fields();
-            let known_names = ["name", "version", "authors", "license"]
+            let known_names = ["name", "version", "authors", "license", "upgrade_policy"]
                 .into_iter()
                 .chain(hook_names.iter().map(|s| s.as_str()))
                 .collect::<Vec<_>>();
