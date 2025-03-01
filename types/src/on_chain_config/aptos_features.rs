@@ -102,8 +102,9 @@ pub enum FeatureFlag {
     ENABLE_LOADER_V2 = 81,
     /// Prior to this feature flag, it was possible to attempt 'init_module' to publish modules
     /// that results in a new package created but without any code. With this feature, it is no
-    /// longer possible and an explicit error is returned if publishing is attempted.
-    DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES = 82,
+    /// longer possible and an explicit error is returned if publishing is attempted. The feature
+    /// was enabled on mainnet and will not be disabled.
+    _DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES = 82,
     /// We keep the Call Tree cache and instruction (per-instruction)
     /// cache together here.  Generally, we could allow Call Tree
     /// cache and disallow instruction cache, however there's little
@@ -205,7 +206,6 @@ impl FeatureFlag {
             FeatureFlag::NATIVE_MEMORY_OPERATIONS,
             FeatureFlag::COLLECTION_OWNER,
             FeatureFlag::ENABLE_LOADER_V2,
-            FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES,
             FeatureFlag::PERMISSIONED_SIGNER,
             FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
             FeatureFlag::ACCOUNT_ABSTRACTION,
@@ -367,10 +367,6 @@ impl Features {
 
     pub fn is_loader_v2_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ENABLE_LOADER_V2)
-    }
-
-    pub fn is_disallow_init_module_to_publish_modules_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES)
     }
 
     pub fn is_call_tree_and_instruction_vm_cache_enabled(&self) -> bool {
