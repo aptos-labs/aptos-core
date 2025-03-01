@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::VMConfig,
     data_cache::TransactionDataCache,
     loader::{LegacyModuleStorageAdapter, LoadedFunction},
     module_traversal::TraversalContext,
@@ -13,7 +12,7 @@ use crate::{
     CodeStorage, LayoutConverter, StorageLayoutConverter,
 };
 use bytes::Bytes;
-use move_binary_format::{compatibility::Compatibility, errors::*, file_format::LocalIndex};
+use move_binary_format::{errors::*, file_format::LocalIndex};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Changes},
@@ -25,7 +24,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::runtime_types::{Type, TypeBuilder},
+    loaded_data::runtime_types::Type,
     values::{GlobalValue, Value},
 };
 use std::borrow::Borrow;
@@ -178,59 +177,6 @@ impl<'r, 'l> Session<'r, 'l> {
         )
     }
 
-    /// Publish a series of modules.
-    ///
-    /// The Move VM MUST return a user error, i.e., an error that's not an invariant violation, if
-    /// any module fails to deserialize or verify (see the full list of  failing conditions in the
-    /// `publish_module` API). The publishing of the module series is an all-or-nothing action:
-    /// either all modules are published to the data store or none is.
-    ///
-    /// Similar to the `publish_module` API, the Move VM should not be able to produce other user
-    /// errors. Besides, no user input should cause the Move VM to return an invariant violation.
-    ///
-    /// In case an invariant violation occurs, the whole Session should be considered corrupted and
-    /// one shall not proceed with effect generation.
-    ///
-    /// This operation performs compatibility checks if a module is replaced. See also
-    /// `move_binary_format::compatibility`.
-    #[deprecated]
-    pub fn publish_module_bundle(
-        &mut self,
-        modules: Vec<Vec<u8>>,
-        sender: AccountAddress,
-        gas_meter: &mut impl GasMeter,
-    ) -> VMResult<()> {
-        #[allow(deprecated)]
-        self.move_vm.runtime.publish_module_bundle(
-            modules,
-            sender,
-            &mut self.data_cache,
-            &self.module_store,
-            gas_meter,
-            Compatibility::full_check(),
-        )
-    }
-
-    /// Same like `publish_module_bundle` but with a custom compatibility check.
-    #[deprecated]
-    pub fn publish_module_bundle_with_compat_config(
-        &mut self,
-        modules: Vec<Vec<u8>>,
-        sender: AccountAddress,
-        gas_meter: &mut impl GasMeter,
-        compat_config: Compatibility,
-    ) -> VMResult<()> {
-        #[allow(deprecated)]
-        self.move_vm.runtime.publish_module_bundle(
-            modules,
-            sender,
-            &mut self.data_cache,
-            &self.module_store,
-            gas_meter,
-            compat_config,
-        )
-    }
-
     pub fn num_mutated_resources(&self, sender: &AccountAddress) -> u64 {
         self.data_cache.num_mutated_resources(sender)
     }
@@ -297,24 +243,6 @@ impl<'r, 'l> Session<'r, 'l> {
         ty: &Type,
     ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
         self.data_cache.load_resource(module_storage, addr, ty)
-    }
-
-    /// DO NOT USE THIS API!
-    ///
-    /// It is only used to extract metadata from a module, which in loader V2 design will be done
-    /// via ModuleStorage directly.
-    #[deprecated]
-    pub fn fetch_module_from_data_store(&self, module_id: &ModuleId) -> VMResult<Bytes> {
-        self.data_cache
-            .load_module(module_id)
-            .map_err(|e| e.finish(Location::Undefined))
-    }
-
-    /// Check if this module exists.
-    #[deprecated]
-    pub fn exists_module(&self, module_id: &ModuleId) -> VMResult<bool> {
-        #[allow(deprecated)]
-        self.data_cache.exists_module(module_id)
     }
 
     /// Load a module, a function, and all of its types into cache
@@ -411,14 +339,6 @@ impl<'r, 'l> Session<'r, 'l> {
         self.move_vm
     }
 
-    pub fn get_vm_config(&self) -> &'l VMConfig {
-        self.move_vm.runtime.loader().vm_config()
-    }
-
-    pub fn get_ty_builder(&self) -> &'l TypeBuilder {
-        self.move_vm.runtime.loader().ty_builder()
-    }
-
     /// If type is a (generic or non-generic) struct or enum, returns its name. Otherwise, returns
     /// [None].
     pub fn get_struct_name(
@@ -430,11 +350,9 @@ impl<'r, 'l> Session<'r, 'l> {
 
         Ok(match ty {
             Struct { idx, .. } | StructInstantiation { idx, .. } => {
-                let struct_identifier = self
-                    .move_vm
-                    .runtime
-                    .loader()
-                    .struct_name_index_map(module_storage)
+                let struct_identifier = module_storage
+                    .runtime_environment()
+                    .struct_name_index_map()
                     .idx_to_struct_name(*idx)?;
                 Some((struct_identifier.module, struct_identifier.name))
             },
