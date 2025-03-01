@@ -18,11 +18,7 @@ use move_vm_runtime::{
     RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
-use move_vm_types::{
-    code::ModuleBytesStorage,
-    gas::UnmeteredGasMeter,
-    resolver::{ModuleResolver, ResourceResolver},
-};
+use move_vm_types::{code::ModuleBytesStorage, gas::UnmeteredGasMeter, resolver::ResourceResolver};
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 
@@ -591,16 +587,6 @@ impl ModuleBytesStorage for BogusModuleStorage {
     }
 }
 
-impl ModuleResolver for BogusModuleStorage {
-    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
-        vec![]
-    }
-
-    fn get_module(&self, _module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
-        Err(PartialVMError::new(self.bad_status_code))
-    }
-}
-
 impl ResourceResolver for BogusModuleStorage {
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
@@ -617,16 +603,6 @@ impl ResourceResolver for BogusModuleStorage {
 struct BogusResourceStorage {
     module_storage: InMemoryStorage,
     bad_status_code: StatusCode,
-}
-
-impl ModuleResolver for BogusResourceStorage {
-    fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
-        self.module_storage.get_module_metadata(module_id)
-    }
-
-    fn get_module(&self, module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
-        self.module_storage.get_module(module_id)
-    }
 }
 
 impl ResourceResolver for BogusResourceStorage {
