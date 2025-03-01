@@ -8,6 +8,7 @@ use crate::{
     workload::TransactionBlock,
 };
 use anyhow::{anyhow, bail};
+use aptos_gas_meter::enable_gas_metering;
 use aptos_logger::Level;
 use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
 use clap::Parser;
@@ -69,6 +70,13 @@ pub struct BenchmarkCommand {
         help = "If false, Move VM runs in paranoid mode, if true, paranoid mode is not used"
     )]
     disable_paranoid_mode: bool,
+
+    #[clap(
+        long,
+        default_value_t = false,
+        help = "If true, a no-op gas meter will be used for execution"
+    )]
+    disable_gas_metering: bool,
 }
 
 impl BenchmarkCommand {
@@ -118,6 +126,8 @@ impl BenchmarkCommand {
             .collect::<Vec<_>>();
 
         set_paranoid_type_checks(!self.disable_paranoid_mode);
+        enable_gas_metering(!self.disable_gas_metering);
+
         BenchmarkRunner::new(
             self.concurrency_levels,
             self.num_repeats,
