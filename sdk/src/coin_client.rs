@@ -69,6 +69,7 @@ impl<'a> CoinClient<'a> {
             .context("Failed to get chain ID")?
             .inner()
             .chain_id;
+        // TODO[Orderless]: Change this payload v2 format.
         let transaction_builder = TransactionBuilder::new(
             TransactionPayload::EntryFunction(EntryFunction::new(
                 ModuleId::new(
