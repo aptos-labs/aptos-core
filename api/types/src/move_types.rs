@@ -420,7 +420,7 @@ impl From<StructTag> for MoveStructTag {
             address: tag.address.into(),
             module: tag.module.into(),
             name: tag.name.into(),
-            generic_type_params: tag.type_args.into_iter().map(MoveType::from).collect(),
+            generic_type_params: tag.type_args.iter().map(MoveType::from).collect(),
         }
     }
 }
@@ -467,17 +467,17 @@ impl<'de> Deserialize<'de> for MoveStructTag {
     }
 }
 
-impl TryFrom<MoveStructTag> for StructTag {
+impl TryFrom<&MoveStructTag> for StructTag {
     type Error = anyhow::Error;
 
-    fn try_from(tag: MoveStructTag) -> anyhow::Result<Self> {
+    fn try_from(tag: &MoveStructTag) -> anyhow::Result<Self> {
         Ok(Self {
-            address: tag.address.into(),
-            module: tag.module.into(),
-            name: tag.name.into(),
+            address: (&tag.address).into(),
+            module: (&tag.module).into(),
+            name: (&tag.name).into(),
             type_args: tag
                 .generic_type_params
-                .into_iter()
+                .iter()
                 .map(|p| p.try_into())
                 .collect::<anyhow::Result<Vec<TypeTag>>>()?,
         })
@@ -545,12 +545,17 @@ impl VerifyInputWithRecursion for MoveType {
 }
 
 impl MoveType {
-    // Returns corresponding JSON data type for the value of `MoveType`
+    /// Returns corresponding JSON data type for the value of `MoveType`
+    ///
+    /// This type notation here, is just to explain to the user in error messages the type that needs
+    /// to be passed in to represent the value.  So it is represented as `JsonType<MoveType>`, where
+    /// `JsonType` is the value to be passed in as JSON, and `MoveType` is the move type it is converting
+    /// into.
     pub fn json_type_name(&self) -> String {
         match self {
-            MoveType::U8 => "integer".to_owned(),
-            MoveType::U16 => "string<u16>".to_owned(),
-            MoveType::U32 => "string<u32>".to_owned(),
+            MoveType::U8 => "integer<u8>".to_owned(),
+            MoveType::U16 => "integer<u16>".to_owned(),
+            MoveType::U32 => "integer<u32>".to_owned(),
             MoveType::U64 => "string<u64>".to_owned(),
             MoveType::U128 => "string<u128>".to_owned(),
             MoveType::U256 => "string<u256>".to_owned(),
@@ -623,7 +628,7 @@ impl FromStr for MoveType {
         // return a serialized version of an object and not be able to
         // deserialize it using that same object.
         let inner = match parse_type_tag(s) {
-            Ok(inner) => inner.into(),
+            Ok(inner) => (&inner).into(),
             Err(_e) => MoveType::Unparsable(s.to_string()),
         };
         if is_ref {
@@ -665,30 +670,6 @@ impl MoveType {
     }
 }
 
-impl From<TypeTag> for MoveType {
-    fn from(tag: TypeTag) -> Self {
-        match tag {
-            TypeTag::Bool => MoveType::Bool,
-            TypeTag::U8 => MoveType::U8,
-            TypeTag::U16 => MoveType::U16,
-            TypeTag::U32 => MoveType::U32,
-            TypeTag::U64 => MoveType::U64,
-            TypeTag::U256 => MoveType::U256,
-            TypeTag::U128 => MoveType::U128,
-            TypeTag::Address => MoveType::Address,
-            TypeTag::Signer => MoveType::Signer,
-            TypeTag::Vector(v) => MoveType::Vector {
-                items: Box::new(MoveType::from(*v)),
-            },
-            TypeTag::Struct(v) => MoveType::Struct((*v).into()),
-            TypeTag::Function(..) => {
-                // TODO(#15664): support function values
-                MoveType::Unparsable("Function types are not supported".to_string())
-            },
-        }
-    }
-}
-
 impl From<&TypeTag> for MoveType {
     fn from(tag: &TypeTag) -> Self {
         match tag {
@@ -704,7 +685,7 @@ impl From<&TypeTag> for MoveType {
             TypeTag::Vector(v) => MoveType::Vector {
                 items: Box::new(MoveType::from(v.as_ref())),
             },
-            TypeTag::Struct(v) => MoveType::Struct((&**v).into()),
+            TypeTag::Struct(v) => MoveType::Struct(v.as_ref().into()),
             TypeTag::Function(..) => {
                 // TODO(#15664): support function values
                 MoveType::Unparsable("Function types are not supported".to_string())
@@ -713,10 +694,10 @@ impl From<&TypeTag> for MoveType {
     }
 }
 
-impl TryFrom<MoveType> for TypeTag {
+impl TryFrom<&MoveType> for TypeTag {
     type Error = anyhow::Error;
 
-    fn try_from(tag: MoveType) -> anyhow::Result<Self> {
+    fn try_from(tag: &MoveType) -> anyhow::Result<Self> {
         let ret = match tag {
             MoveType::Bool => TypeTag::Bool,
             MoveType::U8 => TypeTag::U8,
@@ -727,7 +708,7 @@ impl TryFrom<MoveType> for TypeTag {
             MoveType::U256 => TypeTag::U256,
             MoveType::Address => TypeTag::Address,
             MoveType::Signer => TypeTag::Signer,
-            MoveType::Vector { items } => TypeTag::Vector(Box::new((*items).try_into()?)),
+            MoveType::Vector { items } => TypeTag::Vector(Box::new(items.as_ref().try_into()?)),
             MoveType::Struct(v) => TypeTag::Struct(Box::new(v.try_into()?)),
             MoveType::GenericTypeParam { index: _ } => TypeTag::Address, // Dummy type, allows for Object<T>
             _ => {
@@ -1145,6 +1126,17 @@ impl MoveScriptBytecode {
         }
         self
     }
+
+    pub fn try_parse_abi_ref(&mut self) {
+        if self.abi.is_none() {
+            // ignore error, because it is possible a transaction script payload contains
+            // invalid bytecode.
+            // So we ignore the error and output bytecode without abi.
+            if let Ok(script) = CompiledScript::deserialize(self.bytecode.inner()) {
+                self.abi = Some((&script).into());
+            }
+        }
+    }
 }
 
 /// Entry function id
@@ -1245,7 +1237,7 @@ mod tests {
     fn test_serialize_move_type_tag() {
         use TypeTag::*;
         fn assert_serialize(t: TypeTag, expected: Value) {
-            let value = to_value(MoveType::from(t)).unwrap();
+            let value = to_value(MoveType::from(&t)).unwrap();
             assert_json(value, expected)
         }
         assert_serialize(Bool, json!("bool"));
