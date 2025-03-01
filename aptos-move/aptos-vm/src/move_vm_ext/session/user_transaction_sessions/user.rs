@@ -103,8 +103,8 @@ impl<'r, 'l> UserSession<'r, 'l> {
 
             self.session.execute(|session| {
                 let module_id = module.self_id();
-                let init_function_exists = session
-                    .load_function(&staging_module_storage, &module_id, init_func_name, &[])
+                let init_function_exists = staging_module_storage
+                    .load_function(&module_id, init_func_name, &[])
                     .is_ok();
 
                 if init_function_exists {

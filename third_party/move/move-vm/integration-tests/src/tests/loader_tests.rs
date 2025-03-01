@@ -187,9 +187,8 @@ fn load_phantom_module() {
     let module_storage = InMemoryStorage::new().into_unsync_module_storage();
     let new_module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
 
-    let mut session = adapter.vm.new_session(&adapter.store);
-    let _ = session
-        .load_function(&new_module_storage, &module_id, ident_str!("foo"), &[])
+    let _ = new_module_storage
+        .load_function(&module_id, ident_str!("foo"), &[])
         .unwrap();
 }
 
@@ -248,9 +247,8 @@ fn load_with_extra_ability() {
     let module_storage = InMemoryStorage::new().into_unsync_module_storage();
     let new_module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
 
-    let mut session = adapter.vm.new_session(&adapter.store);
-    let _ = session
-        .load_function(&new_module_storage, &module_id, ident_str!("foo"), &[])
+    let _ = new_module_storage
+        .load_function(&module_id, ident_str!("foo"), &[])
         .unwrap();
 }
 
