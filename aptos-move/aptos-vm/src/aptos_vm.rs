@@ -68,7 +68,7 @@ use aptos_types::{
         TimedFeatureFlag, TimedFeatures,
     },
     randomness::Randomness,
-    state_store::{state_key::StateKey, StateView, TStateView},
+    state_store::{StateView, TStateView},
     transaction::{
         authenticator::{AbstractionAuthData, AnySignature, AuthenticationProof},
         signature_verified_transaction::SignatureVerifiedTransaction,
@@ -114,8 +114,7 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::{ModuleId, StructTag, TypeTag},
-    metadata::Metadata,
+    language_storage::{ModuleId, TypeTag},
     move_resource::MoveStructType,
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveTypeLayout, MoveValue},
@@ -1492,7 +1491,6 @@ impl AptosVM {
             for module in modules.iter() {
                 let addr = module.self_addr();
                 let name = module.self_name();
-                let state_key = StateKey::module(addr, name);
 
                 // TODO: Allow the check of special addresses to be customized.
                 if addr.is_special() || traversal_context.visited.insert((addr, name), ()).is_some()
@@ -1500,17 +1498,9 @@ impl AptosVM {
                     continue;
                 }
 
-                let size_if_module_exists = if self.features().is_loader_v2_enabled() {
-                    module_storage
-                        .fetch_module_size_in_bytes(addr, name)?
-                        .map(|v| v as u64)
-                } else {
-                    resolver
-                        .as_executor_view()
-                        .get_module_state_value_size(&state_key)
-                        .map_err(|e| e.finish(Location::Undefined))?
-                };
-
+                let size_if_module_exists = module_storage
+                    .fetch_module_size_in_bytes(addr, name)?
+                    .map(|v| v as u64);
                 if let Some(size) = size_if_module_exists {
                     gas_meter
                         .charge_dependency(false, addr, name, NumBytes::new(size))
@@ -2202,15 +2192,11 @@ impl AptosVM {
 
         // All Move executions satisfy the read-before-write property. Thus, we need to read each
         // access path that the write set is going to update.
-        for (state_key, write) in module_write_set.writes() {
-            if self.features().is_loader_v2_enabled() {
-                // It is sufficient to simply get the size in order to enforce read-before-write.
-                module_storage
-                    .fetch_module_size_in_bytes(write.module_address(), write.module_name())
-                    .map_err(|e| e.to_partial())?;
-            } else {
-                executor_view.get_module_state_value(state_key)?;
-            }
+        for write in module_write_set.writes().values() {
+            // It is sufficient to simply get the size in order to enforce read-before-write.
+            module_storage
+                .fetch_module_size_in_bytes(write.module_address(), write.module_name())
+                .map_err(|e| e.to_partial())?;
         }
         for (state_key, write_op) in change_set.resource_write_set().iter() {
             executor_view.get_resource_state_value(state_key, None)?;
@@ -3111,15 +3097,13 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
         && txn_data.fee_payer.is_some()
         && txn_data.sequence_number == 0
     {
-        let metadata = fetch_module_metadata_for_struct_tag(
-            &AccountResource::struct_tag(),
-            resolver,
-            module_storage,
-        )?;
+        let account_tag = AccountResource::struct_tag();
+        let metadata = module_storage
+            .fetch_existing_module_metadata(&account_tag.address, &account_tag.module)?;
         let (maybe_bytes, _) = resolver
             .get_resource_bytes_with_metadata_and_layout(
                 &txn_data.sender(),
-                &AccountResource::struct_tag(),
+                &account_tag,
                 &metadata,
                 None,
             )
@@ -3127,18 +3111,6 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
         return Ok(maybe_bytes.is_none());
     }
     Ok(false)
-}
-
-pub(crate) fn fetch_module_metadata_for_struct_tag(
-    struct_tag: &StructTag,
-    resolver: &impl AptosMoveResolver,
-    module_storage: &impl ModuleStorage,
-) -> VMResult<Vec<Metadata>> {
-    if module_storage.is_enabled() {
-        module_storage.fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
-    } else {
-        Ok(resolver.get_module_metadata(&struct_tag.module_id()))
-    }
 }
 
 #[cfg(test)]

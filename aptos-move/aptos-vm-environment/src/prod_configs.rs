@@ -146,7 +146,6 @@ pub fn aptos_prod_vm_config(
         ty_builder,
         disallow_dispatch_for_native: features.is_enabled(FeatureFlag::DISALLOW_USER_NATIVES),
         use_compatibility_checker_v2,
-        use_loader_v2: features.is_loader_v2_enabled(),
         use_call_tree_and_instruction_cache: features
             .is_call_tree_and_instruction_vm_cache_enabled(),
     }
