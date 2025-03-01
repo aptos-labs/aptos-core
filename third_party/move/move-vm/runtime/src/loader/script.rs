@@ -1,8 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{intern_type, BinaryCache, Function, FunctionHandle, FunctionInstantiation};
-use crate::loader::ScriptHash;
+use super::{intern_type, Function, FunctionHandle, FunctionInstantiation};
 use move_binary_format::{
     access::ScriptAccess,
     binary_views::BinaryIndexedView,
@@ -200,32 +199,5 @@ impl Deref for Script {
 
     fn deref(&self) -> &Self::Target {
         &self.script
-    }
-}
-
-// A script cache is a map from the hash value of a script and the `Script` itself.
-// Script are added in the cache once verified and so getting a script out the cache
-// does not require further verification (except for parameters and type parameters)
-#[derive(Clone)]
-pub(crate) struct ScriptCache {
-    pub(crate) scripts: BinaryCache<ScriptHash, Arc<Script>>,
-}
-
-impl ScriptCache {
-    pub(crate) fn new() -> Self {
-        Self {
-            scripts: BinaryCache::new(),
-        }
-    }
-
-    pub(crate) fn get(&self, hash: &ScriptHash) -> Option<Arc<Script>> {
-        self.scripts.get(hash).cloned()
-    }
-
-    pub(crate) fn insert(&mut self, hash: ScriptHash, script: Script) -> Arc<Script> {
-        match self.get(&hash) {
-            Some(cached) => cached,
-            None => self.scripts.insert(hash, Arc::new(script)).clone(),
-        }
     }
 }
