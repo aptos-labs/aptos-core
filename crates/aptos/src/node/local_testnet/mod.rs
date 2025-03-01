@@ -99,7 +99,7 @@ pub struct RunLocalnet {
     /// By default all services running on the host system will be bound to 127.0.0.1,
     /// unless you're running the CLI inside a container, in which case it will run
     /// them on 0.0.0.0. You can use this flag to override this behavior in both cases.
-    #[clap(long, hide = true)]
+    #[clap(long)]
     bind_to: Option<Ipv4Addr>,
 
     /// By default, tracing output goes to files. With this set, it goes to stdout.
