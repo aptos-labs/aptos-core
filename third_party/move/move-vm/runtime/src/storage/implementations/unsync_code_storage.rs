@@ -20,7 +20,9 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::TypeTag,
+    account_address::AccountAddress,
+    identifier::IdentStr,
+    language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
 };
 use move_vm_types::{

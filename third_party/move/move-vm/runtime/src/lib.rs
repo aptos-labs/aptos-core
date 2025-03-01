@@ -35,7 +35,7 @@ mod reentrancy_checker;
 mod runtime_type_checks;
 mod storage;
 
-pub use loader::{Function, LoadedFunction, Module, Script};
+pub use loader::{Function, LoadedFunction, LoadedFunctionOwner, Module, Script};
 pub use storage::{
     code_storage::{ambassador_impl_CodeStorage, CodeStorage},
     dependencies_gas_charging::{
