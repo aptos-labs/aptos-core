@@ -150,18 +150,6 @@ macro_rules! versioned_loader_getter {
 impl Loader {
     versioned_loader_getter!(vm_config, VMConfig);
 
-    versioned_loader_getter!(ty_builder, TypeBuilder);
-
-    pub(crate) fn struct_name_index_map<'a>(
-        &'a self,
-        module_storage: &'a dyn ModuleStorage,
-    ) -> &StructNameIndexMap {
-        match self {
-            Self::V1(loader) => &loader.name_cache,
-            Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
-        }
-    }
-
     pub(crate) fn v1(natives: NativeFunctions, vm_config: VMConfig) -> Self {
         Self::V1(LoaderV1 {
             scripts: RwLock::new(ScriptCache::new()),
@@ -176,43 +164,6 @@ impl Loader {
 
     pub(crate) fn v2(vm_config: VMConfig) -> Self {
         Self::V2(LoaderV2::new(vm_config))
-    }
-
-    /// Flush this cache if it is marked as invalidated.
-    #[deprecated]
-    pub(crate) fn flush_v1_if_invalidated(&self) {
-        match self {
-            Self::V1(loader) => {
-                let mut invalidated = loader.invalidated.write();
-                if *invalidated {
-                    *loader.scripts.write() = ScriptCache::new();
-                    loader.type_cache.flush();
-                    loader.name_cache.flush();
-                    *invalidated = false;
-                }
-            },
-            Self::V2(_) => unreachable!("Loader V2 cannot be flushed"),
-        }
-    }
-
-    /// Mark this cache as invalidated.
-    #[deprecated]
-    pub(crate) fn mark_v1_as_invalid(&self) {
-        match self {
-            Self::V1(loader) => {
-                *loader.invalidated.write() = true;
-            },
-            Self::V2(_) => unreachable!("Loader V2 cannot be marked as invalid"),
-        }
-    }
-
-    /// Check whether this cache is invalidated.
-    #[deprecated]
-    pub(crate) fn is_v1_invalidated(&self) -> bool {
-        match self {
-            Self::V1(loader) => *loader.invalidated.read(),
-            Self::V2(_) => unreachable!("Loader V2 is never invalidated"),
-        }
     }
 
     fn load_function_without_type_args(
@@ -265,6 +216,7 @@ impl Loader {
 // The `pub(crate)` API is what a Loader offers to the runtime.
 pub(crate) struct LoaderV1 {
     scripts: RwLock<ScriptCache>,
+    #[allow(dead_code)]
     type_cache: TypeTagCache,
     natives: NativeFunctions,
     pub(crate) name_cache: StructNameIndexMap,
@@ -292,6 +244,7 @@ pub(crate) struct LoaderV1 {
     // - should delegate lifetime ownership to the adapter. Code loading (including verification)
     //   is a major execution bottleneck. We should be able to reuse a cache for the lifetime of
     //   the adapter/node, not just a VM or even session (as effectively today).
+    #[allow(dead_code)]
     invalidated: RwLock<bool>,
 
     // Collects the cache hits on module loads. This information can be read and reset by
@@ -544,6 +497,7 @@ impl LoaderV1 {
     //
     // All modules in the bundle to be published must be loadable. This function performs all
     // verification steps to load these modules without actually loading them into the code cache.
+    #[allow(dead_code)]
     pub(crate) fn verify_module_bundle_for_publication(
         &self,
         modules: &[CompiledModule],
