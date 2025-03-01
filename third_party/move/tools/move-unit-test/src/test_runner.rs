@@ -29,7 +29,7 @@ use move_vm_runtime::{
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
-    AsFunctionValueExtension, AsUnsyncModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
+    AsFunctionValueExtension, AsUnsyncModuleStorage, RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use rayon::prelude::*;
@@ -248,8 +248,7 @@ impl SharedTestingConfig {
     ) {
         // Note: While Move unit tests run concurrently, there is no publishing involved. To keep
         // things simple, we create a new VM instance for each test.
-        let move_vm =
-            MoveVM::new_with_runtime_environment(self.starting_storage_state.runtime_environment());
+        let move_vm = MoveVM::new();
         let module_storage = self.starting_storage_state.as_unsync_module_storage();
 
         let extensions = extensions::new_extensions();

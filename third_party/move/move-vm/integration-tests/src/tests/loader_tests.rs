@@ -20,7 +20,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     module_traversal::*, move_vm::MoveVM, AsUnsyncModuleStorage, ModuleStorage,
-    StagingModuleStorage, WithRuntimeEnvironment,
+    StagingModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -59,10 +59,7 @@ impl Adapter {
             ),
         ];
 
-        let vm = Arc::new(MoveVM::new_with_runtime_environment(
-            store.runtime_environment(),
-        ));
-
+        let vm = Arc::new(MoveVM::new());
         Self {
             store,
             vm,
