@@ -3621,11 +3621,11 @@ Update feature flags directly. Only used in genesis/tests.
     <b>if</b> (!<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
         <b>move_to</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework, <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[] })
     };
-    <b>let</b> <a href="features.md#0x1_features">features</a> = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>;
-    <a href="vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&enable, |feature| {
+    <b>let</b> <a href="features.md#0x1_features">features</a> = &<b>mut</b> <a href="features.md#0x1_features_Features">Features</a>[@std].<a href="features.md#0x1_features">features</a>;
+    enable.for_each_ref(|feature| {
         <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *feature, <b>true</b>);
     });
-    <a href="vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&disable, |feature| {
+    disable.for_each_ref(|feature| {
         <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *feature, <b>false</b>);
     });
 }
@@ -3665,7 +3665,7 @@ Enable and disable features for the next epoch.
         <a href="features.md#0x1_features">features</a>
     } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
         // Otherwise, <b>use</b> the currently effective feature flag vec <b>as</b> the baseline, <b>if</b> it <b>exists</b>.
-        <b>borrow_global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>
+        <a href="features.md#0x1_features_Features">Features</a>[@std].<a href="features.md#0x1_features">features</a>
     } <b>else</b> {
         // Otherwise, <b>use</b> an empty feature vec.
         <a href="vector.md#0x1_vector">vector</a>[]
@@ -3705,7 +3705,7 @@ who have permission to set the flag that's checked in <code>extract()</code>.
     <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std)) {
         <b>let</b> <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> { <a href="features.md#0x1_features">features</a> } = <b>move_from</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std);
         <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
-            <b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a> = <a href="features.md#0x1_features">features</a>;
+            <a href="features.md#0x1_features_Features">Features</a>[@std].<a href="features.md#0x1_features">features</a> = <a href="features.md#0x1_features">features</a>;
         } <b>else</b> {
             <b>move_to</b>(framework, <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a> })
         }
@@ -3736,7 +3736,7 @@ Check whether the feature is enabled.
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_enabled">is_enabled</a>(feature: u64): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std) &&
-        <a href="features.md#0x1_features_contains">contains</a>(&<b>borrow_global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>, feature)
+        <a href="features.md#0x1_features_contains">contains</a>(&<a href="features.md#0x1_features_Features">Features</a>[@std].<a href="features.md#0x1_features">features</a>, feature)
 }
 </code></pre>
 
@@ -3763,14 +3763,14 @@ Helper to include or exclude a feature flag.
 <pre><code><b>fun</b> <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, feature: u64, <b>include</b>: bool) {
     <b>let</b> byte_index = feature / 8;
     <b>let</b> bit_mask = 1 &lt;&lt; ((feature % 8) <b>as</b> u8);
-    <b>while</b> (<a href="vector.md#0x1_vector_length">vector::length</a>(<a href="features.md#0x1_features">features</a>) &lt;= byte_index) {
-        <a href="vector.md#0x1_vector_push_back">vector::push_back</a>(<a href="features.md#0x1_features">features</a>, 0)
+    <b>while</b> (<a href="features.md#0x1_features">features</a>.length() &lt;= byte_index) {
+        <a href="features.md#0x1_features">features</a>.push_back(0)
     };
-    <b>let</b> entry = <a href="vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(<a href="features.md#0x1_features">features</a>, byte_index);
+
     <b>if</b> (<b>include</b>)
-        *entry = *entry | bit_mask
+        <a href="features.md#0x1_features">features</a>[byte_index] |= bit_mask
     <b>else</b>
-        *entry = *entry & (0xff ^ bit_mask)
+        <a href="features.md#0x1_features">features</a>[byte_index] &= (0xff ^ bit_mask)
 }
 </code></pre>
 
@@ -3797,7 +3797,7 @@ Helper to check whether a feature flag is enabled.
 <pre><code><b>fun</b> <a href="features.md#0x1_features_contains">contains</a>(<a href="features.md#0x1_features">features</a>: &<a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, feature: u64): bool {
     <b>let</b> byte_index = feature / 8;
     <b>let</b> bit_mask = 1 &lt;&lt; ((feature % 8) <b>as</b> u8);
-    byte_index &lt; <a href="vector.md#0x1_vector_length">vector::length</a>(<a href="features.md#0x1_features">features</a>) && (*<a href="vector.md#0x1_vector_borrow">vector::borrow</a>(<a href="features.md#0x1_features">features</a>, byte_index) & bit_mask) != 0
+    byte_index &lt; <a href="features.md#0x1_features">features</a>.length() && (<a href="features.md#0x1_features">features</a>[byte_index] & bit_mask) != 0
 }
 </code></pre>
 
@@ -3821,10 +3821,10 @@ Helper to check whether a feature flag is enabled.
 
 
 <pre><code><b>fun</b> <a href="features.md#0x1_features_apply_diff">apply_diff</a>(<a href="features.md#0x1_features">features</a>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;) {
-    <a href="vector.md#0x1_vector_for_each">vector::for_each</a>(enable, |feature| {
+    enable.for_each(|feature| {
         <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, feature, <b>true</b>);
     });
-    <a href="vector.md#0x1_vector_for_each">vector::for_each</a>(disable, |feature| {
+    disable.for_each(|feature| {
         <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, feature, <b>false</b>);
     });
 }
