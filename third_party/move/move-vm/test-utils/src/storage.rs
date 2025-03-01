@@ -190,8 +190,7 @@ where
 
 impl InMemoryAccountStorage {
     fn apply(&mut self, account_changeset: AccountChangeSet) -> PartialVMResult<()> {
-        let (modules, resources) = account_changeset.into_inner();
-        apply_changes(&mut self.modules, modules)?;
+        let resources = account_changeset.into_resources();
         apply_changes(&mut self.resources, resources)?;
         Ok(())
     }

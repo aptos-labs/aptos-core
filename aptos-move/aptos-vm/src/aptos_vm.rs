@@ -206,20 +206,7 @@ pub(crate) fn get_system_transaction_output(
     module_storage: &impl AptosModuleStorage,
     change_set_configs: &ChangeSetConfigs,
 ) -> Result<VMOutput, VMStatus> {
-    let (change_set, empty_module_write_set) =
-        session.finish(change_set_configs, module_storage)?;
-
-    // System transactions can never publish modules! When we move publishing outside MoveVM, we do not
-    // need to have this check here, as modules will only be visible in user session.
-    empty_module_write_set
-        .is_empty_or_invariant_violation()
-        .map_err(|e| {
-            e.with_message(
-                "Non-empty module write set in when creating system transaction output".to_string(),
-            )
-            .finish(Location::Undefined)
-            .into_vm_status()
-        })?;
+    let change_set = session.finish(change_set_configs, module_storage)?;
 
     Ok(VMOutput::new(
         change_set,
@@ -723,7 +710,6 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
         traversal_context: &mut TraversalContext,
-        _has_modules_published_to_special_address: bool,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         if self.gas_feature_version() >= 12 {
             // Check if the gas meter's internal counters are consistent.
@@ -954,7 +940,6 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         payload: &'a TransactionPayload,
         log_context: &AdapterLogSchema,
-        new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         fail_point!("aptos_vm::execute_script_or_entry_function", |_| {
@@ -1007,11 +992,8 @@ impl AptosVM {
             code_storage,
             gas_meter,
             traversal_context,
-            new_published_modules_loaded,
             change_set_configs,
         )?;
-        let has_modules_published_to_special_address =
-            user_session_change_set.has_modules_published_to_special_address();
 
         let epilogue_session = self.charge_change_set_and_respawn_session(
             user_session_change_set,
@@ -1032,7 +1014,6 @@ impl AptosVM {
             log_context,
             change_set_configs,
             traversal_context,
-            has_modules_published_to_special_address,
         )
     }
 
@@ -1103,7 +1084,6 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         payload: &'a Multisig,
         log_context: &AdapterLogSchema,
-        new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         match &payload.transaction_payload {
@@ -1120,11 +1100,8 @@ impl AptosVM {
                                 traversal_context,
                                 payload.multisig_address,
                                 entry_function,
-                                new_published_modules_loaded,
                                 change_set_configs,
                             )?;
-                            let has_modules_published_to_special_address =
-                                user_session_change_set.has_modules_published_to_special_address();
 
                             // TODO: Deduplicate this against execute_multisig_transaction
                             // A bit tricky since we need to skip success/failure cleanups,
@@ -1147,7 +1124,6 @@ impl AptosVM {
                                 log_context,
                                 change_set_configs,
                                 traversal_context,
-                                has_modules_published_to_special_address,
                             )
                         })
                     },
@@ -1175,7 +1151,6 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         txn_payload: &Multisig,
         log_context: &AdapterLogSchema,
-        new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         fail_point!("move_adapter::execute_multisig_transaction", |_| {
@@ -1264,7 +1239,6 @@ impl AptosVM {
                     traversal_context,
                     txn_payload.multisig_address,
                     &entry_function,
-                    new_published_modules_loaded,
                     change_set_configs,
                 ),
         };
@@ -1279,23 +1253,17 @@ impl AptosVM {
             MoveValue::vector_u8(payload_bytes),
         ]);
 
-        let (epilogue_session, has_modules_published_to_special_address) = match execution_result {
-            Err(execution_error) => {
-                let epilogue_session = self.failure_multisig_payload_cleanup(
-                    resolver,
-                    module_storage,
-                    prologue_session_change_set,
-                    execution_error,
-                    txn_data,
-                    cleanup_args,
-                    traversal_context,
-                )?;
-                (epilogue_session, false)
-            },
+        let epilogue_session = match execution_result {
+            Err(execution_error) => self.failure_multisig_payload_cleanup(
+                resolver,
+                module_storage,
+                prologue_session_change_set,
+                execution_error,
+                txn_data,
+                cleanup_args,
+                traversal_context,
+            )?,
             Ok(user_session_change_set) => {
-                let has_modules_published_to_special_address =
-                    user_session_change_set.has_modules_published_to_special_address();
-
                 // Charge gas for write set before we do cleanup. This ensures we don't charge gas for
                 // cleanup write set changes, which is consistent with outer-level success cleanup
                 // flow. We also wouldn't need to worry that we run out of gas when doing cleanup.
@@ -1319,7 +1287,7 @@ impl AptosVM {
                         )
                         .map_err(|e| e.into_vm_status())
                 })?;
-                (epilogue_session, has_modules_published_to_special_address)
+                epilogue_session
             },
         };
 
@@ -1333,7 +1301,6 @@ impl AptosVM {
             log_context,
             change_set_configs,
             traversal_context,
-            has_modules_published_to_special_address,
         )
     }
 
@@ -1349,7 +1316,6 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         payload: &'a Multisig,
         log_context: &AdapterLogSchema,
-        new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         // Once `simulation_enhancement` is enabled, we use `execute_multisig_transaction` for simulation,
@@ -1369,7 +1335,6 @@ impl AptosVM {
                 txn_data,
                 payload,
                 log_context,
-                new_published_modules_loaded,
                 change_set_configs,
             )
         } else {
@@ -1384,7 +1349,6 @@ impl AptosVM {
                 txn_data,
                 payload,
                 log_context,
-                new_published_modules_loaded,
                 change_set_configs,
             )
         }
@@ -1399,7 +1363,6 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
         multisig_address: AccountAddress,
         payload: &EntryFunction,
-        new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<UserSessionChangeSet, VMStatus> {
         // If txn args are not valid, we'd still consider the transaction as executed but
@@ -1423,7 +1386,6 @@ impl AptosVM {
             module_storage,
             gas_meter,
             traversal_context,
-            new_published_modules_loaded,
             change_set_configs,
         )
     }
@@ -1498,7 +1460,6 @@ impl AptosVM {
         module_storage: &impl AptosModuleStorage,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
-        _new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<UserSessionChangeSet, VMStatus> {
         let maybe_publish_request = session.execute(|session| session.extract_publish_request());
@@ -1901,7 +1862,6 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         gas_meter: &mut impl AptosGasMeter,
         change_set_configs: &ChangeSetConfigs,
-        _new_published_modules_loaded: bool,
         traversal_context: &mut TraversalContext,
     ) -> (VMStatus, VMOutput) {
         self.failed_transaction_cleanup(
@@ -2001,10 +1961,6 @@ impl AptosVM {
         let payload_timer =
             VM_TIMER.timer_with_label("AptosVM::execute_user_transaction_impl [payload]");
 
-        // We keep track of whether any newly published modules are loaded into the Vm's loader
-        // cache as part of executing transactions. This would allow us to decide whether the cache
-        // should be flushed later.
-        let mut new_published_modules_loaded = false;
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
             | payload @ TransactionPayload::EntryFunction(_) => self
@@ -2018,7 +1974,6 @@ impl AptosVM {
                     &txn_data,
                     payload,
                     log_context,
-                    &mut new_published_modules_loaded,
                     change_set_configs,
                 ),
             TransactionPayload::Multisig(payload) => self.execute_or_simulate_multisig_transaction(
@@ -2032,7 +1987,6 @@ impl AptosVM {
                 &txn_data,
                 payload,
                 log_context,
-                &mut new_published_modules_loaded,
                 change_set_configs,
             ),
 
@@ -2061,7 +2015,6 @@ impl AptosVM {
                 log_context,
                 gas_meter,
                 change_set_configs,
-                new_published_modules_loaded,
                 &mut traversal_context,
             )
         });
@@ -2232,22 +2185,11 @@ impl AptosVM {
 
                 let change_set_configs =
                     ChangeSetConfigs::unlimited_at_gas_feature_version(self.gas_feature_version());
+                let change_set = tmp_session.finish(&change_set_configs, code_storage)?;
 
                 // While scripts should be able to publish modules, this should be done through
                 // native context, and so the module write set must always be empty.
-                let (change_set, empty_module_write_set) =
-                    tmp_session.finish(&change_set_configs, code_storage)?;
-                empty_module_write_set
-                    .is_empty_or_invariant_violation()
-                    .map_err(|e| {
-                        e.with_message(
-                            "Scripts in write set payload cannot publish modules".to_string(),
-                        )
-                        .finish(Location::Undefined)
-                        .into_vm_status()
-                    })?;
-
-                Ok((change_set, empty_module_write_set))
+                Ok((change_set, ModuleWriteSet::empty()))
             },
         }
     }
