@@ -48,7 +48,8 @@ use aptos_vm_environment::{
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
-    module_and_script_storage::AsAptosCodeStorage, storage::change_set_configs::ChangeSetConfigs,
+    module_and_script_storage::AsAptosCodeStorage, module_write_set::ModuleWriteSet,
+    storage::change_set_configs::ChangeSetConfigs,
 };
 use clap::Parser;
 use move_binary_format::{
@@ -483,16 +484,11 @@ fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<(
         &mut TraversalContext::new(&traversal_storage),
         &module_storage,
     )?;
-    let (mut change_set, empty_module_write_set) =
-        sess.finish(&change_set_configs, &module_storage)?;
-    assert!(
-        empty_module_write_set.is_empty(),
-        "Modules cannot be published by 'force_end_epoch'"
-    );
+    let mut change_set = sess.finish(&change_set_configs, &module_storage)?;
 
     change_set.try_materialize_aggregator_v1_delta_set(&resolver)?;
     let (write_set, _events) = change_set
-        .try_combine_into_storage_change_set(empty_module_write_set)
+        .try_combine_into_storage_change_set(ModuleWriteSet::empty())
         .expect("Failed to convert to storage ChangeSet")
         .into_inner();
 

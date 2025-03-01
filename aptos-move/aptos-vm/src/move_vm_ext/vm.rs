@@ -16,9 +16,7 @@ use aptos_vm_environment::{
     prod_configs::{aptos_default_ty_builder, aptos_prod_vm_config},
 };
 use aptos_vm_types::storage::change_set_configs::ChangeSetConfigs;
-use move_vm_runtime::{
-    config::VMConfig, move_vm::MoveVM, RuntimeEnvironment, WithRuntimeEnvironment,
-};
+use move_vm_runtime::{config::VMConfig, move_vm::MoveVM, RuntimeEnvironment};
 use std::ops::Deref;
 
 /// Used by genesis to create runtime environment and VM ([GenesisMoveVM]), encapsulating all
@@ -65,7 +63,7 @@ impl GenesisRuntimeBuilder {
     /// Returns MoveVM for the genesis.
     pub fn build_genesis_vm(&self) -> GenesisMoveVM {
         GenesisMoveVM {
-            vm: MoveVM::new_with_runtime_environment(&self.runtime_environment),
+            vm: MoveVM::new(),
             chain_id: self.chain_id,
             features: self.features.clone(),
             vm_config: self.runtime_environment.vm_config().clone(),
@@ -121,7 +119,7 @@ pub struct MoveVmExt {
 
 impl MoveVmExt {
     pub fn new(env: &AptosEnvironment) -> Self {
-        let vm = MoveVM::new_with_runtime_environment(env.runtime_environment());
+        let vm = MoveVM::new();
         Self {
             inner: vm,
             env: env.clone(),
