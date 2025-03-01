@@ -134,7 +134,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     }
 
     let allowed_structs = get_allowed_structs(are_struct_constructors_enabled);
-    let ty_builder = session.get_ty_builder();
+    let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
 
     // Need to keep this here to ensure we return the historic correct error code for replay
     for ty in func.param_tys()[signer_param_cnt..].iter() {
@@ -243,7 +243,7 @@ pub(crate) fn construct_args(
         return Err(invalid_signature());
     }
 
-    let ty_builder = session.get_ty_builder();
+    let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
     for (ty, arg) in types.iter().zip(args) {
         let subst_res = ty_builder.create_ty_with_subst(ty, ty_args);
         let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
@@ -466,7 +466,7 @@ fn validate_and_construct(
         expected_type,
     )?;
     let mut args = vec![];
-    let ty_builder = session.get_ty_builder();
+    let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
     for param_ty in function.param_tys() {
         let mut arg = vec![];
         let arg_ty = ty_builder
