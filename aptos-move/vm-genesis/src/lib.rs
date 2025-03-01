@@ -904,8 +904,6 @@ fn publish_framework(
     hash_value: HashValue,
     framework: &ReleaseBundle,
 ) -> (VMChangeSet, ModuleWriteSet) {
-    assert!(genesis_runtime_environment.vm_config().use_loader_v2);
-
     // Reset state view to be empty, to make sure all module write ops are creations.
     let mut state_view = GenesisStateView::new();
 
