@@ -38,8 +38,8 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    move_vm::MoveVM, native_extensions::NativeContextExtensions, session::Session,
-    AsFunctionValueExtension, ModuleStorage, VerifiedModuleBundle,
+    config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
+    session::Session, AsFunctionValueExtension, ModuleStorage, VerifiedModuleBundle,
 };
 use move_vm_types::{value_serde::ValueSerDeContext, values::Value};
 use std::{
@@ -75,6 +75,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         move_vm: &'l MoveVM,
         chain_id: ChainId,
         features: &Features,
+        vm_config: &VMConfig,
         maybe_user_transaction_context: Option<UserTransactionContext>,
         resolver: &'r R,
     ) -> Self {
@@ -91,7 +92,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         extensions.add(NativeAggregatorContext::new(
             txn_hash,
             resolver,
-            move_vm.vm_config().delayed_field_optimization_enabled,
+            vm_config.delayed_field_optimization_enabled,
             resolver,
         ));
         extensions.add(RandomnessContext::new());
