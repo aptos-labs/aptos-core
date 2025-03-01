@@ -11646,7 +11646,6 @@ dependencies = [
  "parking_lot 0.12.1",
  "proptest",
  "serde",
- "sha3 0.9.1",
  "smallbitvec",
  "triomphe",
  "typed-arena",

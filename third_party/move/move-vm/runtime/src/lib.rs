@@ -6,10 +6,6 @@
 #![deny(deprecated)]
 
 //! The core Move VM logic.
-//!
-//! It is a design goal for the Move VM to be independent of the Diem blockchain, so that
-//! other blockchains can use it as well. The VM isn't there yet, but hopefully will be there
-//! soon.
 
 pub mod data_cache;
 mod interpreter;
