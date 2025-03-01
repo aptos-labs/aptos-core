@@ -5,9 +5,7 @@
 use crate::{
     data_cache::TransactionDataCache,
     interpreter::Interpreter,
-    loader::{
-        LegacyModuleCache, LegacyModuleStorage, LegacyModuleStorageAdapter, LoadedFunction, Loader,
-    },
+    loader::LoadedFunction,
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     session::SerializedReturnValues,
@@ -26,32 +24,15 @@ use move_vm_types::{
     value_serde::ValueSerDeContext,
     values::{Locals, Reference, VMValueCast, Value},
 };
-use std::{borrow::Borrow, sync::Arc};
+use std::borrow::Borrow;
 
 /// An instantiation of the MoveVM.
-pub(crate) struct VMRuntime {
-    loader: Loader,
-    pub(crate) module_cache: Arc<LegacyModuleCache>,
-}
+pub(crate) struct VMRuntime {}
 
 impl VMRuntime {
     /// Creates a new runtime instance with provided environment.
-    pub(crate) fn new(runtime_environment: &RuntimeEnvironment) -> Self {
-        let vm_config = runtime_environment.vm_config().clone();
-        let loader = if vm_config.use_loader_v2 {
-            Loader::v2(vm_config)
-        } else {
-            let natives = runtime_environment.natives().clone();
-            Loader::v1(natives, vm_config)
-        };
-
-        VMRuntime {
-            loader,
-            // TODO(loader_v2):
-            //   We still create this cache, but if V2 loader is used, it is not used. We will
-            //   remove it in the future together with other V1 components.
-            module_cache: Arc::new(LegacyModuleCache::new()),
-        }
+    pub(crate) fn new(_runtime_environment: &RuntimeEnvironment) -> Self {
+        Self {}
     }
 
     fn deserialize_arg(
@@ -209,7 +190,6 @@ impl VMRuntime {
         function: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
-        module_store: &LegacyModuleStorageAdapter,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -248,12 +228,10 @@ impl VMRuntime {
             function,
             deserialized_args,
             data_store,
-            module_store,
             module_storage,
             gas_meter,
             traversal_context,
             extensions,
-            &self.loader,
         )?;
         drop(timer);
 
@@ -287,7 +265,6 @@ impl VMRuntime {
         func: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
-        module_store: &LegacyModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -297,7 +274,6 @@ impl VMRuntime {
             func,
             serialized_args,
             data_store,
-            module_store,
             module_storage,
             gas_meter,
             traversal_context,
@@ -311,7 +287,6 @@ impl VMRuntime {
         ty_args: Vec<TypeTag>,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
-        module_store: &LegacyModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -324,20 +299,11 @@ impl VMRuntime {
             main,
             serialized_args,
             data_store,
-            module_store,
             code_storage,
             gas_meter,
             traversal_context,
             extensions,
         )?;
         Ok(())
-    }
-
-    pub(crate) fn loader(&self) -> &Loader {
-        &self.loader
-    }
-
-    pub(crate) fn module_storage_v1(&self) -> Arc<dyn LegacyModuleStorage> {
-        self.module_cache.clone() as Arc<dyn LegacyModuleStorage>
     }
 }
