@@ -10,7 +10,7 @@ use crate::{
     native_extensions::NativeContextExtensions,
     session::SerializedReturnValues,
     storage::{code_storage::CodeStorage, module_storage::ModuleStorage},
-    AsFunctionValueExtension, LayoutConverter, RuntimeEnvironment, StorageLayoutConverter,
+    AsFunctionValueExtension, LayoutConverter, StorageLayoutConverter,
 };
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
@@ -31,7 +31,8 @@ pub(crate) struct VMRuntime {}
 
 impl VMRuntime {
     /// Creates a new runtime instance with provided environment.
-    pub(crate) fn new(_runtime_environment: &RuntimeEnvironment) -> Self {
+    #[allow(clippy::new_without_default)]
+    pub(crate) fn new() -> Self {
         Self {}
     }
 
