@@ -932,20 +932,6 @@ impl IncludedArtifacts {
         experiments.append(&mut move_options.experiments.clone());
         experiments.append(&mut more_experiments);
 
-        if matches!(compiler_version, Some(CompilerVersion::V1)) {
-            if !matches!(optimize, Option::None | Some(OptimizationLevel::Default)) {
-                return Err(CliError::CommandArgumentError(
-                    "`--optimization-level`/`--optimize` flag is not compatible with Move Compiler V1"
-                        .to_string(),
-                ));
-            };
-            if !move_options.experiments.is_empty() {
-                return Err(CliError::CommandArgumentError(
-                    "`--experiments` flag is not compatible with Move Compiler V1".to_string(),
-                ));
-            };
-        }
-
         let base_options = BuildOptions {
             dev,
             // Always enable error map bytecode injection
