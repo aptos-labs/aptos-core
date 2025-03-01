@@ -61,7 +61,7 @@ pub struct Function {
 
 /// For loaded function representation, specifies the owner: a script or a module.
 #[derive(Clone)]
-pub(crate) enum LoadedFunctionOwner {
+pub enum LoadedFunctionOwner {
     Script(Arc<Script>),
     Module(Arc<Module>),
 }
@@ -69,12 +69,12 @@ pub(crate) enum LoadedFunctionOwner {
 /// A loaded runtime function representation along with type arguments used to instantiate it.
 #[derive(Clone)]
 pub struct LoadedFunction {
-    pub(crate) owner: LoadedFunctionOwner,
+    pub owner: LoadedFunctionOwner,
     // A set of verified type arguments provided for this definition. If
     // function is not generic, an empty vector.
-    pub(crate) ty_args: Vec<Type>,
+    pub ty_args: Vec<Type>,
     // Definition of the loaded function.
-    pub(crate) function: Arc<Function>,
+    pub function: Arc<Function>,
 }
 
 /// A lazy loaded function, which can either be unresolved (as resulting
