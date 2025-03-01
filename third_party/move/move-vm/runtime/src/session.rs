@@ -11,7 +11,6 @@ use crate::{
     storage::{module_storage::ModuleStorage, ty_tag_converter::TypeTagConverter},
     CodeStorage, LayoutConverter, StorageLayoutConverter,
 };
-use bytes::Bytes;
 use move_binary_format::{errors::*, file_format::LocalIndex};
 use move_core_types::{
     account_address::AccountAddress,
@@ -184,7 +183,7 @@ impl<'r, 'l> Session<'r, 'l> {
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
         module_storage: &impl ModuleStorage,
-    ) -> VMResult<Changes<Bytes, Resource>> {
+    ) -> VMResult<Changes<Resource>> {
         self.data_cache
             .into_custom_effects(resource_converter, module_storage)
             .map_err(|e| e.finish(Location::Undefined))
@@ -210,7 +209,7 @@ impl<'r, 'l> Session<'r, 'l> {
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
         module_storage: &impl ModuleStorage,
-    ) -> VMResult<(Changes<Bytes, Resource>, NativeContextExtensions<'r>)> {
+    ) -> VMResult<(Changes<Resource>, NativeContextExtensions<'r>)> {
         let Session {
             data_cache,
             native_extensions,

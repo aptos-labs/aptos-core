@@ -24,7 +24,6 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage, AsUnsyncModuleStorage,
-    WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -256,7 +255,7 @@ fn call_script_with_args_ty_args_signers(
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
     let storage = InMemoryStorage::new();
-    let move_vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
+    let move_vm = MoveVM::new();
     let code_storage = storage.as_unsync_code_storage();
     let mut session = move_vm.new_session(&storage);
 
@@ -286,7 +285,7 @@ fn call_function_with_args_ty_args_signers(
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
     let mut storage = InMemoryStorage::new();
-    let move_vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
+    let move_vm = MoveVM::new();
 
     let module_id = module.self_id();
     let mut module_blob = vec![];
@@ -780,7 +779,7 @@ fn call_missing_item() {
     let function_name = ident_str!("foo");
 
     let mut storage = InMemoryStorage::new();
-    let move_vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
+    let move_vm = MoveVM::new();
     let module_storage = storage.as_unsync_module_storage();
     let mut session = move_vm.new_session(&storage);
 

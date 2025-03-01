@@ -4,7 +4,7 @@
 
 use crate::{
     data_cache::TransactionDataCache, native_extensions::NativeContextExtensions,
-    runtime::VMRuntime, session::Session, RuntimeEnvironment,
+    runtime::VMRuntime, session::Session,
 };
 use move_vm_types::resolver::MoveResolver;
 
@@ -13,10 +13,11 @@ pub struct MoveVM {
 }
 
 impl MoveVM {
-    /// Creates a new VM instance for the given [RuntimeEnvironment].
-    pub fn new_with_runtime_environment(runtime_environment: &RuntimeEnvironment) -> Self {
+    /// Creates a new VM instance.
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
         Self {
-            runtime: VMRuntime::new(runtime_environment),
+            runtime: VMRuntime::new(),
         }
     }
 
