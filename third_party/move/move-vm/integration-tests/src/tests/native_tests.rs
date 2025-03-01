@@ -93,13 +93,8 @@ fn load_and_run_functions(
     traversal_storage: &TraversalStorage,
     module_id: &ModuleId,
 ) {
-    let func = session
-        .load_function(
-            module_storage,
-            module_id,
-            &Identifier::new("foo").unwrap(),
-            &[],
-        )
+    let func = module_storage
+        .load_function(module_id, &Identifier::new("foo").unwrap(), &[])
         .unwrap();
     let err1 = session
         .execute_entry_function(
@@ -113,13 +108,8 @@ fn load_and_run_functions(
 
     assert!(err1.exec_state().unwrap().stack_trace().is_empty());
 
-    let func = session
-        .load_function(
-            module_storage,
-            module_id,
-            &Identifier::new("foo2").unwrap(),
-            &[],
-        )
+    let func = module_storage
+        .load_function(module_id, &Identifier::new("foo2").unwrap(), &[])
         .unwrap();
     let err2 = session
         .execute_entry_function(

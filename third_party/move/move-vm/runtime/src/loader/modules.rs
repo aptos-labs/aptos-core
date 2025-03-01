@@ -157,6 +157,7 @@ impl LegacyModuleStorageAdapter {
 
     /// Given module address/name and the function name, returns the corresponding module
     /// and function if they exist in module store cache. If not, an error is returned.
+    #[allow(dead_code)]
     pub(crate) fn resolve_module_and_function_by_name(
         &self,
         module_id: &ModuleId,
