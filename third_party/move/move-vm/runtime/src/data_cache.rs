@@ -18,7 +18,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    resolver::MoveResolver,
+    resolver::ResourceResolver,
     value_serde::ValueSerDeContext,
     values::{GlobalValue, Value},
 };
@@ -52,14 +52,14 @@ impl AccountDataCache {
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
 pub(crate) struct TransactionDataCache<'r> {
-    remote: &'r dyn MoveResolver,
+    remote: &'r dyn ResourceResolver,
     account_map: BTreeMap<AccountAddress, AccountDataCache>,
 }
 
 impl<'r> TransactionDataCache<'r> {
     /// Create a `TransactionDataCache` with a `RemoteCache` that provides access to data
     /// not updated in the transaction.
-    pub(crate) fn new(remote: &'r impl MoveResolver) -> Self {
+    pub(crate) fn new(remote: &'r impl ResourceResolver) -> Self {
         TransactionDataCache {
             remote,
             account_map: BTreeMap::new(),
