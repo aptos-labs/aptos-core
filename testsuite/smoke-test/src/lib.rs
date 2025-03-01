@@ -5,6 +5,8 @@
 extern crate core;
 
 #[cfg(test)]
+mod account_abstraction;
+#[cfg(test)]
 mod aptos;
 #[cfg(test)]
 mod aptos_cli;
