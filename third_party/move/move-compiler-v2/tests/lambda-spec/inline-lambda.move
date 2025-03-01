@@ -1,6 +1,4 @@
 module 0x42::Test {
-    use std::vector;
-
     inline fun apply(v: u64, predicate: |u64| bool): bool {
         spec {
             assert v != 42;
@@ -36,34 +34,6 @@ module 0x42::Test {
 
     fun call_inline(y: u64) {
         let z = 3 + y;
-        inline_1(y, |x| x > 2, |x| x > z, |x| { while(z < y) {let _x = x;}; x > 5 });
-    }
-
-    inline fun find<Element>(s: &vector<Element>, f: |&Element|bool): (bool, u64) {
-        let find = false;
-        let found_index = 0;
-        let i = 0;
-        let len = vector::length(s);
-        while ({
-            spec {
-               invariant i <= len;
-               invariant found_index == 0;
-               invariant forall j in 0..i: !f(s[j]);
-            };
-            i < len
-            }) {
-            if (f(vector::borrow(s, i))) {
-                find = true;
-                found_index = i;
-                break
-            };
-            i = i + 1;
-        };
-        (find, found_index)
-    }
-
-    fun call_find() {
-        let s = vector[1, 2, 3];
-        let (_a, _b) = find(&s, |x| *x > 1);
+        inline_1(y, |x| x > 2, |x| x > z, |x| { while(z > 0) {let _x = x + 1;}; x > 5 });
     }
 }

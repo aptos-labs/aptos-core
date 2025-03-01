@@ -204,6 +204,7 @@ pub trait ExpRewriterFunctions {
         pat: &Pattern,
         body: &Exp,
         capture_kind: LambdaCaptureKind,
+        spec_opt: &Option<Exp>,
     ) -> Option<Exp> {
         None
     }
@@ -374,7 +375,7 @@ pub trait ExpRewriterFunctions {
                 };
                 self.rewrite_exit_scope(new_id);
                 if let Some(new_exp) =
-                    self.rewrite_lambda(new_id, &new_pat, &new_body, *capture_kind)
+                    self.rewrite_lambda(new_id, &new_pat, &new_body, *capture_kind, &new_spec_opt)
                 {
                     new_exp
                 } else if id_changed || pat_changed || body_changed || spec_body_changed {

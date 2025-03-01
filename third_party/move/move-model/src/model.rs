@@ -1969,6 +1969,7 @@ impl GlobalEnv {
         params: Vec<Parameter>,
         result_type: Type,
         def: Exp,
+        spec_opt: Option<Spec>,
     ) {
         let used_funs = def.used_funs();
         let called_funs = def.called_funs();
@@ -1990,7 +1991,7 @@ impl GlobalEnv {
             params,
             result_type,
             access_specifiers: None,
-            spec: RefCell::new(Default::default()),
+            spec: RefCell::new(spec_opt.unwrap_or_default()),
             def: Some(def),
             called_funs: Some(called_funs),
             calling_funs: RefCell::new(None),
@@ -2006,6 +2007,49 @@ impl GlobalEnv {
             .function_data
             .insert(FunId::new(name), data)
             .is_none())
+    }
+
+    pub fn construct_function_data(
+        &self,
+        name: Symbol,
+        loc: Loc,
+        visibility: Visibility,
+        has_package_visibility: bool,
+        type_params: Vec<TypeParameter>,
+        params: Vec<Parameter>,
+        result_type: Type,
+        def: Exp,
+        spec_opt: Option<Spec>,
+    ) -> FunctionData {
+        let used_funs = def.used_funs();
+        let called_funs = def.called_funs();
+        FunctionData {
+            name,
+            loc: FunctionLoc {
+                full: loc.clone(),
+                id_loc: loc.clone(),
+                result_type_loc: loc,
+            },
+            def_idx: None,
+            handle_idx: None,
+            visibility,
+            has_package_visibility,
+            is_native: false,
+            kind: FunctionKind::Regular,
+            attributes: vec![],
+            type_params,
+            params,
+            result_type,
+            access_specifiers: None,
+            spec: RefCell::new(spec_opt.unwrap_or_default()),
+            def: Some(def),
+            called_funs: Some(called_funs),
+            calling_funs: RefCell::new(None),
+            transitive_closure_of_called_funs: RefCell::new(None),
+            used_funs: Some(used_funs),
+            using_funs: RefCell::new(None),
+            transitive_closure_of_used_funs: RefCell::new(None),
+        }
     }
 
     /// Returns a reference to the declaration of a spec fun.
@@ -4328,7 +4372,7 @@ pub struct FunctionEnv<'env> {
     pub module_env: ModuleEnv<'env>,
 
     /// Reference to the function data.
-    data: &'env FunctionData,
+    pub data: &'env FunctionData,
 }
 
 impl<'env> FunctionEnv<'env> {

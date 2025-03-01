@@ -37,8 +37,10 @@
 //! - TODO(10858): add an anchor AST node so we can implement `Return` for inline functions and
 //!   `Lambda`.
 
-use crate::env_pipeline::rewrite_target::{
-    RewriteState, RewriteTarget, RewriteTargets, RewritingScope,
+use super::lambda_lifter::{LambdaLifter, LambdaLiftingOptions};
+use crate::env_pipeline::{
+    rewrite_target::{RewriteState, RewriteTarget, RewriteTargets, RewritingScope},
+    spec_rewriter::run_spec_rewriter_inline,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -46,11 +48,11 @@ use log::trace;
 use move_model::{
     ast::{
         Condition, ConditionKind, Exp, ExpData, Operation, Pattern, Spec, SpecBlockTarget,
-        TempIndex,
+        SpecFunDecl, TempIndex,
     },
     exp_rewriter::ExpRewriterFunctions,
     metadata::LanguageVersion,
-    model::{FunId, GlobalEnv, Loc, NodeId, Parameter, QualifiedId},
+    model::{FunId, GlobalEnv, Loc, NodeId, Parameter, QualifiedId, SpecFunId},
     symbol::Symbol,
     ty::{ReferenceKind, Type},
 };
@@ -73,7 +75,12 @@ const LAMBDA_TEMP_RESULT: &str = "$temp_result";
 
 /// Run inlining on current program's AST.  For each function which is target of the compilation,
 /// visit that function body and inline any calls to functions marked as "inline".
-pub fn run_inlining(env: &mut GlobalEnv, scope: RewritingScope, keep_inline_functions: bool) {
+pub fn run_inlining(
+    env: &mut GlobalEnv,
+    scope: RewritingScope,
+    keep_inline_functions: bool,
+    lift_inline_funs: bool,
+) {
     // Get non-inline function roots for running inlining.
     // Also generate an error for any target inline functions lacking a body to inline.
     let mut targets = RewriteTargets::create(env, scope);
@@ -115,7 +122,7 @@ pub fn run_inlining(env: &mut GlobalEnv, scope: RewritingScope, keep_inline_func
         {
             // We inline functions bottom-up, so that any inline function which itself has calls to
             // inline functions has already had its stuff inlined.
-            let mut inliner = Inliner::new(env, targets);
+            let mut inliner = Inliner::new(env, targets, lift_inline_funs);
             for target in targets_needing_inlining.into_iter() {
                 inliner.do_inlining_in(target);
             }
@@ -366,16 +373,23 @@ fn check_for_cycles<T: Ord + Copy + Debug>(
 }
 
 struct Inliner<'env> {
-    env: &'env GlobalEnv,
+    env: &'env mut GlobalEnv,
     /// The set of rewrite targets the inliner works on.
     inline_targets: RewriteTargets,
+    /// Flag to indicate whether lift lambda expression
+    lift_inline_funs: bool,
 }
 
 impl<'env> Inliner<'env> {
-    fn new(env: &'env GlobalEnv, inline_targets: RewriteTargets) -> Self {
+    fn new(
+        env: &'env mut GlobalEnv,
+        inline_targets: RewriteTargets,
+        lift_inline_funs: bool,
+    ) -> Self {
         Self {
             env,
             inline_targets,
+            lift_inline_funs,
         }
     }
 
@@ -397,42 +411,50 @@ impl<'env> Inliner<'env> {
         match &target {
             MoveFun(func_id) => {
                 let func_env = self.env.get_function(*func_id);
-                if let Some(new_def) = func_env.get_def().and_then(|def| self.do_rewrite_exp(def)) {
-                    *self.inline_targets.state_mut(&target) = Def(new_def)
+                let def_opt = func_env.get_def();
+                if let Some(def) = def_opt {
+                    if let Some(new_def) = self.do_rewrite_exp(def.clone(), Some(*func_id)) {
+                        *self.inline_targets.state_mut(&target) = Def(new_def)
+                    }
                 }
             },
             SpecFun(func_id) => {
                 let func_env = self.env.get_spec_fun(*func_id);
-                if let Some(new_def) = func_env
-                    .body
-                    .as_ref()
-                    .and_then(|def| self.do_rewrite_exp(def))
-                {
-                    *self.inline_targets.state_mut(&target) = Def(new_def);
+                if let Some(def) = func_env.body.clone() {
+                    if let Some(new_def) = self.do_rewrite_exp(def, None) {
+                        *self.inline_targets.state_mut(&target) = Def(new_def);
+                    }
                 }
             },
             SpecBlock(sb_target) => {
-                let spec = self.env.get_spec_block(sb_target);
-                if let Some(new_spec) = self.do_rewrite_spec(sb_target, &spec) {
+                let spec = self.env.get_spec_block(sb_target).clone();
+                let fun_target_id = target.get_rewrite_target_fun_id();
+                if let Some(new_spec) = self.do_rewrite_spec(sb_target, spec.clone(), fun_target_id)
+                {
                     *self.inline_targets.state_mut(&target) = Spec(new_spec)
                 }
             },
         }
     }
 
-    fn do_rewrite_exp(&mut self, exp: &Exp) -> Option<Exp> {
-        let mut rewriter = OuterInlinerRewriter::new(self.env, self);
+    fn do_rewrite_exp(&mut self, exp: Exp, target: Option<QualifiedFunId>) -> Option<Exp> {
+        let mut rewriter = OuterInlinerRewriter::new(self, target);
         let rewritten = rewriter.rewrite_exp(exp.clone());
-        if !ExpData::ptr_eq(&rewritten, exp) {
+        if !ExpData::ptr_eq(&rewritten, &exp) {
             Some(rewritten)
         } else {
             None
         }
     }
 
-    fn do_rewrite_spec(&mut self, target: &SpecBlockTarget, spec: &Spec) -> Option<Spec> {
-        let mut rewriter = OuterInlinerRewriter::new(self.env, self);
-        let (changed, new_spec) = rewriter.rewrite_spec_descent(target, spec);
+    fn do_rewrite_spec(
+        &mut self,
+        target: &SpecBlockTarget,
+        spec: Spec,
+        fun_target: Option<QualifiedFunId>,
+    ) -> Option<Spec> {
+        let mut rewriter = OuterInlinerRewriter::new(self, fun_target);
+        let (changed, new_spec) = rewriter.rewrite_spec_descent(target, &spec);
         if changed {
             Some(new_spec)
         } else {
@@ -490,15 +512,19 @@ impl<'env> ExpRewriterFunctions for LambdaSpecRewriter<'env> {
 /// use the ExpRewriterFunctions trait to find such calls and reconstruct the outer function to
 /// include them after rewriting.
 struct OuterInlinerRewriter<'env, 'inliner> {
-    env: &'env GlobalEnv,
     /// Functions already processed all get an entry here, with a new function body after inline
     /// calls are substituted here.
     inliner: &'inliner mut Inliner<'env>,
+    /// Target function
+    current_fun_target_opt: Option<QualifiedFunId>,
 }
 
 impl<'env, 'inliner> OuterInlinerRewriter<'env, 'inliner> {
-    fn new(env: &'env GlobalEnv, inliner: &'inliner mut Inliner<'env>) -> Self {
-        Self { env, inliner }
+    fn new(inliner: &'inliner mut Inliner<'env>, current_target: Option<QualifiedFunId>) -> Self {
+        Self {
+            inliner,
+            current_fun_target_opt: current_target,
+        }
     }
 }
 
@@ -507,10 +533,10 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
     fn rewrite_call(&mut self, call_id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
         if let Operation::MoveFunction(module_id, fun_id) = oper {
             let qfid = module_id.qualified(*fun_id);
-            let func_env = self.env.get_function(qfid);
+            let func_env = self.inliner.env.get_function(qfid);
             if func_env.is_inline() {
                 // inline the function call
-                let type_args = self.env.get_node_instantiation(call_id);
+                let type_args = self.inliner.env.get_node_instantiation(call_id);
                 let parameters = func_env.get_parameters();
                 let func_loc = func_env.get_id_loc();
                 let body_expr = if let RewriteState::Def(expr) = self
@@ -530,18 +556,31 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
                     if DEBUG {
                         trace!(
                             "inlining function `{}` with args `{}`",
-                            self.env.dump_fun(&func_env),
+                            self.inliner.env.dump_fun(&func_env),
                             args.iter()
-                                .map(|exp| format!("{}", exp.as_ref().display(self.env)))
+                                .map(|exp| format!("{}", exp.as_ref().display(self.inliner.env)))
                                 .collect::<Vec<_>>()
                                 .join(","),
                         );
                     }
                     let rewritten = InlinedRewriter::inline_call(
-                        self.env, call_id, &func_loc, &expr, type_args, parameters, args,
+                        self.inliner.env,
+                        call_id,
+                        &func_loc,
+                        &expr,
+                        type_args,
+                        parameters,
+                        args,
+                        qfid,
+                        self.inliner.lift_inline_funs,
+                        self.current_fun_target_opt,
                     );
+
                     if DEBUG {
-                        trace!("After inlining, expr is `{}`", rewritten.display(self.env));
+                        trace!(
+                            "After inlining, expr is `{}`",
+                            rewritten.display(self.inliner.env)
+                        );
                     }
                     Some(rewritten)
                 } else {
@@ -703,6 +742,16 @@ struct InlinedRewriter<'env, 'rewriter> {
     /// Track loop nesting, 0 outside a loop
     in_loop: usize,
     call_site_loc: &'rewriter Loc,
+    /// Track whether in spec context during rewriting
+    in_spec: usize,
+    /// Map from name to corresponding closure exp
+    function_value_map: BTreeMap<usize, Exp>,
+    /// Map from name to corresponding closure exp
+    function_value_spec_map: BTreeMap<usize, QualifiedId<SpecFunId>>,
+    /// Map from symbol to parameter pos
+    sym_para_map: BTreeMap<Symbol, usize>,
+    /// Whether rewriting invoke
+    rewrite_invoke_for_spec: bool,
 }
 
 impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
@@ -713,6 +762,10 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         lambda_param_map: BTreeMap<Symbol, &'rewriter Exp>,
         lambda_free_vars: BTreeSet<Symbol>,
         call_site_loc: &'rewriter Loc,
+        function_value_map: BTreeMap<usize, Exp>,
+        function_value_spec_map: BTreeMap<usize, QualifiedId<SpecFunId>>,
+        sym_para_map: BTreeMap<Symbol, usize>,
+        rewrite_invoke_for_spec: bool,
     ) -> Self {
         let shadow_stack = ShadowStack::new(env, &lambda_free_vars);
         Self {
@@ -723,26 +776,35 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             shadow_stack,
             in_loop: 0,
             call_site_loc,
+            in_spec: 0,
+            function_value_map,
+            function_value_spec_map,
+            sym_para_map,
+            rewrite_invoke_for_spec,
         }
     }
 
     /// Entry point for rewriting a call to an inline function.
     fn inline_call(
-        env: &'env GlobalEnv,
+        env: &'env mut GlobalEnv,
         call_node_id: NodeId,
         func_loc: &Loc,
         body: &Exp,
         type_args: Vec<Type>,
         parameters: Vec<Parameter>,
         args: &[Exp],
+        inline_qualified_fun_id: QualifiedFunId,
+        lift_inline_funs: bool,
+        target_qualified_fun_id_opt: Option<QualifiedFunId>,
     ) -> Exp {
-        let args_matched: Vec<_> = zip(&parameters, args).collect();
+        let body = body.clone();
+        let args_matched: Vec<_> = zip(parameters.iter().enumerate(), args).collect();
         let (lambda_args_matched, regular_args_matched): (Vec<_>, Vec<_>) = args_matched
             .iter()
             .partition(|(_, arg)| matches!(arg.as_ref(), ExpData::Lambda(..)));
         let non_lambda_function_args =
             regular_args_matched.iter().filter_map(|(param, arg_exp)| {
-                if matches!(param.1, Type::Fun(..)) {
+                if matches!(param.1 .1, Type::Fun(..)) {
                     Some(arg_exp)
                 } else {
                     None
@@ -759,11 +821,58 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
 
         let lambda_param_map: BTreeMap<Symbol, &Exp> = lambda_args_matched
             .iter()
-            .map(|(param, arg_exp)| (param.0, *arg_exp))
+            .map(|(param, arg_exp)| (param.1 .0, *arg_exp))
             .collect();
 
-        let (regular_params, regular_actuals): (Vec<&Parameter>, Vec<&Exp>) =
+        let mut function_value_map: BTreeMap<usize, Exp> = BTreeMap::new();
+        let mut _lifted_lambda_fun: BTreeMap<usize, move_model::model::FunctionData> =
+            BTreeMap::new();
+        let mut sym_para_map: BTreeMap<Symbol, usize> = BTreeMap::new();
+        let mut function_value_spec_map = BTreeMap::new();
+        if lift_inline_funs && target_qualified_fun_id_opt.is_some() {
+            let options = LambdaLiftingOptions {
+                include_inline_functions: true,
+            };
+
+            // When handling the current inline call, all inner ones are already handles
+
+            let fun_env = env.get_function(target_qualified_fun_id_opt.unwrap());
+            // println!("inline target:{}", fun_env.get_full_name_str());
+            for (para, lambda) in lambda_args_matched.clone() {
+                let mut lifter = LambdaLifter {
+                    options: &options,
+                    fun_env: &fun_env,
+                    lifted: vec![],
+                    scopes: vec![],
+                    free_params: BTreeMap::default(),
+                    free_locals: BTreeMap::default(),
+                    exempted_lambdas: BTreeSet::default(),
+                    name_suffix: Some(format!(
+                        "_inline_{}_{}",
+                        para.0,
+                        env.get_node_loc(lambda.node_id()).span().start()
+                    )),
+                };
+                //println!("before lifter:{}", lambda.display(env));
+                let closure_exp = lifter.rewrite_exp(lambda.clone());
+                //println!("closure:{:?}", closure_exp);
+                if lifter.lifted.len() == 1 {
+                    let func_data = lifter.lifted[0].generate_function_data(env);
+                    sym_para_map.insert(para.1 .0, para.0);
+                    function_value_map.insert(para.0, closure_exp.clone());
+                    _lifted_lambda_fun.insert(para.0, func_data);
+                }
+            }
+            function_value_spec_map =
+                run_spec_rewriter_inline(env, inline_qualified_fun_id, _lifted_lambda_fun);
+        }
+
+        let (regular_params, regular_actuals): (Vec<(usize, &Parameter)>, Vec<&Exp>) =
             regular_args_matched.into_iter().unzip();
+        let regular_params = regular_params
+            .into_iter()
+            .map(|(_, para)| para)
+            .collect_vec();
 
         // Find free variables in lambda expr.  Perhaps we could minimize changes if we tracked each
         // lambda arg individually in the inlined method and only rewrite the context of each
@@ -802,6 +911,10 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             lambda_param_map,
             all_lambda_free_vars,
             &call_site_loc,
+            function_value_map,
+            function_value_spec_map,
+            sym_para_map,
+            lift_inline_funs,
         );
 
         // For now, just copy the actuals.  If FreezeRef is needed, we'll do it in
@@ -1179,6 +1292,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
     /// Override default implementation to flag an error on an disallowed Return,
     /// as well as Break and Continue expressions outside of loops.
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
+        // println!("track exp:{}", exp.display(self.env));
         // Disallow Return and free LoopCont("continue" and "break") expressions in an inlined function.
         // Record if this is a Loop, as well as tracking loop nesting depth in self.in_loop.
         let this_is_loop = match exp.as_ref() {
@@ -1208,8 +1322,19 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
             _ => false,
         };
 
+        if let ExpData::SpecBlock(_, _) = exp.as_ref() {
+            self.in_spec += 1;
+        } else if self.in_spec > 0 {
+            self.in_spec += 1;
+        }
+
         // Proceed with default behavior in any case.
         let result = self.rewrite_exp_descent(exp);
+
+        //println!("done rewriting:{}", result.display(self.env));
+        if self.in_spec > 0 {
+            self.in_spec -= 1;
+        }
 
         // Exit loop if we matched it.
         if this_is_loop {
@@ -1259,6 +1384,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
         if idx < self.inlined_formal_params.len() {
             let param = &self.inlined_formal_params[idx];
             let sym = param.0;
+            // println!("temporal sym:{}, i:{}, {}, id:{:?}", sym.display(self.env.symbol_pool()), idx, self.in_spec > 0, id);
             let param_type = &param.1;
             let instantiated_param_type = param_type.instantiate(self.type_args);
             let new_node_id = self.env.new_node(loc, instantiated_param_type);
@@ -1287,6 +1413,89 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
     /// convert the body, formal parameters, and actual arguments into a let expression which
     /// can be used in place of the call.
     fn rewrite_invoke(&mut self, id: NodeId, target: &Exp, args: &[Exp]) -> Option<Exp> {
+        // println!("reach invoke");
+        if self.in_spec > 0 && self.rewrite_invoke_for_spec {
+            // println!("lambda target:{}", lambda_target.display(self.env));
+            if let ExpData::LocalVar(_, sym) = target.as_ref() {
+                if let Some(para_pos) = self.sym_para_map.get(sym) {
+                    if let (Some(spec_fun_id), Some(closure)) = (
+                        self.function_value_spec_map.get(para_pos),
+                        self.function_value_map.get(para_pos),
+                    ) {
+                        //println!("call spec id:{:?}", spec_fun_id);
+                        let spec_fun_decl: &SpecFunDecl = self.env.get_spec_fun(*spec_fun_id);
+                        if let ExpData::Call(_, Operation::Closure(_, _, mask), captured) =
+                            closure.as_ref()
+                        {
+                            //println!("mask:{:?}, captured:{:?}", mask, captured);
+                            let mut new_args = vec![];
+                            let mut captured_num = 0;
+                            let mut free_num = 0;
+                            for i in 0..spec_fun_decl.params.len() {
+                                if mask.is_captured(i) {
+                                    //println!("captured i:{}, node id:{:?}, {}", i, captured[captured_num].node_id(),  captured[captured_num].display(self.env));
+                                    new_args.push(captured[captured_num].clone());
+                                    captured_num += 1;
+                                } else {
+                                    //println!("free i:{}", i);
+                                    new_args.push(args[free_num].clone());
+                                    free_num += 1;
+                                }
+                            }
+                            return Some(
+                                ExpData::Call(
+                                    id,
+                                    Operation::SpecFunction(
+                                        spec_fun_id.module_id,
+                                        spec_fun_id.id,
+                                        None,
+                                    ),
+                                    new_args.clone(),
+                                )
+                                .into_exp(),
+                            );
+                        }
+                    }
+                }
+            } else if let ExpData::Temporary(_, para_pos) = target.as_ref() {
+                if let (Some(spec_fun_id), Some(closure)) = (
+                    self.function_value_spec_map.get(para_pos),
+                    self.function_value_map.get(para_pos),
+                ) {
+                    println!("2spec id:{:?}", spec_fun_id);
+                    let spec_fun_decl: &SpecFunDecl = self.env.get_spec_fun(*spec_fun_id);
+                    if let ExpData::Call(_, Operation::Closure(_, _, mask), captured) =
+                        closure.as_ref()
+                    {
+                        let mut new_args = vec![];
+                        let mut captured_num = 0;
+                        let mut free_num = 0;
+                        for i in 0..spec_fun_decl.params.len() {
+                            if mask.is_captured(i) {
+                                new_args.push(captured[captured_num].clone());
+                                captured_num += 1;
+                            } else {
+                                new_args.push(args[free_num].clone());
+                                free_num += 1;
+                            }
+                        }
+                        return Some(
+                            ExpData::Call(
+                                id,
+                                Operation::SpecFunction(
+                                    spec_fun_id.module_id,
+                                    spec_fun_id.id,
+                                    None,
+                                ),
+                                new_args.clone(),
+                            )
+                            .into_exp(),
+                        );
+                    }
+                }
+            }
+            return None;
+        }
         let optional_lambda_target: Option<&Exp> = match target.as_ref() {
             ExpData::LocalVar(_, symbol) => self.lambda_param_map.get(symbol).copied(),
             ExpData::Temporary(_, idx) => {

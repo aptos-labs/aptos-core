@@ -28,7 +28,10 @@ use log::info;
 use move_model::{
     ast::{ConditionKind, Exp, ExpData, GlobalInvariant, Operation, SpecFunDecl},
     exp_rewriter::ExpRewriterFunctions,
-    model::{FunId, GlobalEnv, NodeId, Parameter, QualifiedId, SpecFunId, StructEnv},
+    model::{
+        FunId, FunctionData, FunctionEnv, GlobalEnv, ModuleId, NodeId, Parameter, QualifiedId,
+        SpecFunId, StructEnv,
+    },
     symbol::Symbol,
     ty::ReferenceKind,
 };
@@ -124,8 +127,9 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
                 }
             },
             (SpecFun(id), Def(exp)) => {
-                let mut converter = SpecConverter::new(env, &function_mapping, true)
-                    .symbolized_parameters(get_param_names(&env.get_spec_fun(*id).params));
+                let paras = get_param_names(&env.get_spec_fun(*id).params);
+                let mut converter =
+                    SpecConverter::new(env, &function_mapping, true).symbolized_parameters(paras);
                 let new_exp = converter.rewrite_exp(exp.clone());
                 if !ExpData::ptr_eq(&new_exp, &exp) {
                     *targets.state_mut(&target) = Def(new_exp)
@@ -213,6 +217,51 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
     collect_global_invariants_to_env(env)
 }
 
+pub fn run_spec_rewriter_inline(
+    env: &mut GlobalEnv,
+    target_fid: QualifiedId<FunId>,
+    lambda_fun_map: BTreeMap<usize, FunctionData>,
+) -> BTreeMap<usize, QualifiedId<SpecFunId>> {
+    info!("rewriting specifications in inline functions");
+
+    let mut targets = RewriteTargets::create_fun_targets(env, vec![]);
+
+    // Traverse lifted lambda functions,
+    // generate corresponding spec fun and ad them as rewrite target
+    let mut function_data_mapping = BTreeMap::new();
+    for (i, data) in &lambda_fun_map {
+        let spec_fun_id = derive_spec_fun_from_data(env, data, target_fid.module_id);
+        function_data_mapping.insert(*i, spec_fun_id);
+        // Add new spec fun to targets for later processing
+        targets.entry(RewriteTarget::SpecFun(spec_fun_id));
+        // For simplicity, we assume that all lambda parameters will be called
+        env.add_used_spec_fun(spec_fun_id);
+    }
+    let function_mapping = BTreeMap::new();
+
+    for target in targets.keys().collect_vec() {
+        use RewriteState::*;
+        use RewriteTarget::*;
+        let get_param_names =
+            |params: &[Parameter]| params.iter().map(|Parameter(name, ..)| *name).collect_vec();
+        if let (SpecFun(id), Def(exp)) = (&target, target.get_env_state(env)) {
+            let paras: Vec<Symbol> = get_param_names(&env.get_spec_fun(*id).params);
+            let mut converter = SpecConverter::new_for_inline(env, &function_mapping, true)
+                .symbolized_parameters(paras);
+            let new_exp = converter.rewrite_exp(exp.clone());
+            if converter.contains_imperative_expression {
+                let spec_fun = converter.env.get_spec_fun_mut(*id);
+                spec_fun.uninterpreted = true;
+                spec_fun.body = None;
+            } else if !ExpData::ptr_eq(&new_exp, &exp) {
+                *targets.state_mut(&target) = Def(new_exp)
+            }
+        }
+    }
+    targets.write_to_env(env);
+    function_data_mapping
+}
+
 // -------------------------------------------------------------------------------------------
 // Deriving Specification Functions
 
@@ -259,13 +308,62 @@ fn derive_spec_fun(env: &mut GlobalEnv, fun_id: QualifiedId<FunId>) -> Qualified
     env.add_spec_function_def(fun_id.module_id, decl)
 }
 
+fn derive_spec_fun_from_data(
+    env: &mut GlobalEnv,
+    fun_data: &FunctionData,
+    module_id: ModuleId,
+) -> QualifiedId<SpecFunId> {
+    let fun = FunctionEnv {
+        module_env: env.get_module(module_id),
+        data: fun_data,
+    };
+    let (is_native, body) = if fun.is_native() {
+        (true, None)
+    } else {
+        let exp = fun.get_def().expect("function body").clone();
+        (false, Some(exp))
+    };
+
+    // For historical reasons, those names are prefixed with `$` even though there
+    // is no name clash allowed.
+    let name = env.symbol_pool().make(&format!(
+        "$inline_{}",
+        fun.get_name().display(env.symbol_pool())
+    ));
+    // Eliminate references in parameters and result type
+    let params = fun
+        .get_parameters()
+        .into_iter()
+        .map(|Parameter(sym, ty, loc)| Parameter(sym, ty.skip_reference().clone(), loc))
+        .collect();
+    let result_type = fun.get_result_type().skip_reference().clone();
+
+    let decl = SpecFunDecl {
+        loc: fun.get_loc(),
+        name,
+        type_params: fun.get_type_parameters(),
+        params,
+        context_params: None,
+        result_type,
+        used_memory: BTreeSet::new(),
+        uninterpreted: false,
+        is_move_fun: true,
+        is_native,
+        body,
+        callees: BTreeSet::new(),
+        is_recursive: RefCell::new(None),
+        insts_using_generic_type_reflection: Default::default(),
+    };
+    env.add_spec_function_def(module_id, decl)
+}
+
 // -------------------------------------------------------------------------------------------
 // Expressions Conversion
 
 /// The expression converter takes a Move expression and converts it to a
 /// specification expression. It expects the expression to be checked to be pure.
 struct SpecConverter<'a> {
-    env: &'a GlobalEnv,
+    env: &'a mut GlobalEnv,
     /// Whether we are in a specification expression. Conversion applies only if.
     in_spec: bool,
     /// The mapping from Move function to spec function ids.
@@ -277,11 +375,13 @@ struct SpecConverter<'a> {
     /// reasons nodes which fetch temporaries should not be stripped as the reference
     /// info is needed for correct treatment of the `old(..)` expression.
     reference_strip_exempted: BTreeSet<NodeId>,
+    /// Set true if the expression contains imperative expressions that currently cannot be translated into a spec function
+    contains_imperative_expression: bool,
 }
 
 impl<'a> SpecConverter<'a> {
     fn new(
-        env: &'a GlobalEnv,
+        env: &'a mut GlobalEnv,
         function_mapping: &'a BTreeMap<QualifiedId<FunId>, QualifiedId<SpecFunId>>,
         in_spec: bool,
     ) -> Self {
@@ -291,6 +391,22 @@ impl<'a> SpecConverter<'a> {
             function_mapping,
             symbolized_parameters: vec![],
             reference_strip_exempted: Default::default(),
+            contains_imperative_expression: false,
+        }
+    }
+
+    fn new_for_inline(
+        env: &'a mut GlobalEnv,
+        function_mapping: &'a BTreeMap<QualifiedId<FunId>, QualifiedId<SpecFunId>>,
+        in_spec: bool,
+    ) -> Self {
+        Self {
+            env,
+            in_spec,
+            function_mapping,
+            symbolized_parameters: vec![],
+            reference_strip_exempted: Default::default(),
+            contains_imperative_expression: false,
         }
     }
 
@@ -409,11 +525,57 @@ impl<'a> ExpRewriterFunctions for SpecConverter<'a> {
                         if reduced_exps.len() == 1 {
                             reduced_exps.pop().unwrap()
                         } else {
+                            self.contains_imperative_expression = true;
                             Sequence(*id, reduced_exps).into_exp()
                         }
                     } else {
+                        if reduced_exps.len() != 1 {
+                            self.contains_imperative_expression = true;
+                        }
                         exp.clone()
                     }
+                },
+                Invoke(id, call, args) => {
+                    if let ExpData::Call(_, Closure(mid, fid, mask), captured) = call.as_ref() {
+                        let spec_fun_id = self
+                            .function_mapping
+                            .get(&mid.qualified(*fid))
+                            .unwrap_or_else(|| {
+                                panic!(
+                                    "associated spec fun for {}",
+                                    self.env.get_function(mid.qualified(*fid)).get_name_str()
+                                )
+                            });
+                        let spec_fun_decl: &SpecFunDecl = self.env.get_spec_fun(*spec_fun_id);
+                        let mut new_args = vec![];
+                        let mut captured_num = 0;
+                        let mut free_num = 0;
+                        for i in 0..spec_fun_decl.params.len() {
+                            if mask.is_captured(i) {
+                                new_args.push(captured[captured_num].clone());
+                                captured_num += 1;
+                            } else {
+                                new_args.push(args[free_num].clone());
+                                free_num += 1;
+                            }
+                        }
+
+                        return Call(
+                            *id,
+                            SpecFunction(spec_fun_id.module_id, spec_fun_id.id, None),
+                            new_args.clone(),
+                        )
+                        .into_exp();
+                    }
+                    exp.clone()
+                },
+                ExpData::Return(..)
+                | ExpData::Loop(..)
+                | ExpData::Assign(..)
+                | ExpData::Mutate(..)
+                | ExpData::LoopCont(..) => {
+                    self.contains_imperative_expression = true;
+                    exp.clone()
                 },
                 _ => exp.clone(),
             }

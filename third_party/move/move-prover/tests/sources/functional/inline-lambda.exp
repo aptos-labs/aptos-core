@@ -1,37 +1,62 @@
 Move prover returns: exiting with verification errors
 error: unknown assertion failed
-  ┌─ tests/sources/functional/inline-lambda.move:5:13
+  ┌─ tests/sources/functional/inline-lambda.move:7:13
   │
-5 │             assert predicate(v);
+7 │             assert predicate(v);
   │             ^^^^^^^^^^^^^^^^^^^^
   │
-  =     at tests/sources/functional/inline-lambda.move:10: test_apply
+  =     at tests/sources/functional/inline-lambda.move:12: test_apply
   =         a1 = <redacted>
   =         a2 = <redacted>
-  =     at tests/sources/functional/inline-lambda.move:4: apply
-  =     at tests/sources/functional/inline-lambda.move:5: apply
-  =     at tests/sources/functional/inline-lambda.move:11: test_apply
-  =         r1 = <redacted>
+  =     at tests/sources/functional/inline-lambda.move:6
+  =     at tests/sources/functional/inline-lambda.move:7
   =     at tests/sources/functional/inline-lambda.move:13: test_apply
-  =     at tests/sources/functional/inline-lambda.move:4: apply
-  =     at tests/sources/functional/inline-lambda.move:5: apply
+  =         r1 = <redacted>
+  =     at tests/sources/functional/inline-lambda.move:15: test_apply
+  =     at tests/sources/functional/inline-lambda.move:6
+  =     at tests/sources/functional/inline-lambda.move:7
 
 error: unknown assertion failed
-   ┌─ tests/sources/functional/inline-lambda.move:18:13
+   ┌─ tests/sources/functional/inline-lambda.move:20:13
    │
-18 │             assert !r2;
+20 │             assert !r2;
    │             ^^^^^^^^^^^
    │
-   =     at tests/sources/functional/inline-lambda.move:10: test_apply
+   =     at tests/sources/functional/inline-lambda.move:12: test_apply
    =         a1 = <redacted>
    =         a2 = <redacted>
-   =     at tests/sources/functional/inline-lambda.move:4: apply
-   =     at tests/sources/functional/inline-lambda.move:5: apply
-   =     at tests/sources/functional/inline-lambda.move:11: test_apply
-   =         r1 = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:6
+   =     at tests/sources/functional/inline-lambda.move:7
    =     at tests/sources/functional/inline-lambda.move:13: test_apply
-   =     at tests/sources/functional/inline-lambda.move:4: apply
-   =     at tests/sources/functional/inline-lambda.move:5: apply
-   =     at tests/sources/functional/inline-lambda.move:16: test_apply
-   =         r2 = <redacted>
+   =         r1 = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:15: test_apply
+   =     at tests/sources/functional/inline-lambda.move:6
+   =     at tests/sources/functional/inline-lambda.move:7
    =     at tests/sources/functional/inline-lambda.move:18: test_apply
+   =         r2 = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:20: test_apply
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/inline-lambda.move:32:13
+   │
+32 │             assert w == e(x); // e is translated into an uninterpreted spec fun
+   │             ^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/inline-lambda.move:37: call_inline
+   =         y = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:38: call_inline
+   =         z = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:24
+   =         x = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:39: call_inline
+   =         y = <redacted>
+   =         z' = <redacted>
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:39: call_inline
+   =     enter loop
+   =     at tests/sources/functional/inline-lambda.move:39: call_inline
+   =         w = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:29
+   =     at tests/sources/functional/inline-lambda.move:30
+   =     at tests/sources/functional/inline-lambda.move:31
+   =     at tests/sources/functional/inline-lambda.move:32

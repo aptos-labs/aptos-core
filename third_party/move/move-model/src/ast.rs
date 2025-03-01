@@ -806,6 +806,11 @@ impl ExpData {
         )
     }
 
+    pub fn is_temporary(&self) -> bool {
+        use ExpData::*;
+        matches!(self, Temporary(..))
+    }
+
     /// Checks for different ways how an unit (void) value is represented. This
     /// can be an empty tuple or an empty sequence.
     pub fn is_unit_exp(&self) -> bool {

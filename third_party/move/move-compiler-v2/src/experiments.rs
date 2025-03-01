@@ -202,6 +202,13 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(true),
         },
         Experiment {
+            name: Experiment::LIFT_INLINE_FUNS.to_string(),
+            description: "Whether to keep functions after inlining \
+            or remove them from the model"
+                .to_string(),
+            default: Given(false),
+        },
+        Experiment {
             name: Experiment::AST_SIMPLIFY.to_string(),
             description: "Whether to run the ast simplifier".to_string(),
             default: Inherited(Experiment::OPTIMIZE.to_string()),
@@ -293,6 +300,7 @@ impl Experiment {
     pub const KEEP_UNINIT_ANNOTATIONS: &'static str = "keep-uninit-annotations";
     pub const LAMBDA_LIFTING: &'static str = "lambda-lifting";
     pub const LAMBDA_LIFTING_INLINE: &'static str = "lambda-lifting-inline";
+    pub const LIFT_INLINE_FUNS: &'static str = "lift-inline-funs";
     pub const LINT_CHECKS: &'static str = "lint-checks";
     pub const MESSAGE_FORMAT_JSON: &'static str = "compiler-message-format-json";
     pub const OPTIMIZE: &'static str = "optimize";

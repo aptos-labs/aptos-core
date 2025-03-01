@@ -178,6 +178,27 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::EndStage,
             dump_bytecode_filter: None,
         },
+        // Tests for lambda lifting and lambdas, with function values enabled
+        TestConfig {
+            name: "lambda-spec",
+            runner: |p| run_test(p, get_config_by_name("lambda-spec")),
+            include: vec!["/lambda-spec/"],
+            exclude: vec![],
+            exp_suffix: Some("lambda.exp"),
+            options: opts
+                .clone()
+                // .set_experiment(Experiment::AST_SIMPLIFY, true)
+                .set_experiment(Experiment::FUNCTION_VALUES, true)
+                .set_experiment(Experiment::LAMBDA_LIFTING, true)
+                .set_experiment(Experiment::KEEP_INLINE_FUNS, false)
+                .set_experiment(Experiment::SPEC_REWRITE, true)
+                .set_experiment(Experiment::LIFT_INLINE_FUNS, true)
+                .set_language_version(LanguageVersion::V2_LAMBDA),
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::EndStage,
+            dump_bytecode: DumpLevel::EndStage,
+            dump_bytecode_filter: None,
+        },
         // Tests for simplifier in full mode, with code elimination
         TestConfig {
             name: "simplifier-full",

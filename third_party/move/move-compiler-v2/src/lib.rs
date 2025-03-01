@@ -171,6 +171,10 @@ pub fn run_move_compiler_for_analysis(
     options.whole_program = true; // will set `treat_everything_as_target`
     options = options.set_experiment(Experiment::SPEC_REWRITE, true);
     options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
+    options = options.set_experiment(Experiment::FUNCTION_VALUES, true);
+    options = options.set_experiment(Experiment::LAMBDA_LIFTING, true);
+    options = options.set_experiment(Experiment::KEEP_INLINE_FUNS, false);
+    options = options.set_experiment(Experiment::LIFT_INLINE_FUNS, true);
     let mut emitter = options.error_emitter(error_writer);
     let (env, _units) = run_move_compiler(emitter.as_mut(), options)?;
     // Reset for subsequent analysis
@@ -350,8 +354,11 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
 
     if options.experiment_on(Experiment::INLINING) {
         let keep_inline_funs = options.experiment_on(Experiment::KEEP_INLINE_FUNS);
+        let lift_inline_funs = options.experiment_on(Experiment::LIFT_INLINE_FUNS);
         env_pipeline.add("inlining", {
-            move |env| inliner::run_inlining(env, inlining_scope, keep_inline_funs)
+            move |env| {
+                inliner::run_inlining(env, inlining_scope, keep_inline_funs, lift_inline_funs)
+            }
         });
     }
 

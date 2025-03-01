@@ -44,9 +44,9 @@ use itertools::Itertools;
 use move_binary_format::file_format::Visibility;
 use move_core_types::function::ClosureMask;
 use move_model::{
-    ast::{Exp, ExpData, LambdaCaptureKind, Operation, Pattern, TempIndex},
+    ast::{Exp, ExpData, LambdaCaptureKind, Operation, Pattern, Spec, TempIndex},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
-    model::{FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, TypeParameter},
+    model::{FunId, FunctionData, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, TypeParameter},
     symbol::Symbol,
     ty::{ReferenceKind, Type},
 };
@@ -102,6 +102,7 @@ pub fn lift_lambdas(options: LambdaLiftingOptions, env: &mut GlobalEnv) {
                 free_params: BTreeMap::default(),
                 free_locals: BTreeMap::default(),
                 exempted_lambdas: BTreeSet::default(),
+                name_suffix: None,
             };
             let new_def = lifter.rewrite_exp(def.clone());
             if def != &new_def {
@@ -121,6 +122,7 @@ pub fn lift_lambdas(options: LambdaLiftingOptions, env: &mut GlobalEnv) {
             params,
             result_type,
             def,
+            spec,
         } in new_funs
         {
             env.add_function_def(
@@ -133,6 +135,7 @@ pub fn lift_lambdas(options: LambdaLiftingOptions, env: &mut GlobalEnv) {
                 params,
                 result_type,
                 def,
+                spec,
             )
         }
     }
@@ -143,25 +146,27 @@ pub fn lift_lambdas(options: LambdaLiftingOptions, env: &mut GlobalEnv) {
 /// traversal of an expression, on ascent all the used but
 /// so far unbound parameters and locals are found here.
 /// These are the ones which need to be captured in a closure.
-struct LambdaLifter<'a> {
+pub struct LambdaLifter<'a> {
     /// The options for lambda lifting.
-    options: &'a LambdaLiftingOptions,
+    pub options: &'a LambdaLiftingOptions,
     /// Function being processed.
-    fun_env: &'a FunctionEnv<'a>,
+    pub fun_env: &'a FunctionEnv<'a>,
     /// The generated closure functions.
-    lifted: Vec<ClosureFunction>,
+    pub lifted: Vec<ClosureFunction>,
     /// Local name scopes.
-    scopes: Vec<BTreeSet<Symbol>>,
+    pub scopes: Vec<BTreeSet<Symbol>>,
     /// Any unbound parameters names used so far.
-    free_params: BTreeMap<TempIndex, VarInfo>,
+    pub free_params: BTreeMap<TempIndex, VarInfo>,
     /// Any unbound locals used so far.
-    free_locals: BTreeMap<Symbol, VarInfo>,
+    pub free_locals: BTreeMap<Symbol, VarInfo>,
     /// NodeId's of lambdas which are parameters to inline functions
     /// and should be exempted from lifting. Pushed down during descend.
-    exempted_lambdas: BTreeSet<NodeId>,
+    pub exempted_lambdas: BTreeSet<NodeId>,
+    /// Optional suffix to attach in the function name
+    pub name_suffix: Option<String>,
 }
 
-struct VarInfo {
+pub struct VarInfo {
     /// The node were this variable was found.
     node_id: NodeId,
     /// Whether the variable is modified
@@ -169,13 +174,34 @@ struct VarInfo {
 }
 
 /// A new function to be created in the global env.
-struct ClosureFunction {
+pub struct ClosureFunction {
     loc: Loc,
     fun_id: FunId,
     type_params: Vec<TypeParameter>,
     params: Vec<Parameter>,
     result_type: Type,
     def: Exp,
+    spec: Option<Spec>,
+}
+
+impl ClosureFunction {
+    pub fn generate_function_data(&self, env: &GlobalEnv) -> FunctionData {
+        env.construct_function_data(
+            self.fun_id.symbol(),
+            self.loc.clone(),
+            Visibility::Private,
+            false,
+            self.type_params.clone(),
+            self.params.clone(),
+            self.result_type.clone(),
+            self.def.clone(),
+            self.spec.clone(),
+        )
+    }
+
+    pub fn get_fun_id(&self) -> FunId {
+        self.fun_id
+    }
 }
 
 impl<'a> LambdaLifter<'a> {
@@ -190,9 +216,10 @@ impl<'a> LambdaLifter<'a> {
     fn gen_closure_function_name(&mut self) -> Symbol {
         let env = self.fun_env.module_env.env;
         env.symbol_pool().make(&format!(
-            "{}{}__{}",
+            "{}{}{}__{}",
             LIFTED_FUN_MARKER,
             self.lifted.len() + 1,
+            self.name_suffix.clone().unwrap_or("".to_string()),
             self.fun_env.get_name().display(env.symbol_pool()),
         ))
     }
@@ -493,6 +520,7 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         pat: &Pattern,
         body: &Exp,
         capture_kind: LambdaCaptureKind,
+        spec_opt: &Option<Exp>,
     ) -> Option<Exp> {
         if self.exempted_lambdas.contains(&id) {
             return None;
@@ -578,11 +606,32 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
             if let RewriteTarget::Temporary(temp) = target {
                 let new_temp = param_index_mapping.get(&temp).cloned().unwrap_or(temp);
                 return Some(ExpData::Temporary(id, new_temp).into_exp());
+            } else if let RewriteTarget::LocalVar(sym) = target {
+                for (i, par) in params.iter().enumerate() {
+                    if sym == par.0 {
+                        return Some(ExpData::Temporary(id, i).into_exp());
+                    }
+                }
             }
             None
         };
         let body = ExpRewriter::new(env, &mut replacer).rewrite_exp(body.clone());
         let fun_id = FunId::new(fun_name);
+        let spec = if let Some(spec_exp) = spec_opt {
+            if let ExpData::SpecBlock(_, _) = spec_exp.as_ref() {
+                let new_spec_exp =
+                    ExpRewriter::new(env, &mut replacer).rewrite_exp(spec_exp.clone());
+                if let ExpData::SpecBlock(_, new_spec) = new_spec_exp.as_ref() {
+                    Some(new_spec.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
         self.lifted.push(ClosureFunction {
             loc: lambda_loc.clone(),
             fun_id,
@@ -590,6 +639,7 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
             params,
             result_type: result_type.clone(),
             def: self.bind(bindings, body),
+            spec,
         });
 
         // Create and return closure expression. The type instantiation
