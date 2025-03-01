@@ -198,11 +198,7 @@ impl AptosModuleCacheManager {
         // To avoid cold starts, fetch the framework code. This ensures the state with 0 modules
         // cached is not possible for block execution (as long as the config enables the framework
         // prefetch).
-        let environment = guard.environment();
-        if environment.features().is_loader_v2_enabled()
-            && guard.module_cache().num_modules() == 0
-            && config.prefetch_framework_code
-        {
+        if guard.module_cache().num_modules() == 0 && config.prefetch_framework_code {
             prefetch_aptos_framework(state_view, &mut guard).map_err(|err| {
                 alert_or_println!("Failed to load Aptos framework to module cache: {:?}", err);
                 VMError::from(err).into_vm_status()
