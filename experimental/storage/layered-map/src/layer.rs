@@ -6,6 +6,7 @@ use crate::{
     flatten_perfect_tree::{FlattenPerfectTree, FptRef},
     map::{DefaultHashBuilder, LayeredMap},
     metrics::LAYER,
+    node::NodeRef,
 };
 use aptos_crypto::HashValue;
 use aptos_drop_helper::ArcAsyncDrop;
@@ -15,7 +16,7 @@ use std::{marker::PhantomData, sync::Arc};
 
 #[derive(Debug)]
 struct LayerInner<K: ArcAsyncDrop, V: ArcAsyncDrop> {
-    peak: FlattenPerfectTree<K, V>,
+    peak: FlattenPerfectTree<NodeRef<K, V>>,
     children: Mutex<Vec<Arc<LayerInner<K, V>>>>,
     use_case: &'static str,
     family: HashValue,
@@ -49,7 +50,7 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> LayerInner<K, V> {
     fn new_family(use_case: &'static str) -> Arc<Self> {
         let family = HashValue::random();
         Arc::new(Self {
-            peak: FlattenPerfectTree::new_with_empty_nodes(1),
+            peak: FlattenPerfectTree::new_with(1, || NodeRef::Empty),
             children: Mutex::new(Vec::new()),
             use_case,
             family,
@@ -58,7 +59,11 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> LayerInner<K, V> {
         })
     }
 
-    fn spawn(self: &Arc<Self>, child_peak: FlattenPerfectTree<K, V>, base_layer: u64) -> Arc<Self> {
+    fn spawn(
+        self: &Arc<Self>,
+        child_peak: FlattenPerfectTree<NodeRef<K, V>>,
+        base_layer: u64,
+    ) -> Arc<Self> {
         let child = Arc::new(Self {
             peak: child_peak,
             children: Mutex::new(Vec::new()),
@@ -147,11 +152,15 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
         self.inner.use_case
     }
 
-    pub(crate) fn spawn(&self, child_peak: FlattenPerfectTree<K, V>, base_layer: u64) -> Self {
+    pub(crate) fn spawn(
+        &self,
+        child_peak: FlattenPerfectTree<NodeRef<K, V>>,
+        base_layer: u64,
+    ) -> Self {
         Self::new(self.inner.spawn(child_peak, base_layer))
     }
 
-    pub(crate) fn peak(&self) -> FptRef<K, V> {
+    pub(crate) fn peak(&self) -> FptRef<NodeRef<K, V>> {
         self.inner.peak.get_ref()
     }
 }
