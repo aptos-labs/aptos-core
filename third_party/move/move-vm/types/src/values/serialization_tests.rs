@@ -8,7 +8,10 @@ mod tests {
     use crate::{
         delayed_values::delayed_field_id::DelayedFieldID,
         value_serde::{MockFunctionValueExtension, ValueSerDeContext},
-        values::{values_impl, AbstractFunction, SerializedFunctionData, Struct, Value},
+        values::{
+            values_impl, AbstractFunction, SerializedFunctionData, SerializedFunctionKind, Struct,
+            Value,
+        },
     };
     use better_any::{Tid, TidAble, TidExt};
     use claims::{assert_err, assert_ok, assert_some};
@@ -346,6 +349,7 @@ mod tests {
 
     impl MockAbstractFunction {
         fn new(
+            kind: SerializedFunctionKind,
             fun_name: &str,
             ty_args: Vec<TypeTag>,
             mask: ClosureMask,
@@ -353,6 +357,7 @@ mod tests {
         ) -> MockAbstractFunction {
             Self {
                 data: SerializedFunctionData {
+                    kind,
                     module_id: ModuleId::new(AccountAddress::TWO, Identifier::new("m").unwrap()),
                     fun_id: Identifier::new(fun_name).unwrap(),
                     ty_args,
@@ -426,20 +431,41 @@ mod tests {
         let ty_args = make_type_args();
         let good_seeds = vec![
             (
-                MockAbstractFunction::new("f", ty_args, ClosureMask::new(0b101), vec![
-                    MoveTypeLayout::Bool,
-                    MoveTypeLayout::U64,
-                ]),
+                MockAbstractFunction::new(
+                    SerializedFunctionKind::CreatedByMove,
+                    "f",
+                    ty_args,
+                    ClosureMask::new(0b101),
+                    vec![MoveTypeLayout::Bool, MoveTypeLayout::U64],
+                ),
                 vec![Value::bool(true), Value::u64(22)],
             ),
             (
-                MockAbstractFunction::new("f", vec![TypeTag::Bool], ClosureMask::new(0b1), vec![
-                    MoveTypeLayout::U64,
-                ]),
+                MockAbstractFunction::new(
+                    SerializedFunctionKind::CreatedByName(FunctionTag {
+                        args: vec![TypeTag::U64, TypeTag::Bool],
+                        results: vec![TypeTag::U64],
+                        abilities: AbilitySet::ALL,
+                    }),
+                    "f",
+                    vec![TypeTag::Bool],
+                    ClosureMask::new(0b1),
+                    vec![MoveTypeLayout::U64],
+                ),
                 vec![Value::u64(22)],
             ),
             (
-                MockAbstractFunction::new("f", vec![TypeTag::U16], ClosureMask::new(0b0), vec![]),
+                MockAbstractFunction::new(
+                    SerializedFunctionKind::CreatedByName(FunctionTag {
+                        args: vec![],
+                        results: vec![],
+                        abilities: AbilitySet::EMPTY,
+                    }),
+                    "f",
+                    vec![TypeTag::U16],
+                    ClosureMask::new(0b0),
+                    vec![],
+                ),
                 vec![],
             ),
         ];
@@ -455,10 +481,13 @@ mod tests {
     #[test]
     fn closure_round_trip_vm_value_bad_size() {
         let (_, de_value) = round_trip_vm_closure_value(
-            MockAbstractFunction::new("f", vec![], ClosureMask::new(0b1), vec![
-                MoveTypeLayout::Bool,
-                MoveTypeLayout::U64,
-            ]),
+            MockAbstractFunction::new(
+                SerializedFunctionKind::CreatedByMove,
+                "f",
+                vec![],
+                ClosureMask::new(0b1),
+                vec![MoveTypeLayout::Bool, MoveTypeLayout::U64],
+            ),
             vec![Value::bool(false), Value::u64(22)],
         );
         de_value
@@ -472,9 +501,13 @@ mod tests {
             .expect_err("bad size value deserialization fails");
 
         let (_, de_value) = round_trip_vm_closure_value(
-            MockAbstractFunction::new("f", vec![], ClosureMask::new(0b11), vec![
-                MoveTypeLayout::Bool,
-            ]),
+            MockAbstractFunction::new(
+                SerializedFunctionKind::CreatedByMove,
+                "f",
+                vec![],
+                ClosureMask::new(0b11),
+                vec![MoveTypeLayout::Bool],
+            ),
             vec![Value::bool(false)],
         );
         de_value
@@ -488,9 +521,13 @@ mod tests {
             .expect_err("bad size value deserialization fails");
 
         let (_, de_value) = round_trip_vm_closure_value(
-            MockAbstractFunction::new("f", vec![], ClosureMask::new(0b1), vec![
-                MoveTypeLayout::Bool,
-            ]),
+            MockAbstractFunction::new(
+                SerializedFunctionKind::CreatedByMove,
+                "f",
+                vec![],
+                ClosureMask::new(0b1),
+                vec![MoveTypeLayout::Bool],
+            ),
             vec![],
         );
         de_value
