@@ -216,32 +216,31 @@ module aptos_framework::transaction_fee {
         coin::destroy_zero(coin)
     }
 
-    /// Mints a specified amount of AptosCoin to a recipient's address.
-    /// 
-    /// @param core_resource The signer representing the core resource account.
-    /// @param recipient The address of the recipient to mint coins to.
-    /// @param amount The amount of AptosCoin to mint.
-    public fun mint_to(aptos_framework: &signer, recipient: address, amount: u64) acquires AptosCoinMintCapability {
-        system_addresses::assert_aptos_framework(aptos_framework);
-        coin::deposit(recipient, coin::mint(
-            amount,
-            &borrow_global<AptosCoinMintCapability>(@aptos_framework).mint_cap
-        ));
-    }
-
     /// Burns a specified amount of AptosCoin from an address.
     /// 
     /// @param core_resource The signer representing the core resource account.
-    /// @param from The address from which to burn AptosCoin.
-    /// @param amount The amount of AptosCoin to burn.
+    /// @param account The address from which to burn AptosCoin.
+    /// @param fee The amount of AptosCoin to burn.
     /// @abort If the burn capability is not available.
-    public fun burn_from(aptos_framework: &signer, from: address, amount: u64) acquires AptosCoinBurnCapability {
+    public fun burn_from(aptos_framework: &signer, account: address, fee: u64) acquires AptosFABurnCapabilities, AptosCoinCapabilities {
         system_addresses::assert_aptos_framework(aptos_framework);
-        coin::burn_from(
-            from,
-            amount,
-            &borrow_global<AptosCoinBurnCapability>(@aptos_framework).burn_cap,
-        );
+        if (exists<AptosFABurnCapabilities>(@aptos_framework)) {
+            let burn_ref = &borrow_global<AptosFABurnCapabilities>(@aptos_framework).burn_ref;
+            aptos_account::burn_from_fungible_store(burn_ref, account, fee);
+        } else {
+            let burn_cap = &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap;
+            if (features::operations_default_to_fa_apt_store_enabled()) {
+                let (burn_ref, burn_receipt) = coin::get_paired_burn_ref(burn_cap);
+                aptos_account::burn_from_fungible_store(&burn_ref, account, fee);
+                coin::return_paired_burn_ref(burn_ref, burn_receipt);
+            } else {
+                coin::burn_from<AptosCoin>(
+                    account,
+                    fee,
+                    burn_cap,
+                );
+            };
+        };
     }
 
     /// Burn transaction fees in epilogue.
