@@ -3,7 +3,7 @@
 
 use crate::{
     account_address::AccountAddress,
-    contract_event::{ContractEventV1, ContractEventV2, EventWithVersion},
+    contract_event::{ContractEvent, ContractEventV1, ContractEventV2, EventWithVersion},
     event::EventKey,
     state_store::{
         state_key::{prefix::StateKeyPrefix, StateKey},
@@ -13,6 +13,7 @@ use crate::{
     transaction::{AccountTransactionsWithProof, Version},
 };
 use anyhow::Result;
+use move_core_types::language_storage::TypeTag;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum Order {
@@ -42,6 +43,14 @@ pub trait IndexerReader: Send + Sync {
         limit: u64,
         ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>>;
+
+    fn get_events_by_type(
+        &self,
+        type_tag: &TypeTag,
+        start_version: Version,
+        max_versions_to_include: usize,
+        ledger_version: Version,
+    ) -> Result<Vec<(Version, Vec<ContractEvent>)>>;
 
     fn get_account_transactions(
         &self,

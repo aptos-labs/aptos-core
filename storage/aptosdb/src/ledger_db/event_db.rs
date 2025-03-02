@@ -16,7 +16,8 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_db_indexer_schemas::schema::{
-    event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
+    event_by_key::EventByKeySchema, event_by_type::EventByTypeSchema,
+    event_by_version::EventByVersionSchema,
 };
 use aptos_schemadb::{
     batch::{SchemaBatch, WriteBatch},
@@ -204,7 +205,12 @@ impl EventDb {
             ret.push(events.len());
 
             if let Some(ref mut batch) = indices_batch {
-                for event in events {
+                for (idx, event) in events.into_iter().enumerate() {
+                    batch.delete::<EventByTypeSchema>(&(
+                        event.type_tag().clone(),
+                        current_version,
+                        idx as u16,
+                    ))?;
                     if let ContractEvent::V1(v1) = event {
                         batch.delete::<EventByKeySchema>(&(*v1.key(), v1.sequence_number()))?;
                         batch.delete::<EventByVersionSchema>(&(

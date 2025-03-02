@@ -9,8 +9,8 @@ use aptos_config::config::internal_indexer_db_config::InternalIndexerDBConfig;
 use aptos_db_indexer_schemas::{
     metadata::{MetadataKey, MetadataValue, StateSnapshotProgress},
     schema::{
-        event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
-        event_sequence_number::EventSequenceNumberSchema,
+        event_by_key::EventByKeySchema, event_by_type::EventByTypeSchema,
+        event_by_version::EventByVersionSchema, event_sequence_number::EventSequenceNumberSchema,
         indexer_metadata::InternalIndexerMetadataSchema, state_keys::StateKeysSchema,
         transaction_by_account::TransactionByAccountSchema,
         translated_v1_event::TranslatedV1EventSchema,
@@ -21,7 +21,7 @@ use aptos_db_indexer_schemas::{
     },
 };
 use aptos_logger::warn;
-use aptos_schemadb::{batch::SchemaBatch, DB};
+use aptos_schemadb::{batch::SchemaBatch, ReadOptions, DB};
 use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail, AptosDbError, DbReader, Result,
 };
@@ -38,6 +38,8 @@ use aptos_types::{
     transaction::{AccountTransactionsWithProof, Transaction, Version},
     write_set::{TransactionWrite, WriteSet},
 };
+use itertools::Itertools;
+use move_core_types::language_storage::TypeTag;
 use std::{
     cmp::min,
     collections::HashSet,
@@ -243,6 +245,55 @@ impl InternalIndexerDB {
         Ok(result)
     }
 
+    pub fn get_event_indices_by_type(
+        &self,
+        type_tag: &TypeTag,
+        start_version: Version,
+        max_versions_to_include: usize,
+        ledger_version: Version,
+    ) -> Result<Vec<(Version, Vec<u16>)>> {
+        let mut read_opts = ReadOptions::default();
+        read_opts.set_prefix_same_as_start(true);
+        let mut iter = self.db.iter_with_opts::<EventByTypeSchema>(read_opts)?;
+        iter.seek(&(type_tag.clone(), start_version, 0))?;
+
+        let mut result = vec![];
+        let mut current_version = None;
+        let mut current_events = vec![];
+        let mut total = 0;
+        for item in iter {
+            if result.len() == max_versions_to_include {
+                break;
+            }
+            let (_, version, index) = item?.0;
+            if version > ledger_version {
+                break;
+            }
+            if Some(version) != current_version {
+                if !current_events.is_empty() {
+                    total += current_events.len();
+                    if total as u64 >= MAX_REQUEST_LIMIT {
+                        // NOTE: we keep the whole version here, so the actual # of events could be
+                        // slightly larger than MAX_REQUEST_LIMIT, which is acceptable.
+                        break;
+                    }
+                    result.push((current_version.unwrap(), current_events));
+                    current_events = vec![];
+                }
+                current_version = Some(version);
+            }
+            if Some(version) == current_version {
+                current_events.push(index);
+            }
+        }
+
+        if !current_events.is_empty() {
+            result.push((current_version.unwrap(), current_events));
+        }
+
+        Ok(result)
+    }
+
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn get_restore_version_and_progress(
         &self,
@@ -428,6 +479,12 @@ impl DBIndexer {
 
             if self.indexer_db.event_enabled() {
                 events.iter().enumerate().try_for_each(|(idx, event)| {
+                    batch
+                        .put::<EventByTypeSchema>(
+                            &(event.type_tag().clone(), version, idx as u16),
+                            &(),
+                        )
+                        .expect("Failed to put events by type to a batch");
                     if let ContractEvent::V1(v1) = event {
                         batch
                             .put::<EventByKeySchema>(
@@ -720,5 +777,37 @@ impl DBIndexer {
         }
 
         Ok(events_with_version)
+    }
+
+    pub fn get_events_by_type(
+        &self,
+        type_tag: &TypeTag,
+        start_version: Version,
+        max_versions_to_include: usize,
+        ledger_version: Version,
+    ) -> Result<Vec<(Version, Vec<ContractEvent>)>> {
+        self.indexer_db
+            .ensure_cover_ledger_version(ledger_version)?;
+
+        let event_indices = self.indexer_db.get_event_indices_by_type(
+            type_tag,
+            start_version,
+            max_versions_to_include,
+            ledger_version,
+        )?;
+
+        event_indices
+            .into_iter()
+            .map(|(version, indices)| {
+                indices
+                    .into_iter()
+                    .map(|index| {
+                        self.main_db_reader
+                            .get_event_by_version_and_index(version, index as u64)
+                    })
+                    .try_collect()
+                    .map(|events| (version, events))
+            })
+            .try_collect()
     }
 }
