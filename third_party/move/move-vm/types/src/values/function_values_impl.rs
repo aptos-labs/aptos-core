@@ -7,7 +7,7 @@ use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     function::{ClosureMask, MoveFunctionLayout},
     identifier::Identifier,
-    language_storage::{ModuleId, TypeTag},
+    language_storage::{FunctionTag, ModuleId, TypeTag},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
@@ -43,6 +43,7 @@ pub struct Closure(
 /// The representation of a function in storage.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct SerializedFunctionData {
+    pub kind: SerializedFunctionKind,
     pub module_id: ModuleId,
     pub fun_id: Identifier,
     pub ty_args: Vec<TypeTag>,
@@ -52,6 +53,18 @@ pub struct SerializedFunctionData {
     /// resolution time. It also allows to serialize an unresolved
     /// closure, making unused closure data cheap in round trips.
     pub captured_layouts: Vec<MoveTypeLayout>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub enum SerializedFunctionKind {
+    /// The function data was created by Move code. Because of upgrade persistency, it is
+    /// guaranteed to exist and have unchanged type.
+    CreatedByMove,
+    /// The function was created by name (that is, via programmatic string manipulation),
+    /// and is expected to have the given type. When the function is loaded at runtime,
+    /// it's actual declared type must checked be equal to the expected type. Moreover,
+    /// the function must be public to resolve.
+    CreatedByName(FunctionTag),
 }
 
 impl Closure {
@@ -123,7 +136,8 @@ impl<'c, 'l, 'v> serde::Serialize
         let data = fun_ext
             .get_serialization_data(fun.as_ref())
             .map_err(S::Error::custom)?;
-        let mut seq = serializer.serialize_seq(Some(4 + captured.len() * 2))?;
+        let mut seq = serializer.serialize_seq(Some(5 + captured.len() * 2))?;
+        seq.serialize_element(&data.kind)?;
         seq.serialize_element(&data.module_id)?;
         seq.serialize_element(&data.fun_id)?;
         seq.serialize_element(&data.ty_args)?;
@@ -160,6 +174,7 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for ClosureVisitor<'c, 'l> {
             .ctx
             .required_function_extension()
             .map_err(A::Error::custom)?;
+        let kind = read_required_value::<_, SerializedFunctionKind>(&mut seq)?;
         let module_id = read_required_value::<_, ModuleId>(&mut seq)?;
         let fun_id = read_required_value::<_, Identifier>(&mut seq)?;
         let ty_args = read_required_value::<_, Vec<TypeTag>>(&mut seq)?;
@@ -185,6 +200,7 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for ClosureVisitor<'c, 'l> {
         }
         let fun = fun_ext
             .create_from_serialization_data(SerializedFunctionData {
+                kind,
                 module_id,
                 fun_id,
                 ty_args,

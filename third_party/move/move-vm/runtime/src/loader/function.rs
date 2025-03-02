@@ -9,7 +9,7 @@ use crate::{
     },
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
     storage::ty_tag_converter::TypeTagConverter,
-    LayoutConverter, ModuleStorage, StorageLayoutConverter,
+    ModuleStorage,
 };
 use better_any::{Tid, TidAble, TidExt};
 use move_binary_format::{
@@ -26,7 +26,6 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage,
     language_storage::{ModuleId, TypeTag},
-    value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
@@ -34,7 +33,7 @@ use move_vm_types::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
     },
-    values::{AbstractFunction, SerializedFunctionData},
+    values::{AbstractFunction, SerializedFunctionData, SerializedFunctionKind},
 };
 use std::{cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc, sync::Arc};
 
@@ -171,6 +170,7 @@ impl LazyLoadedFunction {
             LazyLoadedFunctionState::Unresolved {
                 data:
                     SerializedFunctionData {
+                        kind,
                         module_id,
                         fun_id,
                         ty_args,
@@ -178,8 +178,7 @@ impl LazyLoadedFunction {
                         captured_layouts,
                     },
             } => {
-                let fun =
-                    Self::resolve(storage, module_id, fun_id, ty_args, *mask, captured_layouts)?;
+                let fun = Self::resolve(storage, kind, module_id, fun_id, ty_args)?;
                 let result = action(fun.clone());
                 *state = LazyLoadedFunctionState::Resolved {
                     fun,
@@ -195,53 +194,50 @@ impl LazyLoadedFunction {
     /// function as well as whether it has the type used for deserializing the captured values.
     fn resolve(
         module_storage: &dyn ModuleStorage,
+        kind: &SerializedFunctionKind,
         module_id: &ModuleId,
         fun_id: &IdentStr,
         ty_args: &[TypeTag],
-        mask: ClosureMask,
-        captured_layouts: &[MoveTypeLayout],
     ) -> PartialVMResult<Rc<LoadedFunction>> {
         let (module, function) = module_storage
             .fetch_function_definition(module_id.address(), module_id.name(), fun_id)
             .map_err(|err| err.to_partial())?;
+
+        match kind {
+            SerializedFunctionKind::CreatedByName(expected_ty) => {
+                // Verify visibility and type
+                let tag_converter = TypeTagConverter::new(module_storage.runtime_environment());
+                let actual_ty = tag_converter.ty_to_ty_tag(&function.create_function_type())?;
+                match actual_ty {
+                    TypeTag::Function(fun_tag) if &*fun_tag == expected_ty => {
+                        // ok
+                    },
+                    _ => {
+                        return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                            .with_message(format!(
+                                "late bound function `{}` does not have expected type",
+                                function.name_id()
+                            )));
+                    },
+                }
+                if function.is_friend_or_private() {
+                    return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                        .with_message(format!(
+                            "late bound function `{}` is inaccessible since it is not public",
+                            function.name_id()
+                        )));
+                }
+            },
+            SerializedFunctionKind::CreatedByMove => {
+                // Upgrade persistency guarantees that function has expected type
+            },
+        }
         let ty_args = ty_args
             .iter()
             .map(|t| module_storage.fetch_ty(t))
             .collect::<PartialVMResult<Vec<_>>>()?;
         Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)?;
 
-        // Verify that the function argument types match the layouts used for deserialization.
-        // This is only done in paranoid mode. Since integrity of storage
-        // and guarantee of public function, this should not able to fail.
-        if module_storage
-            .runtime_environment()
-            .vm_config()
-            .paranoid_type_checks
-        {
-            // TODO(#15664): Determine whether we need to charge gas here.
-            let captured_arg_types = mask.extract(function.param_tys(), true);
-            let converter = StorageLayoutConverter::new(module_storage);
-            if captured_arg_types.len() != captured_layouts.len() {
-                return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                    .with_message(
-                        "captured argument count does not match declared parameters".to_string(),
-                    ));
-            }
-            for (actual_arg_ty, serialized_layout) in
-                captured_arg_types.into_iter().zip(captured_layouts)
-            {
-                // Note that the below call returns a runtime layout, so we can directly
-                // compare it without desugaring.
-                let actual_arg_layout = converter.type_to_type_layout(actual_arg_ty)?;
-                if !serialized_layout.is_compatible_with(&actual_arg_layout) {
-                    return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                        .with_message(
-                            "stored captured argument layout does not match declared parameters"
-                                .to_string(),
-                        ));
-                }
-            }
-        }
         Ok(Rc::new(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),
             ty_args,
