@@ -216,6 +216,34 @@ module aptos_framework::transaction_fee {
         coin::destroy_zero(coin)
     }
 
+    /// Mints a specified amount of AptosCoin to a recipient's address.
+    /// 
+    /// @param core_resource The signer representing the core resource account.
+    /// @param recipient The address of the recipient to mint coins to.
+    /// @param amount The amount of AptosCoin to mint.
+    public fun mint_to(aptos_framework: &signer, recipient: address, amount: u64) acquires AptosCoinMintCapability {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        coin::deposit(recipient, coin::mint(
+            amount,
+            &borrow_global<AptosCoinMintCapability>(@aptos_framework).mint_cap
+        ));
+    }
+
+    /// Burns a specified amount of AptosCoin from an address.
+    /// 
+    /// @param core_resource The signer representing the core resource account.
+    /// @param from The address from which to burn AptosCoin.
+    /// @param amount The amount of AptosCoin to burn.
+    /// @abort If the burn capability is not available.
+    public fun burn_from(aptos_framework: &signer, from: address, amount: u64) acquires AptosCoinBurnCapability {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        coin::burn_from(
+            from,
+            amount,
+            &borrow_global<AptosCoinBurnCapability>(@aptos_framework).burn_cap,
+        );
+    }
+
     /// Burn transaction fees in epilogue.
     public(friend) fun burn_fee(account: address, fee: u64) acquires AptosFABurnCapabilities, AptosCoinCapabilities {
         if (exists<AptosFABurnCapabilities>(@aptos_framework)) {
