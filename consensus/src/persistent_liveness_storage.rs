@@ -20,6 +20,7 @@ use std::{
     cmp::max,
     collections::{HashMap, HashSet},
     fmt::Debug,
+    ops::Add,
     sync::Arc,
 };
 
@@ -161,7 +162,7 @@ impl LedgerRecoveryData {
 
         let window_start_round = blocks[latest_commit_idx]
             .round()
-            .saturating_add(1)
+            .add(1)
             .saturating_sub(window_size);
         let mut id_to_blocks = HashMap::new();
         blocks.iter().for_each(|block| {
@@ -187,7 +188,7 @@ impl LedgerRecoveryData {
         let window_start_idx = blocks
             .iter()
             .position(|block| block.id() == window_start_id)
-            .ok_or_else(|| format_err!("unable to find root: {}", window_start_id))?;
+            .ok_or_else(|| format_err!("unable to find window root: {}", window_start_id))?;
         let window_start_block = blocks.remove(window_start_idx);
 
         info!(
@@ -387,28 +388,24 @@ impl RecoveryData {
             })?;
 
         // If execution pool is enabled, use the window_root, else use the commit_root
-        let (blocks_to_prune, epoch) = match &root.window_root_block {
+        let (root_id, epoch) = match &root.window_root_block {
             None => {
                 let commit_root_id = root.commit_root_block.id();
                 let epoch = root.commit_root_block.epoch();
-                let blocks_to_prune = Some(Self::find_blocks_to_prune(
-                    commit_root_id,
-                    &mut blocks,
-                    &mut quorum_certs,
-                ));
-                (blocks_to_prune, epoch)
+                (commit_root_id, epoch)
             },
             Some(window_root_block) => {
                 let window_start_id = window_root_block.id();
                 let epoch = window_root_block.epoch();
-                let blocks_to_prune = Some(Self::find_blocks_to_prune(
-                    window_start_id,
-                    &mut blocks,
-                    &mut quorum_certs,
-                ));
-                (blocks_to_prune, epoch)
+                (window_start_id, epoch)
             },
         };
+        let blocks_to_prune = Some(Self::find_blocks_to_prune(
+            root_id,
+            &mut blocks,
+            &mut quorum_certs,
+        ));
+
         Ok(RecoveryData {
             last_vote: match last_vote {
                 Some(v) if v.epoch() == epoch => Some(v),
