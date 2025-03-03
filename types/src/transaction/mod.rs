@@ -68,7 +68,10 @@ pub use block_output::BlockOutput;
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 pub use move_core_types::transaction_argument::TransactionArgument;
-use move_core_types::vm_status::AbortLocation;
+use move_core_types::{
+    value::{MoveStruct, MoveValue},
+    vm_status::AbortLocation,
+};
 pub use multisig::{ExecutionError, Multisig, MultisigTransactionPayload};
 use once_cell::sync::OnceCell;
 pub use script::{
@@ -95,6 +98,62 @@ pub enum Auth<'a> {
         account_identity: Vec<u8>,
         sign_function: Arc<dyn Fn(&[u8]) -> Vec<u8>>,
     },
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum ReplayProtector {
+    Nonce(u64),
+    SequenceNumber(u64),
+}
+
+impl Display for ReplayProtector {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            ReplayProtector::Nonce(nonce) => write!(f, "Nonce({})", nonce),
+            ReplayProtector::SequenceNumber(sequence_number) => {
+                write!(f, "SequenceNumber({})", sequence_number)
+            },
+        }
+    }
+}
+
+impl ReplayProtector {
+    pub fn get_nonce(&self) -> Option<u64> {
+        match self {
+            ReplayProtector::Nonce(nonce) => Some(*nonce),
+            ReplayProtector::SequenceNumber(_) => None,
+        }
+    }
+
+    pub fn to_move_value(&self) -> MoveValue {
+        match self {
+            ReplayProtector::Nonce(nonce) => {
+                MoveValue::Struct(MoveStruct::RuntimeVariant(0, vec![MoveValue::U64(*nonce)]))
+            },
+            ReplayProtector::SequenceNumber(sequence_number) => MoveValue::Struct(
+                MoveStruct::RuntimeVariant(1, vec![MoveValue::U64(*sequence_number)]),
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_replay_protector_order() {
+        let nonce = ReplayProtector::Nonce(1);
+        let sequence_number = ReplayProtector::SequenceNumber(1);
+        assert!(nonce < sequence_number);
+
+        let nonce = ReplayProtector::Nonce(2);
+        let sequence_number = ReplayProtector::SequenceNumber(1);
+        assert!(nonce < sequence_number);
+
+        let sequence_number1 = ReplayProtector::SequenceNumber(3);
+        let sequence_number2 = ReplayProtector::SequenceNumber(4);
+        assert!(sequence_number1 < sequence_number2);
+    }
 }
 
 /// RawTransaction is the portion of a transaction that a client signs.
@@ -154,6 +213,7 @@ impl RawTransaction {
         }
     }
 
+    // TODO: Deprecate this
     /// Create a new `RawTransaction` with a script.
     ///
     /// A script transaction contains only code to execute. No publishing is allowed in scripts.
@@ -177,6 +237,7 @@ impl RawTransaction {
         }
     }
 
+    // TODO: Deprecate this
     /// Create a new `RawTransaction` with an entry function.
     pub fn new_entry_function(
         sender: AccountAddress,
@@ -198,6 +259,7 @@ impl RawTransaction {
         }
     }
 
+    // TODO: Deprecate this
     /// Create a new `RawTransaction` of multisig type.
     pub fn new_multisig(
         sender: AccountAddress,
@@ -216,6 +278,56 @@ impl RawTransaction {
             gas_unit_price,
             expiration_timestamp_secs,
             chain_id,
+        }
+    }
+
+    // TODO: After the new transaction format is fully adopted, make `new_txn` as the default
+    // function to create new RawTransaction, and remove other `new_..` variants.
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_txn(
+        sender: AccountAddress,
+        replay_protector: ReplayProtector,
+        executable: TransactionExecutable,
+        multisig_address: Option<AccountAddress>,
+        max_gas_amount: u64,
+        gas_unit_price: u64,
+        expiration_timestamp_secs: u64,
+        chain_id: ChainId,
+    ) -> Self {
+        match replay_protector {
+            ReplayProtector::SequenceNumber(sequence_number) => RawTransaction {
+                sender,
+                sequence_number,
+                payload: TransactionPayload::Payload(TransactionPayloadInner::V1 {
+                    executable,
+                    extra_config: TransactionExtraConfig::V1 {
+                        multisig_address,
+                        replay_protection_nonce: None,
+                    },
+                }),
+                max_gas_amount,
+                gas_unit_price,
+                expiration_timestamp_secs,
+                chain_id,
+            },
+            ReplayProtector::Nonce(nonce) => {
+                RawTransaction {
+                    sender,
+                    // Question: Is it okay to set sequence_number to u64::MAX for orderless transactions?
+                    sequence_number: u64::MAX,
+                    payload: TransactionPayload::Payload(TransactionPayloadInner::V1 {
+                        executable,
+                        extra_config: TransactionExtraConfig::V1 {
+                            multisig_address,
+                            replay_protection_nonce: Some(nonce),
+                        },
+                    }),
+                    max_gas_amount,
+                    gas_unit_price,
+                    expiration_timestamp_secs,
+                    chain_id,
+                }
+            },
         }
     }
 
@@ -424,6 +536,36 @@ impl RawTransaction {
         self.payload
     }
 
+    pub fn executable(&self) -> TransactionExecutable {
+        // TODO: This function clones the payload. Check if there is a better way.
+        self.payload.executable()
+    }
+
+    pub fn extra_config(&self) -> TransactionExtraConfig {
+        self.payload.extra_config()
+    }
+
+    pub fn replay_protector(&self) -> ReplayProtector {
+        match &self.payload {
+            TransactionPayload::Payload(TransactionPayloadInner::V1 { extra_config, .. }) => {
+                if let TransactionExtraConfig::V1 {
+                    replay_protection_nonce: Some(nonce),
+                    ..
+                } = extra_config
+                {
+                    ReplayProtector::Nonce(*nonce)
+                } else {
+                    ReplayProtector::SequenceNumber(self.sequence_number)
+                }
+            },
+            _ => ReplayProtector::SequenceNumber(self.sequence_number),
+        }
+    }
+
+    pub fn set_gas_unit_price(&mut self, gas_unit_price: u64) {
+        self.gas_unit_price = gas_unit_price;
+    }
+
     /// Return the sender of this transaction.
     pub fn sender(&self) -> AccountAddress {
         self.sender
@@ -529,6 +671,49 @@ pub enum TransactionPayload {
     /// A multisig transaction that allows an owner of a multisig account to execute a pre-approved
     /// transaction as the multisig account.
     Multisig(Multisig),
+    /// A new transaction payload format with support for versioning.
+    /// Contains an executable (script/entry function) along with extra configuration.
+    /// Once this new format is fully rolled out, above payload variants will be deprecated.
+    Payload(TransactionPayloadInner),
+}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum TransactionPayloadInner {
+    V1 {
+        executable: TransactionExecutable,
+        extra_config: TransactionExtraConfig,
+    },
+}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum TransactionExecutable {
+    Script(Script),
+    EntryFunction(EntryFunction),
+    Empty,
+}
+
+impl TransactionExecutable {
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Self::Empty)
+    }
+
+    pub fn is_script(&self) -> bool {
+        matches!(self, Self::Script(_))
+    }
+
+    pub fn is_entry_function(&self) -> bool {
+        matches!(self, Self::EntryFunction(_))
+    }
+}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum TransactionExtraConfig {
+    V1 {
+        multisig_address: Option<AccountAddress>,
+        // None for regular transactions
+        // Some(nonce) for orderless transactions
+        replay_protection_nonce: Option<u64>,
+    },
 }
 
 impl TransactionPayload {
@@ -536,6 +721,98 @@ impl TransactionPayload {
         match self {
             Self::EntryFunction(f) => f,
             payload => panic!("Expected EntryFunction(_) payload, found: {:#?}", payload),
+        }
+    }
+
+    pub fn has_nonce(&self) -> bool {
+        match self {
+            Self::Payload(TransactionPayloadInner::V1 {
+                extra_config:
+                    TransactionExtraConfig::V1 {
+                        replay_protection_nonce,
+                        ..
+                    },
+                ..
+            }) => replay_protection_nonce.is_some(),
+            _ => false,
+        }
+    }
+
+    pub fn executable(&self) -> TransactionExecutable {
+        // TODO: This function clones the payload. Check if there is a better way.
+        match self {
+            TransactionPayload::EntryFunction(entry_function) => {
+                TransactionExecutable::EntryFunction(entry_function.clone())
+            },
+            TransactionPayload::Script(script) => TransactionExecutable::Script(script.clone()),
+            TransactionPayload::Multisig(multisig) => multisig.as_transaction_executable(),
+            TransactionPayload::Payload(TransactionPayloadInner::V1 { executable, .. }) => {
+                executable.clone()
+            },
+            TransactionPayload::ModuleBundle(_) => {
+                unimplemented!("ModuleBundle variant is deprecated")
+            },
+        }
+    }
+
+    pub fn extra_config(&self) -> TransactionExtraConfig {
+        match self {
+            TransactionPayload::Script(_)
+            | TransactionPayload::EntryFunction(_)
+            | TransactionPayload::ModuleBundle(_) => TransactionExtraConfig::V1 {
+                multisig_address: None,
+                replay_protection_nonce: None,
+            },
+            TransactionPayload::Multisig(multisig) => TransactionExtraConfig::V1 {
+                multisig_address: Some(multisig.multisig_address),
+                replay_protection_nonce: None,
+            },
+            TransactionPayload::Payload(TransactionPayloadInner::V1 { extra_config, .. }) => {
+                extra_config.clone()
+            },
+        }
+    }
+
+    pub fn payload_type(&self) -> String {
+        match self {
+            TransactionPayload::Script(_) => "script".to_string(),
+            TransactionPayload::ModuleBundle(_) => "module_bundle".to_string(),
+            TransactionPayload::EntryFunction(entry_function) => format!(
+                "entry {}::{}",
+                entry_function.module(),
+                entry_function.function()
+            ),
+            TransactionPayload::Multisig(_) => "multisig".to_string(),
+            // TODO[Orderless]: Edit this.
+            TransactionPayload::Payload(TransactionPayloadInner::V1 {
+                executable: _,
+                extra_config: _,
+            }) => "payload".to_string(),
+        }
+    }
+}
+
+impl TransactionExtraConfig {
+    pub fn is_multisig(&self) -> bool {
+        matches!(self, Self::V1 {
+            multisig_address: Some(_),
+            replay_protection_nonce: _
+        })
+    }
+
+    pub fn is_orderless(&self) -> bool {
+        matches!(self, Self::V1 {
+            multisig_address: _,
+            replay_protection_nonce: Some(_)
+        })
+    }
+
+    pub fn multisig_address(&self) -> Option<AccountAddress> {
+        match self {
+            Self::V1 {
+                multisig_address,
+                replay_protection_nonce: _,
+            } => *multisig_address,
         }
     }
 }
@@ -788,6 +1065,18 @@ impl SignedTransaction {
         &self.raw_txn.payload
     }
 
+    pub fn executable(&self) -> TransactionExecutable {
+        self.raw_txn.executable()
+    }
+
+    pub fn multisig_address(&self) -> Option<AccountAddress> {
+        self.raw_txn.extra_config().multisig_address()
+    }
+
+    pub fn is_module_bundle(&self) -> bool {
+        matches!(self.raw_txn.payload, TransactionPayload::ModuleBundle(_))
+    }
+
     pub fn max_gas_amount(&self) -> u64 {
         self.raw_txn.max_gas_amount
     }
@@ -845,6 +1134,10 @@ impl SignedTransaction {
         *self
             .committed_hash
             .get_or_init(|| Transaction::UserTransaction(self.clone()).hash())
+    }
+
+    pub fn replay_protector(&self) -> ReplayProtector {
+        self.raw_txn.replay_protector()
     }
 }
 
