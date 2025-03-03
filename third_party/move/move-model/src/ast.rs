@@ -63,6 +63,7 @@ pub struct SpecFunDecl {
     pub is_recursive: RefCell<Option<bool>>,
     /// The instantiations for which this function is known to use generic type reflection.
     pub insts_using_generic_type_reflection: RefCell<BTreeMap<Vec<Type>, bool>>,
+    pub spec: RefCell<Spec>,
 }
 
 // =================================================================================================
@@ -466,6 +467,8 @@ pub enum SpecBlockTarget {
     FunctionCode(ModuleId, FunId, usize),
     /// The block is associated with a specification schema.
     Schema(ModuleId, SchemaId, Vec<TypeParameter>),
+    /// The block is associated with a specification function.
+    SpecFunction(ModuleId, SpecFunId),
     /// The block is inline in an expression.
     Inline,
 }

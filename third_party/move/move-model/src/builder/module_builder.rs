@@ -831,6 +831,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             callees: Default::default(),
             is_recursive: Default::default(),
             insts_using_generic_type_reflection: Default::default(),
+            spec: RefCell::new(Default::default()),
         };
         self.spec_funs.push(fun_decl);
     }

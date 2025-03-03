@@ -2106,6 +2106,7 @@ impl GlobalEnv {
                 .unwrap()
                 .spec
                 .borrow(),
+            SpecFunction(mid, fid) => self.get_spec_fun(mid.qualified(*fid)).spec.borrow(),
             FunctionCode(..) | Schema(_, _, _) | Inline => {
                 // Schemas are expanded, inline spec blocks are part of the AST,
                 // and function code is nested inside of a function spec block
@@ -2132,6 +2133,7 @@ impl GlobalEnv {
                 .unwrap()
                 .spec
                 .borrow_mut(),
+            SpecFunction(mid, fid) => self.get_spec_fun(mid.qualified(*fid)).spec.borrow_mut(),
             FunctionCode(..) | Schema(_, _, _) | Inline => {
                 // Schemas are expanded, inline spec blocks are part of the AST,
                 // and function code is nested inside of a function spec block

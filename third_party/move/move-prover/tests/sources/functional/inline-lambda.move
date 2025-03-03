@@ -36,7 +36,7 @@ module 0x42::Test {
 
     fun call_inline(y: u64) {
         let z = 3 + y;
-        inline_1(y, |x| x > 2, |x| x > z, |x| { while(z < y) {let _x = x;}; x > 5 });
+        inline_1(y, |x| x > 2, |x| x > z, |x| { while(z < y) {let _x = x;}; x > 5 } spec {ensures result == (x > 5);});
     }
 
     inline fun find<Element>(s: &vector<Element>, f: |&Element|bool): (bool, u64) {

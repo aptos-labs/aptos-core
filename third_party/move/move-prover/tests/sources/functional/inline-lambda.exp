@@ -35,28 +35,3 @@ error: unknown assertion failed
    =     at tests/sources/functional/inline-lambda.move:18: test_apply
    =         r2 = <redacted>
    =     at tests/sources/functional/inline-lambda.move:20: test_apply
-
-error: unknown assertion failed
-   ┌─ tests/sources/functional/inline-lambda.move:32:13
-   │
-32 │             assert w == e(x); // e is translated into an uninterpreted spec fun
-   │             ^^^^^^^^^^^^^^^^^
-   │
-   =     at tests/sources/functional/inline-lambda.move:37: call_inline
-   =         y = <redacted>
-   =     at tests/sources/functional/inline-lambda.move:38: call_inline
-   =         z = <redacted>
-   =     at tests/sources/functional/inline-lambda.move:24
-   =         x = <redacted>
-   =     at tests/sources/functional/inline-lambda.move:39: call_inline
-   =         y = <redacted>
-   =         z' = <redacted>
-   =         <redacted> = <redacted>
-   =     at tests/sources/functional/inline-lambda.move:39: call_inline
-   =     enter loop
-   =     at tests/sources/functional/inline-lambda.move:39: call_inline
-   =         w = <redacted>
-   =     at tests/sources/functional/inline-lambda.move:29
-   =     at tests/sources/functional/inline-lambda.move:30
-   =     at tests/sources/functional/inline-lambda.move:31
-   =     at tests/sources/functional/inline-lambda.move:32

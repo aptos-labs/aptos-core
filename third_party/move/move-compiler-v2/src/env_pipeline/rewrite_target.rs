@@ -129,10 +129,15 @@ impl RewriteTargets {
                         &func.get_spec(),
                     );
                 }
-                for (spec_fun_id, _) in module.get_spec_funs() {
+                for (spec_fun_id, fun_spec) in module.get_spec_funs() {
                     targets.push(RewriteTarget::SpecFun(
                         module.get_id().qualified(*spec_fun_id),
                     ));
+                    add_spec(
+                        &mut targets,
+                        SpecBlockTarget::SpecFunction(module.get_id(), *spec_fun_id),
+                        &fun_spec.spec.borrow(),
+                    );
                 }
                 for struct_env in module.get_structs() {
                     add_spec(

@@ -26,7 +26,7 @@ use crate::env_pipeline::rewrite_target::{
 use itertools::Itertools;
 use log::info;
 use move_model::{
-    ast::{ConditionKind, Exp, ExpData, GlobalInvariant, Operation, SpecFunDecl},
+    ast::{ConditionKind, Exp, ExpData, GlobalInvariant, Operation, SpecBlockTarget, SpecFunDecl},
     exp_rewriter::ExpRewriterFunctions,
     model::{
         FunId, FunctionData, FunctionEnv, GlobalEnv, ModuleId, NodeId, Parameter, QualifiedId,
@@ -136,7 +136,15 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
                 }
             },
             (SpecBlock(sb_target), Spec(spec)) => {
-                let mut converter = SpecConverter::new(env, &function_mapping, true);
+                let mut converter = if let SpecBlockTarget::SpecFunction(mid, spec_fun_id) =
+                    sb_target
+                {
+                    let paras =
+                        get_param_names(&env.get_spec_fun(mid.qualified(*spec_fun_id)).params);
+                    SpecConverter::new(env, &function_mapping, true).symbolized_parameters(paras)
+                } else {
+                    SpecConverter::new(env, &function_mapping, true)
+                };
                 let (changed, new_spec) = converter.rewrite_spec_descent(sb_target, &spec);
                 if changed {
                     *targets.state_mut(&target) = Spec(new_spec)
@@ -304,6 +312,7 @@ fn derive_spec_fun(env: &mut GlobalEnv, fun_id: QualifiedId<FunId>) -> Qualified
         callees: BTreeSet::new(),
         is_recursive: RefCell::new(None),
         insts_using_generic_type_reflection: Default::default(),
+        spec: RefCell::new(Default::default()),
     };
     env.add_spec_function_def(fun_id.module_id, decl)
 }
@@ -353,6 +362,7 @@ fn derive_spec_fun_from_data(
         callees: BTreeSet::new(),
         is_recursive: RefCell::new(None),
         insts_using_generic_type_reflection: Default::default(),
+        spec: RefCell::new(fun.get_spec().clone()),
     };
     env.add_spec_function_def(module_id, decl)
 }

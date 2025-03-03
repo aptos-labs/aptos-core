@@ -1462,7 +1462,6 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                     self.function_value_spec_map.get(para_pos),
                     self.function_value_map.get(para_pos),
                 ) {
-                    println!("2spec id:{:?}", spec_fun_id);
                     let spec_fun_decl: &SpecFunDecl = self.env.get_spec_fun(*spec_fun_id);
                     if let ExpData::Call(_, Operation::Closure(_, _, mask), captured) =
                         closure.as_ref()
