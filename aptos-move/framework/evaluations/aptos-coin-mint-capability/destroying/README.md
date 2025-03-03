@@ -1,4 +1,6 @@
 # Destroying the Aptos Coin Mint Capability
+We assert that destroying the Aptos Coin mint capability would not cause failures of necessary operations of chain which has the Governed Gas Pool feature flags enabled.
+
 We begin with a brief section on the [procedure and intended outcomes](#procedure-and-intended-outcomes) of destroying the Aptos Coin mint capability.
 
 We then evaluate the means of [reversing this procedure](#reversing-the-procedure) and the potential [side effects](#side-effects) of doing so.
