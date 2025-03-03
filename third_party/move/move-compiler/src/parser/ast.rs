@@ -716,8 +716,8 @@ pub enum Exp_ {
 
     // { seq }
     Block(Sequence),
-    // | x1 [: t1], ..., xn [: tn] | e
-    Lambda(TypedBindList, Box<Exp>, LambdaCaptureKind),
+    // | x1 [: t1], ..., xn [: tn] | e [ spec ]
+    Lambda(TypedBindList, Box<Exp>, LambdaCaptureKind, Option<Box<Exp>>),
     // forall/exists x1 : e1, ..., xn [{ t1, .., tk } *] [where cond]: en.
     Quant(
         QuantKind,
@@ -1935,7 +1935,7 @@ impl AstDebug for Exp_ {
                 e.ast_debug(w);
             },
             E::Block(seq) => w.block(|w| seq.ast_debug(w)),
-            E::Lambda(sp!(_, tbs), e, capture_kind) => {
+            E::Lambda(sp!(_, tbs), e, capture_kind, spec_opt) => {
                 if *capture_kind != LambdaCaptureKind::Default {
                     w.write(format!("{} ", capture_kind));
                 }
@@ -1943,6 +1943,11 @@ impl AstDebug for Exp_ {
                 tbs.ast_debug(w);
                 w.write("|");
                 e.ast_debug(w);
+                if let Some(s) = spec_opt {
+                    w.write("spec {");
+                    s.ast_debug(w);
+                    w.write("}");
+                }
             },
             E::Quant(kind, sp!(_, rs), trs, c_opt, e) => {
                 kind.ast_debug(w);

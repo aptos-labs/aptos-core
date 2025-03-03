@@ -21,8 +21,8 @@ use itertools::Itertools;
 use log::{debug, info, warn};
 use move_model::{
     ast::{
-        Exp, ExpData, MemoryLabel, Operation, Pattern, QuantKind, SpecFunDecl, SpecVarDecl,
-        TempIndex, Value,
+        ConditionKind, Exp, ExpData, MemoryLabel, Operation, Pattern, QuantKind, SpecFunDecl,
+        SpecVarDecl, TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -434,6 +434,36 @@ impl<'env> SpecTranslator<'env> {
                         call,
                         type_check
                     );
+                }
+            }
+            for cond in &fun.spec.borrow().conditions {
+                if cond.kind == ConditionKind::Ensures {
+                    let call = format!(
+                        "{}({})",
+                        boogie_name,
+                        fun.params
+                            .iter()
+                            .map(|Parameter(n, ..)| {
+                                format!("{}", n.display(module_env.symbol_pool()))
+                            })
+                            .join(", ")
+                    );
+                    for exp in cond.all_exps() {
+                        if !param_list.is_empty() {
+                            emitln!(
+                                self.writer,
+                                "axiom (forall {} ::\n(var $ret0 := {};",
+                                param_list,
+                                call,
+                            );
+                            self.translate_exp(exp);
+                            emitln!(self.writer, "\n));");
+                        } else {
+                            emitln!(self.writer, "axiom (var $ret0 := {};", call,);
+                            self.translate_exp(exp);
+                            emitln!(self.writer, "\n);");
+                        }
+                    }
                 }
             }
         } else {
