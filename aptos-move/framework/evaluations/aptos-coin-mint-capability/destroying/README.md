@@ -89,26 +89,26 @@ We identified the following methods, all of which are used faucet or test branch
 
 ## Usages and side effects
 
-### Transaction `prologue` and `epilogue`
+### Prologue and epilogue
 
-### `prologue`
+#### Prologue
 There are distinct prologues for executing blocks and transactions within blocks in the Aptos Framework. 
 
-#### [`block_prologue`](https://github.com/movementlabsxyz/aptos-core/blob/aa45303216be96ea30d361ab7eb2e95fb08c2dcb/aptos-move/framework/aptos-framework/sources/block.move#L224)
+##### [`block_prologue`](https://github.com/movementlabsxyz/aptos-core/blob/aa45303216be96ea30d361ab7eb2e95fb08c2dcb/aptos-move/framework/aptos-framework/sources/block.move#L224)
 
 The [`block_prologue`](https://github.com/movementlabsxyz/aptos-core/blob/aa45303216be96ea30d361ab7eb2e95fb08c2dcb/aptos-move/framework/aptos-framework/sources/block.move#L224) and its DKG variant `block_prologue_ext` both primarily call to [`block_prologue_common`](https://github.com/movementlabsxyz/aptos-core/blob/aa45303216be96ea30d361ab7eb2e95fb08c2dcb/aptos-move/framework/aptos-framework/sources/block.move#L155).
 
 We did not identify any usages of `.mint_cap` on any of the `block_prologue_common` branches.
 
-#### Transaction `prologue`
+##### Transaction `prologue`
 All transactions now call one of the [`*_script_prologue`](https://github.com/movementlabsxyz/aptos-core/blob/aa45303216be96ea30d361ab7eb2e95fb08c2dcb/aptos-move/aptos-vm/src/aptos_vm.rs#L2244) functions, which in turn call [`prologue_common`](https://github.com/movementlabsxyz/aptos-core/blob/aa45303216be96ea30d361ab7eb2e95fb08c2dcb/aptos-move/framework/aptos-framework/sources/transaction_validation.move#L74).
 
 We did not identify any usages of `.mint_cap` on any of the `prologue_common` branches.
 
-### `epilogue`
+#### Epilogue
 There are distinct epilogues for executing blocks and transactions within blocks in the Aptos Framework.
 
-#### Block epilogue
+##### Block epilogue
 The Block Epilogue does not map neatly to a single function. Importantly, it can trigger `reconfiguration::reconfigure`(https://github.com/movementlabsxyz/aptos-core/blob/aa45303216be96ea30d361ab7eb2e95fb08c2dcb/aptos-move/framework/aptos-framework/sources/reconfiguration.move#L107) which calls the following coin invoking methods:
 
 - `transaction_fee::process_collected_fees` which does not invoke any minting capabilities.
@@ -116,7 +116,7 @@ The Block Epilogue does not map neatly to a single function. Importantly, it can
 
 To ensure the block epilogue does not `abort` on the `mint` branch, we would need to either set the reward rate to zero or add logic to skip the minting of rewards under a given feature flag.
 
-#### Transaction [`epilogue`](https://github.com/movementlabsxyz/aptos-core/blob/aa45303216be96ea30d361ab7eb2e95fb08c2dcb/aptos-move/framework/aptos-framework/sources/transaction_validation.move#L262)
+##### Transaction [`epilogue`](https://github.com/movementlabsxyz/aptos-core/blob/aa45303216be96ea30d361ab7eb2e95fb08c2dcb/aptos-move/framework/aptos-framework/sources/transaction_validation.move#L262)
 
 The transaction [`epilogue`](https://github.com/movementlabsxyz/aptos-core/blob/aa45303216be96ea30d361ab7eb2e95fb08c2dcb/aptos-move/framework/aptos-framework/sources/transaction_validation.move#L330) does make a call to `mint_and_refund` in the `mint` branch. However, this is [disabled](https://github.com/movementlabsxyz/aptos-core/blob/aa45303216be96ea30d361ab7eb2e95fb08c2dcb/aptos-move/framework/aptos-framework/sources/transaction_validation.move#L330) when the `ggp` feature flag is set.
 
