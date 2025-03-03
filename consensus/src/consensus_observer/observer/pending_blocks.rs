@@ -967,7 +967,7 @@ mod test {
             let block = Block::new_for_testing(block_info.id(), block_data, None);
             let pipelined_block = Arc::new(PipelinedBlock::new_ordered(
                 block,
-                // TODO revisit this, not sure how i would do this right now...
+                // TODO @bchocho @hariria revisit this, not sure how i would do this right now...
                 OrderedBlockWindow::empty(),
             ));
 

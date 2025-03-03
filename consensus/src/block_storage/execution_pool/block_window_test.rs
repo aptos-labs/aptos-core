@@ -11,283 +11,22 @@
 //! This should not happen in production.
 
 use crate::{
-    block_storage::{BlockReader, BlockStore},
-    test_utils::TreeInserter,
+    block_storage::{
+        execution_pool::common::{
+            create_block_tree_no_forks, create_block_tree_no_forks_inner,
+            create_block_tree_with_forks, create_block_tree_with_forks_unordered_parents,
+            create_block_tree_with_forks_unordered_parents_and_nil_blocks,
+            get_blocks_from_block_store_and_window, DEFAULT_MAX_PRUNED_BLOCKS_IN_MEM,
+        },
+        BlockReader,
+    },
+    test_utils::{build_custom_empty_tree, consensus_runtime, timed_block_on, TreeInserter},
 };
-use aptos_consensus_types::{
-    block::{block_test_utils::certificate_for_genesis, Block},
-    pipelined_block::PipelinedBlock,
-};
-use aptos_crypto::HashValue;
+use aptos_consensus_types::{block::block_test_utils, common::Author};
+use aptos_crypto::{HashValue, PrivateKey};
 use aptos_types::{block_info::Round, validator_signer::ValidatorSigner};
-use std::sync::Arc;
-
-const DEFAULT_MAX_PRUNED_BLOCKS_IN_MEM: usize = 10;
-
-/// Helper function to get the [`OrderedBlockWindow`](aptos_consensus_types::pipelined_block::OrderedBlockWindow)
-/// from the `block_store`
-fn get_blocks_from_block_store_and_window(
-    block_store: Arc<BlockStore>,
-    block: &Block,
-    window_size: Option<u64>,
-) -> Vec<Block> {
-    let windowed_blocks = block_store
-        .inner
-        .read()
-        .get_ordered_block_window(block, window_size);
-    let ordered_block_window = windowed_blocks.unwrap();
-    ordered_block_window.blocks().unwrap().to_owned()
-}
-
-/// Helper function for getting `commit_root`, `window_root`
-/// NOTE: `block` is the reference block to base the window on
-fn get_roots(
-    block: &Block,
-    block_store: Arc<BlockStore>,
-    window_size: Option<u64>,
-) -> (Arc<PipelinedBlock>, Option<HashValue>) {
-    let block_store_inner_guard = block_store.inner.read();
-    let commit_root = block_store_inner_guard.commit_root();
-
-    let window_root = block_store_inner_guard.find_window_root(block.id(), window_size);
-
-    (commit_root, Some(window_root))
-}
-
-/// Helper function to create a block tree of size `N` with no forks
-/// ```text
-/// +--------------+       +---------+       +---------+       +---------+       +---------+
-/// | Genesis Block| ----> | Block 1 | ----> | Block 2 | ----> | Block 3 | ----> | Block 4 | --> ...
-/// +--------------+       +---------+       +---------+       +---------+       +---------+
-/// ```
-///
-/// NOTE: `num_blocks` includes the genesis block
-async fn create_block_tree_no_forks_inner<const N: usize>(
-    num_blocks: u64,
-    window_size: Option<u64>,
-    max_pruned_blocks_in_mem: usize,
-) -> (TreeInserter, Arc<BlockStore>, [Arc<PipelinedBlock>; N]) {
-    let validator_signer = ValidatorSigner::random(None);
-    let mut inserter =
-        TreeInserter::new_with_params(validator_signer, window_size, max_pruned_blocks_in_mem);
-    let block_store = inserter.block_store();
-
-    // Block Store is initialized with a genesis block
-    let genesis_pipelined_block = block_store
-        .get_block(block_store.ordered_root().id())
-        .unwrap();
-    assert!(genesis_pipelined_block.block().is_genesis_block());
-    assert_eq!(genesis_pipelined_block.parent_id(), HashValue::zero());
-    let mut cur_node = genesis_pipelined_block.clone();
-
-    // num_blocks + 1
-    let mut pipelined_blocks = Vec::with_capacity(num_blocks as usize);
-    pipelined_blocks.push(genesis_pipelined_block.clone());
-
-    // Adds `num_blocks` blocks to the block_store
-    for round in 1..num_blocks {
-        if round == 1 {
-            cur_node = inserter
-                .insert_block_with_qc(certificate_for_genesis(), &genesis_pipelined_block, round)
-                .await;
-        } else {
-            cur_node = inserter.insert_block(&cur_node, round, None).await;
-        }
-        pipelined_blocks.push(cur_node.clone());
-    }
-    let pipelined_blocks: [Arc<PipelinedBlock>; N] = pipelined_blocks
-        .try_into()
-        .expect("Unexpected error converting fixed size vector into fixed size array. Ensure the generic `N` is equal to `num_blocks`");
-
-    (inserter, block_store, pipelined_blocks)
-}
-
-/// Same as [`create_block_tree_no_forks_inner`](create_block_tree_no_forks_inner) defined above
-/// however ths includes a default for `max_pruned_blocks_in_mem` of 10
-async fn create_block_tree_no_forks<const N: usize>(
-    num_blocks: u64,
-    window_size: Option<u64>,
-) -> (TreeInserter, Arc<BlockStore>, [Arc<PipelinedBlock>; N]) {
-    create_block_tree_no_forks_inner(num_blocks, window_size, DEFAULT_MAX_PRUNED_BLOCKS_IN_MEM)
-        .await
-}
-
-/// Create a block tree with forks. Similar to [`build_simple_tree`](crate::test_utils::build_simple_tree)
-/// Returns the following tree.
-///
-/// ```text
-///       ╭--> A1--> A2--> A3
-/// Genesis--> B1--> B2
-///             ╰--> C1
-/// ```
-///
-/// WARNING: Be wary of changing this function, it will affect consumers downstream
-async fn create_block_tree_with_forks(
-    window_size: Option<u64>,
-) -> (TreeInserter, Arc<BlockStore>, [Arc<PipelinedBlock>; 7]) {
-    let validator_signer = ValidatorSigner::random(None);
-    let mut inserter = TreeInserter::new_with_params(
-        validator_signer,
-        window_size,
-        DEFAULT_MAX_PRUNED_BLOCKS_IN_MEM,
-    );
-    let block_store = inserter.block_store();
-    let genesis = block_store.ordered_root();
-    let genesis_block_id = genesis.id();
-    let genesis_block = block_store
-        .get_block(genesis_block_id)
-        .expect("genesis block must exist");
-    assert_eq!(genesis_block.parent_id(), HashValue::zero());
-
-    assert_eq!(block_store.len(), 1);
-    assert_eq!(block_store.child_links(), block_store.len() - 1);
-    assert!(block_store.block_exists(genesis_block.id()));
-
-    // a1 -> round 1
-    let a1_r1 = inserter
-        .insert_block_with_qc(certificate_for_genesis(), &genesis_block, 1)
-        .await;
-    let a2_r2 = inserter.insert_block(&a1_r1, 2, None).await;
-    let a3_r3 = inserter.insert_block(&a2_r2, 3, None).await;
-    let b1_r4 = inserter
-        .insert_block_with_qc(certificate_for_genesis(), &genesis_block, 4)
-        .await;
-    let b2_r5 = inserter.insert_block(&b1_r4, 5, None).await;
-    let c1_r6 = inserter.insert_block(&b1_r4, 6, None).await;
-
-    let pipelined_blocks: [Arc<PipelinedBlock>; 7] =
-        [genesis_block, a1_r1, a2_r2, a3_r3, b1_r4, b2_r5, c1_r6];
-
-    (inserter, block_store, pipelined_blocks)
-}
-
-/// Create a block tree with forks. Similar to [`create_block_tree_with_forks`](create_block_tree_with_forks)
-/// but blocks within a fork are not strictly sequentially increasing in round.
-///
-/// e.g., A1 = round 1, A2 = round 3, A3 = round 6
-///
-/// ```text
-///       ╭--> A1--> A2--> A3--> A4
-/// Genesis--> B1--> B2--> B3
-///             ╰--> C1
-///             ╰--> D1
-/// ```
-///
-/// WARNING: Be wary of changing this function, it will affect consumers downstream
-async fn create_block_tree_with_forks_unordered_parents(
-    window_size: Option<u64>,
-) -> (TreeInserter, Arc<BlockStore>, [Arc<PipelinedBlock>; 10]) {
-    let validator_signer = ValidatorSigner::random(None);
-    let mut inserter = TreeInserter::new_with_params(
-        validator_signer,
-        window_size,
-        DEFAULT_MAX_PRUNED_BLOCKS_IN_MEM,
-    );
-    let block_store = inserter.block_store();
-    let genesis = block_store.ordered_root();
-    let genesis_block_id = genesis.id();
-    let genesis_block = block_store
-        .get_block(genesis_block_id)
-        .expect("genesis block must exist");
-    assert_eq!(genesis_block.parent_id(), HashValue::zero());
-
-    assert_eq!(block_store.len(), 1);
-    assert_eq!(block_store.child_links(), block_store.len() - 1);
-    assert!(block_store.block_exists(genesis_block.id()));
-
-    // a1 -> round 1
-    let a1_r1 = inserter
-        .insert_block_with_qc(certificate_for_genesis(), &genesis_block, 1)
-        .await;
-    let b1_r2 = inserter
-        .insert_block_with_qc(certificate_for_genesis(), &genesis_block, 2)
-        .await;
-    let a2_r3 = inserter.insert_block(&a1_r1, 3, None).await;
-    let b2_r4 = inserter.insert_block(&b1_r2, 4, None).await;
-    let b3_r5 = inserter.insert_block(&b2_r4, 5, None).await;
-    let a3_r6 = inserter.insert_block(&a2_r3, 6, None).await;
-    let c1_r7 = inserter.insert_block(&b1_r2, 7, None).await;
-    let d1_r8 = inserter.insert_block(&b1_r2, 8, None).await;
-    let a4_r9 = inserter
-        .insert_block(&a3_r6, 9, Some(genesis.block_info()))
-        .await;
-
-    let pipelined_blocks: [Arc<PipelinedBlock>; 10] = [
-        genesis_block,
-        a1_r1,
-        a2_r3,
-        a3_r6,
-        a4_r9,
-        b1_r2,
-        b2_r4,
-        b3_r5,
-        c1_r7,
-        d1_r8,
-    ];
-
-    (inserter, block_store, pipelined_blocks)
-}
-
-/// Same as [`create_block_tree_with_forks_unordered_parents`](create_block_tree_with_forks_unordered_parents)
-/// but makes `a4_r9` a nil block and `b2_r4` a nil block. This is to test that nil blocks have
-/// windows. See the test case below.
-async fn create_block_tree_with_forks_unordered_parents_and_nil_blocks(
-    window_size: Option<u64>,
-) -> (TreeInserter, Arc<BlockStore>, [Arc<PipelinedBlock>; 10]) {
-    let validator_signer = ValidatorSigner::random(None);
-    let mut inserter = TreeInserter::new_with_params(
-        validator_signer,
-        window_size,
-        DEFAULT_MAX_PRUNED_BLOCKS_IN_MEM,
-    );
-    let block_store = inserter.block_store();
-    let genesis = block_store.ordered_root();
-    let genesis_block_id = genesis.id();
-    let genesis_block = block_store
-        .get_block(genesis_block_id)
-        .expect("genesis block must exist");
-    assert_eq!(genesis_block.parent_id(), HashValue::zero());
-
-    assert_eq!(block_store.len(), 1);
-    assert_eq!(block_store.child_links(), block_store.len() - 1);
-    assert!(block_store.block_exists(genesis_block.id()));
-
-    // a1 -> round 1
-    let a1_r1 = inserter
-        .insert_block_with_qc(certificate_for_genesis(), &genesis_block, 1)
-        .await;
-    let b1_r2 = inserter
-        .insert_block_with_qc(certificate_for_genesis(), &genesis_block, 2)
-        .await;
-    let a2_r3 = inserter.insert_block(&a1_r1, 3, None).await;
-
-    // Nil block
-    let b2_r4 = inserter.insert_nil_block(&b1_r2, 4, None).await;
-    let b3_r5 = inserter.insert_block(&b2_r4, 5, None).await;
-    let a3_r6 = inserter.insert_block(&a2_r3, 6, None).await;
-    let c1_r7 = inserter.insert_block(&b1_r2, 7, None).await;
-    let d1_r8 = inserter.insert_block(&b1_r2, 8, None).await;
-
-    // Nil block
-    let a4_r9 = inserter
-        .insert_nil_block(&a3_r6, 9, Some(genesis.block_info()))
-        .await;
-
-    let pipelined_blocks: [Arc<PipelinedBlock>; 10] = [
-        genesis_block,
-        a1_r1,
-        a2_r3,
-        a3_r6,
-        a4_r9,
-        b1_r2,
-        b2_r4,
-        b3_r5,
-        c1_r7,
-        d1_r8,
-    ];
-
-    (inserter, block_store, pipelined_blocks)
-}
+use proptest::{prop_assert, prop_assert_eq, proptest};
+use std::collections::HashSet;
 
 /// Check the following:
 /// 1. [`OrderedBlockWindow`](aptos_consensus_types::pipelined_block::OrderedBlockWindow)
@@ -305,6 +44,7 @@ async fn test_execution_pool_block_window_3_no_commit() {
         validator_signer,
         window_size,
         DEFAULT_MAX_PRUNED_BLOCKS_IN_MEM,
+        None,
     );
     let block_store = inserter.block_store();
     let mut round: Round = 0;
@@ -508,10 +248,7 @@ async fn test_window_root_window_size_0_failure() {
 
     // Window size must be greater than 0, should panic
     let window_size = Some(0u64);
-    block_store
-        .inner
-        .read()
-        .find_window_root(genesis_block.id(), window_size);
+    block_store.find_window_root(genesis_block.id(), window_size);
 }
 
 #[tokio::test]
@@ -524,7 +261,7 @@ async fn test_window_root_no_forks() {
 
     // Genesis ──> A1 ──> ... ──> A4
     let [genesis_block, a1, a2, _, a4] = pipelined_blocks;
-    let (commit_root, window_root) = get_roots(a4.block(), block_store.clone(), window_size);
+    let (commit_root, window_root) = block_store.get_roots(a4.block(), window_size);
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), a4.block(), window_size);
 
@@ -541,7 +278,7 @@ async fn test_window_root_no_forks() {
 
     // Prune A2
     block_store.prune_tree(a2.id());
-    let (commit_root, window_root) = get_roots(a4.block(), block_store.clone(), window_size);
+    let (commit_root, window_root) = block_store.get_roots(a4.block(), window_size);
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), a4.block(), window_size);
 
@@ -565,7 +302,7 @@ async fn test_window_root_no_forks() {
 
     // Genesis ──> A1 ──> ... ──> A4
     let [genesis_block, _, a2, a3, a4] = pipelined_blocks;
-    let (commit_root, window_root) = get_roots(a4.block(), block_store.clone(), window_size);
+    let (commit_root, window_root) = block_store.get_roots(a4.block(), window_size);
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), a4.block(), window_size);
 
@@ -582,7 +319,7 @@ async fn test_window_root_no_forks() {
 
     // Prune A2
     block_store.prune_tree(a2.id());
-    let (commit_root, window_root) = get_roots(a4.block(), block_store.clone(), window_size);
+    let (commit_root, window_root) = block_store.get_roots(a4.block(), window_size);
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), a4.block(), window_size);
 
@@ -608,7 +345,7 @@ async fn test_window_root_with_forks() {
     //             ╰--> C1
     let (_, block_store, pipelined_blocks) = create_block_tree_with_forks(window_size).await;
     let [genesis_block, a1, _a2, a3, _b1, _b2, _c1] = pipelined_blocks;
-    let (commit_root, window_root) = get_roots(a3.block(), block_store.clone(), window_size);
+    let (commit_root, window_root) = block_store.get_roots(a3.block(), window_size);
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), a3.block(), window_size);
 
@@ -627,7 +364,7 @@ async fn test_window_root_with_forks() {
 
     // Prune A1
     block_store.prune_tree(a1.id());
-    let (commit_root, window_root) = get_roots(a3.block(), block_store.clone(), window_size);
+    let (commit_root, window_root) = block_store.get_roots(a3.block(), window_size);
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), a3.block(), window_size);
 
@@ -653,7 +390,7 @@ async fn test_window_root_with_forks() {
     let (_, block_store, pipelined_blocks) = create_block_tree_with_forks(window_size).await;
     let [genesis_block, _a1, _a2, _a3, b1, _b2, c1] = pipelined_blocks;
     let current_block = c1.block();
-    let (commit_root, window_root) = get_roots(current_block, block_store.clone(), window_size);
+    let (commit_root, window_root) = block_store.get_roots(current_block, window_size);
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), current_block, window_size);
 
@@ -669,7 +406,7 @@ async fn test_window_root_with_forks() {
 
     // Prune B1
     block_store.prune_tree(b1.id());
-    let (commit_root, window_root) = get_roots(c1.block(), block_store.clone(), window_size);
+    let (commit_root, window_root) = block_store.get_roots(c1.block(), window_size);
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), c1.block(), window_size);
 
@@ -698,7 +435,7 @@ async fn test_window_root_with_non_sequential_round_forks() {
     let [genesis_block, a1_r1, a2_r3, a3_r6, a4_r9, _b1_r2, _b2_r4, _b3_r5, _c1_r7, _d1_r8] =
         pipelined_blocks;
     let current_block = a4_r9.block();
-    let (commit_root, window_root) = get_roots(current_block, block_store.clone(), window_size);
+    let (commit_root, window_root) = block_store.get_roots(current_block, window_size);
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), current_block, window_size);
 
@@ -718,7 +455,7 @@ async fn test_window_root_with_non_sequential_round_forks() {
 
     // expand window size to 7
     let window_size = Some(7u64);
-    let (commit_root, window_root) = get_roots(current_block, block_store.clone(), window_size);
+    let (commit_root, window_root) = block_store.get_roots(current_block, window_size);
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), current_block, window_size);
 
@@ -741,7 +478,7 @@ async fn test_window_root_with_non_sequential_round_forks() {
 
     // Expand window_size to 100
     let window_size = Some(100u64);
-    let (commit_root, window_root) = get_roots(current_block, block_store.clone(), window_size);
+    let (commit_root, window_root) = block_store.get_roots(current_block, window_size);
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), current_block, window_size);
 
@@ -766,7 +503,7 @@ async fn test_window_root_with_non_sequential_round_forks() {
 
     // Prune a2
     block_store.prune_tree(a2_r3.id());
-    let (commit_root, window_root) = get_roots(current_block, block_store.clone(), window_size);
+    let (commit_root, window_root) = block_store.get_roots(current_block, window_size);
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), current_block, window_size);
 
@@ -806,7 +543,7 @@ async fn test_window_root_with_non_sequential_round_forks_and_nil_blocks() {
 
     // a4_r9 is the nil block
     let current_block = a4_r9.block();
-    let (commit_root, window_root) = get_roots(current_block, block_store.clone(), window_size);
+    let (commit_root, window_root) = block_store.get_roots(current_block, window_size);
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), current_block, window_size);
 
@@ -833,4 +570,78 @@ async fn test_window_root_with_non_sequential_round_forks_and_nil_blocks() {
     assert_eq!(block_window.get(1).unwrap().id(), b2_r4.id());
     assert!(b2_r4.block().is_nil_block());
     assert_eq!(block_window.len(), 2);
+}
+
+proptest! {
+    /// Test block window during block_store insertion
+    /// Inspired by [`test_block_store_insert`](crate::block_storage::block_store::block_store_test::test_block_store_insert)
+    #[test]
+    fn test_window_block_store_insert(
+        (private_keys, blocks) in block_test_utils::block_forest_and_its_keys(
+            10, // quorum size
+            50 // recursion depth
+        )
+    ){
+        let window_size = Some(3u64);
+        let authors: HashSet<Author> = private_keys.iter().map(
+            // match the signer_strategy in validator_signer.rs
+            |key| Author::from_bytes(&key.public_key().to_bytes()[0..32]).unwrap()
+        ).collect();
+        let runtime = consensus_runtime();
+        let block_store = build_custom_empty_tree(
+            window_size,
+            10usize, // max_pruned_blocks_in_mem
+            None
+        );
+        for block in blocks {
+            if block.round() > 0 && authors.contains(&block.author().unwrap()) {
+                let known_parent = block_store.block_exists(block.parent_id());
+                let certified_parent = block.quorum_cert().certified_block().id() == block.parent_id();
+                let verify_res = block.verify_well_formed();
+                let res = timed_block_on(&runtime, block_store.insert_block(block.clone()));
+                // assert_eq!(block.round(), 3);
+                if !certified_parent {
+                    prop_assert!(verify_res.is_err());
+                } else if !known_parent {
+                    // We cannot really bring blocks in this test because the block retrieval
+                    // functionality invokes event processing, which is not setup here.
+                    assert!(res.is_err());
+                }
+                else {
+                    // The parent must be present if we get to this line.
+                    let parent = block_store.get_block(block.parent_id()).unwrap();
+                    let ordered_block_window = get_blocks_from_block_store_and_window(block_store.clone(), &block, window_size);
+
+                    assert_eq!(block.round(), 3);
+
+                    // First block in the window must be the window root
+                    prop_assert_eq!(
+                        ordered_block_window.first().unwrap().id(),
+                        block_store.window_root().id(),
+                        "first block in ordered block window does not match window_root"
+                    );
+
+                    // TODO, in the beginning this shouldn't be true right?
+                    // There should be (window_size - 1) blocks in the window
+                    if let Some(window_size) = window_size {
+                        prop_assert_eq!(
+                            ordered_block_window.len() as u64,
+                            window_size - 1,
+                            "length of ordered block window is not (window_size - 1)"
+                        );
+                    }
+
+                    // TODO assertions on commit_root vs window_root positioning
+                    if block.round() <= parent.round() {
+                        prop_assert!(res.is_err());
+                    } else {
+                        let executed_block = res.unwrap();
+                        prop_assert_eq!(executed_block.block(),
+                             &block,
+                            "expected ok on block: {:#?}, got {:#?}", block, executed_block.block());
+                    }
+                }
+            }
+        }
+    }
 }

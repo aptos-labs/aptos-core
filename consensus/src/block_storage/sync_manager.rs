@@ -51,6 +51,7 @@ use rand::{prelude::*, Rng};
 use std::{
     clone::Clone,
     cmp::{max, min},
+    fmt::Display,
     sync::Arc,
     time::Duration,
 };
@@ -303,26 +304,14 @@ impl BlockStore {
         Ok(())
     }
 
-    pub async fn fast_forward_sync<'a>(
+    // TODO: we should not retrieve genesis, double check this is the right way to do that
+    // If execution pool is enabled, use round based block retrieval, else use target block id
+    pub(crate) fn generate_target_block_retrieval_payload_and_num_blocks<'a>(
         highest_quorum_cert: &'a QuorumCert,
         highest_commit_cert: &'a WrappedLedgerInfo,
-        retriever: &'a mut BlockRetriever,
-        storage: Arc<dyn PersistentLivenessStorage>,
-        execution_client: Arc<dyn TExecutionClient>,
-        payload_manager: Arc<dyn TPayloadManager>,
-        order_vote_enabled: bool,
         window_size: Option<u64>,
-    ) -> anyhow::Result<RecoveryData> {
-        info!(
-            LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer),
-            "Start state sync to commit cert: {}, quorum cert: {}",
-            highest_commit_cert,
-            highest_quorum_cert,
-        );
-
-        // TODO: we should not retrieve genesis, double check this is the right way to do that
-        // If execution pool is enabled, use round based block retrieval, else use target block id
-        let (target_block_retrieval_payload, num_blocks) = match window_size {
+    ) -> (TargetBlockRetrieval, u64) {
+        match window_size {
             None => {
                 let num_blocks = highest_quorum_cert.certified_block().round()
                     - highest_commit_cert.ledger_info().ledger_info().round()
@@ -355,7 +344,32 @@ impl BlockStore {
                 );
                 (TargetBlockRetrieval::TargetRound(target_round), num_blocks)
             },
-        };
+        }
+    }
+
+    pub async fn fast_forward_sync<'a>(
+        highest_quorum_cert: &'a QuorumCert,
+        highest_commit_cert: &'a WrappedLedgerInfo,
+        retriever: &'a mut BlockRetriever,
+        storage: Arc<dyn PersistentLivenessStorage>,
+        execution_client: Arc<dyn TExecutionClient>,
+        payload_manager: Arc<dyn TPayloadManager>,
+        order_vote_enabled: bool,
+        window_size: Option<u64>,
+    ) -> anyhow::Result<RecoveryData> {
+        info!(
+            LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer),
+            "Start state sync to commit cert: {}, quorum cert: {}",
+            highest_commit_cert,
+            highest_quorum_cert,
+        );
+
+        let (target_block_retrieval_payload, num_blocks) =
+            Self::generate_target_block_retrieval_payload_and_num_blocks(
+                highest_quorum_cert,
+                highest_commit_cert,
+                window_size,
+            );
 
         // although unlikely, we might wrap num_blocks around on a 32-bit machine
         assert!(num_blocks < std::usize::MAX as u64);
@@ -565,7 +579,7 @@ impl BlockStore {
                         if !executed_block.block().is_genesis_block() {
                             blocks.push(executed_block.block().clone());
                         }
-                        if req.match_target_round(executed_block.round()) {
+                        if req.is_leq_target_round(executed_block.round()) {
                             status = BlockRetrievalStatus::SucceededWithTarget;
                             break;
                         }
@@ -625,6 +639,19 @@ pub enum TargetBlockRetrieval {
     TargetRound(u64),
 }
 
+impl Display for TargetBlockRetrieval {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            TargetBlockRetrieval::TargetBlockId(id) => {
+                write!(f, "TargetBlockRetrieval with id {}", id)
+            },
+            TargetBlockRetrieval::TargetRound(round) => {
+                write!(f, "TargetBlockRetrieval with round {}", round)
+            },
+        }
+    }
+}
+
 impl BlockRetriever {
     pub fn new(
         network: Arc<NetworkSender>,
@@ -646,7 +673,7 @@ impl BlockRetriever {
         self.validator_addresses.clone()
     }
 
-    async fn retrieve_block_for_id_chunk(
+    async fn retrieve_block_chunk(
         &mut self,
         block_id: HashValue,
         target_block_retrieval_payload: TargetBlockRetrieval,
@@ -768,7 +795,7 @@ impl BlockRetriever {
     /// leader to drive quorum certificate creation The other peers from the quorum certificate
     /// will be randomly tried next.  If all members of the quorum certificate are exhausted, an
     /// error is returned
-    async fn retrieve_block_for_id(
+    async fn retrieve_blocks(
         &mut self,
         block_id: HashValue,
         target_block_retrieval_payload: TargetBlockRetrieval,
@@ -807,7 +834,7 @@ impl BlockRetriever {
             );
 
             let response = self
-                .retrieve_block_for_id_chunk(
+                .retrieve_block_chunk(
                     last_block_id,
                     target_block_retrieval_payload,
                     retrieve_batch_size,
@@ -830,23 +857,13 @@ impl BlockRetriever {
                     result_blocks.extend(batch);
                     break;
                 },
-                res => match res {
-                    Ok(resp) => {
-                        bail!(
-                            "Failed to fetch block {}, for original start {}, returned status {:?}",
-                            last_block_id,
-                            block_id,
-                            resp.status()
-                        );
-                    },
-                    Err(e) => {
-                        bail!(
-                            "Error: Failed to fetch block {}, for original start {}: {}",
-                            last_block_id,
-                            block_id,
-                            e
-                        );
-                    },
+                res => {
+                    bail!(
+                        "Failed to fetch block {}, for original start {}, returned status {:?}",
+                        last_block_id,
+                        block_id,
+                        res
+                    );
                 },
             }
         }
@@ -884,7 +901,7 @@ impl BlockRetriever {
         peers: Vec<AccountAddress>,
     ) -> anyhow::Result<Vec<Block>> {
         BLOCKS_FETCHED_FROM_NETWORK_IN_BLOCK_RETRIEVER.inc_by(num_blocks);
-        self.retrieve_block_for_id(
+        self.retrieve_blocks(
             initial_block_id,
             target_block_retrieval_payload,
             peers,

@@ -34,7 +34,8 @@ mod mock_state_computer;
 mod mock_storage;
 
 use crate::{
-    block_storage::pending_blocks::PendingBlocks, pipeline::execution_client::DummyExecutionClient,
+    block_storage::pending_blocks::PendingBlocks,
+    pipeline::{execution_client::DummyExecutionClient, pipeline_builder::PipelineBuilder},
     util::mock_time_service::SimulatedTimeService,
 };
 use aptos_consensus_types::{block::block_test_utils::gen_test_certificate, common::Payload};
@@ -88,7 +89,11 @@ pub async fn build_simple_tree() -> (Vec<Arc<PipelinedBlock>>, Arc<BlockStore>) 
     (vec![genesis_block, a1, a2, a3, b1, b2, c1], block_store)
 }
 
-fn build_empty_tree_inner(window_size: Option<u64>, max_pruned_blocks_in_mem: usize) -> BlockStore {
+fn build_empty_tree_inner(
+    window_size: Option<u64>,
+    max_pruned_blocks_in_mem: usize,
+    pipeline_builder: Option<PipelineBuilder>,
+) -> BlockStore {
     let (initial_data, storage) = EmptyStorage::start_for_testing();
     BlockStore::new(
         storage,
@@ -101,7 +106,7 @@ fn build_empty_tree_inner(window_size: Option<u64>, max_pruned_blocks_in_mem: us
         false,
         window_size,
         Arc::new(Mutex::new(PendingBlocks::new())),
-        None,
+        pipeline_builder,
     )
 }
 
@@ -111,14 +116,17 @@ pub fn build_default_empty_tree() -> Arc<BlockStore> {
     Arc::new(build_empty_tree_inner(
         window_size,
         max_pruned_blocks_in_mem,
+        None,
     ))
 }
 
 pub fn build_custom_empty_tree(
     window_size: Option<u64>,
     max_pruned_blocks_in_mem: usize,
+    pipeline_builder: Option<PipelineBuilder>,
 ) -> Arc<BlockStore> {
-    let block_store = build_empty_tree_inner(window_size, max_pruned_blocks_in_mem);
+    let block_store =
+        build_empty_tree_inner(window_size, max_pruned_blocks_in_mem, pipeline_builder);
     Arc::new(block_store)
 }
 
@@ -144,8 +152,10 @@ impl TreeInserter {
         signer: ValidatorSigner,
         window_size: Option<u64>,
         max_pruned_blocks_in_mem: usize,
+        pipeline_builder: Option<PipelineBuilder>,
     ) -> Self {
-        let block_store = build_custom_empty_tree(window_size, max_pruned_blocks_in_mem);
+        let block_store =
+            build_custom_empty_tree(window_size, max_pruned_blocks_in_mem, pipeline_builder);
         Self {
             signer,
             block_store,

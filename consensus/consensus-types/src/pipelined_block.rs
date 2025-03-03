@@ -11,7 +11,7 @@ use crate::{
     quorum_cert::QuorumCert,
     vote_proposal::VoteProposal,
 };
-use anyhow::{bail, Error};
+use anyhow::Error;
 use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
 use aptos_executor_types::{
     state_compute_result::StateComputeResult, ExecutorError, ExecutorResult,
@@ -146,27 +146,34 @@ impl OrderedBlockWindow {
     /// if the `PipelinedBlock` still exists
     ///      `upgraded_block` will be `Some(PipelinedBlock)`, and included in `blocks`
     /// else it will be `None`, and not included in `blocks`
-    pub fn blocks(&self) -> anyhow::Result<Vec<Block>> {
+    pub fn blocks(&self) -> Vec<Block> {
         let mut blocks: Vec<Block> = vec![];
         for (index, block) in self.blocks.iter().enumerate() {
             let upgraded_block = block.upgrade();
             if let Some(block) = upgraded_block {
                 blocks.push(block.block().clone())
             } else {
-                bail!(
+                // TODO @bchocho @hariria revisit if we want to panic or bail
+                panic!(
                     "Block {} not found during upgrade in OrderedBlockWindow::blocks()",
                     index
                 )
             }
         }
-        Ok(blocks)
+        blocks
     }
 
     pub fn pipelined_blocks(&self) -> Vec<Arc<PipelinedBlock>> {
         let mut blocks: Vec<Arc<PipelinedBlock>> = Vec::new();
-        for block in &self.blocks {
+        for (index, block) in self.blocks.iter().enumerate() {
             if let Some(block) = block.upgrade() {
                 blocks.push(block);
+            } else {
+                // TODO @bchocho @hariria revisit if we want to panic or bail
+                panic!(
+                    "Block {} not found during upgrade in OrderedBlockWindow::pipelined_blocks()",
+                    index
+                )
             }
         }
         blocks

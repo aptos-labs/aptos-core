@@ -284,19 +284,25 @@ impl BlockTree {
         block: &Block,
         window_size: Option<u64>,
     ) -> anyhow::Result<OrderedBlockWindow> {
-        // window_size is None only if execution pool is turned off
-        if window_size.is_none() {
-            return Ok(OrderedBlockWindow::empty());
-        }
+        // Block round should never be less than the commit root round
+        ensure!(
+            block.round() >= self.commit_root().round(),
+            "Block round {} is less than the commit root round {}, cannot get_ordered_block_window",
+            block.round(),
+            self.commit_root().round()
+        );
 
-        // TODO Currently we do not check to see if the `block` provided exists in the `BlockTree`
+        // window_size is None only if execution pool is turned off
+        let Some(window_size) = window_size else {
+            return Ok(OrderedBlockWindow::empty());
+        };
+
         // See `insert_block()` for more context.
         //
         // It's a little strange because you can call `get_block_window` with a recently pruned block,
         // and it will return a seemingly valid OrderedBlockWindow... which is a bit unintuitive.
         // Maybe rename this function or scope it to be non-public to not confuse people in the future.
         // Revisit this later
-        let window_size = window_size.expect("Unexpected window size of None, assert window_size.is_none() invariant above was changed");
         let round = block.round();
         let window_start_round = (round + 1).saturating_sub(window_size);
         let window_size = (round + 1) - window_start_round;
@@ -308,11 +314,9 @@ impl BlockTree {
         let mut window = vec![];
         let mut current_block = block.clone();
         ensure!(!current_block.is_genesis_block());
-        loop {
-            // Break if my parent's block round is outside the window
-            if current_block.quorum_cert().certified_block().round() < window_start_round {
-                break;
-            }
+
+        // Add each block to the window until you reach the start round
+        while current_block.quorum_cert().certified_block().round() >= window_start_round {
             if let Some(parent_block) = self.get_block(&current_block.parent_id()) {
                 current_block = parent_block.block().clone();
                 if current_block.is_genesis_block() {
@@ -323,6 +327,7 @@ impl BlockTree {
                 bail!("Parent block not found for block {}", current_block.id());
             }
         }
+
         // The window order is lower round -> higher round
         window.reverse();
         ensure!(window.len() < window_size as usize);
@@ -512,11 +517,7 @@ impl BlockTree {
             .get_ordered_block_window(block.block(), window_size)
             .expect("Ordered block window not found");
         let pipelined_blocks = ordered_block_window.pipelined_blocks();
-        let first_block = pipelined_blocks
-            .iter()
-            .chain(std::iter::once(&block))
-            .next()
-            .expect("Ordered block window not found");
+        let first_block = pipelined_blocks.first().unwrap_or(&block);
         first_block.id()
     }
 

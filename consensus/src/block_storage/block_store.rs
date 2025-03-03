@@ -37,7 +37,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, proof::accumulator::InMemoryTransactionAccumulator,
 };
 use futures::executor::block_on;
-#[cfg(test)]
+#[cfg(any(test, feature = "fuzzing"))]
 use std::collections::VecDeque;
 #[cfg(any(test, feature = "fuzzing"))]
 use std::sync::atomic::AtomicBool;
@@ -48,10 +48,6 @@ use std::{sync::Arc, time::Duration};
 #[cfg(test)]
 #[path = "block_store_test.rs"]
 mod block_store_test;
-
-#[cfg(test)]
-#[path = "execution_pool_test.rs"]
-mod execution_pool_test;
 
 #[path = "sync_manager.rs"]
 pub mod sync_manager;
@@ -427,7 +423,7 @@ impl BlockStore {
             .inner
             .read()
             .get_ordered_block_window(&block, self.window_size)?;
-        let blocks = block_window.blocks()?;
+        let blocks = block_window.blocks();
         for block in blocks {
             if let Some(payload) = block.payload() {
                 self.payload_manager.prefetch_payload_data(
@@ -567,39 +563,6 @@ impl BlockStore {
             .context("Timeout certificate insert failed when persisting to DB")?;
         self.inner.write().replace_2chain_timeout_cert(tc);
         Ok(())
-    }
-
-    /// Prune the tree up to next_root_id (keep next_root_id's block).  Any branches not part of
-    /// the next_root_id's tree should be removed as well.
-    ///
-    /// For example, root = B0
-    /// B0--> B1--> B2
-    ///        ╰--> B3--> B4
-    ///
-    /// prune_tree(B3) should be left with
-    /// B3--> B4, root = B3
-    ///
-    /// Returns the block ids of the blocks removed.
-    #[cfg(test)]
-    fn prune_tree(&self, next_root_id: HashValue) -> VecDeque<HashValue> {
-        let id_to_remove = self.inner.read().find_blocks_to_prune(next_root_id);
-        if let Err(e) = self
-            .storage
-            .prune_tree(id_to_remove.clone().into_iter().collect())
-        {
-            // it's fine to fail here, as long as the commit succeeds, the next restart will clean
-            // up dangling blocks, and we need to prune the tree to keep the root consistent with
-            // executor.
-            warn!(error = ?e, "fail to delete block");
-        }
-
-        // synchronously update both root_id and commit_root_id
-        let mut wlock = self.inner.write();
-        wlock.update_ordered_root(next_root_id);
-        wlock.update_commit_root(next_root_id);
-        wlock.update_window_root(next_root_id);
-        wlock.process_pruned_blocks(id_to_remove.clone());
-        id_to_remove
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
@@ -830,5 +793,78 @@ impl BlockStore {
                 .await?;
         }
         self.insert_block(block).await
+    }
+
+    /// Prune the tree up to next_root_id (keep next_root_id's block).  Any branches not part of
+    /// the next_root_id's tree should be removed as well.
+    ///
+    /// For example, root = B0
+    /// B0--> B1--> B2
+    ///        ╰--> B3--> B4
+    ///
+    /// prune_tree(B3) should be left with
+    /// B3--> B4, root = B3
+    ///
+    /// Returns the block ids of the blocks removed.
+    pub(crate) fn prune_tree(&self, next_root_id: HashValue) -> VecDeque<HashValue> {
+        let id_to_remove = self.inner.read().find_blocks_to_prune(next_root_id);
+        if let Err(e) = self
+            .storage
+            .prune_tree(id_to_remove.clone().into_iter().collect())
+        {
+            // it's fine to fail here, as long as the commit succeeds, the next restart will clean
+            // up dangling blocks, and we need to prune the tree to keep the root consistent with
+            // executor.
+            warn!(error = ?e, "fail to delete block");
+        }
+
+        // synchronously update both root_id and commit_root_id
+        let mut wlock = self.inner.write();
+        wlock.update_ordered_root(next_root_id);
+        wlock.update_commit_root(next_root_id);
+        wlock.update_window_root(next_root_id);
+        wlock.process_pruned_blocks(id_to_remove.clone());
+        id_to_remove
+    }
+
+    /// Retrieves the `window_root`
+    /// User can provide a `window_size` to override the `BlockStore::window_size`
+    pub(crate) fn window_root(&self) -> Arc<PipelinedBlock> {
+        self.inner.read().window_root()
+    }
+
+    /// Helper function for testing `find_window_root`.
+    /// User can provide a `window_size` to override the `BlockStore::window_size`
+    pub(crate) fn find_window_root(&self, block_id: HashValue, window_size: Option<u64>) {
+        self.inner
+            .read()
+            .find_window_root(block_id, window_size.or(self.window_size));
+    }
+
+    /// Helper function for testing get_ordered_block_window.
+    /// User can provide a `window_size` to override the `BlockStore::window_size`
+    pub(crate) fn get_ordered_block_window(
+        &self,
+        block: &Block,
+        window_size: Option<u64>,
+    ) -> anyhow::Result<OrderedBlockWindow> {
+        self.inner
+            .read()
+            .get_ordered_block_window(block, window_size.or(self.window_size))
+    }
+
+    /// Retrieves the state of the `commit_root` and `window_root`
+    /// User can provide a `window_size` to override the `BlockStore::window_size`
+    pub(crate) fn get_roots(
+        &self,
+        block: &Block,
+        window_size: Option<u64>,
+    ) -> (Arc<PipelinedBlock>, Option<HashValue>) {
+        let block_store_inner_guard = self.inner.read();
+        let commit_root = block_store_inner_guard.commit_root();
+        let window_root =
+            block_store_inner_guard.find_window_root(block.id(), window_size.or(self.window_size));
+
+        (commit_root, Some(window_root))
     }
 }
