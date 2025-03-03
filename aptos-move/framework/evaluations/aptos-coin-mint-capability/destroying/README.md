@@ -100,7 +100,7 @@ The [`block_prologue`](https://github.com/movementlabsxyz/aptos-core/blob/aa4530
 
 We did not identify any usages of `.mint_cap` on any of the `block_prologue_common` branches.
 
-#### Transaction [`prologue`]
+#### Transaction `prologue`
 All transactions now call one of the [`*_script_prologue`](https://github.com/movementlabsxyz/aptos-core/blob/aa45303216be96ea30d361ab7eb2e95fb08c2dcb/aptos-move/aptos-vm/src/aptos_vm.rs#L2244) functions, which in turn call [`prologue_common`](https://github.com/movementlabsxyz/aptos-core/blob/aa45303216be96ea30d361ab7eb2e95fb08c2dcb/aptos-move/framework/aptos-framework/sources/transaction_validation.move#L74).
 
 We did not identify any usages of `.mint_cap` on any of the `prologue_common` branches.
