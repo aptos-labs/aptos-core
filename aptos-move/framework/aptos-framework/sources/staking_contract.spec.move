@@ -515,6 +515,7 @@ spec aptos_framework::staking_contract {
 
     spec schema IncreaseLockupWithCapAbortsIf {
         use aptos_framework::timestamp;
+        use aptos_framework::aggregator_v2;
         staker: address;
         operator: address;
 
@@ -529,9 +530,9 @@ spec aptos_framework::staking_contract {
         let config = global<staking_config::StakingConfig>(@aptos_framework);
         let stake_pool = global<stake::StakePool>(pool_address);
         let old_locked_until_secs = stake_pool.locked_until_secs;
-        let seconds = global<timestamp::CurrentTimeMicroseconds>(
+        let seconds = aggregator_v2::read(global<timestamp::CurrentTimeMicroseconds>(
             @aptos_framework
-        ).microseconds / timestamp::MICRO_CONVERSION_FACTOR;
+        ).microseconds) / timestamp::MICRO_CONVERSION_FACTOR;
         let new_locked_until_secs = seconds + config.recurring_lockup_duration_secs;
         aborts_if seconds + config.recurring_lockup_duration_secs > MAX_U64;
         aborts_if old_locked_until_secs > new_locked_until_secs || old_locked_until_secs == new_locked_until_secs;
