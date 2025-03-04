@@ -148,7 +148,13 @@ for i in $(seq 1 "$NODE_COUNT"); do
         .validator_network.identity.type = \"from_file\" |
         .validator_network.identity.path = \"/opt/aptos/genesis/validator-identity.yaml\" |
         .api.enabled = true |
-        .api.address = \"0.0.0.0:8080\"
+        .api.address = \"0.0.0.0:8080\" |
+        .indexer_grpc.enabled = true |
+        .indexer_grpc.address = \"0.0.0.0:50051\" |
+        .indexer_grpc.use_data_service_interface = true |
+        .indexer_table_info.parser_task_count = 20 |
+        .indexer_table_info.parser_batch_size = 1000 |
+        .indexer_table_info.table_info_service_mode = \"IndexingOnly\"
       " > "$GENESIS_DIR/validator_$i/validator.yaml"
     fi
 
