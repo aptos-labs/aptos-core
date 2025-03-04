@@ -23,12 +23,11 @@ async fn test_function_values() {
     context.publish_package(&mut account, txn).await;
 
     let state_resource = format!("{}::{}::{}", account_addr, "calculator", "State");
-
-    let state = context
+    let state = &context
         .gen_resource(&account_addr, &state_resource)
         .await
-        .unwrap();
-    assert_eq!(state["data"]["__variant__"], "Empty");
+        .unwrap()["data"];
+    assert_eq!(state, &json!({"__variant__": "Empty"}));
 
     context
         .api_execute_entry_function(
@@ -38,12 +37,11 @@ async fn test_function_values() {
             json!(["22"]),
         )
         .await;
-    let state = context
+    let state = &context
         .gen_resource(&account_addr, &state_resource)
         .await
-        .unwrap();
-    assert_eq!(state["data"]["__variant__"], "Value");
-    assert_eq!(state["data"]["_0"], "22");
+        .unwrap()["data"];
+    assert_eq!(state, &json!({"__variant__": "Value", "_0": "22"}));
 
     context
         .api_execute_entry_function(
@@ -53,24 +51,22 @@ async fn test_function_values() {
             json!([]),
         )
         .await;
-    let state = context
+    let state = &context
         .gen_resource(&account_addr, &state_resource)
         .await
-        .unwrap();
-    assert_eq!(state["data"]["__variant__"], "WaitForNumber");
-    let closure = &state["data"]["_0"];
-    // Closure has the form:
-    // {
-    //     __fun_name__: string<qualified_name>,
-    //     __mask__    : string<number>,
-    //     __captured__: array<value>
-    // }
+        .unwrap()["data"];
+    let expected_fun = format!("{}::calculator::storable_add", account_addr);
     assert_eq!(
-        closure["__fun_name__"],
-        format!("{}::calculator::storable_add", account_addr)
+        state,
+        &json!({
+            "__variant__": "WaitForNumber",
+            "_0": {
+                "__fun_name__": &expected_fun,
+                "__mask__": "1",
+                "__captured__": [ "22" ]
+            }
+        })
     );
-    assert_eq!(closure["__mask__"], "1");
-    assert_eq!(closure["__captured__"][0], "22");
 
     context
         .api_execute_entry_function(
@@ -80,10 +76,9 @@ async fn test_function_values() {
             json!(["11"]),
         )
         .await;
-    let state = context
+    let state = &context
         .gen_resource(&account_addr, &state_resource)
         .await
-        .unwrap();
-    assert_eq!(state["data"]["__variant__"], "Value");
-    assert_eq!(state["data"]["_0"], "33");
+        .unwrap()["data"];
+    assert_eq!(state, &json!({"__variant__": "Value", "_0": "33"}));
 }
