@@ -9,9 +9,11 @@ use crate::{
     },
 };
 use aptos_aggregator::delta_change_set::serialize;
-use aptos_language_e2e_tests::data_store::FakeDataStore;
+use aptos_transaction_simulation::{InMemoryStateStore, SimulationStateStore};
 use aptos_types::{
-    state_store::state_key::StateKey, transaction::TransactionOutput, write_set::WriteOp,
+    state_store::{state_key::StateKey, state_value::StateValue},
+    transaction::TransactionOutput,
+    write_set::WriteOp,
 };
 use claims::{assert_err, assert_matches, assert_ok};
 use move_core_types::vm_status::{AbortLocation, VMStatus};
@@ -39,7 +41,7 @@ fn assert_eq_outputs(vm_output: &VMOutput, txn_output: TransactionOutput) {
 
 #[test]
 fn test_ok_output_equality_no_deltas() {
-    let state_view = FakeDataStore::default();
+    let state_view = InMemoryStateStore::new();
     let vm_output = build_vm_output(
         vec![mock_create_with_layout("0", 0, None)],
         vec![mock_module_modify("1", 1)],
@@ -72,8 +74,13 @@ fn test_ok_output_equality_no_deltas() {
 #[test]
 fn test_ok_output_equality_with_deltas() {
     let delta_key = "3";
-    let mut state_view = FakeDataStore::default();
-    state_view.set_legacy(as_state_key!(delta_key), serialize(&100));
+    let state_view = InMemoryStateStore::new();
+    state_view
+        .set_state_value(
+            as_state_key!(delta_key),
+            StateValue::new_legacy(serialize(&100).into()),
+        )
+        .unwrap();
 
     let vm_output = build_vm_output(
         vec![mock_create_with_layout("0", 0, None)],
@@ -123,8 +130,13 @@ fn test_ok_output_equality_with_deltas() {
 #[test]
 fn test_err_output_equality_with_deltas() {
     let delta_key = "3";
-    let mut state_view = FakeDataStore::default();
-    state_view.set_legacy(as_state_key!(delta_key), serialize(&900));
+    let state_view = InMemoryStateStore::new();
+    state_view
+        .set_state_value(
+            as_state_key!(delta_key),
+            StateValue::new_legacy(serialize(&900).into()),
+        )
+        .unwrap();
 
     let vm_output = build_vm_output(vec![], vec![], vec![], vec![], vec![mock_add(
         delta_key, 300,
