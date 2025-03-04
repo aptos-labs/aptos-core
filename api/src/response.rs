@@ -637,22 +637,6 @@ pub fn version_pruned<E: GoneError>(ledger_version: u64, ledger_info: &LedgerInf
     )
 }
 
-pub fn account_not_found<E: NotFoundError>(
-    address: Address,
-    ledger_version: u64,
-    ledger_info: &LedgerInfo,
-) -> E {
-    build_not_found(
-        "Account",
-        format!(
-            "Address({}) and Ledger version({})",
-            address, ledger_version
-        ),
-        AptosErrorCode::AccountNotFound,
-        ledger_info,
-    )
-}
-
 pub fn resource_not_found<E: NotFoundError>(
     address: Address,
     struct_tag: &StructTag,
