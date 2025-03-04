@@ -2,7 +2,7 @@ testnet:
   # Transaction Stream endpoint addresss.
   transaction_stream_endpoint: https://grpc.testnet.aptoslabs.com:443
   # (Optional) The key to use with developers.aptoslabs.com
-  api_key: aptoslabs_F8W1c58BmDB_LM3hb87W79AqLcBPr4ErzY1V2AitQ2Bts
+  api_key: TESTNET_API_KEY
   # A map from versions to dump and their output names.
   versions_to_import:
     # naming: <version_descriptive_name>
