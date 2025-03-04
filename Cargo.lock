@@ -2918,6 +2918,7 @@ dependencies = [
  "aptos-transaction-generator-lib",
  "aptos-transaction-workloads-lib",
  "aptos-types",
+ "clap 4.5.21",
  "rand 0.7.3",
  "serde_json",
 ]
