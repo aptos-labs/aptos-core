@@ -220,6 +220,7 @@ async fn test_get_account_balance() {
         .await;
     assert_eq!(coin_balance_after, fa_balance);
     // upgrade to concurrent store
+    // TODO[Orderless]: Change this payload v2 format
     let txn = root_account.sign_with_transaction_builder(context.transaction_factory().payload(
         TransactionPayload::EntryFunction(EntryFunction::new(
             ModuleId::new(
