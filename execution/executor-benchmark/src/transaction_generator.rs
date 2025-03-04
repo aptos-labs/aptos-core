@@ -801,8 +801,8 @@ impl TransactionGenerator {
                 assert_eq!(
                     AccountResource::fetch_move_resource(&db_state_view, &address)
                         .unwrap()
-                        .unwrap()
-                        .sequence_number(),
+                        .map(|acct| acct.sequence_number)
+                        .unwrap_or(0),
                     account.sequence_number()
                 );
                 bar.inc(1);

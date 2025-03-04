@@ -39,7 +39,7 @@ async fn test_get_account_resources_by_address_0x0() {
     let address = "0x0";
 
     let resp = context
-        .expect_status_code(404)
+        .expect_status_code(200)
         .get(&account_resources(address))
         .await;
     context.check_golden_output(resp);
@@ -289,7 +289,7 @@ async fn test_get_core_account_data() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_core_account_data_not_found() {
     let mut context = new_test_context(current_function_name!());
-    let resp = context.expect_status_code(404).get("/accounts/0xf").await;
+    let resp = context.expect_status_code(200).get("/accounts/0xf").await;
     context.check_golden_output(resp);
 }
 
