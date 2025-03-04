@@ -1144,6 +1144,8 @@ mod tests {
                 assert_eq!(value, other_value, "different value for key: {:?}", key);
             }
         }
+        println!("{:?}", vm_writes);
+        println!("{:?}", other_writes);
         assert_eq!(vm_writes.len(), other_writes.len());
 
         if values_match {

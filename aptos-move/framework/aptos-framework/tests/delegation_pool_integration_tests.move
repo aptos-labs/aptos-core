@@ -84,6 +84,7 @@ module aptos_framework::delegation_pool_integration_tests {
 
     #[test_only]
     public fun mint_and_add_stake(account: &signer, amount: u64) {
+        account::create_account_for_test(signer::address_of(account));
         stake::mint(account, amount);
         dp::add_stake(account, dp::get_owned_pool_address(signer::address_of(account)), amount);
     }
