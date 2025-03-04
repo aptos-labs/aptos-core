@@ -134,6 +134,7 @@ pub enum FeatureFlag {
     /// Whether function values are enabled.
     ENABLE_FUNCTION_VALUES = 89,
     NEW_ACCOUNTS_DEFAULT_TO_FA_STORE = 90,
+    DEFAULT_ACCOUNT_RESOURCE = 91,
 }
 
 impl FeatureFlag {

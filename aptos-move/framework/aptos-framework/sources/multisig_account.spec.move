@@ -207,8 +207,8 @@ spec aptos_framework::multisig_account {
     }
 
     spec get_next_multisig_account_address(creator: address): address {
-        pragma aborts_if_is_partial;
-        aborts_if !exists<account::Account>(creator);
+        //pragma aborts_if_is_partial;
+        //aborts_if !exists<account::Account>(creator);
         let owner_nonce = global<account::Account>(creator).sequence_number;
     }
 
