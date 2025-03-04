@@ -110,6 +110,7 @@ module aptos_framework::genesis {
         version::initialize(&aptos_framework_account, initial_version);
         stake::initialize(&aptos_framework_account);
         timestamp::set_time_has_started(&aptos_framework_account);
+        timestamp::initialize_conflict_free_timer(&aptos_framework_account);
         staking_config::initialize(
             &aptos_framework_account,
             minimum_stake,
