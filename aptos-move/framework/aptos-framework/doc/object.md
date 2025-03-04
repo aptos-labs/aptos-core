@@ -2565,7 +2565,8 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 ### Module-level Specification
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 

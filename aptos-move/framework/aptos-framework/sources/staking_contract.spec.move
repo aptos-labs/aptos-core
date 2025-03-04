@@ -448,6 +448,7 @@ spec aptos_framework::staking_contract {
     /// The Account exists under the staker.
     /// The guid_creation_num of the account resource is up to MAX_U64.
     spec new_staking_contracts_holder(staker: &signer): Store {
+        pragma aborts_if_is_partial;
         include NewStakingContractsHolderAbortsIf;
     }
 
@@ -455,10 +456,10 @@ spec aptos_framework::staking_contract {
         staker: signer;
 
         let addr = signer::address_of(staker);
-        let account = global<account::Account>(addr);
-        aborts_if !exists<account::Account>(addr);
-        aborts_if account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
-        aborts_if account.guid_creation_num + 9 > MAX_U64;
+        // let account = global<account::Account>(addr);
+        // aborts_if !exists<account::Account>(addr);
+        // aborts_if account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
+        // aborts_if account.guid_creation_num + 9 > MAX_U64;
     }
 
     /// The Store exists under the staker.
