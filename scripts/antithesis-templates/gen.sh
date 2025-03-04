@@ -154,6 +154,21 @@ for i in $(seq 1 "$NODE_COUNT"); do
 
 done
 
+# Indexer configs
+processor=("account_transaction_processor" "events_processor" "fungible_asset_processor" "objects_processor" "token_v2_processor" "transaction_metadata_processor" "user_transaction_processor" "default_processor")
+for i in "${processor[@]}"; do
+  echo "processor: $i"
+  yq eval -n "
+    .health_check_port = 8084 |
+    .server_config.processor_config.type = \"$i\" |
+    .server_config.postgres_connection_string = \"postgresql://postgres:@$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+71)}'):5432/local_testnet\" |
+    .server_config.indexer_grpc_data_service_address = \"http://$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+11)}'):50051\" |
+    .server_config.indexer_grpc_http2_ping_interval_in_secs = 60 |
+    .server_config.indexer_grpc_http2_ping_timeout_in_secs = 10 |
+    .server_config.auth_token = \"AUTH_TOKEN\"
+  " > "$GENESIS_DIR/indexer/processor-config-$i.yaml"
+done
+
 cat "$GENESIS_DIR/layout.yaml"
 
 # Generate genesis.blob and waypoint

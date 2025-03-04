@@ -95,10 +95,20 @@ docker cp genesis_antithesis-builder:/aptos-core/$GENESIS_DIR/. $GENESIS_DIR/
 docker rm -f genesis_antithesis-builder
 echo "Genesis blob and waypoint generated in $GENESIS_DIR."
 
+# Fetch docker images (those images need to be available in the antithesis infra, so retag them and push them)
+docker pull postgres:14
+docker pull aptos/aptos-indexer:latest
+docker pull hasura/graphql-engine:v2.36.0
+echo "!!! Please push the following images to the antithesis infra !!!"
+echo "postgres:14"
+echo "aptos/aptos-indexer:latest"
+echo "hasura/graphql-engine:v2.36.0"
+
 # Entrypoint and Dockerfile copy
 cp scripts/antithesis-templates/entrypoint.sh $GENESIS_DIR/entrypoint.sh
 cp scripts/antithesis-templates/healthcheck.sh $GENESIS_DIR/healthcheck.sh
 cp -r scripts/antithesis-templates/antithesis-tests $GENESIS_DIR/antithesis-tests
+cp scripts/antithesis-templates/hasura_metadata.json $GENESIS_DIR/hasura_metadata.json
 #awk -v ip="$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+30)}')" '{gsub("<FAUCET_IP>", ip); print}' scripts/antithesis-templates/singleton_driver_test1.sh > $GENESIS_DIR/singleton_driver_test1.sh
 cp scripts/antithesis-templates/Dockerfile-node $GENESIS_DIR/Dockerfile-node
 cp scripts/antithesis-templates/Dockerfile-config $GENESIS_DIR/Dockerfile-config
@@ -106,6 +116,50 @@ cp scripts/antithesis-templates/Dockerfile-client $GENESIS_DIR/Dockerfile-client
 
 # Generate docker-compose.yaml using yq
 SERVICES=""
+
+# Generate indexer configs
+processor=("account_transaction_processor" "events_processor" "fungible_asset_processor" "objects_processor" "token_v2_processor" "transaction_metadata_processor" "user_transaction_processor" "default_processor")
+counter=0
+for i in "${processor[@]}"; do
+  echo "processor: $i"
+    SERVICES="$SERVICES .services.indexer_$i.image = \"indexer-processor-rust:latest\" |"
+    SERVICES="$SERVICES .services.indexer_$i.container_name = \"aptos-indexer-processor-$i\" |"
+    SERVICES="$SERVICES .services.indexer_$i.hostname = \"aptos-indexer-processor-$i\" |"
+    if [ "$counter" -eq 0 ]; then
+      SERVICES="$SERVICES .services.indexer_$i.depends_on.aptos-indexer-postgres.condition = \"service_healthy\" |"
+    else
+      SERVICES="$SERVICES .services.indexer_$i.depends_on.aptos-indexer-processor-${processor[$counter-1]}.condition = \"service_started\" |"
+    fi
+    SERVICES="$SERVICES .services.indexer_$i.command = \"-c processor-config.yaml\" |"
+    SERVICES="$SERVICES .services.indexer_$i.volumes = [\"./indexer/processor-config-$i.yaml:/opt/aptos/etc/processor-config.yaml\"] |"
+    SERVICES="$SERVICES .services.indexer_$i.networks.custom_network.ipv4_address = \"$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+70+counter)}')\" |"
+    SERVICES="$SERVICES .services.indexer_$i.restart = \"unless-stopped\" |"
+    SERVICES="$SERVICES .services.indexer_$i.expose = [8090] |"
+    ((counter++))
+done
+
+# Hasura API
+SERVICES="$SERVICES .services.migration-check.image = \"postgres:14\" |"
+SERVICES="$SERVICES .services.migration-check.container_name = \"migration-check\" |"
+SERVICES="$SERVICES .services.migration-check.hostname = \"migration-check\" |"
+SERVICES="$SERVICES .services.migration-check.command = \"bash -c 'echo \"Waiting for migrations to complete...\" && while true; do echo \"\\nChecking migration status...\" && result=\$(timeout 10s PGPASSWORD= psql -h 192.168.5.71 -p 5432 -U postgres -d local_testnet -t -c \"SELECT * FROM transactions LIMIT 1\" 2>&1 || echo \"TIMEOUT\") && if [ \"\$result\" = \"TIMEOUT\" ]; then echo \"Connection timed out, retrying in 5 seconds...\" && sleep 5 && continue; fi && echo \"Transaction query result:\" && psql -h 192.168.5.71 -p 5432 -U postgres -d local_testnet -t -c \"SELECT * FROM transactions LIMIT 1\" && break; done'\" |"
+SERVICES="$SERVICES .services.migration-check.depends_on.aptos-indexer-postgres.condition = \"service_healthy\" |"
+SERVICES="$SERVICES .services.migration-check.depends_on.aptos-indexer-processor-${processor[$counter]}.condition = \"service_started\" |"
+SERVICES="$SERVICES .services.aptos-indexer-hasura.image = \"graphql-engine:v2.36.0\" |"
+SERVICES="$SERVICES .services.aptos-indexer-hasura.container_name = \"aptos-indexer-api\" |"
+SERVICES="$SERVICES .services.aptos-indexer-hasura.environment.PG_DATABASE_URL = \"postgres://postgres@$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+71)}'):5432/local_testnet\" |"
+SERVICES="$SERVICES .services.aptos-indexer-hasura.environment.HASURA_GRAPHQL_METADATA_DATABASE_URL = \"postgres://postgres@$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+71)}'):5432/local_testnet\" |"
+SERVICES="$SERVICES .services.aptos-indexer-hasura.environment.INDEXER_V2_POSTGRES_URL = \"postgres://postgres@$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+71)}'):5432/local_testnet\" |"
+SERVICES="$SERVICES .services.aptos-indexer-hasura.environment.HASURA_GRAPHQL_DEV_MODE = \"true\" |"
+SERVICES="$SERVICES .services.aptos-indexer-hasura.environment.HASURA_GRAPHQL_ENABLE_CONSOLE = \"true\" |"
+SERVICES="$SERVICES .services.aptos-indexer-hasura.environment.HASURA_GRAPHQL_CONSOLE_ASSETS_DIR = \"/srv/console-assets\" |"
+SERVICES="$SERVICES .services.aptos-indexer-hasura.environment.HASURA_GRAPHQL_SERVER_PORT = \"8090\" |"
+SERVICES="$SERVICES .services.aptos-indexer-hasura.depends_on.migration-check.condition = \"service_completed_successfully\" |"
+SERVICES="$SERVICES .services.aptos-indexer-hasura.networks.custom_network.ipv4_address = \"$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+70)}')\" |"
+SERVICES="$SERVICES .services.aptos-indexer-hasura.restart = \"unless-stopped\" |"
+SERVICES="$SERVICES .services.aptos-indexer-hasura.expose = [8090] |"
+
+
 for i in $(seq 1 "$NODE_COUNT"); do
     if [ "$i" -gt 1 ]; then
         SERVICES="$SERVICES |"
@@ -134,7 +188,6 @@ for i in $(seq 1 "$NODE_COUNT"); do
     fi
 done
 
-
 # NODE_URL is the first validator node for the faucet to connect to
 yq eval -n "
   .services.faucet.image = \"aptos-node:$DOCKER_TAG\" |
@@ -155,6 +208,7 @@ yq eval -n "
   .services.healthcheck.environment.NODE_COUNT = \"$NODE_COUNT\" |
   .services.healthcheck.environment.NETWORK_IP = \"$NETWORK_IP\" |
   .services.healthcheck.environment.NODE_URL = \"http://$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+11)}'):8080\" |
+  .services.healthcheck.environment.INDEXER_URL = \"http://$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+70)}'):8090\" |
   .services.healthcheck.volumes = [\"./healthcheck.sh:/usr/local/bin/healthcheck.sh\"] |
   .services.healthcheck.networks.custom_network.ipv4_address = \"$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+50)}')\" |
   .services.client.image = \"aptos-client:$DOCKER_TAG\" |
@@ -169,6 +223,19 @@ yq eval -n "
   .services.client.restart = \"unless-stopped\" |
   .networks.custom_network.driver = \"bridge\" |
   .networks.custom_network.ipam.config[0].subnet = \"$NETWORK_IP/24\" |
+  .services.aptos-indexer-postgres.image = \"postgres:14\" |
+  .services.aptos-indexer-postgres.container_name = \"aptos-indexer-postgres\" |
+  .services.aptos-indexer-postgres.hostname = \"aptos-indexer-postgres\" |
+  .services.aptos-indexer-postgres.environment.POSTGRES_USER = \"postgres\" |
+  .services.aptos-indexer-postgres.environment.POSTGRES_HOST_AUTH_METHOD = \"trust\" |
+  .services.aptos-indexer-postgres.environment.POSTGRES_DB = \"local_testnet\" |
+  .services.aptos-indexer-postgres.healthcheck.test = [\"CMD-SHELL\", \"pg_isready -U postgres\"] |
+  .services.aptos-indexer-postgres.healthcheck.interval = \"5s\" |
+  .services.aptos-indexer-postgres.healthcheck.timeout = \"5s\" |
+  .services.aptos-indexer-postgres.healthcheck.retries = 5 |
+  .services.aptos-indexer-postgres.restart = \"unless-stopped\" |
+  .services.aptos-indexer-postgres.expose = [5432] |
+  .services.aptos-indexer-postgres.networks.custom_network.ipv4_address = \"$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+71)}')\" |
   $SERVICES
 " > "$GENESIS_DIR/docker-compose.yml"
 

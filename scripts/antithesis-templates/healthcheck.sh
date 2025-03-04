@@ -2,6 +2,7 @@
 
 NODE_COUNT=$1
 NETWORK_IP=$2
+INDEXER_URL=$3
 
 if [ -z "$ANTITHESIS_OUTPUT_DIR" ]; then
   echo "ANTITHESIS_OUTPUT_DIR is not set"
@@ -30,6 +31,15 @@ while true; do
   FOUNDING_SUCCESS=$?
 
   if [ $FOUNDING_SUCCESS -eq 0 ] && [ ${#HEALTHY_NODES[@]} -eq "$NODE_COUNT" ]; then
+    until curl -s "$INDEXER_URL/healthz" > /dev/null; do
+      echo "Waiting for Hasura..."
+      sleep 2
+    done
+    curl -X POST "$INDEXER_URL/v1/metadata" \
+    -H "Content-Type: application/json" \
+    -d @/opt/aptos/etc/hasura_metadata.json
+    printf "\n"
+
     echo "All nodes are healthy!"
     #JSONL message to sdk.jsonl
     echo '{"antithesis_setup": { "status": "complete", "details": null }}' >> "$ANTITHESIS_OUTPUT_DIR/sdk.jsonl"

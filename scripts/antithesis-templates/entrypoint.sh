@@ -25,7 +25,7 @@ elif [ "$ROLE" = "healthcheck" ]; then
   sleep 60
   echo "Starting aptos-healthcheck"
   chmod +x /usr/local/bin/healthcheck.sh
-  exec /usr/local/bin/healthcheck.sh "$NODE_COUNT" "$NETWORK_IP"
+  exec /usr/local/bin/healthcheck.sh "$NODE_COUNT" "$NETWORK_IP" "$INDEXER_URL"
 else
   echo "ERROR: Unknown ROLE: ${ROLE}"
   exit 1
