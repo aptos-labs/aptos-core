@@ -78,6 +78,8 @@ type SubmitTransactionsBatchResult<T> =
 
 type SimulateTransactionResult<T> = poem::Result<BasicResponse<T>, SubmitTransactionError>;
 
+const TWO_APT: u64 = 200000000;
+
 // TODO: Consider making both content types accept either
 // SubmitTransactionRequest or SignedTransaction, the way
 // it is now is quite confusing.
@@ -668,30 +670,55 @@ impl TransactionsApi {
                             AptosErrorCode::InvalidInput,
                         )
                     })?;
-                let output = AptosVM::execute_view_function(
-                    &state_view,
-                    ModuleId::new(AccountAddress::ONE, ident_str!("coin").into()),
-                    ident_str!("balance").into(),
-                    vec![AptosCoinType::type_tag()],
-                    vec![signed_transaction.sender().to_vec()],
-                    context.node_config.api.max_gas_view_function,
-                );
-                let values = output.values.map_err(|status| {
-                    let (err_string, vm_error_code) =
-                        convert_view_function_error(&status, &state_view, &context);
-                    SubmitTransactionError::bad_request_with_optional_vm_status_and_ledger_info(
-                        anyhow::anyhow!(err_string),
-                        AptosErrorCode::InvalidInput,
-                        vm_error_code,
-                        Some(&ledger_info),
-                    )
-                })?;
-                let balance: u64 = bcs::from_bytes(&values[0]).map_err(|err| {
-                    SubmitTransactionError::bad_request_with_code_no_info(
-                        err,
-                        AptosErrorCode::InvalidInput,
-                    )
-                })?;
+
+                // To determine who to check the amount of, need to determine if there's a fee payer
+                let fee_payer_address = if let Some(address) =
+                    signed_transaction.authenticator_ref().fee_payer_address()
+                {
+                    if address.eq(&AccountAddress::ZERO) {
+                        // This means we don't know who the fee payer is, but there is one.
+                        // In this case, we'll have to estimate based on the max gas amount, though
+                        // it may fail
+                        None
+                    } else {
+                        // If it's defined, then use that address
+                        Some(address)
+                    }
+                } else {
+                    // If no fee payer, use the sender
+                    Some(signed_transaction.sender())
+                };
+
+                let balance: u64 = if let Some(fee_payer_address) = fee_payer_address {
+                    let output = AptosVM::execute_view_function(
+                        &state_view,
+                        ModuleId::new(AccountAddress::ONE, ident_str!("coin").into()),
+                        ident_str!("balance").into(),
+                        vec![AptosCoinType::type_tag()],
+                        vec![fee_payer_address.to_vec()],
+                        context.node_config.api.max_gas_view_function,
+                    );
+                    let values = output.values.map_err(|status| {
+                        let (err_string, vm_error_code) =
+                            convert_view_function_error(&status, &state_view, &context);
+                        SubmitTransactionError::bad_request_with_optional_vm_status_and_ledger_info(
+                            anyhow::anyhow!(err_string),
+                            AptosErrorCode::InvalidInput,
+                            vm_error_code,
+                            Some(&ledger_info),
+                        )
+                    })?;
+                    bcs::from_bytes(&values[0]).map_err(|err| {
+                        SubmitTransactionError::bad_request_with_code_no_info(
+                            err,
+                            AptosErrorCode::InvalidInput,
+                        )
+                    })?
+                } else {
+                    // If we don't know who's paying, we just have to put in an assumed number, right
+                    // now we'll assume 2 APT
+                    TWO_APT
+                };
 
                 let gas_unit_price =
                     estimated_gas_unit_price.unwrap_or_else(|| signed_transaction.gas_unit_price());
