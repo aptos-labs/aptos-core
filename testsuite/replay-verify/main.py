@@ -554,7 +554,14 @@ def read_skip_ranges(network: str) -> tuple[int, int, list[tuple[int, int]]]:
         (int(range["start_version"]), int(range["end_version"]))
         for range in data["skip_ranges"]
     ]
-    return (data["start"], data["end"], skip_ranges)
+
+    end = int(json.loads(
+        urllib.request.urlopen(f"https://fullnode.{network}.aptoslabs.com/v1")
+        .read()
+        .decode()
+    )["ledger_version"])
+
+    return (data["start"], end, skip_ranges)
 
 
 def parse_args() -> argparse.Namespace:
