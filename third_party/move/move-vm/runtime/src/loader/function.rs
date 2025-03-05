@@ -171,6 +171,7 @@ impl LazyLoadedFunction {
             LazyLoadedFunctionState::Unresolved {
                 data:
                     SerializedFunctionData {
+                        format_version: _,
                         module_id,
                         fun_id,
                         ty_args,
