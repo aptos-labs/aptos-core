@@ -106,7 +106,6 @@ const TEST_CONFIGS: &[TestConfig] = &[
         experiments: &[
             (Experiment::OPTIMIZE, true),
             (Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true),
-            (Experiment::FUNCTION_VALUES, true),
         ],
         language_version: LanguageVersion::V2_2,
         include: &["/closures/"],

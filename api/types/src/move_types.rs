@@ -4,7 +4,9 @@
 
 use crate::{Address, Bytecode, IdentifierWrapper, VerifyInput, VerifyInputWithRecursion};
 use anyhow::{bail, format_err};
-use aptos_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
+use aptos_resource_viewer::{
+    AnnotatedMoveClosure, AnnotatedMoveStruct, AnnotatedMoveValue, RawMoveStruct,
+};
 use aptos_types::{account_config::CORE_CODE_ADDRESS, event::EventKey, transaction::Module};
 use move_binary_format::{
     access::ModuleAccess,
@@ -14,7 +16,7 @@ use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::{ModuleId, StructTag, TypeTag},
+    language_storage::{FunctionTag, ModuleId, StructTag, TypeTag},
     parser::{parse_struct_tag, parse_type_tag},
     transaction_argument::TransactionArgument,
 };
@@ -215,7 +217,7 @@ impl HexEncodedBytes {
     }
 }
 
-/// A JSON map representation of a Move struct's inner types
+/// A JSON map representation of a Move struct's or closure's inner values
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MoveStructValue(pub BTreeMap<IdentifierWrapper, serde_json::Value>);
 
@@ -232,6 +234,81 @@ impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
         }
         for (id, val) in s.value {
             map.insert(id.into(), MoveValue::try_from(val)?.json()?);
+        }
+        Ok(Self(map))
+    }
+}
+
+impl TryFrom<RawMoveStruct> for MoveStructValue {
+    type Error = anyhow::Error;
+
+    fn try_from(s: RawMoveStruct) -> anyhow::Result<Self> {
+        let mut map = BTreeMap::new();
+        if let Some(tag) = s.variant_info {
+            map.insert(
+                IdentifierWrapper::from_str("__variant_tag__")?,
+                MoveValue::U16(tag).json()?,
+            );
+        }
+        for (pos, val) in s.field_values.into_iter().enumerate() {
+            map.insert(
+                IdentifierWrapper::from_str(&pos.to_string())?,
+                MoveValue::try_from(val)?.json()?,
+            );
+        }
+        Ok(Self(map))
+    }
+}
+
+impl TryFrom<AnnotatedMoveClosure> for MoveStructValue {
+    type Error = anyhow::Error;
+
+    fn try_from(s: AnnotatedMoveClosure) -> anyhow::Result<Self> {
+        let mut map = BTreeMap::new();
+        let AnnotatedMoveClosure {
+            module_id,
+            fun_id,
+            ty_args,
+            mask,
+            captured,
+        } = s;
+        map.insert(
+            IdentifierWrapper::from_str("__fun_name__")?,
+            MoveValue::String(format!(
+                "0x{}::{}::{}",
+                module_id.address.short_str_lossless(),
+                module_id.name,
+                fun_id
+            ))
+            .json()?,
+        );
+        if !ty_args.is_empty() {
+            map.insert(
+                IdentifierWrapper::from_str("__ty_args__")?,
+                MoveValue::Vector(
+                    ty_args
+                        .iter()
+                        .map(|ty| MoveValue::String(ty.to_canonical_string()))
+                        .collect(),
+                )
+                .json()?,
+            );
+        }
+        map.insert(
+            IdentifierWrapper::from_str("__mask__")?,
+            MoveValue::String(mask.to_string()).json()?,
+        );
+        if !captured.is_empty() {
+            map.insert(
+                IdentifierWrapper::from_str("__captured__")?,
+                MoveValue::Vector(
+                    captured
+                        .into_iter()
+                        .map(MoveValue::try_from)
+                        .collect::<anyhow::Result<Vec<_>>>()?,
+                )
+                .json()?,
+            );
         }
         Ok(Self(map))
     }
@@ -313,6 +390,8 @@ impl TryFrom<AnnotatedMoveValue> for MoveValue {
                     MoveValue::Struct(v.try_into()?)
                 }
             },
+            AnnotatedMoveValue::RawStruct(v) => MoveValue::Struct(v.try_into()?),
+            AnnotatedMoveValue::Closure(c) => MoveValue::Struct(c.try_into()?),
         })
     }
 }
@@ -509,6 +588,12 @@ pub enum MoveType {
     Vector { items: Box<MoveType> },
     /// A struct of [`MoveStructTag`]
     Struct(MoveStructTag),
+    /// A function
+    Function {
+        args: Vec<MoveType>,
+        results: Vec<MoveType>,
+        abilities: AbilitySet,
+    },
     /// A generic type param with index
     GenericTypeParam { index: u16 },
     /// A reference
@@ -536,6 +621,12 @@ impl VerifyInputWithRecursion for MoveType {
         match self {
             MoveType::Vector { items } => items.verify(recursion_count + 1),
             MoveType::Struct(struct_tag) => struct_tag.verify(recursion_count + 1),
+            MoveType::Function { args, results, .. } => {
+                for ty in args.iter().chain(results) {
+                    ty.verify(recursion_count + 1)?
+                }
+                Ok(())
+            },
             MoveType::GenericTypeParam { .. } => Ok(()),
             MoveType::Reference { to, .. } => to.verify(recursion_count + 1),
             MoveType::Unparsable(inner) => bail!("Unable to parse move type {}", inner),
@@ -571,6 +662,10 @@ impl MoveType {
             MoveType::Struct(_) | MoveType::GenericTypeParam { index: _ } => {
                 "string<move_struct_tag_id>".to_owned()
             },
+            MoveType::Function { .. } => {
+                // TODO(#15664): what to put here for functions?
+                "string<move_function_id>".to_owned()
+            },
             MoveType::Reference { mutable: _, to } => to.json_type_name(),
             MoveType::Unparsable(string) => string.to_string(),
         }
@@ -598,6 +693,21 @@ impl fmt::Display for MoveType {
                 } else {
                     write!(f, "&{}", to)
                 }
+            },
+            MoveType::Function { args, results, .. } => {
+                write!(
+                    f,
+                    "|{}|{}",
+                    args.iter()
+                        .map(|ty| ty.to_string())
+                        .collect::<Vec<_>>()
+                        .join(","),
+                    results
+                        .iter()
+                        .map(|ty| ty.to_string())
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
             },
             MoveType::Unparsable(string) => write!(f, "unparsable<{}>", string),
         }
@@ -686,11 +796,22 @@ impl From<&TypeTag> for MoveType {
                 items: Box::new(MoveType::from(v.as_ref())),
             },
             TypeTag::Struct(v) => MoveType::Struct(v.as_ref().into()),
-            TypeTag::Function(..) => {
-                // TODO(#15664): support function values
-                MoveType::Unparsable("Function types are not supported".to_string())
-            },
+            TypeTag::Function(f) => from_function_tag(f),
         }
+    }
+}
+
+fn from_function_tag(f: &FunctionTag) -> MoveType {
+    let FunctionTag {
+        args,
+        results,
+        abilities,
+    } = f;
+    let from_vec = |tys: &[TypeTag]| tys.iter().map(MoveType::from).collect::<Vec<_>>();
+    MoveType::Function {
+        args: from_vec(args),
+        results: from_vec(results),
+        abilities: *abilities,
     }
 }
 
@@ -710,6 +831,22 @@ impl TryFrom<&MoveType> for TypeTag {
             MoveType::Signer => TypeTag::Signer,
             MoveType::Vector { items } => TypeTag::Vector(Box::new(items.as_ref().try_into()?)),
             MoveType::Struct(v) => TypeTag::Struct(Box::new(v.try_into()?)),
+            MoveType::Function {
+                args,
+                results,
+                abilities,
+            } => {
+                let try_vec = |tys: &[MoveType]| {
+                    tys.iter()
+                        .map(Self::try_from)
+                        .collect::<anyhow::Result<_>>()
+                };
+                TypeTag::Function(Box::new(FunctionTag {
+                    args: try_vec(args)?,
+                    results: try_vec(results)?,
+                    abilities: *abilities,
+                }))
+            },
             MoveType::GenericTypeParam { index: _ } => TypeTag::Address, // Dummy type, allows for Object<T>
             _ => {
                 return Err(anyhow::anyhow!(
