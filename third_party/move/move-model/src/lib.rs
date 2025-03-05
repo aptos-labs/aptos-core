@@ -65,6 +65,7 @@ pub mod sourcifier;
 pub mod spec_translator;
 pub mod symbol;
 pub mod ty;
+pub mod ty_invariant_analysis;
 pub mod well_known;
 
 pub use builder::binary_module_loader;
