@@ -23,7 +23,7 @@ from archive_disk_utils import (
     get_kubectl_credentials,
 )
 
-SHARDING_ENABLED = False
+SHARDING_ENABLED = True
 MAX_RETRIES = 5
 RETRY_DELAY = 20  # seconds
 QUERY_DELAY = 5  # seconds
