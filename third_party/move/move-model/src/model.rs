@@ -31,9 +31,9 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{
-        AbilityInference, AbilityInferer, NoUnificationContext, Type, TypeDisplayContext,
-        TypeUnificationAdapter, Variance,
+        AbilityInference, AbilityInferer, NoUnificationContext, Type, TypeDisplayContext, Variance,
     },
+    ty_invariant_analysis::TypeUnificationAdapter,
     well_known,
 };
 use anyhow::bail;
