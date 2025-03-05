@@ -6,7 +6,7 @@ module 0x42::test {
     }
 
     struct Function has store {
-        f: |u64| u64 with store,
+        f: |u64| u64 has store,
         key: u64
     }
 
@@ -25,7 +25,7 @@ module 0x42::test {
         x
     }
 
-    fun replace_or_add_function(v: &mut vector<Function>, k: u64, f: |u64| u64 with store): Option<Function> {
+    fun replace_or_add_function(v: &mut vector<Function>, k: u64, f: |u64| u64 has store): Option<Function> {
         let done = false;
         vector::for_each_mut(v, |f: &mut Function| {
             if (f.key == k) {
@@ -39,7 +39,7 @@ module 0x42::test {
         }
     }
 
-    fun register(owner: &signer, f: |u64| u64 with store, k: u64) acquires Registry {
+    fun register(owner: &signer, f: |u64| u64 has store, k: u64) acquires Registry {
         let addr = owner.address;
         if (!exists<Registry>(addr)) {
             let new_registry = Registry {
@@ -88,12 +88,12 @@ module 0x42::test {
         x * y
     }
 
-    fun multiply_by_x(x: u64): |u64|u64 with store {
+    fun multiply_by_x(x: u64): |u64|u64 has store {
         |y| multiply(x, y)
     }
 
-    fun multiply_by_x2(x: u64): |u64|u64 with store {
-        move |y| multiply(x, y)
+    fun multiply_by_x2(x: u64): |u64|u64 has store {
+        |y| multiply(x, y)
     }
 
     #[test(a = @0x42)]

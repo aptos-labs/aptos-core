@@ -5,6 +5,7 @@
 use crate::{
     config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
     module_traversal::TraversalContext, storage::module_storage::ModuleStorage, CodeStorage,
+    LayoutConverter,
 };
 use hashbrown::Equivalent;
 use lazy_static::lazy_static;
@@ -15,7 +16,6 @@ use move_binary_format::{
         CompiledModule, CompiledScript, Constant, ConstantPoolIndex, FieldHandleIndex,
         FieldInstantiationIndex, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex,
         StructDefInstantiationIndex, StructDefinitionIndex, StructFieldInformation, TableIndex,
-        TypeParameterIndex,
     },
     IndexKind,
 };
@@ -23,25 +23,28 @@ use move_bytecode_verifier::{self, cyclic_dependencies, dependencies};
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{NumBytes, NumTypeNodes},
-    ident_str,
     identifier::IdentStr,
     language_storage::{ModuleId, StructTag, TypeTag},
-    value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
+    value::MoveTypeLayout,
     vm_status::StatusCode,
 };
+use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::runtime_types::{
-        AbilityInfo, DepthFormula, StructIdentifier, StructNameIndex, StructType, Type,
+    loaded_data::{
+        runtime_types::{AbilityInfo, StructType, Type},
+        struct_name_indexing::StructNameIndex,
     },
     sha3_256,
+    value_serde::FunctionValueExtension,
 };
 use parking_lot::{Mutex, RwLock};
 use std::{
-    collections::{btree_map, BTreeMap, BTreeSet},
+    collections::{btree_map, BTreeMap, BTreeSet, HashMap},
     hash::Hash,
     sync::Arc,
 };
+use type_loader::intern_type;
 use typed_arena::Arena;
 
 mod access_specifier_loader;
@@ -54,27 +57,33 @@ use crate::{
     loader::modules::{StructVariantInfo, VariantFieldInfo},
     native_functions::NativeFunctions,
     storage::{
-        loader::LoaderV2, module_storage::FunctionValueExtensionAdapter,
-        struct_name_index_map::StructNameIndexMap, ty_cache::StructInfoCache,
-        ty_tag_cache::TypeTagBuilder,
+        loader::LoaderV2,
+        module_storage::FunctionValueExtensionAdapter,
+        ty_layout_converter::LoaderLayoutConverter,
+        ty_tag_converter::{PricedStructTag, TypeTagCache, TypeTagConverter},
     },
 };
 pub use function::{Function, LoadedFunction};
-pub(crate) use function::{FunctionHandle, FunctionInstantiation, LoadedFunctionOwner};
+pub(crate) use function::{
+    FunctionHandle, FunctionInstantiation, LazyLoadedFunction, LazyLoadedFunctionState,
+    LoadedFunctionOwner,
+};
 pub use modules::Module;
 pub(crate) use modules::{LegacyModuleCache, LegacyModuleStorage, LegacyModuleStorageAdapter};
 use move_binary_format::file_format::{
-    StructVariantHandleIndex, StructVariantInstantiationIndex, VariantFieldHandleIndex,
-    VariantFieldInstantiationIndex, VariantIndex,
+    StructVariantHandleIndex, StructVariantInstantiationIndex, TypeParameterIndex,
+    VariantFieldHandleIndex, VariantFieldInstantiationIndex, VariantIndex,
 };
-use move_vm_metrics::{Timer, VM_TIMER};
+use move_core_types::language_storage::FunctionTag;
 use move_vm_types::{
-    loaded_data::runtime_types::{StructLayout, TypeBuilder},
-    value_serde::FunctionValueExtension,
+    loaded_data::{
+        runtime_types::{DepthFormula, StructLayout, TypeBuilder},
+        struct_name_indexing::StructNameIndexMap,
+    },
+    values::{AbstractFunction, SerializedFunctionData},
 };
 pub use script::Script;
 pub(crate) use script::ScriptCache;
-use type_loader::intern_type;
 
 type ScriptHash = [u8; 32];
 
@@ -131,7 +140,6 @@ lazy_static! {
 // Loader
 //
 
-#[derive(Clone)]
 pub(crate) enum Loader {
     V1(LoaderV1),
     V2(LoaderV2),
@@ -153,13 +161,6 @@ impl Loader {
 
     versioned_loader_getter!(ty_builder, TypeBuilder);
 
-    fn ty_cache<'a>(&'a self, module_storage: &'a dyn ModuleStorage) -> &StructInfoCache {
-        match self {
-            Self::V1(loader) => &loader.type_cache,
-            Self::V2(_) => module_storage.runtime_environment().ty_cache(),
-        }
-    }
-
     pub(crate) fn struct_name_index_map<'a>(
         &'a self,
         module_storage: &'a dyn ModuleStorage,
@@ -173,7 +174,7 @@ impl Loader {
     pub(crate) fn v1(natives: NativeFunctions, vm_config: VMConfig) -> Self {
         Self::V1(LoaderV1 {
             scripts: RwLock::new(ScriptCache::new()),
-            type_cache: StructInfoCache::empty(),
+            type_cache: TypeTagCache::empty(),
             name_cache: StructNameIndexMap::empty(),
             natives,
             invalidated: RwLock::new(false),
@@ -375,7 +376,7 @@ impl Loader {
 // The `pub(crate)` API is what a Loader offers to the runtime.
 pub(crate) struct LoaderV1 {
     scripts: RwLock<ScriptCache>,
-    type_cache: StructInfoCache,
+    type_cache: TypeTagCache,
     natives: NativeFunctions,
     pub(crate) name_cache: StructNameIndexMap,
 
@@ -410,20 +411,6 @@ pub(crate) struct LoaderV1 {
     module_cache_hits: RwLock<BTreeSet<ModuleId>>,
 
     vm_config: VMConfig,
-}
-
-impl Clone for LoaderV1 {
-    fn clone(&self) -> Self {
-        Self {
-            scripts: RwLock::new(self.scripts.read().clone()),
-            type_cache: self.type_cache.clone(),
-            natives: self.natives.clone(),
-            name_cache: self.name_cache.clone(),
-            invalidated: RwLock::new(*self.invalidated.read()),
-            module_cache_hits: RwLock::new(self.module_cache_hits.read().clone()),
-            vm_config: self.vm_config.clone(),
-        }
-    }
 }
 
 impl LoaderV1 {
@@ -1607,27 +1594,26 @@ impl<'a> Resolver<'a> {
     }
 
     pub(crate) fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
-        self.loader
-            .type_to_type_layout(ty, self.module_store, self.module_storage)
+        self.layout_converter().type_to_type_layout(ty)
     }
 
     pub(crate) fn type_to_type_layout_with_identifier_mappings(
         &self,
         ty: &Type,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        self.loader.type_to_type_layout_with_identifier_mappings(
-            ty,
-            self.module_store,
-            self.module_storage,
-        )
+        self.layout_converter()
+            .type_to_type_layout_with_identifier_mappings(ty)
     }
 
     pub(crate) fn type_to_fully_annotated_layout(
         &self,
         ty: &Type,
     ) -> PartialVMResult<MoveTypeLayout> {
-        self.loader
-            .type_to_fully_annotated_layout(ty, self.module_store, self.module_storage)
+        self.layout_converter().type_to_fully_annotated_layout(ty)
+    }
+
+    pub(crate) fn layout_converter(&self) -> LoaderLayoutConverter {
+        LoaderLayoutConverter::new(self.loader, self.module_store, self.module_storage)
     }
 
     //
@@ -1663,14 +1649,30 @@ impl<'a> FunctionValueExtension for Resolver<'a> {
         };
         function_value_extension.get_function_arg_tys(module_id, function_name, ty_arg_tags)
     }
+
+    fn create_from_serialization_data(
+        &self,
+        data: SerializedFunctionData,
+    ) -> PartialVMResult<Box<dyn AbstractFunction>> {
+        let function_value_extension = FunctionValueExtensionAdapter {
+            module_storage: self.module_storage,
+        };
+        function_value_extension.create_from_serialization_data(data)
+    }
+
+    fn get_serialization_data(
+        &self,
+        fun: &dyn AbstractFunction,
+    ) -> PartialVMResult<SerializedFunctionData> {
+        let function_value_extension = FunctionValueExtensionAdapter {
+            module_storage: self.module_storage,
+        };
+        function_value_extension.get_serialization_data(fun)
+    }
 }
 
 /// Maximal depth of a value in terms of type depth.
 pub const VALUE_DEPTH_MAX: u64 = 128;
-
-/// Maximal nodes which are allowed when converting to layout. This includes the types of
-/// fields for struct types.
-const MAX_TYPE_TO_LAYOUT_NODES: u64 = 256;
 
 pub(crate) struct PseudoGasContext {
     // Parameters for metering type tag construction:
@@ -1729,9 +1731,9 @@ impl LoaderV1 {
         ty_args: &[Type],
         gas_context: &mut PseudoGasContext,
     ) -> PartialVMResult<StructTag> {
-        if let Some((struct_tag, gas)) = self.type_cache.get_struct_tag(&struct_name_idx, ty_args) {
-            gas_context.charge(gas)?;
-            return Ok(struct_tag.clone());
+        if let Some(priced_tag) = self.type_cache.get_struct_tag(&struct_name_idx, ty_args) {
+            gas_context.charge(priced_tag.pseudo_gas_cost)?;
+            return Ok(priced_tag.struct_tag);
         }
 
         let cur_cost = gas_context.current_cost();
@@ -1745,16 +1747,17 @@ impl LoaderV1 {
             .idx_to_struct_tag(struct_name_idx, type_args)?;
 
         gas_context.charge_struct_tag(&struct_tag)?;
-        self.type_cache.store_struct_tag(
-            struct_name_idx,
-            ty_args.to_vec(),
-            struct_tag.clone(),
-            gas_context.current_cost() - cur_cost,
-        );
-        Ok(struct_tag)
+
+        let priced_tag = PricedStructTag {
+            struct_tag,
+            pseudo_gas_cost: gas_context.current_cost() - cur_cost,
+        };
+        self.type_cache
+            .insert_struct_tag(&struct_name_idx, ty_args, &priced_tag);
+        Ok(priced_tag.struct_tag)
     }
 
-    fn type_to_type_tag_impl(
+    pub(crate) fn type_to_type_tag_impl(
         &self,
         ty: &Type,
         gas_context: &mut PseudoGasContext,
@@ -1782,6 +1785,24 @@ impl LoaderV1 {
             Type::StructInstantiation { idx, ty_args, .. } => TypeTag::Struct(Box::new(
                 self.struct_name_to_type_tag(*idx, ty_args, gas_context)?,
             )),
+            Type::Function {
+                args,
+                results,
+                abilities,
+            } => {
+                let to_vec = |ts: &[Type],
+                              gas_ctx: &mut PseudoGasContext|
+                 -> PartialVMResult<Vec<TypeTag>> {
+                    ts.iter()
+                        .map(|t| self.type_to_type_tag_impl(t, gas_ctx))
+                        .collect()
+                };
+                TypeTag::Function(Box::new(FunctionTag {
+                    args: to_vec(args, gas_context)?,
+                    results: to_vec(results, gas_context)?,
+                    abilities: *abilities,
+                }))
+            },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -1793,400 +1814,21 @@ impl LoaderV1 {
 }
 
 impl Loader {
-    fn struct_name_to_type_layout(
-        &self,
-        struct_name_idx: StructNameIndex,
-        module_store: &LegacyModuleStorageAdapter,
-        module_storage: &dyn ModuleStorage,
-        ty_args: &[Type],
-        count: &mut u64,
-        depth: u64,
-    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        let ty_cache = self.ty_cache(module_storage);
-        if let Some((struct_layout, node_count, has_identifier_mappings)) =
-            ty_cache.get_struct_layout_info(&struct_name_idx, ty_args)
-        {
-            *count += node_count;
-            return Ok((struct_layout, has_identifier_mappings));
-        }
-
-        let count_before = *count;
-        let struct_type =
-            self.fetch_struct_ty_by_idx(struct_name_idx, module_store, module_storage)?;
-
-        let mut has_identifier_mappings = false;
-
-        let layout = match &struct_type.layout {
-            StructLayout::Single(fields) => {
-                // Some types can have fields which are lifted at serialization or deserialization
-                // times. Right now these are Aggregator and AggregatorSnapshot.
-                let struct_name = self
-                    .struct_name_index_map(module_storage)
-                    .idx_to_struct_name_ref(struct_name_idx)?;
-                let maybe_mapping = self.get_identifier_mapping_kind(struct_name.as_ref());
-
-                let field_tys = fields
-                    .iter()
-                    .map(|(_, ty)| self.ty_builder().create_ty_with_subst(ty, ty_args))
-                    .collect::<PartialVMResult<Vec<_>>>()?;
-                let (mut field_layouts, field_has_identifier_mappings): (
-                    Vec<MoveTypeLayout>,
-                    Vec<bool>,
-                ) = field_tys
-                    .iter()
-                    .map(|ty| {
-                        self.type_to_type_layout_impl(
-                            ty,
-                            module_store,
-                            module_storage,
-                            count,
-                            depth,
-                        )
-                    })
-                    .collect::<PartialVMResult<Vec<_>>>()?
-                    .into_iter()
-                    .unzip();
-
-                has_identifier_mappings =
-                    maybe_mapping.is_some() || field_has_identifier_mappings.into_iter().any(|b| b);
-
-                let layout = if Some(IdentifierMappingKind::DerivedString) == maybe_mapping {
-                    // For DerivedString, the whole object should be lifted.
-                    MoveTypeLayout::Native(
-                        IdentifierMappingKind::DerivedString,
-                        Box::new(MoveTypeLayout::Struct(MoveStructLayout::new(field_layouts))),
-                    )
-                } else {
-                    // For aggregators / snapshots, the first field should be lifted.
-                    if let Some(kind) = &maybe_mapping {
-                        if let Some(l) = field_layouts.first_mut() {
-                            *l = MoveTypeLayout::Native(kind.clone(), Box::new(l.clone()));
-                        }
-                    }
-                    MoveTypeLayout::Struct(MoveStructLayout::new(field_layouts))
-                };
-                layout
-            },
-            StructLayout::Variants(variants) => {
-                // We do not support variants to have direct identifier mappings,
-                // but their inner types may.
-                let variant_layouts = variants
-                    .iter()
-                    .map(|variant| {
-                        variant
-                            .1
-                            .iter()
-                            .map(|(_, ty)| {
-                                let ty = self.ty_builder().create_ty_with_subst(ty, ty_args)?;
-                                let (ty, has_id_mappings) = self.type_to_type_layout_impl(
-                                    &ty,
-                                    module_store,
-                                    module_storage,
-                                    count,
-                                    depth,
-                                )?;
-                                has_identifier_mappings |= has_id_mappings;
-                                Ok(ty)
-                            })
-                            .collect::<PartialVMResult<Vec<_>>>()
-                    })
-                    .collect::<PartialVMResult<Vec<_>>>()?;
-                MoveTypeLayout::Struct(MoveStructLayout::RuntimeVariants(variant_layouts))
-            },
-        };
-
-        let field_node_count = *count - count_before;
-        ty_cache.store_struct_layout_info(
-            struct_name_idx,
-            ty_args.to_vec(),
-            layout.clone(),
-            field_node_count,
-            has_identifier_mappings,
-        );
-        Ok((layout, has_identifier_mappings))
-    }
-
-    // TODO[agg_v2](cleanup):
-    // Currently aggregator checks are hardcoded and leaking to loader.
-    // It seems that this is only because there is no support for native
-    // types.
-    // Let's think how we can do this nicer.
-    fn get_identifier_mapping_kind(
-        &self,
-        struct_name: &StructIdentifier,
-    ) -> Option<IdentifierMappingKind> {
-        if !self.vm_config().delayed_field_optimization_enabled {
-            return None;
-        }
-
-        let ident_str_to_kind = |ident_str: &IdentStr| -> Option<IdentifierMappingKind> {
-            if ident_str.eq(ident_str!("Aggregator")) {
-                Some(IdentifierMappingKind::Aggregator)
-            } else if ident_str.eq(ident_str!("AggregatorSnapshot")) {
-                Some(IdentifierMappingKind::Snapshot)
-            } else if ident_str.eq(ident_str!("DerivedStringSnapshot")) {
-                Some(IdentifierMappingKind::DerivedString)
-            } else {
-                None
-            }
-        };
-
-        (struct_name.module.address().eq(&AccountAddress::ONE)
-            && struct_name.module.name().eq(ident_str!("aggregator_v2")))
-        .then_some(ident_str_to_kind(struct_name.name.as_ident_str()))
-        .flatten()
-    }
-
-    fn type_to_type_layout_impl(
+    pub(crate) fn type_to_type_tag(
         &self,
         ty: &Type,
-        module_store: &LegacyModuleStorageAdapter,
         module_storage: &dyn ModuleStorage,
-        count: &mut u64,
-        depth: u64,
-    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        if *count > MAX_TYPE_TO_LAYOUT_NODES {
-            return Err(
-                PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
-                    "Number of type nodes when constructing type layout exceeded the maximum of {}",
-                    MAX_TYPE_TO_LAYOUT_NODES
-                )),
-            );
-        }
-        if depth > VALUE_DEPTH_MAX {
-            return Err(
-                PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED).with_message(format!(
-                    "Depth of a layout exceeded the maximum of {} during construction",
-                    VALUE_DEPTH_MAX
-                )),
-            );
-        }
-        Ok(match ty {
-            Type::Bool => {
-                *count += 1;
-                (MoveTypeLayout::Bool, false)
-            },
-            Type::U8 => {
-                *count += 1;
-                (MoveTypeLayout::U8, false)
-            },
-            Type::U16 => {
-                *count += 1;
-                (MoveTypeLayout::U16, false)
-            },
-            Type::U32 => {
-                *count += 1;
-                (MoveTypeLayout::U32, false)
-            },
-            Type::U64 => {
-                *count += 1;
-                (MoveTypeLayout::U64, false)
-            },
-            Type::U128 => {
-                *count += 1;
-                (MoveTypeLayout::U128, false)
-            },
-            Type::U256 => {
-                *count += 1;
-                (MoveTypeLayout::U256, false)
-            },
-            Type::Address => {
-                *count += 1;
-                (MoveTypeLayout::Address, false)
-            },
-            Type::Signer => {
-                *count += 1;
-                (MoveTypeLayout::Signer, false)
-            },
-            Type::Vector(ty) => {
-                *count += 1;
-                let (layout, has_identifier_mappings) = self.type_to_type_layout_impl(
-                    ty,
-                    module_store,
-                    module_storage,
-                    count,
-                    depth + 1,
-                )?;
-                (
-                    MoveTypeLayout::Vector(Box::new(layout)),
-                    has_identifier_mappings,
-                )
-            },
-            Type::Struct { idx, .. } => {
-                *count += 1;
-                let (layout, has_identifier_mappings) = self.struct_name_to_type_layout(
-                    *idx,
-                    module_store,
-                    module_storage,
-                    &[],
-                    count,
-                    depth + 1,
-                )?;
-                (layout, has_identifier_mappings)
-            },
-            Type::StructInstantiation { idx, ty_args, .. } => {
-                *count += 1;
-                let (layout, has_identifier_mappings) = self.struct_name_to_type_layout(
-                    *idx,
-                    module_store,
-                    module_storage,
-                    ty_args,
-                    count,
-                    depth + 1,
-                )?;
-                (layout, has_identifier_mappings)
-            },
-            Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
-                return Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(format!("No type layout for {:?}", ty)),
-                );
-            },
-        })
-    }
-
-    fn struct_name_to_fully_annotated_layout(
-        &self,
-        struct_name_idx: StructNameIndex,
-        module_store: &LegacyModuleStorageAdapter,
-        module_storage: &dyn ModuleStorage,
-        ty_args: &[Type],
-        count: &mut u64,
-        depth: u64,
-    ) -> PartialVMResult<MoveTypeLayout> {
-        let ty_cache = self.ty_cache(module_storage);
-        if let Some((layout, annotated_node_count)) =
-            ty_cache.get_annotated_struct_layout_info(&struct_name_idx, ty_args)
-        {
-            *count += annotated_node_count;
-            return Ok(layout);
-        }
-
-        let struct_type =
-            self.fetch_struct_ty_by_idx(struct_name_idx, module_store, module_storage)?;
-
-        // TODO(#13806): have annotated layouts for variants. Currently, we just return the raw
-        //   layout for them.
-        if matches!(struct_type.layout, StructLayout::Variants(_)) {
-            return self
-                .struct_name_to_type_layout(
-                    struct_name_idx,
-                    module_store,
-                    module_storage,
-                    ty_args,
-                    count,
-                    depth,
-                )
-                .map(|(l, _)| l);
-        }
-
-        let count_before = *count;
-        let struct_tag = match self {
+    ) -> PartialVMResult<TypeTag> {
+        match self {
             Loader::V1(loader) => {
-                let mut gas_context = PseudoGasContext::new(loader.vm_config());
-                loader.struct_name_to_type_tag(struct_name_idx, ty_args, &mut gas_context)?
+                let mut gas_context = PseudoGasContext::new(self.vm_config());
+                loader.type_to_type_tag_impl(ty, &mut gas_context)
             },
             Loader::V2(_) => {
-                let ty_tag_builder = TypeTagBuilder::new(module_storage.runtime_environment());
-                ty_tag_builder.struct_name_idx_to_struct_tag(&struct_name_idx, ty_args)?
+                let ty_tag_builder = TypeTagConverter::new(module_storage.runtime_environment());
+                ty_tag_builder.ty_to_ty_tag(ty)
             },
-        };
-        let fields = struct_type.fields(None)?;
-
-        let field_layouts = fields
-            .iter()
-            .map(|(n, ty)| {
-                let ty = self.ty_builder().create_ty_with_subst(ty, ty_args)?;
-                let l = self.type_to_fully_annotated_layout_impl(
-                    &ty,
-                    module_store,
-                    module_storage,
-                    count,
-                    depth,
-                )?;
-                Ok(MoveFieldLayout::new(n.clone(), l))
-            })
-            .collect::<PartialVMResult<Vec<_>>>()?;
-        let struct_layout =
-            MoveTypeLayout::Struct(MoveStructLayout::with_types(struct_tag, field_layouts));
-        let field_node_count = *count - count_before;
-
-        ty_cache.store_annotated_struct_layout_info(
-            struct_name_idx,
-            ty_args.to_vec(),
-            struct_layout.clone(),
-            field_node_count,
-        );
-        Ok(struct_layout)
-    }
-
-    fn type_to_fully_annotated_layout_impl(
-        &self,
-        ty: &Type,
-        module_store: &LegacyModuleStorageAdapter,
-        module_storage: &dyn ModuleStorage,
-        count: &mut u64,
-        depth: u64,
-    ) -> PartialVMResult<MoveTypeLayout> {
-        if *count > MAX_TYPE_TO_LAYOUT_NODES {
-            return Err(
-                PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
-                    "Number of type nodes when constructing type layout exceeded the maximum of {}",
-                    MAX_TYPE_TO_LAYOUT_NODES
-                )),
-            );
         }
-        if depth > VALUE_DEPTH_MAX {
-            return Err(
-                PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED).with_message(format!(
-                    "Depth of a layout exceeded the maximum of {} during construction",
-                    VALUE_DEPTH_MAX
-                )),
-            );
-        }
-        Ok(match ty {
-            Type::Bool => MoveTypeLayout::Bool,
-            Type::U8 => MoveTypeLayout::U8,
-            Type::U16 => MoveTypeLayout::U16,
-            Type::U32 => MoveTypeLayout::U32,
-            Type::U64 => MoveTypeLayout::U64,
-            Type::U128 => MoveTypeLayout::U128,
-            Type::U256 => MoveTypeLayout::U256,
-            Type::Address => MoveTypeLayout::Address,
-            Type::Signer => MoveTypeLayout::Signer,
-            Type::Vector(ty) => {
-                MoveTypeLayout::Vector(Box::new(self.type_to_fully_annotated_layout_impl(
-                    ty,
-                    module_store,
-                    module_storage,
-                    count,
-                    depth + 1,
-                )?))
-            },
-            Type::Struct { idx, .. } => self.struct_name_to_fully_annotated_layout(
-                *idx,
-                module_store,
-                module_storage,
-                &[],
-                count,
-                depth + 1,
-            )?,
-            Type::StructInstantiation { idx, ty_args, .. } => self
-                .struct_name_to_fully_annotated_layout(
-                    *idx,
-                    module_store,
-                    module_storage,
-                    ty_args,
-                    count,
-                    depth + 1,
-                )?,
-            Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
-                return Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(format!("No type layout for {:?}", ty)),
-                );
-            },
-        })
     }
 
     pub(crate) fn calculate_depth_of_struct(
@@ -2194,10 +1836,10 @@ impl Loader {
         struct_name_idx: StructNameIndex,
         module_store: &LegacyModuleStorageAdapter,
         module_storage: &dyn ModuleStorage,
+        visited_cache: &mut HashMap<StructNameIndex, DepthFormula>,
     ) -> PartialVMResult<DepthFormula> {
-        let ty_cache = self.ty_cache(module_storage);
-        if let Some(depth_formula) = ty_cache.get_depth_formula(&struct_name_idx) {
-            return Ok(depth_formula);
+        if let Some(depth_formula) = visited_cache.get(&struct_name_idx) {
+            return Ok(depth_formula.clone());
         }
 
         let struct_type =
@@ -2206,22 +1848,46 @@ impl Loader {
             StructLayout::Single(fields) => fields
                 .iter()
                 .map(|(_, field_ty)| {
-                    self.calculate_depth_of_type(field_ty, module_store, module_storage)
+                    self.calculate_depth_of_type(
+                        field_ty,
+                        module_store,
+                        module_storage,
+                        visited_cache,
+                    )
                 })
                 .collect::<PartialVMResult<Vec<_>>>()?,
             StructLayout::Variants(variants) => variants
                 .iter()
                 .flat_map(|variant| variant.1.iter().map(|(_, ty)| ty))
                 .map(|field_ty| {
-                    self.calculate_depth_of_type(field_ty, module_store, module_storage)
+                    self.calculate_depth_of_type(
+                        field_ty,
+                        module_store,
+                        module_storage,
+                        visited_cache,
+                    )
                 })
                 .collect::<PartialVMResult<Vec<_>>>()?,
         };
 
         let formula = DepthFormula::normalize(formulas);
-
-        let struct_name_index_map = self.struct_name_index_map(module_storage);
-        ty_cache.store_depth_formula(struct_name_idx, struct_name_index_map, &formula)?;
+        if visited_cache
+            .insert(struct_name_idx, formula.clone())
+            .is_some()
+        {
+            // Same thread has put this entry previously, which means there is a recursion.
+            let struct_name = self
+                .struct_name_index_map(module_storage)
+                .idx_to_struct_name_ref(struct_name_idx)?;
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                    format!(
+                        "Depth formula for struct '{}' is already cached by the same thread",
+                        struct_name.as_ref(),
+                    ),
+                ),
+            );
+        }
         Ok(formula)
     }
 
@@ -2230,6 +1896,7 @@ impl Loader {
         ty: &Type,
         module_store: &LegacyModuleStorageAdapter,
         module_storage: &dyn ModuleStorage,
+        visited_cache: &mut HashMap<StructNameIndex, DepthFormula>,
     ) -> PartialVMResult<DepthFormula> {
         Ok(match ty {
             Type::Bool
@@ -2242,19 +1909,25 @@ impl Loader {
             | Type::U32
             | Type::U256 => DepthFormula::constant(1),
             Type::Vector(ty) => {
-                let mut inner = self.calculate_depth_of_type(ty, module_store, module_storage)?;
+                let mut inner =
+                    self.calculate_depth_of_type(ty, module_store, module_storage, visited_cache)?;
                 inner.scale(1);
                 inner
             },
             Type::Reference(ty) | Type::MutableReference(ty) => {
-                let mut inner = self.calculate_depth_of_type(ty, module_store, module_storage)?;
+                let mut inner =
+                    self.calculate_depth_of_type(ty, module_store, module_storage, visited_cache)?;
                 inner.scale(1);
                 inner
             },
             Type::TyParam(ty_idx) => DepthFormula::type_parameter(*ty_idx),
             Type::Struct { idx, .. } => {
-                let mut struct_formula =
-                    self.calculate_depth_of_struct(*idx, module_store, module_storage)?;
+                let mut struct_formula = self.calculate_depth_of_struct(
+                    *idx,
+                    module_store,
+                    module_storage,
+                    visited_cache,
+                )?;
                 debug_assert!(struct_formula.terms.is_empty());
                 struct_formula.scale(1);
                 struct_formula
@@ -2267,109 +1940,55 @@ impl Loader {
                         let var = idx as TypeParameterIndex;
                         Ok((
                             var,
-                            self.calculate_depth_of_type(ty, module_store, module_storage)?,
+                            self.calculate_depth_of_type(
+                                ty,
+                                module_store,
+                                module_storage,
+                                visited_cache,
+                            )?,
                         ))
                     })
                     .collect::<PartialVMResult<BTreeMap<_, _>>>()?;
-                let struct_formula =
-                    self.calculate_depth_of_struct(*idx, module_store, module_storage)?;
+                let struct_formula = self.calculate_depth_of_struct(
+                    *idx,
+                    module_store,
+                    module_storage,
+                    visited_cache,
+                )?;
                 let mut subst_struct_formula = struct_formula.subst(ty_arg_map)?;
                 subst_struct_formula.scale(1);
                 subst_struct_formula
             },
+            Type::Function {
+                args,
+                results,
+                abilities: _,
+            } => {
+                let mut inner = DepthFormula::normalize(
+                    args.iter()
+                        .chain(results)
+                        .map(|arg_ty| {
+                            self.calculate_depth_of_type(
+                                arg_ty,
+                                module_store,
+                                module_storage,
+                                visited_cache,
+                            )
+                        })
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                );
+                inner.scale(1);
+                inner
+            },
         })
-    }
-
-    pub(crate) fn type_to_type_tag(
-        &self,
-        ty: &Type,
-        module_storage: &dyn ModuleStorage,
-    ) -> PartialVMResult<TypeTag> {
-        match self {
-            Loader::V1(loader) => {
-                let mut gas_context = PseudoGasContext::new(self.vm_config());
-                loader.type_to_type_tag_impl(ty, &mut gas_context)
-            },
-            Loader::V2(_) => {
-                let ty_tag_builder = TypeTagBuilder::new(module_storage.runtime_environment());
-                ty_tag_builder.ty_to_ty_tag(ty)
-            },
-        }
-    }
-
-    pub(crate) fn type_to_type_layout_with_identifier_mappings(
-        &self,
-        ty: &Type,
-        module_store: &LegacyModuleStorageAdapter,
-        module_storage: &dyn ModuleStorage,
-    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        let mut count = 0;
-        self.type_to_type_layout_impl(ty, module_store, module_storage, &mut count, 1)
-    }
-
-    pub(crate) fn type_to_type_layout(
-        &self,
-        ty: &Type,
-        module_store: &LegacyModuleStorageAdapter,
-        module_storage: &dyn ModuleStorage,
-    ) -> PartialVMResult<MoveTypeLayout> {
-        let mut count = 0;
-        let (layout, _has_identifier_mappings) =
-            self.type_to_type_layout_impl(ty, module_store, module_storage, &mut count, 1)?;
-        Ok(layout)
-    }
-
-    pub(crate) fn type_to_fully_annotated_layout(
-        &self,
-        ty: &Type,
-        module_store: &LegacyModuleStorageAdapter,
-        module_storage: &dyn ModuleStorage,
-    ) -> PartialVMResult<MoveTypeLayout> {
-        let mut count = 0;
-        self.type_to_fully_annotated_layout_impl(ty, module_store, module_storage, &mut count, 1)
-    }
-}
-
-// Public APIs for external uses.
-impl Loader {
-    pub(crate) fn get_type_layout(
-        &self,
-        type_tag: &TypeTag,
-        move_storage: &mut TransactionDataCache,
-        module_storage_adapter: &LegacyModuleStorageAdapter,
-        module_storage: &impl ModuleStorage,
-    ) -> VMResult<MoveTypeLayout> {
-        let ty = self.load_type(
-            type_tag,
-            move_storage,
-            module_storage_adapter,
-            module_storage,
-        )?;
-        self.type_to_type_layout(&ty, module_storage_adapter, module_storage)
-            .map_err(|e| e.finish(Location::Undefined))
-    }
-
-    pub(crate) fn get_fully_annotated_type_layout(
-        &self,
-        type_tag: &TypeTag,
-        move_storage: &mut TransactionDataCache,
-        module_storage_adapter: &LegacyModuleStorageAdapter,
-        module_storage: &impl ModuleStorage,
-    ) -> VMResult<MoveTypeLayout> {
-        let ty = self.load_type(
-            type_tag,
-            move_storage,
-            module_storage_adapter,
-            module_storage,
-        )?;
-        self.type_to_fully_annotated_layout(&ty, module_storage_adapter, module_storage)
-            .map_err(|e| e.finish(Location::Undefined))
     }
 }
 
 // Matches the actual returned type to the expected type, binding any type args to the
 // necessary type as stored in the map. The expected type must be a concrete type (no TyParam).
 // Returns true if a successful match is made.
+// TODO: is this really needed in presence of paranoid mode? This does a deep structural
+//   comparison and is expensive.
 fn match_return_type<'a>(
     returned: &Type,
     expected: &'a Type,
@@ -2391,6 +2010,31 @@ fn match_return_type<'a>(
         },
         (Type::Vector(ret_inner), Type::Vector(expected_inner)) => {
             match_return_type(ret_inner, expected_inner, map)
+        },
+        // Function types, the expected abilities need to be equal to the provided ones,
+        // and recursively argument and result types need to match.
+        (
+            Type::Function {
+                args,
+                results,
+                abilities,
+            },
+            Type::Function {
+                args: exp_args,
+                results: exp_results,
+                abilities: exp_abilities,
+            },
+        ) if abilities == exp_abilities
+            && args.len() == exp_args.len()
+            && results.len() == exp_results.len() =>
+        {
+            args.iter()
+                .zip(exp_args)
+                .all(|(t, e)| match_return_type(t, e, map))
+                && results
+                    .iter()
+                    .zip(exp_results)
+                    .all(|(t, e)| match_return_type(t, e, map))
         },
         // Abilities should not contribute to the equality check as they just serve for caching computations.
         // For structs the both need to be the same struct.
@@ -2444,6 +2088,7 @@ fn match_return_type<'a>(
         | (Type::Signer, _)
         | (Type::Struct { .. }, _)
         | (Type::StructInstantiation { .. }, _)
+        | (Type::Function { .. }, _)
         | (Type::Vector(_), _)
         | (Type::MutableReference(_), _)
         | (Type::Reference(_), _) => false,

@@ -10,14 +10,17 @@ use crate::{
     },
     test_utils::{create_vec_signed_transactions, mock_quorum_store_sender::MockQuorumStoreSender},
 };
-use aptos_consensus_types::proof_of_store::{BatchId, SignedBatchInfo, SignedBatchInfoMsg};
+use aptos_consensus_types::proof_of_store::{
+    BatchId, BatchInfo, SignedBatchInfo, SignedBatchInfoMsg,
+};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_types::{
     transaction::SignedTransaction, validator_verifier::random_validator_verifier, PeerId,
 };
+use futures::future::Shared;
 use mini_moka::sync::Cache;
-use std::sync::Arc;
+use std::{future::Future, pin::Pin, sync::Arc};
 use tokio::sync::mpsc::channel;
 
 pub struct MockBatchReader {
@@ -31,10 +34,9 @@ impl BatchReader for MockBatchReader {
 
     fn get_batch(
         &self,
-        _digest: HashValue,
-        _expiration: u64,
+        _batch_info: BatchInfo,
         _signers: Vec<PeerId>,
-    ) -> tokio::sync::oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>> {
+    ) -> Shared<Pin<Box<dyn Future<Output = ExecutorResult<Vec<SignedTransaction>>> + Send>>> {
         unimplemented!()
     }
 

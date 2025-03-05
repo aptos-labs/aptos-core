@@ -34,7 +34,7 @@ use move_model::metadata::{CompilationMetadata, CompilerVersion, LanguageVersion
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     process::Command,
     str,
 };
@@ -267,11 +267,43 @@ impl BytecodeCommand {
 
     fn disassemble(&self, bytecode_path: &Path) -> Result<String, CliError> {
         let bytecode_bytes = read_from_file(bytecode_path)?;
-        let move_path = bytecode_path.with_extension(MOVE_EXTENSION);
-        let source_map_path = bytecode_path.with_extension(SOURCE_MAP_EXTENSION);
 
-        let source = fs::read_to_string(move_path).ok();
-        let source_map = source_map_from_file(&source_map_path).ok();
+        let source = {
+            let move_path = bytecode_path.with_extension(MOVE_EXTENSION);
+            if let Ok(source) = fs::read_to_string(move_path.clone()) {
+                Some(source)
+            } else {
+                let move_path = move_path
+                    .components()
+                    .map(|elt| {
+                        if elt.as_os_str() == "bytecode_modules" {
+                            Component::Normal("sources".as_ref())
+                        } else {
+                            elt
+                        }
+                    })
+                    .collect::<PathBuf>();
+                fs::read_to_string(move_path).ok()
+            }
+        };
+        let source_map = {
+            let source_map_path = bytecode_path.with_extension(SOURCE_MAP_EXTENSION);
+            if let Ok(source_map) = source_map_from_file(&source_map_path) {
+                Some(source_map)
+            } else {
+                let source_map_path = source_map_path
+                    .components()
+                    .map(|elt| {
+                        if elt.as_os_str() == "bytecode_modules" {
+                            Component::Normal("source_maps".as_ref())
+                        } else {
+                            elt
+                        }
+                    })
+                    .collect::<PathBuf>();
+                source_map_from_file(&source_map_path).ok()
+            }
+        };
 
         let disassembler_options = DisassemblerOptions {
             print_code: true,

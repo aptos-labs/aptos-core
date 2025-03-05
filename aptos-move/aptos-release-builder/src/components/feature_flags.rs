@@ -135,6 +135,12 @@ pub enum FeatureFlag {
     EnableLoaderV2,
     DisallowInitModuleToPublishModules,
     EnableCallTreeAndInstructionVMCache,
+    PermissionedSigner,
+    AccountAbstraction,
+    VMBinaryFormatV8,
+    BulletproofsBatchNatives,
+    DomainAccountAbstraction,
+    EnableFunctionValues,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -227,6 +233,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::AptosStdChainIdNatives => AptosFeatureFlag::APTOS_STD_CHAIN_ID_NATIVES,
             FeatureFlag::VMBinaryFormatV6 => AptosFeatureFlag::VM_BINARY_FORMAT_V6,
             FeatureFlag::VMBinaryFormatV7 => AptosFeatureFlag::VM_BINARY_FORMAT_V7,
+            FeatureFlag::VMBinaryFormatV8 => AptosFeatureFlag::VM_BINARY_FORMAT_V8,
             FeatureFlag::MultiEd25519PkValidateV2Natives => {
                 AptosFeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES
             },
@@ -356,11 +363,16 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::NativeMemoryOperations => AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS,
             FeatureFlag::EnableLoaderV2 => AptosFeatureFlag::ENABLE_LOADER_V2,
             FeatureFlag::DisallowInitModuleToPublishModules => {
-                AptosFeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES
+                AptosFeatureFlag::_DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES
             },
             FeatureFlag::EnableCallTreeAndInstructionVMCache => {
                 AptosFeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE
             },
+            FeatureFlag::PermissionedSigner => AptosFeatureFlag::PERMISSIONED_SIGNER,
+            FeatureFlag::AccountAbstraction => AptosFeatureFlag::ACCOUNT_ABSTRACTION,
+            FeatureFlag::BulletproofsBatchNatives => AptosFeatureFlag::BULLETPROOFS_BATCH_NATIVES,
+            FeatureFlag::DomainAccountAbstraction => AptosFeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION,
+            FeatureFlag::EnableFunctionValues => AptosFeatureFlag::ENABLE_FUNCTION_VALUES,
         }
     }
 }
@@ -380,6 +392,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::APTOS_STD_CHAIN_ID_NATIVES => FeatureFlag::AptosStdChainIdNatives,
             AptosFeatureFlag::VM_BINARY_FORMAT_V6 => FeatureFlag::VMBinaryFormatV6,
             AptosFeatureFlag::VM_BINARY_FORMAT_V7 => FeatureFlag::VMBinaryFormatV7,
+            AptosFeatureFlag::VM_BINARY_FORMAT_V8 => FeatureFlag::VMBinaryFormatV8,
             AptosFeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES => {
                 FeatureFlag::MultiEd25519PkValidateV2Natives
             },
@@ -508,12 +521,17 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::COLLECTION_OWNER => FeatureFlag::CollectionOwner,
             AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS => FeatureFlag::NativeMemoryOperations,
             AptosFeatureFlag::ENABLE_LOADER_V2 => FeatureFlag::EnableLoaderV2,
-            AptosFeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES => {
+            AptosFeatureFlag::_DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES => {
                 FeatureFlag::DisallowInitModuleToPublishModules
             },
             AptosFeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE => {
                 FeatureFlag::EnableCallTreeAndInstructionVMCache
             },
+            AptosFeatureFlag::PERMISSIONED_SIGNER => FeatureFlag::PermissionedSigner,
+            AptosFeatureFlag::ACCOUNT_ABSTRACTION => FeatureFlag::AccountAbstraction,
+            AptosFeatureFlag::BULLETPROOFS_BATCH_NATIVES => FeatureFlag::BulletproofsBatchNatives,
+            AptosFeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION => FeatureFlag::DomainAccountAbstraction,
+            AptosFeatureFlag::ENABLE_FUNCTION_VALUES => FeatureFlag::EnableFunctionValues,
         }
     }
 }

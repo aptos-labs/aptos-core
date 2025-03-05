@@ -20,6 +20,22 @@
 - name: SAS
   value: {{ .config.azure.sas }}
 {{- end }}
+{{- if hasPrefix "r2" (toString .config.location) }}
+- name: BUCKET
+  value: {{ .config.r2.bucket }}
+- name: R2_ENDPOINT_URL
+  value: {{ .config.r2.endpoint_url }}
+- name: AWS_ACCESS_KEY_ID
+  valueFrom:
+    secretKeyRef:
+      name: r2-credentials
+      key: access-key-id
+- name: AWS_SECRET_ACCESS_KEY
+  valueFrom:
+    secretKeyRef:
+      name: r2-credentials
+      key: secret-access-key
+{{- end }}
 {{- if hasPrefix "scw_s3" (toString .config.location) }}
 - name: AWS_ACCESS_KEY_ID
   value: {{ .config.scw_s3.access_key }}

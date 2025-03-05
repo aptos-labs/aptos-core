@@ -5,23 +5,22 @@
 use crate::compiler::compile_modules_in_file;
 use move_binary_format::{
     file_format::{
-        empty_module, AbilitySet, AddressIdentifierIndex, Bytecode, CodeUnit, FunctionDefinition,
+        empty_module, AddressIdentifierIndex, Bytecode, CodeUnit, FunctionDefinition,
         FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandle, ModuleHandleIndex,
         SignatureIndex, StructHandle, StructTypeParameter, TableIndex, Visibility,
     },
     CompiledModule,
 };
-use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
+    ability::AbilitySet,
     account_address::AccountAddress,
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
 };
 use move_vm_runtime::{
-    config::VMConfig, module_traversal::*, move_vm::MoveVM,
-    unreachable_code_storage::UnreachableCodeStorage, AsUnsyncModuleStorage, ModuleStorage,
-    RuntimeEnvironment, StagingModuleStorage,
+    module_traversal::*, move_vm::MoveVM, unreachable_code_storage::UnreachableCodeStorage,
+    AsUnsyncModuleStorage, ModuleStorage, StagingModuleStorage, WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -32,7 +31,6 @@ const WORKING_ACCOUNT: AccountAddress = AccountAddress::TWO;
 struct Adapter {
     store: InMemoryStorage,
     vm: Arc<MoveVM>,
-    runtime_environment: RuntimeEnvironment,
     functions: Vec<(ModuleId, Identifier)>,
 }
 
@@ -61,37 +59,25 @@ impl Adapter {
             ),
         ];
 
-        let config = VMConfig {
-            verifier_config: VerifierConfig {
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], config);
-        let vm = Arc::new(MoveVM::new_with_runtime_environment(&runtime_environment));
+        let vm = Arc::new(MoveVM::new_with_runtime_environment(
+            store.runtime_environment(),
+        ));
 
         Self {
             store,
             vm,
-            runtime_environment,
             functions,
         }
     }
 
     fn fresh(self) -> Self {
-        let config = VMConfig {
-            verifier_config: VerifierConfig {
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], config);
-        let vm = Arc::new(MoveVM::new_with_runtime_environment(&runtime_environment));
+        let vm = Arc::new(MoveVM::new_with_runtime_environment(
+            self.store.runtime_environment(),
+        ));
 
         Self {
             store: self.store,
             vm,
-            runtime_environment,
             functions: self.functions,
         }
     }
@@ -223,8 +209,7 @@ fn load() {
 
     // calls all functions sequentially
     if adapter.vm.vm_config().use_loader_v2 {
-        let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(adapter.runtime_environment.clone());
+        let module_storage = InMemoryStorage::new().into_unsync_module_storage();
         let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
         adapter.call_functions(&module_storage);
     } else {
@@ -295,6 +280,7 @@ fn load_phantom_module() {
         return_: SignatureIndex(0),
         type_parameters: vec![],
         access_specifiers: None,
+        attributes: vec![],
     });
     module.function_defs.push(FunctionDefinition {
         function: FunctionHandleIndex(0),
@@ -312,8 +298,7 @@ fn load_phantom_module() {
     modules.push(module);
 
     if adapter.vm.vm_config().use_loader_v2 {
-        let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(adapter.runtime_environment.clone());
+        let module_storage = InMemoryStorage::new().into_unsync_module_storage();
         let new_module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
 
         let mut session = adapter.vm.new_session(&adapter.store);
@@ -362,6 +347,7 @@ fn load_with_extra_ability() {
         return_: SignatureIndex(0),
         type_parameters: vec![],
         access_specifiers: None,
+        attributes: vec![],
     });
     module.function_defs.push(FunctionDefinition {
         function: FunctionHandleIndex(0),
@@ -379,8 +365,7 @@ fn load_with_extra_ability() {
     modules.push(module);
 
     if adapter.vm.vm_config().use_loader_v2 {
-        let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(adapter.runtime_environment.clone());
+        let module_storage = InMemoryStorage::new().into_unsync_module_storage();
         let new_module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
 
         let mut session = adapter.vm.new_session(&adapter.store);
@@ -452,8 +437,7 @@ fn deep_dependency_list_ok_0() {
     let module = empty_module_with_dependencies(name, deps);
 
     if adapter.vm.vm_config().use_loader_v2 {
-        let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(adapter.runtime_environment.clone());
+        let module_storage = InMemoryStorage::new().into_unsync_module_storage();
         let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
         adapter.publish_modules_using_loader_v2(&module_storage, vec![module]);
     } else {
@@ -479,8 +463,7 @@ fn deep_dependency_list_ok_1() {
     let module = empty_module_with_dependencies(name, deps);
 
     if adapter.vm.vm_config().use_loader_v2 {
-        let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(adapter.runtime_environment.clone());
+        let module_storage = InMemoryStorage::new().into_unsync_module_storage();
         let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
         adapter.publish_modules_using_loader_v2(&module_storage, vec![module]);
     } else {
@@ -640,8 +623,7 @@ fn deep_friend_list_ok_0() {
     let module = empty_module_with_friends(name, deps);
 
     if adapter.vm.vm_config().use_loader_v2 {
-        let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(adapter.runtime_environment.clone());
+        let module_storage = InMemoryStorage::new().into_unsync_module_storage();
         let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
         adapter.publish_modules_using_loader_v2(&module_storage, vec![module]);
     } else {
@@ -667,8 +649,7 @@ fn deep_friend_list_ok_1() {
     let module = empty_module_with_friends(name, deps);
 
     if adapter.vm.vm_config().use_loader_v2 {
-        let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(adapter.runtime_environment.clone());
+        let module_storage = InMemoryStorage::new().into_unsync_module_storage();
         let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
         adapter.publish_modules_using_loader_v2(&module_storage, vec![module]);
     } else {

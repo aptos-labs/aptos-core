@@ -16,6 +16,8 @@ use move_vm_types::{
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
+const EPERMISSION_SIGNER_DISABLED: u64 = 9;
+
 /***************************************************************************************************
  * native fun is_permissioned_signer_impl
  *
@@ -29,6 +31,15 @@ fn native_is_permissioned_signer_impl(
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(arguments.len() == 1);
+
+    if !context
+        .get_feature_flags()
+        .is_enabled(aptos_types::on_chain_config::FeatureFlag::PERMISSIONED_SIGNER)
+    {
+        return SafeNativeResult::Err(SafeNativeError::Abort {
+            abort_code: EPERMISSION_SIGNER_DISABLED,
+        });
+    }
 
     let signer = safely_pop_arg!(arguments, SignerRef);
 
@@ -51,6 +62,15 @@ fn native_permission_address(
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(args.len() == 1);
+
+    if !context
+        .get_feature_flags()
+        .is_enabled(aptos_types::on_chain_config::FeatureFlag::PERMISSIONED_SIGNER)
+    {
+        return SafeNativeResult::Err(SafeNativeError::Abort {
+            abort_code: EPERMISSION_SIGNER_DISABLED,
+        });
+    }
 
     let signer = safely_pop_arg!(args, SignerRef);
 
@@ -75,6 +95,15 @@ fn native_signer_from_permissioned(
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(arguments.len() == 2);
+
+    if !context
+        .get_feature_flags()
+        .is_enabled(aptos_types::on_chain_config::FeatureFlag::PERMISSIONED_SIGNER)
+    {
+        return SafeNativeResult::Err(SafeNativeError::Abort {
+            abort_code: EPERMISSION_SIGNER_DISABLED,
+        });
+    }
 
     let permission_addr = safely_pop_arg!(arguments, AccountAddress);
     let master_addr = safely_pop_arg!(arguments, AccountAddress);

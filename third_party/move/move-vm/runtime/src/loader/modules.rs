@@ -9,7 +9,6 @@ use crate::{
         BinaryCache,
     },
     native_functions::NativeFunctions,
-    storage::struct_name_index_map::StructNameIndexMap,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -29,8 +28,9 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_metrics::{Timer, VM_TIMER};
-use move_vm_types::loaded_data::runtime_types::{
-    StructIdentifier, StructLayout, StructNameIndex, StructType, Type,
+use move_vm_types::loaded_data::{
+    runtime_types::{StructIdentifier, StructLayout, StructType, Type},
+    struct_name_indexing::{StructNameIndex, StructNameIndexMap},
 };
 use parking_lot::RwLock;
 use std::{
@@ -402,7 +402,8 @@ impl Module {
                 if let Some(code_unit) = &func.code {
                     for bc in &code_unit.code {
                         match bc {
-                            Bytecode::VecPack(si, _)
+                            Bytecode::CallClosure(si)
+                            | Bytecode::VecPack(si, _)
                             | Bytecode::VecLen(si)
                             | Bytecode::VecImmBorrow(si)
                             | Bytecode::VecMutBorrow(si)
@@ -575,7 +576,6 @@ impl Module {
     ) -> PartialVMResult<StructType> {
         let struct_handle = module.struct_handle_at(struct_def.struct_handle);
         let abilities = struct_handle.abilities;
-        let name = module.identifier_at(struct_handle.name).to_owned();
         let ty_params = struct_handle.type_parameters.clone();
         let layout = match &struct_def.field_information {
             StructFieldInformation::Native => unreachable!("native structs have been removed"),
@@ -613,8 +613,6 @@ impl Module {
             abilities,
             ty_params,
             idx: struct_name_table[struct_def.struct_handle.0 as usize],
-            module: module.self_id(),
-            name,
         })
     }
 

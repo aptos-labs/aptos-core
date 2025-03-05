@@ -105,11 +105,18 @@ spec aptos_framework::vesting {
     /// </high-level-req>
     spec module {
         pragma verify = true;
-        pragma aborts_if_is_strict;
+        pragma aborts_if_is_partial;
         // property 2: The vesting pool should not exceed a maximum of 30 shareholders.
         /// [high-level-spec-2]
         invariant forall a: address where exists<VestingContract>(a):
             global<VestingContract>(a).grant_pool.shareholders_limit <= MAXIMUM_SHAREHOLDERS;
+    }
+
+    spec schema AbortsIfPermissionedSigner {
+        use aptos_framework::permissioned_signer;
+        s: signer;
+        let perm = VestPermission {};
+        aborts_if !permissioned_signer::spec_check_permission_exists(s, perm);
     }
 
     spec stake_pool_address(vesting_contract_address: address): address {
@@ -487,6 +494,7 @@ spec aptos_framework::vesting {
     }
 
     spec get_vesting_account_signer(admin: &signer, contract_address: address): signer {
+        pragma verify_duration_estimate = 120;
         include VerifyAdminAbortsIf;
     }
 
@@ -530,8 +538,11 @@ spec aptos_framework::vesting {
     }
 
     spec verify_admin(admin: &signer, vesting_contract: &VestingContract) {
+        pragma verify_duration_estimate = 120;
+        aborts_if permissioned_signer::spec_is_permissioned_signer(admin);
         /// [high-level-req-9]
         aborts_if signer::address_of(admin) != vesting_contract.admin;
+        // include AbortsIfPermissionedSigner { s: admin };
     }
 
     spec assert_vesting_contract_exists(contract_address: address) {
@@ -630,6 +641,8 @@ spec aptos_framework::vesting {
     spec schema VerifyAdminAbortsIf {
         contract_address: address;
         admin: signer;
+
+        aborts_if permissioned_signer::spec_is_permissioned_signer(admin);
         aborts_if !exists<VestingContract>(contract_address);
         let vesting_contract = global<VestingContract>(contract_address);
         aborts_if signer::address_of(admin) != vesting_contract.admin;

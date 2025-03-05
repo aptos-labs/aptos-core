@@ -6,14 +6,14 @@
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use move_binary_format::file_format::{
-    empty_module, AbilitySet, Bytecode, CodeUnit, Constant, FieldDefinition, FunctionDefinition,
+    empty_module, Bytecode, CodeUnit, Constant, FieldDefinition, FunctionDefinition,
     FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandleIndex, Signature,
     SignatureIndex, SignatureToken,
     SignatureToken::{Address, Bool},
     StructDefinition, StructFieldInformation, StructHandle, StructHandleIndex, TypeSignature,
     Visibility,
 };
-use move_core_types::{account_address::AccountAddress, ident_str};
+use move_core_types::{ability::AbilitySet, account_address::AccountAddress, ident_str};
 use utils::helpers::compiled_module_serde;
 mod utils;
 
@@ -43,6 +43,7 @@ fuzz_target!(|mix: Mixed| {
         return_: SignatureIndex(1),
         type_parameters: vec![],
         access_specifiers: None,
+        attributes: vec![],
     };
 
     module.function_handles.push(fun_handle);

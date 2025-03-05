@@ -144,8 +144,9 @@ impl BinaryUpdater for AptosUpdateTool {
                 // OpenSSL 3.x.x, meaning Ubuntu 22.04. Otherwise we use the one built
                 // on 20.04.
                 if version.starts_with('3') {
-                    "Ubuntu-22.04-x86_64"
+                    "Linux-x86_64"
                 } else {
+                    eprintln!("Warning: OpenSSL 1.x.x is deprecated, and so is the CLI associated.  It may not work or have future updates");
                     "Ubuntu-x86_64"
                 }
             },

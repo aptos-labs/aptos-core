@@ -54,6 +54,7 @@ diesel = { workspace = true, features = [
 digest = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }
+move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }

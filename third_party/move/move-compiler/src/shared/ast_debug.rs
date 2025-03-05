@@ -5,7 +5,7 @@
 /// Simple trait used for pretty printing the various AST
 ///
 /// Unfortunately, the trait implementation cannot be derived. The actual implementation should
-/// closely resemble the source syntax. As suchfield does not get printed in a direct manner, and
+/// closely resemble the source syntax. As such, field does not get printed in a direct manner, and
 /// most of the logic is ad hoc
 ///
 /// To avoid missing fields in the printing, be sure to fully pattern match against the struct

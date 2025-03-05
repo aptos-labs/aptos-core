@@ -8,7 +8,9 @@ use crate::{
     transaction_deduper::TransactionDeduper, transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
-use aptos_consensus_types::{block::Block, pipelined_block::PipelinedBlock};
+use aptos_consensus_types::{
+    block::Block, pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
+};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_types::{
@@ -32,6 +34,7 @@ pub trait StateComputer: Send + Sync {
         // The parent block root hash.
         _parent_block_id: HashValue,
         _randomness: Option<Randomness>,
+        _block_qc: Option<Arc<QuorumCert>>,
         _lifetime_guard: CountedRequest<()>,
     ) -> StateComputeResultFut {
         unimplemented!();

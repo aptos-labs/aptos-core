@@ -65,6 +65,7 @@ use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, Genes
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
     module_and_script_storage::{module_storage::AptosModuleStorage, AsAptosCodeStorage},
+    resolver::NoopBlockSynchronizationKillSwitch,
     storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
@@ -823,10 +824,10 @@ impl FakeExecutor {
 
         // TODO(Gas): revisit this.
         let env = AptosEnvironment::new(&self.data_store);
-        let vm = AptosVM::new(env.clone(), self.get_state_view());
+        let vm = AptosVM::new(&env, self.get_state_view());
 
         let resolver = self.data_store.as_move_resolver();
-        let code_storage = self.get_state_view().as_aptos_code_storage(env.clone());
+        let code_storage = self.get_state_view().as_aptos_code_storage(&env);
 
         let (_status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,
@@ -896,11 +897,11 @@ impl FakeExecutor {
     /// Validates the given transaction by running it through the VM validator.
     pub fn validate_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
         let env = AptosEnvironment::new(&self.data_store);
-        let vm = AptosVM::new(env.clone(), self.get_state_view());
+        let vm = AptosVM::new(&env, self.get_state_view());
         vm.validate_transaction(
             txn,
             &self.data_store,
-            &self.data_store.as_aptos_code_storage(env),
+            &self.data_store.as_aptos_code_storage(&env),
         )
     }
 
@@ -1016,11 +1017,11 @@ impl FakeExecutor {
 
         let env = AptosEnvironment::new(&self.data_store);
         let resolver = self.data_store.as_move_resolver();
-        let vm = MoveVmExt::new(env.clone(), &resolver);
+        let vm = MoveVmExt::new(&env);
 
         // Create module storage, and ensure the module for the function we want to execute is
         // cached.
-        let module_storage = self.data_store.as_aptos_code_storage(env.clone());
+        let module_storage = self.data_store.as_aptos_code_storage(&env);
         assert_ok!(module_storage.fetch_verified_module(module.address(), module.name()));
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
@@ -1072,6 +1073,7 @@ impl FakeExecutor {
                         env.storage_gas_params().as_ref().unwrap().clone(),
                         false,
                         1_000_000_000_000_000.into(),
+                        &NoopBlockSynchronizationKillSwitch {},
                     )),
                     None,
                 ),
@@ -1161,9 +1163,9 @@ impl FakeExecutor {
                 }),
             );
             let resolver = self.data_store.as_move_resolver();
-            let vm = MoveVmExt::new(env.clone(), &resolver);
+            let vm = MoveVmExt::new(&env);
 
-            let module_storage = self.data_store.as_aptos_code_storage(env.clone());
+            let module_storage = self.data_store.as_aptos_code_storage(&env);
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             let fun_name = Self::name(function_name);
@@ -1182,6 +1184,7 @@ impl FakeExecutor {
                         env.storage_gas_params().as_ref().unwrap().clone(),
                         false,
                         10_000_000_000_000,
+                        &NoopBlockSynchronizationKillSwitch {},
                     ),
                     shared_buffer: Arc::clone(&a1),
                 }),
@@ -1221,9 +1224,9 @@ impl FakeExecutor {
         let (write_set, events) = {
             let env = AptosEnvironment::new(&self.data_store);
             let resolver = self.data_store.as_move_resolver();
-            let vm = MoveVmExt::new(env.clone(), &resolver);
+            let vm = MoveVmExt::new(&env);
 
-            let module_storage = self.data_store.as_aptos_code_storage(env.clone());
+            let module_storage = self.data_store.as_aptos_code_storage(&env);
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
             let storage = TraversalStorage::new();
             session
@@ -1264,9 +1267,9 @@ impl FakeExecutor {
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
         let env = AptosEnvironment::new(&self.data_store);
         let resolver = self.data_store.as_move_resolver();
-        let vm = MoveVmExt::new(env.clone(), &resolver);
+        let vm = MoveVmExt::new(&env);
 
-        let module_storage = self.data_store.as_aptos_code_storage(env.clone());
+        let module_storage = self.data_store.as_aptos_code_storage(&env);
 
         let mut session = vm.new_session(&resolver, SessionId::void(), None);
         let traversal_storage = TraversalStorage::new();

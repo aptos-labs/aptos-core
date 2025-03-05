@@ -23,7 +23,7 @@ pub(super) struct MockPayloadManager {}
 
 #[async_trait]
 impl TPayloadManager for MockPayloadManager {
-    fn prefetch_payload_data(&self, _payload: &Payload, _timestamp: u64) {}
+    fn prefetch_payload_data(&self, _payload: &Payload, _author: Author, _timestamp: u64) {}
 
     fn notify_commit(&self, _block_timestamp: u64, _payloads: Vec<Payload>) {}
 
@@ -34,6 +34,7 @@ impl TPayloadManager for MockPayloadManager {
     async fn get_transactions(
         &self,
         _block: &Block,
+        _block_signers: Option<BitVec>,
     ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
         Ok((Vec::new(), None))
     }

@@ -1,4 +1,6 @@
 ---
+AbilitySet:
+  NEWTYPESTRUCT: U8
 AbortInfo:
   STRUCT:
     - reason_name: STR
@@ -11,6 +13,20 @@ AbortLocation:
           TYPENAME: ModuleId
     1:
       Script: UNIT
+AbstractionAuthData:
+  ENUM:
+    0:
+      V1:
+        STRUCT:
+          - signing_message_digest: BYTES
+          - authenticator: BYTES
+    1:
+      DomainV1:
+        STRUCT:
+          - signing_message_digest: BYTES
+          - authenticator: BYTES
+          - account:
+              TYPENAME: DomainAccount
 AccessPath:
   STRUCT:
     - address:
@@ -49,6 +65,13 @@ AccountAuthenticator:
               TYPENAME: MultiKeyAuthenticator
     4:
       NoAccountAuthenticator: UNIT
+    5:
+      Abstraction:
+        STRUCT:
+          - function_info:
+              TYPENAME: FunctionInfo
+          - auth_data:
+              TYPENAME: AbstractionAuthData
 AggregateSignature:
   STRUCT:
     - validator_bitmask:
@@ -227,6 +250,12 @@ DKGTranscriptMetadata:
 DepositEvent:
   STRUCT:
     - amount: U64
+DomainAccount:
+  ENUM:
+    0:
+      V1:
+        STRUCT:
+          - account_identity: BYTES
 DeprecatedPayload:
   STRUCT:
     - dummy_value: U64
@@ -321,6 +350,22 @@ FederatedKeylessPublicKey:
         TYPENAME: AccountAddress
     - pk:
         TYPENAME: KeylessPublicKey
+FunctionInfo:
+  STRUCT:
+    - module_address:
+        TYPENAME: AccountAddress
+    - module_name: STR
+    - function_name: STR
+FunctionTag:
+  STRUCT:
+    - args:
+        SEQ:
+          TYPENAME: TypeTag
+    - results:
+        SEQ:
+          TYPENAME: TypeTag
+    - abilities:
+        TYPENAME: AbilitySet
 G1Bytes:
   NEWTYPESTRUCT:
     TUPLEARRAY:
@@ -762,6 +807,10 @@ TypeTag:
       u32: UNIT
     10:
       u256: UNIT
+    11:
+      Function:
+        NEWTYPE:
+          TYPENAME: FunctionTag
 ValidatorTransaction:
   ENUM:
     0:

@@ -38,7 +38,7 @@ use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::{
     access::ModuleAccess,
-    file_format::{Ability, AbilitySet, Constant, Visibility},
+    file_format::{Constant, Visibility},
     CompiledModule,
 };
 use move_bytecode_source_map::source_map::SourceMap;
@@ -48,6 +48,7 @@ use move_compiler::{
     parser::ast as PA,
     shared::{unique_map::UniqueMap, Identifier, Name},
 };
+use move_core_types::ability::{Ability, AbilitySet};
 use move_ir_types::{
     ast::ConstantName,
     location::{sp, Spanned},
@@ -1478,8 +1479,20 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         for (name_loc, field_name, (idx, ty)) in fields {
             let field_loc = et.to_loc(&name_loc);
             let field_sym = et.symbol_pool().make(field_name);
-            let field_ty = et.translate_type(ty);
+            let mut field_ty = et.translate_type(ty);
             let field_ty_loc = et.to_loc(&ty.loc);
+            // If the field type has a function type with empty abilities,
+            // assign struct abilities.
+            if let Type::Fun(arg, res, abilities) = &field_ty {
+                if abilities.is_empty() {
+                    let abilities = if struct_abilities.has_key() {
+                        struct_abilities.remove(Ability::Key).add(Ability::Store)
+                    } else {
+                        struct_abilities
+                    };
+                    field_ty = Type::Fun(arg.clone(), res.clone(), abilities)
+                }
+            }
             for ctr in Constraint::for_field(struct_abilities, &field_ty) {
                 et.add_constraint_and_report(
                     &field_ty_loc,
@@ -2597,7 +2610,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 let translated =
                     et.translate_seq(&loc, seq, &result_type, &ErrorMessageContext::Return);
                 et.finalize_types();
-                self.spec_funs[self.spec_fun_index].body = Some(translated.into_exp());
+                let translated = et.post_process_body(translated.into_exp());
+                self.spec_funs[self.spec_fun_index].body = Some(translated);
             },
             EA::FunctionBody_::Native => {
                 if !uninterpreted {

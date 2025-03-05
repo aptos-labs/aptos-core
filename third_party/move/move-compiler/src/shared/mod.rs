@@ -20,7 +20,6 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Debug},
     hash::Hash,
-    string::ToString,
     sync::atomic::{AtomicUsize, Ordering as AtomicOrdering},
 };
 
@@ -353,12 +352,6 @@ pub struct Flags {
     )]
     verify: bool,
 
-    /// Compilation flavor.
-    #[clap(
-        long = cli::FLAVOR,
-    )]
-    flavor: String,
-
     /// Bytecode version.
     #[clap(
         long = cli::BYTECODE_VERSION,
@@ -429,7 +422,6 @@ impl Flags {
             test: false,
             verify: false,
             shadow: false,
-            flavor: "".to_string(),
             bytecode_version: None,
             keep_testing_functions: false,
             skip_attribute_checks: false,
@@ -479,13 +471,6 @@ impl Flags {
         }
     }
 
-    pub fn set_flavor(self, flavor: impl ToString) -> Self {
-        Self {
-            flavor: flavor.to_string(),
-            ..self
-        }
-    }
-
     pub fn set_verify(self, value: bool) -> Self {
         Self {
             verify: value,
@@ -525,10 +510,6 @@ impl Flags {
 
     pub fn sources_shadow_deps(&self) -> bool {
         self.shadow
-    }
-
-    pub fn has_flavor(&self, flavor: &str) -> bool {
-        self.flavor == flavor
     }
 
     pub fn bytecode_version(&self) -> Option<u32> {
@@ -717,6 +698,7 @@ pub mod known_attributes {
         Native(NativeAttribute),
         Deprecation(DeprecationAttribute),
         Lint(LintAttribute),
+        Execution(ExecutionAttribute),
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -752,6 +734,14 @@ pub mod known_attributes {
     pub enum LintAttribute {
         // Allow the user to suppress a specific subset of lint warnings.
         Allow,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub enum ExecutionAttribute {
+        /// Marks a function as being persistent on upgrade (behave like a public function)
+        Persistent,
+        /// Marks a function to establish a module reentrancy lock during execution
+        ModuleLock,
     }
 
     impl fmt::Display for AttributePosition {
@@ -810,6 +800,7 @@ pub mod known_attributes {
             NativeAttribute::add_attribute_names(table);
             DeprecationAttribute::add_attribute_names(table);
             LintAttribute::add_attribute_names(table);
+            ExecutionAttribute::add_attribute_names(table);
         }
 
         fn name(&self) -> &str {
@@ -819,6 +810,7 @@ pub mod known_attributes {
                 Self::Native(a) => a.name(),
                 Self::Deprecation(a) => a.name(),
                 Self::Lint(a) => a.name(),
+                Self::Execution(a) => a.name(),
             }
         }
 
@@ -829,6 +821,7 @@ pub mod known_attributes {
                 Self::Native(a) => a.expected_positions(),
                 Self::Deprecation(a) => a.expected_positions(),
                 Self::Lint(a) => a.expected_positions(),
+                Self::Execution(a) => a.expected_positions(),
             }
         }
     }
@@ -1026,6 +1019,32 @@ pub mod known_attributes {
             match self {
                 Self::Allow => &ALLOW_POSITIONS,
             }
+        }
+    }
+
+    impl ExecutionAttribute {
+        const ALL_ATTRIBUTE_NAMES: [&'static str; 2] = [Self::MODULE_LOCK, Self::PERSISTENT];
+        pub const MODULE_LOCK: &'static str = "module_lock";
+        pub const PERSISTENT: &'static str = "persistent";
+    }
+    impl AttributeKind for ExecutionAttribute {
+        fn add_attribute_names(table: &mut BTreeSet<String>) {
+            for str in Self::ALL_ATTRIBUTE_NAMES {
+                table.insert(str.to_string());
+            }
+        }
+
+        fn name(&self) -> &str {
+            match self {
+                Self::Persistent => Self::PERSISTENT,
+                Self::ModuleLock => Self::MODULE_LOCK,
+            }
+        }
+
+        fn expected_positions(&self) -> &'static BTreeSet<AttributePosition> {
+            static POSITIONS: Lazy<BTreeSet<AttributePosition>> =
+                Lazy::new(|| IntoIterator::into_iter([AttributePosition::Function]).collect());
+            &POSITIONS
         }
     }
 }

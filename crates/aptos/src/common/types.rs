@@ -1181,6 +1181,7 @@ pub struct MovePackageDir {
     /// ...or --compiler COMPILER_VERSION
     /// Specify the version of the compiler.
     /// Defaults to the latest stable compiler version (at least 2)
+    /// Note: `aptos move prove` does not support v1
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
            alias = "compiler",
            default_value = LATEST_STABLE_COMPILER_VERSION,
@@ -1205,6 +1206,7 @@ pub struct MovePackageDir {
     pub move_2: bool,
 
     /// Select bytecode, language, and compiler versions for Move 1.
+    /// Note: `aptos move prove` does not support v1
     #[clap(long, verbatim_doc_comment)]
     pub move_1: bool,
 }
@@ -1608,7 +1610,7 @@ impl FaucetOptions {
 }
 
 /// Gas price options for manipulating how to prioritize transactions
-#[derive(Debug, Eq, Parser, PartialEq)]
+#[derive(Debug, Clone, Eq, Parser, PartialEq)]
 pub struct GasOptions {
     /// Gas multiplier per unit of gas
     ///
@@ -2139,7 +2141,7 @@ impl TryInto<Vec<TypeTag>> for TypeArgVec {
 
     fn try_into(self) -> Result<Vec<TypeTag>, Self::Error> {
         let mut type_tags: Vec<TypeTag> = vec![];
-        for type_arg in self.type_args {
+        for type_arg in self.type_args.iter() {
             type_tags.push(
                 TypeTag::try_from(type_arg)
                     .map_err(|err| CliError::UnableToParse("type argument", err.to_string()))?,

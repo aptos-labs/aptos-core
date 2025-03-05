@@ -4,7 +4,7 @@
 use crate::VerifierConfig;
 use move_binary_format::{
     file_format::{
-        empty_module, AbilitySet, AddressIdentifierIndex,
+        empty_module, AddressIdentifierIndex,
         Bytecode::{self, *},
         CodeUnit, Constant, FieldDefinition, FunctionDefinition, FunctionHandle,
         FunctionHandleIndex, IdentifierIndex, ModuleHandle, ModuleHandleIndex, Signature,
@@ -17,7 +17,8 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress, ident_str, identifier::Identifier, vm_status::StatusCode,
+    ability::AbilitySet, account_address::AccountAddress, ident_str, identifier::Identifier,
+    vm_status::StatusCode,
 };
 
 #[test]
@@ -39,6 +40,7 @@ fn unbalanced_stack_crash() {
         return_: SignatureIndex(1),
         type_parameters: vec![],
         access_specifiers: None,
+        attributes: vec![],
     };
 
     module.function_handles.push(fun_handle);
@@ -133,6 +135,7 @@ fn too_many_locals() {
             return_: SignatureIndex(0),
             type_parameters: vec![AbilitySet::ALL],
             access_specifiers: None,
+            attributes: vec![],
         }],
         field_handles: vec![],
         friend_decls: vec![],
@@ -186,6 +189,7 @@ fn borrow_graph() {
             return_: SignatureIndex(0),
             type_parameters: vec![],
             access_specifiers: None,
+            attributes: vec![],
         }],
         field_handles: vec![],
         friend_decls: vec![],
@@ -287,6 +291,7 @@ fn indirect_code() {
             return_: SignatureIndex(0),
             type_parameters: vec![],
             access_specifiers: None,
+            attributes: vec![],
         }],
         field_handles: vec![],
         friend_decls: vec![],

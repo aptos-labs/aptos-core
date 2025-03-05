@@ -12,6 +12,7 @@ edition = "2021"
 [dependencies]
 ambassador = { workspace = true }
 bcs = { workspace = true }
+better_any = { workspace = true }
 bytes = { workspace = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
@@ -20,6 +21,7 @@ hashbrown = { workspace = true }
 itertools = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
+parking_lot = { workspace = true }
 proptest = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive", "rc"] }
 sha3 = { workspace = true }
@@ -29,6 +31,7 @@ triomphe = { workspace = true }
 
 [dev-dependencies]
 claims = { workspace = true }
+mockall = { workspace = true }
 move-binary-format = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
 rand = { workspace = true }

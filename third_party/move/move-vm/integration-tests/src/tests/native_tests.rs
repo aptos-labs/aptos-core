@@ -11,6 +11,7 @@ use move_core_types::{
 use move_vm_runtime::{
     config::VMConfig, module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction,
     session::Session, AsUnsyncCodeStorage, ModuleStorage, RuntimeEnvironment, StagingModuleStorage,
+    WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, natives::function::NativeResult};
@@ -55,8 +56,6 @@ fn test_publish_module_with_nested_loops() {
     let traversal_storage = TraversalStorage::new();
 
     {
-        let storage = InMemoryStorage::new();
-
         let natives = vec![(
             TEST_ADDR,
             Identifier::new("M").unwrap(),
@@ -71,10 +70,11 @@ fn test_publish_module_with_nested_loops() {
             ..Default::default()
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
-        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
+        let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
+        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
 
         let mut sess = vm.new_session(&storage);
-        let module_storage = storage.as_unsync_code_storage(runtime_environment);
+        let module_storage = storage.as_unsync_code_storage();
         if vm.vm_config().use_loader_v2 {
             let new_module_storage =
                 StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob

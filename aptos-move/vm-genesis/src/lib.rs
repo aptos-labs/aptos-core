@@ -27,8 +27,7 @@ use aptos_types::{
         secure_test_rsa_jwk,
     },
     keyless::{
-        self, test_utils::get_sample_iss, Groth16VerificationKey, DEVNET_VERIFICATION_KEY,
-        KEYLESS_ACCOUNT_MODULE_NAME,
+        self, test_utils::get_sample_iss, Groth16VerificationKey, KEYLESS_ACCOUNT_MODULE_NAME,
     },
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
@@ -86,6 +85,7 @@ const RANDOMNESS_API_V0_CONFIG_MODULE_NAME: &str = "randomness_api_v0_config";
 const RANDOMNESS_CONFIG_SEQNUM_MODULE_NAME: &str = "randomness_config_seqnum";
 const RANDOMNESS_CONFIG_MODULE_NAME: &str = "randomness_config";
 const RANDOMNESS_MODULE_NAME: &str = "randomness";
+const ACCOUNT_ABSTRACTION_MODULE_NAME: &str = "account_abstraction";
 const RECONFIGURATION_STATE_MODULE_NAME: &str = "reconfiguration_state";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
@@ -111,7 +111,7 @@ pub struct GenesisConfiguration {
     pub randomness_config_override: Option<OnChainRandomnessConfig>,
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
     pub initial_jwks: Vec<IssuerJWK>,
-    pub keyless_groth16_vk_override: Option<Groth16VerificationKey>,
+    pub keyless_groth16_vk: Option<Groth16VerificationKey>,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -148,7 +148,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let genesis_runtime_builder = GenesisRuntimeBuilder::new(chain_id);
     let genesis_runtime_environment = genesis_runtime_builder.build_genesis_runtime_environment();
 
-    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment.clone());
+    let module_storage = state_view.as_aptos_code_storage(&genesis_runtime_environment);
     let resolver = state_view.as_move_resolver();
 
     let genesis_vm = genesis_runtime_builder.build_genesis_vm();
@@ -255,7 +255,7 @@ pub fn encode_genesis_change_set(
     let genesis_runtime_builder = GenesisRuntimeBuilder::new(chain_id);
     let genesis_runtime_environment = genesis_runtime_builder.build_genesis_runtime_environment();
 
-    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment.clone());
+    let module_storage = state_view.as_aptos_code_storage(&genesis_runtime_environment);
     let resolver = state_view.as_move_resolver();
 
     let genesis_vm = genesis_runtime_builder.build_genesis_vm();
@@ -297,6 +297,7 @@ pub fn encode_genesis_change_set(
     initialize_randomness_config(&mut session, &module_storage, randomness_config);
     initialize_randomness_resources(&mut session, &module_storage);
     initialize_on_chain_governance(&mut session, &module_storage, genesis_config);
+    initialize_account_abstraction(&mut session, &module_storage);
     create_and_initialize_validators(&mut session, &module_storage, validators);
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session, &module_storage);
@@ -312,7 +313,7 @@ pub fn encode_genesis_change_set(
         &module_storage,
         chain_id,
         genesis_config.initial_jwks.clone(),
-        genesis_config.keyless_groth16_vk_override.clone(),
+        genesis_config.keyless_groth16_vk.clone(),
     );
     set_genesis_end(&mut session, &module_storage);
 
@@ -587,6 +588,20 @@ fn initialize_randomness_resources(
     );
 }
 
+fn initialize_account_abstraction(
+    session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
+) {
+    exec_function(
+        session,
+        module_storage,
+        ACCOUNT_ABSTRACTION_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
 fn initialize_reconfiguration_state(
     session: &mut SessionExt,
     module_storage: &impl AptosModuleStorage,
@@ -686,7 +701,7 @@ fn initialize_keyless_accounts(
     module_storage: &impl AptosModuleStorage,
     chain_id: ChainId,
     mut initial_jwks: Vec<IssuerJWK>,
-    vk_override: Option<Groth16VerificationKey>,
+    vk: Option<Groth16VerificationKey>,
 ) {
     let config = keyless::Configuration::new_for_devnet();
     exec_function(
@@ -700,9 +715,8 @@ fn initialize_keyless_accounts(
             config.as_move_value(),
         ]),
     );
-    if !chain_id.is_mainnet() {
-        let vk =
-            vk_override.unwrap_or_else(|| Groth16VerificationKey::from(&*DEVNET_VERIFICATION_KEY));
+
+    if vk.is_some() {
         exec_function(
             session,
             module_storage,
@@ -711,10 +725,11 @@ fn initialize_keyless_accounts(
             vec![],
             serialize_values(&vec![
                 MoveValue::Signer(CORE_CODE_ADDRESS),
-                vk.as_move_value(),
+                vk.unwrap().as_move_value(),
             ]),
         );
-
+    }
+    if !chain_id.is_mainnet() {
         let additional_jwk_patch = IssuerJWK {
             issuer: get_sample_iss(),
             jwk: JWK::RSA(secure_test_rsa_jwk()),
@@ -899,8 +914,7 @@ fn code_to_writes_for_loader_v2_publishing(
     addr: AccountAddress,
     code: Vec<Bytes>,
 ) -> VMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
-    let module_storage =
-        genesis_state_view.as_aptos_code_storage(genesis_runtime_environment.clone());
+    let module_storage = genesis_state_view.as_aptos_code_storage(genesis_runtime_environment);
     let resolver = genesis_state_view.as_move_resolver();
 
     let module_storage_with_staged_modules =
@@ -964,7 +978,7 @@ fn publish_framework_with_loader_v2(
     // At this point we processed all packages, and the state view contains all the code. We can
     // run package initialization.
 
-    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment.clone());
+    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment);
     let resolver = state_view.as_move_resolver();
     let mut session = genesis_vm.new_genesis_session(&resolver, hash_value);
 
@@ -1001,7 +1015,7 @@ fn publish_framework_with_loader_v1(
     // Here, we set the state view to be empty. Hence, publishing module bundle will always create
     // new write ops.
     let state_view = GenesisStateView::new();
-    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment.clone());
+    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment);
 
     let resolver = state_view.as_move_resolver();
     let mut session = genesis_vm.new_genesis_session(&resolver, hash_value);
@@ -1255,7 +1269,7 @@ pub fn generate_test_genesis(
             randomness_config_override: None,
             jwk_consensus_config_override: None,
             initial_jwks: vec![],
-            keyless_groth16_vk_override: None,
+            keyless_groth16_vk: None,
         },
         &OnChainConsensusConfig::default_for_genesis(),
         &OnChainExecutionConfig::default_for_genesis(),
@@ -1307,7 +1321,7 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         randomness_config_override: None,
         jwk_consensus_config_override: None,
         initial_jwks: vec![],
-        keyless_groth16_vk_override: None,
+        keyless_groth16_vk: None,
     }
 }
 

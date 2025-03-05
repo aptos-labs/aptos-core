@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::file_format::{
-    AbilitySet, AddressIdentifierIndex, Bytecode::*, CodeUnit, CompiledModule, FieldDefinition,
+    AddressIdentifierIndex, Bytecode::*, CodeUnit, CompiledModule, FieldDefinition,
     FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandle,
     ModuleHandleIndex, Signature, SignatureIndex, SignatureToken::*, StructDefinition,
     StructFieldInformation, StructHandle, StructHandleIndex, StructTypeParameter, TypeSignature,
 };
 use move_core_types::{
+    ability::AbilitySet,
     account_address::AccountAddress,
     ident_str,
     identifier::Identifier,
@@ -16,7 +17,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, session::Session, AsUnsyncCodeStorage, ModuleStorage,
-    RuntimeEnvironment, StagingModuleStorage,
+    RuntimeEnvironment, StagingModuleStorage, WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -62,6 +63,7 @@ fn instantiation_err() {
             return_: SignatureIndex(0),
             type_parameters: vec![AbilitySet::PRIMITIVES],
             access_specifiers: None,
+            attributes: vec![],
         }],
         field_handles: vec![],
         friend_decls: vec![],
@@ -114,9 +116,10 @@ fn instantiation_err() {
         ..VMConfig::default()
     };
     let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
-    let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
+    let storage: InMemoryStorage =
+        InMemoryStorage::new_with_runtime_environment(runtime_environment);
+    let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
 
-    let storage: InMemoryStorage = InMemoryStorage::new();
     let mut session = vm.new_session(&storage);
     let mut mod_bytes = vec![];
     cm.serialize(&mut mod_bytes).unwrap();
@@ -132,7 +135,7 @@ fn instantiation_err() {
         }));
     }
 
-    let module_storage = storage.as_unsync_code_storage(runtime_environment);
+    let module_storage = storage.as_unsync_code_storage();
 
     // Publish (must succeed!) and then load the function.
     if vm.vm_config().use_loader_v2 {

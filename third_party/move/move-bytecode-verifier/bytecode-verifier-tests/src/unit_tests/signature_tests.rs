@@ -10,7 +10,8 @@ use move_bytecode_verifier::{
 };
 use move_bytecode_verifier_invalid_mutations::signature::{FieldRefMutation, SignatureRefMutation};
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
+    ability::AbilitySet, account_address::AccountAddress, identifier::Identifier,
+    vm_status::StatusCode,
 };
 use proptest::{collection::vec, prelude::*, sample::Index as PropIndex};
 
@@ -81,6 +82,7 @@ fn no_verify_locals_good() {
                 parameters: SignatureIndex(0),
                 type_parameters: vec![],
                 access_specifiers: None,
+                attributes: vec![],
             },
             FunctionHandle {
                 module: ModuleHandleIndex(0),
@@ -89,6 +91,7 @@ fn no_verify_locals_good() {
                 parameters: SignatureIndex(1),
                 type_parameters: vec![],
                 access_specifiers: None,
+                attributes: vec![],
             },
         ],
         field_handles: vec![],
@@ -187,6 +190,7 @@ fn big_signature_test() {
             return_: SignatureIndex(0),
             type_parameters: vec![],
             access_specifiers: None,
+            attributes: vec![],
         }],
         field_handles: vec![],
         friend_decls: vec![],

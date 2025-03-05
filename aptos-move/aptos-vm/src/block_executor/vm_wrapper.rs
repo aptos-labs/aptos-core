@@ -16,7 +16,7 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::{
     module_and_script_storage::code_storage::AptosCodeStorage,
-    resolver::{ExecutorView, ResourceGroupView},
+    resolver::{BlockSynchronizationKillSwitch, ExecutorView, ResourceGroupView},
 };
 use fail::fail_point;
 use move_core_types::vm_status::{StatusCode, VMStatus};
@@ -31,7 +31,7 @@ impl ExecutorTask for AptosExecutorTask {
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
-    fn init(environment: AptosEnvironment, state_view: &impl StateView) -> Self {
+    fn init(environment: &AptosEnvironment, state_view: &impl StateView) -> Self {
         let vm = AptosVM::new(environment, state_view);
         let id = state_view.id();
         Self { vm, id }
@@ -42,7 +42,10 @@ impl ExecutorTask for AptosExecutorTask {
     // execution, or speculatively as a part of a parallel execution.
     fn execute_transaction(
         &self,
-        view: &(impl ExecutorView + ResourceGroupView + AptosCodeStorage),
+        view: &(impl ExecutorView
+              + ResourceGroupView
+              + AptosCodeStorage
+              + BlockSynchronizationKillSwitch),
         txn: &SignatureVerifiedTransaction,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {

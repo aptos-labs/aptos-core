@@ -105,12 +105,16 @@ impl SparseMerkleLeafNode {
         SparseMerkleLeafNode { key, value_hash }
     }
 
-    pub fn key(&self) -> HashValue {
-        self.key
+    pub fn key(&self) -> &HashValue {
+        &self.key
     }
 
-    pub fn value_hash(&self) -> HashValue {
-        self.value_hash
+    pub fn value_hash(&self) -> &HashValue {
+        &self.value_hash
+    }
+
+    pub fn calc_hash(&self) -> HashValue {
+        CryptoHash::hash(self)
     }
 }
 

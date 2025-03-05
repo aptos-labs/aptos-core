@@ -1,7 +1,13 @@
 
 Diagnostics:
-error: Only inline functions may have function-typed parameters, but non-inline function `m::call` has a function parameter:
-  ┌─ tests/lambda/inline-parity/op_with_side_effect_49.move:3:9
+error: captured variable `x` cannot be modified inside of a lambda
+  ┌─ tests/lambda/inline-parity/op_with_side_effect_49.move:9:22
   │
-3 │     fun call(f: ||u64): u64 {
-  │         ^^^^ - Parameter `f` has function-valued type `|()|u64`.
+9 │         x + call(|| {x = x + 1; x}) + call(|| {x = x + 7; x})
+  │                      ^
+
+error: captured variable `x` cannot be modified inside of a lambda
+  ┌─ tests/lambda/inline-parity/op_with_side_effect_49.move:9:48
+  │
+9 │         x + call(|| {x = x + 1; x}) + call(|| {x = x + 7; x})
+  │                                                ^

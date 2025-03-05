@@ -32,6 +32,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Struct `TransferRef`](#0x1_object_TransferRef)
 -  [Struct `LinearTransferRef`](#0x1_object_LinearTransferRef)
 -  [Struct `DeriveRef`](#0x1_object_DeriveRef)
+-  [Struct `TransferPermission`](#0x1_object_TransferPermission)
 -  [Struct `TransferEvent`](#0x1_object_TransferEvent)
 -  [Struct `Transfer`](#0x1_object_Transfer)
 -  [Constants](#@Constants_0)
@@ -89,6 +90,8 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `is_owner`](#0x1_object_is_owner)
 -  [Function `owns`](#0x1_object_owns)
 -  [Function `root_owner`](#0x1_object_root_owner)
+-  [Function `grant_permission`](#0x1_object_grant_permission)
+-  [Function `grant_permission_with_transfer_ref`](#0x1_object_grant_permission_with_transfer_ref)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
@@ -133,6 +136,7 @@ make it so that a reference to a global object can be returned from a function.
     -  [Function `is_owner`](#@Specification_1_is_owner)
     -  [Function `owns`](#@Specification_1_owns)
     -  [Function `root_owner`](#@Specification_1_root_owner)
+    -  [Function `grant_permission`](#@Specification_1_grant_permission)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -144,6 +148,7 @@ make it so that a reference to a global object can be returned from a function.
 <b>use</b> <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs">0x1::from_bcs</a>;
 <b>use</b> <a href="guid.md#0x1_guid">0x1::guid</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">0x1::hash</a>;
+<b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
@@ -498,6 +503,34 @@ Used to create derived objects from a given objects.
 
 </details>
 
+<a id="0x1_object_TransferPermission"></a>
+
+## Struct `TransferPermission`
+
+Permission to transfer object with permissioned signer.
+
+
+<pre><code><b>struct</b> <a href="object.md#0x1_object_TransferPermission">TransferPermission</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="object.md#0x1_object">object</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="0x1_object_TransferEvent"></a>
 
 ## Struct `TransferEvent`
@@ -604,16 +637,6 @@ generate_unique_address uses this for domain separation within its native implem
 
 
 
-<a id="0x1_object_EBURN_NOT_ALLOWED"></a>
-
-Objects cannot be burnt
-
-
-<pre><code><b>const</b> <a href="object.md#0x1_object_EBURN_NOT_ALLOWED">EBURN_NOT_ALLOWED</a>: u64 = 10;
-</code></pre>
-
-
-
 <a id="0x1_object_ECANNOT_DELETE"></a>
 
 The object does not allow for deletion
@@ -650,6 +673,16 @@ The object does not have ungated transfers enabled
 
 
 <pre><code><b>const</b> <a href="object.md#0x1_object_ENO_UNGATED_TRANSFERS">ENO_UNGATED_TRANSFERS</a>: u64 = 3;
+</code></pre>
+
+
+
+<a id="0x1_object_EOBJECT_ALREADY_BURNT"></a>
+
+Cannot burn an object that is already burnt.
+
+
+<pre><code><b>const</b> <a href="object.md#0x1_object_EOBJECT_ALREADY_BURNT">EOBJECT_ALREADY_BURNT</a>: u64 = 10;
 </code></pre>
 
 
@@ -1687,7 +1720,7 @@ Removes from the specified Object from global storage.
     } = object_core;
 
     <b>if</b> (<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self)) {
-      <b>let</b> <a href="object.md#0x1_object_Untransferable">Untransferable</a> {} = <b>move_from</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self);
+        <b>let</b> <a href="object.md#0x1_object_Untransferable">Untransferable</a> {} = <b>move_from</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self);
     };
 
     <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(transfer_events);
@@ -1999,6 +2032,10 @@ hierarchy.
     <b>to</b>: <b>address</b>,
 ) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
     <b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+    <b>assert</b>!(
+        <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_exists">permissioned_signer::check_permission_exists</a>(owner, <a href="object.md#0x1_object_TransferPermission">TransferPermission</a> { <a href="object.md#0x1_object">object</a> }),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_EOBJECT_NOT_TRANSFERRABLE">EOBJECT_NOT_TRANSFERRABLE</a>)
+    );
     <a href="object.md#0x1_object_verify_ungated_and_descendant">verify_ungated_and_descendant</a>(owner_address, <a href="object.md#0x1_object">object</a>);
     <a href="object.md#0x1_object_transfer_raw_inner">transfer_raw_inner</a>(<a href="object.md#0x1_object">object</a>, <b>to</b>);
 }
@@ -2142,13 +2179,13 @@ objects may have cyclic dependencies.
 
 ## Function `burn`
 
-Previously allowed to burn objects, has now been disabled.  Objects can still be unburnt.
+Add a TombStone to the object.  The object will then be interpreted as hidden via indexers.
+This only works for objects directly owned and for simplicity does not apply to indirectly owned objects.
+Original owners can reclaim burnt objects any time in the future by calling unburn.
+Please use the test only [<code>object::burn_object_with_transfer</code>] for testing with previously burned objects.
 
-Please use the test only [<code>object::burn_object</code>] for testing with previously burned objects.
 
-
-<pre><code>#[deprecated]
-<b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _object: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
 </code></pre>
 
 
@@ -2157,8 +2194,12 @@ Please use the test only [<code>object::burn_object</code>] for testing with pre
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _object: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;) {
-    <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_EBURN_NOT_ALLOWED">EBURN_NOT_ALLOWED</a>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    <b>let</b> original_owner = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+    <b>assert</b>!(<a href="object.md#0x1_object_is_owner">is_owner</a>(<a href="object.md#0x1_object">object</a>, original_owner), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>));
+    <b>let</b> object_addr = <a href="object.md#0x1_object">object</a>.inner;
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_addr), <a href="object.md#0x1_object_EOBJECT_ALREADY_BURNT">EOBJECT_ALREADY_BURNT</a>);
+    <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer">create_signer</a>(object_addr), <a href="object.md#0x1_object_TombStone">TombStone</a> { original_owner });
 }
 </code></pre>
 
@@ -2188,10 +2229,26 @@ Allow origin owners to reclaim any objects they previous burnt.
 ) <b>acquires</b> <a href="object.md#0x1_object_TombStone">TombStone</a>, <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
     <b>let</b> object_addr = <a href="object.md#0x1_object">object</a>.inner;
     <b>assert</b>!(<b>exists</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="object.md#0x1_object_EOBJECT_NOT_BURNT">EOBJECT_NOT_BURNT</a>));
+    <b>assert</b>!(
+        <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_exists">permissioned_signer::check_permission_exists</a>(original_owner, <a href="object.md#0x1_object_TransferPermission">TransferPermission</a> { <a href="object.md#0x1_object">object</a>: object_addr }),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_EOBJECT_NOT_TRANSFERRABLE">EOBJECT_NOT_TRANSFERRABLE</a>)
+    );
 
-    <b>let</b> <a href="object.md#0x1_object_TombStone">TombStone</a> { original_owner: original_owner_addr } = <b>move_from</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_addr);
-    <b>assert</b>!(original_owner_addr == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(original_owner), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>));
-    <a href="object.md#0x1_object_transfer_raw_inner">transfer_raw_inner</a>(object_addr, original_owner_addr);
+    // The new owner of the <a href="object.md#0x1_object">object</a> can always unburn it, but <b>if</b> it's the burn <b>address</b>, we go <b>to</b> the <b>old</b> functionality
+    <b>let</b> object_core = <b>borrow_global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(object_addr);
+    <b>if</b> (object_core.owner == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(original_owner)) {
+        <b>let</b> <a href="object.md#0x1_object_TombStone">TombStone</a> { original_owner: _ } = <b>move_from</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_addr);
+    } <b>else</b> <b>if</b> (object_core.owner == <a href="object.md#0x1_object_BURN_ADDRESS">BURN_ADDRESS</a>) {
+        // The <b>old</b> functionality
+        <b>let</b> <a href="object.md#0x1_object_TombStone">TombStone</a> { original_owner: original_owner_addr } = <b>move_from</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_addr);
+        <b>assert</b>!(
+            original_owner_addr == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(original_owner),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>)
+        );
+        <a href="object.md#0x1_object_transfer_raw_inner">transfer_raw_inner</a>(object_addr, original_owner_addr);
+    } <b>else</b> {
+        <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>);
+    };
 }
 </code></pre>
 
@@ -2363,6 +2420,70 @@ to determine the identity of the starting point of ownership.
 
 </details>
 
+<a id="0x1_object_grant_permission"></a>
+
+## Function `grant_permission`
+
+Master signer offers a transfer permission of an object to a permissioned signer.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_grant_permission">grant_permission</a>&lt;T&gt;(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_grant_permission">grant_permission</a>&lt;T&gt;(
+    master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;,
+) {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_authorize_unlimited">permissioned_signer::authorize_unlimited</a>(
+        master,
+        <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>,
+        <a href="object.md#0x1_object_TransferPermission">TransferPermission</a> { <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object">object</a>.inner }
+    )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_grant_permission_with_transfer_ref"></a>
+
+## Function `grant_permission_with_transfer_ref`
+
+Grant a transfer permission to the permissioned signer using TransferRef.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_grant_permission_with_transfer_ref">grant_permission_with_transfer_ref</a>(<a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, ref: &<a href="object.md#0x1_object_TransferRef">object::TransferRef</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_grant_permission_with_transfer_ref">grant_permission_with_transfer_ref</a>(
+    <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    ref: &<a href="object.md#0x1_object_TransferRef">TransferRef</a>,
+) {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_grant_unlimited_with_permissioned_signer">permissioned_signer::grant_unlimited_with_permissioned_signer</a>(
+        <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>,
+        <a href="object.md#0x1_object_TransferPermission">TransferPermission</a> { <a href="object.md#0x1_object">object</a>: ref.self }
+    )
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="@Specification_1"></a>
 
 ## Specification
@@ -2437,16 +2558,7 @@ to determine the identity of the starting point of ownership.
 ### Module-level Specification
 
 
-<pre><code><b>pragma</b> aborts_if_is_strict;
-</code></pre>
-
-
-
-
-<a id="0x1_object_spec_exists_at"></a>
-
-
-<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
@@ -3255,14 +3367,18 @@ to determine the identity of the starting point of ownership.
 ### Function `burn`
 
 
-<pre><code>#[deprecated]
-<b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _object: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> <b>true</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>let</b> object_address = <a href="object.md#0x1_object">object</a>.inner;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(object_address);
+<b>aborts_if</b> <a href="object.md#0x1_object_owner">owner</a>(<a href="object.md#0x1_object">object</a>) != <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+<b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_address);
+<b>ensures</b> <a href="object.md#0x1_object_is_owner">is_owner</a>(<a href="object.md#0x1_object">object</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
 </code></pre>
 
 
@@ -3283,7 +3399,9 @@ to determine the identity of the starting point of ownership.
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(object_address);
 <b>aborts_if</b> !<a href="object.md#0x1_object_is_burnt">is_burnt</a>(<a href="object.md#0x1_object">object</a>);
 <b>let</b> tomb_stone = <b>borrow_global</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_address);
-<b>aborts_if</b> tomb_stone.original_owner != <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(original_owner);
+<b>let</b> original_owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(original_owner);
+<b>let</b> object_current_owner = <b>borrow_global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(object_address).owner;
+<b>aborts_if</b> object_current_owner != original_owner_address && tomb_stone.original_owner != original_owner_address;
 </code></pre>
 
 
@@ -3399,6 +3517,34 @@ to determine the identity of the starting point of ownership.
 
 
 <pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_guid_object_address">spec_create_guid_object_address</a>(source: <b>address</b>, creation_num: u64): <b>address</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_grant_permission"></a>
+
+### Function `grant_permission`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_grant_permission">grant_permission</a>&lt;T&gt;(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>aborts_if</b> !<a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">permissioned_signer::spec_is_permissioned_signer</a>(<a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>);
+<b>aborts_if</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">permissioned_signer::spec_is_permissioned_signer</a>(master);
+<b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(master) != <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>);
+</code></pre>
+
+
+
+
+<a id="0x1_object_spec_exists_at"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool;
 </code></pre>
 
 

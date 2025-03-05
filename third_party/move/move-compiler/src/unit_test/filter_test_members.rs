@@ -242,10 +242,7 @@ fn test_attributes(attrs: &P::Attributes) -> Vec<(Loc, known_attributes::Testing
         .filter_map(
             |attr| match KnownAttribute::resolve(attr.value.attribute_name().value)? {
                 KnownAttribute::Testing(test_attr) => Some((attr.loc, test_attr)),
-                KnownAttribute::Verification(_)
-                | KnownAttribute::Native(_)
-                | KnownAttribute::Deprecation(_)
-                | KnownAttribute::Lint(_) => None,
+                _ => None,
             },
         )
         .collect()

@@ -14,7 +14,7 @@ fun m::test(): u64 {
 
 
 Diagnostics:
-warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
   ┌─ tests/variable-coalescing/multi_assigns.move:3:17
   │
 3 │         let x = 1;
@@ -80,7 +80,7 @@ fun m::test(): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 
 

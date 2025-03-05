@@ -75,8 +75,10 @@ impl MockExecutionClient {
                 .lock()
                 .remove(&block.id())
                 .ok_or_else(|| format_err!("Cannot find block"))?;
-            let (mut payload_txns, _max_txns_from_block_to_execute) =
-                self.payload_manager.get_transactions(block.block()).await?;
+            let (mut payload_txns, _max_txns_from_block_to_execute) = self
+                .payload_manager
+                .get_transactions(block.block(), None)
+                .await?;
             txns.append(&mut payload_txns);
         }
         // they may fail during shutdown
@@ -106,6 +108,7 @@ impl TExecutionClient for MockExecutionClient {
         _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _highest_committed_round: Round,
+        _new_pipeline_enabled: bool,
     ) {
     }
 

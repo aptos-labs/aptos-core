@@ -3,16 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    payload::{OptQuorumStorePayload, PayloadExecutionLimit},
+    payload::{OptBatches, OptQuorumStorePayload, PayloadExecutionLimit},
     proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
 };
+use anyhow::ensure;
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,
 };
 use aptos_crypto_derive::CryptoHasher;
-use aptos_executor_types::ExecutorResult;
-use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress, transaction::SignedTransaction,
@@ -24,10 +23,8 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
     fmt::{self, Write},
-    sync::Arc,
     u64,
 };
-use tokio::sync::oneshot;
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
 /// monotonically. It is used for the protocol safety and liveness (please see the detailed
@@ -126,67 +123,22 @@ pub struct RejectedTransactionSummary {
     pub reason: DiscardedVMStatus,
 }
 
-#[derive(Debug)]
-pub enum DataStatus {
-    Cached(Vec<SignedTransaction>),
-    Requested(
-        Vec<(
-            HashValue,
-            oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>,
-        )>,
-    ),
-}
-
-impl DataStatus {
-    pub fn extend(&mut self, other: DataStatus) {
-        match (self, other) {
-            (DataStatus::Requested(v1), DataStatus::Requested(v2)) => v1.extend(v2),
-            (_, _) => unreachable!(),
-        }
-    }
-
-    pub fn take(&mut self) -> DataStatus {
-        std::mem::replace(self, DataStatus::Requested(vec![]))
-    }
-}
-
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct ProofWithData {
     pub proofs: Vec<ProofOfStore>,
-    #[serde(skip)]
-    pub status: Arc<Mutex<Option<DataStatus>>>,
 }
-
-impl PartialEq for ProofWithData {
-    fn eq(&self, other: &Self) -> bool {
-        self.proofs == other.proofs && Arc::as_ptr(&self.status) == Arc::as_ptr(&other.status)
-    }
-}
-
-impl Eq for ProofWithData {}
 
 impl ProofWithData {
     pub fn new(proofs: Vec<ProofOfStore>) -> Self {
-        Self {
-            proofs,
-            status: Arc::new(Mutex::new(None)),
-        }
+        Self { proofs }
     }
 
     pub fn empty() -> Self {
         Self::new(vec![])
     }
 
-    #[allow(clippy::unwrap_used)]
     pub fn extend(&mut self, other: ProofWithData) {
-        let other_data_status = other.status.lock().as_mut().unwrap().take();
         self.proofs.extend(other.proofs);
-        let mut status = self.status.lock();
-        if status.is_none() {
-            *status = Some(other_data_status);
-        } else {
-            status.as_mut().unwrap().extend(other_data_status);
-        }
     }
 
     pub fn len(&self) -> usize {
@@ -343,7 +295,9 @@ impl Payload {
                     .sum::<usize>()) as u64)
                 .min(max_txns_to_execute.unwrap_or(u64::MAX)),
             Payload::OptQuorumStore(opt_qs_payload) => {
-                opt_qs_payload.max_txns_to_execute().unwrap_or(u64::MAX)
+                let num_txns = opt_qs_payload.num_txns() as u64;
+                let max_txns_to_execute = opt_qs_payload.max_txns_to_execute().unwrap_or(u64::MAX);
+                num_txns.min(max_txns_to_execute)
             },
         }
     }
@@ -487,38 +441,72 @@ impl Payload {
         Ok(())
     }
 
+    pub fn verify_inline_batches<'a>(
+        inline_batches: impl Iterator<Item = (&'a BatchInfo, &'a Vec<SignedTransaction>)>,
+    ) -> anyhow::Result<()> {
+        for (batch, payload) in inline_batches {
+            // TODO: Can cloning be avoided here?
+            let computed_digest = BatchPayload::new(batch.author(), payload.clone()).hash();
+            ensure!(
+                computed_digest == *batch.digest(),
+                "Hash of the received inline batch doesn't match the digest value for batch {}: {} != {}",
+                batch,
+                computed_digest,
+                batch.digest()
+            );
+        }
+        Ok(())
+    }
+
+    pub fn verify_opt_batches(
+        verifier: &ValidatorVerifier,
+        opt_batches: &OptBatches,
+    ) -> anyhow::Result<()> {
+        let authors = verifier.address_to_validator_index();
+        for batch in &opt_batches.batch_summary {
+            ensure!(
+                authors.contains_key(&batch.author()),
+                "Invalid author {} for batch {}",
+                batch.author(),
+                batch.digest()
+            );
+        }
+        Ok(())
+    }
+
     pub fn verify(
         &self,
-        validator: &ValidatorVerifier,
+        verifier: &ValidatorVerifier,
         proof_cache: &ProofCache,
         quorum_store_enabled: bool,
     ) -> anyhow::Result<()> {
         match (quorum_store_enabled, self) {
             (false, Payload::DirectMempool(_)) => Ok(()),
             (true, Payload::InQuorumStore(proof_with_status)) => {
-                Self::verify_with_cache(&proof_with_status.proofs, validator, proof_cache)
+                Self::verify_with_cache(&proof_with_status.proofs, verifier, proof_cache)
             },
             (true, Payload::InQuorumStoreWithLimit(proof_with_status)) => Self::verify_with_cache(
                 &proof_with_status.proof_with_data.proofs,
-                validator,
+                verifier,
                 proof_cache,
             ),
             (true, Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)) => {
-                Self::verify_with_cache(&proof_with_data.proofs, validator, proof_cache)?;
-                for (batch, payload) in inline_batches.iter() {
-                    // TODO: Can cloning be avoided here?
-                    if BatchPayload::new(batch.author(), payload.clone()).hash() != *batch.digest()
-                    {
-                        return Err(anyhow::anyhow!(
-                            "Hash of the received inline batch doesn't match the digest value",
-                        ));
-                    }
-                }
+                Self::verify_with_cache(&proof_with_data.proofs, verifier, proof_cache)?;
+                Self::verify_inline_batches(
+                    inline_batches.iter().map(|(info, txns)| (info, txns)),
+                )?;
                 Ok(())
             },
             (true, Payload::OptQuorumStore(opt_quorum_store)) => {
                 let proof_with_data = opt_quorum_store.proof_with_data();
-                Self::verify_with_cache(&proof_with_data.batch_summary, validator, proof_cache)?;
+                Self::verify_with_cache(&proof_with_data.batch_summary, verifier, proof_cache)?;
+                Self::verify_inline_batches(
+                    opt_quorum_store
+                        .inline_batches()
+                        .iter()
+                        .map(|batch| (batch.info(), batch.transactions())),
+                )?;
+                Self::verify_opt_batches(verifier, opt_quorum_store.opt_batches())?;
                 Ok(())
             },
             (_, _) => Err(anyhow::anyhow!(
@@ -527,6 +515,42 @@ impl Payload {
                 self
             )),
         }
+    }
+
+    pub(crate) fn verify_epoch(&self, epoch: u64) -> anyhow::Result<()> {
+        match self {
+            Payload::DirectMempool(_) => return Ok(()),
+            Payload::InQuorumStore(proof_with_data) => {
+                ensure!(
+                    proof_with_data.proofs.iter().all(|p| p.epoch() == epoch),
+                    "Payload epoch doesn't match given epoch"
+                );
+            },
+            Payload::InQuorumStoreWithLimit(proof_with_data_with_txn_limit) => {
+                ensure!(
+                    proof_with_data_with_txn_limit
+                        .proof_with_data
+                        .proofs
+                        .iter()
+                        .all(|p| p.epoch() == epoch),
+                    "Payload epoch doesn't match given epoch"
+                );
+            },
+            Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
+                ensure!(
+                    proof_with_data.proofs.iter().all(|p| p.epoch() == epoch),
+                    "Payload proof epoch doesn't match given epoch"
+                );
+                ensure!(
+                    inline_batches.iter().all(|b| b.0.epoch() == epoch),
+                    "Payload inline batch epoch doesn't match given epoch"
+                )
+            },
+            Payload::OptQuorumStore(opt_quorum_store_payload) => {
+                opt_quorum_store_payload.check_epoch(epoch)?;
+            },
+        };
+        Ok(())
     }
 }
 

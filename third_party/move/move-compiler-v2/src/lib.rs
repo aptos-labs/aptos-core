@@ -17,11 +17,11 @@ pub mod plan_builder;
 use crate::{
     diagnostics::Emitter,
     env_pipeline::{
-        acquires_checker, ast_simplifier, cyclic_instantiation_checker, flow_insensitive_checkers,
-        function_checker, inliner, lambda_lifter, lambda_lifter::LambdaLiftingOptions,
-        model_ast_lints, recursive_struct_checker, rewrite_target::RewritingScope,
-        seqs_in_binop_checker, spec_checker, spec_rewriter, unused_params_checker,
-        EnvProcessorPipeline,
+        acquires_checker, ast_simplifier, closure_checker, cyclic_instantiation_checker,
+        flow_insensitive_checkers, function_checker, inliner, lambda_lifter,
+        lambda_lifter::LambdaLiftingOptions, model_ast_lints, recursive_struct_checker,
+        rewrite_target::RewritingScope, seqs_in_binop_checker, spec_checker, spec_rewriter,
+        unused_params_checker, EnvProcessorPipeline,
     },
     pipeline::{
         ability_processor::AbilityProcessor,
@@ -48,9 +48,8 @@ use codespan_reporting::{
 };
 pub use experiments::{Experiment, EXPERIMENTS};
 use log::{debug, info, log_enabled, Level};
-use move_binary_format::{binary_views::BinaryIndexedView, errors::VMError};
+use move_binary_format::errors::VMError;
 use move_bytecode_source_map::source_map::SourceMap;
-use move_command_line_common::files::FileHash;
 use move_compiler::{
     command_line,
     compiled_unit::{
@@ -62,7 +61,6 @@ use move_compiler::{
 };
 use move_core_types::vm_status::StatusType;
 use move_disassembler::disassembler::Disassembler;
-use move_ir_types::location;
 use move_model::{
     metadata::LanguageVersion,
     model::{GlobalEnv, Loc, MoveIrLoc},
@@ -102,7 +100,7 @@ where
     check_errors(&env, emitter, "checking errors")?;
 
     if options.experiment_on(Experiment::STOP_BEFORE_STACKLESS_BYTECODE) {
-        std::process::exit(0)
+        std::process::exit(if env.has_warnings() { 1 } else { 0 })
     }
 
     // Run code generator
@@ -140,7 +138,7 @@ where
     check_errors(&env, emitter, "stackless-bytecode analysis errors")?;
 
     if options.experiment_on(Experiment::STOP_BEFORE_FILE_FORMAT) {
-        std::process::exit(0)
+        std::process::exit(if env.has_warnings() { 1 } else { 0 })
     }
 
     let modules_and_scripts = run_file_format_gen(&mut env, &targets);
@@ -268,8 +266,8 @@ pub fn run_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
         let data = bytecode_generator::generate_bytecode(env, id);
         targets.insert_target_data(&id, FunctionVariant::Baseline, data);
         for callee in func_env
-            .get_called_functions()
-            .expect("called functions available")
+            .get_used_functions()
+            .expect("used functions available")
         {
             if !done.contains(callee) {
                 todo.insert(*callee);
@@ -380,14 +378,28 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
         });
     }
 
-    if options.experiment_on(Experiment::LAMBDA_LIFTING) {
-        env_pipeline.add("lambda-lifting", |env: &mut GlobalEnv| {
+    if options
+        .language_version
+        .unwrap_or_default()
+        .is_at_least(LanguageVersion::V2_2)
+    {
+        let include_inline_functions = options.experiment_on(Experiment::LAMBDA_LIFTING_INLINE);
+        env_pipeline.add("lambda-lifting", move |env: &mut GlobalEnv| {
             lambda_lifter::lift_lambdas(
                 LambdaLiftingOptions {
-                    include_inline_functions: true,
+                    include_inline_functions,
                 },
                 env,
             )
+        });
+    }
+    if options
+        .language_version
+        .unwrap_or_default()
+        .is_at_least(LanguageVersion::V2_2)
+    {
+        env_pipeline.add("closure-ability-checker", |env: &mut GlobalEnv| {
+            closure_checker::check_closures(env)
         });
     }
 
@@ -515,14 +527,7 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
 pub fn disassemble_compiled_units(units: &[CompiledUnit]) -> anyhow::Result<String> {
     let disassembled_units: anyhow::Result<Vec<_>> = units
         .iter()
-        .map(|unit| {
-            let view = match unit {
-                CompiledUnit::Module(module) => BinaryIndexedView::Module(&module.module),
-                CompiledUnit::Script(script) => BinaryIndexedView::Script(&script.script),
-            };
-            Disassembler::from_view(view, location::Loc::new(FileHash::empty(), 0, 0))
-                .and_then(|d| d.disassemble())
-        })
+        .map(|unit| Disassembler::from_unit(unit).disassemble())
         .collect();
     Ok(disassembled_units?.concat())
 }

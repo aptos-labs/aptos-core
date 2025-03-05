@@ -4,9 +4,9 @@
 
 use crate::{
     file_format::{
-        AbilitySet, FieldDefinition, IdentifierIndex, ModuleHandleIndex, SignatureToken,
-        StructDefinition, StructFieldInformation, StructHandle, StructHandleIndex,
-        StructTypeParameter, TableIndex, TypeSignature, VariantDefinition,
+        FieldDefinition, IdentifierIndex, ModuleHandleIndex, SignatureToken, StructDefinition,
+        StructFieldInformation, StructHandle, StructHandleIndex, StructTypeParameter, TableIndex,
+        TypeSignature, VariantDefinition,
     },
     internals::ModuleIndex,
     proptest_types::{
@@ -14,6 +14,7 @@ use crate::{
         signature::{AbilitySetGen, SignatureTokenGen},
     },
 };
+use move_core_types::ability::AbilitySet;
 use proptest::{
     collection::{vec, SizeRange},
     option,
@@ -71,6 +72,7 @@ impl StDefnMaterializeState {
                 let inner = self.potential_abilities(ty);
                 inner.intersect(AbilitySet::VECTOR)
             },
+            Function(_, _, a) => *a,
             Struct(idx) => {
                 let sh = &self.struct_handles[idx.0 as usize];
                 sh.abilities

@@ -2,11 +2,13 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+mod account_abstraction_test;
 mod accounts_test;
 mod blocks_test;
 mod converter_test;
 mod event_v2_translation_test;
 mod events_test;
+mod function_value_test;
 mod index_test;
 mod invalid_post_request_test;
 mod modules;

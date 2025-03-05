@@ -986,7 +986,7 @@ fn strip_transactions(
         .map(|mut txn| {
             // Note: `is_allowed` means the txn matches the filter, in which case
             // we strip it.
-            if txns_to_strip_filter.is_allowed(&txn) {
+            if txns_to_strip_filter.matches(&txn) {
                 stripped_count += 1;
                 if let Some(info) = txn.info.as_mut() {
                     info.changes = vec![];

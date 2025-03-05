@@ -23,7 +23,7 @@ error: abort code not covered by any of the `aborts_if` or `aborts_with` clauses
    ┌─ tests/sources/functional/aborts_if_with_code.move:48:5
    │
 46 │           10 / x
-   │              - abort happened here with execution failure
+   │           ------ abort happened here with execution failure
 47 │       }
 48 │ ╭     spec exec_failure_invalid {
 49 │ │         aborts_if x == 0 with 1; // wrong code

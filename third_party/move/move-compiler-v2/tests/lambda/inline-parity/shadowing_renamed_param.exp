@@ -1,13 +1,25 @@
 
 Diagnostics:
-error: Only inline functions may have function-typed parameters, but non-inline function `Test::foo` has a function parameter:
-  ┌─ tests/lambda/inline-parity/shadowing_renamed_param.move:4:16
-  │
-4 │     public fun foo(f:|u64|, x:u64) {
-  │                ^^^ - Parameter `f` has function-valued type `|u64|`.
+error: captured variable `x` cannot be modified inside of a lambda
+   ┌─ tests/lambda/inline-parity/shadowing_renamed_param.move:15:13
+   │
+15 │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
+   │             ^
 
-error: Only inline functions may have function-typed parameters, but non-inline function `Test::foo2` has a function parameter:
-  ┌─ tests/lambda/inline-parity/shadowing_renamed_param.move:8:16
-  │
-8 │     public fun foo2(f:|u64|, x:u64) {
-  │                ^^^^ - Parameter `f` has function-valued type `|u64|`.
+error: captured variable `x` cannot be modified inside of a lambda
+   ┌─ tests/lambda/inline-parity/shadowing_renamed_param.move:21:13
+   │
+21 │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
+   │             ^
+
+error: captured variable `x` cannot be modified inside of a lambda
+   ┌─ tests/lambda/inline-parity/shadowing_renamed_param.move:30:13
+   │
+30 │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
+   │             ^
+
+error: captured variable `x` cannot be modified inside of a lambda
+   ┌─ tests/lambda/inline-parity/shadowing_renamed_param.move:36:13
+   │
+36 │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
+   │             ^

@@ -7,6 +7,18 @@ use crate::tests::new_test_context_with_db_sharding_and_internal_indexer;
 use aptos_api_test_context::{current_function_name, find_value, TestContext};
 use aptos_api_types::{MoveModuleBytecode, MoveResource, MoveStructTag, StateKeyWrapper};
 use aptos_cached_packages::aptos_stdlib;
+use aptos_sdk::types::APTOS_COIN_TYPE_STR;
+use aptos_types::{
+    account_config::{primary_apt_store, ObjectCoreResource},
+    transaction::{EntryFunction, TransactionPayload},
+    AptosCoinType, CoinType,
+};
+use move_core_types::{
+    account_address::AccountAddress,
+    identifier::Identifier,
+    language_storage::{ModuleId, TypeTag},
+    move_resource::MoveStructType,
+};
 use serde_json::json;
 use std::str::FromStr;
 
@@ -177,6 +189,56 @@ async fn test_get_account_resources_by_invalid_ledger_version() {
         ))
         .await;
     context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_account_balance() {
+    let mut context = new_test_context(current_function_name!());
+    let root_account = context.root_account().await;
+    let coin_balance_before = context
+        .get(&account_balance(
+            &root_account.address().to_hex_literal(),
+            APTOS_COIN_TYPE_STR,
+        ))
+        .await;
+    let txn = root_account.sign_with_transaction_builder(context.transaction_factory().payload(
+        aptos_stdlib::coin_migrate_to_fungible_store(AptosCoinType::type_tag()),
+    ));
+    context.commit_block(&vec![txn.clone()]).await;
+    let coin_balance_after = context
+        .get(&account_balance(
+            &root_account.address().to_hex_literal(),
+            APTOS_COIN_TYPE_STR,
+        ))
+        .await;
+    assert_eq!(coin_balance_before, coin_balance_after);
+    let fa_balance = context
+        .get(&account_balance(
+            &root_account.address().to_hex_literal(),
+            &AccountAddress::TEN.to_hex_literal(),
+        ))
+        .await;
+    assert_eq!(coin_balance_after, fa_balance);
+    // upgrade to concurrent store
+    let txn = root_account.sign_with_transaction_builder(context.transaction_factory().payload(
+        TransactionPayload::EntryFunction(EntryFunction::new(
+            ModuleId::new(
+                AccountAddress::TEN,
+                Identifier::new("fungible_asset").unwrap(),
+            ),
+            Identifier::new("upgrade_store_to_concurrent").unwrap(),
+            vec![TypeTag::Struct(Box::new(ObjectCoreResource::struct_tag()))],
+            vec![bcs::to_bytes(&primary_apt_store(root_account.address())).unwrap()],
+        )),
+    ));
+    context.commit_block(&vec![txn.clone()]).await;
+    let concurrent_fa_balance = context
+        .get(&account_balance(
+            &root_account.address().to_hex_literal(),
+            &AccountAddress::TEN.to_hex_literal(),
+        ))
+        .await;
+    assert_eq!(concurrent_fa_balance, fa_balance);
 }
 
 async fn test_get_account_modules_by_ledger_version_with_context(mut context: TestContext) {
@@ -423,6 +485,10 @@ fn account_resources_with_ledger_version(address: &str, ledger_version: i128) ->
 
 fn account_modules(address: &str) -> String {
     format!("/accounts/{}/modules", address)
+}
+
+fn account_balance(address: &str, coin_type: &str) -> String {
+    format!("/accounts/{}/balance/{}", address, coin_type)
 }
 
 fn account_modules_with_ledger_version(address: &str, ledger_version: i128) -> String {

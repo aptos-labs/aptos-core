@@ -59,11 +59,15 @@ use move_stackless_bytecode::{
         Operation, PropKind,
     },
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    hash::{DefaultHasher, Hash, Hasher},
+};
 
 pub struct BoogieTranslator<'env> {
     env: &'env GlobalEnv,
     options: &'env BoogieOptions,
+    for_shard: Option<usize>,
     writer: &'env CodeWriter,
     spec_translator: SpecTranslator<'env>,
     targets: &'env FunctionTargetsHolder,
@@ -85,12 +89,14 @@ impl<'env> BoogieTranslator<'env> {
     pub fn new(
         env: &'env GlobalEnv,
         options: &'env BoogieOptions,
+        for_shard: Option<usize>,
         targets: &'env FunctionTargetsHolder,
         writer: &'env CodeWriter,
     ) -> Self {
         Self {
             env,
             options,
+            for_shard,
             targets,
             writer,
             spec_translator: SpecTranslator::new(writer, env, options),
@@ -113,7 +119,24 @@ impl<'env> BoogieTranslator<'env> {
             .unwrap_or(default_timeout)
     }
 
-    pub fn is_not_verified_timeout(&self, fun_target: &FunctionTarget) -> bool {
+    /// Checks whether the given function is a verification target.
+    fn is_verified(&self, fun_variant: &FunctionVariant, fun_target: &FunctionTarget) -> bool {
+        if !fun_variant.is_verified() {
+            return false;
+        }
+        if let Some(shard) = self.for_shard {
+            // Check whether the shard is included.
+            if self.options.only_shard.is_some() && self.options.only_shard != Some(shard + 1) {
+                return false;
+            }
+            // Check whether it is part of the shard.
+            let mut hasher = DefaultHasher::new();
+            fun_target.func_env.get_full_name_str().hash(&mut hasher);
+            if (hasher.finish() as usize) % self.options.shards != shard {
+                return false;
+            }
+        }
+        // Check whether the estimated duration is too large for configured timeout
         let options = self.options;
         let estimate_timeout_opt = fun_target
             .func_env
@@ -123,9 +146,9 @@ impl<'env> BoogieTranslator<'env> {
                 .func_env
                 .get_num_pragma(TIMEOUT_PRAGMA)
                 .unwrap_or(options.vc_timeout);
-            estimate_timeout > timeout
+            estimate_timeout <= timeout
         } else {
-            false
+            true
         }
     }
 
@@ -279,7 +302,7 @@ impl<'env> BoogieTranslator<'env> {
                     continue;
                 }
                 for (variant, ref fun_target) in self.targets.get_targets(fun_env) {
-                    if variant.is_verified() && !self.is_not_verified_timeout(fun_target) {
+                    if self.is_verified(&variant, fun_target) {
                         verified_functions_count += 1;
                         debug!(
                             "will verify primary function `{}`",
@@ -363,7 +386,15 @@ impl<'env> BoogieTranslator<'env> {
         }
         // Emit any finalization items required by spec translation.
         self.spec_translator.finalize();
-        info!("{} verification conditions", verified_functions_count);
+        let shard_info = if let Some(shard) = self.for_shard {
+            format!(" (for shard #{} of {})", shard + 1, self.options.shards)
+        } else {
+            "".to_string()
+        };
+        info!(
+            "{} verification conditions{}",
+            verified_functions_count, shard_info
+        );
     }
 }
 
@@ -1106,7 +1137,7 @@ impl<'env> FunctionTranslator<'env> {
         }
 
         // Initial assumptions
-        if variant.is_verified() && !self.parent.is_not_verified_timeout(fun_target) {
+        if self.parent.is_verified(variant, fun_target) {
             self.translate_verify_entry_assumptions(fun_target);
         }
 
@@ -1364,6 +1395,10 @@ impl<'env> FunctionTranslator<'env> {
             Call(_, dests, oper, srcs, aa) => {
                 use Operation::*;
                 match oper {
+                    Closure(..) | Invoke => {
+                        // TODO(#15664): implement closures for prover
+                        panic!("closures not yet supported")
+                    },
                     TestVariant(mid, sid, variant, inst) => {
                         let inst = &self.inst_slice(inst);
                         let src_type = self.get_local_type(srcs[0]);

@@ -491,7 +491,27 @@ pub async fn submit_transactions(
                 .counts();
             if let Some(failure) = failures.first() {
                 sample!(SampleRate::Duration(Duration::from_secs(60)), {
-                    let sender = txns[failure.transaction_index].sender();
+                    let first_failed_txn = &txns[failure.transaction_index];
+                    let sender = first_failed_txn.sender();
+                    use aptos_types::transaction::TransactionPayload::*;
+                    let payload = match first_failed_txn.payload() {
+                        Script(_) => "script".to_string(),
+                        ModuleBundle(_) => "module_bundle".to_string(),
+                        EntryFunction(entry_function) => format!(
+                            "entry {}::{}",
+                            entry_function.module(),
+                            entry_function.function()
+                        ),
+                        Multisig(_) => "multisig".to_string(),
+                    };
+
+                    let first_failed_txn_info = format!(
+                        "due to {:?}, for account {}, max gas {}, payload {}",
+                        failure,
+                        first_failed_txn.sender(),
+                        first_failed_txn.max_gas_amount(),
+                        payload,
+                    );
 
                     let last_transactions =
                         if let Ok(account) = client.get_account_bcs(sender).await {
@@ -513,11 +533,10 @@ pub async fn submit_transactions(
                         .map_or(-1, |v| v.into_inner() as i64);
 
                     warn!(
-                        "[{:?}] Failed to submit {} txns in a batch, first failure due to {:?}, for account {}, chain id: {:?}, first asked: {}, failed seq nums: {:?}, failed error codes: {:?}, balance of {} and last transaction for account: {:?}",
+                        "[{:?}] Failed to submit {} txns in a batch, first failure: {}, chain id: {:?}, first asked: {}, failed seq nums: {:?}, failed error codes: {:?}, balance of {} and last transaction for account: {:?}",
                         client.path_prefix_string(),
                         failures.len(),
-                        failure,
-                        sender,
+                        first_failed_txn_info,
                         txns[0].chain_id(),
                         txns[0].sequence_number(),
                         failures.iter().map(|f| txns[f.transaction_index].sequence_number()).collect::<Vec<_>>(),
