@@ -21,7 +21,7 @@ postgress:14.0
 aptos/indexer-processor-rust:latest
 hasura/graphql-engine:latest
 ```
-The script already pulls the images, uses tags, and pushes them to make them available, removing aptos/ and hasura/ in order for them to be inside your org.
+The script already pulls the images, uses tags, and pushes them to make them available, removing `aptos/` and `hasura/` in order for them to be inside your org.
 
 Refer to https://antithesis.com/docs/getting_started/deploy_to_antithesis/this link for instructions on pushing images into the registry and startstarting a test run.
 

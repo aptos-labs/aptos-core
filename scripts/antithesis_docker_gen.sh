@@ -125,6 +125,7 @@ for i in "${processor[@]}"; do
     SERVICES="$SERVICES .services.indexer_$i.image = \"indexer-processor-rust:latest\" |"
     SERVICES="$SERVICES .services.indexer_$i.container_name = \"aptos-indexer-processor-$i\" |"
     SERVICES="$SERVICES .services.indexer_$i.hostname = \"aptos-indexer-processor-$i\" |"
+    SERVICES="$SERVICES .services.indexer_$i.environment.RUST_LOG = \"error\" |"
     if [ "$counter" -eq 0 ]; then
       SERVICES="$SERVICES .services.indexer_$i.depends_on.aptos-indexer-postgres.condition = \"service_healthy\" |"
     else
