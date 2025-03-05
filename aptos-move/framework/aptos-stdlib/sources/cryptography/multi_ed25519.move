@@ -6,7 +6,6 @@ module aptos_std::multi_ed25519 {
     use std::error;
     use std::features;
     use std::option::{Self, Option};
-    use std::vector;
     use aptos_std::ed25519;
 
     //
@@ -301,7 +300,7 @@ module aptos_std::multi_ed25519 {
 
     /// Derives the Aptos-specific authentication key of the given Ed25519 public key.
     fun public_key_bytes_to_authentication_key(pk_bytes: vector<u8>): vector<u8> {
-        vector::push_back(&mut pk_bytes, SIGNATURE_SCHEME_ID);
+        pk_bytes.push_back(SIGNATURE_SCHEME_ID);
         std::hash::sha3_256(pk_bytes)
     }
 
@@ -359,8 +358,8 @@ module aptos_std::multi_ed25519 {
 
     #[test_only]
     public fun maul_first_signature(sig: &mut Signature) {
-        let first_sig_byte = vector::borrow_mut(&mut sig.bytes, 0);
-        *first_sig_byte = *first_sig_byte ^ 0xff;
+        let first_sig_byte = sig.bytes.borrow_mut(0);
+        *first_sig_byte ^= 0xff;
     }
 
 
@@ -368,18 +367,18 @@ module aptos_std::multi_ed25519 {
     fun bugfix_validated_pk_from_zero_subpks(fx: signer) {
         features::change_feature_flags_for_testing(&fx, vector[ features::multi_ed25519_pk_validate_v2_feature()], vector[]);
         let bytes = vector<u8>[1u8];
-        assert!(vector::length(&bytes) == 1, 1);
+        assert!(bytes.length() == 1, 1);
 
         // Try deserializing a MultiEd25519 `ValidatedPublicKey` with 0 Ed25519 sub-PKs and 1 threshold byte.
         // This would ideally NOT succeed, but it currently does. Regardless, such invalid PKs will be safely dismissed
         // during signature verification.
         let some = new_validated_public_key_from_bytes(bytes);
-        assert!(option::is_none(&check_and_get_threshold(bytes)), 1);   // ground truth
-        assert!(option::is_some(&some), 2);                             // incorrect
+        assert!(check_and_get_threshold(bytes).is_none(), 1);   // ground truth
+        assert!(some.is_some(), 2);                             // incorrect
 
         // In contrast, the v2 API will fail deserializing, as it should.
         let none = new_validated_public_key_from_bytes_v2(bytes);
-        assert!(option::is_none(&none), 3);
+        assert!(none.is_none(), 3);
     }
 
     #[test(fx = @std)]
@@ -388,17 +387,17 @@ module aptos_std::multi_ed25519 {
 
         let (_, subpk) = ed25519::generate_keys();
         let bytes = ed25519::validated_public_key_to_bytes(&subpk);
-        assert!(vector::length(&bytes) == INDIVIDUAL_PUBLIC_KEY_NUM_BYTES, 1);
+        assert!(bytes.length() == INDIVIDUAL_PUBLIC_KEY_NUM_BYTES, 1);
 
         // Try deserializing a MultiEd25519 `ValidatedPublicKey` with 1 Ed25519 sub-PKs but no threshold byte, which
         // will not succeed,
         let none = new_validated_public_key_from_bytes(bytes);
-        assert!(option::is_none(&check_and_get_threshold(bytes)), 1);   // ground truth
-        assert!(option::is_none(&none), 2);                             // correct
+        assert!(check_and_get_threshold(bytes).is_none(), 1);   // ground truth
+        assert!(none.is_none(), 2);                             // correct
 
         // Similarly, the v2 API will also fail deserializing.
         let none = new_validated_public_key_from_bytes_v2(bytes);
-        assert!(option::is_none(&none), 3);                             // also correct
+        assert!(none.is_none(), 3);                             // also correct
     }
 
     #[test(fx = @std)]
@@ -409,28 +408,28 @@ module aptos_std::multi_ed25519 {
             0, 0, 1,
         ];
 
-        assert!(option::extract(&mut check_and_get_threshold(torsion_point_with_threshold_1)) == 1, 1);
+        assert!(check_and_get_threshold(torsion_point_with_threshold_1).extract() == 1, 1);
 
         // Try deserializing a MultiEd25519 `ValidatedPublicKey` with 1 Ed25519 sub-PKs and 1 threshold byte, as it should,
         // except the sub-PK is of small order. This should not succeed,
         let none = new_validated_public_key_from_bytes(torsion_point_with_threshold_1);
-        assert!(option::is_none(&none), 2);
+        assert!(none.is_none(), 2);
 
         // Similarly, the v2 API will also fail deserializing.
         let none = new_validated_public_key_from_bytes_v2(torsion_point_with_threshold_1);
-        assert!(option::is_none(&none), 3);
+        assert!(none.is_none(), 3);
     }
 
     #[test]
     fun test_gen_sign_verify() {
         let thresholds = vector[1, 1, 2, 2, 3, 15,]; // the thresholds, implicitly encoded in the public keys
         let party_counts = vector[1, 2, 2, 3, 10, 32,];
-        let test_case_count = vector::length(&party_counts);
+        let test_case_count = party_counts.length();
         let test_case_idx = 0;
 
         while (test_case_idx < test_case_count) {
-            let threshold = *vector::borrow(&thresholds, test_case_idx);
-            let group_size = *vector::borrow(&party_counts, test_case_idx);
+            let threshold = thresholds[test_case_idx];
+            let group_size = party_counts[test_case_idx];
 
             let (sk, pk) = generate_keys(threshold, group_size);
             assert!(validated_public_key_threshold(&pk) == threshold, 1);
@@ -438,7 +437,7 @@ module aptos_std::multi_ed25519 {
             assert!(public_key_validate_v2_internal(pk.bytes), 3);
 
             let upk = public_key_into_unvalidated(pk);
-            assert!(option::extract(&mut unvalidated_public_key_threshold(&upk)) == threshold, 4);
+            assert!(unvalidated_public_key_threshold(&upk).extract() == threshold, 4);
             assert!(unvalidated_public_key_num_sub_pks(&upk) == group_size, 5);
 
             let msg1 = b"Hello Aptos!";
@@ -452,7 +451,7 @@ module aptos_std::multi_ed25519 {
             let sig2 = sign_struct(&sk, copy obj2);
             assert!(signature_verify_strict_t(&sig2, &upk, copy obj2), 7);
 
-            test_case_idx = test_case_idx + 1;
+            test_case_idx += 1;
         }
     }
 
@@ -464,7 +463,7 @@ module aptos_std::multi_ed25519 {
         assert!(public_key_validate_v2_internal(pk.bytes), 3);
 
         let upk = public_key_into_unvalidated(pk);
-        assert!(option::extract(&mut unvalidated_public_key_threshold(&upk)) == 4, 4);
+        assert!(unvalidated_public_key_threshold(&upk).extract() == 4, 4);
         assert!(unvalidated_public_key_num_sub_pks(&upk) == 5, 5);
 
         let msg1 = b"Hello Aptos!";
