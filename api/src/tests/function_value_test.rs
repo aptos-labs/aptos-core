@@ -18,7 +18,7 @@ async fn test_function_values() {
     let txn = futures::executor::block_on(async move {
         let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
             .join("../aptos-move/move-examples/function_values/calculator");
-        TestContext::build_package_latest_language(path, named_addresses)
+        TestContext::build_package_with_latest_language(path, named_addresses)
     });
     context.publish_package(&mut account, txn).await;
 

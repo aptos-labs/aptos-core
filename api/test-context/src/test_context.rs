@@ -759,7 +759,7 @@ impl TestContext {
         Self::build_package_with_options(path, named_addresses, BuildOptions::default())
     }
 
-    pub fn build_package_latest_language(
+    pub fn build_package_with_latest_language(
         path: PathBuf,
         named_addresses: Vec<(String, AccountAddress)>,
     ) -> TransactionPayload {

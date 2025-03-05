@@ -343,7 +343,7 @@ impl FatType {
         Ok(res)
     }
 
-    pub(crate) fn from_layout(
+    pub(crate) fn from_runtime_layout(
         layout: &MoveTypeLayout,
         limit: &mut Limiter,
     ) -> PartialVMResult<FatType> {
@@ -358,7 +358,7 @@ impl FatType {
             U256 => FatType::U256,
             Address => FatType::Address,
             Signer => FatType::Signer,
-            Vector(ty) => FatType::Vector(Box::new(Self::from_layout(ty, limit)?)),
+            Vector(ty) => FatType::Vector(Box::new(Self::from_runtime_layout(ty, limit)?)),
             Struct(MoveStructLayout::Runtime(tys)) => {
                 FatType::Runtime(Self::from_layout_slice(tys, limit)?)
             },
@@ -389,7 +389,7 @@ impl FatType {
     ) -> PartialVMResult<Vec<FatType>> {
         layouts
             .iter()
-            .map(|l| Self::from_layout(l, limit))
+            .map(|l| Self::from_runtime_layout(l, limit))
             .collect()
     }
 }

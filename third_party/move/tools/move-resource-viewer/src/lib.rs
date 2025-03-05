@@ -615,7 +615,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         let captured = captured
             .iter()
             .map(|(layout, value)| {
-                let fat_type = FatType::from_layout(layout, limit)
+                let fat_type = FatType::from_runtime_layout(layout, limit)
                     .map_err(|e| anyhow!("failed to annotate captured value: {}", e))?;
                 self.annotate_value(value, &fat_type, limit)
             })

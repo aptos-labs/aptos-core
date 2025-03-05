@@ -12,9 +12,6 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
-[lib]
-test = true
-
 [dependencies]
 anyhow = { workspace = true }
 aptos-api-types = { workspace = true }
