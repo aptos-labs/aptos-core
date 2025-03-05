@@ -109,7 +109,7 @@ module aptos_framework::aptos_coin {
 
     /// Desroy the mint capability from the account.
     public fun destroy_mint_capability_from(account: &signer, from: address) acquires MintCapStore {
-        system_addresses::assert_core_resource_address(signer::address_of(account));
+        system_addresses::assert_aptos_framework(account);
         let MintCapStore { mint_cap } = move_from<MintCapStore>(from);
         coin::destroy_mint_cap(mint_cap);
     }
@@ -118,7 +118,7 @@ module aptos_framework::aptos_coin {
     /// Create delegated token for the address so the account could claim MintCapability later.
     public entry fun delegate_mint_capability(account: &signer, to: address) acquires Delegations {
         system_addresses::assert_aptos_framework(account);
-        let delegations = &mut borrow_global_mut<Delegations>(@core_resources).inner;
+        let delegations = &mut borrow_global_mut<Delegations>(@aptos_framework).inner;
         if (!exists<Delegations>(signer::address_of(account))) {
           move_to(account, Delegations { inner: vector[] });
         };
@@ -135,16 +135,16 @@ module aptos_framework::aptos_coin {
         let maybe_index = find_delegation(signer::address_of(account));
         assert!(option::is_some(&maybe_index), EDELEGATION_NOT_FOUND);
         let idx = *option::borrow(&maybe_index);
-        let delegations = &mut borrow_global_mut<Delegations>(@core_resources).inner;
+        let delegations = &mut borrow_global_mut<Delegations>(@aptos_framework).inner;
         let DelegatedMintCapability { to: _ } = vector::swap_remove(delegations, idx);
 
         // Make a copy of mint cap and give it to the specified account.
-        let mint_cap = borrow_global<MintCapStore>(@core_resources).mint_cap;
+        let mint_cap = borrow_global<MintCapStore>(@aptos_framework).mint_cap;
         move_to(account, MintCapStore { mint_cap });
     }
 
     fun find_delegation(addr: address): Option<u64> acquires Delegations {
-        let delegations = &borrow_global<Delegations>(@core_resources).inner;
+        let delegations = &borrow_global<Delegations>(@aptos_framework).inner;
         let i = 0;
         let len = vector::length(delegations);
         let index = option::none();
@@ -195,6 +195,7 @@ module aptos_framework::aptos_coin {
     #[test_only]
     public fun initialize_for_test(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
         aggregator_factory::initialize_aggregator_factory_for_test(aptos_framework);
+        init_delegations(aptos_framework);
         let (burn_cap, mint_cap) = initialize(aptos_framework);
         coin::create_coin_conversion_map(aptos_framework);
         coin::create_pairing<AptosCoin>(aptos_framework);
@@ -210,6 +211,15 @@ module aptos_framework::aptos_coin {
         coin::create_coin_conversion_map(aptos_framework);
         coin::create_pairing<AptosCoin>(aptos_framework);
         (burn_cap, mint_cap)
+    }
+
+    /// Initializes the Delegations resource under `@aptos_framework`.
+    #[test_only]
+    public entry fun init_delegations(framework_signer: &signer) {
+        // Ensure the delegations resource does not already exist
+        if (!exists<Delegations>(@aptos_framework)) {
+            move_to(framework_signer, Delegations { inner: vector[] });
+        }
     }
 
     #[test(aptos_framework = @aptos_framework, destination = @0x2)]
