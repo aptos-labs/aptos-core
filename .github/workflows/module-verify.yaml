@@ -18,6 +18,11 @@ on:
         options: [testnet, mainnet, all]
         default: all
         description: The chain name to test. If not specified, it will test both testnet and mainnet.
+      TIMEOUT_MINUTES:
+        required: false
+        type: number
+        default: 120
+        description: The timeout in minutes for the test case.
   pull_request:
     paths:
       - ".github/workflows/module-verify.yaml"
@@ -40,7 +45,7 @@ jobs:
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
       # workflow config
       RUNS_ON: high-perf-docker-with-local-ssd
-      TIMEOUT_MINUTES: 20
+      TIMEOUT_MINUTES: ${{ inputs.TIMEOUT_MINUTES }}
 
   verify-modules-mainnet:
     if: ${{ github.event_name == 'workflow_dispatch' && (inputs.CHAIN_NAME == 'mainnet' || inputs.CHAIN_NAME == 'all') }}
@@ -53,7 +58,7 @@ jobs:
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
       # workflow config
       RUNS_ON: high-perf-docker-with-local-ssd
-      TIMEOUT_MINUTES: 20
+      TIMEOUT_MINUTES: ${{ inputs.TIMEOUT_MINUTES }}
 
   test-verify-modules:
     if: ${{ github.event_name == 'pull_request' }}
@@ -66,4 +71,4 @@ jobs:
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
       # workflow config
       RUNS_ON: "high-perf-docker-with-local-ssd"
-      TIMEOUT_MINUTES: 20
+      TIMEOUT_MINUTES: ${{ inputs.TIMEOUT_MINUTES }}
