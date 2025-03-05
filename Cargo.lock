@@ -290,7 +290,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "6.1.1"
+version = "6.2.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -2918,6 +2918,7 @@ dependencies = [
  "aptos-transaction-generator-lib",
  "aptos-transaction-workloads-lib",
  "aptos-types",
+ "clap 4.5.21",
  "rand 0.7.3",
  "serde_json",
 ]
@@ -3263,6 +3264,7 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "tokio",
+ "ureq",
  "url",
 ]
 
@@ -3969,6 +3971,7 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-experimental-layered-map",
+ "aptos-infallible",
  "aptos-metrics-core",
  "aptos-scratchpad",
  "aptos-secure-net",
@@ -4466,6 +4469,7 @@ dependencies = [
  "quick_cache",
  "rand 0.7.3",
  "rayon",
+ "ref-cast",
  "reqwest 0.11.23",
  "ring 0.16.20",
  "rsa 0.9.6",
@@ -11159,16 +11163,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-explain"
-version = "0.1.0"
-dependencies = [
- "bcs 0.1.4",
- "clap 4.5.21",
- "move-command-line-common",
- "move-core-types",
-]
-
-[[package]]
 name = "move-ir-compiler"
 version = "0.1.0"
 dependencies = [
@@ -11594,6 +11588,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytes",
+ "claims",
  "codespan-reporting",
  "memory-stats",
  "move-binary-format",
@@ -11669,6 +11664,7 @@ dependencies = [
  "move-bytecode-utils",
  "move-core-types",
  "move-table-extension",
+ "move-vm-runtime",
  "move-vm-types",
  "once_cell",
  "serde",

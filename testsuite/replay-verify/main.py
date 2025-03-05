@@ -145,7 +145,8 @@ class WorkerPod:
                 return True
         except Exception as e:
             logger.error(f"Failed to get pod status: {e}")
-        return False    
+        return False
+
     def is_failed(self) -> bool:
         self.update_status()
         if self.status and self.status.status.phase == "Failed":
@@ -466,7 +467,7 @@ class ReplayScheduler:
                     self.task_stats[worker_pod.name] = TaskStats(worker_pod.name)
 
                 if self.current_workers[i] is not None:
-                    try: 
+                    try:
                         phase = self.current_workers[i].get_phase()
                         logger.info(
                             f"Checking worker {i}: {self.current_workers[i].name}: {phase}"
@@ -553,7 +554,14 @@ def read_skip_ranges(network: str) -> tuple[int, int, list[tuple[int, int]]]:
         (int(range["start_version"]), int(range["end_version"]))
         for range in data["skip_ranges"]
     ]
-    return (data["start"], data["end"], skip_ranges)
+
+    end = int(json.loads(
+        urllib.request.urlopen(f"https://fullnode.{network}.aptoslabs.com/v1")
+        .read()
+        .decode()
+    )["ledger_version"])
+
+    return (data["start"], end, skip_ranges)
 
 
 def parse_args() -> argparse.Namespace:

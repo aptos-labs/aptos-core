@@ -13,7 +13,7 @@ use aptos_crypto::{hash::HOT_STATE_PLACE_HOLDER_HASH, HashValue};
 use aptos_experimental_layered_map::LayeredMap;
 use aptos_metrics_core::TimerHelper;
 use itertools::Itertools;
-use std::sync::Arc;
+use std::sync::{atomic, atomic::Ordering, Arc};
 
 pub struct HexyView {
     base: Arc<HexyBase>,
@@ -26,6 +26,16 @@ impl HexyView {
     }
 
     pub fn new_overlay(&self, leaves: Vec<(LeafIdx, HashValue)>) -> Result<HexyOverlay> {
+        // Make sure mutations to the base from last merge is synced to this thread.
+        // N.B. assuming not sending work to other threads, otherwise every thread needs a fence.
+        atomic::fence(Ordering::Acquire);
+
+        // Now it's safe even if there's ongoing merge, because all the cells being mutated should
+        // be in the overlay.
+        unsafe { self.unsafe_new_overlay(leaves) }
+    }
+
+    unsafe fn unsafe_new_overlay(&self, leaves: Vec<(LeafIdx, HashValue)>) -> Result<HexyOverlay> {
         // Sort and dedup leaves.
         let sorted_leaves = sort_dedup(leaves);
 
@@ -57,7 +67,7 @@ impl HexyView {
                 for (updated_child_position, updated_child_hash) in updated_children.into_iter() {
                     let updated_child = updated_child_position.index_in_siblings();
                     for child in next_child..updated_child {
-                        hasher.add_child(&self.expect_hash(parent_position.child(child)))?;
+                        hasher.add_child(&self.unsafe_expect_hash(parent_position.child(child)))?;
                     }
                     // n.b. There's the rule of "16 placeholders hash to the placeholder", and
                     // it seems a waste to detect that.
@@ -66,7 +76,7 @@ impl HexyView {
                     next_child = updated_child + 1;
                 }
                 for child in next_child..ARITY {
-                    hasher.add_child(&self.expect_hash(parent_position.child(child)))?;
+                    hasher.add_child(&self.unsafe_expect_hash(parent_position.child(child)))?;
                 }
                 this_level_updates.push((parent_position, hasher.finish()?))
             } // end for children per parent
@@ -121,10 +131,10 @@ impl HexyView {
         self.base.num_leaves()
     }
 
-    fn expect_hash(&self, position: NodePosition) -> HashValue {
+    unsafe fn unsafe_expect_hash(&self, position: NodePosition) -> HashValue {
         match self.overlay.get(&position) {
             Some(hash) => hash,
-            None => self.base.expect_hash(position),
+            None => self.base.unsafe_expect_hash(position),
         }
     }
 }

@@ -971,6 +971,20 @@ impl Type {
         }
     }
 
+    /// If this is a function wrapper, return the inner function type
+    pub fn get_function_wrapper_ty(&self, env: &GlobalEnv) -> Option<Type> {
+        if let Some((struct_env, inst)) = self.get_struct(env) {
+            let fields = struct_env.get_fields().collect_vec();
+            if fields.len() == 1 && fields[0].is_positional() {
+                let ty = fields[0].get_type();
+                if ty.is_function() {
+                    return Some(ty.instantiate(inst));
+                }
+            }
+        }
+        None
+    }
+
     /// Get the target type of a reference
     pub fn get_target_type(&self) -> Option<&Type> {
         if let Type::Reference(_, t) = self {
@@ -1418,6 +1432,11 @@ impl Type {
         struct_resolver: &impl Fn(ModuleName, Symbol) -> QualifiedId<StructId>,
         sig: &SignatureToken,
     ) -> Self {
+        let from_slice = |ts: &[SignatureToken]| {
+            ts.iter()
+                .map(|t| Self::from_signature_token(env, module, struct_resolver, t))
+                .collect::<Vec<_>>()
+        };
         match sig {
             SignatureToken::Bool => Type::Primitive(PrimitiveType::Bool),
             SignatureToken::U8 => Type::Primitive(PrimitiveType::U8),
@@ -1459,18 +1478,13 @@ impl Type {
                     env.to_module_name(&struct_view.module_id()),
                     env.symbol_pool.make(struct_view.name().as_str()),
                 );
-                Type::Struct(
-                    struct_id.module_id,
-                    struct_id.id,
-                    args.iter()
-                        .map(|t| Self::from_signature_token(env, module, struct_resolver, t))
-                        .collect(),
-                )
+                Type::Struct(struct_id.module_id, struct_id.id, from_slice(args))
             },
-            SignatureToken::Function(..) => {
-                // TODO(#15664): implement function conversion
-                unimplemented!("signature token to model type")
-            },
+            SignatureToken::Function(args, result, abilities) => Type::Fun(
+                Box::new(Type::tuple(from_slice(args))),
+                Box::new(Type::Tuple(from_slice(result))),
+                *abilities,
+            ),
         }
     }
 
@@ -1662,6 +1676,10 @@ pub trait UnificationContext: AbilityContext {
         field_name: Symbol,
     ) -> (Vec<(Option<Symbol>, Type)>, bool);
 
+    /// If this is a function type wrapper (`struct W(|T|R)`), get the underlying
+    /// function type.
+    fn get_function_wrapper_type(&self, id: &QualifiedInstId<StructId>) -> Option<Type>;
+
     /// For a given type, return a receiver style function of the given name, if available.
     /// If the function is generic it will be instantiated with fresh type variables.
     fn get_receiver_function(
@@ -1712,6 +1730,10 @@ impl UnificationContext for NoUnificationContext {
         _field_name: Symbol,
     ) -> (Vec<(Option<Symbol>, Type)>, bool) {
         (vec![], false)
+    }
+
+    fn get_function_wrapper_type(&self, _id: &QualifiedInstId<StructId>) -> Option<Type> {
+        None
     }
 
     fn get_receiver_function(
@@ -1977,6 +1999,23 @@ impl Substitution {
                     self.unify(context, variance, order, result_ty, ctr_result_ty)
                         .map_err(TypeUnificationError::map_to_fun_result_mismatch)?;
                     Ok(())
+                },
+                (
+                    Constraint::SomeFunctionValue(ctr_arg_ty, ctr_result_ty),
+                    Type::Struct(mid, sid, inst),
+                ) => {
+                    let sid = &mid.qualified_inst(*sid, inst.clone());
+                    if let Some(Type::Fun(arg_ty, result_ty, _)) =
+                        context.get_function_wrapper_type(sid)
+                    {
+                        self.unify(context, variance, order.swap(), &arg_ty, ctr_arg_ty)
+                            .map_err(TypeUnificationError::map_to_fun_arg_mismatch)?;
+                        self.unify(context, variance, order, &result_ty, ctr_result_ty)
+                            .map_err(TypeUnificationError::map_to_fun_result_mismatch)?;
+                        Ok(())
+                    } else {
+                        constraint_unsatisfied_error()
+                    }
                 },
                 (Constraint::HasAbilities(required_abilities, scope), ty) => self
                     .eval_ability_constraint(

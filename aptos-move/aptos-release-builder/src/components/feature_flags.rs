@@ -140,6 +140,7 @@ pub enum FeatureFlag {
     VMBinaryFormatV8,
     BulletproofsBatchNatives,
     DomainAccountAbstraction,
+    EnableFunctionValues,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -362,7 +363,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::NativeMemoryOperations => AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS,
             FeatureFlag::EnableLoaderV2 => AptosFeatureFlag::ENABLE_LOADER_V2,
             FeatureFlag::DisallowInitModuleToPublishModules => {
-                AptosFeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES
+                AptosFeatureFlag::_DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES
             },
             FeatureFlag::EnableCallTreeAndInstructionVMCache => {
                 AptosFeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE
@@ -371,6 +372,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::AccountAbstraction => AptosFeatureFlag::ACCOUNT_ABSTRACTION,
             FeatureFlag::BulletproofsBatchNatives => AptosFeatureFlag::BULLETPROOFS_BATCH_NATIVES,
             FeatureFlag::DomainAccountAbstraction => AptosFeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION,
+            FeatureFlag::EnableFunctionValues => AptosFeatureFlag::ENABLE_FUNCTION_VALUES,
         }
     }
 }
@@ -519,7 +521,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::COLLECTION_OWNER => FeatureFlag::CollectionOwner,
             AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS => FeatureFlag::NativeMemoryOperations,
             AptosFeatureFlag::ENABLE_LOADER_V2 => FeatureFlag::EnableLoaderV2,
-            AptosFeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES => {
+            AptosFeatureFlag::_DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES => {
                 FeatureFlag::DisallowInitModuleToPublishModules
             },
             AptosFeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE => {
@@ -529,6 +531,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ACCOUNT_ABSTRACTION => FeatureFlag::AccountAbstraction,
             AptosFeatureFlag::BULLETPROOFS_BATCH_NATIVES => FeatureFlag::BulletproofsBatchNatives,
             AptosFeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION => FeatureFlag::DomainAccountAbstraction,
+            AptosFeatureFlag::ENABLE_FUNCTION_VALUES => FeatureFlag::EnableFunctionValues,
         }
     }
 }

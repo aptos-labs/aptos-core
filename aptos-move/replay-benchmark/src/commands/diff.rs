@@ -11,7 +11,7 @@ use crate::{
 use anyhow::{anyhow, bail};
 use aptos_logger::Level;
 use aptos_types::transaction::TransactionOutput;
-use aptos_vm::{aptos_vm::AptosVMBlockExecutor, move_vm_ext::flush_warm_vm_cache, VMBlockExecutor};
+use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use clap::Parser;
 use std::path::PathBuf;
 use tokio::fs;
@@ -154,7 +154,6 @@ impl DiffCommand {
         workloads: &[Workload],
         inputs: &[ReadSet],
     ) -> Vec<Vec<TransactionOutput>> {
-        flush_warm_vm_cache();
         let executor = AptosVMBlockExecutor::new();
         workloads
             .iter()

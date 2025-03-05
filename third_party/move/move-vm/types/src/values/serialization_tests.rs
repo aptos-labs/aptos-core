@@ -8,7 +8,10 @@ mod tests {
     use crate::{
         delayed_values::delayed_field_id::DelayedFieldID,
         value_serde::{MockFunctionValueExtension, ValueSerDeContext},
-        values::{values_impl, AbstractFunction, SerializedFunctionData, Struct, Value},
+        values::{
+            values_impl, AbstractFunction, SerializedFunctionData, Struct, Value,
+            FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
+        },
     };
     use better_any::{Tid, TidAble, TidExt};
     use claims::{assert_err, assert_ok, assert_some};
@@ -210,7 +213,7 @@ mod tests {
         MoveTypeLayout::Function(MoveFunctionLayout(
             vec![],
             vec![],
-            AbilitySet::MAXIMAL_FUNCTIONS,
+            AbilitySet::PUBLIC_FUNCTIONS,
         ))
     }
 
@@ -226,7 +229,7 @@ mod tests {
                     type_args: vec![TypeTag::Signer],
                 }))],
                 results: vec![TypeTag::Address],
-                abilities: AbilitySet::MAXIMAL_FUNCTIONS,
+                abilities: AbilitySet::PUBLIC_FUNCTIONS,
             })),
         ]
     }
@@ -353,6 +356,7 @@ mod tests {
         ) -> MockAbstractFunction {
             Self {
                 data: SerializedFunctionData {
+                    format_version: FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
                     module_id: ModuleId::new(AccountAddress::TWO, Identifier::new("m").unwrap()),
                     fun_id: Identifier::new(fun_name).unwrap(),
                     ty_args,
