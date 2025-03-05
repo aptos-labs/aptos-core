@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 // TODO: figure why this broke after landing successfully
 // #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[alllow(unused)]
+#[allow(unused)]
 async fn test_function_values() {
     let mut context = new_test_context(current_function_name!());
     let mut account = context.create_account().await;
