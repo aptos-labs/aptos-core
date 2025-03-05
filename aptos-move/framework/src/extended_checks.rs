@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{KnownAttribute, RandomnessAnnotation, RuntimeModuleMetadataV1};
+use aptos_types::vm::module_metadata::{
+    KnownAttribute, RandomnessAnnotation, ResourceGroupScope, RuntimeModuleMetadataV1,
+};
 use legacy_move_compiler::shared::known_attributes;
 use move_binary_format::file_format::Visibility;
 use move_cli::base::test_validation;
@@ -31,9 +33,7 @@ use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},
     rc::Rc,
-    str::FromStr,
 };
-use thiserror::Error;
 
 const ALLOW_UNSAFE_RANDOMNESS_ATTRIBUTE: &str = "lint::allow_unsafe_randomness";
 const FMT_SKIP_ATTRIBUTE: &str = "fmt::skip";
@@ -910,68 +910,3 @@ impl<'a> ExtendedChecker<'a> {
             == AccountAddress::ONE
     }
 }
-
-// ----------------------------------------------------------------------------------
-// Resource Group Container Scope
-
-#[derive(Debug, Eq, PartialEq)]
-pub enum ResourceGroupScope {
-    Global,
-    Address,
-    Module,
-}
-
-impl ResourceGroupScope {
-    pub fn is_less_strict(&self, other: &ResourceGroupScope) -> bool {
-        match self {
-            ResourceGroupScope::Global => other != self,
-            ResourceGroupScope::Address => other == &ResourceGroupScope::Module,
-            ResourceGroupScope::Module => false,
-        }
-    }
-
-    pub fn are_equal_envs(&self, resource: &StructEnv, group: &StructEnv) -> bool {
-        match self {
-            ResourceGroupScope::Global => true,
-            ResourceGroupScope::Address => {
-                resource.module_env.get_name().addr() == group.module_env.get_name().addr()
-            },
-            ResourceGroupScope::Module => {
-                resource.module_env.get_name() == group.module_env.get_name()
-            },
-        }
-    }
-
-    pub fn are_equal_module_ids(&self, resource: &ModuleId, group: &ModuleId) -> bool {
-        match self {
-            ResourceGroupScope::Global => true,
-            ResourceGroupScope::Address => resource.address() == group.address(),
-            ResourceGroupScope::Module => resource == group,
-        }
-    }
-
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            ResourceGroupScope::Global => "global",
-            ResourceGroupScope::Address => "address",
-            ResourceGroupScope::Module => "module_",
-        }
-    }
-}
-
-impl FromStr for ResourceGroupScope {
-    type Err = ResourceGroupScopeError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "global" => Ok(ResourceGroupScope::Global),
-            "address" => Ok(ResourceGroupScope::Address),
-            "module_" => Ok(ResourceGroupScope::Module),
-            _ => Err(ResourceGroupScopeError(s.to_string())),
-        }
-    }
-}
-
-#[derive(Debug, Error)]
-#[error("Invalid resource group scope: {0}")]
-pub struct ResourceGroupScopeError(String);
