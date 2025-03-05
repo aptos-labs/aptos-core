@@ -649,7 +649,7 @@ Called by the Adapter
     <b>if</b> (amount_to_burn &gt; storage_fee_refunded) {
         <b>let</b> burn_amount = amount_to_burn - storage_fee_refunded;
         <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_governed_gas_pool_enabled">features::governed_gas_pool_enabled</a>()) {
-            <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_gas_fee">governed_gas_pool::deposit_gas_fee</a>(gas_payer, burn_amount);
+            <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_gas_fee_v2">governed_gas_pool::deposit_gas_fee_v2</a>(gas_payer, burn_amount);
         } <b>else</b> {
             <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer, burn_amount);
         }
