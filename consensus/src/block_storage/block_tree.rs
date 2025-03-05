@@ -311,9 +311,10 @@ impl BlockTree {
             return Ok(OrderedBlockWindow::empty());
         }
 
+        // genesis will never be inserted via insert_block
+        ensure!(!block.is_genesis_block());
         let mut window = vec![];
         let mut current_block = block.clone();
-        ensure!(!current_block.is_genesis_block());
 
         // Add each block to the window until you reach the start round
         while current_block.quorum_cert().certified_block().round() >= window_start_round {
