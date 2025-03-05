@@ -716,11 +716,10 @@ module aptos_std::smart_table {
 
     #[test, expected_failure(abort_code = EINVALID_BUCKET_INDEX)]
     fun test_keys_invalid_bucket_index() {
-        let table = new();
+        let table = new<u64, u64>();
         table.add(1, 0);
         let num_buckets = table.num_buckets;
-        // TODO: Note that, changing this line to receiver syntax, leads to `unexpected type: _`
-        keys_paginated(&table, num_buckets + 1, 0, 1);
+        table.keys_paginated(num_buckets + 1, 0, 1);
         table.destroy();
     }
 
