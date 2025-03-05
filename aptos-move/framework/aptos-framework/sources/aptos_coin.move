@@ -107,10 +107,17 @@ module aptos_framework::aptos_coin {
         coin::deposit<AptosCoin>(dst_addr, coins_minted);
     }
 
+    /// Desroy the mint capability from the account.
+    public fun destroy_mint_capability_from(account: &signer, from: address) acquires MintCapStore {
+        system_addresses::assert_aptos_framework(account);
+        let MintCapStore { mint_cap } = move_from<MintCapStore>(from);
+        coin::destroy_mint_cap(mint_cap);
+    }
+
     /// Only callable in tests and testnets where the core resources account exists.
     /// Create delegated token for the address so the account could claim MintCapability later.
-    public entry fun delegate_mint_capability(account: signer, to: address) acquires Delegations {
-        system_addresses::assert_core_resource(&account);
+    public entry fun delegate_mint_capability(account: &signer, to: address) acquires Delegations {
+        system_addresses::assert_core_resource(account);
         let delegations = &mut borrow_global_mut<Delegations>(@core_resources).inner;
         vector::for_each_ref(delegations, |element| {
             let element: &DelegatedMintCapability = element;
@@ -200,5 +207,29 @@ module aptos_framework::aptos_coin {
         coin::create_coin_conversion_map(aptos_framework);
         coin::create_pairing<AptosCoin>(aptos_framework);
         (burn_cap, mint_cap)
+    }
+
+    #[test(aptos_framework = @aptos_framework, destination = @0x2)]
+    public entry fun test_destroy_mint_cap(
+        aptos_framework: &signer,
+        destination: &signer,
+    ) acquires Delegations, MintCapStore {
+
+        // initialize the `aptos_coin`
+        let (burn_cap, mint_cap) = initialize_for_test(aptos_framework);
+        let core_resource
+
+        // delegate and claim the mint capability
+        delegate_mint_capability(aptos_framework, signer::address_of(destination));
+        claim_mint_capability(destination);
+
+        // destroy the mint Capability
+        destroy_mint_capability_from(aptos_framework, signer::address_of(destination));
+
+        // check if the mint capability is destroyed
+        assert!(!exists<MintCapStore>(signer::address_of(destination)), 2);
+
+        coin::destroy_burn_cap(burn_cap);
+        coin::destroy_mint_cap(mint_cap);
     }
 }
