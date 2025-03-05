@@ -304,7 +304,6 @@ impl BlockStore {
         Ok(())
     }
 
-    // TODO: we should not retrieve genesis, double check this is the right way to do that
     // If execution pool is enabled, use round based block retrieval, else use target block id
     pub(crate) fn generate_target_block_retrieval_payload_and_num_blocks<'a>(
         highest_quorum_cert: &'a QuorumCert,
@@ -551,13 +550,13 @@ impl BlockStore {
     /// TODO @bchocho @hariria deprecate later once BlockRetrievalRequest enum is released
     pub async fn process_block_retrieval_inner(
         &self,
-        request: &IncomingBlockRetrievalRequest,
+        request: &BlockRetrievalRequest,
     ) -> Box<BlockRetrievalResponse> {
         let mut blocks = vec![];
         let mut status = BlockRetrievalStatus::Succeeded;
-        let mut id = request.req.block_id();
+        let mut id = request.block_id();
 
-        match &request.req {
+        match &request {
             BlockRetrievalRequest::V1(req) => {
                 while (blocks.len() as u64) < req.num_blocks() {
                     if let Some(executed_block) = self.get_block(id) {
@@ -612,7 +611,7 @@ impl BlockStore {
         fail_point!("consensus::process_block_retrieval", |_| {
             Err(anyhow::anyhow!("Injected error in process_block_retrieval"))
         });
-        let response = self.process_block_retrieval_inner(&request).await;
+        let response = self.process_block_retrieval_inner(&request.req).await;
         let response_bytes = request
             .protocol
             .to_bytes(&ConsensusMsg::BlockRetrievalResponse(response))?;

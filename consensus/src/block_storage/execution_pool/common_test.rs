@@ -8,12 +8,46 @@ use crate::{
 use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     pipelined_block::PipelinedBlock,
+    quorum_cert::QuorumCert,
+    vote_data::VoteData,
 };
-use aptos_crypto::HashValue;
-use aptos_types::validator_signer::ValidatorSigner;
+use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_types::{
+    aggregate_signature::PartialSignatures,
+    block_info::{BlockInfo, Round},
+    ledger_info::{LedgerInfo, LedgerInfoWithVerifiedSignatures},
+    validator_signer::ValidatorSigner,
+    validator_verifier::random_validator_verifier,
+};
 use std::sync::Arc;
 
 pub const DEFAULT_MAX_PRUNED_BLOCKS_IN_MEM: usize = 10;
+
+/// Helper function to create a `QuorumCert` which can provide a `highest_commit_cert` via
+/// `highest_quorum_cert.into_wrapped_ledger_info()`
+pub fn generate_qc(round: Round, parent_round: Round) -> QuorumCert {
+    let num_nodes = 4;
+    let (signers, validators) = random_validator_verifier(num_nodes, None, false);
+    let quorum_size = validators.quorum_voting_power() as usize;
+
+    let generate_quorum_inner = |round, parent_round| {
+        let vote_data = VoteData::new(BlockInfo::random(round), BlockInfo::random(parent_round));
+        let mut ledger_info = LedgerInfoWithVerifiedSignatures::new(
+            LedgerInfo::new(BlockInfo::empty(), vote_data.hash()),
+            PartialSignatures::empty(),
+        );
+        for signer in &signers[0..quorum_size] {
+            let signature = signer.sign(ledger_info.ledger_info()).unwrap();
+            ledger_info.add_signature(signer.author(), signature);
+        }
+        QuorumCert::new(
+            vote_data,
+            ledger_info.aggregate_signatures(&validators).unwrap(),
+        )
+    };
+
+    generate_quorum_inner(round, parent_round)
+}
 
 /// Helper function to get the [`OrderedBlockWindow`](aptos_consensus_types::pipelined_block::OrderedBlockWindow)
 /// from the `block_store`
@@ -182,10 +216,16 @@ pub async fn create_block_tree_with_forks_unordered_parents(
     let b1_r2 = inserter
         .insert_block_with_qc(certificate_for_genesis(), &genesis_block, 2)
         .await;
-    let a2_r3 = inserter.insert_block(&a1_r1, 3, None).await;
+
+    let a2_r3 = inserter
+        .insert_block(&a1_r1, 3, Some(a1_r1.block_info()))
+        .await;
+
     let b2_r4 = inserter.insert_block(&b1_r2, 4, None).await;
     let b3_r5 = inserter.insert_block(&b2_r4, 5, None).await;
-    let a3_r6 = inserter.insert_block(&a2_r3, 6, None).await;
+    let a3_r6 = inserter
+        .insert_block(&a2_r3, 6, Some(a2_r3.block_info()))
+        .await;
     let c1_r7 = inserter.insert_block(&b1_r2, 7, None).await;
     let d1_r8 = inserter.insert_block(&b1_r2, 8, None).await;
     let a4_r9 = inserter

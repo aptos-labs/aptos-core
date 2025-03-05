@@ -867,4 +867,22 @@ impl BlockStore {
 
         (commit_root, Some(window_root))
     }
+
+    /// Helper function for testing commit_callback
+    /// User can provide a `window_size` to override the `BlockStore::window_size`
+    pub(crate) fn commit_callback(
+        &self,
+        block_id: HashValue,
+        block_round: Round,
+        commit_proof: WrappedLedgerInfo,
+        window_size: Option<u64>,
+    ) {
+        self.inner.write().commit_callback(
+            self.storage.clone(),
+            block_id,
+            block_round,
+            commit_proof,
+            window_size.or(self.window_size),
+        )
+    }
 }

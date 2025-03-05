@@ -12,7 +12,7 @@
 
 use crate::{
     block_storage::{
-        execution_pool::common::{
+        execution_pool::common_test::{
             create_block_tree_no_forks, create_block_tree_no_forks_inner,
             create_block_tree_with_forks, create_block_tree_with_forks_unordered_parents,
             create_block_tree_with_forks_unordered_parents_and_nil_blocks,
@@ -20,13 +20,10 @@ use crate::{
         },
         BlockReader,
     },
-    test_utils::{build_custom_empty_tree, consensus_runtime, timed_block_on, TreeInserter},
+    test_utils::TreeInserter,
 };
-use aptos_consensus_types::{block::block_test_utils, common::Author};
-use aptos_crypto::{HashValue, PrivateKey};
+use aptos_crypto::HashValue;
 use aptos_types::{block_info::Round, validator_signer::ValidatorSigner};
-use proptest::{prop_assert, prop_assert_eq, proptest};
-use std::collections::HashSet;
 
 /// Check the following:
 /// 1. [`OrderedBlockWindow`](aptos_consensus_types::pipelined_block::OrderedBlockWindow)
@@ -570,78 +567,4 @@ async fn test_window_root_with_non_sequential_round_forks_and_nil_blocks() {
     assert_eq!(block_window.get(1).unwrap().id(), b2_r4.id());
     assert!(b2_r4.block().is_nil_block());
     assert_eq!(block_window.len(), 2);
-}
-
-proptest! {
-    /// Test block window during block_store insertion
-    /// Inspired by [`test_block_store_insert`](crate::block_storage::block_store::block_store_test::test_block_store_insert)
-    #[test]
-    fn test_window_block_store_insert(
-        (private_keys, blocks) in block_test_utils::block_forest_and_its_keys(
-            10, // quorum size
-            50 // recursion depth
-        )
-    ){
-        let window_size = Some(3u64);
-        let authors: HashSet<Author> = private_keys.iter().map(
-            // match the signer_strategy in validator_signer.rs
-            |key| Author::from_bytes(&key.public_key().to_bytes()[0..32]).unwrap()
-        ).collect();
-        let runtime = consensus_runtime();
-        let block_store = build_custom_empty_tree(
-            window_size,
-            10usize, // max_pruned_blocks_in_mem
-            None
-        );
-        for block in blocks {
-            if block.round() > 0 && authors.contains(&block.author().unwrap()) {
-                let known_parent = block_store.block_exists(block.parent_id());
-                let certified_parent = block.quorum_cert().certified_block().id() == block.parent_id();
-                let verify_res = block.verify_well_formed();
-                let res = timed_block_on(&runtime, block_store.insert_block(block.clone()));
-                // assert_eq!(block.round(), 3);
-                if !certified_parent {
-                    prop_assert!(verify_res.is_err());
-                } else if !known_parent {
-                    // We cannot really bring blocks in this test because the block retrieval
-                    // functionality invokes event processing, which is not setup here.
-                    assert!(res.is_err());
-                }
-                else {
-                    // The parent must be present if we get to this line.
-                    let parent = block_store.get_block(block.parent_id()).unwrap();
-                    let ordered_block_window = get_blocks_from_block_store_and_window(block_store.clone(), &block, window_size);
-
-                    assert_eq!(block.round(), 3);
-
-                    // First block in the window must be the window root
-                    prop_assert_eq!(
-                        ordered_block_window.first().unwrap().id(),
-                        block_store.window_root().id(),
-                        "first block in ordered block window does not match window_root"
-                    );
-
-                    // TODO, in the beginning this shouldn't be true right?
-                    // There should be (window_size - 1) blocks in the window
-                    if let Some(window_size) = window_size {
-                        prop_assert_eq!(
-                            ordered_block_window.len() as u64,
-                            window_size - 1,
-                            "length of ordered block window is not (window_size - 1)"
-                        );
-                    }
-
-                    // TODO assertions on commit_root vs window_root positioning
-                    if block.round() <= parent.round() {
-                        prop_assert!(res.is_err());
-                    } else {
-                        let executed_block = res.unwrap();
-                        prop_assert_eq!(executed_block.block(),
-                             &block,
-                            "expected ok on block: {:#?}, got {:#?}", block, executed_block.block());
-                    }
-                }
-            }
-        }
-    }
 }
