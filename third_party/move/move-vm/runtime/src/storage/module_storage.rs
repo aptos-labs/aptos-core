@@ -26,7 +26,7 @@ use move_vm_types::{
     loaded_data::runtime_types::{StructType, Type},
     module_cyclic_dependency_error, module_linker_error,
     value_serde::FunctionValueExtension,
-    values::{AbstractFunction, SerializedFunctionData},
+    values::{AbstractFunction, SerializedFunctionData, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
 };
 use std::sync::Arc;
 
@@ -483,6 +483,7 @@ impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
                     .map(|t| ty_converter.type_to_type_layout(&instantiate(t)?))
                     .collect::<PartialVMResult<Vec<_>>>()?;
                 Ok(SerializedFunctionData {
+                    format_version: FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
                     module_id: fun
                         .module_id()
                         .ok_or_else(|| {
