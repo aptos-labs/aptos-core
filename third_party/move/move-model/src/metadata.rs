@@ -196,11 +196,6 @@ pub enum LanguageVersion {
     V2_2,
 }
 
-impl LanguageVersion {
-    /// Leave this symbolic for now in case of more versions.
-    pub const V2_LAMBDA: Self = Self::V2_2;
-}
-
 impl Default for LanguageVersion {
     fn default() -> Self {
         Self::latest_stable()

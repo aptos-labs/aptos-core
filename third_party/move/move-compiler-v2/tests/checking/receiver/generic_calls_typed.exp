@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: DEPRECATED. will be removed
+   ┌─ tests/checking/receiver/generic_calls_typed.move:30:35
+   │
+30 │         s.receiver_needs_type_args::<u64, u8>(x);
+   │                                   ^^ The `::` qualifier is obsolete since Move 2.2
+
 // -- Model dump before bytecode pipeline
 module 0x42::m {
     struct S<T> {
@@ -31,6 +39,7 @@ module 0x42::m {
         m::receiver_ref<u64>(Borrow(Immutable)(s), x);
         m::receiver_ref_mut<u64>(Borrow(Mutable)(s), x);
         m::receiver_more_generics<u64, u64>(s, 22);
+        m::receiver_needs_type_args<u64, u8>(s, x);
         m::receiver_needs_type_args<u64, u8>(s, x);
         Tuple()
     }
@@ -75,6 +84,7 @@ module 0x42::m {
         receiver_ref<u64>(&s, x);
         receiver_ref_mut<u64>(&mut s, x);
         receiver_more_generics<u64,u64>(s, 22);
+        receiver_needs_type_args<u64,u8>(s, x);
         receiver_needs_type_args<u64,u8>(s, x);
     }
     fun test_receiver_inference(s: S<u64>) {

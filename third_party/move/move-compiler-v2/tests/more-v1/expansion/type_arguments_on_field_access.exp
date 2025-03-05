@@ -7,4 +7,4 @@ error: unexpected token
   │                 ^
   │                 │
   │                 Unexpected ';'
-  │                 Expected an expression term
+  │                 Expected '('
