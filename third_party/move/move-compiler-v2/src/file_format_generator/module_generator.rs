@@ -973,10 +973,11 @@ impl ModuleGenerator {
         cons: &Constant,
         ty: &Type,
     ) -> FF::ConstantPoolIndex {
-        if let Some(idx) = self.cons_to_idx.get(&(cons.clone(), ty.clone())) {
+        let canonical_const = cons.to_canonical();
+        if let Some(idx) = self.cons_to_idx.get(&(canonical_const.clone(), ty.clone())) {
             return *idx;
         }
-        let data = cons
+        let data = canonical_const
             .to_move_value()
             .simple_serialize()
             .expect("serialization succeeds");
@@ -991,7 +992,7 @@ impl ModuleGenerator {
             "constant",
         ));
         self.module.constant_pool.push(ff_cons);
-        self.cons_to_idx.insert((cons.clone(), ty.clone()), idx);
+        self.cons_to_idx.insert((canonical_const, ty.clone()), idx);
         idx
     }
 }
