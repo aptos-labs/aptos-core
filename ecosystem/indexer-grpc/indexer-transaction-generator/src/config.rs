@@ -273,7 +273,7 @@ impl TransactionImporterConfig {
         // Run the transaction importer for each network.
         for (network_name, network_config) in self.configs.iter() {
             // If network is specified, only run the transaction importer for the specified network.
-            if let Some(network) = network {
+            if let Some(network) = &network {
                 if network != network_name {
                     continue;
                 }
