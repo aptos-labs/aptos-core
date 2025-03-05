@@ -161,7 +161,6 @@ impl BuildOptions {
             bytecode_version: Some(file_format_common::VERSION_MAX),
             ..self
         }
-        .with_experiment(Experiment::FUNCTION_VALUES)
     }
 }
 

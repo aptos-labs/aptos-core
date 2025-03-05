@@ -84,7 +84,7 @@ pub fn verify_pack_closure(
     mask: ClosureMask,
 ) -> PartialVMResult<()> {
     // Accumulated abilities
-    let mut abilities = if func.is_public() {
+    let mut abilities = if func.function.is_persistent() {
         AbilitySet::PUBLIC_FUNCTIONS
     } else {
         AbilitySet::PRIVATE_FUNCTIONS

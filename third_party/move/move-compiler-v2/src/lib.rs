@@ -378,7 +378,11 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
         });
     }
 
-    if options.experiment_on(Experiment::LAMBDA_LIFTING) {
+    if options
+        .language_version
+        .unwrap_or_default()
+        .is_at_least(LanguageVersion::V2_2)
+    {
         let include_inline_functions = options.experiment_on(Experiment::LAMBDA_LIFTING_INLINE);
         env_pipeline.add("lambda-lifting", move |env: &mut GlobalEnv| {
             lambda_lifter::lift_lambdas(
@@ -389,7 +393,11 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
             )
         });
     }
-    if options.experiment_on(Experiment::FUNCTION_VALUES) {
+    if options
+        .language_version
+        .unwrap_or_default()
+        .is_at_least(LanguageVersion::V2_2)
+    {
         env_pipeline.add("closure-ability-checker", |env: &mut GlobalEnv| {
             closure_checker::check_closures(env)
         });

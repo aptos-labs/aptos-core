@@ -42,11 +42,7 @@ use aptos_types::{
     transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
     write_set::{TransactionWrite, WriteSet},
 };
-use aptos_vm::{
-    data_cache::AsMoveResolver,
-    move_vm_ext::{flush_warm_vm_cache, SessionId},
-    AptosVM,
-};
+use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::SessionId, AptosVM};
 use aptos_vm_environment::{
     environment::AptosEnvironment, prod_configs::aptos_prod_deserializer_config,
 };
@@ -181,6 +177,7 @@ fn add_simple_native_function(
         return_,
         type_parameters: vec![],
         access_specifiers: None,
+        attributes: vec![],
     };
     let func_handle_idx = FunctionHandleIndex(m.function_handles.len() as u16);
     m.function_handles.push(func_handle);
@@ -461,11 +458,10 @@ fn add_script_execution_hash(
  *
  **************************************************************************************************/
 fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<()> {
-    flush_warm_vm_cache();
     let env = AptosEnvironment::new_with_injected_create_signer_for_gov_sim(&state_view);
-    let vm = AptosVM::new(env.clone(), &state_view);
+    let vm = AptosVM::new(&env, &state_view);
     let resolver = state_view.as_move_resolver();
-    let module_storage = state_view.as_aptos_code_storage(env);
+    let module_storage = state_view.as_aptos_code_storage(&env);
 
     let gas_schedule =
         GasScheduleV2::fetch_config(&state_view).context("failed to fetch gas schedule v2")?;
@@ -616,15 +612,12 @@ pub async fn simulate_multistep_proposal(
         println!("    {}", script_name);
 
         // Create a new VM to ensure the loader is clean.
-        // The warm vm cache also needs to be explicitly flushed as it cannot detect the
-        // patches we performed.
-        flush_warm_vm_cache();
         let env = AptosEnvironment::new_with_injected_create_signer_for_gov_sim(&state_view);
-        let vm = AptosVM::new(env.clone(), &state_view);
+        let vm = AptosVM::new(&env, &state_view);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let resolver = state_view.as_move_resolver();
-        let code_storage = state_view.as_aptos_code_storage(env);
+        let code_storage = state_view.as_aptos_code_storage(&env);
 
         let txn = account
             .account()

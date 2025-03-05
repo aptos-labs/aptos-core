@@ -246,7 +246,6 @@ members = [
     "third_party/move/tools/move-coverage",
     "third_party/move/tools/move-decompiler",
     "third_party/move/tools/move-disassembler",
-    "third_party/move/tools/move-explain",
     "third_party/move/tools/move-linter",
     "third_party/move/tools/move-package",
     "third_party/move/tools/move-resource-viewer",

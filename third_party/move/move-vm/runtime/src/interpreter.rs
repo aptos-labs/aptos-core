@@ -288,12 +288,7 @@ impl InterpreterImpl {
         }
 
         self.reentrancy_checker
-            .enter_function(
-                None,
-                function.module_or_script_id(),
-                function.name_id(),
-                CallType::Regular,
-            )
+            .enter_function(None, &function, CallType::Regular)
             .map_err(|e| self.set_location(e))?;
 
         let frame_cache = if RTCaches::caches_enabled() {
@@ -345,8 +340,7 @@ impl InterpreterImpl {
                         self.reentrancy_checker
                             .exit_function(
                                 frame.function.module_or_script_id(),
-                                current_frame.function.module_or_script_id(),
-                                current_frame.function.name_id(),
+                                &current_frame.function,
                                 current_frame.call_type,
                             )
                             .map_err(|e| self.set_location(e))?;
@@ -701,8 +695,7 @@ impl InterpreterImpl {
         self.reentrancy_checker
             .enter_function(
                 Some(current_frame.function.module_or_script_id()),
-                function.module_or_script_id(),
-                function.name_id(),
+                &function,
                 call_type,
             )
             .map_err(|e| self.set_location(e))?;

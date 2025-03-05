@@ -8,12 +8,14 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        Bytecode, CodeOffset, CompiledModule, CompiledScript, FunctionDefinitionIndex,
-        FunctionHandleIndex, ModuleHandleIndex, SignatureToken, StructHandleIndex,
-        StructTypeParameter, TableIndex, Visibility,
+        Bytecode, CodeOffset, CompiledModule, CompiledScript, FunctionAttribute,
+        FunctionDefinitionIndex, FunctionHandleIndex, ModuleHandleIndex, SignatureToken,
+        StructHandleIndex, StructTypeParameter, TableIndex, Visibility,
     },
     file_format_common::VERSION_5,
-    safe_unwrap, IndexKind,
+    safe_unwrap,
+    views::FunctionHandleView,
+    IndexKind,
 };
 use move_core_types::{
     ability::AbilitySet, identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode,
@@ -26,9 +28,10 @@ struct Context<'a, 'b> {
     dependency_map: BTreeMap<ModuleId, &'b CompiledModule>,
     // (Module::StructName -> handle) for all types of all dependencies
     struct_id_to_handle_map: BTreeMap<(ModuleId, Identifier), StructHandleIndex>,
-    // (Module::FunctionName -> handle) for all functions that can ever be called by this
-    // module/script in all dependencies
-    func_id_to_handle_map: BTreeMap<(ModuleId, Identifier), FunctionHandleIndex>,
+    // (Module::FunctionName -> (handle_idx, def_idx)) for all functions that can ever be
+    // called by this module/script in all dependencies
+    func_id_to_index_map:
+        BTreeMap<(ModuleId, Identifier), (FunctionHandleIndex, FunctionDefinitionIndex)>,
     // (handle -> visibility) for all function handles found in the module being checked
     function_visibilities: BTreeMap<FunctionHandleIndex, Visibility>,
     // all function handles found in the module being checked that are script functions in <V5
@@ -77,7 +80,7 @@ impl<'a, 'b> Context<'a, 'b> {
             resolver,
             dependency_map,
             struct_id_to_handle_map: BTreeMap::new(),
-            func_id_to_handle_map: BTreeMap::new(),
+            func_id_to_index_map: BTreeMap::new(),
             function_visibilities: BTreeMap::new(),
             script_functions,
         };
@@ -96,7 +99,7 @@ impl<'a, 'b> Context<'a, 'b> {
                 );
             }
             // Module::FuncName -> def handle idx
-            for func_def in module.function_defs() {
+            for (idx, func_def) in module.function_defs().iter().enumerate() {
                 let func_handle = module.function_handle_at(func_def.function);
                 let func_name = module.identifier_at(func_handle.name);
                 dependency_visibilities.insert(
@@ -111,9 +114,13 @@ impl<'a, 'b> Context<'a, 'b> {
                     Visibility::Private => false,
                 };
                 if may_be_called {
-                    context
-                        .func_id_to_handle_map
-                        .insert((module_id.clone(), func_name.to_owned()), func_def.function);
+                    context.func_id_to_index_map.insert(
+                        (module_id.clone(), func_name.to_owned()),
+                        (
+                            func_def.function,
+                            FunctionDefinitionIndex(idx as TableIndex),
+                        ),
+                    );
                 }
             }
         }
@@ -275,11 +282,11 @@ fn verify_imported_functions(context: &Context) -> PartialVMResult<()> {
         let function_name = context.resolver.identifier_at(function_handle.name);
         let owner_module = safe_unwrap!(context.dependency_map.get(&owner_module_id));
         match context
-            .func_id_to_handle_map
+            .func_id_to_index_map
             .get(&(owner_module_id.clone(), function_name.to_owned()))
         {
-            Some(def_idx) => {
-                let def_handle = owner_module.function_handle_at(*def_idx);
+            Some((owner_handle_idx, owner_def_idx)) => {
+                let def_handle = owner_module.function_handle_at(*owner_handle_idx);
                 // compatible type parameter constraints
                 if !compatible_fun_type_parameters(
                     &function_handle.type_parameters,
@@ -332,6 +339,32 @@ fn verify_imported_functions(context: &Context) -> PartialVMResult<()> {
                     owner_module,
                 )
                 .map_err(|e| e.at_index(IndexKind::FunctionHandle, idx as TableIndex))?;
+
+                // Compatible attributes.
+                let mut def_attrs = def_handle.attributes.as_slice();
+                let handle_attrs = function_handle.attributes.as_slice();
+                if !handle_attrs.is_empty() && def_attrs.is_empty() {
+                    // This is a function with no attributes, which can come from that
+                    // it's compiled for < Move 2.2. Synthesize the
+                    // `persistent` attribute from Public visibility, which we find
+                    // in the definition.
+                    if owner_module.function_def_at(*owner_def_idx).visibility == Visibility::Public
+                    {
+                        def_attrs = &[FunctionAttribute::Persistent]
+                    }
+                }
+                if !FunctionAttribute::is_compatible_with(handle_attrs, def_attrs) {
+                    let def_view = FunctionHandleView::new(*owner_module, def_handle);
+                    return Err(verification_error(
+                        StatusCode::LINKER_ERROR,
+                        IndexKind::FunctionHandle,
+                        idx as TableIndex,
+                    )
+                    .with_message(format!(
+                        "imported function `{}` missing expected attributes",
+                        def_view.name()
+                    )));
+                }
             },
             None => {
                 return Err(verification_error(

@@ -117,7 +117,7 @@ def main():
             line = line.strip()
             if "}" in line:
                 parts = line.split("}")
-                res = [parts[0] + "}"] + parts[1].split(", ")[1:]
+                res = ["}".join(parts[:-1]) + "}"] + parts[-1].split(", ")[1:]
                 return res
             else:
                 return line.split(", ")

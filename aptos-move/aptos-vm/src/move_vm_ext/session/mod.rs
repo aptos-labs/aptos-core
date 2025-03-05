@@ -199,9 +199,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
     /// Returns the publish request if it exists. If the provided flag is set to true, disables any
     /// subsequent module publish requests.
-    pub fn extract_publish_request(&mut self, disable: bool) -> Option<PublishRequest> {
+    pub fn extract_publish_request(&mut self) -> Option<PublishRequest> {
         let ctx = self.get_native_extensions().get_mut::<NativeCodeContext>();
-        ctx.extract_publish_request(disable)
+        ctx.extract_publish_request()
     }
 
     fn populate_v0_resource_group_change_set(

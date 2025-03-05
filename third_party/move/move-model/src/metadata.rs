@@ -244,6 +244,7 @@ impl FromStr for LanguageVersion {
             "1" => Ok(Self::V1),
             "2.0" => Ok(Self::V2_0),
             "2" | "2.1" => Ok(Self::V2_1),
+            "2.2" => Ok(Self::V2_2),
             _ => bail!(
                 "unrecognized language version `{}` (supported versions: `1`, `2`, `2.0`, `2.1`)",
                 s
