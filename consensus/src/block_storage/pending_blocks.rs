@@ -33,14 +33,14 @@ impl PendingBlocks {
         self.blocks_by_hash.insert(block.id(), block.clone());
         self.blocks_by_round.insert(block.round(), block.clone());
         if let Some((target_block_retrieval_payload, tx)) = self.pending_request.take() {
-            let should_fulfill = match target_block_retrieval_payload {
+            let is_fulfilled = match target_block_retrieval_payload {
                 TargetBlockRetrieval::TargetBlockId(target_block_id) => {
                     target_block_id == block.id()
                 },
                 TargetBlockRetrieval::TargetRound(target_round) => target_round == block.round(),
             };
 
-            if should_fulfill {
+            if is_fulfilled {
                 info!(
                     "FulFill block request from incoming block: {:?}",
                     target_block_retrieval_payload
