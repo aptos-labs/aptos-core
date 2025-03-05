@@ -126,6 +126,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exp_suffix: None,
             options: opts
                 .clone()
+                .set_language_version(LanguageVersion::V2_1)
                 .set_experiment(Experiment::ACQUIRES_CHECK, false),
             stop_after: StopAfter::BytecodeGen, // FileFormat,
             dump_ast: DumpLevel::EndStage,
@@ -167,10 +168,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             include: vec!["/lambda/", "/lambda-lifting/"],
             exclude: vec![],
             exp_suffix: None,
-            options: opts
-                .clone()
-                .set_experiment(Experiment::FUNCTION_VALUES, true)
-                .set_experiment(Experiment::LAMBDA_LIFTING, true),
+            options: opts.clone(),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,
             dump_bytecode: DumpLevel::EndStage,
@@ -199,7 +197,10 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             include: vec!["/more-v1/"],
             exclude: vec![],
             exp_suffix: None,
-            options: opts.clone().set_experiment(Experiment::AST_SIMPLIFY, true),
+            options: opts
+                .clone()
+                .set_experiment(Experiment::AST_SIMPLIFY, true)
+                .set_language_version(LanguageVersion::V2_1),
             // Run the entire compiler pipeline to double-check the result
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
@@ -213,7 +214,10 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             include: vec!["/inlining/", "/folding/", "/simplifier/"],
             exclude: vec!["/more-v1/"],
             exp_suffix: None,
-            options: opts.clone().set_experiment(Experiment::AST_SIMPLIFY, true),
+            options: opts
+                .clone()
+                .set_experiment(Experiment::AST_SIMPLIFY, true)
+                .set_language_version(LanguageVersion::V2_1),
             // Run the entire compiler pipeline to double-check the result
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,
