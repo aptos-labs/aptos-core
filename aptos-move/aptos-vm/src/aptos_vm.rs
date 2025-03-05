@@ -33,7 +33,7 @@ use aptos_block_executor::{
     txn_provider::{default::DefaultTxnProvider, TxnProvider},
 };
 use aptos_crypto::HashValue;
-use aptos_framework::{natives::code::PublishRequest, RuntimeModuleMetadataV1};
+use aptos_framework::natives::code::PublishRequest;
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
 use aptos_gas_schedule::{
@@ -73,6 +73,11 @@ use aptos_types::{
         MultisigTransactionPayload, Script, SignedTransaction, Transaction, TransactionArgument,
         TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         ViewFunctionOutput, WriteSetPayload,
+    },
+    vm::module_metadata::{
+        get_compilation_metadata_from_compiled_module,
+        get_compilation_metadata_from_compiled_script, get_metadata, get_metadata_v0,
+        verify_module_metadata, RuntimeModuleMetadataV1,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
@@ -1620,7 +1625,7 @@ impl AptosVM {
                     }
                 }
             }
-            aptos_framework::verify_module_metadata(m, self.features(), self.timed_features())
+            verify_module_metadata(m, self.features(), self.timed_features())
                 .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
         }
 
@@ -1644,9 +1649,7 @@ impl AptosVM {
     fn reject_unstable_bytecode(&self, modules: &[CompiledModule]) -> VMResult<()> {
         if self.chain_id().is_mainnet() {
             for module in modules {
-                if let Some(metadata) =
-                    aptos_framework::get_compilation_metadata_from_compiled_module(module)
-                {
+                if let Some(metadata) = get_compilation_metadata_from_compiled_module(module) {
                     if metadata.unstable {
                         return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
                             .with_message(
@@ -1663,9 +1666,7 @@ impl AptosVM {
     /// Check whether the script can be run on mainnet based on the unstable tag in the metadata
     pub fn reject_unstable_bytecode_for_script(&self, module: &CompiledScript) -> VMResult<()> {
         if self.chain_id().is_mainnet() {
-            if let Some(metadata) =
-                aptos_framework::get_compilation_metadata_from_compiled_script(module)
-            {
+            if let Some(metadata) = get_compilation_metadata_from_compiled_script(module) {
                 if metadata.unstable {
                     return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
                         .with_message("script marked unstable cannot be run on mainnet".to_string())
@@ -2381,10 +2382,13 @@ impl AptosVM {
         module_storage: &impl AptosModuleStorage,
         module_id: &ModuleId,
     ) -> Option<Arc<RuntimeModuleMetadataV1>> {
+        let metadata = module_storage
+            .fetch_module_metadata(module_id.address(), module_id.name())
+            .ok()??;
         if self.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
-            aptos_framework::get_vm_metadata(module_storage, module_id)
+            get_metadata(&metadata)
         } else {
-            aptos_framework::get_vm_metadata_v0(module_storage, module_id)
+            get_metadata_v0(&metadata)
         }
     }
 
