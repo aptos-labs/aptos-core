@@ -19,6 +19,7 @@ This module provides an interface to burn or collect and redistribute transactio
 -  [Function `register_proposer_for_fee_collection`](#0x1_transaction_fee_register_proposer_for_fee_collection)
 -  [Function `burn_coin_fraction`](#0x1_transaction_fee_burn_coin_fraction)
 -  [Function `process_collected_fees`](#0x1_transaction_fee_process_collected_fees)
+-  [Function `burn_from`](#0x1_transaction_fee_burn_from)
 -  [Function `burn_fee`](#0x1_transaction_fee_burn_fee)
 -  [Function `mint_and_refund`](#0x1_transaction_fee_mint_and_refund)
 -  [Function `collect_fee`](#0x1_transaction_fee_collect_fee)
@@ -593,6 +594,53 @@ at the beginning of the block or during reconfiguration.
     // If checks did not pass, simply burn all collected coins and <b>return</b> none.
     <a href="transaction_fee.md#0x1_transaction_fee_burn_coin_fraction">burn_coin_fraction</a>(&<b>mut</b> <a href="coin.md#0x1_coin">coin</a>, 100);
     <a href="coin.md#0x1_coin_destroy_zero">coin::destroy_zero</a>(<a href="coin.md#0x1_coin">coin</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_fee_burn_from"></a>
+
+## Function `burn_from`
+
+Burns a specified amount of AptosCoin from an address.
+
+@param core_resource The signer representing the core resource account.
+@param account The address from which to burn AptosCoin.
+@param fee The amount of AptosCoin to burn.
+@abort If the burn capability is not available.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_from">burn_from</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, fee: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_from">burn_from</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, fee: u64) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosFABurnCapabilities">AptosFABurnCapabilities</a>, <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <b>if</b> (<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosFABurnCapabilities">AptosFABurnCapabilities</a>&gt;(@aptos_framework)) {
+        <b>let</b> burn_ref = &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosFABurnCapabilities">AptosFABurnCapabilities</a>&gt;(@aptos_framework).burn_ref;
+        <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store">aptos_account::burn_from_fungible_store</a>(burn_ref, <a href="account.md#0x1_account">account</a>, fee);
+    } <b>else</b> {
+        <b>let</b> burn_cap = &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).burn_cap;
+        <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operations_default_to_fa_apt_store_enabled">features::operations_default_to_fa_apt_store_enabled</a>()) {
+            <b>let</b> (burn_ref, burn_receipt) = <a href="coin.md#0x1_coin_get_paired_burn_ref">coin::get_paired_burn_ref</a>(burn_cap);
+            <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store">aptos_account::burn_from_fungible_store</a>(&burn_ref, <a href="account.md#0x1_account">account</a>, fee);
+            <a href="coin.md#0x1_coin_return_paired_burn_ref">coin::return_paired_burn_ref</a>(burn_ref, burn_receipt);
+        } <b>else</b> {
+            <a href="coin.md#0x1_coin_burn_from">coin::burn_from</a>&lt;AptosCoin&gt;(
+                <a href="account.md#0x1_account">account</a>,
+                fee,
+                burn_cap,
+            );
+        };
+    };
 }
 </code></pre>
 

@@ -131,6 +131,7 @@ module aptos_framework::aptos_coin {
 
     /// Only callable in tests and testnets where the core resources account exists.
     /// Claim the delegated mint capability and destroy the delegated token.
+    //@TODO: restore to non-reference `signer` type
     public entry fun claim_mint_capability(account: &signer) acquires Delegations, MintCapStore {
         let maybe_index = find_delegation(signer::address_of(account));
         assert!(option::is_some(&maybe_index), EDELEGATION_NOT_FOUND);
