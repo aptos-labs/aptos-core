@@ -149,8 +149,9 @@ impl BlockRetrievalRequestV2 {
     }
 
     /// If there are gaps in the rounds, there might not be a block that stops exactly at the target
-    pub fn is_leq_target_round(&self, round: u64) -> bool {
-        round <= self.target_round()
+    pub fn is_window_start_block(&self, block: &Block) -> bool {
+        block.round() == self.target_round()
+            || block.quorum_cert().certified_block().round() < self.target_round()
     }
 }
 
@@ -226,12 +227,10 @@ impl BlockRetrievalResponse {
                 );
                 ensure!(
                     self.status != BlockRetrievalStatus::SucceededWithTarget
-                        || (!self.blocks.is_empty()
-                            && retrieval_request
-                                .is_leq_target_round(self.blocks.last().unwrap().round())),
-                    "target not found in blocks returned, expected {:?}, got {:?}",
+                        || self.blocks.last().map_or(false, |block| retrieval_request
+                            .is_window_start_block(block)),
+                    "target not found in blocks returned, expect {},",
                     retrieval_request.target_round(),
-                    self.blocks.iter().map(|b| b.round()).collect::<Vec<_>>(),
                 );
             },
         }

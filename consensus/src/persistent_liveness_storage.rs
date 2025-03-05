@@ -2,7 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{consensusdb::ConsensusDB, epoch_manager::LivenessStorageData, error::DbError};
+use crate::{
+    consensusdb::ConsensusDB, epoch_manager::LivenessStorageData, error::DbError,
+    util::calculate_window_start_round,
+};
 use anyhow::{ensure, format_err, Context, Result};
 use aptos_config::config::NodeConfig;
 use aptos_consensus_types::{
@@ -20,7 +23,6 @@ use std::{
     cmp::max,
     collections::{HashMap, HashSet},
     fmt::Debug,
-    ops::Add,
     sync::Arc,
 };
 
@@ -160,10 +162,17 @@ impl LedgerRecoveryData {
             (root_ordered_cert, root_commit_cert)
         };
 
-        let window_start_round = blocks[latest_commit_idx]
-            .round()
-            .add(1)
-            .saturating_sub(window_size);
+        if commit_block.is_genesis_block() {
+            return Ok(RootInfo {
+                commit_root_block: Box::new(commit_block),
+                window_root_block: None,
+                quorum_cert: root_quorum_cert,
+                ordered_cert: root_ordered_cert,
+                commit_cert: root_commit_cert,
+            });
+        }
+
+        let window_start_round = calculate_window_start_round(commit_block.round(), window_size);
         let mut id_to_blocks = HashMap::new();
         blocks.iter().for_each(|block| {
             id_to_blocks.insert(block.id(), block);

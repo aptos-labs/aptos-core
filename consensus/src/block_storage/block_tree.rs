@@ -7,6 +7,7 @@ use crate::{
     counters::update_counters_for_committed_blocks,
     logging::{LogEvent, LogSchema},
     persistent_liveness_storage::PersistentLivenessStorage,
+    util::calculate_window_start_round,
 };
 use anyhow::{bail, ensure};
 use aptos_consensus_types::{
@@ -304,8 +305,8 @@ impl BlockTree {
         // Maybe rename this function or scope it to be non-public to not confuse people in the future.
         // Revisit this later
         let round = block.round();
-        let window_start_round = (round + 1).saturating_sub(window_size);
-        let window_size = (round + 1) - window_start_round;
+        let window_start_round = calculate_window_start_round(round, window_size);
+        let window_size = round - window_start_round + 1;
         ensure!(window_size > 0, "window_size must be greater than 0");
         if window_size == 1 {
             return Ok(OrderedBlockWindow::empty());
