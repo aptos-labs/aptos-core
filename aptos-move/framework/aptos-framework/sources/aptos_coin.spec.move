@@ -55,7 +55,7 @@ spec aptos_framework::aptos_coin {
     }
 
     spec destroy_mint_cap {
-        let addr = signer::address_of(aptos_framework);
+        let addr = signer::address_of(account);
         aborts_if addr != @aptos_framework;
         aborts_if !exists<MintCapStore>(@aptos_framework);
     }

@@ -61,8 +61,8 @@ module aptos_framework::aptos_coin {
 
     /// Only called during genesis to destroy the aptos framework account's mint capability once all initial validators
     /// and accounts have been initialized during genesis.
-    public(friend) fun destroy_mint_cap(aptos_framework: &signer) acquires MintCapStore {
-        system_addresses::assert_aptos_framework(aptos_framework);
+    public(friend) fun destroy_mint_cap(account: &signer) acquires MintCapStore {
+        system_addresses::assert_aptos_framework(account);
         let MintCapStore { mint_cap } = move_from<MintCapStore>(@aptos_framework);
         coin::destroy_mint_cap(mint_cap);
     }
@@ -109,7 +109,7 @@ module aptos_framework::aptos_coin {
 
     /// Desroy the mint capability from the account.
     public fun destroy_mint_capability_from(account: &signer, from: address) acquires MintCapStore {
-        system_addresses::assert_aptos_framework(account);
+        system_addresses::assert_core_resource_address(signer::address_of(account));
         let MintCapStore { mint_cap } = move_from<MintCapStore>(from);
         coin::destroy_mint_cap(mint_cap);
     }
@@ -117,8 +117,11 @@ module aptos_framework::aptos_coin {
     /// Only callable in tests and testnets where the core resources account exists.
     /// Create delegated token for the address so the account could claim MintCapability later.
     public entry fun delegate_mint_capability(account: &signer, to: address) acquires Delegations {
-        system_addresses::assert_core_resource(account);
+        system_addresses::assert_aptos_framework(account);
         let delegations = &mut borrow_global_mut<Delegations>(@core_resources).inner;
+        if (!exists<Delegations>(signer::address_of(account))) {
+          move_to(account, Delegations { inner: vector[] });
+        };
         vector::for_each_ref(delegations, |element| {
             let element: &DelegatedMintCapability = element;
             assert!(element.to != to, error::invalid_argument(EALREADY_DELEGATED));
@@ -214,10 +217,8 @@ module aptos_framework::aptos_coin {
         aptos_framework: &signer,
         destination: &signer,
     ) acquires Delegations, MintCapStore {
-
         // initialize the `aptos_coin`
         let (burn_cap, mint_cap) = initialize_for_test(aptos_framework);
-        let core_resource
 
         // delegate and claim the mint capability
         delegate_mint_capability(aptos_framework, signer::address_of(destination));
