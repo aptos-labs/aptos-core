@@ -116,11 +116,11 @@ module aptos_framework::aptos_coin {
 
     /// Only callable in tests and testnets where the core resources account exists.
     /// Create delegated token for the address so the account could claim MintCapability later.
-    public entry fun delegate_mint_capability(account: &signer, to: address) acquires Delegations {
-        system_addresses::assert_aptos_framework(account);
+    public entry fun delegate_mint_capability(account: signer, to: address) acquires Delegations {
+        system_addresses::assert_aptos_framework(&account);
         let delegations = &mut borrow_global_mut<Delegations>(@aptos_framework).inner;
-        if (!exists<Delegations>(signer::address_of(account))) {
-          move_to(account, Delegations { inner: vector[] });
+        if (!exists<Delegations>(signer::address_of(&account))) {
+          move_to(&account, Delegations { inner: vector[] });
         };
         vector::for_each_ref(delegations, |element| {
             let element: &DelegatedMintCapability = element;
@@ -231,8 +231,11 @@ module aptos_framework::aptos_coin {
         // initialize the `aptos_coin`
         let (burn_cap, mint_cap) = initialize_for_test(aptos_framework);
 
+        // get a copy of the framework signer for test
+        let aptos_framework_delegate = account::create_signer_for_test(signer::address_of(aptos_framework));
+
         // delegate and claim the mint capability
-        delegate_mint_capability(aptos_framework, signer::address_of(destination));
+        delegate_mint_capability(aptos_framework_delegate, signer::address_of(destination));
         claim_mint_capability(destination);
 
         // destroy the mint Capability
