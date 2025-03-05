@@ -97,7 +97,7 @@ impl IndexerCliArgs {
                         serde_yaml::from_str(&imported_transactions_config_raw)?;
 
                     imported_transactions_config
-                        .validate_and_run(&output_folder, &self.network)
+                        .validate_and_run(&output_folder, self.network.clone())
                         .await
                         .context("Importing transactions failed.")?;
                 }
@@ -265,7 +265,7 @@ impl TransactionImporterConfig {
     pub async fn validate_and_run(
         &self,
         output_path: &Path,
-        network: &Option<String>,
+        network: Option<String>,
     ) -> anyhow::Result<()> {
         // Validate the configuration.
         self.validate()?;
