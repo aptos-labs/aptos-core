@@ -1150,6 +1150,7 @@ impl FakeExecutor {
                 ),
             };
             let elapsed = start.elapsed();
+            // println!("result: {:?}", result.is_ok());
             if let Err(err) = result {
                 if !should_error {
                     println!(
@@ -1170,6 +1171,7 @@ impl FakeExecutor {
             i += 1;
         }
 
+        println!("measurements: {:?}", measurements.len());
         // take median of all running time iterations as a more robust measurement
         measurements.sort_by_key(|v| v.elapsed);
         let length = measurements.len();

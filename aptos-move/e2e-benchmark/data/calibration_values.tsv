@@ -40,3 +40,4 @@ MapInsertRemove { len: 100, repeats: 100, map_type: SimpleMap }	55	0.962	1.116	3
 MapInsertRemove { len: 100, repeats: 100, map_type: BigOrderedMap { inner_max_degree: 4, leaf_max_degree: 4 } }	55	0.961	1.165	114032.6
 MapInsertRemove { len: 100, repeats: 100, map_type: BigOrderedMap { inner_max_degree: 1024, leaf_max_degree: 1024 } }	55	0.946	1.055	20418.7
 MapInsertRemove { len: 1000, repeats: 100, map_type: OrderedMap }	55	0.956	1.085	58391.0
+NonceTableInsert    10	0.949	1.038	59041.6
