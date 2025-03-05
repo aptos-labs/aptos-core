@@ -12,7 +12,7 @@ use crate::{
     update::get_revela_path,
 };
 use anyhow::Context;
-use aptos_framework::{
+use aptos_types::vm::module_metadata::{
     get_compilation_metadata_from_compiled_module, get_compilation_metadata_from_compiled_script,
     get_metadata_from_compiled_module, get_metadata_from_compiled_script, RuntimeModuleMetadataV1,
 };
