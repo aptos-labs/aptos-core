@@ -45,8 +45,8 @@ spec aptos_std::pool_u64_unbound {
         let new_shares = spec_amount_to_shares_with_total_coins(self, coins_amount, self.total_coins);
         aborts_if self.total_coins + coins_amount > MAX_U64;
         aborts_if self.total_shares + new_shares > MAX_U128;
-        include coins_amount > 0 ==> AddSharesAbortsIf { new_shares: new_shares };
-        include coins_amount > 0 ==> AddSharesEnsures { new_shares: new_shares };
+        include coins_amount > 0 ==> AddSharesAbortsIf { new_shares };
+        include coins_amount > 0 ==> AddSharesEnsures { new_shares };
         ensures self.total_coins == old(self.total_coins) + coins_amount;
         ensures self.total_shares == old(self.total_shares) + new_shares;
         ensures result == new_shares;
@@ -177,15 +177,5 @@ spec aptos_std::pool_u64_unbound {
         let remaining_shares = table::spec_get(self.shares, shareholder) - num_shares;
         ensures remaining_shares > 0 ==> table::spec_get(self.shares, shareholder) == remaining_shares;
         ensures remaining_shares == 0 ==> !table::spec_contains(self.shares, shareholder);
-    }
-
-    spec to_u128(num: u64): u128 {
-        aborts_if false;
-        ensures result == num;
-    }
-
-    spec to_u256(num: u128): u256 {
-        aborts_if false;
-        ensures result == num;
     }
 }
