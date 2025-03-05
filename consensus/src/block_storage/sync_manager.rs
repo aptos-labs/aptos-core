@@ -22,6 +22,7 @@ use crate::{
     payload_manager::TPayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     pipeline::execution_client::TExecutionClient,
+    util::calculate_window_start_round,
 };
 use anyhow::{anyhow, bail, Context};
 use aptos_consensus_types::{
@@ -43,18 +44,11 @@ use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
 };
-use claims::assert_ge;
 use fail::fail_point;
 use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
 use futures_channel::oneshot;
 use rand::{prelude::*, Rng};
-use std::{
-    clone::Clone,
-    cmp::{max, min},
-    fmt::Display,
-    sync::Arc,
-    time::Duration,
-};
+use std::{clone::Clone, cmp::min, fmt::Display, sync::Arc, time::Duration};
 use tokio::{time, time::timeout};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -326,16 +320,11 @@ impl BlockStore {
                 )
             },
             Some(window_size) => {
-                // For execution, we need the window starting from the highest_commit_cert + 1.
                 let highest_commit_cert_round =
                     highest_commit_cert.ledger_info().ledger_info().round();
-                let target_round = max(
-                    1,
-                    min(
-                        highest_commit_cert_round,
-                        highest_commit_cert_round.saturating_sub(window_size),
-                    ),
-                );
+                // The next block to be executed is highest_commit_cert + 1.
+                let target_round =
+                    calculate_window_start_round(highest_commit_cert_round + 1, window_size);
                 let num_blocks = highest_quorum_cert.certified_block().round() - target_round + 1;
                 info!(
                     "[FastForwardSync] with window_size: {}, target_round: {}, num_blocks: {}",
@@ -384,33 +373,6 @@ impl BlockStore {
                     .get_voters(&retriever.validator_addresses()),
             )
             .await?;
-
-        assert_eq!(
-            blocks.first().expect("blocks are empty").id(),
-            highest_quorum_cert.certified_block().id(),
-            "Expecting in the retrieval response, first block should be {}, but got {}",
-            highest_quorum_cert.certified_block().id(),
-            blocks.first().expect("blocks are empty").id(),
-        );
-
-        // Confirm retrieval hit at least the last round we care about
-        // Slightly different logic if using execution pool and not
-        match target_block_retrieval_payload {
-            TargetBlockRetrieval::TargetBlockId(_) => {
-                assert_eq!(
-                    blocks.last().expect("blocks are empty").id(),
-                    highest_commit_cert.commit_info().id()
-                );
-            },
-            TargetBlockRetrieval::TargetRound(target_round) => {
-                assert!(
-                    blocks.last().expect("blocks are empty").round() <= target_round,
-                    "Expecting in the retrieval response, last block should be <= {}, but got {}",
-                    target_round,
-                    blocks.last().expect("blocks are empty").round()
-                );
-            },
-        }
 
         let mut quorum_certs = vec![highest_quorum_cert.clone()];
         quorum_certs.extend(
@@ -578,7 +540,7 @@ impl BlockStore {
                         if !executed_block.block().is_genesis_block() {
                             blocks.push(executed_block.block().clone());
                         }
-                        if req.is_leq_target_round(executed_block.round()) {
+                        if req.is_window_start_block(executed_block.block()) {
                             status = BlockRetrievalStatus::SucceededWithTarget;
                             break;
                         }
@@ -867,6 +829,17 @@ impl BlockRetriever {
             }
         }
 
+        // Confirm retrieval hit the first block we care about
+        assert_eq!(
+            result_blocks.first().expect("blocks are empty").id(),
+            block_id,
+            "Expecting in the retrieval response, first block should be {}, but got {}",
+            block_id,
+            result_blocks.first().expect("blocks are empty").id(),
+        );
+
+        // Confirm retrieval hit the last block/round we care about
+        // Slightly different logic if using execution pool and not
         match target_block_retrieval_payload {
             TargetBlockRetrieval::TargetBlockId(target_block_id) => {
                 assert_eq!(
@@ -878,12 +851,14 @@ impl BlockRetriever {
                 );
             },
             TargetBlockRetrieval::TargetRound(target_round) => {
-                assert_ge!(
+                let last_block = result_blocks.last().expect("blocks are empty");
+                assert!(
+                    last_block.round() == target_round || last_block.quorum_cert().certified_block().round() < target_round,
+                    "Expecting in the retrieval response, last block should be == {} or its parent should be < {}, but got {} and parent {}",
                     target_round,
-                    result_blocks
-                        .last()
-                        .expect("Expected at least a result_block")
-                        .round()
+                    target_round,
+                    last_block.round(),
+                    last_block.quorum_cert().certified_block().round(),
                 );
             },
         }
