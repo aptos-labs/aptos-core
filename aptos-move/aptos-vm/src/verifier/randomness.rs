@@ -1,8 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_framework::{KnownAttribute, RandomnessAnnotation};
-use aptos_types::transaction::EntryFunction;
+use aptos_types::{
+    transaction::EntryFunction,
+    vm::module_metadata::{
+        get_metadata_from_compiled_module, KnownAttribute, RandomnessAnnotation,
+    },
+};
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use move_binary_format::errors::VMResult;
 
@@ -16,7 +20,7 @@ pub(crate) fn get_randomness_annotation(
         entry_fn.module().name(),
     )?;
 
-    let metadata = aptos_framework::get_metadata_from_compiled_module(&module);
+    let metadata = get_metadata_from_compiled_module(&module);
     if let Some(metadata) = metadata {
         let maybe_annotation = metadata
             .fun_attributes
