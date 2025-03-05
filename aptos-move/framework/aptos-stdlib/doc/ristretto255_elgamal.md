@@ -160,9 +160,9 @@ Creates a new public key from a serialized Ristretto255 point.
 
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_new_pubkey_from_bytes">new_pubkey_from_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_CompressedPubkey">CompressedPubkey</a>&gt; {
     <b>let</b> point = <a href="ristretto255.md#0x1_ristretto255_new_compressed_point_from_bytes">ristretto255::new_compressed_point_from_bytes</a>(bytes);
-    <b>if</b> (std::option::is_some(&<b>mut</b> point)) {
+    <b>if</b> (point.is_some()) {
         <b>let</b> pk = <a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_CompressedPubkey">CompressedPubkey</a> {
-            point: std::option::extract(&<b>mut</b> point)
+            point: point.extract()
         };
         std::option::some(pk)
     } <b>else</b> {
@@ -268,19 +268,19 @@ next 32 bytes store <code>v * G + r * Y</code>, where <code>Y</code> is the publ
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_new_ciphertext_from_bytes">new_ciphertext_from_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_Ciphertext">Ciphertext</a>&gt; {
-    <b>if</b>(<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&bytes) != 64) {
+    <b>if</b>(bytes.length() != 64) {
         <b>return</b> std::option::none&lt;<a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_Ciphertext">Ciphertext</a>&gt;()
     };
 
-    <b>let</b> bytes_right = <a href="../../move-stdlib/doc/vector.md#0x1_vector_trim">vector::trim</a>(&<b>mut</b> bytes, 32);
+    <b>let</b> bytes_right = bytes.trim(32);
 
     <b>let</b> left_point = <a href="ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(bytes);
     <b>let</b> right_point = <a href="ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(bytes_right);
 
-    <b>if</b> (std::option::is_some&lt;RistrettoPoint&gt;(&<b>mut</b> left_point) && std::option::is_some&lt;RistrettoPoint&gt;(&<b>mut</b> right_point)) {
+    <b>if</b> (left_point.is_some::&lt;RistrettoPoint&gt;() && right_point.is_some::&lt;RistrettoPoint&gt;()) {
         std::option::some&lt;<a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_Ciphertext">Ciphertext</a>&gt;(<a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_Ciphertext">Ciphertext</a> {
-            left: std::option::extract&lt;RistrettoPoint&gt;(&<b>mut</b> left_point),
-            right: std::option::extract&lt;RistrettoPoint&gt;(&<b>mut</b> right_point)
+            left: left_point.extract::&lt;RistrettoPoint&gt;(),
+            right: right_point.extract::&lt;RistrettoPoint&gt;()
         })
     } <b>else</b> {
         std::option::none&lt;<a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_Ciphertext">Ciphertext</a>&gt;()
@@ -397,8 +397,8 @@ Given a ciphertext <code>ct</code>, serializes that ciphertext into bytes.
     <b>let</b> bytes_left = <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(&ct.left));
     <b>let</b> bytes_right = <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(&ct.right));
     <b>let</b> bytes = <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
-    <a href="../../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>&lt;u8&gt;(&<b>mut</b> bytes, bytes_left);
-    <a href="../../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>&lt;u8&gt;(&<b>mut</b> bytes, bytes_right);
+    bytes.append::&lt;u8&gt;(bytes_left);
+    bytes.append::&lt;u8&gt;(bytes_right);
     bytes
 }
 </code></pre>
