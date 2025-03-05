@@ -135,7 +135,7 @@ module aptos_std::capability {
             let root_addr = borrow_global<CapDelegateState<Feature>>(addr).root;
             // double check that requester is actually registered as a delegate
             assert!(exists<CapState<Feature>>(root_addr), error::invalid_state(EDELEGATE));
-            assert!(vector::contains(&borrow_global<CapState<Feature>>(root_addr).delegates, &addr),
+            assert!(borrow_global<CapState<Feature>>(root_addr).delegates.contains(&addr),
                 error::invalid_state(EDELEGATE));
             root_addr
         } else {
@@ -178,16 +178,16 @@ module aptos_std::capability {
 
     /// Helper to remove an element from a vector.
     fun remove_element<E: drop>(v: &mut vector<E>, x: &E) {
-        let (found, index) = vector::index_of(v, x);
+        let (found, index) = v.index_of(x);
         if (found) {
-            vector::remove(v, index);
+            v.remove(index);
         }
     }
 
     /// Helper to add an element to a vector.
     fun add_element<E: drop>(v: &mut vector<E>, x: E) {
-        if (!vector::contains(v, &x)) {
-            vector::push_back(v, x)
+        if (!v.contains(&x)) {
+            v.push_back(x)
         }
     }
 }
