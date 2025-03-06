@@ -1,16 +1,17 @@
-import yaml
+import argparse
+import datetime
+from enum import Enum
+from google.cloud import storage
+import json
 from kubernetes import client, config as KubernetesConfig
 from kubernetes.client.rest import ApiException
-from google.cloud import storage
-import time
 import logging
 import os
-from enum import Enum
-import urllib.parse
-import json
-import argparse
 import sys
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
+import time
+import urllib.parse
+import yaml
 
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -29,6 +30,8 @@ RETRY_DELAY = 20  # seconds
 QUERY_DELAY = 5  # seconds
 
 REPLAY_CONCURRENCY_LEVEL = 1
+
+INT64_MAX = 9_223_372_036_854_775_807
 
 
 class Network(Enum):
@@ -363,34 +366,55 @@ class ReplayScheduler:
     def get_label(self):
         return f"{self.id}-{self.network}"
 
+    def sorted_ranges_to_skip(self):
+        if len(self.ranges_to_skip) == 0:
+            return []
+
+        sorted_skips = [
+            list(r) for r in sorted(self.ranges_to_skip) if r[1] >= self.start_version
+        ]
+
+        # merge skip ranges
+        ret = []
+        current_skip = sorted_skips.pop(0)
+        for next_skip in sorted_skips:
+            if next_skip[0] > current_skip[1] + 1:
+                ret.append(current_skip)
+                current_skip = next_skip
+            else:
+                current_skip[1] = max(current_skip[1], next_skip[1])
+        ret.append(current_skip)
+
+        return sorted_skips
+
     def create_tasks(self) -> None:
         current = self.start_version
 
-        sorted_skips = [
-            r
-            for r in sorted(self.ranges_to_skip, key=lambda x: x[0])
-            if r[0] > self.start_version
-        ]
+        skips = self.sorted_ranges_to_skip()
 
-        while current < self.end_version:
-            while sorted_skips and sorted_skips[0][0] <= current < sorted_skips[0][1]:
-                current = sorted_skips[0][1] + 1
-                sorted_skips.pop(0)
+        while current <= self.end_version:
+            (skip_start, skip_end) = (
+                (INT64_MAX, INT64_MAX) if len(skips) == 0 else skips[0]
+            )
+            if skip_start <= current:
+                skips.pop(0)
+                current = skip_end + 1
+                continue
 
-            range_end = min(
-                (
-                    current + self.range_size,
-                    self.end_version,
-                    sorted_skips[0][0] if sorted_skips else self.end_version,
-                )
+            next_current = min(
+                current + self.range_size, self.end_version + 1, skip_start
             )
 
-            if current < range_end:
-                # avoid having too many small tasks, simply skip the task
-                if range_end - current >= self.config.min_range_size:
-                    self.tasks.append((current, range_end))
-                current = range_end
-        logger.info(self.tasks)
+            # avoid having too many small tasks, simply skip the task
+            range = (current, next_current - 1)
+            if next_current - current >= self.config.min_range_size:
+                self.tasks.append(range)
+            else:
+                logger.info(f"Skipping small range {range}")
+
+            current = next_current
+
+        logger.info(f"Task ranges: {self.tasks}")
 
     def create_pvc_from_snapshot(self):
         snapshot_name = (
@@ -555,11 +579,13 @@ def read_skip_ranges(network: str) -> tuple[int, int, list[tuple[int, int]]]:
         for range in data["skip_ranges"]
     ]
 
-    end = int(json.loads(
-        urllib.request.urlopen(f"https://fullnode.{network}.aptoslabs.com/v1")
-        .read()
-        .decode()
-    )["ledger_version"])
+    end = int(
+        json.loads(
+            urllib.request.urlopen(f"https://fullnode.{network}.aptoslabs.com/v1")
+            .read()
+            .decode()
+        )["ledger_version"]
+    )
 
     return (data["start"], end, skip_ranges)
 
@@ -619,7 +645,7 @@ if __name__ == "__main__":
     get_kubectl_credentials("aptos-devinfra-0", "us-central1", "devinfra-usce1-0")
     (start, end, skip_ranges) = read_skip_ranges(args.network)
     image = get_image(args.image_tag) if args.image_tag is not None else get_image()
-    run_id = image[-5:]
+    run_id = f"{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}-{image[-5:]}"
     network = Network.from_string(args.network)
     config = ReplayConfig(network)
     worker_cnt = args.worker_cnt if args.worker_cnt else config.pvc_number * 7
