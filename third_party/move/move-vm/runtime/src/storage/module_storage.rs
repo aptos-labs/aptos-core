@@ -15,6 +15,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
+    function::FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
@@ -26,7 +27,7 @@ use move_vm_types::{
     loaded_data::runtime_types::{StructType, Type},
     module_cyclic_dependency_error, module_linker_error,
     value_serde::FunctionValueExtension,
-    values::{AbstractFunction, SerializedFunctionData, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
+    values::{AbstractFunction, SerializedFunctionData},
 };
 use std::sync::Arc;
 
