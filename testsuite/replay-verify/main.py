@@ -305,6 +305,7 @@ class TaskStats:
         self.end_time: float | None = None
         self.retry_count: int = 0
         self.durations: list[float] = []
+        self.succeeded: bool = False
 
     def set_end_time(self) -> None:
         self.end_time = time.time()
@@ -313,8 +314,11 @@ class TaskStats:
     def increment_retry_count(self) -> None:
         self.retry_count += 1
 
+    def set_succeeded(self):
+        self.succeeded = True
+
     def __str__(self) -> str:
-        return f"Start time: {self.start_time}, End time: {self.end_time}, Duration: {self.durations}, Retry count: {self.retry_count}"
+        return f"Succeeded: {self.succeeded}, Start time: {self.start_time}, End time: {self.end_time}, Duration: {self.durations}, Retry count: {self.retry_count}"
 
 
 class ReplayScheduler:
@@ -524,6 +528,9 @@ class ReplayScheduler:
             else:
                 self.failed_workpod_logs.append(worker_pod.get_humio_log_link())
                 self.current_workers[worker_idx] = None
+        else:
+            self.task_stats[worker_pod.name].set_succeeded()
+
         self.task_stats[worker_pod.name].set_end_time()
 
     def cleanup(self):
@@ -686,7 +693,9 @@ if __name__ == "__main__":
             print_logs(failed_logs, txn_mismatch_logs)
             if txn_mismatch_logs:
                 logger.error("Transaction mismatch logs found.")
+                exit(2)
+            if len(failed_logs) > 0:
+                logger.error("Failed tasks found.")
                 exit(1)
-
         finally:
             scheduler.cleanup()
