@@ -23,7 +23,7 @@ async fn test_no_window_quorum_round_greater_than_commit_round() {
         pipelined_blocks;
 
     let commit_root = block_store.commit_root().id();
-    assert_eq!(commit_root, genesis_block.id());
+    let window_root = block_store.window_root().id();
 
     // Use a4_r9 as an example of a quorum cert and commit from a different node
     let highest_quorum_cert = a4_r9.quorum_cert().clone();
@@ -32,6 +32,15 @@ async fn test_no_window_quorum_round_greater_than_commit_round() {
     let highest_commit_cert = highest_quorum_cert.into_wrapped_ledger_info();
     let highest_commit_cert_round = highest_commit_cert.commit_info().round();
 
+    // commit_root, window_root (my validator)       highest_quorum_cert (different validator)
+    //      ┌───────────────┘             ┌─────────────────────────────┘
+    //      ↓                             ↓
+    //  Genesis ──> A1_R1 ──> A2_R3 ──> A3_R6 ──> A4_R9
+    //      ↑
+    //      └────────────┐
+    //    highest_commit_cert (different validator)
+    assert_eq!(commit_root, genesis_block.id());
+    assert_eq!(window_root, genesis_block.id());
     assert_eq!(highest_quorum_cert_round, 6);
     assert_eq!(highest_commit_cert_round, 0);
 
@@ -89,6 +98,7 @@ async fn test_window_quorum_round_greater_than_commit_round() {
         window_size,
     );
     let commit_root = block_store.commit_root().id();
+    let window_root = block_store.window_root().id();
 
     // Use a4_r9 as an example of a quorum cert and commit from a different node
     let highest_quorum_cert = a4_r9.quorum_cert().clone();
@@ -104,6 +114,7 @@ async fn test_window_quorum_round_greater_than_commit_round() {
     //                          ↑
     //                   ┌──────┘
     //    highest_commit_cert (different validator)
+    assert_eq!(window_root, a2_r3.id());
     assert_eq!(commit_root, a2_r3.id());
     assert_eq!(highest_quorum_cert_round, 6);
     assert_eq!(highest_commit_cert_round, 3);
@@ -156,8 +167,8 @@ async fn test_window_quorum_round_greater_than_commit_round() {
         window_size,
     )
     .await;
-    assert_eq!(target_round, 2);
-    assert_eq!(num_blocks, 5);
+    assert_eq!(target_round, 3);
+    assert_eq!(num_blocks, 4);
     assert_eq!(
         process_block_retrieval_response_blocks
             .first()
@@ -170,12 +181,40 @@ async fn test_window_quorum_round_greater_than_commit_round() {
             .last()
             .expect("No last block found")
             .round(),
-        a1_r1.block().round()
+        a2_r3.block().round()
     );
 
     // ----------------------------------- window_size = 3 ----------------------------------- //
 
     let window_size = Some(3u64);
+    let (_, num_blocks, target_round, process_block_retrieval_response_blocks) = payload_generator(
+        block_store.clone(),
+        highest_quorum_cert.clone(),
+        highest_commit_cert.clone(),
+        window_size,
+    )
+    .await;
+    assert_eq!(target_round, 1);
+    assert_eq!(num_blocks, 6);
+    assert_eq!(
+        process_block_retrieval_response_blocks
+            .first()
+            .expect("No first block found")
+            .round(),
+        a3_r6.block().round()
+    );
+    assert_eq!(
+        process_block_retrieval_response_blocks
+            .last()
+            .expect("No last block found")
+            .round(),
+        a1_r1.round()
+    );
+
+    // ----------------------------------- window_size = 5 ----------------------------------- //
+    // This is the same as window_size = 3 because the target_round is 1
+
+    let window_size = Some(5u64);
     let (_, num_blocks, target_round, process_block_retrieval_response_blocks) = payload_generator(
         block_store.clone(),
         highest_quorum_cert,

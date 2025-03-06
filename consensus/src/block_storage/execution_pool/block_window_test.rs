@@ -54,12 +54,11 @@ async fn test_execution_pool_block_window_3_no_commit() {
     assert_eq!(genesis_pipelined_block.parent_id(), HashValue::zero());
     let mut curr_pipelined_block = genesis_pipelined_block.clone();
 
-    // | blocks inserted | window_size | round | ordered_block_window block count |
-    // |-----------------|-------------|-------|----------------------------------|
-    // | 0               | 3           | 0     | 0                                |
+    // Getting the ordered block window for a genesis block should return an error
     let block = curr_pipelined_block.block();
-    let blocks = get_blocks_from_block_store_and_window(block_store.clone(), block, window_size);
-    assert_eq!(blocks.len(), 0);
+    assert!(block_store
+        .get_ordered_block_window(block, window_size)
+        .is_err());
 
     // | blocks inserted | window_size | round | ordered_block_window block count |
     // |-----------------|-------------|-------|----------------------------------|
