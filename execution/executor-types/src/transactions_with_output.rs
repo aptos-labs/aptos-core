@@ -12,7 +12,7 @@ use std::{
     ops::Deref,
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct TransactionsWithOutput {
     pub transactions: Vec<Transaction>,
     pub transaction_outputs: Vec<TransactionOutput>,
@@ -168,6 +168,10 @@ impl TransactionsToKeep {
             total,
         );
         Ok(())
+    }
+
+    pub fn transactions_with_output(&self) -> &TransactionsWithOutput {
+        self.borrow_transactions_with_output()
     }
 }
 
