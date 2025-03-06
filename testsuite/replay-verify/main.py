@@ -370,6 +370,23 @@ class ReplayScheduler:
     def get_label(self):
         return f"{self.id}-{self.network}"
 
+    def humio_hash_mismatch_url(self, start_time: float, end_time: float) -> str:
+        query = (
+            f'k8s.labels.run = "{self.get_label()}" | "TransactionOutput does not match"'
+        )
+
+        params = {
+            "live": "false",
+            "query": query,
+            "start": f"{int(start_time*1000)}",
+            "end": f"{int(end_time*1000)}",
+        }
+
+        encoded_params = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
+        url = f"https://cloud.us.humio.com/k8s/search?{encoded_params}"
+
+        return url
+
     def sorted_ranges_to_skip(self):
         if len(self.ranges_to_skip) == 0:
             return []
@@ -687,12 +704,14 @@ if __name__ == "__main__":
     else:
         scheduler.create_pvc_from_snapshot()
         try:
+            start_time = time.time()
             scheduler.schedule(from_scratch=True)
             (failed_logs, txn_mismatch_logs) = scheduler.collect_all_failed_logs()
             scheduler.print_stats()
             print_logs(failed_logs, txn_mismatch_logs)
             if txn_mismatch_logs:
-                logger.error("Transaction mismatch logs found.")
+                url = scheduler.humio_hash_mismatch_url(start_time, time.time())
+                logger.error("Transaction mismatch logs found. All mismatch logs: {url}")
                 exit(2)
             if len(failed_logs) > 0:
                 logger.error("Failed tasks found.")
