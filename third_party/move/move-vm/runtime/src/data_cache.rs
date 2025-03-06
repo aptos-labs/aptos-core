@@ -7,6 +7,7 @@ use crate::{
     logging::expect_no_verification_errors,
     storage::{
         module_storage::FunctionValueExtensionAdapter, ty_layout_converter::LoaderLayoutConverter,
+        ty_tag_converter::TypeTagConverter,
     },
     LayoutConverter, ModuleStorage,
 };
@@ -116,7 +117,6 @@ impl<'r> TransactionDataCache<'r> {
     /// Gives all proper guarantees on lifetime of global data as well.
     pub(crate) fn into_effects(
         self,
-        loader: &Loader,
         module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<ChangeSet> {
         let resource_converter =
@@ -131,7 +131,7 @@ impl<'r> TransactionDataCache<'r> {
                             .with_message(format!("Error when serializing resource {}.", value))
                     })
             };
-        self.into_custom_effects(&resource_converter, loader, module_storage)
+        self.into_custom_effects(&resource_converter, module_storage)
     }
 
     /// Same like `into_effects`, but also allows clients to select the format of
@@ -139,7 +139,6 @@ impl<'r> TransactionDataCache<'r> {
     pub(crate) fn into_custom_effects<Resource>(
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
-        loader: &Loader,
         module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<Changes<Bytes, Resource>> {
         let mut change_set = Changes::<Bytes, Resource>::new();
@@ -157,7 +156,9 @@ impl<'r> TransactionDataCache<'r> {
             let mut resources = BTreeMap::new();
             for (ty, (layout, gv, has_aggregator_lifting)) in account_data_cache.data_map {
                 if let Some(op) = gv.into_effect_with_layout(layout) {
-                    let struct_tag = match loader.type_to_type_tag(&ty, module_storage)? {
+                    let ty_tag_builder =
+                        TypeTagConverter::new(module_storage.runtime_environment());
+                    let struct_tag = match ty_tag_builder.ty_to_ty_tag(&ty)? {
                         TypeTag::Struct(struct_tag) => *struct_tag,
                         _ => return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)),
                     };
@@ -222,7 +223,8 @@ impl<'r> TransactionDataCache<'r> {
 
         let mut load_res = None;
         if !account_cache.data_map.contains_key(ty) {
-            let ty_tag = match loader.type_to_type_tag(ty, module_storage)? {
+            let ty_tag_builder = TypeTagConverter::new(module_storage.runtime_environment());
+            let ty_tag = match ty_tag_builder.ty_to_ty_tag(ty)? {
                 TypeTag::Struct(s_tag) => s_tag,
                 _ =>
                 // non-struct top-level value; can't happen

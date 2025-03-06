@@ -9,7 +9,10 @@ use crate::{
     module_traversal::TraversalContext,
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
-    storage::{module_storage::ModuleStorage, ty_layout_converter::LoaderLayoutConverter},
+    storage::{
+        module_storage::ModuleStorage, ty_layout_converter::LoaderLayoutConverter,
+        ty_tag_converter::TypeTagConverter,
+    },
     CodeStorage, LayoutConverter,
 };
 use bytes::Bytes;
@@ -266,7 +269,7 @@ impl<'r, 'l> Session<'r, 'l> {
     /// This MUST NOT be called if there is a previous invocation that failed with an invariant violation.
     pub fn finish(self, module_storage: &impl ModuleStorage) -> VMResult<ChangeSet> {
         self.data_cache
-            .into_effects(self.move_vm.runtime.loader(), module_storage)
+            .into_effects(module_storage)
             .map_err(|e| e.finish(Location::Undefined))
     }
 
@@ -276,11 +279,7 @@ impl<'r, 'l> Session<'r, 'l> {
         module_storage: &impl ModuleStorage,
     ) -> VMResult<Changes<Bytes, Resource>> {
         self.data_cache
-            .into_custom_effects(
-                resource_converter,
-                self.move_vm.runtime.loader(),
-                module_storage,
-            )
+            .into_custom_effects(resource_converter, module_storage)
             .map_err(|e| e.finish(Location::Undefined))
     }
 
@@ -295,7 +294,7 @@ impl<'r, 'l> Session<'r, 'l> {
             ..
         } = self;
         let change_set = data_cache
-            .into_effects(self.move_vm.runtime.loader(), module_storage)
+            .into_effects(module_storage)
             .map_err(|e| e.finish(Location::Undefined))?;
         Ok((change_set, native_extensions))
     }
@@ -311,11 +310,7 @@ impl<'r, 'l> Session<'r, 'l> {
             ..
         } = self;
         let change_set = data_cache
-            .into_custom_effects(
-                resource_converter,
-                self.move_vm.runtime.loader(),
-                module_storage,
-            )
+            .into_custom_effects(resource_converter, module_storage)
             .map_err(|e| e.finish(Location::Undefined))?;
         Ok((change_set, native_extensions))
     }
@@ -428,10 +423,9 @@ impl<'r, 'l> Session<'r, 'l> {
         ty: &Type,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<TypeTag> {
-        self.move_vm
-            .runtime
-            .loader()
-            .type_to_type_tag(ty, module_storage)
+        let ty_tag_builder = TypeTagConverter::new(module_storage.runtime_environment());
+        ty_tag_builder
+            .ty_to_ty_tag(ty)
             .map_err(|e| e.finish(Location::Undefined))
     }
 
