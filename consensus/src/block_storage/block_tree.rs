@@ -285,6 +285,10 @@ impl BlockTree {
         block: &Block,
         window_size: Option<u64>,
     ) -> anyhow::Result<OrderedBlockWindow> {
+        ensure!(
+            !block.is_genesis_block(),
+            "Genesis block does not have a block window",
+        );
         // Block round should never be less than the commit root round
         ensure!(
             block.round() >= self.commit_root().round(),

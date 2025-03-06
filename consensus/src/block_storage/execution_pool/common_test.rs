@@ -217,12 +217,17 @@ pub async fn create_block_tree_with_forks_unordered_parents(
         .insert_block_with_qc(certificate_for_genesis(), &genesis_block, 2)
         .await;
 
+    // NOTE: we are adding a1_r1 as the committed block here in insert_block
+    // This is important for setting the right QuorumCert for commit_callback in tests
     let a2_r3 = inserter
         .insert_block(&a1_r1, 3, Some(a1_r1.block_info()))
         .await;
 
     let b2_r4 = inserter.insert_block(&b1_r2, 4, None).await;
     let b3_r5 = inserter.insert_block(&b2_r4, 5, None).await;
+
+    // NOTE: we are adding a2_r3 as the committed block here in insert_block
+    // This is important for setting the right QuorumCert for commit_callback in tests
     let a3_r6 = inserter
         .insert_block(&a2_r3, 6, Some(a2_r3.block_info()))
         .await;

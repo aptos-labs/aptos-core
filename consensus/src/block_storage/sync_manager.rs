@@ -320,11 +320,10 @@ impl BlockStore {
                 )
             },
             Some(window_size) => {
-                let highest_commit_cert_round =
-                    highest_commit_cert.ledger_info().ledger_info().round();
-                // The next block to be executed is highest_commit_cert + 1.
-                let target_round =
-                    calculate_window_start_round(highest_commit_cert_round + 1, window_size);
+                let target_round = calculate_window_start_round(
+                    highest_commit_cert.ledger_info().ledger_info().round(),
+                    window_size,
+                );
                 let num_blocks = highest_quorum_cert.certified_block().round() - target_round + 1;
                 info!(
                     "[FastForwardSync] with window_size: {}, target_round: {}, num_blocks: {}",
