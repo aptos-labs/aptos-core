@@ -16,12 +16,15 @@ use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     errors::{PartialVMError, PartialVMResult},
-    file_format::{Bytecode, CompiledModule, FunctionDefinitionIndex, Visibility},
+    file_format::{
+        Bytecode, CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility,
+    },
 };
 use move_core_types::{
     ability::{Ability, AbilitySet},
     function::ClosureMask,
     identifier::{IdentStr, Identifier},
+    language_storage,
     language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
     vm_status::StatusCode,
@@ -52,6 +55,8 @@ pub struct Function {
     pub(crate) local_tys: Vec<Type>,
     pub(crate) param_tys: Vec<Type>,
     pub(crate) access_specifier: AccessSpecifier,
+    pub(crate) is_persistent: bool,
+    pub(crate) has_module_reentrancy_lock: bool,
 }
 
 /// For loaded function representation, specifies the owner: a script or a module.
@@ -166,6 +171,7 @@ impl LazyLoadedFunction {
             LazyLoadedFunctionState::Unresolved {
                 data:
                     SerializedFunctionData {
+                        format_version: _,
                         module_id,
                         fun_id,
                         ty_args,
@@ -312,6 +318,14 @@ impl LoadedFunction {
         match &self.owner {
             LoadedFunctionOwner::Module(m) => Some(Module::self_id(m)),
             LoadedFunctionOwner::Script(_) => None,
+        }
+    }
+
+    /// Returns the module id or, if it is a script, the pseudo module id for scripts.
+    pub fn module_or_script_id(&self) -> &ModuleId {
+        match &self.owner {
+            LoadedFunctionOwner::Module(m) => Module::self_id(m),
+            LoadedFunctionOwner::Script(_) => language_storage::pseudo_script_module_id(),
         }
     }
 
@@ -490,6 +504,8 @@ impl Function {
             return_tys,
             param_tys,
             access_specifier,
+            is_persistent: handle.attributes.contains(&FunctionAttribute::Persistent),
+            has_module_reentrancy_lock: handle.attributes.contains(&FunctionAttribute::ModuleLock),
         })
     }
 
@@ -524,6 +540,14 @@ impl Function {
 
     pub fn param_tys(&self) -> &[Type] {
         &self.param_tys
+    }
+
+    pub fn is_persistent(&self) -> bool {
+        self.is_persistent || !self.is_friend_or_private()
+    }
+
+    pub fn has_module_lock(&self) -> bool {
+        self.has_module_reentrancy_lock
     }
 
     /// Creates the function type instance for this function. This requires cloning

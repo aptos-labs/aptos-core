@@ -103,7 +103,10 @@ const TEST_CONFIGS: &[TestConfig] = &[
     TestConfig {
         name: "closures",
         runner: |p| run(p, get_config_by_name("closures")),
-        experiments: &[(Experiment::FUNCTION_VALUES, true)],
+        experiments: &[
+            (Experiment::OPTIMIZE, true),
+            (Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true),
+        ],
         language_version: LanguageVersion::V2_2,
         include: &["/closures/"],
         exclude: &[],

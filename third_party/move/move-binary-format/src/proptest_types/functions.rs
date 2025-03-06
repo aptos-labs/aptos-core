@@ -228,6 +228,7 @@ impl FunctionHandleGen {
             return_: return_idx,
             type_parameters,
             access_specifiers: self.access_specifiers,
+            attributes: vec![],
         })
     }
 }
@@ -438,6 +439,7 @@ impl FunctionDefinitionGen {
             return_: return_idx,
             type_parameters: vec![],
             access_specifiers: None,
+            attributes: vec![],
         };
         let function_handle = state.add_function_handle(handle);
         let mut acquires_set = BTreeSet::new();

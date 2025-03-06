@@ -13,7 +13,7 @@ use move_core_types::{
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumString, FromRepr};
 
-/// The feature flags define in the Move source. This must stay aligned with the constants there.
+/// The feature flags defined in the Move source. This must stay aligned with the constants there.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr, EnumString)]
 #[allow(non_camel_case_types)]
 pub enum FeatureFlag {
@@ -102,8 +102,9 @@ pub enum FeatureFlag {
     ENABLE_LOADER_V2 = 81,
     /// Prior to this feature flag, it was possible to attempt 'init_module' to publish modules
     /// that results in a new package created but without any code. With this feature, it is no
-    /// longer possible and an explicit error is returned if publishing is attempted.
-    DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES = 82,
+    /// longer possible and an explicit error is returned if publishing is attempted. The feature
+    /// was enabled on mainnet and will not be disabled.
+    _DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES = 82,
     /// We keep the Call Tree cache and instruction (per-instruction)
     /// cache together here.  Generally, we could allow Call Tree
     /// cache and disallow instruction cache, however there's little
@@ -121,6 +122,9 @@ pub enum FeatureFlag {
     /// Enables bytecode version v8
     VM_BINARY_FORMAT_V8 = 86,
     BULLETPROOFS_BATCH_NATIVES = 87,
+    DOMAIN_ACCOUNT_ABSTRACTION = 88,
+    /// Whether function values are enabled.
+    ENABLE_FUNCTION_VALUES = 89,
 }
 
 impl FeatureFlag {
@@ -202,11 +206,13 @@ impl FeatureFlag {
             FeatureFlag::NATIVE_MEMORY_OPERATIONS,
             FeatureFlag::COLLECTION_OWNER,
             FeatureFlag::ENABLE_LOADER_V2,
-            FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES,
             FeatureFlag::PERMISSIONED_SIGNER,
             FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
             FeatureFlag::ACCOUNT_ABSTRACTION,
             FeatureFlag::BULLETPROOFS_BATCH_NATIVES,
+            FeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION,
+            FeatureFlag::VM_BINARY_FORMAT_V8,
+            FeatureFlag::ENABLE_FUNCTION_VALUES,
         ]
     }
 }
@@ -286,6 +292,10 @@ impl Features {
         self.is_enabled(FeatureFlag::ACCOUNT_ABSTRACTION)
     }
 
+    pub fn is_domain_account_abstraction_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION)
+    }
+
     pub fn is_module_event_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::MODULE_EVENT)
     }
@@ -357,10 +367,6 @@ impl Features {
 
     pub fn is_loader_v2_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ENABLE_LOADER_V2)
-    }
-
-    pub fn is_disallow_init_module_to_publish_modules_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES)
     }
 
     pub fn is_call_tree_and_instruction_vm_cache_enabled(&self) -> bool {

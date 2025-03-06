@@ -126,6 +126,8 @@ impl Script {
             local_tys,
             param_tys,
             access_specifier: AccessSpecifier::Any,
+            is_persistent: false,
+            has_module_reentrancy_lock: false,
         });
 
         let mut single_signature_token_map = BTreeMap::new();

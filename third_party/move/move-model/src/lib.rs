@@ -65,6 +65,7 @@ pub mod sourcifier;
 pub mod spec_translator;
 pub mod symbol;
 pub mod ty;
+pub mod ty_invariant_analysis;
 pub mod well_known;
 
 pub use builder::binary_module_loader;
@@ -687,6 +688,7 @@ pub fn script_into_module(compiled_script: CompiledScript, name: &str) -> Compil
         return_: return_sig_idx,
         type_parameters: script.type_parameters,
         access_specifiers: None, // TODO: access specifiers for script functions
+        attributes: vec![],
     });
 
     // Create a function definition for the main function.

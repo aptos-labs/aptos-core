@@ -112,13 +112,8 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(false),
         },
         Experiment {
-            name: Experiment::LAMBDA_LIFTING.to_string(),
-            description: "Turns on or off lambda lifting".to_string(),
-            default: Inherited(Experiment::FUNCTION_VALUES.to_string()),
-        },
-        Experiment {
-            name: Experiment::FUNCTION_VALUES.to_string(),
-            description: "Turns on or off first-class function values".to_string(),
+            name: Experiment::LAMBDA_LIFTING_INLINE.to_string(),
+            description: "Whether inline functions shall be included in lambda lifting".to_string(),
             default: Given(false),
         },
         Experiment {
@@ -281,12 +276,11 @@ impl Experiment {
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
     pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";
     pub const FLUSH_WRITES_OPTIMIZATION: &'static str = "flush-writes-optimization";
-    pub const FUNCTION_VALUES: &'static str = "lambda-values";
     pub const GEN_ACCESS_SPECIFIERS: &'static str = "gen-access-specifiers";
     pub const INLINING: &'static str = "inlining";
     pub const KEEP_INLINE_FUNS: &'static str = "keep-inline-funs";
     pub const KEEP_UNINIT_ANNOTATIONS: &'static str = "keep-uninit-annotations";
-    pub const LAMBDA_LIFTING: &'static str = "lambda-lifting";
+    pub const LAMBDA_LIFTING_INLINE: &'static str = "lambda-lifting-inline";
     pub const LINT_CHECKS: &'static str = "lint-checks";
     pub const MESSAGE_FORMAT_JSON: &'static str = "compiler-message-format-json";
     pub const OPTIMIZE: &'static str = "optimize";

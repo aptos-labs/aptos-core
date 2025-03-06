@@ -15,6 +15,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
+    function::FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
@@ -483,6 +484,7 @@ impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
                     .map(|t| ty_converter.type_to_type_layout(&instantiate(t)?))
                     .collect::<PartialVMResult<Vec<_>>>()?;
                 Ok(SerializedFunctionData {
+                    format_version: FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
                     module_id: fun
                         .module_id()
                         .ok_or_else(|| {

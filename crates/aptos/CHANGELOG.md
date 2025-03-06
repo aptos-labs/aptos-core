@@ -4,6 +4,10 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [6.2.0]
+- Several compiler parsing bugs fixed, including in specifications for receiver style functions
+- Remove support for OpenSSL 1.x.x and Ubuntu 20.04, add warning appropriately
+
 ## [6.1.1]
 - Added a new feature to `aptos workspace run`: The workspace server now listens for a "stop" command from
 stdin, which triggers a graceful shutdown when received.
