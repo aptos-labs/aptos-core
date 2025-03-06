@@ -100,7 +100,7 @@ pub enum FeatureFlag {
     /// AIP-105 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-105.md)
     NATIVE_MEMORY_OPERATIONS = 80,
     /// The feature was used to gate the rollout of new loader used by Move VM. It was enabled on
-    /// mainnet and cannot be disabled.
+    /// mainnet and can no longer be disabled.
     _ENABLE_LOADER_V2 = 81,
     /// Prior to this feature flag, it was possible to attempt 'init_module' to publish modules
     /// that results in a new package created but without any code. With this feature, it is no
