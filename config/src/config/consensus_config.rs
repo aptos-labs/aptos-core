@@ -130,18 +130,29 @@ pub struct ExecutionBackpressureLookbackConfig {
     pub target_block_time_ms: usize,
 }
 
-/// Execution backpressure which handles gas/s variance,
+/// Execution backpressure which handles txn/s variance,
 /// and adjusts block sizes to "recalibrate it" to wanted range.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct ExecutionBackpressureConfig {
-    pub txn_limit_lookback: ExecutionBackpressureLookbackConfig,
+pub struct ExecutionBackpressureTxnLimitLookbackConfig {
+    pub lookback_config: ExecutionBackpressureLookbackConfig,
     /// A minimal number of transactions per block, even if calibration suggests otherwise
     /// To make sure backpressure doesn't become too aggressive.
     pub min_calibrated_txns_per_block: u64,
+}
 
-    pub gas_limit_lookback: ExecutionBackpressureLookbackConfig,
+/// Execution backpressure which handles gas/s variance,
+/// and adjusts gas limit to "recalibrate it" to wanted range.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ExecutionBackpressureGasLimitLookbackConfig {
+    pub lookback_config: ExecutionBackpressureLookbackConfig,
     pub block_execution_overhead_ms: u64,
     pub min_calibrated_block_gas_limit: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ExecutionBackpressureConfig {
+    pub txn_limit_lookback: ExecutionBackpressureTxnLimitLookbackConfig,
+    pub gas_limit_lookback: ExecutionBackpressureGasLimitLookbackConfig,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]

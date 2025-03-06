@@ -192,16 +192,18 @@ impl PipelineBackpressureConfig {
         max_block_txns: u64,
     ) -> Option<u64> {
         self.execution.as_ref().and_then(|config| {
+            let lookback_config = config.txn_limit_lookback.lookback_config;
+            let min_calibrated_txns_per_block =
+                config.txn_limit_lookback.min_calibrated_txns_per_block;
             let sizes = self.compute_lookback_blocks(block_execution_times, |summary| {
                 let execution_time_ms = summary.execution_time.as_millis();
                 // Only block above the time threshold are considered giving enough signal to support calibration
                 // so we filter out shorter locks
-                if execution_time_ms as u64
-                    > config.txn_limit_lookback.min_block_time_ms_to_activate as u64
+                if execution_time_ms as u64 > lookback_config.min_block_time_ms_to_activate as u64
                     && summary.payload_len > 0
                 {
                     Some(
-                        ((config.txn_limit_lookback.target_block_time_ms as f64
+                        ((lookback_config.target_block_time_ms as f64
                             / summary.execution_time.as_millis() as f64
                             * (summary.to_commit as f64
                                 / (summary.to_commit + summary.to_retry) as f64)
@@ -213,10 +215,10 @@ impl PipelineBackpressureConfig {
                     None
                 }
             });
-            if sizes.len() >= config.txn_limit_lookback.min_blocks_to_activate {
+            if sizes.len() >= lookback_config.min_blocks_to_activate {
                 let calibrated_block_size = self
-                    .compute_lookback_metric(&sizes, &config.txn_limit_lookback.metric)
-                    .max(config.min_calibrated_txns_per_block);
+                    .compute_lookback_metric(&sizes, &lookback_config.metric)
+                    .max(min_calibrated_txns_per_block);
                 PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS.observe(calibrated_block_size as f64);
                 // Check if calibrated block size is reduction in size, to turn on backpressure.
                 if max_block_txns > calibrated_block_size {
@@ -244,24 +246,26 @@ impl PipelineBackpressureConfig {
         max_block_gas_limit: u64,
     ) -> Option<u64> {
         self.execution.as_ref().and_then(|config| {
+            let lookback_config = config.gas_limit_lookback.lookback_config;
+            let block_execution_overhead_ms = config.gas_limit_lookback.block_execution_overhead_ms;
+            let min_calibrated_block_gas_limit =
+                config.gas_limit_lookback.min_calibrated_block_gas_limit;
             let gas_limit_estimates =
                 self.compute_lookback_blocks(block_execution_times, |summary| {
                     let execution_time_ms = summary.execution_time.as_millis() as u64;
                     let execution_time_ms =
-                        execution_time_ms.saturating_sub(config.block_execution_overhead_ms);
+                        execution_time_ms.saturating_sub(block_execution_overhead_ms);
                     // Only block above the time threshold are considered giving enough signal to support calibration
                     // so we filter out shorter locks
-                    if execution_time_ms
-                        > config.gas_limit_lookback.min_block_time_ms_to_activate as u64
-                    {
+                    if execution_time_ms > lookback_config.min_block_time_ms_to_activate as u64 {
                         if let Some(gas_used) = summary.gas_used {
-                            if gas_used >= config.min_calibrated_block_gas_limit {
+                            if gas_used >= min_calibrated_block_gas_limit {
                                 Some(
-                                    ((config.gas_limit_lookback.target_block_time_ms as f64
+                                    ((lookback_config.target_block_time_ms as f64
                                         / execution_time_ms as f64
                                         * gas_used as f64)
                                         .floor() as u64)
-                                        .max(config.min_calibrated_block_gas_limit),
+                                        .max(min_calibrated_block_gas_limit),
                                 )
                             } else {
                                 None
@@ -274,13 +278,10 @@ impl PipelineBackpressureConfig {
                         None
                     }
                 });
-            if gas_limit_estimates.len() >= config.gas_limit_lookback.min_blocks_to_activate {
+            if gas_limit_estimates.len() >= lookback_config.min_blocks_to_activate {
                 let calibrated_gas_limit = self
-                    .compute_lookback_metric(
-                        &gas_limit_estimates,
-                        &config.gas_limit_lookback.metric,
-                    )
-                    .max(config.min_calibrated_block_gas_limit);
+                    .compute_lookback_metric(&gas_limit_estimates, &lookback_config.metric)
+                    .max(min_calibrated_block_gas_limit);
                 PROPOSER_ESTIMATED_CALIBRATED_BLOCK_GAS.observe(calibrated_gas_limit as f64);
                 // Check if calibrated block size is reduction in size, to turn on backpressure.
                 if max_block_gas_limit > calibrated_gas_limit {
@@ -305,8 +306,14 @@ impl PipelineBackpressureConfig {
     pub fn num_blocks_to_look_at(&self) -> Option<usize> {
         self.execution.as_ref().map(|config| {
             std::cmp::max(
-                config.txn_limit_lookback.num_blocks_to_look_at,
-                config.gas_limit_lookback.num_blocks_to_look_at,
+                config
+                    .txn_limit_lookback
+                    .lookback_config
+                    .num_blocks_to_look_at,
+                config
+                    .gas_limit_lookback
+                    .lookback_config
+                    .num_blocks_to_look_at,
             )
         })
     }
