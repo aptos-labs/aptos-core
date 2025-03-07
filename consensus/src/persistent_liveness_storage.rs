@@ -68,6 +68,7 @@ pub trait PersistentLivenessStorage: Send + Sync {
 #[derive(Clone)]
 pub struct RootInfo {
     pub commit_root_block: Box<Block>,
+    /// Genesis `window_root_block` will be None
     pub window_root_block: Option<Box<Block>>,
     pub quorum_cert: QuorumCert,
     pub ordered_cert: WrappedLedgerInfo,
@@ -136,7 +137,7 @@ impl LedgerRecoveryData {
             .position(|block| block.id() == latest_commit_id)
             .ok_or_else(|| format_err!("unable to find root: {}", latest_commit_id))?;
         let commit_block = blocks[latest_commit_idx].clone();
-        let root_quorum_cert = quorum_certs
+        let commit_block_quorum_cert = quorum_certs
             .iter()
             .find(|qc| qc.certified_block().id() == commit_block.id())
             .ok_or_else(|| format_err!("No QC found for root: {}", commit_block.id()))?
@@ -166,7 +167,7 @@ impl LedgerRecoveryData {
             return Ok(RootInfo {
                 commit_root_block: Box::new(commit_block),
                 window_root_block: None,
-                quorum_cert: root_quorum_cert,
+                quorum_cert: commit_block_quorum_cert,
                 ordered_cert: root_ordered_cert,
                 commit_cert: root_commit_cert,
             });
@@ -208,7 +209,7 @@ impl LedgerRecoveryData {
         Ok(RootInfo {
             commit_root_block: Box::new(commit_block),
             window_root_block: Some(Box::new(window_start_block)),
-            quorum_cert: root_quorum_cert,
+            quorum_cert: commit_block_quorum_cert,
             ordered_cert: root_ordered_cert,
             commit_cert: root_commit_cert,
         })

@@ -42,7 +42,7 @@ impl PendingBlocks {
 
             if is_fulfilled {
                 info!(
-                    "FulFill block request from incoming block: {:?}",
+                    "FulFill block request from incoming block: {}",
                     target_block_retrieval_payload
                 );
                 BLOCK_RETRIEVAL_LOCAL_FULFILL_COUNT.inc();

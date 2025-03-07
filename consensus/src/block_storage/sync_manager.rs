@@ -396,14 +396,10 @@ impl BlockStore {
                     highest_commit_cert
                 );
                 BLOCKS_FETCHED_FROM_NETWORK_WHILE_FAST_FORWARD_SYNC.inc_by(1);
-                let target_block_retrieval_payload = match window_size {
-                    None => {
-                        TargetBlockRetrieval::TargetBlockId(highest_commit_certified_block.id())
-                    },
-                    Some(_) => {
-                        TargetBlockRetrieval::TargetRound(highest_commit_certified_block.round())
-                    },
-                };
+
+                // Only retrieving one block here, we can simply use TargetBlockRetrieval::TargetBlockId
+                let target_block_retrieval_payload =
+                    TargetBlockRetrieval::TargetBlockId(highest_commit_certified_block.id());
                 let mut additional_blocks = retriever
                     .retrieve_blocks_in_range(
                         highest_commit_certified_block.id(),
@@ -508,7 +504,6 @@ impl BlockStore {
         }
     }
 
-    /// TODO @bchocho @hariria deprecate later once BlockRetrievalRequest enum is released
     pub async fn process_block_retrieval_inner(
         &self,
         request: &BlockRetrievalRequest,

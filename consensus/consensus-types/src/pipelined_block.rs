@@ -123,7 +123,9 @@ pub struct PipelineInputRx {
 /// A window of blocks that are needed for execution with the execution pool, EXCLUDING the current block
 #[derive(Clone)]
 pub struct OrderedBlockWindow {
-    blocks: Vec<Weak<PipelinedBlock>>,
+    /// `block_id` (HashValue) helps with logging in the unlikely case there are issues upgrading
+    /// the `Weak` pointer (we can use `block_id`)
+    blocks: Vec<(HashValue, Weak<PipelinedBlock>)>,
 }
 
 impl OrderedBlockWindow {
@@ -131,8 +133,8 @@ impl OrderedBlockWindow {
         Self {
             blocks: blocks
                 .iter()
-                .map(Arc::downgrade)
-                .collect::<Vec<Weak<PipelinedBlock>>>(),
+                .map(|x| (x.id(), Arc::downgrade(x)))
+                .collect::<Vec<(HashValue, Weak<PipelinedBlock>)>>(),
         }
     }
 
@@ -144,18 +146,17 @@ impl OrderedBlockWindow {
     ///
     /// if the `PipelinedBlock` still exists
     ///      `upgraded_block` will be `Some(PipelinedBlock)`, and included in `blocks`
-    /// else it will be `None`, and not included in `blocks`
+    /// else it will panic
     pub fn blocks(&self) -> Vec<Block> {
         let mut blocks: Vec<Block> = vec![];
-        for (index, block) in self.blocks.iter().enumerate() {
+        for (block_id, block) in self.blocks.iter() {
             let upgraded_block = block.upgrade();
             if let Some(block) = upgraded_block {
                 blocks.push(block.block().clone())
             } else {
-                // TODO @bchocho @hariria revisit if we want to panic or bail
                 panic!(
-                    "Block {} not found during upgrade in OrderedBlockWindow::blocks()",
-                    index
+                    "Block with id: {} not found during upgrade in OrderedBlockWindow::blocks()",
+                    block_id
                 )
             }
         }
@@ -164,14 +165,13 @@ impl OrderedBlockWindow {
 
     pub fn pipelined_blocks(&self) -> Vec<Arc<PipelinedBlock>> {
         let mut blocks: Vec<Arc<PipelinedBlock>> = Vec::new();
-        for (index, block) in self.blocks.iter().enumerate() {
+        for (block_id, block) in self.blocks.iter() {
             if let Some(block) = block.upgrade() {
                 blocks.push(block);
             } else {
-                // TODO @bchocho @hariria revisit if we want to panic or bail
                 panic!(
-                    "Block {} not found during upgrade in OrderedBlockWindow::pipelined_blocks()",
-                    index
+                    "Block with id: {} not found during upgrade in OrderedBlockWindow::pipelined_blocks()",
+                    block_id
                 )
             }
         }
