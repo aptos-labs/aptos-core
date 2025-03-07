@@ -52,8 +52,8 @@ impl PseudoGasContext {
         if self.cost > self.max_cost {
             Err(
                 PartialVMError::new(StatusCode::TYPE_TAG_LIMIT_EXCEEDED).with_message(format!(
-                    "Exceeded maximum type tag limit of {}",
-                    self.max_cost
+                    "Exceeded maximum type tag limit of {} when charging {}",
+                    self.max_cost, amount
                 )),
             )
         } else {

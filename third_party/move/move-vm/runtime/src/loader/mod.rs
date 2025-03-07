@@ -1212,7 +1212,7 @@ impl<'a> Resolver<'a> {
             }
         }
 
-        let ty_builder = &self.vm_config().ty_builder;
+        let ty_builder = self.ty_builder();
         let instantiation = instantiation
             .iter()
             .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
@@ -1263,7 +1263,7 @@ impl<'a> Resolver<'a> {
         };
 
         let struct_ty = &struct_inst.definition_struct_type;
-        let ty_builder = &self.vm_config().ty_builder;
+        let ty_builder = self.ty_builder();
         ty_builder.create_struct_instantiation_ty(struct_ty, &struct_inst.instantiation, ty_args)
     }
 
@@ -1296,7 +1296,7 @@ impl<'a> Resolver<'a> {
         ty_args: &[Type],
         instantiation_tys: &[Type],
     ) -> PartialVMResult<Type> {
-        let ty_builder = &self.vm_config().ty_builder;
+        let ty_builder = self.ty_builder();
         let instantiation_tys = instantiation_tys
             .iter()
             .map(|inst_ty| ty_builder.create_ty_with_subst(inst_ty, ty_args))
@@ -1369,7 +1369,7 @@ impl<'a> Resolver<'a> {
         instantiation: &[Type],
         ty_args: &[Type],
     ) -> PartialVMResult<Vec<Type>> {
-        let ty_builder = &self.vm_config().ty_builder;
+        let ty_builder = self.ty_builder();
         let instantiation_tys = instantiation
             .iter()
             .map(|inst_ty| ty_builder.create_ty_with_subst(inst_ty, ty_args))
@@ -1397,9 +1397,7 @@ impl<'a> Resolver<'a> {
         let ty = self.single_type_at(idx);
 
         if !ty_args.is_empty() {
-            self.vm_config()
-                .ty_builder
-                .create_ty_with_subst(ty, ty_args)
+            self.ty_builder().create_ty_with_subst(ty, ty_args)
         } else {
             Ok(ty.clone())
         }
@@ -1441,8 +1439,7 @@ impl<'a> Resolver<'a> {
         match &self.binary {
             BinaryType::Module(module) => {
                 let struct_ty = &module.field_handles[idx.0 as usize].definition_struct_type;
-                self.vm_config()
-                    .ty_builder
+                self.ty_builder()
                     .create_struct_ty(struct_ty.idx, AbilityInfo::struct_(struct_ty.abilities))
             },
             BinaryType::Script(_) => unreachable!("Scripts cannot have field instructions"),
@@ -1466,8 +1463,7 @@ impl<'a> Resolver<'a> {
     }
 
     pub(crate) fn create_struct_ty(&self, struct_ty: &Arc<StructType>) -> Type {
-        self.vm_config()
-            .ty_builder
+        self.ty_builder()
             .create_struct_ty(struct_ty.idx, AbilityInfo::struct_(struct_ty.abilities))
     }
 
@@ -1477,8 +1473,7 @@ impl<'a> Resolver<'a> {
         ty_params: &[Type],
         ty_args: &[Type],
     ) -> PartialVMResult<Type> {
-        self.vm_config()
-            .ty_builder
+        self.ty_builder()
             .create_struct_instantiation_ty(struct_ty, ty_params, ty_args)
     }
 
@@ -1515,6 +1510,10 @@ impl<'a> Resolver<'a> {
 
     pub(crate) fn vm_config(&self) -> &VMConfig {
         self.module_storage.runtime_environment().vm_config()
+    }
+
+    pub(crate) fn ty_builder(&self) -> &TypeBuilder {
+        &self.vm_config().ty_builder
     }
 }
 

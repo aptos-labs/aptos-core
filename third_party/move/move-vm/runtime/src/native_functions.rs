@@ -206,7 +206,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
             .resolver
             .module_storage()
             .fetch_function_definition(module_id.address(), module_id.name(), function_name)
-            // TODO(loader_v2):
+            // TODO(#16077):
             //   Keeping this consistent with loader V1 implementation which returned that
             //   error. Check if we can avoid remapping by replaying transactions.
             .map_err(|_| {

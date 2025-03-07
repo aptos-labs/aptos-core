@@ -296,16 +296,16 @@ impl VMRuntime {
             .into_iter()
             .zip(serialized_args)
             .enumerate()
-            .map(|(idx, (ty, arg_bytes))| match &ty {
-                Type::MutableReference(inner_t) | Type::Reference(inner_t) => {
+            .map(|(idx, (ty, arg_bytes))| match ty.get_ref_inner_ty() {
+                Some(inner_ty) => {
                     dummy_locals.store_loc(
                         idx,
-                        self.deserialize_arg(module_storage, inner_t, arg_bytes)?,
+                        self.deserialize_arg(module_storage, inner_ty, arg_bytes)?,
                         self.loader.vm_config().check_invariant_in_swap_loc,
                     )?;
                     dummy_locals.borrow_loc(idx)
                 },
-                _ => self.deserialize_arg(module_storage, &ty, arg_bytes),
+                None => self.deserialize_arg(module_storage, &ty, arg_bytes),
             })
             .collect::<PartialVMResult<Vec<_>>>()?;
         Ok((dummy_locals, deserialized_args))
@@ -317,11 +317,11 @@ impl VMRuntime {
         ty: &Type,
         value: Value,
     ) -> PartialVMResult<(Vec<u8>, MoveTypeLayout)> {
-        let (ty, value) = match ty {
-            Type::Reference(inner) | Type::MutableReference(inner) => {
+        let (ty, value) = match ty.get_ref_inner_ty() {
+            Some(inner_ty) => {
                 let ref_value: Reference = value.cast()?;
                 let inner_value = ref_value.read_ref()?;
-                (&**inner, inner_value)
+                (inner_ty, inner_value)
             },
             _ => (ty, value),
         };
