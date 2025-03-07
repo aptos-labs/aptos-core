@@ -148,10 +148,12 @@ impl BlockRetrievalRequestV2 {
         self.target_round
     }
 
-    /// If there are gaps in the rounds, there might not be a block that stops exactly at the target
+    /// The window start block is either exactly at the target round, or it is at a higher round
+    /// and its parent is at a lower round than the target round.
     pub fn is_window_start_block(&self, block: &Block) -> bool {
         block.round() == self.target_round()
-            || block.quorum_cert().certified_block().round() < self.target_round()
+            || (block.round() > self.target_round()
+                && block.quorum_cert().certified_block().round() < self.target_round())
     }
 }
 
@@ -208,6 +210,14 @@ impl BlockRetrievalResponse {
                     self.blocks.len(),
                 );
                 ensure!(
+                    self.status == BlockRetrievalStatus::SucceededWithTarget
+                        || !self
+                            .blocks
+                            .last()
+                            .map_or(false, |block| retrieval_request.match_target_id(block.id())),
+                    "target was found, but response is not marked as SucceededWithTarget",
+                );
+                ensure!(
                     self.status != BlockRetrievalStatus::SucceededWithTarget
                         || self
                             .blocks
@@ -224,6 +234,12 @@ impl BlockRetrievalResponse {
                     "not enough blocks returned, expect {}, get {}",
                     retrieval_request.num_blocks(),
                     self.blocks.len(),
+                );
+                ensure!(
+                    self.status == BlockRetrievalStatus::SucceededWithTarget
+                        || !self.blocks.last().map_or(false, |block| retrieval_request
+                            .is_window_start_block(block)),
+                    "target was found, but response is not marked as SucceededWithTarget",
                 );
                 ensure!(
                     self.status != BlockRetrievalStatus::SucceededWithTarget
