@@ -58,6 +58,7 @@ impl LegacyModuleCache {
         LegacyModuleCache(RwLock::new(BinaryCache::new()))
     }
 
+    #[allow(dead_code)]
     pub fn flush(&self) {
         *self.0.write() = BinaryCache::new();
     }

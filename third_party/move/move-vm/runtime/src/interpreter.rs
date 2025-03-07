@@ -239,7 +239,7 @@ impl InterpreterImpl<'_> {
         function: Rc<LoadedFunction>,
         args: Vec<Value>,
     ) -> VMResult<Vec<Value>> {
-        if loader.vm_config().use_call_tree_and_instruction_cache {
+        if self.vm_config.use_call_tree_and_instruction_cache {
             self.execute_main::<RTTCheck, AllRuntimeCaches>(
                 loader,
                 data_store,
@@ -287,7 +287,7 @@ impl InterpreterImpl<'_> {
         let mut locals = Locals::new(function.local_tys().len());
         for (i, value) in args.into_iter().enumerate() {
             locals
-                .store_loc(i, value, loader.vm_config().check_invariant_in_swap_loc)
+                .store_loc(i, value, self.vm_config.check_invariant_in_swap_loc)
                 .map_err(|e| self.set_location(e))?;
         }
 
