@@ -28,7 +28,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::runtime_types::{AbilityInfo, StructType, Type},
+    loaded_data::runtime_types::{AbilityInfo, StructType, Type, TypeBuilder},
     value_serde::FunctionValueExtension,
     values::{AbstractFunction, SerializedFunctionData},
 };
