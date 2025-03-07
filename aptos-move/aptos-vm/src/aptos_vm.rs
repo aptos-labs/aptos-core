@@ -891,8 +891,7 @@ impl AptosVM {
             )?;
         }
 
-        let function = session.load_function(
-            module_storage,
+        let function = module_storage.load_function(
             entry_fn.module(),
             entry_fn.function(),
             entry_fn.ty_args(),
@@ -2564,7 +2563,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         module_storage: &impl AptosModuleStorage,
     ) -> anyhow::Result<Vec<Vec<u8>>> {
-        let func = session.load_function(module_storage, &module_id, &func_name, &type_args)?;
+        let func = module_storage.load_function(&module_id, &func_name, &type_args)?;
         let metadata = vm.extract_module_metadata(module_storage, &module_id);
         let arguments = verifier::view_function::validate_view_function(
             session,

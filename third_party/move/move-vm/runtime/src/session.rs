@@ -98,14 +98,7 @@ impl<'r, 'l> Session<'r, 'l> {
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
-        let func = self.move_vm.runtime.loader().load_function(
-            module_id,
-            function_name,
-            &ty_args,
-            &mut self.data_cache,
-            &self.module_store,
-            module_storage,
-        )?;
+        let func = module_storage.load_function(module_id, function_name, &ty_args)?;
 
         self.move_vm.runtime.execute_function_instantiation(
             func,
@@ -243,58 +236,6 @@ impl<'r, 'l> Session<'r, 'l> {
         ty: &Type,
     ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
         self.data_cache.load_resource(module_storage, addr, ty)
-    }
-
-    /// Load a module, a function, and all of its types into cache
-    pub fn load_function_with_type_arg_inference(
-        &mut self,
-        module_storage: &impl ModuleStorage,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
-        expected_return_type: &Type,
-    ) -> VMResult<LoadedFunction> {
-        self.move_vm
-            .runtime
-            .loader()
-            .load_function_with_type_arg_inference(
-                module_id,
-                function_name,
-                expected_return_type,
-                &mut self.data_cache,
-                &self.module_store,
-                module_storage,
-            )
-    }
-
-    /// Load a module, a function, and all of its types into cache
-    pub fn load_function(
-        &mut self,
-        module_storage: &impl ModuleStorage,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
-        ty_args: &[TypeTag],
-    ) -> VMResult<LoadedFunction> {
-        self.move_vm.runtime.loader().load_function(
-            module_id,
-            function_name,
-            ty_args,
-            &mut self.data_cache,
-            &self.module_store,
-            module_storage,
-        )
-    }
-
-    pub fn load_type(
-        &mut self,
-        type_tag: &TypeTag,
-        module_storage: &impl ModuleStorage,
-    ) -> VMResult<Type> {
-        self.move_vm.runtime.loader().load_type(
-            type_tag,
-            &mut self.data_cache,
-            &self.module_store,
-            module_storage,
-        )
     }
 
     pub fn get_type_tag(

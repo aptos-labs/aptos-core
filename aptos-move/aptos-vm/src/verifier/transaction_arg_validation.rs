@@ -459,8 +459,7 @@ fn validate_and_construct(
         *max_invocations -= 1;
     }
 
-    let function = session.load_function_with_type_arg_inference(
-        module_storage,
+    let function = module_storage.load_function_with_type_arg_inference(
         &constructor.module_id,
         constructor.func_name,
         expected_type,
