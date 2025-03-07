@@ -213,8 +213,8 @@ impl BlockRetrievalResponse {
                     self.status == BlockRetrievalStatus::SucceededWithTarget
                         || !self
                             .blocks
-                            .last()
-                            .map_or(false, |block| retrieval_request.match_target_id(block.id())),
+                            .iter()
+                            .any(|block| retrieval_request.match_target_id(block.id())),
                     "target was found, but response is not marked as SucceededWithTarget",
                 );
                 ensure!(
@@ -237,9 +237,11 @@ impl BlockRetrievalResponse {
                 );
                 ensure!(
                     self.status == BlockRetrievalStatus::SucceededWithTarget
-                        || !self.blocks.last().map_or(false, |block| retrieval_request
-                            .is_window_start_block(block)),
-                    "target was found, but response is not marked as SucceededWithTarget",
+                        || !self.blocks.last().map_or(false, |block| {
+                            block.round() < retrieval_request.target_round()
+                                || retrieval_request.is_window_start_block(block)
+                        }),
+                    "smaller than target round or window start block was found, but response is not marked as SucceededWithTarget",
                 );
                 ensure!(
                     self.status != BlockRetrievalStatus::SucceededWithTarget
