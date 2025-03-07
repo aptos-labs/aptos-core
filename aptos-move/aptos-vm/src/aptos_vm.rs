@@ -873,7 +873,6 @@ impl AptosVM {
 
     fn validate_and_execute_entry_function(
         &self,
-        resolver: &impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
         session: &mut SessionExt,
         serialized_signers: &SerializedSigners,
@@ -928,7 +927,7 @@ impl AptosVM {
 
         // The `has_randomness_attribute()` should have been feature-gated in 1.11...
         if function.is_friend_or_private()
-            && get_randomness_annotation(resolver, module_storage, session, entry_fn)?.is_some()
+            && get_randomness_annotation(module_storage, entry_fn)?.is_some()
         {
             let txn_context = session
                 .get_native_extensions()
@@ -999,7 +998,6 @@ impl AptosVM {
             TransactionPayload::EntryFunction(entry_fn) => {
                 session.execute(|session| {
                     self.validate_and_execute_entry_function(
-                        resolver,
                         code_storage,
                         session,
                         serialized_signers,
@@ -1295,15 +1293,6 @@ impl AptosVM {
 
         let (epilogue_session, has_modules_published_to_special_address) = match execution_result {
             Err(execution_error) => {
-                // Invalidate the loader V1 cache in case there was a new module loaded from a
-                // module publish request that failed.
-                // This is redundant with the logic in execute_user_transaction but unfortunately is
-                // necessary here as executing the underlying call can fail without this function
-                // returning an error to execute_user_transaction.
-                if *new_published_modules_loaded && !self.features().is_loader_v2_enabled() {
-                    #[allow(deprecated)]
-                    self.move_vm.mark_loader_cache_as_invalid();
-                };
                 let epilogue_session = self.failure_multisig_payload_cleanup(
                     resolver,
                     module_storage,
@@ -1429,7 +1418,6 @@ impl AptosVM {
         // failed. This is primarily because it's unrecoverable at this point.
         session.execute(|session| {
             self.validate_and_execute_entry_function(
-                resolver,
                 module_storage,
                 session,
                 &SerializedSigners::new(vec![serialized_signer(&multisig_address)], None),
