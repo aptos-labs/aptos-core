@@ -20,23 +20,24 @@ module staking::commission {
 
     const INITIAL_COMMISSION_AMOUNT: u64 = 100000;
     const ONE_YEAR_IN_SECONDS: u64 = 31536000;
+    const OCTAS_IN_ONE_APT: u128 = 100000000; // 1e8
 
     /// Account is not authorized to call this function.
     const EUNAUTHORIZED: u64 = 1;
 
     struct CommissionConfig has key {
-        // The manager of the contract who can set the commission rate.
+        /// The manager of the contract who can set the commission rate.
         manager: address,
-        // The operator who receives the specified commission in dollars in exchange for running the node.
+        /// The operator who receives the specified commission in dollars in exchange for running the node.
         operator: address,
-        // The yearly commission rate in dollars. Will be used to determine how much APT the operator receives.
+        /// The yearly commission rate in dollars. Will be used to determine how much APT the operator receives.
         yearly_commission_amount: u64,
-        // Used to withdraw commission.
+        /// Used to withdraw commission.
         signer_cap: SignerCapability,
-        // Timestamp for tracking yearly commission.
+        /// Timestamp for tracking yearly commission.
         last_update_secs: u64,
-        // Amount of debt in dollars owed to the operator due to insufficient amount received from node commission.
-        // This can happen if the commission rate is set too high or APT price is too low.
+        /// Amount of debt in dollars owed to the operator due to insufficient amount received from node commission.
+        /// This can happen if the commission rate is set too high or APT price is too low.
         commission_debt: u64,
     }
 
@@ -53,8 +54,13 @@ module staking::commission {
     }
 
     #[view]
+    public fun operator(): address acquires CommissionConfig {
+        CommissionConfig[@staking].operator
+    }
+
+    #[view]
     public fun yearly_commission_amount(): u64 acquires CommissionConfig {
-        (&CommissionConfig[@staking]).yearly_commission_amount
+        CommissionConfig[@staking].yearly_commission_amount
     }
 
     #[view]
@@ -68,37 +74,37 @@ module staking::commission {
         commission_earned + config.commission_debt
     }
 
+    #[view]
+    public fun commission_owed_in_apt(): u64 acquires CommissionConfig {
+        usd_to_apt(commission_owed())
+    }
+
     /// Can be called by the manager to change the yearly commission amount.
     public entry fun set_yearly_commission_amount(manager: &signer, new_commission: u64) acquires CommissionConfig {
-        let config = &mut CommissionConfig[@staking];
-        assert!(signer::address_of(manager) == config.manager, EUNAUTHORIZED);
-        config.yearly_commission_amount = new_commission;
+        assert_manager(manager);
+        CommissionConfig[@staking].yearly_commission_amount = new_commission;
     }
 
     /// Can be called by the manager or operator to change the account that receives the commission.
     public entry fun set_operator(account: &signer, new_operator: address) acquires CommissionConfig {
-        let config = &mut CommissionConfig[@staking];
-        let account_addr = signer::address_of(account);
-        assert!(account_addr == config.manager || account_addr == config.operator, EUNAUTHORIZED);
-        config.operator = new_operator;
+        assert_manager_or_operator(account);
+        CommissionConfig[@staking].operator = new_operator;
     }
 
     /// Distribute the commission to operator and remaining amount to manager.
     /// Can only be called by the manager or operator.
     public entry fun distribute_commission(account: &signer) acquires CommissionConfig {
+        assert_manager_or_operator(account);
+
         // Commission owed so far plus any debt.
-        let commission_owed = (commission_owed() as u128);
+        // There can be a rounding error of 1 octa here when converting from USD to APT. This is negligible.
+        let commission_in_apt = commission_owed_in_apt();
 
         // Only manager or operator can call this function.
         let config = &mut CommissionConfig[@staking];
-        let account_addr = signer::address_of(account);
-        assert!(account_addr == config.manager || account_addr == config.operator, EUNAUTHORIZED);
         config.last_update_secs = timestamp::now_seconds();
+        // Commission debt is already included in commission_owed by the commission_owed function.
         config.commission_debt = 0;
-
-        // Commission in APT = commission earned / APT price.
-        let apt_price = oracle::get_apt_price();
-        let commission_in_apt = (math128::mul_div(commission_owed, apt_price, oracle::precision()) as u64);
 
         let commission_signer = &account::create_signer_with_capability(&config.signer_cap);
         let balance = coin::balance<AptosCoin>(@staking);
@@ -107,7 +113,9 @@ module staking::commission {
         if (balance <= commission_in_apt) {
             // If balance is exactly equal to commission in APT, this will set commission_debt to 0.
             let debt_apt = commission_in_apt - balance;
-            config.commission_debt = (math128::mul_div((debt_apt as u128), oracle::precision(), apt_price) as u64)
+            // There can be rounding error here when converting from APT to USD. If this is of concern, the amount of
+            // commission can be set higher to cover the rounding error.
+            config.commission_debt = apt_to_usd(debt_apt);
         } else {
             let surplus_balance = balance - commission_in_apt;
             aptos_account::transfer(commission_signer, config.manager, surplus_balance);
@@ -115,5 +123,40 @@ module staking::commission {
 
         let remaining_balance = coin::balance<AptosCoin>(@staking);
         aptos_account::transfer(commission_signer, config.operator, remaining_balance)
+    }
+
+    inline fun assert_manager(account: &signer) {
+        assert!(signer::address_of(account) == CommissionConfig[@staking].manager, EUNAUTHORIZED);
+    }
+
+    inline fun assert_manager_or_operator(account: &signer) {
+        let config = &CommissionConfig[@staking];
+        let account_addr = signer::address_of(account);
+        assert!(account_addr == config.manager || account_addr == config.operator, EUNAUTHORIZED);
+    }
+
+    inline fun usd_to_apt(usd_amount: u64): u64 {
+        let apt_price = oracle::get_apt_price();
+        // Amount in APT octas = amount * number of octas in one APT / APT price.
+        math128::mul_div((usd_amount as u128) * OCTAS_IN_ONE_APT, oracle::precision(), apt_price) as u64
+    }
+
+    inline fun apt_to_usd(apt_amount: u64): u64 {
+        let apt_price = oracle::get_apt_price();
+        // Amount in USD = amount * APT price / precision / number of octas in one APT.
+        math128::mul_div((apt_amount as u128), apt_price, oracle::precision() * OCTAS_IN_ONE_APT) as u64
+    }
+
+    #[test_only]
+    public fun init_for_test(deployer: &signer) {
+        let signer_cap = account::create_test_signer_cap(signer::address_of(deployer));
+        move_to(deployer, CommissionConfig {
+            manager: @manager,
+            operator: @operator,
+            yearly_commission_amount: INITIAL_COMMISSION_AMOUNT,
+            signer_cap,
+            last_update_secs: timestamp::now_seconds(),
+            commission_debt: 0,
+        });
     }
 }

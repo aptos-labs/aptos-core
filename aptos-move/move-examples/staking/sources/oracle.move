@@ -1,11 +1,10 @@
+/// Module used to read the price of APT from the oracle.
 module staking::oracle {
     use aptos_std::math128;
     use pyth::i64;
     use pyth::price;
     use pyth::price_identifier;
     use pyth::pyth;
-
-    friend staking::commission;
 
     const PRECISION: u128 = 100000000; // 1e8
     const INITIAL_MAX_AGE_SECS: u64 = 120; // 2 minutes
@@ -16,6 +15,7 @@ module staking::oracle {
     const ESTALE_PRICE: u64 = 1;
 
     struct OracleConfig has key {
+        /// Maximum age of the price in seconds. If the price is older than this, reading the price will fail.
         max_age_secs: u64,
     }
 
@@ -26,7 +26,11 @@ module staking::oracle {
     }
 
     #[view]
-    public fun get_apt_price(): u128 acquires OracleConfig {
+    public fun get_apt_price(): u128 acquires OracleConfig, TestPrice {
+        if (exists<TestPrice>(@staking)) {
+            return TestPrice[@staking].price;
+        };
+
         let config = &OracleConfig[@staking];
         let price = pyth::get_price_no_older_than(price_identifier::from_byte_vec(PYTH_APT_ID), config.max_age_secs);
         let raw_price = i64::get_magnitude_if_positive(&price::get_price(&price));
@@ -39,12 +43,24 @@ module staking::oracle {
         )
     }
 
-    public fun precision(): u128 {
+    public inline fun precision(): u128 {
         PRECISION
     }
 
-    friend fun set_max_age_secs(max_age_secs: u64) acquires OracleConfig {
-        let config = &mut OracleConfig[@staking];
-        config.max_age_secs = max_age_secs;
+    #[test_only]
+    use aptos_framework::account;
+
+    // This struct is used to test the commission contract only and will not be used in production.
+    struct TestPrice has key {
+        price: u128,
+    }
+
+    #[test_only]
+    public fun set_test_price(price: u128) acquires TestPrice {
+        if (exists<TestPrice>(@staking)) {
+            TestPrice[@staking].price = price;
+        } else {
+            move_to(&account::create_signer_for_test(@staking), TestPrice { price });
+        }
     }
 }

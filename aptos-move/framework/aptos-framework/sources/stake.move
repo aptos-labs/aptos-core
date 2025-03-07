@@ -1436,9 +1436,9 @@ module aptos_framework::stake {
             };
             let new_voting_power =
                 cur_active
-                + if (lockup_expired) { 0 } else { cur_pending_inactive }
-                + cur_pending_active
-                + cur_reward;
+                    + if (lockup_expired) { 0 } else { cur_pending_inactive }
+                    + cur_pending_active
+                    + cur_reward;
 
             if (new_voting_power >= minimum_stake) {
                 let config = *borrow_global<ValidatorConfig>(candidate.addr);
