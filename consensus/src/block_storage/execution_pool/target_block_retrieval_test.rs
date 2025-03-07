@@ -7,7 +7,10 @@ use crate::block_storage::{
     BlockStore,
 };
 use aptos_consensus_types::{
-    block_retrieval::{BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalRequestV2},
+    block_retrieval::{
+        BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalRequestV2,
+        BlockRetrievalResponse, BlockRetrievalStatus,
+    },
     quorum_cert::QuorumCert,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
@@ -238,4 +241,55 @@ async fn test_window_quorum_round_greater_than_commit_round() {
             .round(),
         a1_r1.round()
     );
+}
+
+#[tokio::test]
+async fn test_verify_badly_formed_retrieval_responses() {
+    let window_size: Option<u64> = Some(1u64);
+    let (_, _block_store, pipelined_blocks) =
+        create_block_tree_with_forks_unordered_parents(window_size).await;
+    let [_genesis_block, a1_r1, a2_r3, a3_r6, _a4_r9, _b1_r2, _b2_r4, _b3_r5, _c1_r7, _d1_r8] =
+        pipelined_blocks;
+
+    //  Genesis ──> A1_R1 ──> A2_R3 ──> A3_R6 ──> A4_R9
+
+    let request = BlockRetrievalRequest::new_with_target_round(a3_r6.id(), 6, 2);
+
+    // Correct SucceededWithTarget: [ A2_R3 ──> A3_R6 ]
+    let response = BlockRetrievalResponse::new(BlockRetrievalStatus::SucceededWithTarget, vec![
+        a3_r6.block().clone(),
+        a2_r3.block().clone(),
+    ]);
+    assert!(response.verify_inner(&request).is_ok());
+
+    // Correct SucceededWithTarget, but not marked as SucceededWithTarget
+    for status in [
+        BlockRetrievalStatus::Succeeded,
+        BlockRetrievalStatus::NotEnoughBlocks,
+    ] {
+        let response =
+            BlockRetrievalResponse::new(status, vec![a3_r6.block().clone(), a2_r3.block().clone()]);
+        assert!(response.verify_inner(&request).is_err());
+    }
+
+    // Insufficient SucceededWithTarget
+    let response =
+        BlockRetrievalResponse::new(BlockRetrievalStatus::SucceededWithTarget, vec![a3_r6
+            .block()
+            .clone()]);
+    assert!(response.verify_inner(&request).is_err());
+
+    // Block returned not within target round
+    for status in [
+        BlockRetrievalStatus::SucceededWithTarget,
+        BlockRetrievalStatus::Succeeded,
+        BlockRetrievalStatus::NotEnoughBlocks,
+    ] {
+        let response = BlockRetrievalResponse::new(status, vec![
+            a3_r6.block().clone(),
+            a2_r3.block().clone(),
+            a1_r1.block().clone(),
+        ]);
+        assert!(response.verify_inner(&request).is_err());
+    }
 }
