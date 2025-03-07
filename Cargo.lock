@@ -11000,6 +11000,7 @@ dependencies = [
  "flexi_logger",
  "im",
  "itertools 0.13.0",
+ "libtest-mimic",
  "log",
  "move-binary-format",
  "move-borrow-graph",

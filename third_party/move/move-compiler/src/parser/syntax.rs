@@ -1163,7 +1163,6 @@ fn parse_sequence(context: &mut Context) -> Result<Sequence, Box<Diagnostic>> {
 //          | "abort" <Exp>
 //          | "for" "(" <Exp> "in" <Exp> ".." <Exp> ")" "{" <Exp> "}"
 //          | <NameExp>
-//          | <Term> <CallArgs>              // --> ExpCall
 fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     const VECTOR_IDENT: &str = "vector";
     const FOR_IDENT: &str = "for";
@@ -1319,14 +1318,12 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
         },
     };
     let end_loc = context.tokens.previous_end_loc();
-    let mut result_term = spanned(context.tokens.file_hash(), start_loc, end_loc, term);
-    while matches!(context.tokens.peek(), Tok::LParen) {
-        let args = parse_call_args(context)?;
-        let term = Exp_::ExpCall(Box::new(result_term), args);
-        let end_loc = context.tokens.previous_end_loc();
-        result_term = spanned(context.tokens.file_hash(), start_loc, end_loc, term);
-    }
-    Ok(result_term)
+    Ok(spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        end_loc,
+        term,
+    ))
 }
 
 fn parse_cast_or_test_exp(
@@ -2242,8 +2239,9 @@ fn parse_unary_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
 // Parse an expression term optionally followed by a chain of dot accesses and/or index accesses
 // and/or calls of function values.
 //      DotOrIndexChain =
-//          <DotOrIndexChain> "." <Identifier> [ ["::" "<" Comma<Type> ">"]? <CallArgs> ]?
+//          <DotOrIndexChain> "." <Identifier> [ ["<" Comma<Type> ">"]? <CallArgs> ]?
 //          | <DotOrIndexChain> "[" <Exp> "]"
+//          | <DotOrIndexChain> <CallArgs>
 //          | <Term>
 fn parse_dot_or_index_chain(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
@@ -2253,10 +2251,37 @@ fn parse_dot_or_index_chain(context: &mut Context) -> Result<Exp, Box<Diagnostic
             Tok::Period => {
                 context.tokens.advance()?;
                 let n = parse_identifier_or_positional_field(context)?;
-                let ahead = context.tokens.peek();
-                if matches!(ahead, Tok::LParen | Tok::ColonColon) {
-                    let generics = if ahead == Tok::ColonColon {
-                        context.tokens.advance()?;
+                let is_2_2_or_later =
+                    context.env.flags().language_version() >= LanguageVersion::V2_2;
+                let has_generics = match context.tokens.peek() {
+                    Tok::Less
+                        if is_2_2_or_later
+                            && n.loc.end() as usize == context.tokens.start_loc() =>
+                    {
+                        true
+                    },
+                    Tok::ColonColon
+                        if context.tokens.lookahead().unwrap_or(Tok::ColonColon) == Tok::Less =>
+                    {
+                        let loc = context.tokens.advance_with_loc()?;
+                        if is_2_2_or_later {
+                            context.env.add_diag(diag!(
+                                Uncategorized::DeprecatedWillBeRemoved,
+                                (
+                                    loc,
+                                    format!(
+                                        "The `::` qualifier is obsolete since Move {}",
+                                        LanguageVersion::V2_2
+                                    )
+                                )
+                            ));
+                        }
+                        true
+                    },
+                    _ => false,
+                };
+                if has_generics || matches!(context.tokens.peek(), Tok::LParen) {
+                    let generics = if has_generics {
                         Some(parse_comma_list(
                             context,
                             Tok::Less,
@@ -2283,6 +2308,10 @@ fn parse_dot_or_index_chain(context: &mut Context) -> Result<Exp, Box<Diagnostic
                 let exp = Exp_::Index(Box::new(lhs), Box::new(index));
                 consume_token(context.tokens, Tok::RBracket)?;
                 exp
+            },
+            Tok::LParen => {
+                let args = parse_call_args(context)?;
+                Exp_::ExpCall(Box::new(lhs), args)
             },
             _ => break,
         };
