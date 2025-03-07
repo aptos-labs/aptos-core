@@ -44,7 +44,6 @@ use aptos_gas_schedule::{
     AptosGasParameters, VMGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
-use aptos_metrics_core::TimerHelper;
 #[cfg(any(test, feature = "testing"))]
 use aptos_types::state_store::StateViewId;
 use aptos_types::{
@@ -128,6 +127,8 @@ use move_core_types::{
 };
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_runtime::{
+    check_dependencies_and_charge_gas, check_script_dependencies_and_check_gas,
+    check_type_tag_dependencies_and_charge_gas,
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
     ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
@@ -273,22 +274,19 @@ impl AptosVM {
     /// block executor to create multiple tasks sharing the same execution configurations extracted
     /// from the environment.
     // TODO: Passing `state_view` is not needed once we move keyless configs to the environment.
-    pub fn new(env: AptosEnvironment, state_view: &impl StateView) -> Self {
-        let _timer = TIMER.timer_with(&["AptosVM::new"]);
-
+    pub fn new(env: &AptosEnvironment, state_view: &impl StateView) -> Self {
         let resolver = state_view.as_move_resolver();
-        let move_vm = MoveVmExt::new(env.clone(), &resolver);
+        let module_storage = state_view.as_aptos_code_storage(env);
 
         // We use an `Option` to handle the VK not being set on-chain, or an incorrect VK being set
         // via governance (although, currently, we do check for that in `keyless_account.move`).
-        let module_storage = state_view.as_aptos_code_storage(env);
         let pvk = keyless_validation::get_groth16_vk_onchain(&resolver, &module_storage)
             .ok()
             .and_then(|vk| vk.try_into().ok());
 
         Self {
             is_simulation: false,
-            move_vm,
+            move_vm: MoveVmExt::new(env),
             pvk,
         }
     }
@@ -810,7 +808,7 @@ impl AptosVM {
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
         if self.gas_feature_version() >= RELEASE_V1_10 {
-            session.check_script_dependencies_and_check_gas(
+            check_script_dependencies_and_check_gas(
                 code_storage,
                 gas_meter,
                 traversal_context,
@@ -818,7 +816,7 @@ impl AptosVM {
             )?;
         }
         if self.gas_feature_version() >= RELEASE_V1_27 {
-            session.check_type_tag_dependencies_and_charge_gas(
+            check_type_tag_dependencies_and_charge_gas(
                 code_storage,
                 gas_meter,
                 traversal_context,
@@ -826,7 +824,7 @@ impl AptosVM {
             )?;
         }
 
-        let func = session.load_script(code_storage, script.code(), script.ty_args())?;
+        let func = code_storage.load_script(script.code(), script.ty_args())?;
 
         let compiled_script = match CompiledScript::deserialize_with_config(
             script.code(),
@@ -890,16 +888,14 @@ impl AptosVM {
             let module_id = traversal_context
                 .referenced_module_ids
                 .alloc(entry_fn.module().clone());
-            session.check_dependencies_and_charge_gas(
-                module_storage,
-                gas_meter,
-                traversal_context,
-                [(module_id.address(), module_id.name())],
-            )?;
+            check_dependencies_and_charge_gas(module_storage, gas_meter, traversal_context, [(
+                module_id.address(),
+                module_id.name(),
+            )])?;
         }
 
         if self.gas_feature_version() >= RELEASE_V1_27 {
-            session.check_type_tag_dependencies_and_charge_gas(
+            check_type_tag_dependencies_and_charge_gas(
                 module_storage,
                 gas_meter,
                 traversal_context,
@@ -1576,12 +1572,7 @@ impl AptosVM {
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<UserSessionChangeSet, VMStatus> {
-        let maybe_publish_request = session.execute(|session| {
-            let disable_publishing = self
-                .features()
-                .is_disallow_init_module_to_publish_modules_enabled();
-            session.extract_publish_request(disable_publishing)
-        });
+        let maybe_publish_request = session.execute(|session| session.extract_publish_request());
         if maybe_publish_request.is_none() {
             let user_change_set = session.finish(change_set_configs, module_storage)?;
 
@@ -1668,21 +1659,19 @@ impl AptosVM {
                 .map(|module| (module.self_addr(), module.self_name()))
                 .collect::<BTreeSet<_>>();
 
-            session.execute(|session| {
-                session.check_dependencies_and_charge_gas(
-                    module_storage,
-                    gas_meter,
-                    traversal_context,
-                    modules
-                        .iter()
-                        .flat_map(|module| {
-                            module
-                                .immediate_dependencies_iter()
-                                .chain(module.immediate_friends_iter())
-                        })
-                        .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
-                )
-            })?;
+            check_dependencies_and_charge_gas(
+                module_storage,
+                gas_meter,
+                traversal_context,
+                modules
+                    .iter()
+                    .flat_map(|module| {
+                        module
+                            .immediate_dependencies_iter()
+                            .chain(module.immediate_friends_iter())
+                    })
+                    .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
+            )?;
 
             // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
         }
@@ -1930,7 +1919,15 @@ impl AptosVM {
                     function_info,
                     auth_data,
                 }) => {
-                    if self.features().is_account_abstraction_enabled() {
+                    let enabled = match auth_data {
+                        AbstractionAuthData::V1 { .. } => {
+                            self.features().is_account_abstraction_enabled()
+                        },
+                        AbstractionAuthData::DomainV1 { .. } => {
+                            self.features().is_domain_account_abstraction_enabled()
+                        },
+                    };
+                    if enabled {
                         dispatchable_authenticate(
                             session,
                             gas_meter,
@@ -1962,7 +1959,15 @@ impl AptosVM {
                     function_info,
                     auth_data,
                 } => {
-                    if self.features().is_account_abstraction_enabled() {
+                    let enabled = match auth_data {
+                        AbstractionAuthData::V1 { .. } => {
+                            self.features().is_account_abstraction_enabled()
+                        },
+                        AbstractionAuthData::DomainV1 { .. } => {
+                            self.features().is_domain_account_abstraction_enabled()
+                        },
+                    };
+                    if enabled {
                         dispatchable_authenticate(
                             session,
                             gas_meter,
@@ -2627,7 +2632,7 @@ impl AptosVM {
         max_gas_amount: u64,
     ) -> ViewFunctionOutput {
         let env = AptosEnvironment::new(state_view);
-        let vm = AptosVM::new(env.clone(), state_view);
+        let vm = AptosVM::new(&env, state_view);
 
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
@@ -2654,7 +2659,7 @@ impl AptosVM {
         );
 
         let resolver = state_view.as_move_resolver();
-        let module_storage = state_view.as_aptos_code_storage(env);
+        let module_storage = state_view.as_aptos_code_storage(&env);
 
         let mut session = vm.new_session(&resolver, SessionId::Void, None);
         let execution_result = Self::execute_view_function_in_vm(
@@ -3194,15 +3199,9 @@ impl VMValidator for AptosVM {
 }
 
 // Ensure encapsulation of AptosVM APIs by using a wrapper.
-pub struct AptosSimulationVM(AptosVM);
+pub struct AptosSimulationVM;
 
 impl AptosSimulationVM {
-    pub fn new(env: AptosEnvironment, state_view: &impl StateView) -> Self {
-        let mut vm = AptosVM::new(env, state_view);
-        vm.is_simulation = true;
-        Self(vm)
-    }
-
     /// Simulates a signed transaction (i.e., executes it without performing
     /// signature verification) on a newly created VM instance.
     /// *Precondition:* the transaction must **not** have a valid signature.
@@ -3216,14 +3215,16 @@ impl AptosSimulationVM {
         );
 
         let env = AptosEnvironment::new(state_view);
-        let vm = Self::new(env.clone(), state_view);
+        let mut vm = AptosVM::new(&env, state_view);
+        vm.is_simulation = true;
+
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let resolver = state_view.as_move_resolver();
-        let code_storage = state_view.as_aptos_code_storage(env);
+        let code_storage = state_view.as_aptos_code_storage(&env);
 
         let (vm_status, vm_output) =
-            vm.0.execute_user_transaction(&resolver, &code_storage, transaction, &log_context);
+            vm.execute_user_transaction(&resolver, &code_storage, transaction, &log_context);
         let txn_output = vm_output
             .try_materialize_into_transaction_output(&resolver)
             .expect("Materializing aggregator V1 deltas should never fail");

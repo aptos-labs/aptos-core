@@ -12,18 +12,14 @@ use crate::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_binary_format::{
-    file_format as FF,
-    file_format::{AccessKind, FunctionHandle, ModuleHandle, StructDefinitionIndex, TableIndex},
-    file_format_common,
-};
+use move_binary_format::{file_format as FF, file_format::Visibility, file_format_common};
 use move_bytecode_source_map::source_map::{SourceMap, SourceName};
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, metadata::Metadata,
 };
 use move_ir_types::ast as IR_AST;
 use move_model::{
-    ast::{AccessSpecifier, Address, AddressSpecifier, ResourceSpecifier},
+    ast::{AccessSpecifier, Address, AddressSpecifier, Attribute, ResourceSpecifier},
     metadata::{CompilationMetadata, CompilerVersion, LanguageVersion, COMPILATION_METADATA_KEY},
     model::{
         FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, Parameter, QualifiedId,
@@ -31,6 +27,7 @@ use move_model::{
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
+    well_known,
 };
 use move_stackless_bytecode::{
     function_target_pipeline::{FunctionTargetsHolder, FunctionVariant},
@@ -44,6 +41,8 @@ use std::collections::{BTreeMap, BTreeSet};
 pub struct ModuleGenerator {
     /// Whether to generate access specifiers
     gen_access_specifiers: bool,
+    /// Whether to generate function attributes.
+    pub(crate) gen_function_attributes: bool,
     /// The module index for which we generate code.
     #[allow(unused)]
     module_idx: FF::ModuleHandleIndex,
@@ -58,9 +57,9 @@ pub struct ModuleGenerator {
     /// The special function handle of the `main` function of a script. This is not stored
     /// in `module.function_handles` because the file format does not maintain a handle
     /// for this function.
-    main_handle: Option<FunctionHandle>,
+    main_handle: Option<FF::FunctionHandle>,
     /// The special module handle for a script, see also `main_handle`.
-    script_handle: Option<ModuleHandle>,
+    script_handle: Option<FF::ModuleHandle>,
     /// A mapping from function instantiations to indices.
     fun_inst_to_idx:
         BTreeMap<(QualifiedId<FunId>, FF::SignatureIndex), FF::FunctionInstantiationIndex>,
@@ -127,6 +126,7 @@ impl ModuleGenerator {
             .unwrap_or(CompilerVersion::latest_stable());
         let gen_access_specifiers = language_version.is_at_least(LanguageVersion::V2_0)
             && options.experiment_on(Experiment::GEN_ACCESS_SPECIFIERS);
+        let gen_function_attributes = language_version.is_at_least(LanguageVersion::V2_2);
         let compilation_metadata = CompilationMetadata::new(compiler_version, language_version);
         let metadata = Metadata {
             key: COMPILATION_METADATA_KEY.to_vec(),
@@ -155,6 +155,7 @@ impl ModuleGenerator {
         };
         let mut gen = Self {
             gen_access_specifiers,
+            gen_function_attributes,
             module_idx: FF::ModuleHandleIndex(0),
             module_to_idx: Default::default(),
             name_to_idx: Default::default(),
@@ -224,7 +225,7 @@ impl ModuleGenerator {
             return;
         }
         let loc = &struct_env.get_loc();
-        let def_idx = StructDefinitionIndex::new(ctx.checked_bound(
+        let def_idx = FF::StructDefinitionIndex::new(ctx.checked_bound(
             loc,
             self.module.struct_defs.len(),
             MAX_STRUCT_DEF_COUNT,
@@ -269,7 +270,7 @@ impl ModuleGenerator {
     fn field(
         &mut self,
         ctx: &ModuleContext,
-        struct_def_idx: StructDefinitionIndex,
+        struct_def_idx: FF::StructDefinitionIndex,
         field_env: &FieldEnv,
     ) -> FF::FieldDefinition {
         let field_loc = field_env.get_loc();
@@ -458,7 +459,7 @@ impl ModuleGenerator {
         let handle = self.module_handle(ctx, loc, module_env);
         let idx = if module_env.is_script_module() {
             self.script_handle = Some(handle);
-            FF::ModuleHandleIndex(TableIndex::MAX)
+            FF::ModuleHandleIndex(FF::TableIndex::MAX)
         } else {
             let idx = FF::ModuleHandleIndex(ctx.checked_bound(
                 loc,
@@ -478,7 +479,7 @@ impl ModuleGenerator {
         ctx: &ModuleContext,
         loc: &Loc,
         module_env: &ModuleEnv,
-    ) -> ModuleHandle {
+    ) -> FF::ModuleHandle {
         let name = module_env.get_name();
         let address = self.address_index(ctx, loc, name.addr().expect_numerical());
         let name = self.name_index(ctx, loc, name.name());
@@ -529,7 +530,7 @@ impl ModuleGenerator {
                 .get_access_specifiers()
                 .map(|v| {
                     v.iter().any(|s| {
-                        s.kind != AccessKind::Acquires
+                        s.kind != FF::AccessKind::Acquires
                             || s.negated
                             || !matches!(s.resource.1, ResourceSpecifier::Resource(_))
                             || !matches!(s.address.1, AddressSpecifier::Any)
@@ -544,6 +545,11 @@ impl ModuleGenerator {
             }
             None
         };
+        let attributes = if self.gen_function_attributes {
+            ctx.function_attributes(fun_env)
+        } else {
+            vec![]
+        };
         let handle = FF::FunctionHandle {
             module,
             name,
@@ -551,10 +557,11 @@ impl ModuleGenerator {
             parameters,
             return_,
             access_specifiers,
+            attributes,
         };
         let idx = if fun_env.module_env.is_script_module() {
             self.main_handle = Some(handle);
-            FF::FunctionHandleIndex(TableIndex::MAX)
+            FF::FunctionHandleIndex(FF::TableIndex::MAX)
         } else {
             let idx = FF::FunctionHandleIndex(ctx.checked_bound(
                 loc,
@@ -966,10 +973,11 @@ impl ModuleGenerator {
         cons: &Constant,
         ty: &Type,
     ) -> FF::ConstantPoolIndex {
-        if let Some(idx) = self.cons_to_idx.get(&(cons.clone(), ty.clone())) {
+        let canonical_const = cons.to_canonical();
+        if let Some(idx) = self.cons_to_idx.get(&(canonical_const.clone(), ty.clone())) {
             return *idx;
         }
-        let data = cons
+        let data = canonical_const
             .to_move_value()
             .simple_serialize()
             .expect("serialization succeeds");
@@ -984,7 +992,7 @@ impl ModuleGenerator {
             "constant",
         ));
         self.module.constant_pool.push(ff_cons);
-        self.cons_to_idx.insert((cons.clone(), ty.clone()), idx);
+        self.cons_to_idx.insert((canonical_const, ty.clone()), idx);
         idx
     }
 }
@@ -1078,7 +1086,7 @@ impl<'env> ModuleContext<'env> {
                 if fun.is_inline() {
                     continue;
                 }
-                if let Some(callees) = fun.get_used_functions() {
+                if let Some(callees) = fun.get_called_functions() {
                     let mut usage = usage_map[&fun.get_id()].clone();
                     let count = usage.len();
                     // Extend usage by that of callees from the same module. Acquires is only
@@ -1128,5 +1136,65 @@ impl<'env> ModuleContext<'env> {
             name.as_ref().display(self.env.symbol_pool()).to_string(),
             self.env.to_ir_loc(loc.as_ref()),
         )
+    }
+
+    /// Delivers the function attributes which are relevant for execution for the given
+    /// function. This includes annotated ones as well as ones which are derived.
+    /// Currently, a public function derives `Persistent`.
+    pub(crate) fn function_attributes(&self, fun_env: &FunctionEnv) -> Vec<FF::FunctionAttribute> {
+        let mut result = vec![];
+        let mut has_persistent = false;
+        for attr in fun_env.get_attributes() {
+            match attr {
+                Attribute::Apply(_, name, args) => {
+                    let no_args = |attr: &str| {
+                        if !args.is_empty() {
+                            self.error(
+                                fun_env.get_id_loc(),
+                                format!("attribute `{}` cannot have arguments", attr),
+                            )
+                        }
+                        if fun_env.module_env.is_script_module() {
+                            self.error(
+                                fun_env.get_id_loc(),
+                                format!("attribute `{}` cannot be on script functions", attr),
+                            )
+                        }
+                    };
+                    let name = fun_env.symbol_pool().string(*name);
+                    match name.as_str() {
+                        well_known::PERSISTENT_ATTRIBUTE => {
+                            no_args(name.as_str());
+                            has_persistent = true;
+                            result.push(FF::FunctionAttribute::Persistent)
+                        },
+                        well_known::MODULE_LOCK_ATTRIBUTE => {
+                            no_args(name.as_str());
+                            result.push(FF::FunctionAttribute::ModuleLock)
+                        },
+                        _ => {
+                            // skip
+                        },
+                    }
+                },
+                Attribute::Assign(_, name, _) => {
+                    let name = fun_env.symbol_pool().string(*name);
+                    if matches!(
+                        name.as_str(),
+                        well_known::PERSISTENT_ATTRIBUTE | well_known::MODULE_LOCK_ATTRIBUTE
+                    ) {
+                        self.error(
+                            fun_env.get_id_loc(),
+                            format!("attribute `{}` cannot be assigned to", name),
+                        )
+                    }
+                },
+            }
+        }
+        if !has_persistent && fun_env.visibility() == Visibility::Public {
+            // For a public function, derive the persistent attribute
+            result.push(FF::FunctionAttribute::Persistent)
+        }
+        result
     }
 }

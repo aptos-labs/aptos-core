@@ -4,6 +4,7 @@
 
 use crate::{
     access_control::AccessControlState,
+    check_type_tag_dependencies_and_charge_gas,
     data_cache::TransactionDataCache,
     frame_type_cache::{
         AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
@@ -12,8 +13,12 @@ use crate::{
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
+    reentrancy_checker::{CallType, ReentrancyChecker},
     runtime_type_checks::{FullRuntimeTypeCheck, NoRuntimeTypeCheck, RuntimeTypeCheck},
-    storage::ty_tag_converter::TypeTagConverter,
+    storage::{
+        dependencies_gas_charging::check_dependencies_and_charge_gas,
+        depth_formula_calculator::DepthFormulaCalculator, ty_tag_converter::TypeTagConverter,
+    },
     trace, LoadedFunction, ModuleStorage,
 };
 use fail::fail_point;
@@ -28,7 +33,7 @@ use move_core_types::{
     account_address::AccountAddress,
     function::ClosureMask,
     gas_algebra::{NumArgs, NumBytes, NumTypeNodes},
-    language_storage::{ModuleId, TypeTag},
+    language_storage::TypeTag,
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_metrics::{Timer, VM_TIMER};
@@ -49,7 +54,7 @@ use move_vm_types::{
 use std::{
     cell::RefCell,
     cmp::min,
-    collections::{btree_map, BTreeSet, HashMap, VecDeque},
+    collections::{btree_map, VecDeque},
     fmt::Write,
     rc::Rc,
 };
@@ -86,8 +91,8 @@ pub(crate) struct InterpreterImpl {
     paranoid_type_checks: bool,
     /// The access control state.
     access_control: AccessControlState,
-    /// Set of modules that exists on call stack.
-    active_modules: BTreeSet<ModuleId>,
+    /// Reentrancy checker.
+    reentrancy_checker: ReentrancyChecker,
 }
 
 struct TypeWithLoader<'a, 'b, 'c> {
@@ -97,10 +102,9 @@ struct TypeWithLoader<'a, 'b, 'c> {
 
 impl<'a, 'b, 'c> TypeView for TypeWithLoader<'a, 'b, 'c> {
     fn to_type_tag(&self) -> TypeTag {
-        self.resolver
-            .loader()
-            .type_to_type_tag(self.ty, self.resolver.module_storage())
-            .unwrap()
+        let ty_tag_builder =
+            TypeTagConverter::new(self.resolver.module_storage().runtime_environment());
+        ty_tag_builder.ty_to_ty_tag(self.ty).unwrap()
     }
 }
 
@@ -151,7 +155,7 @@ impl InterpreterImpl {
             call_stack: CallStack::new(),
             paranoid_type_checks: loader.vm_config().paranoid_type_checks,
             access_control: AccessControlState::default(),
-            active_modules: BTreeSet::new(),
+            reentrancy_checker: ReentrancyChecker::default(),
         };
 
         let function = Rc::new(function);
@@ -286,9 +290,9 @@ impl InterpreterImpl {
                 .map_err(|e| self.set_location(e))?;
         }
 
-        if let Some(module_id) = function.module_id() {
-            self.active_modules.insert(module_id.clone());
-        }
+        self.reentrancy_checker
+            .enter_function(None, &function, CallType::Regular)
+            .map_err(|e| self.set_location(e))?;
 
         let frame_cache = if RTCaches::caches_enabled() {
             FrameTypeCache::make_rc_for_function(&function)
@@ -297,7 +301,14 @@ impl InterpreterImpl {
         };
 
         let mut current_frame = self
-            .make_new_frame(gas_meter, loader, function, locals, frame_cache.clone())
+            .make_new_frame(
+                gas_meter,
+                loader,
+                function,
+                CallType::Regular,
+                locals,
+                frame_cache.clone(),
+            )
             .map_err(|err| self.set_location(err))?;
 
         // Access control for the new frame.
@@ -329,11 +340,13 @@ impl InterpreterImpl {
                         .map_err(|e| self.set_location(e))?;
 
                     if let Some(frame) = self.call_stack.pop() {
-                        if frame.function.module_id() != current_frame.function.module_id() {
-                            if let Some(module_id) = current_frame.function.module_id() {
-                                self.active_modules.remove(module_id);
-                            }
-                        }
+                        self.reentrancy_checker
+                            .exit_function(
+                                frame.function.module_or_script_id(),
+                                &current_frame.function,
+                                current_frame.call_type,
+                            )
+                            .map_err(|e| self.set_location(e))?;
                         // Note: the caller will find the callee's return values at the top of the shared operand stack
                         current_frame = frame;
                         current_frame.pc += 1; // advance past the Call instruction in the caller
@@ -434,6 +447,7 @@ impl InterpreterImpl {
                         gas_meter,
                         loader,
                         function,
+                        CallType::Regular,
                         frame_cache,
                         ClosureMask::empty(),
                         vec![],
@@ -537,6 +551,7 @@ impl InterpreterImpl {
                         gas_meter,
                         loader,
                         function,
+                        CallType::Regular,
                         frame_cache,
                         ClosureMask::empty(),
                         vec![],
@@ -572,38 +587,20 @@ impl InterpreterImpl {
                             let arena_id = traversal_context
                                 .referenced_module_ids
                                 .alloc(module_id.clone());
-                            loader.check_dependencies_and_charge_gas(
-                                resolver.module_store(),
-                                data_store,
-                                gas_meter,
-                                &mut traversal_context.visited,
-                                traversal_context.referenced_modules,
-                                [(arena_id.address(), arena_id.name())],
+                            check_dependencies_and_charge_gas(
                                 resolver.module_storage(),
+                                gas_meter,
+                                traversal_context,
+                                [(arena_id.address(), arena_id.name())],
                             )?;
 
                             // Charge gas for code loading of modules used by type arguments.
-                            let modules_used_by_ty_args = ty_arg_tags
-                                .iter()
-                                .flat_map(|ty_tag| ty_tag.preorder_traversal_iter())
-                                .filter_map(TypeTag::struct_tag)
-                                .map(|struct_tag| {
-                                    let module_id = traversal_context
-                                        .referenced_module_ids
-                                        .alloc(struct_tag.module_id());
-                                    (module_id.address(), module_id.name())
-                                })
-                                .collect::<BTreeSet<_>>();
-                            loader.check_dependencies_and_charge_gas(
-                                resolver.module_store(),
-                                data_store,
+                            check_type_tag_dependencies_and_charge_gas(
+                                module_storage,
                                 gas_meter,
-                                &mut traversal_context.visited,
-                                traversal_context.referenced_modules,
-                                modules_used_by_ty_args,
-                                resolver.module_storage(),
+                                traversal_context,
+                                ty_arg_tags,
                             )?;
-
                             Ok(module_id.clone())
                         },
                     )?;
@@ -658,6 +655,7 @@ impl InterpreterImpl {
                             gas_meter,
                             loader,
                             callee,
+                            CallType::ClosureDynamicDispatch,
                             frame_cache.clone(),
                             mask,
                             captured_vec,
@@ -674,35 +672,25 @@ impl InterpreterImpl {
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
         function: Rc<LoadedFunction>,
+        call_type: CallType,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
         mask: ClosureMask,
         captured: Vec<Value>,
     ) -> VMResult<()> {
-        match (function.module_id(), current_frame.function.module_id()) {
-            (Some(module_id), Some(current_module_id)) if module_id != current_module_id => {
-                if self.active_modules.contains(module_id) {
-                    return Err(self.set_location(
-                        PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR).with_message(
-                            format!(
-                                "Re-entrancy detected: {} already exists on top of the stack",
-                                module_id
-                            ),
-                        ),
-                    ));
-                }
-                self.active_modules.insert(module_id.clone());
-            },
-            (Some(module_id), None) => {
-                self.active_modules.insert(module_id.clone());
-            },
-            _ => (),
-        }
+        self.reentrancy_checker
+            .enter_function(
+                Some(current_frame.function.module_or_script_id()),
+                &function,
+                call_type,
+            )
+            .map_err(|e| self.set_location(e))?;
 
         let mut frame = self
             .make_call_frame::<RTTCheck, RTCaches>(
                 gas_meter,
                 loader,
                 function,
+                call_type,
                 frame_cache,
                 mask,
                 captured,
@@ -735,6 +723,7 @@ impl InterpreterImpl {
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
         function: Rc<LoadedFunction>,
+        call_type: CallType,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
         mask: ClosureMask,
         mut captured: Vec<Value>,
@@ -771,7 +760,7 @@ impl InterpreterImpl {
                 }
             }
         }
-        self.make_new_frame(gas_meter, loader, function, locals, frame_cache)
+        self.make_new_frame(gas_meter, loader, function, call_type, locals, frame_cache)
     }
 
     /// Create a new `Frame` given a function and its locals.
@@ -782,6 +771,7 @@ impl InterpreterImpl {
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
         function: Rc<LoadedFunction>,
+        call_type: CallType,
         locals: Locals,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
     ) -> PartialVMResult<Frame> {
@@ -810,6 +800,7 @@ impl InterpreterImpl {
             pc: 0,
             locals,
             function,
+            call_type,
             local_tys,
             frame_cache,
         })
@@ -1059,6 +1050,7 @@ impl InterpreterImpl {
                     gas_meter,
                     resolver.loader(),
                     Rc::new(target_func),
+                    CallType::NativeDynamicDispatch,
                     frame_cache,
                     ClosureMask::empty(),
                     vec![],
@@ -1069,16 +1061,11 @@ impl InterpreterImpl {
                 let arena_id = traversal_context
                     .referenced_module_ids
                     .alloc(module_name.clone());
-                resolver
-                    .loader()
-                    .check_dependencies_and_charge_gas(
-                        resolver.module_store(),
-                        data_store,
-                        gas_meter,
-                        &mut traversal_context.visited,
-                        traversal_context.referenced_modules,
-                        [(arena_id.address(), arena_id.name())],
+                check_dependencies_and_charge_gas(
                         resolver.module_storage(),
+                        gas_meter,
+                        traversal_context,
+                        [(arena_id.address(), arena_id.name())],
                     )
                     .map_err(|err| err
                         .to_partial()
@@ -1260,6 +1247,12 @@ impl InterpreterImpl {
             .loader()
             .struct_name_index_map(resolver.module_storage())
             .idx_to_struct_name(struct_idx)?;
+
+        // Perform resource reentrancy check
+        self.reentrancy_checker
+            .check_resource_access(&struct_name)?;
+
+        // Perform resource access control
         if let Some(access) = AccessInstance::new(kind, struct_name, instance, addr) {
             self.access_control.check_access(access)?
         }
@@ -1409,11 +1402,10 @@ impl InterpreterImpl {
         if !ty_args.is_empty() {
             let mut ty_tags = vec![];
             for ty in ty_args {
-                ty_tags.push(
-                    resolver
-                        .loader()
-                        .type_to_type_tag(ty, resolver.module_storage())?,
-                );
+                let ty_tag_builder =
+                    TypeTagConverter::new(resolver.module_storage().runtime_environment());
+                let tag = ty_tag_builder.ty_to_ty_tag(ty)?;
+                ty_tags.push(tag);
             }
             debug_write!(buf, "<")?;
             let mut it = ty_tags.iter();
@@ -1755,12 +1747,8 @@ fn check_depth_of_type_impl(
         },
         Type::Vector(ty) => check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(1))?,
         Type::Struct { idx, .. } => {
-            let formula = resolver.loader().calculate_depth_of_struct(
-                *idx,
-                resolver.module_store(),
-                resolver.module_storage(),
-                &mut HashMap::new(),
-            )?;
+            let formula = DepthFormulaCalculator::new(resolver.module_storage())
+                .calculate_depth_of_struct(idx)?;
             check_depth!(formula.solve(&[]))
         },
         // NB: substitution must be performed before calling this function
@@ -1773,12 +1761,8 @@ fn check_depth_of_type_impl(
                     check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(0))
                 })
                 .collect::<PartialVMResult<Vec<_>>>()?;
-            let formula = resolver.loader().calculate_depth_of_struct(
-                *idx,
-                resolver.module_store(),
-                resolver.module_storage(),
-                &mut HashMap::new(),
-            )?;
+            let formula = DepthFormulaCalculator::new(resolver.module_storage())
+                .calculate_depth_of_struct(idx)?;
             check_depth!(formula.solve(&ty_arg_depths))
         },
         Type::Function { args, results, .. } => {
@@ -1810,6 +1794,8 @@ struct Frame {
     pc: u16,
     // Currently being executed function.
     function: Rc<LoadedFunction>,
+    // How this frame was established.
+    call_type: CallType,
     // Locals for this execution context and their instantiated types.
     locals: Locals,
     local_tys: Vec<Type>,

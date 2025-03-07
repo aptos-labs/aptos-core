@@ -14,9 +14,9 @@ use aptos_block_executor::{
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{
-        primary_apt_store, AccountResource, CoinDeposit, CoinInfoResource, CoinRegister,
-        CoinStoreResource, CoinWithdraw, ConcurrentSupplyResource, DepositFAEvent,
-        FungibleStoreResource, WithdrawFAEvent,
+        primary_apt_store, AccountResource, CoinInfoResource, CoinRegister, CoinStoreResource,
+        ConcurrentSupplyResource, DepositEvent, DepositFAEvent, FungibleStoreResource,
+        WithdrawEvent, WithdrawFAEvent,
     },
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
@@ -24,7 +24,7 @@ use aptos_types::{
     },
     contract_event::ContractEvent,
     fee_statement::FeeStatement,
-    move_utils::move_event_v2::MoveEventV2Type,
+    move_utils::{move_event_v1::MoveEventV1Type, move_event_v2::MoveEventV2Type},
     on_chain_config::{FeatureFlag, Features, OnChainConfig},
     state_store::{state_key::StateKey, StateView},
     transaction::{
@@ -591,12 +591,8 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
 
         if transfer_amount != 0 {
             output.events.push(
-                CoinWithdraw {
-                    coin_type: self.db_util.common.apt_coin_type_name.clone(),
-                    account: sender_address,
-                    amount: transfer_amount,
-                }
-                .create_event_v2(),
+                WithdrawEvent::new(transfer_amount)
+                    .create_event_v1(sender_coin_store.withdraw_events_mut()),
             );
             // Coin doesn't emit Withdraw event for gas
         }
@@ -707,12 +703,8 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
         // first need to create events, to update the handle, and then serialize sender_coin_store
         if transfer_amount != 0 {
             output.events.push(
-                CoinDeposit {
-                    coin_type: self.db_util.common.apt_coin_type_name.clone(),
-                    account: recipient_address,
-                    amount: transfer_amount,
-                }
-                .create_event_v2(),
+                DepositEvent::new(transfer_amount)
+                    .create_event_v1(recipient_coin_store.deposit_events_mut()),
             );
         }
 

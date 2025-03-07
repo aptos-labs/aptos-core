@@ -912,32 +912,20 @@ pub struct CompileScriptFunction {
     #[clap(flatten)]
     pub framework_package_args: FrameworkPackageArgs,
 
-    #[clap(long, default_value_if("move_2", "true", "7"))]
+    #[clap(long)]
     pub bytecode_version: Option<u32>,
 
     /// Specify the version of the compiler.
     /// Defaults to the latest stable compiler version (at least 2)
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
-           default_value = LATEST_STABLE_COMPILER_VERSION,
-           default_value_if("move_2", "true", LATEST_STABLE_COMPILER_VERSION),
-           default_value_if("move_1", "true", "1"),)]
+           default_value = LATEST_STABLE_COMPILER_VERSION,)]
     pub compiler_version: Option<CompilerVersion>,
 
     /// Specify the language version to be supported.
     /// Defaults to the latest stable language version (at least 2)
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
-           default_value = LATEST_STABLE_LANGUAGE_VERSION,
-           default_value_if("move_2", "true", LATEST_STABLE_LANGUAGE_VERSION),
-           default_value_if("move_1", "true", "1"),)]
+           default_value = LATEST_STABLE_LANGUAGE_VERSION,)]
     pub language_version: Option<LanguageVersion>,
-
-    /// Select bytecode, language, compiler for Move 2
-    #[clap(long, default_value_t = true)]
-    pub move_2: bool,
-
-    /// Select bytecode, language, and compiler versions for Move 1.
-    #[clap(long, default_value_t = false)]
-    pub move_1: bool,
 }
 
 impl CompileScriptFunction {

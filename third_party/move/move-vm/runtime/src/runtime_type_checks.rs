@@ -84,7 +84,7 @@ pub fn verify_pack_closure(
     mask: ClosureMask,
 ) -> PartialVMResult<()> {
     // Accumulated abilities
-    let mut abilities = if func.is_public() {
+    let mut abilities = if func.function.is_persistent() {
         AbilitySet::PUBLIC_FUNCTIONS
     } else {
         AbilitySet::PRIVATE_FUNCTIONS
@@ -100,7 +100,7 @@ pub fn verify_pack_closure(
     {
         with_instantiation(resolver, func, expected, |expected| {
             // Intersect the captured type with the accumulated abilities
-            abilities = abilities.intersect(expected.abilities()?);
+            abilities = abilities.intersect(given.abilities()?);
             given.paranoid_check_assignable(expected)
         })?
     }

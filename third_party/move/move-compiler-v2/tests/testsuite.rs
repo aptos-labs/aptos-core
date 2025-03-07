@@ -166,12 +166,10 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             runner: |p| run_test(p, get_config_by_name("lambda")),
             include: vec!["/lambda/", "/lambda-lifting/"],
             exclude: vec![],
-            exp_suffix: Some("lambda.exp"),
+            exp_suffix: None,
             options: opts
                 .clone()
                 // .set_experiment(Experiment::AST_SIMPLIFY, true)
-                .set_experiment(Experiment::FUNCTION_VALUES, true)
-                .set_experiment(Experiment::LAMBDA_LIFTING, true)
                 .set_language_version(LanguageVersion::V2_LAMBDA),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,
@@ -797,7 +795,6 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         // Run env processor pipeline.
         let env_pipeline = move_compiler_v2::check_and_rewrite_pipeline(
             &options,
-            false,
             RewritingScope::CompilationTarget,
         );
         if config.dump_ast == DumpLevel::AllStages {

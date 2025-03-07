@@ -10,7 +10,7 @@ use aptos_config::config::{
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db::{backup::backup_handler::BackupHandler, AptosDB};
-use aptos_logger::{error, info};
+use aptos_logger::prelude::*;
 use aptos_storage_interface::{
     state_store::state_view::db_state_view::DbStateViewAtVersion, AptosDbError, DbReader,
 };
@@ -79,7 +79,10 @@ impl Opt {
         let verifier = Verifier::new(&self)?;
         let all_errors = verifier.run()?;
         if !all_errors.is_empty() {
-            error!("All failed transactions: {:?}", all_errors);
+            error!("{} failed transactions", all_errors.len());
+            for e in all_errors {
+                error!("Failed: {}", e);
+            }
             process::exit(2);
         }
         Ok(())
@@ -151,7 +154,7 @@ impl Verifier {
             Self::get_start_and_limit(&arc_db, config.start_version, config.end_version)?;
         info!(
             start_version = start,
-            end_version = start + limit,
+            limit = limit,
             "Replaying transactions."
         );
         Ok(Self {
@@ -169,6 +172,11 @@ impl Verifier {
 
     // Split the replay to multiple reply tasks running in parallel
     pub fn run(self) -> Result<Vec<Error>> {
+        if self.limit == 0 {
+            info!("Nothing to verify.");
+            return Ok(vec![]);
+        }
+
         AptosVM::set_concurrency_level_once(self.replay_concurrency_level);
         let task_size = self.limit / self.concurrent_replay as u64;
         let ranges: Vec<(u64, u64)> = (0..self.concurrent_replay)
@@ -260,28 +268,31 @@ impl Verifier {
         start_version: Version,
         end_version: Version,
     ) -> Result<(Version, u64)> {
-        let start_version = std::cmp::max(
-            aptos_db
-                .get_first_txn_version()?
-                .ok_or(AptosDbError::NotFound(
-                    "First txn version is None".to_string(),
-                ))?,
-            start_version,
-        );
+        let db_start = aptos_db
+            .get_first_txn_version()?
+            .ok_or(AptosDbError::NotFound(
+                "First txn version is None".to_string(),
+            ))?;
+        let start = std::cmp::max(db_start, start_version);
 
-        let end_version = std::cmp::min(
-            aptos_db
-                .get_synced_version()?
-                .ok_or(AptosDbError::NotFound("Synced version is None".to_string()))?,
-            end_version,
-        );
-        assert!(
-            start_version <= end_version,
-            "start_version {} must be less than or equal to end_version{}",
-            start_version,
-            end_version
-        );
-        let limit = end_version - start_version;
+        let db_end = aptos_db
+            .get_synced_version()?
+            .ok_or(AptosDbError::NotFound("Synced version is None".to_string()))?;
+        let end = std::cmp::min(end_version, db_end);
+
+        let limit = if start <= end {
+            end - start + 1
+        } else {
+            warn!(
+                start = start_version,
+                db_start = db_start,
+                end = end_version,
+                db_end = db_end,
+                "No transactions to verify in requested range."
+            );
+            0
+        };
+
         Ok((start_version, limit))
     }
 

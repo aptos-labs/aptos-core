@@ -4,8 +4,7 @@
 
 use crate::{
     config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
-    module_traversal::TraversalContext, storage::module_storage::ModuleStorage, CodeStorage,
-    LayoutConverter,
+    module_traversal::TraversalContext, storage::module_storage::ModuleStorage, LayoutConverter,
 };
 use hashbrown::Equivalent;
 use lazy_static::lazy_static;
@@ -40,7 +39,7 @@ use move_vm_types::{
 };
 use parking_lot::{Mutex, RwLock};
 use std::{
-    collections::{btree_map, BTreeMap, BTreeSet, HashMap},
+    collections::{btree_map, BTreeMap, BTreeSet},
     hash::Hash,
     sync::Arc,
 };
@@ -60,7 +59,7 @@ use crate::{
         loader::LoaderV2,
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::LoaderLayoutConverter,
-        ty_tag_converter::{PricedStructTag, TypeTagCache, TypeTagConverter},
+        ty_tag_converter::{PricedStructTag, TypeTagCache},
     },
 };
 pub use function::{Function, LoadedFunction};
@@ -71,15 +70,12 @@ pub(crate) use function::{
 pub use modules::Module;
 pub(crate) use modules::{LegacyModuleCache, LegacyModuleStorage, LegacyModuleStorageAdapter};
 use move_binary_format::file_format::{
-    StructVariantHandleIndex, StructVariantInstantiationIndex, TypeParameterIndex,
-    VariantFieldHandleIndex, VariantFieldInstantiationIndex, VariantIndex,
+    StructVariantHandleIndex, StructVariantInstantiationIndex, VariantFieldHandleIndex,
+    VariantFieldInstantiationIndex, VariantIndex,
 };
 use move_core_types::language_storage::FunctionTag;
 use move_vm_types::{
-    loaded_data::{
-        runtime_types::{DepthFormula, StructLayout, TypeBuilder},
-        struct_name_indexing::StructNameIndexMap,
-    },
+    loaded_data::{runtime_types::TypeBuilder, struct_name_indexing::StructNameIndexMap},
     values::{AbstractFunction, SerializedFunctionData},
 };
 pub use script::Script;
@@ -140,7 +136,6 @@ lazy_static! {
 // Loader
 //
 
-#[derive(Clone)]
 pub(crate) enum Loader {
     V1(LoaderV1),
     V2(LoaderV2),
@@ -222,80 +217,6 @@ impl Loader {
         match self {
             Self::V1(loader) => *loader.invalidated.read(),
             Self::V2(_) => unreachable!("Loader V2 is never invalidated"),
-        }
-    }
-
-    pub(crate) fn check_script_dependencies_and_check_gas(
-        &self,
-        module_store: &LegacyModuleStorageAdapter,
-        data_store: &mut TransactionDataCache,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        script_blob: &[u8],
-        code_storage: &impl CodeStorage,
-    ) -> VMResult<()> {
-        match self {
-            Self::V1(loader) => loader.check_script_dependencies_and_check_gas(
-                module_store,
-                data_store,
-                gas_meter,
-                traversal_context,
-                script_blob,
-            ),
-            Self::V2(loader) => loader.check_script_dependencies_and_check_gas(
-                code_storage,
-                gas_meter,
-                traversal_context,
-                script_blob,
-            ),
-        }
-    }
-
-    pub(crate) fn check_dependencies_and_charge_gas<'a, I>(
-        &self,
-        module_store: &LegacyModuleStorageAdapter,
-        data_store: &mut TransactionDataCache,
-        gas_meter: &mut impl GasMeter,
-        visited: &mut BTreeMap<(&'a AccountAddress, &'a IdentStr), ()>,
-        referenced_modules: &'a Arena<Arc<CompiledModule>>,
-        ids: I,
-        module_storage: &dyn ModuleStorage,
-    ) -> VMResult<()>
-    where
-        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
-        I::IntoIter: DoubleEndedIterator,
-    {
-        let _timer = VM_TIMER.timer_with_label("Loader::check_dependencies_and_charge_gas");
-        match self {
-            Self::V1(loader) => loader.check_dependencies_and_charge_gas(
-                module_store,
-                data_store,
-                gas_meter,
-                visited,
-                referenced_modules,
-                ids,
-            ),
-            Self::V2(loader) => loader.check_dependencies_and_charge_gas(
-                module_storage,
-                gas_meter,
-                visited,
-                referenced_modules,
-                ids,
-            ),
-        }
-    }
-
-    pub(crate) fn load_script(
-        &self,
-        script_blob: &[u8],
-        ty_args: &[TypeTag],
-        data_store: &mut TransactionDataCache,
-        module_store: &LegacyModuleStorageAdapter,
-        code_storage: &impl CodeStorage,
-    ) -> VMResult<LoadedFunction> {
-        match self {
-            Self::V1(loader) => loader.load_script(script_blob, ty_args, data_store, module_store),
-            Self::V2(loader) => loader.load_script(code_storage, script_blob, ty_args),
         }
     }
 
@@ -414,20 +335,6 @@ pub(crate) struct LoaderV1 {
     vm_config: VMConfig,
 }
 
-impl Clone for LoaderV1 {
-    fn clone(&self) -> Self {
-        Self {
-            scripts: RwLock::new(self.scripts.read().clone()),
-            type_cache: self.type_cache.clone(),
-            natives: self.natives.clone(),
-            name_cache: self.name_cache.clone(),
-            invalidated: RwLock::new(*self.invalidated.read()),
-            module_cache_hits: RwLock::new(self.module_cache_hits.read().clone()),
-            vm_config: self.vm_config.clone(),
-        }
-    }
-}
-
 impl LoaderV1 {
     pub(crate) fn vm_config(&self) -> &VMConfig {
         &self.vm_config
@@ -441,6 +348,7 @@ impl LoaderV1 {
     // Script verification and loading
     //
 
+    #[allow(dead_code)]
     pub(crate) fn check_script_dependencies_and_check_gas(
         &self,
         module_store: &LegacyModuleStorageAdapter,
@@ -474,6 +382,7 @@ impl LoaderV1 {
     // Entry point for script execution (`MoveVM::execute_script`).
     // Verifies the script if it is not in the cache of scripts loaded.
     // Type parameters are checked as well after every type is loaded.
+    #[allow(dead_code)]
     pub(crate) fn load_script(
         &self,
         script_blob: &[u8],
@@ -840,6 +749,7 @@ impl LoaderV1 {
     /// performance.
     ///
     /// TODO: Revisit the order of traversal. Consider switching to alphabetical order.
+    #[allow(dead_code)]
     pub(crate) fn check_dependencies_and_charge_gas<'a, I>(
         &self,
         module_store: &LegacyModuleStorageAdapter,
@@ -1823,177 +1733,6 @@ impl LoaderV1 {
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!("No type tag for {:?}", ty)),
                 );
-            },
-        })
-    }
-}
-
-impl Loader {
-    pub(crate) fn type_to_type_tag(
-        &self,
-        ty: &Type,
-        module_storage: &dyn ModuleStorage,
-    ) -> PartialVMResult<TypeTag> {
-        match self {
-            Loader::V1(loader) => {
-                let mut gas_context = PseudoGasContext::new(self.vm_config());
-                loader.type_to_type_tag_impl(ty, &mut gas_context)
-            },
-            Loader::V2(_) => {
-                let ty_tag_builder = TypeTagConverter::new(module_storage.runtime_environment());
-                ty_tag_builder.ty_to_ty_tag(ty)
-            },
-        }
-    }
-
-    pub(crate) fn calculate_depth_of_struct(
-        &self,
-        struct_name_idx: StructNameIndex,
-        module_store: &LegacyModuleStorageAdapter,
-        module_storage: &dyn ModuleStorage,
-        visited_cache: &mut HashMap<StructNameIndex, DepthFormula>,
-    ) -> PartialVMResult<DepthFormula> {
-        if let Some(depth_formula) = visited_cache.get(&struct_name_idx) {
-            return Ok(depth_formula.clone());
-        }
-
-        let struct_type =
-            self.fetch_struct_ty_by_idx(struct_name_idx, module_store, module_storage)?;
-        let formulas = match &struct_type.layout {
-            StructLayout::Single(fields) => fields
-                .iter()
-                .map(|(_, field_ty)| {
-                    self.calculate_depth_of_type(
-                        field_ty,
-                        module_store,
-                        module_storage,
-                        visited_cache,
-                    )
-                })
-                .collect::<PartialVMResult<Vec<_>>>()?,
-            StructLayout::Variants(variants) => variants
-                .iter()
-                .flat_map(|variant| variant.1.iter().map(|(_, ty)| ty))
-                .map(|field_ty| {
-                    self.calculate_depth_of_type(
-                        field_ty,
-                        module_store,
-                        module_storage,
-                        visited_cache,
-                    )
-                })
-                .collect::<PartialVMResult<Vec<_>>>()?,
-        };
-
-        let formula = DepthFormula::normalize(formulas);
-        if visited_cache
-            .insert(struct_name_idx, formula.clone())
-            .is_some()
-        {
-            // Same thread has put this entry previously, which means there is a recursion.
-            let struct_name = self
-                .struct_name_index_map(module_storage)
-                .idx_to_struct_name_ref(struct_name_idx)?;
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
-                    format!(
-                        "Depth formula for struct '{}' is already cached by the same thread",
-                        struct_name.as_ref(),
-                    ),
-                ),
-            );
-        }
-        Ok(formula)
-    }
-
-    fn calculate_depth_of_type(
-        &self,
-        ty: &Type,
-        module_store: &LegacyModuleStorageAdapter,
-        module_storage: &dyn ModuleStorage,
-        visited_cache: &mut HashMap<StructNameIndex, DepthFormula>,
-    ) -> PartialVMResult<DepthFormula> {
-        Ok(match ty {
-            Type::Bool
-            | Type::U8
-            | Type::U64
-            | Type::U128
-            | Type::Address
-            | Type::Signer
-            | Type::U16
-            | Type::U32
-            | Type::U256 => DepthFormula::constant(1),
-            Type::Vector(ty) => {
-                let mut inner =
-                    self.calculate_depth_of_type(ty, module_store, module_storage, visited_cache)?;
-                inner.scale(1);
-                inner
-            },
-            Type::Reference(ty) | Type::MutableReference(ty) => {
-                let mut inner =
-                    self.calculate_depth_of_type(ty, module_store, module_storage, visited_cache)?;
-                inner.scale(1);
-                inner
-            },
-            Type::TyParam(ty_idx) => DepthFormula::type_parameter(*ty_idx),
-            Type::Struct { idx, .. } => {
-                let mut struct_formula = self.calculate_depth_of_struct(
-                    *idx,
-                    module_store,
-                    module_storage,
-                    visited_cache,
-                )?;
-                debug_assert!(struct_formula.terms.is_empty());
-                struct_formula.scale(1);
-                struct_formula
-            },
-            Type::StructInstantiation { idx, ty_args, .. } => {
-                let ty_arg_map = ty_args
-                    .iter()
-                    .enumerate()
-                    .map(|(idx, ty)| {
-                        let var = idx as TypeParameterIndex;
-                        Ok((
-                            var,
-                            self.calculate_depth_of_type(
-                                ty,
-                                module_store,
-                                module_storage,
-                                visited_cache,
-                            )?,
-                        ))
-                    })
-                    .collect::<PartialVMResult<BTreeMap<_, _>>>()?;
-                let struct_formula = self.calculate_depth_of_struct(
-                    *idx,
-                    module_store,
-                    module_storage,
-                    visited_cache,
-                )?;
-                let mut subst_struct_formula = struct_formula.subst(ty_arg_map)?;
-                subst_struct_formula.scale(1);
-                subst_struct_formula
-            },
-            Type::Function {
-                args,
-                results,
-                abilities: _,
-            } => {
-                let mut inner = DepthFormula::normalize(
-                    args.iter()
-                        .chain(results)
-                        .map(|arg_ty| {
-                            self.calculate_depth_of_type(
-                                arg_ty,
-                                module_store,
-                                module_storage,
-                                visited_cache,
-                            )
-                        })
-                        .collect::<PartialVMResult<Vec<_>>>()?,
-                );
-                inner.scale(1);
-                inner
             },
         })
     }

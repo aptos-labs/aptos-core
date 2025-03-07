@@ -15,6 +15,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
+    function::FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
@@ -23,7 +24,10 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
-    loaded_data::runtime_types::{StructType, Type},
+    loaded_data::{
+        runtime_types::{StructType, Type},
+        struct_name_indexing::StructNameIndex,
+    },
     module_cyclic_dependency_error, module_linker_error,
     value_serde::FunctionValueExtension,
     values::{AbstractFunction, SerializedFunctionData},
@@ -151,6 +155,19 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
             })?
             .definition_struct_type
             .clone())
+    }
+
+    fn fetch_struct_ty_by_idx(&self, idx: &StructNameIndex) -> PartialVMResult<Arc<StructType>> {
+        let struct_name = self
+            .runtime_environment()
+            .struct_name_index_map()
+            .idx_to_struct_name_ref(*idx)?;
+
+        self.fetch_struct_ty(
+            struct_name.module.address(),
+            struct_name.module.name(),
+            struct_name.name.as_ident_str(),
+        )
     }
 
     /// Returns a runtime type corresponding to the specified type tag (file format type
@@ -483,6 +500,7 @@ impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
                     .map(|t| ty_converter.type_to_type_layout(&instantiate(t)?))
                     .collect::<PartialVMResult<Vec<_>>>()?;
                 Ok(SerializedFunctionData {
+                    format_version: FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
                     module_id: fun
                         .module_id()
                         .ok_or_else(|| {
