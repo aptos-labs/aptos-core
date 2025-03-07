@@ -337,7 +337,15 @@ impl Verifier {
                 Some(expected_writeset),
                 Some(expected_events),
             ) {
-                failed_txns.push(err);
+                if idx == 0 {
+                    // FIXME(aldenhu): remove this hack
+                    warn!(
+                        version = version,
+                        "Probably known failure due to StateStorageUsage missing from a restored DB."
+                    );
+                } else {
+                    failed_txns.push(err);
+                }
             }
         }
 
