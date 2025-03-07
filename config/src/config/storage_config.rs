@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::{config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig},
+    config::{
+        config_optimizer::ConfigOptimizer, config_sanitizer::ConfigSanitizer,
+        node_config_loader::NodeType, Error, NodeConfig,
+    },
     utils,
 };
 use anyhow::{bail, ensure, Result};
@@ -11,6 +14,7 @@ use aptos_logger::warn;
 use aptos_types::chain_id::ChainId;
 use arr_macro::arr;
 use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
 use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -197,6 +201,10 @@ pub struct StorageConfig {
     /// If not specificed, will use `dir` as default.
     /// Only allowed when sharding is enabled.
     pub db_path_overrides: Option<DbPathConfig>,
+    /// ensure `ulimit -n`, set to 0 to not ensure.
+    pub ensure_rlimit_nofile: u64,
+    /// panic if failed to ensure `ulimit -n`
+    pub assert_rlimit_nofile: bool,
 }
 
 pub const NO_OP_STORAGE_PRUNER_CONFIG: PrunerConfig = PrunerConfig {
@@ -346,6 +354,8 @@ impl Default for StorageConfig {
             db_path_overrides: None,
             buffered_state_target_items: BUFFERED_STATE_TARGET_ITEMS,
             max_num_nodes_per_lru_cache_shard: DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            ensure_rlimit_nofile: 0,
+            assert_rlimit_nofile: false,
         }
     }
 }
@@ -493,6 +503,34 @@ impl ShardedDbPaths {
     }
 }
 
+impl ConfigOptimizer for StorageConfig {
+    fn optimize(
+        node_config: &mut NodeConfig,
+        local_config_yaml: &Value,
+        _node_type: NodeType,
+        chain_id: Option<ChainId>,
+    ) -> Result<bool, Error> {
+        let config = &mut node_config.storage;
+        let config_yaml = &local_config_yaml["storage"];
+
+        let mut modified_config = false;
+        if let Some(chain_id) = chain_id {
+            if (chain_id.is_testnet() || chain_id.is_mainnet())
+                && config_yaml["ensure_rlimit_nofile"].is_null()
+            {
+                config.ensure_rlimit_nofile = 999_999;
+                modified_config = true;
+            }
+            if chain_id.is_testnet() && config_yaml["assert_rlimit_nofile"].is_null() {
+                config.assert_rlimit_nofile = true;
+                modified_config = true;
+            }
+        }
+
+        Ok(modified_config)
+    }
+}
+
 impl ConfigSanitizer for StorageConfig {
     fn sanitize(
         node_config: &NodeConfig,
@@ -598,7 +636,11 @@ impl ConfigSanitizer for StorageConfig {
 
 #[cfg(test)]
 mod test {
-    use crate::config::{PrunerConfig, ShardPathConfig, ShardedDbPathConfig};
+    use crate::config::{
+        config_optimizer::ConfigOptimizer, NodeConfig, NodeType, PrunerConfig, ShardPathConfig,
+        ShardedDbPathConfig, StorageConfig,
+    };
+    use aptos_types::chain_id::ChainId;
 
     #[test]
     pub fn test_default_prune_window() {
@@ -673,5 +715,36 @@ mod test {
         };
 
         assert!(path_overrides.get_shard_paths().is_err());
+    }
+
+    #[test]
+    fn test_optimize_ensure_rlimit_nofile() {
+        let mut node_config = NodeConfig::default();
+        assert_eq!(node_config.storage.ensure_rlimit_nofile, 0);
+        assert!(!node_config.storage.assert_rlimit_nofile);
+
+        let modified_config = StorageConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config,
+            NodeType::Validator,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap();
+        assert!(modified_config);
+
+        assert_eq!(node_config.storage.ensure_rlimit_nofile, 999_999);
+        assert!(!node_config.storage.assert_rlimit_nofile);
+
+        let modified_config = StorageConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config,
+            NodeType::Validator,
+            Some(ChainId::testnet()),
+        )
+        .unwrap();
+        assert!(modified_config);
+
+        assert_eq!(node_config.storage.ensure_rlimit_nofile, 999_999);
+        assert!(node_config.storage.assert_rlimit_nofile);
     }
 }

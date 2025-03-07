@@ -99,6 +99,14 @@ module aptos_framework::transaction_validation {
         });
     }
 
+    // TODO: can be removed after features have been rolled out.
+    inline fun allow_missing_txn_authentication_key(transaction_sender: address): bool {
+        // aa verifies authentication itself
+        features::is_account_abstraction_enabled() &&
+        (features::is_domain_account_abstraction_enabled()
+            || account_abstraction::using_dispatchable_authenticator(transaction_sender))
+    }
+
     fun prologue_common(
         sender: &signer,
         gas_payer: &signer,
@@ -135,10 +143,7 @@ module aptos_framework::transaction_validation {
                     );
                 } else {
                     assert!(
-                        features::is_account_abstraction_enabled(
-                        ) && account_abstraction::using_dispatchable_authenticator(
-                            transaction_sender
-                        ),
+                        allow_missing_txn_authentication_key(transaction_sender),
                         error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
                     )
                 };
@@ -168,10 +173,17 @@ module aptos_framework::transaction_validation {
 
             if (!features::transaction_simulation_enhancement_enabled() ||
                     !skip_auth_key_check(is_simulation, &txn_authentication_key)) {
-                assert!(
-                    txn_authentication_key == option::some(bcs::to_bytes(&transaction_sender)),
-                    error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
-                );
+                if (option::is_some(&txn_authentication_key)) {
+                    assert!(
+                        txn_authentication_key == option::some(bcs::to_bytes(&transaction_sender)),
+                        error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
+                    );
+                } else {
+                    assert!(
+                        allow_missing_txn_authentication_key(transaction_sender),
+                        error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
+                    );
+                }
             }
         };
 
@@ -369,10 +381,7 @@ module aptos_framework::transaction_validation {
                     );
                 } else {
                     assert!(
-                        features::is_account_abstraction_enabled(
-                        ) && account_abstraction::using_dispatchable_authenticator(
-                            secondary_address
-                        ),
+                        allow_missing_txn_authentication_key(secondary_address),
                         error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
                     )
                 };
@@ -454,10 +463,13 @@ module aptos_framework::transaction_validation {
             vector::map(secondary_signer_public_key_hashes, |x| option::some(x)),
             is_simulation
         );
-        assert!(
-            fee_payer_public_key_hash == account::get_authentication_key(fee_payer_address),
-            error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
-        )
+        if (!features::transaction_simulation_enhancement_enabled() ||
+            !skip_auth_key_check(is_simulation, &option::some(fee_payer_public_key_hash))) {
+            assert!(
+                fee_payer_public_key_hash == account::get_authentication_key(fee_payer_address),
+                error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
+            )
+        }
     }
 
     /// Epilogue function is run after a transaction is successfully executed.
@@ -590,6 +602,7 @@ module aptos_framework::transaction_validation {
 
     fun unified_prologue(
         sender: signer,
+        // None means no need to check, i.e. either AA (where it is already checked) or simulation
         txn_sender_public_key: Option<vector<u8>>,
         txn_sequence_number: u64,
         secondary_signer_addresses: vector<address>,
@@ -618,7 +631,9 @@ module aptos_framework::transaction_validation {
     fun unified_prologue_fee_payer(
         sender: signer,
         fee_payer: signer,
+        // None means no need to check, i.e. either AA (where it is already checked) or simulation
         txn_sender_public_key: Option<vector<u8>>,
+        // None means no need to check, i.e. either AA (where it is already checked) or simulation
         fee_payer_public_key_hash: Option<vector<u8>>,
         txn_sequence_number: u64,
         secondary_signer_addresses: vector<address>,
@@ -651,9 +666,7 @@ module aptos_framework::transaction_validation {
                 );
             } else {
                 assert!(
-                    features::is_account_abstraction_enabled() && account_abstraction::using_dispatchable_authenticator(
-                        fee_payer_address
-                    ),
+                    allow_missing_txn_authentication_key(fee_payer_address),
                     error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
                 )
             };

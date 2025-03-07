@@ -40,6 +40,7 @@ fn unbalanced_stack_crash() {
         return_: SignatureIndex(1),
         type_parameters: vec![],
         access_specifiers: None,
+        attributes: vec![],
     };
 
     module.function_handles.push(fun_handle);
@@ -134,6 +135,7 @@ fn too_many_locals() {
             return_: SignatureIndex(0),
             type_parameters: vec![AbilitySet::ALL],
             access_specifiers: None,
+            attributes: vec![],
         }],
         field_handles: vec![],
         friend_decls: vec![],
@@ -187,6 +189,7 @@ fn borrow_graph() {
             return_: SignatureIndex(0),
             type_parameters: vec![],
             access_specifiers: None,
+            attributes: vec![],
         }],
         field_handles: vec![],
         friend_decls: vec![],
@@ -288,6 +291,7 @@ fn indirect_code() {
             return_: SignatureIndex(0),
             type_parameters: vec![],
             access_specifiers: None,
+            attributes: vec![],
         }],
         field_handles: vec![],
         friend_decls: vec![],

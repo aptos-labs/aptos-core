@@ -11,6 +11,7 @@ import type { CallOptions, ClientOptions, UntypedServiceImplementation } from "@
 import Long from "long";
 import _m0 from "protobufjs/minimal";
 import { Transaction } from "../../transaction/v1/transaction";
+import { BooleanTransactionFilter } from "./filter";
 
 /** This is for storage only. */
 export interface TransactionsInStorage {
@@ -38,7 +39,11 @@ export interface GetTransactionsRequest {
    * Optional; number of transactions in each `TransactionsResponse` for current stream.
    * If not present, default to 1000. If larger than 1000, request will be rejected.
    */
-  batchSize?: bigint | undefined;
+  batchSize?:
+    | bigint
+    | undefined;
+  /** If provided, only transactions that match the filter will be included. */
+  transactionFilter?: BooleanTransactionFilter | undefined;
 }
 
 /** TransactionsResponse is a batch of transactions. */
@@ -167,7 +172,12 @@ export const TransactionsInStorage = {
 };
 
 function createBaseGetTransactionsRequest(): GetTransactionsRequest {
-  return { startingVersion: undefined, transactionsCount: undefined, batchSize: undefined };
+  return {
+    startingVersion: undefined,
+    transactionsCount: undefined,
+    batchSize: undefined,
+    transactionFilter: undefined,
+  };
 }
 
 export const GetTransactionsRequest = {
@@ -189,6 +199,9 @@ export const GetTransactionsRequest = {
         throw new globalThis.Error("value provided for field message.batchSize of type uint64 too large");
       }
       writer.uint32(24).uint64(message.batchSize.toString());
+    }
+    if (message.transactionFilter !== undefined) {
+      BooleanTransactionFilter.encode(message.transactionFilter, writer.uint32(34).fork()).ldelim();
     }
     return writer;
   },
@@ -220,6 +233,13 @@ export const GetTransactionsRequest = {
           }
 
           message.batchSize = longToBigint(reader.uint64() as Long);
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.transactionFilter = BooleanTransactionFilter.decode(reader, reader.uint32());
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -269,6 +289,9 @@ export const GetTransactionsRequest = {
       startingVersion: isSet(object.startingVersion) ? BigInt(object.startingVersion) : undefined,
       transactionsCount: isSet(object.transactionsCount) ? BigInt(object.transactionsCount) : undefined,
       batchSize: isSet(object.batchSize) ? BigInt(object.batchSize) : undefined,
+      transactionFilter: isSet(object.transactionFilter)
+        ? BooleanTransactionFilter.fromJSON(object.transactionFilter)
+        : undefined,
     };
   },
 
@@ -283,6 +306,9 @@ export const GetTransactionsRequest = {
     if (message.batchSize !== undefined) {
       obj.batchSize = message.batchSize.toString();
     }
+    if (message.transactionFilter !== undefined) {
+      obj.transactionFilter = BooleanTransactionFilter.toJSON(message.transactionFilter);
+    }
     return obj;
   },
 
@@ -294,6 +320,9 @@ export const GetTransactionsRequest = {
     message.startingVersion = object.startingVersion ?? undefined;
     message.transactionsCount = object.transactionsCount ?? undefined;
     message.batchSize = object.batchSize ?? undefined;
+    message.transactionFilter = (object.transactionFilter !== undefined && object.transactionFilter !== null)
+      ? BooleanTransactionFilter.fromPartial(object.transactionFilter)
+      : undefined;
     return message;
   },
 };

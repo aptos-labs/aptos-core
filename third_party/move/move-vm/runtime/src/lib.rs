@@ -31,6 +31,7 @@ mod debug;
 
 mod access_control;
 mod frame_type_cache;
+mod reentrancy_checker;
 mod runtime_type_checks;
 mod storage;
 
@@ -39,6 +40,10 @@ pub use loader::{Function, LoadedFunction, Module, Script};
 pub use storage::implementations::unreachable_code_storage;
 pub use storage::{
     code_storage::{ambassador_impl_CodeStorage, CodeStorage},
+    dependencies_gas_charging::{
+        check_dependencies_and_charge_gas, check_script_dependencies_and_check_gas,
+        check_type_tag_dependencies_and_charge_gas,
+    },
     environment::{
         ambassador_impl_WithRuntimeEnvironment, RuntimeEnvironment, WithRuntimeEnvironment,
     },

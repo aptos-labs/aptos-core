@@ -87,16 +87,13 @@ use crate::sparse_merkle::{
     updater::SubTreeUpdater,
     utils::get_state_shard_id,
 };
-use aptos_crypto::{
-    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
-    HashValue,
-};
-use aptos_drop_helper::ArcAsyncDrop;
+use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_infallible::Mutex;
 use aptos_metrics_core::IntGaugeHelper;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble},
     proof::SparseMerkleProofExt,
+    state_store::state_key::StateKey,
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -111,14 +108,14 @@ const BITS_IN_BYTE: usize = 8;
 /// The inner content of a sparse merkle tree, we have this so that even if a tree is dropped, the
 /// INNER of it can still live if referenced by a previous version.
 #[derive(Debug)]
-struct Inner<V: ArcAsyncDrop> {
-    root: Option<SubTree<V>>,
-    children: Mutex<Vec<Arc<Inner<V>>>>,
+struct Inner {
+    root: Option<SubTree>,
+    children: Mutex<Vec<Arc<Inner>>>,
     family: HashValue,
     generation: u64,
 }
 
-impl<V: ArcAsyncDrop> Drop for Inner<V> {
+impl Drop for Inner {
     fn drop(&mut self) {
         // Drop the root in a different thread, because that's the slowest part.
         SUBTREE_DROPPER.schedule_drop(self.root.take());
@@ -138,8 +135,8 @@ impl<V: ArcAsyncDrop> Drop for Inner<V> {
     }
 }
 
-impl<V: ArcAsyncDrop> Inner<V> {
-    fn new(root: SubTree<V>) -> Arc<Self> {
+impl Inner {
+    fn new(root: SubTree) -> Arc<Self> {
         let family = HashValue::random();
         let me = Arc::new(Self {
             root: Some(root),
@@ -151,12 +148,12 @@ impl<V: ArcAsyncDrop> Inner<V> {
         me
     }
 
-    fn root(&self) -> &SubTree<V> {
+    fn root(&self) -> &SubTree {
         // root only goes away during Drop
         self.root.as_ref().expect("Root must exist.")
     }
 
-    fn spawn(self: &Arc<Self>, child_root: SubTree<V>) -> Arc<Self> {
+    fn spawn(self: &Arc<Self>, child_root: SubTree) -> Arc<Self> {
         let child = Arc::new(Self {
             root: Some(child_root),
             children: Mutex::new(Vec::new()),
@@ -179,14 +176,11 @@ impl<V: ArcAsyncDrop> Inner<V> {
 
 /// The Sparse Merkle Tree implementation.
 #[derive(Clone, Debug)]
-pub struct SparseMerkleTree<V: ArcAsyncDrop> {
-    inner: Arc<Inner<V>>,
+pub struct SparseMerkleTree {
+    inner: Arc<Inner>,
 }
 
-impl<V> SparseMerkleTree<V>
-where
-    V: Clone + CryptoHash + ArcAsyncDrop,
-{
+impl SparseMerkleTree {
     /// Constructs a Sparse Merkle Tree with a root hash. This is often used when we restart and
     /// the scratch pad and the storage have identical state, so we use a single root hash to
     /// represent the entire state.
@@ -217,7 +211,7 @@ where
         self.root_hash() == other.root_hash()
     }
 
-    pub fn freeze(&self, base_smt: &SparseMerkleTree<V>) -> FrozenSparseMerkleTree<V> {
+    pub fn freeze(&self, base_smt: &SparseMerkleTree) -> FrozenSparseMerkleTree {
         assert!(base_smt.is_family(self));
 
         self.log_generation("freeze");
@@ -235,13 +229,13 @@ where
     }
 
     #[cfg(test)]
-    fn new_with_root(root: SubTree<V>) -> Self {
+    fn new_with_root(root: SubTree) -> Self {
         Self {
             inner: Inner::new(root),
         }
     }
 
-    fn root_weak(&self) -> SubTree<V> {
+    fn root_weak(&self) -> SubTree {
         self.inner.root().weak()
     }
 
@@ -309,7 +303,7 @@ where
                         }
                     },
                     NodeInner::Leaf(leaf_node) => {
-                        if get_state_shard_id(leaf_node.key) == shard_id {
+                        if get_state_shard_id(leaf_node.key()) == shard_id {
                             let mut nibble_path = NibblePath::new_even(vec![]);
                             nibble_path.push(Nibble::from(shard_id));
                             node_hashes.insert(nibble_path, subtree.hash());
@@ -332,7 +326,7 @@ where
 
     /// Recursively generate the partial node update batch of jellyfish merkle
     fn new_node_hashes_since_impl(
-        subtree: SubTree<V>,
+        subtree: SubTree,
         since_generation: u64,
         pos: &mut NodePosition,
         node_hashes: &mut HashMap<NibblePath, HashValue>,
@@ -364,7 +358,7 @@ where
                     pos.pop();
                 },
                 NodeInner::Leaf(leaf_node) => {
-                    let mut path = NibblePath::new_even(leaf_node.key.to_vec());
+                    let mut path = NibblePath::new_even(leaf_node.key().to_vec());
                     if !is_nibble {
                         path.truncate(pos.len() / BITS_IN_NIBBLE + 1);
                         node_hashes.insert(path, subtree.hash());
@@ -397,30 +391,24 @@ where
 
 /// In tests and benchmark, reference to ancestors are manually managed
 #[cfg(any(feature = "fuzzing", feature = "bench", test))]
-impl<V> SparseMerkleTree<V>
-where
-    V: Clone + CryptoHash + ArcAsyncDrop,
-{
-    pub fn batch_update(
+impl SparseMerkleTree {
+    pub fn freeze_self_and_update(
         &self,
-        updates: Vec<(HashValue, Option<&V>)>,
+        updates: Vec<(HashValue, Option<HashValue>)>,
         proof_reader: &impl ProofRead,
     ) -> Result<Self, UpdateError> {
         self.clone()
             .freeze(self)
-            .batch_update(updates, proof_reader)
+            .batch_update(updates.iter(), proof_reader)
             .map(FrozenSparseMerkleTree::unfreeze)
     }
 
-    pub fn get(&self, key: HashValue) -> StateStoreStatus<V> {
+    pub fn freeze_self_and_get(&self, key: HashValue) -> StateStoreStatus {
         self.clone().freeze(self).get(key)
     }
 }
 
-impl<V> Default for SparseMerkleTree<V>
-where
-    V: Clone + CryptoHash + ArcAsyncDrop,
-{
+impl Default for SparseMerkleTree {
     fn default() -> Self {
         SparseMerkleTree::new_empty()
     }
@@ -428,9 +416,9 @@ where
 
 /// `AccountStatus` describes the result of querying an account from this SparseMerkleTree.
 #[derive(Debug, Eq, PartialEq)]
-pub enum StateStoreStatus<V> {
+pub enum StateStoreStatus {
     /// The entry exists in the tree, therefore we can give its value.
-    ExistsInScratchPad(V),
+    ExistsInScratchPad(HashValue),
 
     /// The entry does not exist in either the tree or DB. This happens when the search reaches
     /// an empty node, or a leaf node that has a different account.
@@ -439,25 +427,44 @@ pub enum StateStoreStatus<V> {
     /// Tree nodes only exist until `depth` on the route from the root to the leaf address, needs
     /// to check the DB for the rest.
     UnknownSubtreeRoot { hash: HashValue, depth: usize },
+}
 
-    /// Found leaf node, but the value is only in the DB.
-    UnknownValue,
+/// Possible to use AsRef<HashValue> instead, but HashValue has already implemented AsRef<[u8; 32]>
+/// and Deref<[u8; 32]>, which brings a lot of changes necessary on the calls sites if we add
+/// AsRef<HashValue>.
+pub trait HashValueRef {
+    fn hash_ref(&self) -> &HashValue;
+}
+
+impl HashValueRef for HashValue {
+    fn hash_ref(&self) -> &HashValue {
+        self
+    }
+}
+
+impl HashValueRef for &HashValue {
+    fn hash_ref(&self) -> &HashValue {
+        self
+    }
+}
+
+impl HashValueRef for &StateKey {
+    fn hash_ref(&self) -> &HashValue {
+        self.crypto_hash_ref()
+    }
 }
 
 /// In the entire lifetime of this, in-mem nodes won't be dropped because a reference to the oldest
 /// SMT is held inside.
 #[derive(Clone, Debug)]
-pub struct FrozenSparseMerkleTree<V: ArcAsyncDrop> {
-    pub base_smt: SparseMerkleTree<V>,
+pub struct FrozenSparseMerkleTree {
+    pub base_smt: SparseMerkleTree,
     pub base_generation: u64,
-    pub smt: SparseMerkleTree<V>,
+    pub smt: SparseMerkleTree,
 }
 
-impl<V> FrozenSparseMerkleTree<V>
-where
-    V: Clone + CryptoHash + ArcAsyncDrop,
-{
-    fn spawn(&self, child_root: SubTree<V>) -> Self {
+impl FrozenSparseMerkleTree {
+    fn spawn(&self, child_root: SubTree) -> Self {
         let smt = SparseMerkleTree {
             inner: self.smt.inner.spawn(child_root),
         };
@@ -470,7 +477,7 @@ where
         }
     }
 
-    pub fn unfreeze(self) -> SparseMerkleTree<V> {
+    pub fn unfreeze(self) -> SparseMerkleTree {
         self.smt
     }
 
@@ -482,26 +489,38 @@ where
     /// all at once.
     /// Since the tree is immutable, existing tree remains the same and may share parts with the
     /// new, returned tree.
-    pub fn batch_update(
+    pub fn batch_update<'a>(
         &self,
-        updates: Vec<(HashValue, Option<&V>)>,
+        updates: impl Iterator<Item = &'a (impl HashValueRef + 'a, Option<impl HashValueRef + 'a>)>,
         proof_reader: &impl ProofRead,
     ) -> Result<Self, UpdateError> {
         // Flatten, dedup and sort the updates with a btree map since the updates between different
         // versions may overlap on the same address in which case the latter always overwrites.
         let kvs = updates
-            .into_iter()
+            .map(|(k, v)| (k.hash_ref(), v.as_ref().map(|v| v.hash_ref())))
             .collect::<BTreeMap<_, _>>()
             .into_iter()
             .collect::<Vec<_>>();
 
-        if kvs.is_empty() {
+        self.batch_update_sorted_uniq(&kvs, proof_reader)
+    }
+
+    pub fn batch_update_sorted_uniq<'a, K, V>(
+        &self,
+        sorted_unique_updates: &'a [(K, Option<V>)],
+        proof_reader: &impl ProofRead,
+    ) -> Result<Self, UpdateError>
+    where
+        K: 'a + HashValueRef + Sync,
+        V: 'a + HashValueRef + Sync,
+    {
+        if sorted_unique_updates.is_empty() {
             Ok(self.clone())
         } else {
             let current_root = self.smt.root_weak();
             let root = SubTreeUpdater::update(
                 current_root,
-                &kvs[..],
+                sorted_unique_updates,
                 proof_reader,
                 self.smt.inner.generation + 1,
             )?;
@@ -510,7 +529,8 @@ where
     }
 
     /// Queries a `key` in this `SparseMerkleTree`.
-    pub fn get(&self, key: HashValue) -> StateStoreStatus<V> {
+    #[cfg(any(feature = "fuzzing", feature = "bench", test))]
+    fn get(&self, key: HashValue) -> StateStoreStatus {
         let mut subtree = self.smt.root_weak();
         let mut bits = key.iter_bits();
         let mut next_depth = 0;
@@ -537,13 +557,8 @@ where
                                 continue;
                             }, // end NodeInner::Internal
                             NodeInner::Leaf(leaf_node) => {
-                                return if leaf_node.key == key {
-                                    match &leaf_node.value.data.get_if_in_mem() {
-                                        Some(value) => StateStoreStatus::ExistsInScratchPad(
-                                            value.as_ref().clone(),
-                                        ),
-                                        None => StateStoreStatus::UnknownValue,
-                                    }
+                                return if *leaf_node.key() == key {
+                                    StateStoreStatus::ExistsInScratchPad(*leaf_node.value_hash())
                                 } else {
                                     StateStoreStatus::DoesNotExist
                                 };
@@ -559,11 +574,11 @@ where
 /// A type that implements `ProofRead` can provide proof for keys in persistent storage.
 pub trait ProofRead: Sync {
     /// Gets verified proof for this key in persistent storage.
-    fn get_proof(&self, key: HashValue, root_depth: usize) -> Option<SparseMerkleProofExt>;
+    fn get_proof(&self, key: &HashValue, root_depth: usize) -> Option<SparseMerkleProofExt>;
 }
 
 impl ProofRead for () {
-    fn get_proof(&self, _key: HashValue, _root_depth: usize) -> Option<SparseMerkleProofExt> {
+    fn get_proof(&self, _key: &HashValue, _root_depth: usize) -> Option<SparseMerkleProofExt> {
         unimplemented!()
     }
 }

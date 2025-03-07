@@ -3,6 +3,23 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
+- Compiler v1 is now deprecated. It is now removed from the Aptos CLI.
+
+## [6.2.0]
+- Several compiler parsing bugs fixed, including in specifications for receiver style functions
+- Remove support for OpenSSL 1.x.x and Ubuntu 20.04, add warning appropriately
+
+## [6.1.1]
+- Added a new feature to `aptos workspace run`: The workspace server now listens for a "stop" command from
+stdin, which triggers a graceful shutdown when received.
+
+## [6.1.0]
+- Remove FFI support from Aptos CLI.
+- Various compiler bug fixes.
+- Fix for coverage tool crash in the presence of inline functions.
+
+## [6.0.3] - 2025/01/27
+- Update the processors used by localnet to 1.26.
 
 ## [6.0.2] - 2025/01/24
 - Fix `aptos workspace run` so it does not panic when writing to closed stdout/stderr, allowing it to finish its graceful shutdown sequence when used as a child process.

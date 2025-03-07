@@ -112,29 +112,8 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(false),
         },
         Experiment {
-            name: Experiment::LAMBDA_FIELDS.to_string(),
-            description: "Turns on or off function values in struct fields".to_string(),
-            default: Given(false),
-        },
-        Experiment {
-            name: Experiment::LAMBDA_LIFTING.to_string(),
-            description: "Turns on or off lambda lifting".to_string(),
-            default: Given(false),
-        },
-        Experiment {
-            name: Experiment::LAMBDA_IN_PARAMS.to_string(),
-            description: "Turns on or off function values as parameters to non-inline functions"
-                .to_string(),
-            default: Given(false),
-        },
-        Experiment {
-            name: Experiment::LAMBDA_IN_RETURNS.to_string(),
-            description: "Turns on or off function values in function return values".to_string(),
-            default: Given(false),
-        },
-        Experiment {
-            name: Experiment::LAMBDA_VALUES.to_string(),
-            description: "Turns on or off first-class function values".to_string(),
+            name: Experiment::LAMBDA_LIFTING_INLINE.to_string(),
+            description: "Whether inline functions shall be included in lambda lifting".to_string(),
             default: Given(false),
         },
         Experiment {
@@ -301,11 +280,7 @@ impl Experiment {
     pub const INLINING: &'static str = "inlining";
     pub const KEEP_INLINE_FUNS: &'static str = "keep-inline-funs";
     pub const KEEP_UNINIT_ANNOTATIONS: &'static str = "keep-uninit-annotations";
-    pub const LAMBDA_FIELDS: &'static str = "lambda-fields";
-    pub const LAMBDA_IN_PARAMS: &'static str = "lambda-in-params";
-    pub const LAMBDA_IN_RETURNS: &'static str = "lambda-in-returns";
-    pub const LAMBDA_LIFTING: &'static str = "lambda-lifting";
-    pub const LAMBDA_VALUES: &'static str = "lambda-values";
+    pub const LAMBDA_LIFTING_INLINE: &'static str = "lambda-lifting-inline";
     pub const LINT_CHECKS: &'static str = "lint-checks";
     pub const MESSAGE_FORMAT_JSON: &'static str = "compiler-message-format-json";
     pub const OPTIMIZE: &'static str = "optimize";

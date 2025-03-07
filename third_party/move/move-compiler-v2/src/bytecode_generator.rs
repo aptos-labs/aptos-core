@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{experiments::Experiment, Options};
+use crate::Options;
 use codespan_reporting::diagnostic::Severity;
 use ethnum::U256;
 use itertools::Itertools;
@@ -10,6 +10,7 @@ use move_core_types::ability::Ability;
 use move_model::{
     ast::{Exp, ExpData, MatchArm, Operation, Pattern, SpecBlockTarget, TempIndex, Value},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
+    metadata::LanguageVersion,
     model::{
         FieldId, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId,
         QualifiedInstId, StructId,
@@ -30,7 +31,6 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
 };
-
 // ======================================================================================
 // Entry
 
@@ -331,7 +331,19 @@ impl<'env> Generator<'env> {
             .env()
             .get_extension::<Options>()
             .expect("Options is available");
-        options.experiment_on(Experiment::LAMBDA_VALUES)
+        options
+            .language_version
+            .unwrap_or_default()
+            .is_at_least(LanguageVersion::V2_2)
+    }
+
+    fn expect_function_values_enabled(&self, id: NodeId) {
+        if !self.check_if_lambdas_enabled() {
+            self.error(
+                id,
+                "function values outside of inline functions not supported in this language version",
+            )
+        }
     }
 }
 
@@ -346,6 +358,20 @@ impl<'env> Generator<'env> {
             ExpData::Value(id, val) => self.gen_value(targets, *id, val),
             ExpData::LocalVar(id, name) => self.gen_local(targets, *id, *name),
             ExpData::Call(id, op, args) => self.gen_call(targets, *id, op, args),
+            ExpData::Invoke(id, fun, args) => {
+                self.expect_function_values_enabled(*id);
+                self.gen_invoke(targets, *id, fun, args)
+            },
+            ExpData::Lambda(id, ..) => {
+                if self.check_if_lambdas_enabled() {
+                    self.internal_error(
+                        *id,
+                        "unexpected lambda, expected to be eliminated by lambda lifting",
+                    )
+                } else {
+                    self.expect_function_values_enabled(*id)
+                }
+            },
             ExpData::Sequence(_, exps) => {
                 for step in exps.iter().take(exps.len() - 1) {
                     // Result is thrown away, but for typing reasons, we need to introduce
@@ -415,12 +441,9 @@ impl<'env> Generator<'env> {
                         ),
                     );
                 }
-                self.emit_call(
-                    *id,
-                    targets,
-                    BytecodeOperation::WriteRef,
-                    vec![lhs_temp, rhs_temp],
-                )
+                self.emit_call(*id, targets, BytecodeOperation::WriteRef, vec![
+                    lhs_temp, rhs_temp,
+                ])
             },
             ExpData::Assign(id, lhs, rhs) => self.gen_assign(*id, lhs, rhs, None),
             ExpData::Return(id, exp) => {
@@ -488,25 +511,6 @@ impl<'env> Generator<'env> {
                     .rewrite_spec_descent(&SpecBlockTarget::Inline, spec);
                 self.emit_with(*id, |attr| Bytecode::SpecBlock(attr, spec));
             },
-            // TODO(LAMBDA)
-            ExpData::Lambda(id, _, _, _, _) =>
-                self.error(
-                *id,
-                if self.check_if_lambdas_enabled() {
-                    "Function-typed values not yet implemented except as parameters to calls to inline functions"
-                } else {
-                    "Function-typed values not yet supported except as parameters to calls to inline functions"
-                }
-            ),
-            // TODO(LAMBDA)
-            ExpData::Invoke(id, _exp, _) => self.error(
-                *id,
-                if self.check_if_lambdas_enabled() {
-                    "Calls to function values other than inline function parameters not yet implemented"
-                } else {
-                    "Calls to function values other than inline function parameters not yet supported"
-                }
-            ),
             ExpData::Quant(id, _, _, _, _, _) => {
                 self.internal_error(*id, "unsupported specification construct")
             },
@@ -582,18 +586,6 @@ impl<'env> Generator<'env> {
                     Constant::Bool(false)
                 }
             },
-            // TODO(LAMBDA)
-            Value::Function(_mid, _fid) => {
-                self.error(
-                    id,
-                    if self.check_if_lambdas_enabled() {
-                        "Function-typed values not yet implemented except as parameters to calls to inline functions"
-                    } else {
-                        "Function-typed values not yet supported except as parameters to calls to inline functions"
-                    }
-                );
-                Constant::Bool(false)
-            },
         }
     }
 }
@@ -647,6 +639,38 @@ impl<'env> Generator<'env> {
 // Calls
 
 impl<'env> Generator<'env> {
+    fn gen_invoke(&mut self, targets: Vec<TempIndex>, id: NodeId, fun: &Exp, args: &[Exp]) {
+        // Arguments are first computed, finally the function. (On a stack machine, the
+        // function is on the top).
+        let mut arg_temps = self.gen_arg_list(args);
+        let fun_temp = self.gen_arg(fun, false);
+
+        // The function can be a wrapper `struct W(|T|S|)` which we need to unpack first.
+        let fun_ty = self.get_node_type(fun.node_id());
+        if let Some(raw_fun_ty) = fun_ty.get_function_wrapper_ty(self.env()) {
+            let raw_fun_temp = self.new_temp(raw_fun_ty);
+            // This here should be well-defined because only structs can be wrappers.
+            let (wrapper_struct, inst) = fun_ty.get_struct(self.env()).unwrap();
+            let struct_id = wrapper_struct.get_qualified_id();
+            let inst = inst.to_vec();
+            self.emit_with(id, |attr| {
+                Bytecode::Call(
+                    attr,
+                    vec![raw_fun_temp],
+                    BytecodeOperation::Unpack(struct_id.module_id, struct_id.id, inst),
+                    vec![fun_temp],
+                    None,
+                )
+            });
+            arg_temps.push(raw_fun_temp)
+        } else {
+            arg_temps.push(fun_temp)
+        };
+        self.emit_with(id, |attr| {
+            Bytecode::Call(attr, targets, BytecodeOperation::Invoke, arg_temps, None)
+        });
+    }
+
     fn gen_call(&mut self, targets: Vec<TempIndex>, id: NodeId, op: &Operation, args: &[Exp]) {
         match op {
             Operation::Vector => self.gen_op_call(targets, id, BytecodeOperation::Vector, args),
@@ -815,15 +839,48 @@ impl<'env> Generator<'env> {
             Operation::MoveFunction(m, f) => {
                 self.gen_function_call(targets, id, m.qualified(*f), args)
             },
-            // TODO(LAMBDA)
-            Operation::EarlyBind => self.error(
-                id,
-                if self.check_if_lambdas_enabled() {
-                    "Function-typed values not yet implemented except as parameters to calls to inline functions"
+            Operation::Closure(mid, fid, mask) => {
+                self.expect_function_values_enabled(id);
+                let inst = self.env().get_node_instantiation(id);
+                debug_assert_eq!(
+                    inst.len(),
+                    self.env()
+                        .get_function(mid.qualified(*fid))
+                        .get_type_parameter_count(),
+                );
+                let target_ty = self.temp_type(targets[0]).clone();
+                if let Type::Struct(wrapper_mid, wrapper_sid, wrapper_inst) = target_ty {
+                    // Implicitly convert to a function wrapper.
+                    let fun_ty = self
+                        .env()
+                        .get_struct(wrapper_mid.qualified(wrapper_sid))
+                        .get_function_wrapper_type(&wrapper_inst)
+                        .expect("function wrapper type");
+                    let temp = self.new_temp(fun_ty);
+                    self.gen_op_call(
+                        vec![temp],
+                        id,
+                        BytecodeOperation::Closure(*mid, *fid, inst, *mask),
+                        args,
+                    );
+                    self.emit_with(id, |attr| {
+                        Bytecode::Call(
+                            attr,
+                            targets,
+                            BytecodeOperation::Pack(wrapper_mid, wrapper_sid, wrapper_inst),
+                            vec![temp],
+                            None,
+                        )
+                    })
                 } else {
-                    "Function-typed values not yet supported except as parameters to calls to inline functions"
-                },
-            ),
+                    self.gen_op_call(
+                        targets,
+                        id,
+                        BytecodeOperation::Closure(*mid, *fid, inst, *mask),
+                        args,
+                    )
+                }
+            },
             Operation::TestVariants(mid, sid, variants) => {
                 self.gen_test_variants(targets, id, mid.qualified(*sid), variants, args)
             },
@@ -2213,7 +2270,7 @@ impl ValueShape {
         let mut values = BTreeSet::new();
         for (_, shape) in &pattern_shapes {
             for partial_value in shape.possible_values(env) {
-                Self::join_value_shape(&mut values, partial_value)
+                values = Self::join_value_shape(values, partial_value);
             }
         }
         // Now go over all patterns in sequence and incrementally remove matched
@@ -2329,6 +2386,7 @@ impl ValueShape {
             for (s1, s2) in shapes1.iter().zip(shapes2) {
                 if let Some(s) = s1.try_join(s2) {
                     result.push(s);
+                } else {
                     break;
                 }
             }
@@ -2353,16 +2411,21 @@ impl ValueShape {
 
     /// Given a list of value shapes, join a new one. This attempts specializing existing shapes
     /// via the join operator in order to keep the list minimal.
-    fn join_value_shape(set: &mut BTreeSet<ValueShape>, value: ValueShape) {
-        for v in set.iter() {
+    fn join_value_shape(set: BTreeSet<ValueShape>, value: ValueShape) -> BTreeSet<ValueShape> {
+        let mut new_set = BTreeSet::new();
+        let mut joined = false;
+        for v in set.into_iter() {
             if let Some(unified) = v.try_join(&value) {
-                let v = v.clone(); // to free set
-                set.remove(&v);
-                set.insert(unified);
-                return;
+                new_set.insert(unified);
+                joined = true;
+            } else {
+                new_set.insert(v);
             }
         }
-        set.insert(value);
+        if !joined {
+            new_set.insert(value);
+        }
+        new_set
     }
 
     /// Checks whether one shape is instance of another. It holds that

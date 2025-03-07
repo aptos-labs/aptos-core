@@ -60,6 +60,7 @@ resource "helm_release" "validator" {
         }
         storage = {
           class = kubernetes_storage_class.ssd.metadata[0].name
+          size  = var.validator_storage_size
         }
         nodeSelector = var.validator_instance_enable_taint ? {
           "cloud.google.com/gke-nodepool" = "validators"
@@ -80,6 +81,7 @@ resource "helm_release" "validator" {
         }
         storage = {
           class = kubernetes_storage_class.ssd.metadata[0].name
+          size  = var.validator_storage_size
         }
         nodeSelector = var.validator_instance_enable_taint ? {
           "cloud.google.com/gke-nodepool" = "validators"

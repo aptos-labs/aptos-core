@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::options::ProverOptions;
+use crate::{memory_instrumentation::Instrumenter, options::ProverOptions};
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
     ast::{self},
@@ -11,8 +11,7 @@ use move_model::{
     ty::{PrimitiveType, Type},
 };
 use move_stackless_bytecode::{
-    fat_loop,
-    fat_loop::{FatLoopFunctionInfo, LoopUnrollingMark},
+    fat_loop::{self, FatLoopFunctionInfo, LoopUnrollingMark},
     function_data_builder::{FunctionDataBuilder, FunctionDataBuilderOptions},
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
@@ -106,7 +105,23 @@ impl LoopAnalysisProcessor {
                     builder.set_loc_from_attr(attr_id);
                     if let Some(loop_info) = loop_annotation.fat_loops.get(&label) {
                         // assert loop invariants -> this is the base case
-                        for (attr_id, exp) in loop_info.spec_info().invariants.values() {
+                        for (i, (attr_id, exp)) in
+                            loop_info.spec_info().invariants.values().enumerate()
+                        {
+                            // insert write-back actions before the first assertion
+                            if i == 0 {
+                                if let Some((info, nodes)) =
+                                    builder.data.loop_invariant_write_back_map.get(attr_id)
+                                {
+                                    let info_clone = info.clone();
+                                    let nodes_clone = nodes.clone();
+                                    Instrumenter::instrument_write_back_for_spec(
+                                        &mut builder,
+                                        &info_clone,
+                                        nodes_clone,
+                                    );
+                                }
+                            }
                             builder.set_loc_and_vc_info(
                                 builder.get_loc(*attr_id),
                                 LOOP_INVARIANT_BASE_FAILED,
@@ -274,7 +289,21 @@ impl LoopAnalysisProcessor {
             builder.clear_next_debug_comment();
 
             // add instrumentations to assert loop invariants -> this is the induction case
-            for (attr_id, exp) in loop_info.spec_info().invariants.values() {
+            for (i, (attr_id, exp)) in loop_info.spec_info().invariants.values().enumerate() {
+                // insert write-back actions before the first assertion
+                if i == 0 {
+                    if let Some((info, nodes)) =
+                        builder.data.loop_invariant_write_back_map.get(attr_id)
+                    {
+                        let info_clone = info.clone();
+                        let nodes_clone = nodes.clone();
+                        Instrumenter::instrument_write_back_for_spec(
+                            &mut builder,
+                            &info_clone,
+                            nodes_clone,
+                        );
+                    }
+                }
                 builder.set_loc_and_vc_info(
                     builder.get_loc(*attr_id),
                     LOOP_INVARIANT_INDUCTION_FAILED,

@@ -139,6 +139,9 @@ return true.
 -  [Function `is_permissioned_signer_enabled`](#0x1_features_is_permissioned_signer_enabled)
 -  [Function `get_account_abstraction_feature`](#0x1_features_get_account_abstraction_feature)
 -  [Function `is_account_abstraction_enabled`](#0x1_features_is_account_abstraction_enabled)
+-  [Function `get_bulletproofs_batch_feature`](#0x1_features_get_bulletproofs_batch_feature)
+-  [Function `bulletproofs_batch_enabled`](#0x1_features_bulletproofs_batch_enabled)
+-  [Function `is_domain_account_abstraction_enabled`](#0x1_features_is_domain_account_abstraction_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -326,6 +329,17 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_BULLETPROOFS_BATCH_NATIVES"></a>
+
+Whether the batch Bulletproofs native functions are available. This is needed because of the introduction of a new native function.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_BULLETPROOFS_BATCH_NATIVES">BULLETPROOFS_BATCH_NATIVES</a>: u64 = 87;
+</code></pre>
+
+
+
 <a id="0x1_features_BULLETPROOFS_NATIVES"></a>
 
 Whether the Bulletproofs zero-knowledge range proof module is enabled, and the related native function is
@@ -496,6 +510,18 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_DOMAIN_ACCOUNT_ABSTRACTION"></a>
+
+Whether the account abstraction is enabled.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_DOMAIN_ACCOUNT_ABSTRACTION">DOMAIN_ACCOUNT_ABSTRACTION</a>: u64 = 88;
+</code></pre>
+
+
+
 <a id="0x1_features_EAPI_DISABLED"></a>
 
 
@@ -541,6 +567,19 @@ The provided signer has not a framework address.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_EINVALID_FEATURE">EINVALID_FEATURE</a>: u64 = 1;
+</code></pre>
+
+
+
+<a id="0x1_features_ENABLE_FUNCTION_VALUES"></a>
+
+Whether function values are enabled.
+Lifetime: transient
+
+We do not expect use from Move, so for now only for documentation purposes here
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_ENABLE_FUNCTION_VALUES">ENABLE_FUNCTION_VALUES</a>: u64 = 89;
 </code></pre>
 
 
@@ -957,6 +996,19 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_VM_BINARY_FORMAT_V7">VM_BINARY_FORMAT_V7</a>: u64 = 40;
+</code></pre>
+
+
+
+<a id="0x1_features_VM_BINARY_FORMAT_V8"></a>
+
+Whether bytecode version v8 is enabled.
+Lifetime: transient
+
+We do not expect use from Move, so for now only for documentation purposes here
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_VM_BINARY_FORMAT_V8">VM_BINARY_FORMAT_V8</a>: u64 = 86;
 </code></pre>
 
 
@@ -3449,6 +3501,76 @@ Deprecated feature
 
 </details>
 
+<a id="0x1_features_get_bulletproofs_batch_feature"></a>
+
+## Function `get_bulletproofs_batch_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bulletproofs_batch_feature">get_bulletproofs_batch_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bulletproofs_batch_feature">get_bulletproofs_batch_feature</a>(): u64 { <a href="features.md#0x1_features_BULLETPROOFS_BATCH_NATIVES">BULLETPROOFS_BATCH_NATIVES</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_bulletproofs_batch_enabled"></a>
+
+## Function `bulletproofs_batch_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bulletproofs_batch_enabled">bulletproofs_batch_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bulletproofs_batch_enabled">bulletproofs_batch_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BULLETPROOFS_BATCH_NATIVES">BULLETPROOFS_BATCH_NATIVES</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_is_domain_account_abstraction_enabled"></a>
+
+## Function `is_domain_account_abstraction_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_domain_account_abstraction_enabled">is_domain_account_abstraction_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_domain_account_abstraction_enabled">is_domain_account_abstraction_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DOMAIN_ACCOUNT_ABSTRACTION">DOMAIN_ACCOUNT_ABSTRACTION</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_features_change_feature_flags"></a>
 
 ## Function `change_feature_flags`
@@ -3499,11 +3621,11 @@ Update feature flags directly. Only used in genesis/tests.
     <b>if</b> (!<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
         <b>move_to</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework, <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[] })
     };
-    <b>let</b> <a href="features.md#0x1_features">features</a> = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>;
-    <a href="vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&enable, |feature| {
+    <b>let</b> <a href="features.md#0x1_features">features</a> = &<b>mut</b> <a href="features.md#0x1_features_Features">Features</a>[@std].<a href="features.md#0x1_features">features</a>;
+    enable.for_each_ref(|feature| {
         <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *feature, <b>true</b>);
     });
-    <a href="vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&disable, |feature| {
+    disable.for_each_ref(|feature| {
         <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *feature, <b>false</b>);
     });
 }
@@ -3543,7 +3665,7 @@ Enable and disable features for the next epoch.
         <a href="features.md#0x1_features">features</a>
     } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
         // Otherwise, <b>use</b> the currently effective feature flag vec <b>as</b> the baseline, <b>if</b> it <b>exists</b>.
-        <b>borrow_global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>
+        <a href="features.md#0x1_features_Features">Features</a>[@std].<a href="features.md#0x1_features">features</a>
     } <b>else</b> {
         // Otherwise, <b>use</b> an empty feature vec.
         <a href="vector.md#0x1_vector">vector</a>[]
@@ -3583,7 +3705,7 @@ who have permission to set the flag that's checked in <code>extract()</code>.
     <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std)) {
         <b>let</b> <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> { <a href="features.md#0x1_features">features</a> } = <b>move_from</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std);
         <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
-            <b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a> = <a href="features.md#0x1_features">features</a>;
+            <a href="features.md#0x1_features_Features">Features</a>[@std].<a href="features.md#0x1_features">features</a> = <a href="features.md#0x1_features">features</a>;
         } <b>else</b> {
             <b>move_to</b>(framework, <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a> })
         }
@@ -3614,7 +3736,7 @@ Check whether the feature is enabled.
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_enabled">is_enabled</a>(feature: u64): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std) &&
-        <a href="features.md#0x1_features_contains">contains</a>(&<b>borrow_global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>, feature)
+        <a href="features.md#0x1_features_contains">contains</a>(&<a href="features.md#0x1_features_Features">Features</a>[@std].<a href="features.md#0x1_features">features</a>, feature)
 }
 </code></pre>
 
@@ -3641,14 +3763,14 @@ Helper to include or exclude a feature flag.
 <pre><code><b>fun</b> <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, feature: u64, <b>include</b>: bool) {
     <b>let</b> byte_index = feature / 8;
     <b>let</b> bit_mask = 1 &lt;&lt; ((feature % 8) <b>as</b> u8);
-    <b>while</b> (<a href="vector.md#0x1_vector_length">vector::length</a>(<a href="features.md#0x1_features">features</a>) &lt;= byte_index) {
-        <a href="vector.md#0x1_vector_push_back">vector::push_back</a>(<a href="features.md#0x1_features">features</a>, 0)
+    <b>while</b> (<a href="features.md#0x1_features">features</a>.length() &lt;= byte_index) {
+        <a href="features.md#0x1_features">features</a>.push_back(0)
     };
-    <b>let</b> entry = <a href="vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(<a href="features.md#0x1_features">features</a>, byte_index);
+
     <b>if</b> (<b>include</b>)
-        *entry = *entry | bit_mask
+        <a href="features.md#0x1_features">features</a>[byte_index] |= bit_mask
     <b>else</b>
-        *entry = *entry & (0xff ^ bit_mask)
+        <a href="features.md#0x1_features">features</a>[byte_index] &= (0xff ^ bit_mask)
 }
 </code></pre>
 
@@ -3675,7 +3797,7 @@ Helper to check whether a feature flag is enabled.
 <pre><code><b>fun</b> <a href="features.md#0x1_features_contains">contains</a>(<a href="features.md#0x1_features">features</a>: &<a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, feature: u64): bool {
     <b>let</b> byte_index = feature / 8;
     <b>let</b> bit_mask = 1 &lt;&lt; ((feature % 8) <b>as</b> u8);
-    byte_index &lt; <a href="vector.md#0x1_vector_length">vector::length</a>(<a href="features.md#0x1_features">features</a>) && (*<a href="vector.md#0x1_vector_borrow">vector::borrow</a>(<a href="features.md#0x1_features">features</a>, byte_index) & bit_mask) != 0
+    byte_index &lt; <a href="features.md#0x1_features">features</a>.length() && (<a href="features.md#0x1_features">features</a>[byte_index] & bit_mask) != 0
 }
 </code></pre>
 
@@ -3699,10 +3821,10 @@ Helper to check whether a feature flag is enabled.
 
 
 <pre><code><b>fun</b> <a href="features.md#0x1_features_apply_diff">apply_diff</a>(<a href="features.md#0x1_features">features</a>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;) {
-    <a href="vector.md#0x1_vector_for_each">vector::for_each</a>(enable, |feature| {
+    enable.for_each(|feature| {
         <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, feature, <b>true</b>);
     });
-    <a href="vector.md#0x1_vector_for_each">vector::for_each</a>(disable, |feature| {
+    disable.for_each(|feature| {
         <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, feature, <b>false</b>);
     });
 }

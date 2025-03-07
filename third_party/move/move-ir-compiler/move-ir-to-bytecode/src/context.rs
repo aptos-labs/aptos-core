@@ -668,6 +668,7 @@ impl<'a> Context<'a> {
             return_: SignatureIndex(return_idx as TableIndex),
             type_parameters,
             access_specifiers: None,
+            attributes: vec![],
         };
         // handle duplicate declarations
         // erroring on duplicates needs to be done by the bytecode verifier

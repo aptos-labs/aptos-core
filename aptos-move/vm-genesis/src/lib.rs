@@ -85,6 +85,7 @@ const RANDOMNESS_API_V0_CONFIG_MODULE_NAME: &str = "randomness_api_v0_config";
 const RANDOMNESS_CONFIG_SEQNUM_MODULE_NAME: &str = "randomness_config_seqnum";
 const RANDOMNESS_CONFIG_MODULE_NAME: &str = "randomness_config";
 const RANDOMNESS_MODULE_NAME: &str = "randomness";
+const ACCOUNT_ABSTRACTION_MODULE_NAME: &str = "account_abstraction";
 const RECONFIGURATION_STATE_MODULE_NAME: &str = "reconfiguration_state";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
@@ -147,7 +148,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let genesis_runtime_builder = GenesisRuntimeBuilder::new(chain_id);
     let genesis_runtime_environment = genesis_runtime_builder.build_genesis_runtime_environment();
 
-    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment.clone());
+    let module_storage = state_view.as_aptos_code_storage(&genesis_runtime_environment);
     let resolver = state_view.as_move_resolver();
 
     let genesis_vm = genesis_runtime_builder.build_genesis_vm();
@@ -254,7 +255,7 @@ pub fn encode_genesis_change_set(
     let genesis_runtime_builder = GenesisRuntimeBuilder::new(chain_id);
     let genesis_runtime_environment = genesis_runtime_builder.build_genesis_runtime_environment();
 
-    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment.clone());
+    let module_storage = state_view.as_aptos_code_storage(&genesis_runtime_environment);
     let resolver = state_view.as_move_resolver();
 
     let genesis_vm = genesis_runtime_builder.build_genesis_vm();
@@ -296,6 +297,7 @@ pub fn encode_genesis_change_set(
     initialize_randomness_config(&mut session, &module_storage, randomness_config);
     initialize_randomness_resources(&mut session, &module_storage);
     initialize_on_chain_governance(&mut session, &module_storage, genesis_config);
+    initialize_account_abstraction(&mut session, &module_storage);
     create_and_initialize_validators(&mut session, &module_storage, validators);
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session, &module_storage);
@@ -580,6 +582,20 @@ fn initialize_randomness_resources(
         session,
         module_storage,
         RANDOMNESS_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_account_abstraction(
+    session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
+) {
+    exec_function(
+        session,
+        module_storage,
+        ACCOUNT_ABSTRACTION_MODULE_NAME,
         "initialize",
         vec![],
         serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
@@ -898,8 +914,7 @@ fn code_to_writes_for_loader_v2_publishing(
     addr: AccountAddress,
     code: Vec<Bytes>,
 ) -> VMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
-    let module_storage =
-        genesis_state_view.as_aptos_code_storage(genesis_runtime_environment.clone());
+    let module_storage = genesis_state_view.as_aptos_code_storage(genesis_runtime_environment);
     let resolver = genesis_state_view.as_move_resolver();
 
     let module_storage_with_staged_modules =
@@ -963,7 +978,7 @@ fn publish_framework_with_loader_v2(
     // At this point we processed all packages, and the state view contains all the code. We can
     // run package initialization.
 
-    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment.clone());
+    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment);
     let resolver = state_view.as_move_resolver();
     let mut session = genesis_vm.new_genesis_session(&resolver, hash_value);
 
@@ -1000,7 +1015,7 @@ fn publish_framework_with_loader_v1(
     // Here, we set the state view to be empty. Hence, publishing module bundle will always create
     // new write ops.
     let state_view = GenesisStateView::new();
-    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment.clone());
+    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment);
 
     let resolver = state_view.as_move_resolver();
     let mut session = genesis_vm.new_genesis_session(&resolver, hash_value);

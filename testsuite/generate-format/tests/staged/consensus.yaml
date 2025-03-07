@@ -1,4 +1,6 @@
 ---
+AbilitySet:
+  NEWTYPESTRUCT: U8
 AbstractionAuthData:
   ENUM:
     0:
@@ -6,6 +8,13 @@ AbstractionAuthData:
         STRUCT:
           - signing_message_digest: BYTES
           - authenticator: BYTES
+    1:
+      DomainV1:
+        STRUCT:
+          - signing_message_digest: BYTES
+          - authenticator: BYTES
+          - account:
+              TYPENAME: DomainAccount
 AccessPath:
   STRUCT:
     - address:
@@ -269,6 +278,16 @@ BlockMetadataWithRandomness:
         OPTION:
           TYPENAME: Randomness
 BlockRetrievalRequest:
+  ENUM:
+    0:
+      V1:
+        NEWTYPE:
+          TYPENAME: BlockRetrievalRequestV1
+    1:
+      V2:
+        NEWTYPE:
+          TYPENAME: BlockRetrievalRequestV2
+BlockRetrievalRequestV1:
   STRUCT:
     - block_id:
         TYPENAME: HashValue
@@ -276,6 +295,12 @@ BlockRetrievalRequest:
     - target_block_id:
         OPTION:
           TYPENAME: HashValue
+BlockRetrievalRequestV2:
+  STRUCT:
+    - block_id:
+        TYPENAME: HashValue
+    - num_blocks: U64
+    - target_round: U64
 BlockRetrievalResponse:
   STRUCT:
     - status:
@@ -360,9 +385,9 @@ CommitVote:
 ConsensusMsg:
   ENUM:
     0:
-      BlockRetrievalRequest:
+      DeprecatedBlockRetrievalRequest:
         NEWTYPE:
-          TYPENAME: BlockRetrievalRequest
+          TYPENAME: BlockRetrievalRequestV1
     1:
       BlockRetrievalResponse:
         NEWTYPE:
@@ -439,6 +464,10 @@ ConsensusMsg:
       RoundTimeoutMsg:
         NEWTYPE:
           TYPENAME: RoundTimeoutMsg
+    20:
+      BlockRetrievalRequest:
+        NEWTYPE:
+          TYPENAME: BlockRetrievalRequest
 ContractEvent:
   ENUM:
     0:
@@ -479,6 +508,12 @@ DKGTranscriptMetadata:
 DeprecatedPayload:
   STRUCT:
     - dummy_value: U64
+DomainAccount:
+  ENUM:
+    0:
+      V1:
+        STRUCT:
+          - account_identity: BYTES
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
@@ -560,6 +595,16 @@ FunctionInfo:
         TYPENAME: AccountAddress
     - module_name: STR
     - function_name: STR
+FunctionTag:
+  STRUCT:
+    - args:
+        SEQ:
+          TYPENAME: TypeTag
+    - results:
+        SEQ:
+          TYPENAME: TypeTag
+    - abilities:
+        TYPENAME: AbilitySet
 G1Bytes:
   NEWTYPESTRUCT:
     TUPLEARRAY:
@@ -1154,6 +1199,10 @@ TypeTag:
       u32: UNIT
     10:
       u256: UNIT
+    11:
+      Function:
+        NEWTYPE:
+          TYPENAME: FunctionTag
 ValidatorConsensusInfo:
   STRUCT:
     - address:

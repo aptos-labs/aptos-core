@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: Calls to function values other than inline function parameters not yet supported
+error: function values outside of inline functions not supported in this language version
   ┌─ tests/more-v1/parser/invalid_call_lhs_return.move:3:9
   │
 3 │         (return ())(0, 1);

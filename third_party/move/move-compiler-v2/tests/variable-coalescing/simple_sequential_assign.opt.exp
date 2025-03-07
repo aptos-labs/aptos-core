@@ -98,8 +98,7 @@ fun m::sequential($t0: u64): u64 {
      var $t4: u64 [unused]
      var $t5: u64 [unused]
      var $t6: u64 [unused]
-  0: $t0 := move($t0)
-  1: return $t0
+  0: return $t0
 }
 
 
@@ -108,9 +107,9 @@ fun m::sequential($t0: u64): u64 {
 module c0ffee.m {
 
 
-sequential(Arg0: u64): u64 /* def_idx: 0 */ {
+sequential(p: u64): u64 /* def_idx: 0 */ {
 B0:
-	0: MoveLoc[0](Arg0: u64)
+	0: MoveLoc[0](p: u64)
 	1: Ret
 }
 }

@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    loader::{Function, Module},
+    loader::{Function, LazyLoadedFunction, LazyLoadedFunctionState, Module},
     logging::expect_no_verification_errors,
-    WithRuntimeEnvironment,
+    LayoutConverter, StorageLayoutConverter, WithRuntimeEnvironment,
 };
 use ambassador::delegatable_trait;
 use bytes::Bytes;
@@ -15,6 +15,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
+    function::FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
@@ -23,9 +24,13 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
-    loaded_data::runtime_types::{StructType, Type},
+    loaded_data::{
+        runtime_types::{StructType, Type},
+        struct_name_indexing::StructNameIndex,
+    },
     module_cyclic_dependency_error, module_linker_error,
     value_serde::FunctionValueExtension,
+    values::{AbstractFunction, SerializedFunctionData},
 };
 use std::sync::Arc;
 
@@ -150,6 +155,19 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
             })?
             .definition_struct_type
             .clone())
+    }
+
+    fn fetch_struct_ty_by_idx(&self, idx: &StructNameIndex) -> PartialVMResult<Arc<StructType>> {
+        let struct_name = self
+            .runtime_environment()
+            .struct_name_index_map()
+            .idx_to_struct_name_ref(*idx)?;
+
+        self.fetch_struct_ty(
+            struct_name.module.address(),
+            struct_name.module.name(),
+            struct_name.name.as_ident_str(),
+        )
     }
 
     /// Returns a runtime type corresponding to the specified type tag (file format type
@@ -447,5 +465,56 @@ impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
                 ty_builder.create_ty_with_subst(ty_to_substitute, &substitution_ty_args)
             })
             .collect::<PartialVMResult<Vec<_>>>()
+    }
+
+    fn create_from_serialization_data(
+        &self,
+        data: SerializedFunctionData,
+    ) -> PartialVMResult<Box<dyn AbstractFunction>> {
+        Ok(Box::new(LazyLoadedFunction::new_unresolved(data)))
+    }
+
+    fn get_serialization_data(
+        &self,
+        fun: &dyn AbstractFunction,
+    ) -> PartialVMResult<SerializedFunctionData> {
+        match &*LazyLoadedFunction::expect_this_impl(fun)?.0.borrow() {
+            LazyLoadedFunctionState::Unresolved { data, .. } => Ok(data.clone()),
+            LazyLoadedFunctionState::Resolved { fun, mask, ty_args } => {
+                let ty_converter = StorageLayoutConverter::new(self.module_storage);
+                let ty_builder = &self
+                    .module_storage
+                    .runtime_environment()
+                    .vm_config()
+                    .ty_builder;
+                let instantiate = |ty: &Type| -> PartialVMResult<Type> {
+                    if fun.ty_args.is_empty() {
+                        Ok(ty.clone())
+                    } else {
+                        ty_builder.create_ty_with_subst(ty, &fun.ty_args)
+                    }
+                };
+                let captured_layouts = mask
+                    .extract(fun.param_tys(), true)
+                    .into_iter()
+                    .map(|t| ty_converter.type_to_type_layout(&instantiate(t)?))
+                    .collect::<PartialVMResult<Vec<_>>>()?;
+                Ok(SerializedFunctionData {
+                    format_version: FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
+                    module_id: fun
+                        .module_id()
+                        .ok_or_else(|| {
+                            PartialVMError::new_invariant_violation(
+                                "attempt to serialize a script function",
+                            )
+                        })?
+                        .clone(),
+                    fun_id: fun.function.name.clone(),
+                    ty_args: ty_args.clone(),
+                    mask: *mask,
+                    captured_layouts,
+                })
+            },
+        }
     }
 }

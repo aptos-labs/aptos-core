@@ -17,7 +17,6 @@ CompiledPackageInfo {
         ),
         force_recompilation: false,
         additional_named_addresses: {},
-        architecture: None,
         fetch_deps_only: false,
         skip_fetch_latest_git_deps: false,
         compiler_config: CompilerConfig {
@@ -27,7 +26,9 @@ CompiledPackageInfo {
                 "deprecated",
                 "expected_failure",
                 "lint::skip",
+                "module_lock",
                 "native_interface",
+                "persistent",
                 "test",
                 "test_only",
                 "verify_only",

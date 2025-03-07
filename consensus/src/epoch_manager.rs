@@ -31,8 +31,9 @@ use crate::{
     metrics_safety_rules::MetricsSafetyRules,
     monitor,
     network::{
-        IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingDAGRequest,
-        IncomingRandGenRequest, IncomingRpcRequest, NetworkReceivers, NetworkSender,
+        DeprecatedIncomingBlockRetrievalRequest, IncomingBatchRetrievalRequest,
+        IncomingBlockRetrievalRequest, IncomingDAGRequest, IncomingRandGenRequest,
+        IncomingRpcRequest, NetworkReceivers, NetworkSender,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::{
@@ -59,6 +60,7 @@ use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{ConsensusConfig, DagConsensusConfig, ExecutionConfig, NodeConfig};
 use aptos_consensus_types::{
+    block_retrieval::BlockRetrievalRequest,
     common::{Author, Round},
     epoch_retrieval::EpochRetrievalRequest,
     proof_of_store::ProofCache,
@@ -569,18 +571,50 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let task = async move {
             info!(epoch = epoch, "Block retrieval task starts");
             while let Some(request) = request_rx.next().await {
-                if request.req.num_blocks() > max_blocks_allowed {
-                    warn!(
-                        "Ignore block retrieval with too many blocks: {}",
-                        request.req.num_blocks()
-                    );
-                    continue;
-                }
-                if let Err(e) = monitor!(
-                    "process_block_retrieval",
-                    block_store.process_block_retrieval(request).await
-                ) {
-                    warn!(epoch = epoch, error = ?e, kind = error_kind(&e));
+                match request.req {
+                    // TODO @bchocho @hariria deprecate once BlockRetrievalRequest enum release is complete
+                    BlockRetrievalRequest::V1(v1) => {
+                        if v1.num_blocks() > max_blocks_allowed {
+                            warn!(
+                                "Ignore block retrieval with too many blocks: {}",
+                                v1.num_blocks()
+                            );
+                            continue;
+                        }
+                        if let Err(e) = monitor!(
+                            "process_block_retrieval",
+                            block_store
+                                .process_block_retrieval(DeprecatedIncomingBlockRetrievalRequest {
+                                    req: v1,
+                                    protocol: request.protocol,
+                                    response_sender: request.response_sender,
+                                })
+                                .await
+                        ) {
+                            warn!(epoch = epoch, error = ?e, kind = error_kind(&e));
+                        }
+                    },
+                    BlockRetrievalRequest::V2(v2) => {
+                        if v2.num_blocks() > max_blocks_allowed {
+                            warn!(
+                                "Ignore block retrieval with too many blocks: {}",
+                                v2.num_blocks()
+                            );
+                            continue;
+                        }
+                        if let Err(e) = monitor!(
+                            "process_block_retrieval_v2",
+                            block_store
+                                .process_block_retrieval_v2(IncomingBlockRetrievalRequest {
+                                    req: BlockRetrievalRequest::V2(v2),
+                                    protocol: request.protocol,
+                                    response_sender: request.response_sender,
+                                })
+                                .await
+                        ) {
+                            warn!(epoch = epoch, error = ?e, kind = error_kind(&e));
+                        }
+                    },
                 }
             }
             info!(epoch = epoch, "Block retrieval task stops");
@@ -822,6 +856,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 fast_rand_config.clone(),
                 rand_msg_rx,
                 recovery_data.root_block().round(),
+                self.config.enable_pipeline,
             )
             .await;
         let consensus_sk = consensus_key;
@@ -1377,6 +1412,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 fast_rand_config,
                 rand_msg_rx,
                 highest_committed_round,
+                self.config.enable_pipeline,
             )
             .await;
 
@@ -1646,8 +1682,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             proposal_event @ VerifiedEvent::ProposalMsg(_) => {
                 if let VerifiedEvent::ProposalMsg(p) = &proposal_event {
                     if let Some(payload) = p.proposal().payload() {
-                        payload_manager
-                            .prefetch_payload_data(payload, p.proposal().timestamp_usecs());
+                        payload_manager.prefetch_payload_data(
+                            payload,
+                            p.proposer(),
+                            p.proposal().timestamp_usecs(),
+                        );
                     }
                     pending_blocks.lock().insert_block(p.proposal().clone());
                 }
@@ -1666,6 +1705,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
     }
 
+    /// TODO: @bchocho @hariria can change after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
     fn process_rpc_request(
         &mut self,
         peer_id: Author,
@@ -1684,15 +1724,26 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 return Ok(());
             },
             None => {
-                ensure!(matches!(request, IncomingRpcRequest::BlockRetrieval(_)));
+                // TODO: @bchocho @hariria can change after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
+                ensure!(matches!(
+                    request,
+                    IncomingRpcRequest::DeprecatedBlockRetrieval(_)
+                        | IncomingRpcRequest::BlockRetrieval(_)
+                ));
             },
             _ => {},
         }
 
         match request {
-            IncomingRpcRequest::BlockRetrieval(request) => {
+            // TODO @bchocho @hariria can remove after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
+            IncomingRpcRequest::DeprecatedBlockRetrieval(request) => {
                 if let Some(tx) = &self.block_retrieval_tx {
-                    tx.push(peer_id, request)
+                    let incoming_block_retrieval_request = IncomingBlockRetrievalRequest {
+                        req: BlockRetrievalRequest::V1(request.req),
+                        protocol: request.protocol,
+                        response_sender: request.response_sender,
+                    };
+                    tx.push(peer_id, incoming_block_retrieval_request)
                 } else {
                     error!("Round manager not started");
                     Ok(())
@@ -1720,6 +1771,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     tx.push(peer_id, request)
                 } else {
                     bail!("Rand manager not started");
+                }
+            },
+            IncomingRpcRequest::BlockRetrieval(request) => {
+                if let Some(tx) = &self.block_retrieval_tx {
+                    tx.push(peer_id, request)
+                } else {
+                    error!("Round manager not started");
+                    Ok(())
                 }
             },
         }

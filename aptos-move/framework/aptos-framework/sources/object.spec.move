@@ -319,9 +319,9 @@ spec aptos_framework::object {
     }
 
     spec create_object_internal(
-    creator_address: address,
-    object: address,
-    can_delete: bool,
+        creator_address: address,
+        object: address,
+        can_delete: bool,
     ): ConstructorRef {
         // property 1: Creating an object twice on the same address must never occur.
         /// [high-level-req-1]
@@ -363,7 +363,7 @@ spec aptos_framework::object {
     }
 
     spec new_event_handle<T: drop + store>(
-    object: &signer,
+        object: &signer,
     ): event::EventHandle<T> {
         aborts_if !exists<ObjectCore>(signer::address_of(object));
         //Guid properties
@@ -433,9 +433,9 @@ spec aptos_framework::object {
     }
 
     spec transfer_call(
-    owner: &signer,
-    object: address,
-    to: address,
+        owner: &signer,
+        object: address,
+        to: address,
     ) {
         pragma aborts_if_is_partial;
         // TODO: Verify the link list loop in verify_ungated_and_descendant
@@ -445,9 +445,9 @@ spec aptos_framework::object {
     }
 
     spec transfer<T: key>(
-    owner: &signer,
-    object: Object<T>,
-    to: address,
+        owner: &signer,
+        object: Object<T>,
+        to: address,
     ) {
         pragma aborts_if_is_partial;
         // TODO: Verify the link list loop in verify_ungated_and_descendant
@@ -458,9 +458,9 @@ spec aptos_framework::object {
     }
 
     spec transfer_raw(
-    owner: &signer,
-    object: address,
-    to: address,
+        owner: &signer,
+        object: address,
+        to: address,
     ) {
         pragma aborts_if_is_partial;
         // TODO: Verify the link list loop in verify_ungated_and_descendant
@@ -470,9 +470,9 @@ spec aptos_framework::object {
     }
 
     spec transfer_to_object<O: key, T: key> (
-    owner: &signer,
-    object: Object<O>,
-    to: Object<T>,
+        owner: &signer,
+        object: Object<O>,
+        to: Object<T>,
     ) {
         pragma aborts_if_is_partial;
         // TODO: Verify the link list loop in verify_ungated_and_descendant
@@ -482,11 +482,16 @@ spec aptos_framework::object {
         aborts_if !global<ObjectCore>(object_address).allow_ungated_transfer;
     }
 
-    spec burn<T: key>(_owner: &signer, _object: Object<T>) {
-        aborts_if true;
+    spec burn<T: key>(owner: &signer, object: Object<T>) {
+        pragma aborts_if_is_partial;
+        let object_address = object.inner;
+        aborts_if !exists<ObjectCore>(object_address);
+        aborts_if owner(object) != signer::address_of(owner);
+        ensures exists<TombStone>(object_address);
+        ensures is_owner(object, signer::address_of(owner));
     }
 
-    spec burn_object<T: key>(owner: &signer, object: Object<T>) {
+    spec burn_object_with_transfer<T: key>(owner: &signer, object: Object<T>) {
         pragma aborts_if_is_partial;
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);
@@ -500,7 +505,9 @@ spec aptos_framework::object {
         aborts_if !exists<ObjectCore>(object_address);
         aborts_if !is_burnt(object);
         let tomb_stone = borrow_global<TombStone>(object_address);
-        aborts_if tomb_stone.original_owner != signer::address_of(original_owner);
+        let original_owner_address = signer::address_of(original_owner);
+        let object_current_owner = borrow_global<ObjectCore>(object_address).owner;
+        aborts_if object_current_owner != original_owner_address && tomb_stone.original_owner != original_owner_address;
     }
 
     spec verify_ungated_and_descendant(owner: address, destination: address) {

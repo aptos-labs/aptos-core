@@ -970,7 +970,7 @@ where
         // Make executor for each task. TODO: fast concurrent executor.
         let num_txns = block.num_txns();
         let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(environment.clone(), base_view);
+        let executor = E::init(environment, base_view);
         drop(init_timer);
 
         // Shared environment used by each executor.
@@ -1366,7 +1366,7 @@ where
         let num_txns = signature_verified_block.num_txns();
         let init_timer = VM_INIT_SECONDS.start_timer();
         let environment = module_cache_manager_guard.environment();
-        let executor = E::init(environment.clone(), base_view);
+        let executor = E::init(environment, base_view);
         drop(init_timer);
 
         let runtime_environment = environment.runtime_environment();
@@ -1734,7 +1734,7 @@ where
             module_cache_manager_guard
                 .environment()
                 .runtime_environment()
-                .flush_struct_name_and_info_caches();
+                .flush_struct_name_and_tag_caches();
             module_cache_manager_guard.module_cache_mut().flush();
 
             info!("parallel execution requiring fallback");

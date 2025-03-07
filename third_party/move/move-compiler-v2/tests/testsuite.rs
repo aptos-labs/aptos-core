@@ -160,24 +160,19 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter: None,
         },
-        // Tests for lambda lifting and lambdas -- with full lambda support
+        // Tests for lambda lifting and lambdas, with function values enabled
         TestConfig {
             name: "lambda",
             runner: |p| run_test(p, get_config_by_name("lambda")),
             include: vec!["/lambda/", "/lambda-lifting/"],
             exclude: vec![],
-            exp_suffix: Some("lambda.exp"),
+            exp_suffix: None,
             options: opts
                 .clone()
                 // .set_experiment(Experiment::AST_SIMPLIFY, true)
-                .set_experiment(Experiment::LAMBDA_FIELDS, true)
-                .set_experiment(Experiment::LAMBDA_IN_PARAMS, true)
-                .set_experiment(Experiment::LAMBDA_IN_RETURNS, true)
-                .set_experiment(Experiment::LAMBDA_VALUES, true)
-                .set_experiment(Experiment::LAMBDA_LIFTING, true)
                 .set_language_version(LanguageVersion::V2_LAMBDA),
             stop_after: StopAfter::FileFormat,
-            dump_ast: DumpLevel::AllStages,
+            dump_ast: DumpLevel::EndStage,
             dump_bytecode: DumpLevel::EndStage,
             dump_bytecode_filter: None,
         },
@@ -215,7 +210,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         TestConfig {
             name: "inlining-et-al",
             runner: |p| run_test(p, get_config_by_name("inlining-et-al")),
-            include: vec!["/inlining/", "/folding/", "/simplifier/", "/lambda/"],
+            include: vec!["/inlining/", "/folding/", "/simplifier/"],
             exclude: vec!["/more-v1/"],
             exp_suffix: None,
             options: opts.clone().set_experiment(Experiment::AST_SIMPLIFY, true),
@@ -800,7 +795,6 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         // Run env processor pipeline.
         let env_pipeline = move_compiler_v2::check_and_rewrite_pipeline(
             &options,
-            false,
             RewritingScope::CompilationTarget,
         );
         if config.dump_ast == DumpLevel::AllStages {

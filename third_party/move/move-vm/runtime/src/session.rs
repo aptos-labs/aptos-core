@@ -9,7 +9,10 @@ use crate::{
     module_traversal::TraversalContext,
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
-    storage::{module_storage::ModuleStorage, ty_layout_converter::LoaderLayoutConverter},
+    storage::{
+        module_storage::ModuleStorage, ty_layout_converter::LoaderLayoutConverter,
+        ty_tag_converter::TypeTagConverter,
+    },
     CodeStorage, LayoutConverter,
 };
 use bytes::Bytes;
@@ -28,7 +31,7 @@ use move_vm_types::{
     loaded_data::runtime_types::{Type, TypeBuilder},
     values::{GlobalValue, Value},
 };
-use std::{borrow::Borrow, collections::BTreeSet};
+use std::borrow::Borrow;
 
 pub struct Session<'r, 'l> {
     pub(crate) move_vm: &'l MoveVM,
@@ -255,24 +258,6 @@ impl<'r, 'l> Session<'r, 'l> {
         )
     }
 
-    #[deprecated]
-    pub fn publish_module_bundle_relax_compatibility(
-        &mut self,
-        modules: Vec<Vec<u8>>,
-        sender: AccountAddress,
-        gas_meter: &mut impl GasMeter,
-    ) -> VMResult<()> {
-        #[allow(deprecated)]
-        self.move_vm.runtime.publish_module_bundle(
-            modules,
-            sender,
-            &mut self.data_cache,
-            &self.module_store,
-            gas_meter,
-            Compatibility::no_check(),
-        )
-    }
-
     pub fn num_mutated_resources(&self, sender: &AccountAddress) -> u64 {
         self.data_cache.num_mutated_resources(sender)
     }
@@ -284,7 +269,7 @@ impl<'r, 'l> Session<'r, 'l> {
     /// This MUST NOT be called if there is a previous invocation that failed with an invariant violation.
     pub fn finish(self, module_storage: &impl ModuleStorage) -> VMResult<ChangeSet> {
         self.data_cache
-            .into_effects(self.move_vm.runtime.loader(), module_storage)
+            .into_effects(module_storage)
             .map_err(|e| e.finish(Location::Undefined))
     }
 
@@ -294,11 +279,7 @@ impl<'r, 'l> Session<'r, 'l> {
         module_storage: &impl ModuleStorage,
     ) -> VMResult<Changes<Bytes, Resource>> {
         self.data_cache
-            .into_custom_effects(
-                resource_converter,
-                self.move_vm.runtime.loader(),
-                module_storage,
-            )
+            .into_custom_effects(resource_converter, module_storage)
             .map_err(|e| e.finish(Location::Undefined))
     }
 
@@ -313,7 +294,7 @@ impl<'r, 'l> Session<'r, 'l> {
             ..
         } = self;
         let change_set = data_cache
-            .into_effects(self.move_vm.runtime.loader(), module_storage)
+            .into_effects(module_storage)
             .map_err(|e| e.finish(Location::Undefined))?;
         Ok((change_set, native_extensions))
     }
@@ -329,11 +310,7 @@ impl<'r, 'l> Session<'r, 'l> {
             ..
         } = self;
         let change_set = data_cache
-            .into_custom_effects(
-                resource_converter,
-                self.move_vm.runtime.loader(),
-                module_storage,
-            )
+            .into_custom_effects(resource_converter, module_storage)
             .map_err(|e| e.finish(Location::Undefined))?;
         Ok((change_set, native_extensions))
     }
@@ -371,22 +348,6 @@ impl<'r, 'l> Session<'r, 'l> {
     pub fn exists_module(&self, module_id: &ModuleId) -> VMResult<bool> {
         #[allow(deprecated)]
         self.data_cache.exists_module(module_id)
-    }
-
-    /// Load a script and all of its types into cache
-    pub fn load_script(
-        &mut self,
-        code_storage: &impl CodeStorage,
-        script: impl Borrow<[u8]>,
-        ty_args: &[TypeTag],
-    ) -> VMResult<LoadedFunction> {
-        self.move_vm.runtime.loader().load_script(
-            script.borrow(),
-            ty_args,
-            &mut self.data_cache,
-            &self.module_store,
-            code_storage,
-        )
     }
 
     /// Load a module, a function, and all of its types into cache
@@ -441,47 +402,19 @@ impl<'r, 'l> Session<'r, 'l> {
         )
     }
 
-    pub fn get_type_layout(
-        &mut self,
-        type_tag: &TypeTag,
-        module_storage: &impl ModuleStorage,
-    ) -> VMResult<MoveTypeLayout> {
-        self.move_vm.runtime.loader().get_type_layout(
-            type_tag,
-            &mut self.data_cache,
-            &self.module_store,
-            module_storage,
-        )
-    }
-
-    pub fn get_fully_annotated_type_layout(
-        &mut self,
-        type_tag: &TypeTag,
-        module_storage: &impl ModuleStorage,
-    ) -> VMResult<MoveTypeLayout> {
-        self.move_vm
-            .runtime
-            .loader()
-            .get_fully_annotated_type_layout(
-                type_tag,
-                &mut self.data_cache,
-                &self.module_store,
-                module_storage,
-            )
-    }
-
     pub fn get_type_tag(
         &self,
         ty: &Type,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<TypeTag> {
-        self.move_vm
-            .runtime
-            .loader()
-            .type_to_type_tag(ty, module_storage)
+        let ty_tag_builder = TypeTagConverter::new(module_storage.runtime_environment());
+        ty_tag_builder
+            .ty_to_ty_tag(ty)
             .map_err(|e| e.finish(Location::Undefined))
     }
 
+    /// Returns [MoveTypeLayout] of a given runtime type. For [TypeTag] to layout conversions, one
+    /// needs to first convert the tag to runtime type.
     pub fn get_type_layout_from_ty(
         &self,
         ty: &Type,
@@ -546,81 +479,20 @@ impl<'r, 'l> Session<'r, 'l> {
                     .idx_to_struct_name(*idx)?;
                 Some((struct_identifier.module, struct_identifier.name))
             },
-            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | TyParam(_)
-            | Vector(_) | Reference(_) | MutableReference(_) => None,
+            Bool
+            | U8
+            | U16
+            | U32
+            | U64
+            | U128
+            | U256
+            | Address
+            | Signer
+            | TyParam(_)
+            | Vector(_)
+            | Reference(_)
+            | MutableReference(_)
+            | Function { .. } => None,
         })
-    }
-
-    pub fn check_type_tag_dependencies_and_charge_gas(
-        &mut self,
-        module_storage: &impl ModuleStorage,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        ty_tags: &[TypeTag],
-    ) -> VMResult<()> {
-        // Charge gas based on the distinct ordered module ids.
-        let ordered_ty_tags = ty_tags
-            .iter()
-            .flat_map(|ty_tag| ty_tag.preorder_traversal_iter())
-            .filter_map(TypeTag::struct_tag)
-            .map(|struct_tag| {
-                let module_id = traversal_context
-                    .referenced_module_ids
-                    .alloc(struct_tag.module_id());
-                (module_id.address(), module_id.name())
-            })
-            .collect::<BTreeSet<_>>();
-
-        self.check_dependencies_and_charge_gas(
-            module_storage,
-            gas_meter,
-            traversal_context,
-            ordered_ty_tags,
-        )
-    }
-
-    pub fn check_dependencies_and_charge_gas<'a, I>(
-        &mut self,
-        module_storage: &impl ModuleStorage,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext<'a>,
-        ids: I,
-    ) -> VMResult<()>
-    where
-        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
-        I::IntoIter: DoubleEndedIterator,
-    {
-        self.move_vm
-            .runtime
-            .loader()
-            .check_dependencies_and_charge_gas(
-                &self.module_store,
-                &mut self.data_cache,
-                gas_meter,
-                &mut traversal_context.visited,
-                traversal_context.referenced_modules,
-                ids,
-                module_storage,
-            )
-    }
-
-    pub fn check_script_dependencies_and_check_gas(
-        &mut self,
-        code_storage: &impl CodeStorage,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        script: impl Borrow<[u8]>,
-    ) -> VMResult<()> {
-        self.move_vm
-            .runtime
-            .loader()
-            .check_script_dependencies_and_check_gas(
-                &self.module_store,
-                &mut self.data_cache,
-                gas_meter,
-                traversal_context,
-                script.borrow(),
-                code_storage,
-            )
     }
 }

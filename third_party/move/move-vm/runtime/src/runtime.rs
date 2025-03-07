@@ -43,15 +43,6 @@ pub(crate) struct VMRuntime {
     pub(crate) module_cache: Arc<LegacyModuleCache>,
 }
 
-impl Clone for VMRuntime {
-    fn clone(&self) -> Self {
-        Self {
-            loader: self.loader.clone(),
-            module_cache: Arc::new(LegacyModuleCache::clone(&self.module_cache)),
-        }
-    }
-}
-
 impl VMRuntime {
     /// Creates a new runtime instance with provided environment.
     pub(crate) fn new(runtime_environment: &RuntimeEnvironment) -> Self {
@@ -510,13 +501,7 @@ impl VMRuntime {
         code_storage: &impl CodeStorage,
     ) -> VMResult<()> {
         // Load the script first, verify it, and then execute the entry-point main function.
-        let main = self.loader.load_script(
-            script.borrow(),
-            &ty_args,
-            data_store,
-            module_store,
-            code_storage,
-        )?;
+        let main = code_storage.load_script(script.borrow(), &ty_args)?;
 
         self.execute_function_impl(
             main,

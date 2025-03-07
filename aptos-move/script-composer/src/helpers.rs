@@ -29,6 +29,11 @@ pub(crate) fn import_type_tag(
     type_tag: &TypeTag,
     module_resolver: &BTreeMap<ModuleId, CompiledModule>,
 ) -> PartialVMResult<SignatureToken> {
+    let to_list = |script_builder: &mut CompiledScriptBuilder, ts: &[TypeTag]| {
+        ts.iter()
+            .map(|t| import_type_tag(script_builder, t, module_resolver))
+            .collect::<PartialVMResult<Vec<_>>>()
+    };
     Ok(match type_tag {
         TypeTag::Address => SignatureToken::Address,
         TypeTag::U8 => SignatureToken::U8,
@@ -53,13 +58,15 @@ pub(crate) fn import_type_tag(
             } else {
                 SignatureToken::StructInstantiation(
                     struct_idx,
-                    s.type_args
-                        .iter()
-                        .map(|ty| import_type_tag(script_builder, ty, module_resolver))
-                        .collect::<PartialVMResult<Vec<_>>>()?,
+                    to_list(script_builder, &s.type_args)?,
                 )
             }
         },
+        TypeTag::Function(f) => SignatureToken::Function(
+            to_list(script_builder, &f.args)?,
+            to_list(script_builder, &f.results)?,
+            f.abilities,
+        ),
     })
 }
 

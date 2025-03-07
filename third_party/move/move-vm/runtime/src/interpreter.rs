@@ -4,15 +4,21 @@
 
 use crate::{
     access_control::AccessControlState,
+    check_type_tag_dependencies_and_charge_gas,
     data_cache::TransactionDataCache,
     frame_type_cache::{
         AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
     },
-    loader::{LegacyModuleStorageAdapter, Loader, Resolver},
+    loader::{LazyLoadedFunction, LegacyModuleStorageAdapter, Loader, Resolver},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
+    reentrancy_checker::{CallType, ReentrancyChecker},
     runtime_type_checks::{FullRuntimeTypeCheck, NoRuntimeTypeCheck, RuntimeTypeCheck},
+    storage::{
+        dependencies_gas_charging::check_dependencies_and_charge_gas,
+        depth_formula_calculator::DepthFormulaCalculator, ty_tag_converter::TypeTagConverter,
+    },
     trace, LoadedFunction, ModuleStorage,
 };
 use fail::fail_point;
@@ -20,14 +26,17 @@ use move_binary_format::{
     errors::*,
     file_format::{
         AccessKind, Bytecode, FunctionHandleIndex, FunctionInstantiationIndex, LocalIndex,
+        SignatureIndex,
     },
 };
 use move_core_types::{
     account_address::AccountAddress,
+    function::ClosureMask,
     gas_algebra::{NumArgs, NumBytes, NumTypeNodes},
-    language_storage::{ModuleId, TypeTag},
+    language_storage::TypeTag,
     vm_status::{StatusCode, StatusType},
 };
+use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     debug_write, debug_writeln,
     gas::{GasMeter, SimpleInstruction},
@@ -37,15 +46,15 @@ use move_vm_types::{
     },
     natives::function::NativeResult,
     values::{
-        self, GlobalValue, IntegerValue, Locals, Reference, SignerRef, Struct, StructRef,
-        VMValueCast, Value, Vector, VectorRef,
+        self, AbstractFunction, Closure, GlobalValue, IntegerValue, Locals, Reference, SignerRef,
+        Struct, StructRef, VMValueCast, Value, Vector, VectorRef,
     },
     views::TypeView,
 };
 use std::{
     cell::RefCell,
     cmp::min,
-    collections::{btree_map, BTreeSet, VecDeque},
+    collections::{btree_map, VecDeque},
     fmt::Write,
     rc::Rc,
 };
@@ -82,8 +91,8 @@ pub(crate) struct InterpreterImpl {
     paranoid_type_checks: bool,
     /// The access control state.
     access_control: AccessControlState,
-    /// Set of modules that exists on call stack.
-    active_modules: BTreeSet<ModuleId>,
+    /// Reentrancy checker.
+    reentrancy_checker: ReentrancyChecker,
 }
 
 struct TypeWithLoader<'a, 'b, 'c> {
@@ -93,10 +102,9 @@ struct TypeWithLoader<'a, 'b, 'c> {
 
 impl<'a, 'b, 'c> TypeView for TypeWithLoader<'a, 'b, 'c> {
     fn to_type_tag(&self) -> TypeTag {
-        self.resolver
-            .loader()
-            .type_to_type_tag(self.ty, self.resolver.module_storage())
-            .unwrap()
+        let ty_tag_builder =
+            TypeTagConverter::new(self.resolver.module_storage().runtime_environment());
+        ty_tag_builder.ty_to_ty_tag(self.ty).unwrap()
     }
 }
 
@@ -147,7 +155,7 @@ impl InterpreterImpl {
             call_stack: CallStack::new(),
             paranoid_type_checks: loader.vm_config().paranoid_type_checks,
             access_control: AccessControlState::default(),
-            active_modules: BTreeSet::new(),
+            reentrancy_checker: ReentrancyChecker::default(),
         };
 
         let function = Rc::new(function);
@@ -282,9 +290,9 @@ impl InterpreterImpl {
                 .map_err(|e| self.set_location(e))?;
         }
 
-        if let Some(module_id) = function.module_id() {
-            self.active_modules.insert(module_id.clone());
-        }
+        self.reentrancy_checker
+            .enter_function(None, &function, CallType::Regular)
+            .map_err(|e| self.set_location(e))?;
 
         let frame_cache = if RTCaches::caches_enabled() {
             FrameTypeCache::make_rc_for_function(&function)
@@ -293,7 +301,14 @@ impl InterpreterImpl {
         };
 
         let mut current_frame = self
-            .make_new_frame(gas_meter, loader, function, locals, frame_cache)
+            .make_new_frame(
+                gas_meter,
+                loader,
+                function,
+                CallType::Regular,
+                locals,
+                frame_cache.clone(),
+            )
             .map_err(|err| self.set_location(err))?;
 
         // Access control for the new frame.
@@ -325,11 +340,13 @@ impl InterpreterImpl {
                         .map_err(|e| self.set_location(e))?;
 
                     if let Some(frame) = self.call_stack.pop() {
-                        if frame.function.module_id() != current_frame.function.module_id() {
-                            if let Some(module_id) = current_frame.function.module_id() {
-                                self.active_modules.remove(module_id);
-                            }
-                        }
+                        self.reentrancy_checker
+                            .exit_function(
+                                frame.function.module_or_script_id(),
+                                &current_frame.function,
+                                current_frame.call_type,
+                            )
+                            .map_err(|e| self.set_location(e))?;
                         // Note: the caller will find the callee's return values at the top of the shared operand stack
                         current_frame = frame;
                         current_frame.pc += 1; // advance past the Call instruction in the caller
@@ -394,11 +411,9 @@ impl InterpreterImpl {
 
                     // Charge gas
                     let module_id = function.module_id().ok_or_else(|| {
-                        let err =
-                            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                                .with_message(
-                                    "Failed to get native function module id".to_string(),
-                                );
+                        let err = PartialVMError::new_invariant_violation(
+                            "Failed to get native function module id",
+                        );
                         set_err_info!(current_frame, err)
                     })?;
                     gas_meter
@@ -421,6 +436,8 @@ impl InterpreterImpl {
                             traversal_context,
                             extensions,
                             &function,
+                            ClosureMask::empty(),
+                            vec![],
                         )?;
                         continue;
                     }
@@ -430,7 +447,10 @@ impl InterpreterImpl {
                         gas_meter,
                         loader,
                         function,
+                        CallType::Regular,
                         frame_cache,
+                        ClosureMask::empty(),
+                        vec![],
                     )?;
                 },
                 ExitCode::CallGeneric(idx) => {
@@ -490,8 +510,9 @@ impl InterpreterImpl {
                     let module_id = function
                         .module_id()
                         .ok_or_else(|| {
-                            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                                .with_message("Failed to get native function module id".to_string())
+                            PartialVMError::new_invariant_violation(
+                                "Failed to get native function module id",
+                            )
                         })
                         .map_err(|e| set_err_info!(current_frame, e))?;
                     // Charge gas
@@ -519,6 +540,8 @@ impl InterpreterImpl {
                             traversal_context,
                             extensions,
                             &function,
+                            ClosureMask::empty(),
+                            vec![],
                         )?;
                         continue;
                     }
@@ -528,8 +551,116 @@ impl InterpreterImpl {
                         gas_meter,
                         loader,
                         function,
+                        CallType::Regular,
                         frame_cache,
+                        ClosureMask::empty(),
+                        vec![],
                     )?;
+                },
+                ExitCode::CallClosure(_sig_idx) => {
+                    // Notice the closure is type-checked in runtime_type_checker
+                    let (fun, captured) = self
+                        .operand_stack
+                        .pop_as::<Closure>()
+                        .map_err(|e| set_err_info!(current_frame, e))?
+                        .unpack();
+                    let lazy_function = LazyLoadedFunction::expect_this_impl(fun.as_ref())
+                        .map_err(|e| set_err_info!(current_frame, e))?;
+                    let mask = lazy_function.closure_mask();
+
+                    // Before trying to resolve the function, charge gas for associated
+                    // module loading.
+                    let module_id = lazy_function.with_name_and_ty_args(
+                        |module_opt, _func_name, ty_arg_tags| {
+                            let Some(module_id) = module_opt else {
+                                // TODO(#15664): currently we need the module id for gas charging
+                                //   of calls, so we can't proceed here without one. But we want
+                                //   to be able to let scripts use closures.
+                                let err = PartialVMError::new_invariant_violation(format!(
+                                    "module id required to charge gas for function `{}`",
+                                    lazy_function.to_stable_string()
+                                ));
+                                return Err(set_err_info!(current_frame, err));
+                            };
+
+                            // Charge gas for function code loading.
+                            let arena_id = traversal_context
+                                .referenced_module_ids
+                                .alloc(module_id.clone());
+                            check_dependencies_and_charge_gas(
+                                resolver.module_storage(),
+                                gas_meter,
+                                traversal_context,
+                                [(arena_id.address(), arena_id.name())],
+                            )?;
+
+                            // Charge gas for code loading of modules used by type arguments.
+                            check_type_tag_dependencies_and_charge_gas(
+                                module_storage,
+                                gas_meter,
+                                traversal_context,
+                                ty_arg_tags,
+                            )?;
+                            Ok(module_id.clone())
+                        },
+                    )?;
+
+                    // Resolve the function. This may lead to loading the code related
+                    // to this function.
+                    let callee = lazy_function
+                        .with_resolved_function(module_storage, |f| Ok(f.clone()))
+                        .map_err(|e| set_err_info!(current_frame, e))?;
+
+                    // Charge gas for call and for the parameters. The current APIs
+                    // require an ExactSizeIterator to be passed for charge_call, so
+                    // some acrobatics is needed (sigh).
+                    // TODO: perhaps refactor and just pass count of arguments, because
+                    //   that is the only thing used for now.
+                    let captured_vec = captured.collect::<Vec<_>>();
+                    let arguments: Vec<&Value> = self
+                        .operand_stack
+                        .last_n(callee.param_tys().len() - mask.captured_count() as usize)
+                        .map_err(|e| set_err_info!(current_frame, e))?
+                        .chain(captured_vec.iter())
+                        .collect();
+                    gas_meter
+                        .charge_call(
+                            &module_id,
+                            callee.name(),
+                            arguments.into_iter(),
+                            (callee.local_tys().len() as u64).into(),
+                        )
+                        .map_err(|e| set_err_info!(current_frame, e))?;
+
+                    // In difference to regular calls, we skip visibility check.
+                    // It is possible to call a private function of another module via
+                    // a closure.
+
+                    // Call function
+                    if callee.is_native() {
+                        self.call_native::<RTTCheck, RTCaches>(
+                            &mut current_frame,
+                            &resolver,
+                            data_store,
+                            gas_meter,
+                            traversal_context,
+                            extensions,
+                            &callee,
+                            mask,
+                            captured_vec,
+                        )?
+                    } else {
+                        self.set_new_call_frame::<RTTCheck, RTCaches>(
+                            &mut current_frame,
+                            gas_meter,
+                            loader,
+                            callee,
+                            CallType::ClosureDynamicDispatch,
+                            frame_cache.clone(),
+                            mask,
+                            captured_vec,
+                        )?
+                    }
                 },
             }
         }
@@ -541,30 +672,29 @@ impl InterpreterImpl {
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
         function: Rc<LoadedFunction>,
+        call_type: CallType,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
+        mask: ClosureMask,
+        captured: Vec<Value>,
     ) -> VMResult<()> {
-        match (function.module_id(), current_frame.function.module_id()) {
-            (Some(module_id), Some(current_module_id)) if module_id != current_module_id => {
-                if self.active_modules.contains(module_id) {
-                    return Err(self.set_location(
-                        PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR).with_message(
-                            format!(
-                                "Re-entrancy detected: {} already exists on top of the stack",
-                                module_id
-                            ),
-                        ),
-                    ));
-                }
-                self.active_modules.insert(module_id.clone());
-            },
-            (Some(module_id), None) => {
-                self.active_modules.insert(module_id.clone());
-            },
-            _ => (),
-        }
+        self.reentrancy_checker
+            .enter_function(
+                Some(current_frame.function.module_or_script_id()),
+                &function,
+                call_type,
+            )
+            .map_err(|e| self.set_location(e))?;
 
         let mut frame = self
-            .make_call_frame::<RTTCheck, RTCaches>(gas_meter, loader, function, frame_cache)
+            .make_call_frame::<RTTCheck, RTCaches>(
+                gas_meter,
+                loader,
+                function,
+                call_type,
+                frame_cache,
+                mask,
+                captured,
+            )
             .map_err(|err| {
                 self.attach_state_if_invariant_violation(self.set_location(err), current_frame)
             })?;
@@ -593,34 +723,44 @@ impl InterpreterImpl {
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
         function: Rc<LoadedFunction>,
+        call_type: CallType,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
+        mask: ClosureMask,
+        mut captured: Vec<Value>,
     ) -> PartialVMResult<Frame> {
         let mut locals = Locals::new(function.local_tys().len());
         let num_param_tys = function.param_tys().len();
-
-        for i in 0..num_param_tys {
-            locals.store_loc(
-                num_param_tys - i - 1,
-                self.operand_stack.pop()?,
-                loader.vm_config().check_invariant_in_swap_loc,
-            )?;
+        for i in (0..num_param_tys).rev() {
+            let is_captured = mask.is_captured(i);
+            let value = if is_captured {
+                captured.pop().ok_or_else(|| {
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message("inconsistent closure mask".to_string())
+                })?
+            } else {
+                self.operand_stack.pop()?
+            };
+            locals.store_loc(i, value, loader.vm_config().check_invariant_in_swap_loc)?;
 
             let ty_args = function.ty_args();
-            if RTTCheck::should_perform_checks() {
+            if RTTCheck::should_perform_checks() && !is_captured {
+                // Only perform paranoid type check for actual operands on the stack.
+                // Captured arguments are already verified against function signature.
                 let ty = self.operand_stack.pop_ty()?;
-                let expected_ty = &function.local_tys()[num_param_tys - i - 1];
+                let expected_ty = &function.local_tys()[i];
                 if !ty_args.is_empty() {
                     let expected_ty = loader
                         .ty_builder()
                         .create_ty_with_subst(expected_ty, ty_args)?;
-                    ty.paranoid_check_eq(&expected_ty)?;
+                    // For parameter to argument, use assignability
+                    ty.paranoid_check_assignable(&expected_ty)?;
                 } else {
                     // Directly check against the expected type to save a clone here.
-                    ty.paranoid_check_eq(expected_ty)?;
+                    ty.paranoid_check_assignable(expected_ty)?;
                 }
             }
         }
-        self.make_new_frame(gas_meter, loader, function, locals, frame_cache)
+        self.make_new_frame(gas_meter, loader, function, call_type, locals, frame_cache)
     }
 
     /// Create a new `Frame` given a function and its locals.
@@ -631,6 +771,7 @@ impl InterpreterImpl {
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
         function: Rc<LoadedFunction>,
+        call_type: CallType,
         locals: Locals,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
     ) -> PartialVMResult<Frame> {
@@ -659,6 +800,7 @@ impl InterpreterImpl {
             pc: 0,
             locals,
             function,
+            call_type,
             local_tys,
             frame_cache,
         })
@@ -674,6 +816,8 @@ impl InterpreterImpl {
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         function: &LoadedFunction,
+        mask: ClosureMask,
+        captured: Vec<Value>,
     ) -> VMResult<()> {
         // Note: refactor if native functions push a frame on the stack
         self.call_native_impl::<RTTCheck, RTCaches>(
@@ -684,6 +828,8 @@ impl InterpreterImpl {
             traversal_context,
             extensions,
             function,
+            mask,
+            captured,
         )
         .map_err(|e| match function.module_id() {
             Some(id) => {
@@ -712,28 +858,42 @@ impl InterpreterImpl {
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         function: &LoadedFunction,
+        mask: ClosureMask,
+        mut captured: Vec<Value>,
     ) -> PartialVMResult<()> {
         let ty_builder = resolver.loader().ty_builder();
 
-        let mut args = VecDeque::new();
         let num_param_tys = function.param_tys().len();
-        for _ in 0..num_param_tys {
-            args.push_front(self.operand_stack.pop()?);
+        let mut args = VecDeque::new();
+        for i in (0..num_param_tys).rev() {
+            if mask.is_captured(i) {
+                args.push_front(captured.pop().ok_or_else(|| {
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message("inconsistent number of captured arguments".to_string())
+                })?)
+            } else {
+                args.push_front(self.operand_stack.pop()?)
+            }
         }
-        let mut arg_tys = VecDeque::new();
 
+        let mut arg_tys = VecDeque::new();
         let ty_args = function.ty_args();
         if RTTCheck::should_perform_checks() {
-            for i in 0..num_param_tys {
-                let ty = self.operand_stack.pop_ty()?;
-                let expected_ty = &function.param_tys()[num_param_tys - i - 1];
-                if !ty_args.is_empty() {
-                    let expected_ty = ty_builder.create_ty_with_subst(expected_ty, ty_args)?;
-                    ty.paranoid_check_eq(&expected_ty)?;
+            for i in (0..num_param_tys).rev() {
+                let expected_ty = &function.param_tys()[i];
+                if !mask.is_captured(i) {
+                    let ty = self.operand_stack.pop_ty()?;
+                    // For param type to argument, use assignability
+                    if !ty_args.is_empty() {
+                        let expected_ty = ty_builder.create_ty_with_subst(expected_ty, ty_args)?;
+                        ty.paranoid_check_assignable(&expected_ty)?;
+                    } else {
+                        ty.paranoid_check_assignable(expected_ty)?;
+                    }
+                    arg_tys.push_front(ty);
                 } else {
-                    ty.paranoid_check_eq(expected_ty)?;
+                    arg_tys.push_front(expected_ty.clone())
                 }
-                arg_tys.push_front(ty);
             }
         }
 
@@ -765,13 +925,9 @@ impl InterpreterImpl {
                 // Paranoid check to protect us against incorrect native function implementations. A native function that
                 // returns a different number of values than its declared types will trigger this check.
                 if return_values.len() != function.return_tys().len() {
-                    return Err(
-                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                            .with_message(
-                            "Arity mismatch: return value count does not match return type count"
-                                .to_string(),
-                        ),
-                    );
+                    return Err(PartialVMError::new_invariant_violation(
+                        "Arity mismatch: return value count does not match return type count",
+                    ));
                 }
                 // Put return values on the top of the operand stack, where the caller will find them.
                 // This is one of only two times the operand stack is shared across call stack frames; the other is in handling
@@ -795,13 +951,14 @@ impl InterpreterImpl {
                 Err(PartialVMError::new(StatusCode::ABORTED).with_sub_status(abort_code))
             },
             NativeResult::OutOfGas { partial_cost } => {
-                let err = match gas_meter.charge_native_function(
-                    partial_cost,
-                    Option::<std::iter::Empty<&Value>>::None,
-                ) {
+                let err = match gas_meter
+                    .charge_native_function(partial_cost, Option::<std::iter::Empty<&Value>>::None)
+                {
                     Err(err) if err.major_status() == StatusCode::OUT_OF_GAS => err,
-                    Ok(_) | Err(_) => PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
-                        "The partial cost returned by the native function did not cause the gas meter to trigger an OutOfGas error, at least one of them is violating the contract".to_string()
+                    Ok(_) | Err(_) => PartialVMError::new_invariant_violation(
+                        "The partial cost returned by the native function did \
+                        not cause the gas meter to trigger an OutOfGas error, at least \
+                        one of them is violating the contract",
                     ),
                 };
 
@@ -893,7 +1050,10 @@ impl InterpreterImpl {
                     gas_meter,
                     resolver.loader(),
                     Rc::new(target_func),
+                    CallType::NativeDynamicDispatch,
                     frame_cache,
+                    ClosureMask::empty(),
+                    vec![],
                 )
                 .map_err(|err| err.to_partial())
             },
@@ -901,16 +1061,11 @@ impl InterpreterImpl {
                 let arena_id = traversal_context
                     .referenced_module_ids
                     .alloc(module_name.clone());
-                resolver
-                    .loader()
-                    .check_dependencies_and_charge_gas(
-                        resolver.module_store(),
-                        data_store,
-                        gas_meter,
-                        &mut traversal_context.visited,
-                        traversal_context.referenced_modules,
-                        [(arena_id.address(), arena_id.name())],
+                check_dependencies_and_charge_gas(
                         resolver.module_storage(),
+                        gas_meter,
+                        traversal_context,
+                        [(arena_id.address(), arena_id.name())],
                     )
                     .map_err(|err| err
                         .to_partial()
@@ -1092,6 +1247,12 @@ impl InterpreterImpl {
             .loader()
             .struct_name_index_map(resolver.module_storage())
             .idx_to_struct_name(struct_idx)?;
+
+        // Perform resource reentrancy check
+        self.reentrancy_checker
+            .check_resource_access(&struct_name)?;
+
+        // Perform resource access control
         if let Some(access) = AccessInstance::new(kind, struct_name, instance, addr) {
             self.access_control.check_access(access)?
         }
@@ -1241,11 +1402,10 @@ impl InterpreterImpl {
         if !ty_args.is_empty() {
             let mut ty_tags = vec![];
             for ty in ty_args {
-                ty_tags.push(
-                    resolver
-                        .loader()
-                        .type_to_type_tag(ty, resolver.module_storage())?,
-                );
+                let ty_tag_builder =
+                    TypeTagConverter::new(resolver.module_storage().runtime_environment());
+                let tag = ty_tag_builder.ty_to_ty_tag(ty)?;
+                ty_tags.push(tag);
             }
             debug_write!(buf, "<")?;
             let mut it = ty_tags.iter();
@@ -1541,6 +1701,8 @@ impl CallStack {
 }
 
 fn check_depth_of_type(resolver: &Resolver, ty: &Type) -> PartialVMResult<()> {
+    let _timer = VM_TIMER.timer_with_label("Interpreter::check_depth_of_type");
+
     // Start at 1 since we always call this right before we add a new node to the value's depth.
     let max_depth = match resolver.vm_config().max_value_nest_depth {
         Some(max_depth) => max_depth,
@@ -1585,11 +1747,8 @@ fn check_depth_of_type_impl(
         },
         Type::Vector(ty) => check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(1))?,
         Type::Struct { idx, .. } => {
-            let formula = resolver.loader().calculate_depth_of_struct(
-                *idx,
-                resolver.module_store(),
-                resolver.module_storage(),
-            )?;
+            let formula = DepthFormulaCalculator::new(resolver.module_storage())
+                .calculate_depth_of_struct(idx)?;
             check_depth!(formula.solve(&[]))
         },
         // NB: substitution must be performed before calling this function
@@ -1602,12 +1761,21 @@ fn check_depth_of_type_impl(
                     check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(0))
                 })
                 .collect::<PartialVMResult<Vec<_>>>()?;
-            let formula = resolver.loader().calculate_depth_of_struct(
-                *idx,
-                resolver.module_store(),
-                resolver.module_storage(),
-            )?;
+            let formula = DepthFormulaCalculator::new(resolver.module_storage())
+                .calculate_depth_of_struct(idx)?;
             check_depth!(formula.solve(&ty_arg_depths))
+        },
+        Type::Function { args, results, .. } => {
+            let mut ty_max_depth = depth;
+            for ty in args.iter().chain(results) {
+                ty_max_depth = ty_max_depth.max(check_depth_of_type_impl(
+                    resolver,
+                    ty,
+                    max_depth,
+                    check_depth!(1),
+                )?);
+            }
+            ty_max_depth
         },
         Type::TyParam(_) => {
             return Err(
@@ -1626,6 +1794,8 @@ struct Frame {
     pc: u16,
     // Currently being executed function.
     function: Rc<LoadedFunction>,
+    // How this frame was established.
+    call_type: CallType,
     // Locals for this execution context and their instantiated types.
     locals: Locals,
     local_tys: Vec<Type>,
@@ -1640,6 +1810,7 @@ enum ExitCode {
     Return,
     Call(FunctionHandleIndex),
     CallGeneric(FunctionInstantiationIndex),
+    CallClosure(SignatureIndex),
 }
 
 impl AccessSpecifierEnv for Frame {
@@ -1724,18 +1895,11 @@ impl Frame {
                     self.function.ty_args(),
                     resolver,
                     &mut interpreter.operand_stack,
+                    frame_cache,
                     instruction,
                 )?;
 
                 match instruction {
-                    // TODO(#15664): implement closures
-                    Bytecode::PackClosure(..)
-                    | Bytecode::PackClosureGeneric(..)
-                    | Bytecode::CallClosure(..) => {
-                        return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FUNCTIONALITY)
-                            .with_message("closure opcodes in interpreter".to_owned()))
-                    },
-
                     Bytecode::Pop => {
                         let popped_val = interpreter.operand_stack.pop()?;
                         gas_meter.charge_pop(popped_val)?;
@@ -1850,6 +2014,7 @@ impl Frame {
                     Bytecode::CallGeneric(idx) => {
                         return Ok(ExitCode::CallGeneric(*idx));
                     },
+                    Bytecode::CallClosure(idx) => return Ok(ExitCode::CallClosure(*idx)),
                     Bytecode::MutBorrowLoc(idx) | Bytecode::ImmBorrowLoc(idx) => {
                         let instr = match instruction {
                             Bytecode::MutBorrowLoc(_) => S::MutBorrowLoc,
@@ -2189,6 +2354,39 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(reference.test_variant(info.variant)?)?;
+                    },
+                    Bytecode::PackClosure(fh_idx, mask) => {
+                        let function = resolver
+                            .build_loaded_function_from_handle_and_ty_args(*fh_idx, vec![])?;
+                        let captured = interpreter.operand_stack.popn(mask.captured_count())?;
+                        let lazy_function = LazyLoadedFunction::new_resolved(
+                            &TypeTagConverter::new(resolver.module_storage().runtime_environment()),
+                            Rc::new(function),
+                            *mask,
+                        )?;
+                        interpreter
+                            .operand_stack
+                            .push(Value::closure(Box::new(lazy_function), captured))?
+                    },
+                    Bytecode::PackClosureGeneric(fi_idx, mask) => {
+                        let ty_args = resolver.instantiate_generic_function(
+                            Some(gas_meter),
+                            *fi_idx,
+                            self.function.ty_args(),
+                        )?;
+                        let function = resolver
+                            .build_loaded_function_from_instantiation_and_ty_args(
+                                *fi_idx, ty_args,
+                            )?;
+                        let captured = interpreter.operand_stack.popn(mask.captured_count())?;
+                        let lazy_function = LazyLoadedFunction::new_resolved(
+                            &TypeTagConverter::new(resolver.module_storage().runtime_environment()),
+                            Rc::new(function),
+                            *mask,
+                        )?;
+                        interpreter
+                            .operand_stack
+                            .push(Value::closure(Box::new(lazy_function), captured))?
                     },
                     Bytecode::ReadRef => {
                         let reference = interpreter.operand_stack.pop_as::<Reference>()?;

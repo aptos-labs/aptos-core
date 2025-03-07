@@ -507,7 +507,7 @@ pub enum Exp_ {
     While(Option<Label>, Box<Exp>, Box<Exp>),
     Loop(Option<Label>, Box<Exp>),
     Block(Sequence),
-    Lambda(TypedLValueList, Box<Exp>, LambdaCaptureKind, AbilitySet),
+    Lambda(TypedLValueList, Box<Exp>, LambdaCaptureKind),
     Quant(
         QuantKind,
         LValueWithRangeList,
@@ -1692,7 +1692,7 @@ impl AstDebug for Exp_ {
                 }
             },
             E::Block(seq) => w.block(|w| seq.ast_debug(w)),
-            E::Lambda(sp!(_, bs), e, capture_kind, abilities) => {
+            E::Lambda(sp!(_, bs), e, capture_kind) => {
                 if *capture_kind != LambdaCaptureKind::Default {
                     w.write(format!(" {}", capture_kind));
                 }
@@ -1700,7 +1700,6 @@ impl AstDebug for Exp_ {
                 bs.ast_debug(w);
                 w.write("|");
                 e.ast_debug(w);
-                ability_constraints_ast_debug(w, abilities)
             },
             E::Quant(kind, sp!(_, rs), trs, c_opt, e) => {
                 kind.ast_debug(w);

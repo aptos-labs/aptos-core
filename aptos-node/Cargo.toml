@@ -73,10 +73,12 @@ hex = { workspace = true }
 num_cpus = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
+rlimit = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
+ureq = { workspace = true }
 url = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]

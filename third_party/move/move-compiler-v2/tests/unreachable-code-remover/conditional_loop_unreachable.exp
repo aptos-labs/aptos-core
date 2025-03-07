@@ -43,13 +43,13 @@ fun m::test($t0: bool, $t1: bool) {
 
 
 Diagnostics:
-warning: Unused assignment to `i`. Consider removing or prefixing with an underscore: `_i`
+warning: Unused assignment/binding to `i`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_i`), or binding to `_`
   ┌─ tests/unreachable-code-remover/conditional_loop_unreachable.move:7:17
   │
 7 │                 i = i + 1;
   │                 ^^^^^^^^^
 
-warning: Unused assignment to `i`. Consider removing or prefixing with an underscore: `_i`
+warning: Unused assignment/binding to `i`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_i`), or binding to `_`
    ┌─ tests/unreachable-code-remover/conditional_loop_unreachable.move:12:13
    │
 12 │             i = i + 1;
@@ -128,14 +128,14 @@ fun m::test($t0: bool, $t1: bool) {
 module c0ffee.m {
 
 
-test(Arg0: bool, Arg1: bool) /* def_idx: 0 */ {
+test(p: bool, q: bool) /* def_idx: 0 */ {
 B0:
-	0: MoveLoc[0](Arg0: bool)
+	0: MoveLoc[0](p: bool)
 	1: BrTrue(3)
 B1:
 	2: Branch(8)
 B2:
-	3: MoveLoc[1](Arg1: bool)
+	3: MoveLoc[1](q: bool)
 	4: BrFalse(6)
 B3:
 	5: Branch(7)

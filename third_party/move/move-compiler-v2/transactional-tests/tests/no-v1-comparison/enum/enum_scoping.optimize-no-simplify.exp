@@ -19,19 +19,19 @@ warning: Unused local variable `b`. Consider removing or prefixing with an under
 35 │             Two{i, b} => 3,
    │                    ^
 
-warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
    ┌─ TEMPFILE:20:21
    │
 20 │             let x = 4;
    │                     ^
 
-warning: Unused assignment to `b`. Consider removing or prefixing with an underscore: `_b`
+warning: Unused assignment/binding to `b`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_b`), or binding to `_`
    ┌─ TEMPFILE:35:13
    │
 35 │             Two{i, b} => 3,
    │             ^^^^^^^^^
 
-warning: Unused assignment to `i`. Consider removing or prefixing with an underscore: `_i`
+warning: Unused assignment/binding to `i`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_i`), or binding to `_`
    ┌─ TEMPFILE:35:13
    │
 35 │             Two{i, b} => 3,

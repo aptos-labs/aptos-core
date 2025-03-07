@@ -52,9 +52,9 @@ enum E {
  }
 }
 
-t(Arg0: E): u64 /* def_idx: 0 */ {
+t(self: E): u64 /* def_idx: 0 */ {
 B0:
-	0: MoveLoc[0](Arg0: E)
+	0: MoveLoc[0](self: E)
 	1: UnpackVariant[0](E/Some)
 	2: Ret
 }

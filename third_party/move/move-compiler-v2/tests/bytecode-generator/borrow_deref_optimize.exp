@@ -148,30 +148,30 @@ struct X has copy, drop, key {
 }
 
 no_optimize_resource(): bool /* def_idx: 0 */ {
-L0:	loc0: X
+L0:	$t2: X
 B0:
 	0: LdConst[0](Address: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
 	1: ImmBorrowGlobal[0](X)
 	2: ReadRef
-	3: StLoc[0](loc0: X)
-	4: MutBorrowLoc[0](loc0: X)
+	3: StLoc[0]($t2: X)
+	4: MutBorrowLoc[0]($t2: X)
 	5: ImmBorrowField[0](X.value: bool)
 	6: ReadRef
 	7: Ret
 }
 no_optimize_vector() /* def_idx: 1 */ {
-L0:	loc0: vector<vector<u64>>
-L1:	loc1: vector<u64>
-L2:	loc2: &mut u64
+L0:	$t5: vector<vector<u64>>
+L1:	$t2: vector<u64>
+L2:	$t0: &mut u64
 B0:
 	0: LdConst[1](Vector(Vector(U64)): [1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0])
-	1: StLoc[0](loc0: vector<vector<u64>>)
-	2: ImmBorrowLoc[0](loc0: vector<vector<u64>>)
+	1: StLoc[0]($t5: vector<vector<u64>>)
+	2: ImmBorrowLoc[0]($t5: vector<vector<u64>>)
 	3: LdU64(0)
 	4: VecImmBorrow(3)
 	5: ReadRef
-	6: StLoc[1](loc1: vector<u64>)
-	7: MutBorrowLoc[1](loc1: vector<u64>)
+	6: StLoc[1]($t2: vector<u64>)
+	7: MutBorrowLoc[1]($t2: vector<u64>)
 	8: LdU64(1)
 	9: VecMutBorrow(4)
 	10: Pop
@@ -186,12 +186,12 @@ B0:
 	4: Ret
 }
 optimize_vector() /* def_idx: 3 */ {
-L0:	loc0: vector<vector<u64>>
-L1:	loc1: &mut u64
+L0:	x: vector<vector<u64>>
+L1:	$t1: &mut u64
 B0:
 	0: LdConst[1](Vector(Vector(U64)): [1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0])
-	1: StLoc[0](loc0: vector<vector<u64>>)
-	2: MutBorrowLoc[0](loc0: vector<vector<u64>>)
+	1: StLoc[0](x: vector<vector<u64>>)
+	2: MutBorrowLoc[0](x: vector<vector<u64>>)
 	3: LdU64(0)
 	4: VecMutBorrow(3)
 	5: LdU64(1)
