@@ -534,10 +534,6 @@ pub enum TestRunConfig {
         language_version: LanguageVersion,
         v2_experiments: Vec<(String, bool)>,
     },
-    ComparisonV1V2 {
-        language_version: LanguageVersion,
-        v2_experiments: Vec<(String, bool)>,
-    },
 }
 
 pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -559,7 +555,6 @@ fn precompiled_v1_stdlib_if_needed(
 ) -> Option<&'static (FullyCompiledProgram, Vec<PackagePaths>)> {
     match config {
         TestRunConfig::CompilerV1 { .. } => PRECOMPILED_MOVE_STDLIB.as_ref(),
-        TestRunConfig::ComparisonV1V2 { .. } => PRECOMPILED_MOVE_STDLIB.as_ref(),
         TestRunConfig::CompilerV2 { .. } => None,
     }
 }
@@ -569,7 +564,6 @@ fn precompiled_v2_stdlib_if_needed(
 ) -> Option<&'static PrecompiledFilesModules> {
     match config {
         TestRunConfig::CompilerV1 { .. } => None,
-        TestRunConfig::ComparisonV1V2 { .. } => Some(&*PRECOMPILED_MOVE_STDLIB_V2),
         TestRunConfig::CompilerV2 { .. } => Some(&*PRECOMPILED_MOVE_STDLIB_V2),
     }
 }
