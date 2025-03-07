@@ -4,6 +4,7 @@
 
 use crate::{
     access_control::AccessControlState,
+    check_type_tag_dependencies_and_charge_gas,
     data_cache::TransactionDataCache,
     frame_type_cache::{
         AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
@@ -15,6 +16,7 @@ use crate::{
     reentrancy_checker::{CallType, ReentrancyChecker},
     runtime_type_checks::{FullRuntimeTypeCheck, NoRuntimeTypeCheck, RuntimeTypeCheck},
     storage::{
+        dependencies_gas_charging::check_dependencies_and_charge_gas,
         depth_formula_calculator::DepthFormulaCalculator, ty_tag_converter::TypeTagConverter,
     },
     trace, LoadedFunction, ModuleStorage,
@@ -52,7 +54,7 @@ use move_vm_types::{
 use std::{
     cell::RefCell,
     cmp::min,
-    collections::{btree_map, BTreeSet, VecDeque},
+    collections::{btree_map, VecDeque},
     fmt::Write,
     rc::Rc,
 };
@@ -585,38 +587,20 @@ impl InterpreterImpl {
                             let arena_id = traversal_context
                                 .referenced_module_ids
                                 .alloc(module_id.clone());
-                            loader.check_dependencies_and_charge_gas(
-                                resolver.module_store(),
-                                data_store,
-                                gas_meter,
-                                &mut traversal_context.visited,
-                                traversal_context.referenced_modules,
-                                [(arena_id.address(), arena_id.name())],
+                            check_dependencies_and_charge_gas(
                                 resolver.module_storage(),
+                                gas_meter,
+                                traversal_context,
+                                [(arena_id.address(), arena_id.name())],
                             )?;
 
                             // Charge gas for code loading of modules used by type arguments.
-                            let modules_used_by_ty_args = ty_arg_tags
-                                .iter()
-                                .flat_map(|ty_tag| ty_tag.preorder_traversal_iter())
-                                .filter_map(TypeTag::struct_tag)
-                                .map(|struct_tag| {
-                                    let module_id = traversal_context
-                                        .referenced_module_ids
-                                        .alloc(struct_tag.module_id());
-                                    (module_id.address(), module_id.name())
-                                })
-                                .collect::<BTreeSet<_>>();
-                            loader.check_dependencies_and_charge_gas(
-                                resolver.module_store(),
-                                data_store,
+                            check_type_tag_dependencies_and_charge_gas(
+                                module_storage,
                                 gas_meter,
-                                &mut traversal_context.visited,
-                                traversal_context.referenced_modules,
-                                modules_used_by_ty_args,
-                                resolver.module_storage(),
+                                traversal_context,
+                                ty_arg_tags,
                             )?;
-
                             Ok(module_id.clone())
                         },
                     )?;
@@ -1077,16 +1061,11 @@ impl InterpreterImpl {
                 let arena_id = traversal_context
                     .referenced_module_ids
                     .alloc(module_name.clone());
-                resolver
-                    .loader()
-                    .check_dependencies_and_charge_gas(
-                        resolver.module_store(),
-                        data_store,
-                        gas_meter,
-                        &mut traversal_context.visited,
-                        traversal_context.referenced_modules,
-                        [(arena_id.address(), arena_id.name())],
+                check_dependencies_and_charge_gas(
                         resolver.module_storage(),
+                        gas_meter,
+                        traversal_context,
+                        [(arena_id.address(), arena_id.name())],
                     )
                     .map_err(|err| err
                         .to_partial()

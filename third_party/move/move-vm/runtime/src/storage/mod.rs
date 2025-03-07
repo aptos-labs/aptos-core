@@ -7,6 +7,7 @@ pub(crate) mod ty_tag_converter;
 mod verified_module_cache;
 
 pub mod code_storage;
+pub mod dependencies_gas_charging;
 pub mod environment;
 pub mod implementations;
 pub mod module_storage;

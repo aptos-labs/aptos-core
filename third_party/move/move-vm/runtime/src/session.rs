@@ -31,7 +31,7 @@ use move_vm_types::{
     loaded_data::runtime_types::{Type, TypeBuilder},
     values::{GlobalValue, Value},
 };
-use std::{borrow::Borrow, collections::BTreeSet};
+use std::borrow::Borrow;
 
 pub struct Session<'r, 'l> {
     pub(crate) move_vm: &'l MoveVM,
@@ -510,78 +510,5 @@ impl<'r, 'l> Session<'r, 'l> {
             | MutableReference(_)
             | Function { .. } => None,
         })
-    }
-
-    pub fn check_type_tag_dependencies_and_charge_gas(
-        &mut self,
-        module_storage: &impl ModuleStorage,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        ty_tags: &[TypeTag],
-    ) -> VMResult<()> {
-        // Charge gas based on the distinct ordered module ids.
-        let ordered_ty_tags = ty_tags
-            .iter()
-            .flat_map(|ty_tag| ty_tag.preorder_traversal_iter())
-            .filter_map(TypeTag::struct_tag)
-            .map(|struct_tag| {
-                let module_id = traversal_context
-                    .referenced_module_ids
-                    .alloc(struct_tag.module_id());
-                (module_id.address(), module_id.name())
-            })
-            .collect::<BTreeSet<_>>();
-
-        self.check_dependencies_and_charge_gas(
-            module_storage,
-            gas_meter,
-            traversal_context,
-            ordered_ty_tags,
-        )
-    }
-
-    pub fn check_dependencies_and_charge_gas<'a, I>(
-        &mut self,
-        module_storage: &impl ModuleStorage,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext<'a>,
-        ids: I,
-    ) -> VMResult<()>
-    where
-        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
-        I::IntoIter: DoubleEndedIterator,
-    {
-        self.move_vm
-            .runtime
-            .loader()
-            .check_dependencies_and_charge_gas(
-                &self.module_store,
-                &mut self.data_cache,
-                gas_meter,
-                &mut traversal_context.visited,
-                traversal_context.referenced_modules,
-                ids,
-                module_storage,
-            )
-    }
-
-    pub fn check_script_dependencies_and_check_gas(
-        &mut self,
-        code_storage: &impl CodeStorage,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        script: impl Borrow<[u8]>,
-    ) -> VMResult<()> {
-        self.move_vm
-            .runtime
-            .loader()
-            .check_script_dependencies_and_check_gas(
-                &self.module_store,
-                &mut self.data_cache,
-                gas_meter,
-                traversal_context,
-                script.borrow(),
-                code_storage,
-            )
     }
 }
