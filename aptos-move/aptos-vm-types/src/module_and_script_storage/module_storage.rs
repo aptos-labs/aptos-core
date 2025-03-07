@@ -25,7 +25,7 @@ pub trait AptosModuleStorage: ModuleStorage {
         &self,
         module_id: &ModuleId,
         function_name: &IdentStr,
-        expected_return_type: &Type,
+        expected_return_ty: &Type,
     ) -> VMResult<LoadedFunction> {
         let (module, function) =
             self.fetch_function_definition(module_id.address(), module_id.name(), function_name)?;
@@ -36,7 +36,7 @@ pub trait AptosModuleStorage: ModuleStorage {
         }
 
         let mut map = BTreeMap::new();
-        if !match_return_type(&function.return_tys()[0], expected_return_type, &mut map) {
+        if !match_return_type(&function.return_tys()[0], expected_return_ty, &mut map) {
             // For functions that are marked constructor this should not happen.
             return Err(
                 PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
@@ -45,8 +45,8 @@ pub trait AptosModuleStorage: ModuleStorage {
         }
 
         // Construct the type arguments from the match.
-        let mut ty_args = vec![];
         let num_ty_args = function.ty_param_abilities().len();
+        let mut ty_args = Vec::with_capacity(num_ty_args);
         for i in 0..num_ty_args {
             if let Some(t) = map.get(&(i as u16)) {
                 ty_args.push((*t).clone());
