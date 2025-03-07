@@ -12,6 +12,7 @@ pub enum TimedFeatureFlag {
     LimitTypeTagSize,
     ModuleComplexityCheck,
     EntryCompatibility,
+    ChargeBytesForPrints,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -70,6 +71,9 @@ impl TimedFeatureFlag {
             (EntryCompatibility, TESTNET) => 1_730_923_200_000_000, /* Wednesday, Nov 6, 2024 12:00:00 AM GMT-07:00 */
             (EntryCompatibility, MAINNET) => 1_731_441_600_000_000, /* Tuesday, Nov 12, 2024 12:00:00 AM GMT-07:00 */
 
+            // TODO: FIX the numbers.
+            (ChargeBytesForPrints, TESTNET) => 1_740_607_200_000_000, /* Wednesday, Feb 26, 2025 2:00:00 PM GMT-08:00 */
+            (ChargeBytesForPrints, MAINNET) => 1_740_693_600_000_000, /* Thursday, Feb 27, 2025 2:00:00 PM GMT-08:00 */
             // If unspecified, a timed feature is considered enabled from the very beginning of time.
             _ => 0,
         }
