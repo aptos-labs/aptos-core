@@ -15,6 +15,7 @@ module aptos_framework::primary_fungible_store {
     use aptos_framework::dispatchable_fungible_asset;
     use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleStore, Metadata, MintRef, TransferRef, BurnRef};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
+    use aptos_framework::account;
 
     use std::option::Option;
     use std::signer;
@@ -182,6 +183,8 @@ module aptos_framework::primary_fungible_store {
         recipient: address,
         amount: u64,
     ) acquires DeriveRefPod {
+        // Create account if it does not yet exist, otherwise funds may get stuck in new accounts.
+        account::create_account_if_does_not_exist(recipient);
         let sender_store = ensure_primary_store_exists(signer::address_of(sender), metadata);
         // Check if the sender store object has been burnt or not. If so, unburn it first.
         may_be_unburn(sender, sender_store);
