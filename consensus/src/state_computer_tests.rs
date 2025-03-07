@@ -194,11 +194,12 @@ async fn should_see_and_notify_validator_txns() {
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         Arc::new(NoOpDeduper {}),
         false,
+        false,
     );
 
     // Ensure the dummy executor has received the txns.
     let _ = execution_policy
-        .schedule_compute(&block, HashValue::zero(), None, None, dummy_guard())
+        .schedule_compute(&block, None, HashValue::zero(), None, None, dummy_guard())
         .await
         .await
         .unwrap();

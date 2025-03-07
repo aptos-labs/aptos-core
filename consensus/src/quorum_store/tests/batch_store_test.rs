@@ -31,7 +31,6 @@ pub fn batch_store_for_test(memory_quota: usize) -> Arc<BatchStore> {
     Arc::new(BatchStore::new(
         10, // epoch
         false,
-        10, // last committed round
         db,
         memory_quota, // memory_quota
         2001,         // db quota

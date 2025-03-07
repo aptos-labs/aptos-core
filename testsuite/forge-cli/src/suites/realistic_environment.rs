@@ -441,6 +441,10 @@ pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                         config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
                         config_v4.transaction_shuffler_type = TransactionShufflerType::SenderAwareV2(256);
                     }
+                    OnChainExecutionConfig::V5(config_v5) => {
+                        config_v5.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                        config_v5.transaction_shuffler_type = TransactionShufflerType::SenderAwareV2(256);
+                    }
                 }
                 helm_values["chain"]["on_chain_execution_config"] =
                     serde_yaml::to_value(on_chain_execution_config).expect("must serialize");
