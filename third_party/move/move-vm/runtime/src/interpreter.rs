@@ -10,7 +10,7 @@ use crate::{
     frame_type_cache::{
         AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
     },
-    loader::{LazyLoadedFunction, LegacyModuleStorageAdapter, Loader, Resolver},
+    loader::{LazyLoadedFunction, Resolver},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
@@ -116,23 +116,19 @@ impl Interpreter {
         function: LoadedFunction,
         args: Vec<Value>,
         data_store: &mut TransactionDataCache,
-        module_store: &LegacyModuleStorageAdapter,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
-        loader: &Loader,
     ) -> VMResult<Vec<Value>> {
         InterpreterImpl::entrypoint(
             function,
             args,
             data_store,
-            module_store,
             module_storage,
             gas_meter,
             traversal_context,
             extensions,
-            loader,
         )
     }
 }
@@ -144,12 +140,10 @@ impl InterpreterImpl<'_> {
         function: LoadedFunction,
         args: Vec<Value>,
         data_store: &mut TransactionDataCache,
-        module_store: &LegacyModuleStorageAdapter,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
-        loader: &Loader,
     ) -> VMResult<Vec<Value>> {
         let interpreter = InterpreterImpl {
             operand_stack: Stack::new(),
@@ -164,9 +158,7 @@ impl InterpreterImpl<'_> {
         // with the static RuntimeTypeCheck trait
         if interpreter.vm_config.paranoid_type_checks {
             interpreter.dispatch_execute_main::<FullRuntimeTypeCheck>(
-                loader,
                 data_store,
-                module_store,
                 module_storage,
                 gas_meter,
                 traversal_context,
@@ -176,9 +168,7 @@ impl InterpreterImpl<'_> {
             )
         } else {
             interpreter.dispatch_execute_main::<NoRuntimeTypeCheck>(
-                loader,
                 data_store,
-                module_store,
                 module_storage,
                 gas_meter,
                 traversal_context,
@@ -229,9 +219,7 @@ impl InterpreterImpl<'_> {
 
     fn dispatch_execute_main<RTTCheck: RuntimeTypeCheck>(
         self,
-        loader: &Loader,
         data_store: &mut TransactionDataCache,
-        module_store: &LegacyModuleStorageAdapter,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -241,9 +229,7 @@ impl InterpreterImpl<'_> {
     ) -> VMResult<Vec<Value>> {
         if self.vm_config.use_call_tree_and_instruction_cache {
             self.execute_main::<RTTCheck, AllRuntimeCaches>(
-                loader,
                 data_store,
-                module_store,
                 module_storage,
                 gas_meter,
                 traversal_context,
@@ -253,9 +239,7 @@ impl InterpreterImpl<'_> {
             )
         } else {
             self.execute_main::<RTTCheck, NoRuntimeCaches>(
-                loader,
                 data_store,
-                module_store,
                 module_storage,
                 gas_meter,
                 traversal_context,
@@ -274,9 +258,7 @@ impl InterpreterImpl<'_> {
     /// at the top of the stack (return). If the call stack is empty execution is completed.
     fn execute_main<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         mut self,
-        loader: &Loader,
         data_store: &mut TransactionDataCache,
-        module_store: &LegacyModuleStorageAdapter,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -317,7 +299,7 @@ impl InterpreterImpl<'_> {
             .map_err(|e| self.set_location(e))?;
 
         loop {
-            let resolver = current_frame.resolver(loader, module_store, module_storage);
+            let resolver = current_frame.resolver(module_storage);
             let exit_code = current_frame
                 .execute_code::<RTTCheck, RTCaches>(&resolver, &mut self, data_store, gas_meter)
                 .map_err(|err| self.attach_state_if_invariant_violation(err, &current_frame))?;
@@ -2736,14 +2718,8 @@ impl Frame {
         }
     }
 
-    fn resolver<'a>(
-        &self,
-        loader: &'a Loader,
-        module_store: &'a LegacyModuleStorageAdapter,
-        module_storage: &'a impl ModuleStorage,
-    ) -> Resolver<'a> {
-        self.function
-            .get_resolver(loader, module_store, module_storage)
+    fn resolver<'a>(&self, module_storage: &'a impl ModuleStorage) -> Resolver<'a> {
+        self.function.get_resolver(module_storage)
     }
 
     fn location(&self) -> Location {

@@ -4,7 +4,7 @@
 
 use crate::{
     data_cache::TransactionDataCache,
-    loader::{LegacyModuleStorageAdapter, LoadedFunction},
+    loader::LoadedFunction,
     module_traversal::TraversalContext,
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
@@ -32,7 +32,6 @@ use std::borrow::Borrow;
 pub struct Session<'r, 'l> {
     pub(crate) move_vm: &'l MoveVM,
     pub(crate) data_cache: TransactionDataCache<'r>,
-    pub(crate) module_store: LegacyModuleStorageAdapter,
     pub(crate) native_extensions: NativeContextExtensions<'r>,
 }
 
@@ -78,7 +77,6 @@ impl<'r, 'l> Session<'r, 'l> {
             func,
             args,
             &mut self.data_cache,
-            &self.module_store,
             gas_meter,
             traversal_context,
             &mut self.native_extensions,
@@ -104,7 +102,6 @@ impl<'r, 'l> Session<'r, 'l> {
             func,
             args,
             &mut self.data_cache,
-            &self.module_store,
             gas_meter,
             traversal_context,
             &mut self.native_extensions,
@@ -124,7 +121,6 @@ impl<'r, 'l> Session<'r, 'l> {
             func,
             args,
             &mut self.data_cache,
-            &self.module_store,
             gas_meter,
             traversal_context,
             &mut self.native_extensions,
@@ -162,7 +158,6 @@ impl<'r, 'l> Session<'r, 'l> {
             ty_args,
             args,
             &mut self.data_cache,
-            &self.module_store,
             gas_meter,
             traversal_context,
             &mut self.native_extensions,

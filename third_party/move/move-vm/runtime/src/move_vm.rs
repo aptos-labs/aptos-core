@@ -3,9 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache, loader::LegacyModuleStorageAdapter,
-    native_extensions::NativeContextExtensions, runtime::VMRuntime, session::Session,
-    RuntimeEnvironment,
+    data_cache::TransactionDataCache, native_extensions::NativeContextExtensions,
+    runtime::VMRuntime, session::Session, RuntimeEnvironment,
 };
 use move_vm_types::resolver::MoveResolver;
 
@@ -47,15 +46,7 @@ impl MoveVM {
     ) -> Session<'r, '_> {
         Session {
             move_vm: self,
-            data_cache: TransactionDataCache::new(
-                self.runtime
-                    .loader()
-                    .vm_config()
-                    .deserializer_config
-                    .clone(),
-                remote,
-            ),
-            module_store: LegacyModuleStorageAdapter::new(self.runtime.module_storage_v1()),
+            data_cache: TransactionDataCache::new(remote),
             native_extensions,
         }
     }
