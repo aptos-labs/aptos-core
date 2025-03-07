@@ -170,15 +170,15 @@ impl BlockStore {
         pipeline_builder: Option<PipelineBuilder>,
         tree_to_replace: Option<Arc<RwLock<BlockTree>>>,
     ) -> Self {
-        let (root_block, window_block, root_qc, root_ordered_cert, root_commit_cert) = (
+        let (commit_root_block, window_root_block, root_qc, root_ordered_cert, root_commit_cert) = (
             root.commit_root_block,
             root.window_root_block,
             root.quorum_cert,
             root.ordered_cert,
             root.commit_cert,
         );
-        let root_block_id = root_block.id();
-        let root_block_round = root_block.round();
+        let root_block_id = commit_root_block.id();
+        let root_block_round = commit_root_block.round();
 
         //verify root is correct
         assert!(
@@ -207,10 +207,10 @@ impl BlockStore {
         ));
         assert_eq!(result.root_hash(), root_metadata.accu_hash);
 
-        let pipelined_root_block = match window_block {
+        let pipelined_root_block = match window_root_block {
             None => {
                 PipelinedBlock::new(
-                    *root_block,
+                    *commit_root_block,
                     vec![],
                     // Create a dummy state_compute_result with necessary fields filled in.
                     result.clone(),
@@ -406,6 +406,8 @@ impl BlockStore {
             "Recovered block already exists"
         );
 
+        // We don't know if the blocks in the window for a committed block will
+        // be available in memory so we set the OrderedBlockWindow to empty
         let pipelined_block = PipelinedBlock::new_ordered(block, OrderedBlockWindow::empty());
         self.insert_block_inner(pipelined_block).await
     }
@@ -434,7 +436,7 @@ impl BlockStore {
             }
         }
 
-        let pipelined_block = PipelinedBlock::new_ordered(block.clone(), block_window);
+        let pipelined_block = PipelinedBlock::new_ordered(block, block_window);
         self.insert_block_inner(pipelined_block).await
     }
 

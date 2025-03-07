@@ -155,7 +155,6 @@ pub enum IncomingRpcRequest {
     DAGRequest(IncomingDAGRequest),
     CommitRequest(IncomingCommitRequest),
     RandGenRequest(IncomingRandGenRequest),
-    #[allow(dead_code)]
     BlockRetrieval(IncomingBlockRetrievalRequest),
 }
 

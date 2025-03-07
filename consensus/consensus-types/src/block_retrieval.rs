@@ -238,7 +238,6 @@ impl BlockRetrievalResponse {
         Ok(())
     }
 
-    /// TODO @bchocho @hariria deprecate `BlockRetrievalRequest::V1` after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
     pub fn verify(
         &self,
         retrieval_request: BlockRetrievalRequest,
