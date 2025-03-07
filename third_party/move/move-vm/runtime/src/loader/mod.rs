@@ -5,6 +5,7 @@
 use crate::{
     config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
     module_traversal::TraversalContext, storage::module_storage::ModuleStorage, LayoutConverter,
+    StorageLayoutConverter,
 };
 use hashbrown::Equivalent;
 use lazy_static::lazy_static;
@@ -30,10 +31,7 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::{
-        runtime_types::{AbilityInfo, StructType, Type},
-        struct_name_indexing::StructNameIndex,
-    },
+    loaded_data::runtime_types::{AbilityInfo, StructType, Type},
     sha3_256,
     value_serde::FunctionValueExtension,
 };
@@ -56,10 +54,8 @@ use crate::{
     loader::modules::{StructVariantInfo, VariantFieldInfo},
     native_functions::NativeFunctions,
     storage::{
-        loader::LoaderV2,
-        module_storage::FunctionValueExtensionAdapter,
-        ty_layout_converter::LoaderLayoutConverter,
-        ty_tag_converter::{PricedStructTag, TypeTagCache},
+        loader::LoaderV2, module_storage::FunctionValueExtensionAdapter,
+        ty_tag_converter::TypeTagCache,
     },
 };
 pub use function::{Function, LoadedFunction};
@@ -73,7 +69,6 @@ use move_binary_format::file_format::{
     StructVariantHandleIndex, StructVariantInstantiationIndex, VariantFieldHandleIndex,
     VariantFieldInstantiationIndex, VariantIndex,
 };
-use move_core_types::language_storage::FunctionTag;
 use move_vm_types::{
     loaded_data::{runtime_types::TypeBuilder, struct_name_indexing::StructNameIndexMap},
     values::{AbstractFunction, SerializedFunctionData},
@@ -260,34 +255,6 @@ impl Loader {
             Self::V2(_) => module_storage
                 .fetch_ty(ty_tag)
                 .map_err(|e| e.finish(Location::Undefined)),
-        }
-    }
-
-    //
-    // Internal helpers
-    //
-
-    pub fn fetch_struct_ty_by_idx(
-        &self,
-        idx: StructNameIndex,
-        module_store: &LegacyModuleStorageAdapter,
-        module_storage: &dyn ModuleStorage,
-    ) -> PartialVMResult<Arc<StructType>> {
-        // Ensure we do not return a guard here (still holding the lock) because loading the struct
-        // type below can fetch struct type by index recursively.
-        let struct_name = self
-            .struct_name_index_map(module_storage)
-            .idx_to_struct_name_ref(idx)?;
-
-        match self {
-            Loader::V1(_) => {
-                module_store.get_struct_type_by_identifier(&struct_name.name, &struct_name.module)
-            },
-            Loader::V2(_) => module_storage.fetch_struct_ty(
-                struct_name.module.address(),
-                struct_name.module.name(),
-                struct_name.name.as_ident_str(),
-            ),
         }
     }
 }
@@ -1087,7 +1054,9 @@ enum BinaryType {
 // interpreter. It's the only API known to the interpreter and it's tailored to the interpreter
 // needs.
 pub(crate) struct Resolver<'a> {
+    #[allow(dead_code)]
     loader: &'a Loader,
+    #[allow(dead_code)]
     module_store: &'a LegacyModuleStorageAdapter,
     binary: BinaryType,
 
@@ -1206,25 +1175,18 @@ impl<'a> Resolver<'a> {
         function_name: &IdentStr,
         verified_ty_args: Vec<Type>,
     ) -> PartialVMResult<LoadedFunction> {
-        let (module, function) = match self.loader() {
-            Loader::V1(_) => self
-                .module_store
-                .resolve_module_and_function_by_name(module_id, function_name)?,
-            Loader::V2(_) => self
-                .module_storage
-                .fetch_function_definition(module_id.address(), module_id.name(), function_name)
-                .map_err(|_| {
-                    // Note: legacy loader implementation used this error, so we need to remap.
-                    PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
-                        format!(
-                            "Module or function do not exist for {}::{}::{}",
-                            module_id.address(),
-                            module_id.name(),
-                            function_name
-                        ),
-                    )
-                })?,
-        };
+        let (module, function) = self
+            .module_storage
+            .fetch_function_definition(module_id.address(), module_id.name(), function_name)
+            .map_err(|_| {
+                // Note: legacy loader implementation used this error, so we need to remap.
+                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(format!(
+                    "Module or function do not exist for {}::{}::{}",
+                    module_id.address(),
+                    module_id.name(),
+                    function_name
+                ))
+            })?;
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),
             ty_args: verified_ty_args,
@@ -1250,7 +1212,7 @@ impl<'a> Resolver<'a> {
             }
         }
 
-        let ty_builder = self.loader().ty_builder();
+        let ty_builder = self.ty_builder();
         let instantiation = instantiation
             .iter()
             .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
@@ -1301,7 +1263,7 @@ impl<'a> Resolver<'a> {
         };
 
         let struct_ty = &struct_inst.definition_struct_type;
-        let ty_builder = self.loader().ty_builder();
+        let ty_builder = self.ty_builder();
         ty_builder.create_struct_instantiation_ty(struct_ty, &struct_inst.instantiation, ty_args)
     }
 
@@ -1334,7 +1296,7 @@ impl<'a> Resolver<'a> {
         ty_args: &[Type],
         instantiation_tys: &[Type],
     ) -> PartialVMResult<Type> {
-        let ty_builder = self.loader().ty_builder();
+        let ty_builder = self.ty_builder();
         let instantiation_tys = instantiation_tys
             .iter()
             .map(|inst_ty| ty_builder.create_ty_with_subst(inst_ty, ty_args))
@@ -1407,7 +1369,7 @@ impl<'a> Resolver<'a> {
         instantiation: &[Type],
         ty_args: &[Type],
     ) -> PartialVMResult<Vec<Type>> {
-        let ty_builder = self.loader().ty_builder();
+        let ty_builder = self.ty_builder();
         let instantiation_tys = instantiation
             .iter()
             .map(|inst_ty| ty_builder.create_ty_with_subst(inst_ty, ty_args))
@@ -1435,7 +1397,7 @@ impl<'a> Resolver<'a> {
         let ty = self.single_type_at(idx);
 
         if !ty_args.is_empty() {
-            self.loader().ty_builder().create_ty_with_subst(ty, ty_args)
+            self.ty_builder().create_ty_with_subst(ty, ty_args)
         } else {
             Ok(ty.clone())
         }
@@ -1477,8 +1439,7 @@ impl<'a> Resolver<'a> {
         match &self.binary {
             BinaryType::Module(module) => {
                 let struct_ty = &module.field_handles[idx.0 as usize].definition_struct_type;
-                self.loader()
-                    .ty_builder()
+                self.ty_builder()
                     .create_struct_ty(struct_ty.idx, AbilityInfo::struct_(struct_ty.abilities))
             },
             BinaryType::Script(_) => unreachable!("Scripts cannot have field instructions"),
@@ -1502,8 +1463,7 @@ impl<'a> Resolver<'a> {
     }
 
     pub(crate) fn create_struct_ty(&self, struct_ty: &Arc<StructType>) -> Type {
-        self.loader()
-            .ty_builder()
+        self.ty_builder()
             .create_struct_ty(struct_ty.idx, AbilityInfo::struct_(struct_ty.abilities))
     }
 
@@ -1513,8 +1473,7 @@ impl<'a> Resolver<'a> {
         ty_params: &[Type],
         ty_args: &[Type],
     ) -> PartialVMResult<Type> {
-        self.loader()
-            .ty_builder()
+        self.ty_builder()
             .create_struct_instantiation_ty(struct_ty, ty_params, ty_args)
     }
 
@@ -1537,28 +1496,24 @@ impl<'a> Resolver<'a> {
         self.layout_converter().type_to_fully_annotated_layout(ty)
     }
 
-    pub(crate) fn layout_converter(&self) -> LoaderLayoutConverter {
-        LoaderLayoutConverter::new(self.loader, self.module_store, self.module_storage)
+    pub(crate) fn layout_converter(&self) -> StorageLayoutConverter {
+        StorageLayoutConverter::new(self.module_storage)
     }
 
     //
     // Getters
     //
 
-    pub(crate) fn loader(&self) -> &Loader {
-        self.loader
-    }
-
-    pub(crate) fn module_store(&self) -> &LegacyModuleStorageAdapter {
-        self.module_store
-    }
-
     pub(crate) fn module_storage(&self) -> &dyn ModuleStorage {
         self.module_storage
     }
 
     pub(crate) fn vm_config(&self) -> &VMConfig {
-        self.loader().vm_config()
+        self.module_storage.runtime_environment().vm_config()
+    }
+
+    pub(crate) fn ty_builder(&self) -> &TypeBuilder {
+        &self.vm_config().ty_builder
     }
 }
 
@@ -1593,148 +1548,6 @@ impl<'a> FunctionValueExtension for Resolver<'a> {
             module_storage: self.module_storage,
         };
         function_value_extension.get_serialization_data(fun)
-    }
-}
-
-/// Maximal depth of a value in terms of type depth.
-pub const VALUE_DEPTH_MAX: u64 = 128;
-
-pub(crate) struct PseudoGasContext {
-    // Parameters for metering type tag construction:
-    //   - maximum allowed cost,
-    //   - base cost for any type to tag conversion,
-    //   - cost for size of a struct tag.
-    max_cost: u64,
-    pub(crate) cost: u64,
-    cost_base: u64,
-    cost_per_byte: u64,
-}
-
-impl PseudoGasContext {
-    pub(crate) fn new(vm_config: &VMConfig) -> Self {
-        Self {
-            max_cost: vm_config.type_max_cost,
-            cost: 0,
-            cost_base: vm_config.type_base_cost,
-            cost_per_byte: vm_config.type_byte_cost,
-        }
-    }
-
-    pub(crate) fn current_cost(&mut self) -> u64 {
-        self.cost
-    }
-
-    pub(crate) fn charge_base(&mut self) -> PartialVMResult<()> {
-        self.charge(self.cost_base)
-    }
-
-    pub(crate) fn charge_struct_tag(&mut self, struct_tag: &StructTag) -> PartialVMResult<()> {
-        let size =
-            (struct_tag.address.len() + struct_tag.module.len() + struct_tag.name.len()) as u64;
-        self.charge(size * self.cost_per_byte)
-    }
-
-    pub(crate) fn charge(&mut self, amount: u64) -> PartialVMResult<()> {
-        self.cost += amount;
-        if self.cost > self.max_cost {
-            Err(
-                PartialVMError::new(StatusCode::TYPE_TAG_LIMIT_EXCEEDED).with_message(format!(
-                    "Exceeded maximum type tag limit of {}",
-                    self.max_cost
-                )),
-            )
-        } else {
-            Ok(())
-        }
-    }
-}
-
-impl LoaderV1 {
-    fn struct_name_to_type_tag(
-        &self,
-        struct_name_idx: StructNameIndex,
-        ty_args: &[Type],
-        gas_context: &mut PseudoGasContext,
-    ) -> PartialVMResult<StructTag> {
-        if let Some(priced_tag) = self.type_cache.get_struct_tag(&struct_name_idx, ty_args) {
-            gas_context.charge(priced_tag.pseudo_gas_cost)?;
-            return Ok(priced_tag.struct_tag);
-        }
-
-        let cur_cost = gas_context.current_cost();
-
-        let type_args = ty_args
-            .iter()
-            .map(|ty| self.type_to_type_tag_impl(ty, gas_context))
-            .collect::<PartialVMResult<Vec<_>>>()?;
-        let struct_tag = self
-            .name_cache
-            .idx_to_struct_tag(struct_name_idx, type_args)?;
-
-        gas_context.charge_struct_tag(&struct_tag)?;
-
-        let priced_tag = PricedStructTag {
-            struct_tag,
-            pseudo_gas_cost: gas_context.current_cost() - cur_cost,
-        };
-        self.type_cache
-            .insert_struct_tag(&struct_name_idx, ty_args, &priced_tag);
-        Ok(priced_tag.struct_tag)
-    }
-
-    pub(crate) fn type_to_type_tag_impl(
-        &self,
-        ty: &Type,
-        gas_context: &mut PseudoGasContext,
-    ) -> PartialVMResult<TypeTag> {
-        gas_context.charge_base()?;
-        Ok(match ty {
-            Type::Bool => TypeTag::Bool,
-            Type::U8 => TypeTag::U8,
-            Type::U16 => TypeTag::U16,
-            Type::U32 => TypeTag::U32,
-            Type::U64 => TypeTag::U64,
-            Type::U128 => TypeTag::U128,
-            Type::U256 => TypeTag::U256,
-            Type::Address => TypeTag::Address,
-            Type::Signer => TypeTag::Signer,
-            Type::Vector(ty) => {
-                let el_ty_tag = self.type_to_type_tag_impl(ty, gas_context)?;
-                TypeTag::Vector(Box::new(el_ty_tag))
-            },
-            Type::Struct { idx, .. } => TypeTag::Struct(Box::new(self.struct_name_to_type_tag(
-                *idx,
-                &[],
-                gas_context,
-            )?)),
-            Type::StructInstantiation { idx, ty_args, .. } => TypeTag::Struct(Box::new(
-                self.struct_name_to_type_tag(*idx, ty_args, gas_context)?,
-            )),
-            Type::Function {
-                args,
-                results,
-                abilities,
-            } => {
-                let to_vec = |ts: &[Type],
-                              gas_ctx: &mut PseudoGasContext|
-                 -> PartialVMResult<Vec<TypeTag>> {
-                    ts.iter()
-                        .map(|t| self.type_to_type_tag_impl(t, gas_ctx))
-                        .collect()
-                };
-                TypeTag::Function(Box::new(FunctionTag {
-                    args: to_vec(args, gas_context)?,
-                    results: to_vec(results, gas_context)?,
-                    abilities: *abilities,
-                }))
-            },
-            Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
-                return Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(format!("No type tag for {:?}", ty)),
-                );
-            },
-        })
     }
 }
 

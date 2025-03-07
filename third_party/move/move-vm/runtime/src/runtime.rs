@@ -11,11 +11,8 @@ use crate::{
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     session::SerializedReturnValues,
-    storage::{
-        code_storage::CodeStorage, module_storage::ModuleStorage,
-        ty_layout_converter::LoaderLayoutConverter,
-    },
-    AsFunctionValueExtension, LayoutConverter, RuntimeEnvironment,
+    storage::{code_storage::CodeStorage, module_storage::ModuleStorage},
+    AsFunctionValueExtension, LayoutConverter, RuntimeEnvironment, StorageLayoutConverter,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -235,23 +232,21 @@ impl VMRuntime {
 
     fn deserialize_arg(
         &self,
-        module_store: &LegacyModuleStorageAdapter,
         module_storage: &impl ModuleStorage,
         ty: &Type,
         arg: impl Borrow<[u8]>,
     ) -> PartialVMResult<Value> {
-        let (layout, has_identifier_mappings) =
-            match LoaderLayoutConverter::new(&self.loader, module_store, module_storage)
-                .type_to_type_layout_with_identifier_mappings(ty)
-            {
-                Ok(layout) => layout,
-                Err(_err) => {
-                    return Err(PartialVMError::new(
-                        StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION,
-                    )
-                    .with_message("[VM] failed to get layout from type".to_string()));
-                },
-            };
+        let (layout, has_identifier_mappings) = match StorageLayoutConverter::new(module_storage)
+            .type_to_type_layout_with_identifier_mappings(ty)
+        {
+            Ok(layout) => layout,
+            Err(_err) => {
+                return Err(PartialVMError::new(
+                    StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION,
+                )
+                .with_message("[VM] failed to get layout from type".to_string()));
+            },
+        };
 
         let deserialization_error = || -> PartialVMError {
             PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)
@@ -277,7 +272,6 @@ impl VMRuntime {
 
     fn deserialize_args(
         &self,
-        module_store: &LegacyModuleStorageAdapter,
         module_storage: &impl ModuleStorage,
         param_tys: Vec<Type>,
         serialized_args: Vec<impl Borrow<[u8]>>,
@@ -302,16 +296,16 @@ impl VMRuntime {
             .into_iter()
             .zip(serialized_args)
             .enumerate()
-            .map(|(idx, (ty, arg_bytes))| match &ty {
-                Type::MutableReference(inner_t) | Type::Reference(inner_t) => {
+            .map(|(idx, (ty, arg_bytes))| match ty.get_ref_inner_ty() {
+                Some(inner_ty) => {
                     dummy_locals.store_loc(
                         idx,
-                        self.deserialize_arg(module_store, module_storage, inner_t, arg_bytes)?,
+                        self.deserialize_arg(module_storage, inner_ty, arg_bytes)?,
                         self.loader.vm_config().check_invariant_in_swap_loc,
                     )?;
                     dummy_locals.borrow_loc(idx)
                 },
-                _ => self.deserialize_arg(module_store, module_storage, &ty, arg_bytes),
+                None => self.deserialize_arg(module_storage, &ty, arg_bytes),
             })
             .collect::<PartialVMResult<Vec<_>>>()?;
         Ok((dummy_locals, deserialized_args))
@@ -319,30 +313,27 @@ impl VMRuntime {
 
     fn serialize_return_value(
         &self,
-        module_store: &LegacyModuleStorageAdapter,
         module_storage: &impl ModuleStorage,
         ty: &Type,
         value: Value,
     ) -> PartialVMResult<(Vec<u8>, MoveTypeLayout)> {
-        let (ty, value) = match ty {
-            Type::Reference(inner) | Type::MutableReference(inner) => {
+        let (ty, value) = match ty.get_ref_inner_ty() {
+            Some(inner_ty) => {
                 let ref_value: Reference = value.cast()?;
                 let inner_value = ref_value.read_ref()?;
-                (&**inner, inner_value)
+                (inner_ty, inner_value)
             },
             _ => (ty, value),
         };
 
-        let (layout, has_identifier_mappings) =
-            LoaderLayoutConverter::new(&self.loader, module_store, module_storage)
-                .type_to_type_layout_with_identifier_mappings(ty)
-                .map_err(|_err| {
-                    // TODO: Should we use `err` instead of mapping?
-                    PartialVMError::new(StatusCode::VERIFICATION_ERROR).with_message(
-                        "entry point functions cannot have non-serializable return types"
-                            .to_string(),
-                    )
-                })?;
+        let (layout, has_identifier_mappings) = StorageLayoutConverter::new(module_storage)
+            .type_to_type_layout_with_identifier_mappings(ty)
+            .map_err(|_err| {
+                // TODO: Should we use `err` instead of mapping?
+                PartialVMError::new(StatusCode::VERIFICATION_ERROR).with_message(
+                    "entry point functions cannot have non-serializable return types".to_string(),
+                )
+            })?;
 
         let serialization_error = || -> PartialVMError {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -364,7 +355,6 @@ impl VMRuntime {
 
     fn serialize_return_values(
         &self,
-        module_store: &LegacyModuleStorageAdapter,
         module_storage: &impl ModuleStorage,
         return_types: &[Type],
         return_values: Vec<Value>,
@@ -384,7 +374,7 @@ impl VMRuntime {
         return_types
             .iter()
             .zip(return_values)
-            .map(|(ty, value)| self.serialize_return_value(module_store, module_storage, ty, value))
+            .map(|(ty, value)| self.serialize_return_value(module_storage, ty, value))
             .collect()
     }
 
@@ -399,7 +389,8 @@ impl VMRuntime {
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<SerializedReturnValues> {
-        let ty_builder = self.loader().ty_builder();
+        let vm_config = module_storage.runtime_environment().vm_config();
+        let ty_builder = &vm_config.ty_builder;
         let ty_args = function.ty_args();
 
         let param_tys = function
@@ -417,7 +408,7 @@ impl VMRuntime {
             })
             .collect::<Vec<_>>();
         let (mut dummy_locals, deserialized_args) = self
-            .deserialize_args(module_store, module_storage, param_tys, serialized_args)
+            .deserialize_args(module_storage, param_tys, serialized_args)
             .map_err(|e| e.finish(Location::Undefined))?;
         let return_tys = function
             .return_tys()
@@ -441,16 +432,16 @@ impl VMRuntime {
         drop(timer);
 
         let serialized_return_values = self
-            .serialize_return_values(module_store, module_storage, &return_tys, return_values)
+            .serialize_return_values(module_storage, &return_tys, return_values)
             .map_err(|e| e.finish(Location::Undefined))?;
         let serialized_mut_ref_outputs = mut_ref_args
             .into_iter()
             .map(|(idx, ty)| {
                 // serialize return values first in the case that a value points into this local
-                let local_val = dummy_locals
-                    .move_loc(idx, self.loader.vm_config().check_invariant_in_swap_loc)?;
+                let local_val =
+                    dummy_locals.move_loc(idx, vm_config.check_invariant_in_swap_loc)?;
                 let (bytes, layout) =
-                    self.serialize_return_value(module_store, module_storage, &ty, local_val)?;
+                    self.serialize_return_value(module_storage, &ty, local_val)?;
                 Ok((idx as LocalIndex, bytes, layout))
             })
             .collect::<PartialVMResult<_>>()

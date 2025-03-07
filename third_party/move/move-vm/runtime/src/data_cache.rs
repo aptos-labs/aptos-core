@@ -3,13 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    loader::{LegacyModuleStorageAdapter, Loader},
     logging::expect_no_verification_errors,
-    storage::{
-        module_storage::FunctionValueExtensionAdapter, ty_layout_converter::LoaderLayoutConverter,
-        ty_tag_converter::TypeTagConverter,
-    },
-    LayoutConverter, ModuleStorage,
+    storage::{module_storage::FunctionValueExtensionAdapter, ty_tag_converter::TypeTagConverter},
+    LayoutConverter, ModuleStorage, StorageLayoutConverter,
 };
 use bytes::Bytes;
 use move_binary_format::{
@@ -23,7 +19,6 @@ use move_core_types::{
     gas_algebra::NumBytes,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
-    metadata::Metadata,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
@@ -211,11 +206,9 @@ impl<'r> TransactionDataCache<'r> {
     // into the cache.
     pub(crate) fn load_resource(
         &mut self,
-        loader: &Loader,
         module_storage: &dyn ModuleStorage,
         addr: AccountAddress,
         ty: &Type,
-        module_store: &LegacyModuleStorageAdapter,
     ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
         let account_cache = Self::get_mut_or_insert_with(&mut self.account_map, &addr, || {
             (addr, AccountDataCache::new())
@@ -234,52 +227,27 @@ impl<'r> TransactionDataCache<'r> {
             };
             // TODO(Gas): Shall we charge for this?
             let (ty_layout, has_aggregator_lifting) =
-                LoaderLayoutConverter::new(loader, module_store, module_storage)
+                StorageLayoutConverter::new(module_storage)
                     .type_to_type_layout_with_identifier_mappings(ty)?;
 
-            let (data, bytes_loaded) = match loader {
-                Loader::V1(_) => {
-                    let maybe_module = module_store.module_at(&ty_tag.module_id());
-                    let metadata: &[Metadata] = match &maybe_module {
-                        Some(m) => &m.metadata,
-                        None => &[],
-                    };
-                    // If we need to process aggregator lifting, we pass type layout to remote.
-                    // Remote, in turn ensures that all aggregator values are lifted if the resolved
-                    // resource comes from storage.
-                    self.remote.get_resource_bytes_with_metadata_and_layout(
-                        &addr,
-                        &ty_tag,
-                        metadata,
-                        if has_aggregator_lifting {
-                            Some(&ty_layout)
-                        } else {
-                            None
-                        },
-                    )?
-                },
-                Loader::V2(_) => {
-                    let metadata = module_storage
-                        .fetch_existing_module_metadata(
-                            &ty_tag.address,
-                            ty_tag.module.as_ident_str(),
-                        )
-                        .map_err(|e| e.to_partial())?;
+            let (data, bytes_loaded) = {
+                let metadata = module_storage
+                    .fetch_existing_module_metadata(&ty_tag.address, ty_tag.module.as_ident_str())
+                    .map_err(|e| e.to_partial())?;
 
-                    // If we need to process aggregator lifting, we pass type layout to remote.
-                    // Remote, in turn ensures that all aggregator values are lifted if the resolved
-                    // resource comes from storage.
-                    self.remote.get_resource_bytes_with_metadata_and_layout(
-                        &addr,
-                        &ty_tag,
-                        &metadata,
-                        if has_aggregator_lifting {
-                            Some(&ty_layout)
-                        } else {
-                            None
-                        },
-                    )?
-                },
+                // If we need to process aggregator lifting, we pass type layout to remote.
+                // Remote, in turn ensures that all aggregator values are lifted if the resolved
+                // resource comes from storage.
+                self.remote.get_resource_bytes_with_metadata_and_layout(
+                    &addr,
+                    &ty_tag,
+                    &metadata,
+                    if has_aggregator_lifting {
+                        Some(&ty_layout)
+                    } else {
+                        None
+                    },
+                )?
             };
             load_res = Some(NumBytes::new(bytes_loaded as u64));
 
