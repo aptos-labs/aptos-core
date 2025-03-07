@@ -22,8 +22,8 @@ module 0x42::m {
         s.receiver_ref_mut(x, x);
         s.receiver();
         s.receiver_ref_mut(1u8);
-        s.receiver_ref_mut<u8>(1);
-        s.receiver_ref_mut<u8, u8>(1);
+        s.receiver_ref_mut::<u8>(1);
+        s.receiver_ref_mut::<u8, u8>(1);
         s.receiver_needs_type_args(x)
     }
 }

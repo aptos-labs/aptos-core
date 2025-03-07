@@ -33,14 +33,14 @@ error: cannot pass `u8` to a function which expects argument of type `u64`
 error: cannot pass `&mut S<u64>` to a function which expects argument of type `&mut S<u8>`
    ┌─ tests/checking/receiver/call_errors.move:25:9
    │
-25 │         s.receiver_ref_mut<u8>(1);
+25 │         s.receiver_ref_mut::<u8>(1);
    │         ^
 
 error: the receiver function takes 1 type argument but 2 were provided
    ┌─ tests/checking/receiver/call_errors.move:26:9
    │
-26 │         s.receiver_ref_mut<u8, u8>(1);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+26 │         s.receiver_ref_mut::<u8, u8>(1);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
    ┌─ tests/checking/receiver/call_errors.move:27:9

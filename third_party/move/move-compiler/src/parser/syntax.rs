@@ -2251,13 +2251,20 @@ fn parse_dot_or_index_chain(context: &mut Context) -> Result<Exp, Box<Diagnostic
             Tok::Period => {
                 context.tokens.advance()?;
                 let n = parse_identifier_or_positional_field(context)?;
+                let is_2_2_or_later =
+                    context.env.flags().language_version() >= LanguageVersion::V2_2;
                 let has_generics = match context.tokens.peek() {
-                    Tok::Less if n.loc.end() as usize == context.tokens.start_loc() => true,
+                    Tok::Less
+                        if is_2_2_or_later
+                            && n.loc.end() as usize == context.tokens.start_loc() =>
+                    {
+                        true
+                    },
                     Tok::ColonColon
                         if context.tokens.lookahead().unwrap_or(Tok::ColonColon) == Tok::Less =>
                     {
                         let loc = context.tokens.advance_with_loc()?;
-                        if context.env.flags().language_version() >= LanguageVersion::V2_2 {
+                        if is_2_2_or_later {
                             context.env.add_diag(diag!(
                                 Uncategorized::DeprecatedWillBeRemoved,
                                 (

@@ -3,8 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
-use datatest_stable::Requirements;
-use itertools::Itertools;
+use libtest_mimic::{Arguments, Trial};
 use log::debug;
 use move_compiler_v2::{
     annotate_units, disassemble_compiled_units, env_pipeline::rewrite_target::RewritingScope,
@@ -142,6 +141,20 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exclude: vec![],
             exp_suffix: None,
             options: opts.clone().set_language_version(LanguageVersion::V1),
+            stop_after: StopAfter::AstPipeline,
+            dump_ast: DumpLevel::EndStage,
+            dump_bytecode: DumpLevel::None,
+            dump_bytecode_filter: None,
+        },
+        // Tests for checking v2 language features only supported if 2.2 or later
+        // is selected
+        TestConfig {
+            name: "checking-lang-v2.2",
+            runner: |p| run_test(p, get_config_by_name("checking-lang-v2.2")),
+            include: vec!["/checking-lang-v2.2/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts.clone().set_language_version(LanguageVersion::V2_2),
             stop_after: StopAfter::AstPipeline,
             dump_ast: DumpLevel::EndStage,
             dump_bytecode: DumpLevel::None,
@@ -975,7 +988,7 @@ fn path_from_crate_root(path: &str) -> String {
 /// TODO: we may want to add some filters here based on env vars (like the prover does),
 ///    which allow e.g. to filter by configuration name.
 #[allow(clippy::borrow_interior_mutable_const)]
-fn collect_tests(root: &str) -> Vec<Requirements> {
+fn collect_tests(root: &str) -> Vec<Trial> {
     let mut test_groups: BTreeMap<&'static str, Vec<String>> = BTreeMap::new();
     for entry in WalkDir::new(root)
         .follow_links(false)
@@ -1007,21 +1020,24 @@ fn collect_tests(root: &str) -> Vec<Requirements> {
             entry_str
         )
     }
-    let mut reqs = vec![];
+    let mut tests = vec![];
     for (name, files) in test_groups {
-        let config = get_config_by_name(name);
-        reqs.push(Requirements::new(
-            config.runner,
-            // This will appear in the output of cargo test/nextest
-            format!("compiler-v2[config={}]", config.name),
-            root.to_string(),
-            files.into_iter().map(|s| s + "$").join("|"),
-        ));
+        let config = &get_config_by_name(name);
+        for file in files {
+            let test_prompt = format!("compiler-v2[config={}]::{}", config.name, file);
+            let test_path = PathBuf::from(file);
+            let runner = config.runner;
+            tests.push(Trial::test(test_prompt, move || {
+                runner(&test_path).map_err(|err| format!("{:?}", err).into())
+            }));
+        }
     }
-    reqs
+    tests
 }
 
 fn main() {
-    let reqs = collect_tests("tests");
-    datatest_stable::runner(&reqs)
+    let args = Arguments::from_args();
+    let mut tests = collect_tests("tests");
+    tests.sort_unstable_by(|a, b| a.name().cmp(b.name()));
+    libtest_mimic::run(&args, tests).exit()
 }
