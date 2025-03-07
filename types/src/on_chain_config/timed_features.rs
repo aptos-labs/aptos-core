@@ -101,7 +101,7 @@ impl TimedFeatureFlag {
                 .unwrap()
                 .with_timezone(&Utc),
             (FixMemoryUsageTracking, MAINNET) => Los_Angeles
-                .with_ymd_and_hms(2025, 3, 12, 17, 0, 0)
+                .with_ymd_and_hms(2025, 3, 11, 17, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 
@@ -110,7 +110,7 @@ impl TimedFeatureFlag {
                 .unwrap()
                 .with_timezone(&Utc),
             (ChargeBytesForPrints, MAINNET) => Los_Angeles
-                .with_ymd_and_hms(2025, 3, 12, 17, 0, 0)
+                .with_ymd_and_hms(2025, 3, 11, 17, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 
