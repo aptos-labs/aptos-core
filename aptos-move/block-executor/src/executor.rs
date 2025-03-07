@@ -181,12 +181,6 @@ where
                             group_key,
                         )));
                     },
-                    Some(KeyKind::Module) => {
-                        return Err(code_invariant_error(format!(
-                            "Group key {:?} recorded as module KeyKind",
-                            group_key,
-                        )));
-                    },
                     None => {
                         // Previously no write to the group at all.
                         needs_suffix_validation = true;
@@ -217,7 +211,7 @@ where
 
             let resource_write_set = output.resource_write_set();
 
-            // Then, process resource & aggregator_v1 & module writes.
+            // Then, process resource & aggregator_v1 writes.
             for (k, v, maybe_layout) in resource_write_set.clone().into_iter().chain(
                 output
                     .aggregator_v1_write_set()
@@ -328,7 +322,6 @@ where
             use KeyKind::*;
             match kind {
                 Resource => versioned_cache.data().remove(&k, idx_to_execute),
-                Module => (),
                 Group(tags) => {
                     // A change in state observable during speculative execution
                     // (which includes group metadata and size) changes, suffix
@@ -417,7 +410,6 @@ where
                 use KeyKind::*;
                 match kind {
                     Resource => versioned_cache.data().mark_estimate(&k, txn_idx),
-                    Module => (),
                     Group(tags) => {
                         // Validation for both group size and metadata is based on values.
                         // Execution may wait for estimates.

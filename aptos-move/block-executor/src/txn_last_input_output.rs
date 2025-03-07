@@ -50,7 +50,6 @@ macro_rules! forward_on_success_or_skip_rest {
 
 pub(crate) enum KeyKind<T> {
     Resource,
-    Module,
     // Contains the set of tags for the given group key.
     Group(HashSet<T>),
 }
@@ -212,7 +211,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         self.outputs[txn_idx as usize].load_full()
     }
 
-    // Extracts a set of paths (keys) written or updated during execution from transaction
+    // Extracts a set of resource paths (keys) written or updated during execution from transaction
     // output, with corresponding KeyKind. If take_group_tags is true, the final HashSet
     // of tags is moved for the group key - should be called once for each incarnation / record
     // due to 'take'. if false, stored modified group resource tags in the group are cloned out.
@@ -244,11 +243,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                                 .collect::<Vec<_>>(),
                         )
                         .map(|k| (k, KeyKind::Resource))
-                        .chain(
-                            t.module_write_set()
-                                .into_keys()
-                                .map(|k| (k, KeyKind::Module)),
-                        )
                         .chain(
                             group_keys_and_tags
                                 .into_iter()
