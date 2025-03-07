@@ -824,7 +824,7 @@ impl AptosVM {
             )?;
         }
 
-        let func = session.load_script(code_storage, script.code(), script.ty_args())?;
+        let func = code_storage.load_script(script.code(), script.ty_args())?;
 
         let compiled_script = match CompiledScript::deserialize_with_config(
             script.code(),

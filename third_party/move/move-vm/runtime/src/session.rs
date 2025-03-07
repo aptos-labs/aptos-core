@@ -350,22 +350,6 @@ impl<'r, 'l> Session<'r, 'l> {
         self.data_cache.exists_module(module_id)
     }
 
-    /// Load a script and all of its types into cache
-    pub fn load_script(
-        &mut self,
-        code_storage: &impl CodeStorage,
-        script: impl Borrow<[u8]>,
-        ty_args: &[TypeTag],
-    ) -> VMResult<LoadedFunction> {
-        self.move_vm.runtime.loader().load_script(
-            script.borrow(),
-            ty_args,
-            &mut self.data_cache,
-            &self.module_store,
-            code_storage,
-        )
-    }
-
     /// Load a module, a function, and all of its types into cache
     pub fn load_function_with_type_arg_inference(
         &mut self,

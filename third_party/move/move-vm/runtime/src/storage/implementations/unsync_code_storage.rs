@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    loader::{Function, Module, Script},
+    loader::{Function, LoadedFunction, Module, Script},
     storage::{
         code_storage::{ambassador_impl_CodeStorage, CodeStorage},
         environment::{
