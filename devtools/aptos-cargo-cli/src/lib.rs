@@ -25,11 +25,9 @@ const RELEVANT_FILE_PATHS_FOR_COMPILER_V2: [&str; 5] = [
     "aptos-move/move-examples",
     "third_party/move",
 ];
-const NO_MVC_BLOCK_V1_PACKAGES: [&str; 4] = [
+const NO_MVC_BLOCK_V1_PACKAGES: [&str; 2] = [
     "e2e-move-tests", // no block v1 because the meta data test requires using v1
     "move-compiler",
-    "move-compiler-transactional-tests",
-    "move-compiler-v2-transactional-tests",
 ];
 const RELEVANT_FILE_PATHS_FOR_EXECUTION_PERFORMANCE_TESTS: [&str; 5] = [
     ".github/workflows/execution-performance.yaml",

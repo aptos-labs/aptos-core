@@ -11,7 +11,7 @@ use crate::{
     },
     vm_test_harness::{PrecompiledFilesModules, TestRunConfig},
 };
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use clap::Parser;
 use move_binary_format::{
     binary_views::BinaryIndexedView,
@@ -20,7 +20,6 @@ use move_binary_format::{
 use move_bytecode_source_map::mapping::SourceMapping;
 use move_command_line_common::{
     address::ParsedAddress,
-    env::read_bool_env_var,
     files::{MOVE_EXTENSION, MOVE_IR_EXTENSION},
     testing::{add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT},
     types::ParsedType,
@@ -28,10 +27,7 @@ use move_command_line_common::{
 };
 use move_compiler::{
     compiled_unit::{AnnotatedCompiledModule, AnnotatedCompiledUnit},
-    diagnostics::{Diagnostics, FilesSourceText},
-    shared::{
-        string_map_to_symbol_map, string_vec_to_symbol_vec, Flags, NumericalAddress, PackagePaths,
-    },
+    shared::{NumericalAddress, PackagePaths},
     FullyCompiledProgram,
 };
 use move_core_types::{
@@ -41,10 +37,7 @@ use move_core_types::{
 };
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
-use move_model::{
-    metadata::LanguageVersion, model::GlobalEnv, options::ModelBuilderOptions,
-    run_model_builder_with_options_and_compilation_flags,
-};
+use move_model::{metadata::LanguageVersion, model::GlobalEnv};
 use move_symbol_pool::Symbol;
 use move_vm_runtime::session::SerializedReturnValues;
 use move_vm_types::value_serde::ValueSerDeContext;
@@ -62,8 +55,7 @@ pub struct ProcessedModule {
 }
 
 pub struct CompiledState<'a> {
-    pre_compiled_deps_v1: Option<&'a (FullyCompiledProgram, Vec<PackagePaths>)>,
-    pre_compiled_deps_v2: Option<&'a PrecompiledFilesModules>,
+    pre_compiled_deps_v2: &'a PrecompiledFilesModules,
     pre_compiled_ids: BTreeSet<(AccountAddress, String)>,
     compiled_module_named_address_mapping: BTreeMap<ModuleId, Symbol>,
     pub named_address_mapping: BTreeMap<String, NumericalAddress>,
@@ -150,19 +142,6 @@ impl PreCompiledModules for PrecompiledFilesModules {
     }
 }
 
-pub fn either_or_no_modules<'a>(
-    pre_compiled_deps_v1: Option<&'a impl PreCompiledModules>,
-    pre_compiled_deps_v2: Option<&'a impl PreCompiledModules>,
-) -> Vec<&'a AnnotatedCompiledModule> {
-    if let Some(v1_deps) = pre_compiled_deps_v1 {
-        v1_deps.get_pre_compiled_modules()
-    } else if let Some(v2_deps) = pre_compiled_deps_v2 {
-        v2_deps.get_pre_compiled_modules()
-    } else {
-        vec![]
-    }
-}
-
 pub trait MoveTestAdapter<'a>: Sized {
     type ExtraPublishArgs: Parser;
     type ExtraValueArgs: ParsableValue;
@@ -176,15 +155,13 @@ pub trait MoveTestAdapter<'a>: Sized {
     fn run_config(&self) -> TestRunConfig {
         TestRunConfig::CompilerV2 {
             language_version: LanguageVersion::default(),
-            v2_experiments: vec![],
+            experiments: vec![],
         }
     }
     fn init(
         default_syntax: SyntaxChoice,
-        comparison_mode: bool,
         run_config: TestRunConfig,
-        pre_compiled_deps_v1: Option<&'a (FullyCompiledProgram, Vec<PackagePaths>)>,
-        pre_compiled_deps_v2: Option<&'a PrecompiledFilesModules>,
+        pre_compiled_deps_v2: &'a PrecompiledFilesModules,
         init_data: Option<TaskInput<(InitCommand, Self::ExtraInitArgs)>>,
     ) -> (Self, Option<String>);
     fn publish_module(
@@ -239,7 +216,7 @@ pub trait MoveTestAdapter<'a>: Sized {
         Option<String>,
     )> {
         let (data, named_addr_opt, module, _opt_model, warnings_opt) =
-            self.compile_module_default(syntax, data, start_line, command_lines_stop, false)?;
+            self.compile_module_default(syntax, data, start_line, command_lines_stop)?;
         Ok((data, named_addr_opt, module, warnings_opt))
     }
 
@@ -249,7 +226,6 @@ pub trait MoveTestAdapter<'a>: Sized {
         data: Option<NamedTempFile>,
         start_line: usize,
         command_lines_stop: usize,
-        need_model: bool,
     ) -> Result<(
         NamedTempFile,
         Option<Symbol>,
@@ -273,7 +249,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     // Run the V2 compiler if requested
                     TestRunConfig::CompilerV2 {
                         language_version,
-                        v2_experiments,
+                        experiments,
                     } => compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
@@ -281,16 +257,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                         data_path.to_owned(),
                         self.known_attributes(),
                         language_version,
-                        v2_experiments,
-                    )?,
-                    // In all other cases, run V1
-                    _ => compile_source_unit(
-                        state.pre_compiled_deps_v1,
-                        state.named_address_mapping.clone(),
-                        &state.source_files().cloned().collect::<Vec<_>>(),
-                        data_path.to_owned(),
-                        self.known_attributes(),
-                        need_model,
+                        experiments,
                     )?,
                 };
                 let (named_addr_opt, module) = match unit {
@@ -326,7 +293,7 @@ pub trait MoveTestAdapter<'a>: Sized {
         command_lines_stop: usize,
     ) -> Result<(CompiledScript, Option<String>)> {
         let (compiled_script, _opt_model, warnings_opt) =
-            self.compile_script_default(syntax, data, start_line, command_lines_stop, false)?;
+            self.compile_script_default(syntax, data, start_line, command_lines_stop)?;
         Ok((compiled_script, warnings_opt))
     }
 
@@ -336,7 +303,6 @@ pub trait MoveTestAdapter<'a>: Sized {
         data: Option<NamedTempFile>,
         start_line: usize,
         command_lines_stop: usize,
-        need_model: bool,
     ) -> Result<(CompiledScript, Option<GlobalEnv>, Option<String>)> {
         let data = match data {
             Some(f) => f,
@@ -351,10 +317,10 @@ pub trait MoveTestAdapter<'a>: Sized {
         let (script, opt_model, warning_opt) = match syntax {
             SyntaxChoice::Source => {
                 let (unit, opt_model, warning_opt) = match run_config {
-                    // Run the V2 compiler if requested.
+                    // Run the V2 compiler.
                     TestRunConfig::CompilerV2 {
                         language_version,
-                        v2_experiments,
+                        experiments: v2_experiments,
                     } => compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
@@ -363,15 +329,6 @@ pub trait MoveTestAdapter<'a>: Sized {
                         self.known_attributes(),
                         language_version,
                         v2_experiments,
-                    )?,
-                    // In all other Source cases, run the V1 compiler
-                    _ => compile_source_unit(
-                        state.pre_compiled_deps_v1,
-                        state.named_address_mapping.clone(),
-                        &state.source_files().cloned().collect::<Vec<_>>(),
-                        data_path.to_owned(),
-                        self.known_attributes(),
-                        need_model,
                     )?,
                 };
                 match unit {
@@ -664,11 +621,11 @@ fn display_return_values(return_values: SerializedReturnValues) -> Option<String
 impl<'a> CompiledState<'a> {
     pub fn new(
         named_address_mapping: BTreeMap<String, NumericalAddress>,
-        pre_compiled_deps_v1: Option<&'a (FullyCompiledProgram, Vec<PackagePaths>)>,
-        pre_compiled_deps_v2: Option<&'a PrecompiledFilesModules>,
+        pre_compiled_deps_v2: &'a PrecompiledFilesModules,
         default_named_address_mapping: Option<NumericalAddress>,
     ) -> Self {
-        let pre_compiled_ids = either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
+        let pre_compiled_ids = pre_compiled_deps_v2
+            .get_pre_compiled_modules()
             .into_iter()
             .map(|annot_module| {
                 let ident = annot_module.module_ident();
@@ -679,7 +636,6 @@ impl<'a> CompiledState<'a> {
             })
             .collect();
         let mut state = Self {
-            pre_compiled_deps_v1,
             pre_compiled_deps_v2,
             pre_compiled_ids,
             modules: BTreeMap::new(),
@@ -688,7 +644,7 @@ impl<'a> CompiledState<'a> {
             default_named_address_mapping,
             temp_file_mapping: BTreeMap::new(),
         };
-        for annot_module in either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2) {
+        for annot_module in pre_compiled_deps_v2.get_pre_compiled_modules() {
             let (named_addr_opt, _id) = annot_module.module_id();
             state.add_precompiled(
                 named_addr_opt.map(|n| n.value),
@@ -781,7 +737,7 @@ impl<'a> CompiledState<'a> {
 }
 
 fn compile_source_unit_v2(
-    pre_compiled_deps: Option<&PrecompiledFilesModules>,
+    pre_compiled_deps: &PrecompiledFilesModules,
     named_address_mapping: BTreeMap<String, NumericalAddress>,
     deps: &[String],
     path: String,
@@ -789,10 +745,10 @@ fn compile_source_unit_v2(
     language_version: LanguageVersion,
     experiments: Vec<(String, bool)>,
 ) -> Result<(AnnotatedCompiledUnit, Option<GlobalEnv>, Option<String>)> {
-    let deps = if let Some(p) = pre_compiled_deps {
+    let all_deps = {
         // The v2 compiler does not really support precompiled programs, so we must include all the
         // dependent sources with their directories here.
-        let mut dirs: BTreeSet<_> = p
+        let mut dirs: BTreeSet<_> = pre_compiled_deps
             .filenames()
             .iter()
             .filter_map(|file_name| {
@@ -803,14 +759,12 @@ fn compile_source_unit_v2(
             .collect();
         remove_sub_dirs(&mut dirs);
         dirs.extend(deps.iter().cloned());
-        dirs.into_iter().collect()
-    } else {
-        deps.to_vec()
+        dirs.into_iter().collect::<Vec<_>>()
     };
 
     let mut options = move_compiler_v2::Options {
         sources: vec![path],
-        dependencies: deps.to_vec(),
+        dependencies: all_deps,
         named_address_mapping: named_address_mapping
             .into_iter()
             .map(|(alias, addr)| format!("{}={}", alias, addr))
@@ -853,100 +807,6 @@ fn remove_sub_dirs(dirs: &mut BTreeSet<String>) {
     }
 }
 
-fn compile_source_unit(
-    pre_compiled_deps: Option<&(FullyCompiledProgram, Vec<PackagePaths>)>,
-    named_address_mapping: BTreeMap<String, NumericalAddress>,
-    deps: &[String],
-    path: String,
-    known_attributes: &BTreeSet<String>,
-    need_model: bool,
-) -> Result<(AnnotatedCompiledUnit, Option<GlobalEnv>, Option<String>)> {
-    fn rendered_diags(files: &FilesSourceText, diags: Diagnostics) -> Option<String> {
-        if diags.is_empty() {
-            return None;
-        }
-
-        let error_buffer = if read_bool_env_var(move_command_line_common::testing::PRETTY) {
-            move_compiler::diagnostics::report_diagnostics_to_color_buffer(files, diags)
-        } else {
-            move_compiler::diagnostics::report_diagnostics_to_buffer(files, diags)
-        };
-        Some(String::from_utf8(error_buffer).unwrap())
-    }
-
-    use move_compiler::PASS_COMPILATION;
-    let flags = move_compiler::Flags::empty()
-        .set_sources_shadow_deps(true)
-        .set_skip_attribute_checks(false);
-
-    let (mut files, comments_and_compiler_res) = move_compiler::Compiler::from_files(
-        vec![path.clone()],
-        deps.to_vec(),
-        named_address_mapping.clone(),
-        flags,
-        known_attributes,
-    )
-    .set_pre_compiled_lib_opt(pre_compiled_deps.map(|(prog, _)| prog))
-    .run::<PASS_COMPILATION>()?;
-    let units_or_diags = comments_and_compiler_res
-        .map(|(_comments, move_compiler)| move_compiler.into_compiled_units());
-
-    match units_or_diags {
-        Err(diags) => {
-            if let Some((pcd, _paths)) = pre_compiled_deps {
-                for (file_name, text) in &pcd.files {
-                    // TODO This is bad. Rethink this when errors are redone
-                    if !files.contains_key(file_name) {
-                        files.insert(*file_name, text.clone());
-                    }
-                }
-            }
-
-            Err(anyhow!(rendered_diags(&files, diags).unwrap()))
-        },
-        Ok((mut units, warnings)) => {
-            let warnings = rendered_diags(&files, warnings);
-            let len = units.len();
-            if len != 1 {
-                panic!("Invalid input. Expected 1 compiled unit but got {}", len)
-            }
-            let unit = units.pop().unwrap();
-            let opt_model = if need_model {
-                if let Some((_fully_compiled_program, lib_paths)) = pre_compiled_deps {
-                    let symbol_map = string_map_to_symbol_map(&named_address_mapping);
-                    let move_target_package = vec![PackagePaths {
-                        name: None,
-                        paths: vec![Symbol::from(path)],
-                        named_address_map: symbol_map.clone(),
-                    }];
-                    let deps_target_package = vec![PackagePaths {
-                        name: None,
-                        paths: string_vec_to_symbol_vec(deps),
-                        named_address_map: symbol_map.clone(),
-                    }];
-                    let model_options = ModelBuilderOptions::default();
-                    // This choice of flags matches that used to build model in `CompiledPackage::build_all()`
-                    let flags = Flags::verification();
-                    let model = run_model_builder_with_options_and_compilation_flags(
-                        move_target_package,
-                        deps_target_package,
-                        lib_paths.to_vec(),
-                        model_options,
-                        flags,
-                        known_attributes,
-                    )?;
-                    Some(model)
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-            Ok((unit, opt_model, warnings))
-        },
-    }
-}
-
 fn compile_ir_module<'a>(
     deps: impl Iterator<Item = &'a CompiledModule>,
     file_name: &str,
@@ -969,8 +829,7 @@ fn compile_ir_script<'a>(
 pub fn run_test_impl<'a, Adapter>(
     config: TestRunConfig,
     path: &Path,
-    pre_compiled_deps_v1: Option<&'a (FullyCompiledProgram, Vec<PackagePaths>)>,
-    pre_compiled_deps_v2: Option<&'a PrecompiledFilesModules>,
+    pre_compiled_deps_v2: &'a PrecompiledFilesModules,
     exp_suffix: &Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>>
 where
@@ -1023,9 +882,7 @@ where
     };
     let (mut adapter, result_opt) = Adapter::init(
         default_syntax,
-        false,
         config.clone(),
-        pre_compiled_deps_v1,
         pre_compiled_deps_v2,
         init_opt,
     );

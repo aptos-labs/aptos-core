@@ -4400,7 +4400,6 @@ dependencies = [
  "move-binary-format",
  "move-bytecode-verifier",
  "move-command-line-common",
- "move-compiler",
  "move-compiler-v2",
  "move-core-types",
  "move-model",
@@ -10977,14 +10976,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-compiler-transactional-tests"
-version = "0.1.0"
-dependencies = [
- "datatest-stable",
- "move-transactional-test-runner",
-]
-
-[[package]]
 name = "move-compiler-v2"
 version = "0.1.0"
 dependencies = [
@@ -16030,17 +16021,6 @@ dependencies = [
  "quote",
  "syn 2.0.87",
  "test-case-core",
-]
-
-[[package]]
-name = "testdiff"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap 4.5.21",
- "once_cell",
- "regex",
- "walkdir",
 ]
 
 [[package]]

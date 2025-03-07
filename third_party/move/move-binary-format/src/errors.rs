@@ -256,7 +256,7 @@ impl VMError {
         }))
     }
 
-    pub fn format_test_output(&self, verbose: bool, comparison_mode: bool) -> String {
+    pub fn format_test_output(&self, verbose: bool) -> String {
         let location_string = match &self.location() {
             Location::Undefined => "undefined".to_owned(),
             Location::Script => "script".to_owned(),
@@ -264,18 +264,8 @@ impl VMError {
                 format!("0x{}::{}", id.address().short_str_lossless(), id.name())
             },
         };
-        let indices = if comparison_mode {
-            // During comparison testing, abstract this data.
-            "redacted".to_string()
-        } else {
-            format!("{:?}", self.indices())
-        };
-        let offsets = if comparison_mode {
-            // During comparison testing, abstract this data.
-            "redacted".to_string()
-        } else {
-            format!("{:?}", self.offsets())
-        };
+        let indices = format!("{:?}", self.indices());
+        let offsets = format!("{:?}", self.offsets());
 
         if verbose {
             let message_str = match &self.message() {
