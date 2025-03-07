@@ -107,7 +107,7 @@ module staking::commission {
         if (balance <= commission_in_apt) {
             // If balance is exactly equal to commission in APT, this will set commission_debt to 0.
             let debt_apt = commission_in_apt - balance;
-            config.commission_debt = (math128::mul_div((debt_apt as u128), apt_price, oracle::precision()) as u64);
+            config.commission_debt = (math128::mul_div((debt_apt as u128), oracle::precision(), apt_price) as u64)
         } else {
             let surplus_balance = balance - commission_in_apt;
             aptos_account::transfer(commission_signer, config.manager, surplus_balance);
