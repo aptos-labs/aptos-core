@@ -581,8 +581,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                             );
                             continue;
                         }
-                        // This should be OK. Wrapping BlockRetrievalRequestV1 in an IncomingBlockRetrievalRequest
-                        // instead of DeprecatedIncomingBlockRetrievalRequest
                         if let Err(e) = monitor!(
                             "process_block_retrieval",
                             block_store
