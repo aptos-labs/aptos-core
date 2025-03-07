@@ -1,0 +1,90 @@
+// -- Model dump before bytecode pipeline
+module 0x66::test {
+    private fun add_some(x: u64): |u64|u64 {
+        closure#1test::__lambda__1__add_some(x)
+    }
+    private fun chain(v: vector<|u64||u64|u64>): u64 {
+        Add<u64>(((Deref(vector::borrow<|u64||u64|u64>(Borrow(Immutable)(v), 0)))(1))(2), (test::add_some(1))(2))
+    }
+    private fun __lambda__1__add_some(x: u64,y: u64): u64 {
+        Add<u64>(x, y)
+    }
+} // end 0x66::test
+
+// -- Sourcified model before bytecode pipeline
+module 0x66::test {
+    fun add_some(x: u64): |u64|u64 {
+        |arg0| __lambda__1__add_some(x, arg0)
+    }
+    fun chain(v: vector<|u64||u64|u64>): u64 {
+        (*0x1::vector::borrow<|u64||u64|u64>(&v, 0))(1)(2) + add_some(1)(2)
+    }
+    fun __lambda__1__add_some(x: u64, y: u64): u64 {
+        x + y
+    }
+}
+
+============ initial bytecode ================
+
+[variant baseline]
+fun test::add_some($t0: u64): |u64|u64 {
+     var $t1: |u64|u64
+  0: $t1 := closure#1 test::__lambda__1__add_some($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun test::chain($t0: vector<|u64||u64|u64>): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: |u64|u64
+     var $t5: u64
+     var $t6: |u64||u64|u64
+     var $t7: &|u64||u64|u64
+     var $t8: &vector<|u64||u64|u64>
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: |u64|u64
+     var $t13: u64
+  0: $t3 := 2
+  1: $t5 := 1
+  2: $t8 := borrow_local($t0)
+  3: $t9 := 0
+  4: $t7 := vector::borrow<|u64||u64|u64>($t8, $t9)
+  5: $t6 := read_ref($t7)
+  6: $t4 := invoke($t5, $t6)
+  7: $t2 := invoke($t3, $t4)
+  8: $t11 := 2
+  9: $t13 := 1
+ 10: $t12 := test::add_some($t13)
+ 11: $t10 := invoke($t11, $t12)
+ 12: $t1 := +($t2, $t10)
+ 13: return $t1
+}
+
+
+[variant baseline]
+fun test::__lambda__1__add_some($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+  0: $t3 := infer($t0)
+  1: $t2 := +($t3, $t1)
+  2: return $t2
+}
+
+
+Diagnostics:
+error: local `v` of type `vector<|u64||u64|u64>` does not have the `drop` ability
+  ┌─ tests/lambda/chained_calls.move:8:9
+  │
+8 │         v[0](1)(2) + add_some(1)(2)
+  │         ^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: value of type `|u64||u64|u64` does not have the `copy` ability
+  ┌─ tests/lambda/chained_calls.move:8:9
+  │
+8 │         v[0](1)(2) + add_some(1)(2)
+  │         ^^^^ reference content copied here

@@ -38,8 +38,8 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    move_vm::MoveVM, native_extensions::NativeContextExtensions, session::Session,
-    AsFunctionValueExtension, ModuleStorage, VerifiedModuleBundle,
+    config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
+    session::Session, AsFunctionValueExtension, ModuleStorage, VerifiedModuleBundle,
 };
 use move_vm_types::{value_serde::ValueSerDeContext, values::Value};
 use std::{
@@ -75,6 +75,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         move_vm: &'l MoveVM,
         chain_id: ChainId,
         features: &Features,
+        vm_config: &VMConfig,
         maybe_user_transaction_context: Option<UserTransactionContext>,
         resolver: &'r R,
     ) -> Self {
@@ -91,7 +92,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         extensions.add(NativeAggregatorContext::new(
             txn_hash,
             resolver,
-            move_vm.vm_config().delayed_field_optimization_enabled,
+            vm_config.delayed_field_optimization_enabled,
             resolver,
         ));
         extensions.add(RandomnessContext::new());
@@ -106,13 +107,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         extensions.add(NativeEventContext::default());
         extensions.add(NativeObjectContext::default());
 
-        // Old VM code loader has bugs around module upgrade. After a module upgrade, the internal
-        // cache needed to be flushed to work around those bugs.
-        if !features.is_loader_v2_enabled() {
-            #[allow(deprecated)]
-            move_vm.flush_loader_cache_if_invalidated();
-        }
-
         let is_storage_slot_metadata_enabled = features.is_storage_slot_metadata_enabled();
         Self {
             inner: move_vm.new_session_with_extensions(resolver, extensions),
@@ -126,7 +120,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         configs: &ChangeSetConfigs,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<(VMChangeSet, ModuleWriteSet)> {
-        let move_vm = self.inner.get_move_vm();
         let function_extension = module_storage.as_function_value_extension();
 
         let resource_converter = |value: Value,
@@ -160,13 +153,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .inner
             .finish_with_extensions_with_custom_effects(&resource_converter, module_storage)?;
 
-        let (change_set, resource_group_change_set) = Self::split_and_merge_resource_groups(
-            move_vm,
-            self.resolver,
-            module_storage,
-            change_set,
-        )
-        .map_err(|e| e.finish(Location::Undefined))?;
+        let (change_set, resource_group_change_set) =
+            Self::split_and_merge_resource_groups(self.resolver, module_storage, change_set)
+                .map_err(|e| e.finish(Location::Undefined))?;
 
         let table_context: NativeTableContext = extensions.remove();
         let table_change_set = table_context
@@ -278,7 +267,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     /// V1 Resource group change set behavior keeps ops for individual resources separate, not
     /// merging them into a single op corresponding to the whole resource group (V0).
     fn split_and_merge_resource_groups(
-        vm: &MoveVM,
         resolver: &dyn AptosMoveResolver,
         module_storage: &impl ModuleStorage,
         change_set: ChangeSet,
@@ -310,16 +298,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             let (modules, resources) = account_changeset.into_inner();
 
             for (struct_tag, blob_op) in resources {
-                let resource_group_tag = if module_storage.is_enabled() {
+                let resource_group_tag = {
                     let metadata = module_storage
                         .fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
                         .map_err(|e| e.to_partial())?;
                     get_resource_group_member_from_metadata(&struct_tag, &metadata)
-                } else {
-                    #[allow(deprecated)]
-                    vm.with_module_metadata(&struct_tag.module_id(), |md| {
-                        get_resource_group_member_from_metadata(&struct_tag, md)
-                    })
                 };
 
                 if let Some(resource_group_tag) = resource_group_tag {

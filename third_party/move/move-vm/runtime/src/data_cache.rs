@@ -3,12 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    loader::{LegacyModuleStorageAdapter, Loader},
     logging::expect_no_verification_errors,
-    storage::{
-        module_storage::FunctionValueExtensionAdapter, ty_layout_converter::LoaderLayoutConverter,
-    },
-    LayoutConverter, ModuleStorage,
+    storage::{module_storage::FunctionValueExtensionAdapter, ty_tag_converter::TypeTagConverter},
+    LayoutConverter, ModuleStorage, StorageLayoutConverter,
 };
 use bytes::Bytes;
 use move_binary_format::{
@@ -22,7 +19,6 @@ use move_core_types::{
     gas_algebra::NumBytes,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
-    metadata::Metadata,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
@@ -116,7 +112,6 @@ impl<'r> TransactionDataCache<'r> {
     /// Gives all proper guarantees on lifetime of global data as well.
     pub(crate) fn into_effects(
         self,
-        loader: &Loader,
         module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<ChangeSet> {
         let resource_converter =
@@ -131,7 +126,7 @@ impl<'r> TransactionDataCache<'r> {
                             .with_message(format!("Error when serializing resource {}.", value))
                     })
             };
-        self.into_custom_effects(&resource_converter, loader, module_storage)
+        self.into_custom_effects(&resource_converter, module_storage)
     }
 
     /// Same like `into_effects`, but also allows clients to select the format of
@@ -139,7 +134,6 @@ impl<'r> TransactionDataCache<'r> {
     pub(crate) fn into_custom_effects<Resource>(
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
-        loader: &Loader,
         module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<Changes<Bytes, Resource>> {
         let mut change_set = Changes::<Bytes, Resource>::new();
@@ -157,7 +151,9 @@ impl<'r> TransactionDataCache<'r> {
             let mut resources = BTreeMap::new();
             for (ty, (layout, gv, has_aggregator_lifting)) in account_data_cache.data_map {
                 if let Some(op) = gv.into_effect_with_layout(layout) {
-                    let struct_tag = match loader.type_to_type_tag(&ty, module_storage)? {
+                    let ty_tag_builder =
+                        TypeTagConverter::new(module_storage.runtime_environment());
+                    let struct_tag = match ty_tag_builder.ty_to_ty_tag(&ty)? {
                         TypeTag::Struct(struct_tag) => *struct_tag,
                         _ => return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)),
                     };
@@ -210,11 +206,9 @@ impl<'r> TransactionDataCache<'r> {
     // into the cache.
     pub(crate) fn load_resource(
         &mut self,
-        loader: &Loader,
         module_storage: &dyn ModuleStorage,
         addr: AccountAddress,
         ty: &Type,
-        module_store: &LegacyModuleStorageAdapter,
     ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
         let account_cache = Self::get_mut_or_insert_with(&mut self.account_map, &addr, || {
             (addr, AccountDataCache::new())
@@ -222,7 +216,8 @@ impl<'r> TransactionDataCache<'r> {
 
         let mut load_res = None;
         if !account_cache.data_map.contains_key(ty) {
-            let ty_tag = match loader.type_to_type_tag(ty, module_storage)? {
+            let ty_tag_builder = TypeTagConverter::new(module_storage.runtime_environment());
+            let ty_tag = match ty_tag_builder.ty_to_ty_tag(ty)? {
                 TypeTag::Struct(s_tag) => s_tag,
                 _ =>
                 // non-struct top-level value; can't happen
@@ -232,52 +227,27 @@ impl<'r> TransactionDataCache<'r> {
             };
             // TODO(Gas): Shall we charge for this?
             let (ty_layout, has_aggregator_lifting) =
-                LoaderLayoutConverter::new(loader, module_store, module_storage)
+                StorageLayoutConverter::new(module_storage)
                     .type_to_type_layout_with_identifier_mappings(ty)?;
 
-            let (data, bytes_loaded) = match loader {
-                Loader::V1(_) => {
-                    let maybe_module = module_store.module_at(&ty_tag.module_id());
-                    let metadata: &[Metadata] = match &maybe_module {
-                        Some(m) => &m.metadata,
-                        None => &[],
-                    };
-                    // If we need to process aggregator lifting, we pass type layout to remote.
-                    // Remote, in turn ensures that all aggregator values are lifted if the resolved
-                    // resource comes from storage.
-                    self.remote.get_resource_bytes_with_metadata_and_layout(
-                        &addr,
-                        &ty_tag,
-                        metadata,
-                        if has_aggregator_lifting {
-                            Some(&ty_layout)
-                        } else {
-                            None
-                        },
-                    )?
-                },
-                Loader::V2(_) => {
-                    let metadata = module_storage
-                        .fetch_existing_module_metadata(
-                            &ty_tag.address,
-                            ty_tag.module.as_ident_str(),
-                        )
-                        .map_err(|e| e.to_partial())?;
+            let (data, bytes_loaded) = {
+                let metadata = module_storage
+                    .fetch_existing_module_metadata(&ty_tag.address, ty_tag.module.as_ident_str())
+                    .map_err(|e| e.to_partial())?;
 
-                    // If we need to process aggregator lifting, we pass type layout to remote.
-                    // Remote, in turn ensures that all aggregator values are lifted if the resolved
-                    // resource comes from storage.
-                    self.remote.get_resource_bytes_with_metadata_and_layout(
-                        &addr,
-                        &ty_tag,
-                        &metadata,
-                        if has_aggregator_lifting {
-                            Some(&ty_layout)
-                        } else {
-                            None
-                        },
-                    )?
-                },
+                // If we need to process aggregator lifting, we pass type layout to remote.
+                // Remote, in turn ensures that all aggregator values are lifted if the resolved
+                // resource comes from storage.
+                self.remote.get_resource_bytes_with_metadata_and_layout(
+                    &addr,
+                    &ty_tag,
+                    &metadata,
+                    if has_aggregator_lifting {
+                        Some(&ty_layout)
+                    } else {
+                        None
+                    },
+                )?
             };
             load_res = Some(NumBytes::new(bytes_loaded as u64));
 
@@ -318,10 +288,6 @@ impl<'r> TransactionDataCache<'r> {
                 .expect("global value must exist"),
             load_res,
         ))
-    }
-
-    pub(crate) fn load_module(&self, module_id: &ModuleId) -> PartialVMResult<Bytes> {
-        load_module_impl(self.remote, &self.account_map, module_id)
     }
 
     pub(crate) fn load_compiled_script_to_cache(
@@ -391,38 +357,5 @@ impl<'r> TransactionDataCache<'r> {
                     .clone())
             },
         }
-    }
-
-    #[deprecated]
-    pub(crate) fn publish_module(
-        &mut self,
-        module_id: &ModuleId,
-        blob: Vec<u8>,
-        is_republishing: bool,
-    ) -> VMResult<()> {
-        let account_cache =
-            Self::get_mut_or_insert_with(&mut self.account_map, module_id.address(), || {
-                (*module_id.address(), AccountDataCache::new())
-            });
-
-        account_cache
-            .module_map
-            .insert(module_id.name().to_owned(), (blob.into(), is_republishing));
-
-        Ok(())
-    }
-
-    #[deprecated]
-    pub(crate) fn exists_module(&self, module_id: &ModuleId) -> VMResult<bool> {
-        if let Some(account_cache) = self.account_map.get(module_id.address()) {
-            if account_cache.module_map.contains_key(module_id.name()) {
-                return Ok(true);
-            }
-        }
-        Ok(self
-            .remote
-            .get_module(module_id)
-            .map_err(|e| e.finish(Location::Undefined))?
-            .is_some())
     }
 }

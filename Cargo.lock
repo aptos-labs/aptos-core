@@ -3618,7 +3618,6 @@ dependencies = [
  "clap 4.5.21",
  "colored",
  "move-core-types",
- "move-vm-runtime",
  "parking_lot 0.12.1",
  "rand 0.7.3",
  "serde",
@@ -11001,6 +11000,7 @@ dependencies = [
  "flexi_logger",
  "im",
  "itertools 0.13.0",
+ "libtest-mimic",
  "log",
  "move-binary-format",
  "move-borrow-graph",
@@ -11029,11 +11029,9 @@ version = "0.1.0"
 dependencies = [
  "datatest-stable",
  "itertools 0.13.0",
- "move-command-line-common",
  "move-compiler-v2",
  "move-model",
  "move-transactional-test-runner",
- "once_cell",
  "walkdir",
 ]
 

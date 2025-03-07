@@ -2,9 +2,6 @@ processed 1 task
 
 task 0 'publish'. lines 1-8:
 
-
-
->>> V1 Compiler {
 == BEGIN Bytecode ==
 // Move bytecode v7
 module cafe.Ristretto {
@@ -16,4 +13,3 @@ B0:
 }
 }
 == END Bytecode ==
-}
