@@ -2977,7 +2977,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-aggregator",
- "aptos-crypto",
  "aptos-types",
  "aptos-vm-types",
  "bytes",
