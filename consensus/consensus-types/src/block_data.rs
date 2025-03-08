@@ -4,13 +4,18 @@
 
 use crate::{
     common::{Author, Payload, Round},
+    opt_block_data::OptBlockData,
     proposal_ext::ProposalExt,
     quorum_cert::QuorumCert,
     vote_data::VoteData,
 };
+use anyhow::{bail, Result};
 use aptos_bitvec::BitVec;
-use aptos_crypto::hash::HashValue;
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_crypto::{
+    hash::{CryptoHash, CryptoHasher},
+    HashValue,
+};
+use aptos_crypto_derive::CryptoHasher;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
@@ -61,9 +66,24 @@ pub enum BlockType {
         parent_block_id: HashValue,
         parents_bitvec: BitVec,
     },
+
+    /// Optimistic proposal
+    OptProposal {
+        validator_txns: Vec<ValidatorTransaction>,
+        /// T of the block (e.g. one or more transaction(s)
+        payload: Payload,
+        /// Author of the block that can be validated by the author's public key and the signature
+        author: Author,
+        /// Failed authors from the parent's block to this block.
+        /// I.e. the list of consecutive proposers from the
+        /// immediately preceeding rounds that didn't produce a successful block.
+        failed_authors: Vec<(Round, Author)>,
+        /// Grandparent QC, used to generate previous_bitvec
+        grandparent_qc: QuorumCert,
+    },
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, CryptoHasher)]
 /// Block has the core data of a consensus block that should be persistent when necessary.
 /// Each block must know the id of its parent and keep the QuorurmCertificate to that parent.
 pub struct BlockData {
@@ -96,12 +116,34 @@ pub struct BlockData {
     block_type: BlockType,
 }
 
+impl CryptoHash for BlockData {
+    type Hasher = BlockDataHasher;
+
+    fn hash(&self) -> HashValue {
+        let mut state = Self::Hasher::default();
+        if self.is_opt_block() {
+            state.update(&self.epoch.to_be_bytes());
+            state.update(&self.round.to_be_bytes());
+            state.update(&self.timestamp_usecs.to_be_bytes());
+            state.update(
+                &bcs::to_bytes(self.quorum_cert().vote_data())
+                    .expect("Unable to serialize quorum cert vote data"),
+            );
+            state
+                .update(&bcs::to_bytes(self.block_type()).expect("Unable to serialize block type"));
+        } else {
+            bcs::serialize_into(&mut state, &self).expect("Failed to serialize BlockData");
+        }
+        state.finish()
+    }
+}
+
 impl BlockData {
     pub fn author(&self) -> Option<Author> {
         match &self.block_type {
-            BlockType::Proposal { author, .. } | BlockType::DAGBlock { author, .. } => {
-                Some(*author)
-            },
+            BlockType::Proposal { author, .. }
+            | BlockType::OptProposal { author, .. }
+            | BlockType::DAGBlock { author, .. } => Some(*author),
             BlockType::ProposalExt(p) => Some(*p.author()),
             _ => None,
         }
@@ -126,11 +168,18 @@ impl BlockData {
         }
     }
 
+    pub fn grandparent_qc(&self) -> Result<QuorumCert> {
+        match &self.block_type {
+            BlockType::OptProposal { grandparent_qc, .. } => Ok(grandparent_qc.clone()),
+            _ => bail!("Invalid block type"),
+        }
+    }
+
     pub fn payload(&self) -> Option<&Payload> {
         match &self.block_type {
-            BlockType::Proposal { payload, .. } | BlockType::DAGBlock { payload, .. } => {
-                Some(payload)
-            },
+            BlockType::Proposal { payload, .. }
+            | BlockType::DAGBlock { payload, .. }
+            | BlockType::OptProposal { payload, .. } => Some(payload),
             BlockType::ProposalExt(p) => p.payload(),
             _ => None,
         }
@@ -141,6 +190,9 @@ impl BlockData {
             BlockType::ProposalExt(proposal_ext) => proposal_ext.validator_txns(),
             BlockType::Proposal { .. } | BlockType::NilBlock { .. } | BlockType::Genesis => None,
             BlockType::DAGBlock { validator_txns, .. } => Some(validator_txns),
+            BlockType::OptProposal { validator_txns, .. } => {
+                (!validator_txns.is_empty()).then_some(validator_txns)
+            },
         }
     }
 
@@ -176,13 +228,18 @@ impl BlockData {
         matches!(self.block_type, BlockType::NilBlock { .. })
     }
 
+    pub fn is_opt_block(&self) -> bool {
+        matches!(self.block_type, BlockType::OptProposal { .. })
+    }
+
     /// the list of consecutive proposers from the immediately preceeding
     /// rounds that didn't produce a successful block
     pub fn failed_authors(&self) -> Option<&Vec<(Round, Author)>> {
         match &self.block_type {
             BlockType::Proposal { failed_authors, .. }
             | BlockType::NilBlock { failed_authors, .. }
-            | BlockType::DAGBlock { failed_authors, .. } => Some(failed_authors),
+            | BlockType::DAGBlock { failed_authors, .. }
+            | BlockType::OptProposal { failed_authors, .. } => Some(failed_authors),
             BlockType::ProposalExt(p) => Some(p.failed_authors()),
             BlockType::Genesis => None,
         }
@@ -353,6 +410,45 @@ impl BlockData {
                 failed_authors,
             }),
         }
+    }
+
+    // Converting OptBlockData to BlockData
+    // by adding QC and failed_authors
+    pub fn new_from_opt(
+        opt_block_data: OptBlockData,
+        quorum_cert: QuorumCert,
+        new_failed_authors: Vec<(Round, Author)>,
+    ) -> Result<Self> {
+        let OptBlockData {
+            epoch,
+            round,
+            timestamp_usecs,
+            parent_id: _,
+            block_type,
+        } = opt_block_data;
+        let block_type = match block_type {
+            BlockType::OptProposal {
+                validator_txns,
+                payload,
+                author,
+                failed_authors: _,
+                grandparent_qc,
+            } => BlockType::OptProposal {
+                validator_txns,
+                payload,
+                author,
+                failed_authors: new_failed_authors,
+                grandparent_qc,
+            },
+            _ => bail!("Invalid block type"),
+        };
+        Ok(Self {
+            epoch,
+            round,
+            timestamp_usecs,
+            quorum_cert,
+            block_type,
+        })
     }
 
     /// It's a reconfiguration suffix block if the parent block's executed state indicates next epoch.

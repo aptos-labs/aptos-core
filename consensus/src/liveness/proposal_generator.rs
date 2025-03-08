@@ -26,6 +26,7 @@ use aptos_consensus_types::{
     block::Block,
     block_data::BlockData,
     common::{Author, Payload, PayloadFilter, Round},
+    opt_block_data::OptBlockData,
     payload_pull_params::PayloadPullParameters,
     pipelined_block::ExecutionSummary,
     quorum_cert::QuorumCert,
@@ -471,6 +472,16 @@ impl ProposalGenerator {
         Ok(Block::new_nil(round, quorum_cert, failed_authors))
     }
 
+    pub fn lock_last_round_generated(&self, round: Round) -> bool {
+        let mut last_round_generated = self.last_round_generated.lock();
+        if *last_round_generated < round {
+            *last_round_generated = round;
+            true
+        } else {
+            false
+        }
+    }
+
     /// The function generates a new proposal block: the returned future is fulfilled when the
     /// payload is delivered by the PayloadClient implementation.  At most one proposal can be
     /// generated per round (no proposal equivocation allowed).
@@ -487,14 +498,6 @@ impl ProposalGenerator {
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
         wait_callback: BoxFuture<'static, ()>,
     ) -> anyhow::Result<BlockData> {
-        {
-            let mut last_round_generated = self.last_round_generated.lock();
-            if *last_round_generated < round {
-                *last_round_generated = round;
-            } else {
-                bail!("Already proposed in the round {}", round);
-            }
-        }
         let maybe_optqs_payload_pull_params = self.opt_qs_payload_param_provider.get_params();
 
         let hqc = self.ensure_highest_quorum_cert(round)?;
@@ -655,6 +658,161 @@ impl ProposalGenerator {
                 quorum_cert,
             )
         };
+
+        Ok(block)
+    }
+
+    pub async fn generate_opt_proposal(
+        &self,
+        epoch: u64,
+        round: Round,
+        parent_id: HashValue,
+        grandparent_qc: QuorumCert,
+        proposer_election: Arc<dyn ProposerElection + Send + Sync>,
+        wait_callback: BoxFuture<'static, ()>,
+    ) -> anyhow::Result<OptBlockData> {
+        let maybe_optqs_payload_pull_params = self.opt_qs_payload_param_provider.get_params();
+
+        let hqc = self.ensure_highest_quorum_cert(round)?;
+
+        ensure!(
+            hqc.certified_block().round() + 1 < round,
+            "[OptProposal] Given round {} is no higher than hqc round {} + 1, should generate regular proposal instead of optimistic",
+            round,
+            hqc.certified_block().round()
+        );
+
+        let (validator_txns, payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
+            bail!("[OptProposal] HQC has reconfiguration!");
+        } else {
+            // One needs to hold the blocks with the references to the payloads while get_block is
+            // being executed: pending blocks vector keeps all the pending ancestors of the extended branch.
+            let mut pending_blocks = self
+                .block_store
+                .path_from_commit_root(parent_id)
+                .ok_or_else(|| format_err!("Parent block {} already pruned", parent_id))?;
+            // Avoid txn manager long poll if the root block has txns, so that the leader can
+            // deliver the commit proof to others without delay.
+            pending_blocks.push(self.block_store.commit_root());
+
+            // Exclude all the pending transactions: these are all the ancestors of
+            // parent (including) up to the root (including).
+            let exclude_payload: Vec<_> = pending_blocks
+                .iter()
+                .flat_map(|block| block.payload())
+                .collect();
+            let payload_filter = PayloadFilter::from(&exclude_payload);
+
+            let pending_ordering = self
+                .block_store
+                .path_from_ordered_root(parent_id)
+                .ok_or_else(|| format_err!("Parent block {} already pruned", parent_id))?
+                .iter()
+                .any(|block| !block.payload().map_or(true, |txns| txns.is_empty()));
+
+            // All proposed blocks in a branch are guaranteed to have increasing timestamps
+            // since their predecessor block will not be added to the BlockStore until
+            // the local time exceeds it.
+            let timestamp = self.time_service.get_current_timestamp();
+
+            let voting_power_ratio = proposer_election.get_voting_power_participation_ratio(round);
+
+            let (
+                max_block_txns,
+                max_block_txns_after_filtering,
+                max_txns_from_block_to_execute,
+                proposal_delay,
+            ) = self
+                .calculate_max_block_sizes(voting_power_ratio, timestamp, round)
+                .await;
+
+            PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING.observe(max_block_txns_after_filtering as f64);
+            if let Some(max_to_execute) = max_txns_from_block_to_execute {
+                PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE.observe(max_to_execute as f64);
+            }
+
+            PROPOSER_DELAY_PROPOSAL.observe(proposal_delay.as_secs_f64());
+            if !proposal_delay.is_zero() {
+                tokio::time::sleep(proposal_delay).await;
+            }
+
+            let max_pending_block_size = pending_blocks
+                .iter()
+                .map(|block| {
+                    block.payload().map_or(PayloadTxnsSize::zero(), |p| {
+                        PayloadTxnsSize::new(p.len() as u64, p.size() as u64)
+                    })
+                })
+                .reduce(PayloadTxnsSize::maximum)
+                .unwrap_or_default();
+            // Use non-backpressure reduced values for computing fill_fraction
+            let max_fill_fraction =
+                (max_pending_block_size.count() as f32 / self.max_block_txns.count() as f32).max(
+                    max_pending_block_size.size_in_bytes() as f32
+                        / self.max_block_txns.size_in_bytes() as f32,
+                );
+            PROPOSER_PENDING_BLOCKS_COUNT.set(pending_blocks.len() as i64);
+            PROPOSER_PENDING_BLOCKS_FILL_FRACTION.set(max_fill_fraction as f64);
+
+            let pending_validator_txn_hashes: HashSet<HashValue> = pending_blocks
+                .iter()
+                .filter_map(|block| block.validator_txns())
+                .flatten()
+                .map(ValidatorTransaction::hash)
+                .collect();
+            let validator_txn_filter =
+                vtxn_pool::TransactionFilter::PendingTxnHashSet(pending_validator_txn_hashes);
+
+            let (validator_txns, mut payload) = self
+                .payload_client
+                .pull_payload(
+                    PayloadPullParameters {
+                        max_poll_time: self.quorum_store_poll_time.saturating_sub(proposal_delay),
+                        max_txns: max_block_txns,
+                        max_txns_after_filtering: max_block_txns_after_filtering,
+                        soft_max_txns_after_filtering: max_txns_from_block_to_execute
+                            .unwrap_or(max_block_txns_after_filtering),
+                        max_inline_txns: self.max_inline_txns,
+                        maybe_optqs_payload_pull_params,
+                        user_txn_filter: payload_filter,
+                        pending_ordering,
+                        pending_uncommitted_blocks: pending_blocks.len(),
+                        recent_max_fill_fraction: max_fill_fraction,
+                        block_timestamp: timestamp,
+                    },
+                    validator_txn_filter,
+                    wait_callback,
+                )
+                .await
+                .context("Fail to retrieve payload")?;
+
+            if !payload.is_direct()
+                && max_txns_from_block_to_execute.is_some()
+                && max_txns_from_block_to_execute.map_or(false, |v| payload.len() as u64 > v)
+            {
+                payload = payload.transform_to_quorum_store_v2(max_txns_from_block_to_execute);
+            }
+            (validator_txns, payload, timestamp.as_micros() as u64)
+        };
+
+        let failed_authors = vec![];
+        let validator_txns = if self.vtxn_config.enabled() {
+            validator_txns
+        } else {
+            vec![]
+        };
+
+        let block = OptBlockData::new_proposal(
+            validator_txns,
+            payload,
+            self.author,
+            failed_authors,
+            epoch,
+            round,
+            timestamp,
+            parent_id,
+            grandparent_qc,
+        );
 
         Ok(block)
     }
