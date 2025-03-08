@@ -40,7 +40,7 @@ fn verify_signature() {
         *sender.address(),
         0,
         &private_key,
-        sender.account().pubkey.as_ed25519().unwrap(),
+        sender.account().public_key().clone(),
         program,
     );
 
@@ -70,9 +70,9 @@ fn verify_multi_agent_invalid_sender_signature() {
         vec![*secondary_signer.address()],
         10,
         &private_key,
-        sender.account().pubkey.as_ed25519().unwrap(),
-        vec![&secondary_signer.account().privkey],
-        vec![secondary_signer.account().pubkey.as_ed25519().unwrap()],
+        sender.account().public_key().clone(),
+        vec![secondary_signer.account().private_key()],
+        vec![secondary_signer.account().public_key().clone()],
         None,
     );
     assert_prologue_parity!(
@@ -99,10 +99,10 @@ fn verify_multi_agent_invalid_secondary_signature() {
         *sender.address(),
         vec![*secondary_signer.address()],
         10,
-        &sender.account().privkey,
-        sender.account().pubkey.as_ed25519().unwrap(),
+        &sender.account().private_key(),
+        sender.account().public_key().clone(),
         vec![&private_key],
-        vec![secondary_signer.account().pubkey.as_ed25519().unwrap()],
+        vec![secondary_signer.account().public_key().clone()],
         None,
     );
     assert_prologue_parity!(
@@ -133,17 +133,17 @@ fn verify_multi_agent_duplicate_secondary_signer() {
             *secondary_signer.address(),
         ],
         10,
-        &sender.account().privkey,
-        sender.account().pubkey.as_ed25519().unwrap(),
+        &sender.account().private_key(),
+        sender.account().public_key().clone(),
         vec![
-            &secondary_signer.account().privkey,
-            &third_signer.account().privkey,
-            &secondary_signer.account().privkey,
+            &secondary_signer.account().private_key(),
+            &third_signer.account().private_key(),
+            &secondary_signer.account().private_key(),
         ],
         vec![
-            secondary_signer.account().pubkey.as_ed25519().unwrap(),
-            third_signer.account().pubkey.as_ed25519().unwrap(),
-            secondary_signer.account().pubkey.as_ed25519().unwrap(),
+            secondary_signer.account().public_key().clone(),
+            third_signer.account().public_key().clone(),
+            secondary_signer.account().public_key().clone(),
         ],
         None,
     );
@@ -213,8 +213,8 @@ fn verify_simple_payment() {
         .gas_unit_price(1)
         .raw()
         .sign(
-            &sender.account().privkey,
-            sender.account().pubkey.as_ed25519().unwrap(),
+            sender.account().private_key(),
+            sender.account().public_key().clone(),
         )
         .unwrap()
         .into_inner();
@@ -433,7 +433,7 @@ fn verify_expiration_time() {
     let mut executor = FakeExecutor::from_head_genesis();
     let sender = executor.create_raw_account_data(900_000, 0);
     executor.add_account_data(&sender);
-    let private_key = &sender.account().privkey;
+    let private_key = sender.account().private_key();
     let txn = transaction_test_helpers::get_test_signed_transaction(
         *sender.address(),
         0, /* sequence_number */
@@ -495,7 +495,7 @@ fn verify_max_sequence_number() {
     let mut executor = FakeExecutor::from_head_genesis();
     let sender = executor.create_raw_account_data(900_000, std::u64::MAX);
     executor.add_account_data(&sender);
-    let private_key = &sender.account().privkey;
+    let private_key = sender.account().private_key();
     let txn = transaction_test_helpers::get_test_signed_transaction(
         *sender.address(),
         std::u64::MAX, /* sequence_number */
