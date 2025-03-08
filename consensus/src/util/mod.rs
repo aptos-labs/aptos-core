@@ -25,10 +25,6 @@ pub fn is_vtxn_expected(
 }
 
 pub fn calculate_window_start_round(current_round: Round, window_size: u64) -> Round {
-    assert!(current_round > 0);
     assert!(window_size > 0);
-    (current_round + 1)
-        .saturating_sub(window_size)
-        // Window cannot start at genesis
-        .max(1)
+    (current_round + 1).saturating_sub(window_size)
 }

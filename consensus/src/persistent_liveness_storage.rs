@@ -163,16 +163,6 @@ impl LedgerRecoveryData {
             (root_ordered_cert, root_commit_cert)
         };
 
-        if commit_block.is_genesis_block() {
-            return Ok(RootInfo {
-                commit_root_block: Box::new(commit_block),
-                window_root_block: None,
-                quorum_cert: commit_block_quorum_cert,
-                ordered_cert: root_ordered_cert,
-                commit_cert: root_commit_cert,
-            });
-        }
-
         let window_start_round = calculate_window_start_round(commit_block.round(), window_size);
         let mut id_to_blocks = HashMap::new();
         blocks.iter().for_each(|block| {
