@@ -162,8 +162,7 @@ impl UnitTestingConfig {
                     .collect(),
                 ..Default::default()
             };
-            let (files, units, opt_env) = build_and_report_v2_driver(options).unwrap();
-            let env = opt_env.expect("v2 driver should return env");
+            let (files, units, env) = build_and_report_v2_driver(options).unwrap();
             let test_plan = plan_builder_v2::construct_test_plan(&env, None);
             (test_plan, files, units)
         };

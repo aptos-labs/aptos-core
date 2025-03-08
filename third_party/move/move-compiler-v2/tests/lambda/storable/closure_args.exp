@@ -118,7 +118,7 @@ error: captured value is missing abilities `store`
     │
     = expected function type: `|u64|u64 with store`
 
-error: non-public function resulting from lambda lifting is missing the `store` ability
+error: function resulting from lambda lifting is missing the `store` ability
     ┌─ tests/lambda/storable/closure_args.move:223:17
     │
 223 │                 |x| x * 2
@@ -193,7 +193,7 @@ error: captured value is missing abilities `copy`
     │
     = expected function type: `|u64|u64 with copy+store`
 
-error: non-public function resulting from lambda lifting is missing the `store` ability
+error: function resulting from lambda lifting is missing the `store` ability
     ┌─ tests/lambda/storable/closure_args.move:283:17
     │
 283 │                 |x| x * 2

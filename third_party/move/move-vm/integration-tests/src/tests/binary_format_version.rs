@@ -6,10 +6,10 @@ use move_binary_format::{
     file_format::{basic_test_module, basic_test_script},
     file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_MAX},
 };
-use move_core_types::{account_address::AccountAddress, vm_status::StatusCode};
+use move_core_types::vm_status::StatusCode;
 use move_vm_runtime::{
     config::VMConfig, module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage,
-    AsUnsyncModuleStorage, RuntimeEnvironment, StagingModuleStorage,
+    AsUnsyncModuleStorage, RuntimeEnvironment, StagingModuleStorage, WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -28,51 +28,20 @@ fn test_publish_module_with_custom_max_binary_format_version() {
     {
         let storage = InMemoryStorage::new();
 
-        let natives = move_stdlib::natives::all_natives(
-            AccountAddress::from_hex_literal("0x1").unwrap(),
-            move_stdlib::natives::GasParameters::zeros(),
-        );
-        let runtime_environment = RuntimeEnvironment::new(natives);
-        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
-        let mut sess = vm.new_session(&storage);
-
-        if vm.vm_config().use_loader_v2 {
-            let module_storage = storage.as_unsync_module_storage(runtime_environment);
-            let new_module_storage =
-                StagingModuleStorage::create(m.self_addr(), &module_storage, vec![b_new
-                    .clone()
-                    .into()])
-                .expect("New module should be publishable");
-            StagingModuleStorage::create(m.self_addr(), &new_module_storage, vec![b_old
+        let module_storage = storage.as_unsync_module_storage();
+        let new_module_storage =
+            StagingModuleStorage::create(m.self_addr(), &module_storage, vec![b_new
                 .clone()
                 .into()])
-            .expect("Old module should be publishable");
-        } else {
-            #[allow(deprecated)]
-            sess.publish_module_bundle(
-                vec![b_new.clone()],
-                *m.self_id().address(),
-                &mut UnmeteredGasMeter,
-            )
-            .unwrap();
-
-            #[allow(deprecated)]
-            sess.publish_module_bundle(
-                vec![b_old.clone()],
-                *m.self_id().address(),
-                &mut UnmeteredGasMeter,
-            )
-            .unwrap();
-        }
+            .expect("New module should be publishable");
+        StagingModuleStorage::create(m.self_addr(), &new_module_storage, vec![b_old
+            .clone()
+            .into()])
+        .expect("Old module should be publishable");
     }
 
     // Should reject the module with newer version with max binary format version being set to VERSION_MAX - 1
     {
-        let storage = InMemoryStorage::new();
-        let natives = move_stdlib::natives::all_natives(
-            AccountAddress::from_hex_literal("0x1").unwrap(),
-            move_stdlib::natives::GasParameters::zeros(),
-        );
         let vm_config = VMConfig {
             deserializer_config: DeserializerConfig::new(
                 VERSION_MAX.checked_sub(1).unwrap(),
@@ -80,44 +49,20 @@ fn test_publish_module_with_custom_max_binary_format_version() {
             ),
             ..Default::default()
         };
-        let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
-        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
-        let mut sess = vm.new_session(&storage);
+        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
+        let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
 
-        if vm.vm_config().use_loader_v2 {
-            let module_storage = storage.as_unsync_module_storage(runtime_environment);
-            let result = StagingModuleStorage::create(m.self_addr(), &module_storage, vec![b_new
-                .clone()
-                .into()]);
-            if let Err(err) = result {
-                assert_eq!(err.major_status(), StatusCode::UNKNOWN_VERSION);
-            } else {
-                panic!("Module publishing should fail")
-            }
-            StagingModuleStorage::create(m.self_addr(), &module_storage, vec![b_old
-                .clone()
-                .into()])
-            .unwrap();
+        let module_storage = storage.as_unsync_module_storage();
+        let result = StagingModuleStorage::create(m.self_addr(), &module_storage, vec![b_new
+            .clone()
+            .into()]);
+        if let Err(err) = result {
+            assert_eq!(err.major_status(), StatusCode::UNKNOWN_VERSION);
         } else {
-            #[allow(deprecated)]
-            let s = sess
-                .publish_module_bundle(
-                    vec![b_new.clone()],
-                    *m.self_id().address(),
-                    &mut UnmeteredGasMeter,
-                )
-                .unwrap_err()
-                .major_status();
-            assert_eq!(s, StatusCode::UNKNOWN_VERSION);
-
-            #[allow(deprecated)]
-            sess.publish_module_bundle(
-                vec![b_old.clone()],
-                *m.self_id().address(),
-                &mut UnmeteredGasMeter,
-            )
-            .unwrap();
+            panic!("Module publishing should fail")
         }
+        StagingModuleStorage::create(m.self_addr(), &module_storage, vec![b_old.clone().into()])
+            .unwrap();
     }
 }
 
@@ -135,14 +80,9 @@ fn test_run_script_with_custom_max_binary_format_version() {
     // Should accept both modules with the default settings
     {
         let storage = InMemoryStorage::new();
-        let natives = move_stdlib::natives::all_natives(
-            AccountAddress::from_hex_literal("0x1").unwrap(),
-            move_stdlib::natives::GasParameters::zeros(),
-        );
-        let runtime_environment = RuntimeEnvironment::new(natives);
-        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
+        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
         let mut sess = vm.new_session(&storage);
-        let code_storage = storage.as_unsync_code_storage(runtime_environment);
+        let code_storage = storage.as_unsync_code_storage();
 
         let args: Vec<Vec<u8>> = vec![];
         sess.execute_script(
@@ -168,11 +108,6 @@ fn test_run_script_with_custom_max_binary_format_version() {
 
     // Should reject the module with newer version with max binary format version being set to VERSION_MAX - 1
     {
-        let storage = InMemoryStorage::new();
-        let natives = move_stdlib::natives::all_natives(
-            AccountAddress::from_hex_literal("0x1").unwrap(),
-            move_stdlib::natives::GasParameters::zeros(),
-        );
         let vm_config = VMConfig {
             deserializer_config: DeserializerConfig::new(
                 VERSION_MAX.checked_sub(1).unwrap(),
@@ -180,10 +115,11 @@ fn test_run_script_with_custom_max_binary_format_version() {
             ),
             ..Default::default()
         };
-        let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
-        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
+        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
+        let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
+        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
         let mut sess = vm.new_session(&storage);
-        let code_storage = storage.as_unsync_code_storage(runtime_environment);
+        let code_storage = storage.as_unsync_code_storage();
 
         let args: Vec<Vec<u8>> = vec![];
         assert_eq!(

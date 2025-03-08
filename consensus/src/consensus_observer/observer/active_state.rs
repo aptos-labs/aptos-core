@@ -42,6 +42,9 @@ pub struct ActiveObserverState {
     // The current epoch state
     epoch_state: Option<Arc<EpochState>>,
 
+    // Execution pool window size (if none, execution pool is disabled)
+    execution_pool_window_size: Option<u64>,
+
     // Whether quorum store is enabled for the current epoch
     quorum_store_enabled: bool,
 
@@ -78,8 +81,9 @@ impl ActiveObserverState {
         Self {
             node_config,
             consensus_publisher,
-            epoch_state: None,
-            quorum_store_enabled: false,
+            epoch_state: None,                // This is updated on epoch change
+            execution_pool_window_size: None, // This is updated by the on-chain configs
+            quorum_store_enabled: false,      // This is updated by the on-chain configs
             reconfig_events,
             root: Arc::new(Mutex::new(root)),
         }
@@ -134,6 +138,11 @@ impl ActiveObserverState {
             .expect("The epoch state is not set! This should never happen!")
     }
 
+    /// Returns the execution pool window size
+    pub fn execution_pool_window_size(&self) -> Option<u64> {
+        self.execution_pool_window_size
+    }
+
     /// Returns true iff the quorum store is enabled for the current epoch
     pub fn is_quorum_store_enabled(&self) -> bool {
         self.quorum_store_enabled
@@ -168,11 +177,12 @@ impl ActiveObserverState {
 
         // Update the local epoch state and quorum store config
         self.epoch_state = Some(epoch_state.clone());
+        self.execution_pool_window_size = consensus_config.window_size();
         self.quorum_store_enabled = consensus_config.quorum_store_enabled();
         info!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                "New epoch started: {:?}. Updated the epoch state! Quorum store enabled: {:?}",
-                epoch_state.epoch, self.quorum_store_enabled,
+                "New epoch started: {:?}. Execution pool window: {:?}. Quorum store enabled: {:?}",
+                epoch_state.epoch, self.execution_pool_window_size, self.quorum_store_enabled,
             ))
         );
 
@@ -506,16 +516,21 @@ mod test {
         let mut observer_state =
             ActiveObserverState::new_with_root(NodeConfig::default(), reconfig_events, None, root);
 
+        // Verify that the execution pool window size is not set
+        assert!(observer_state.execution_pool_window_size().is_none());
+
         // Verify that quorum store is not enabled
         assert!(!observer_state.is_quorum_store_enabled());
 
-        // Manually update the epoch state and quorum store flag
+        // Manually update the epoch state, execution pool window, and quorum store flag
         let epoch_state = Arc::new(EpochState::empty());
         observer_state.epoch_state = Some(epoch_state.clone());
+        observer_state.execution_pool_window_size = Some(1);
         observer_state.quorum_store_enabled = true;
 
         // Verify the epoch state and quorum store flag are updated
         assert_eq!(observer_state.epoch_state(), epoch_state);
+        assert_eq!(observer_state.execution_pool_window_size(), Some(1));
         assert!(observer_state.is_quorum_store_enabled());
     }
 

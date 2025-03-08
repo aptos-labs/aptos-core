@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Experiment, Options};
+use crate::Options;
 use codespan_reporting::diagnostic::Severity;
 use ethnum::U256;
 use itertools::Itertools;
@@ -10,6 +10,7 @@ use move_core_types::ability::Ability;
 use move_model::{
     ast::{Exp, ExpData, MatchArm, Operation, Pattern, SpecBlockTarget, TempIndex, Value},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
+    metadata::LanguageVersion,
     model::{
         FieldId, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId,
         QualifiedInstId, StructId,
@@ -330,7 +331,10 @@ impl<'env> Generator<'env> {
             .env()
             .get_extension::<Options>()
             .expect("Options is available");
-        options.experiment_on(Experiment::FUNCTION_VALUES)
+        options
+            .language_version
+            .unwrap_or_default()
+            .is_at_least(LanguageVersion::V2_2)
     }
 
     fn expect_function_values_enabled(&self, id: NodeId) {
