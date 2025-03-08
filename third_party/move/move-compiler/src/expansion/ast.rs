@@ -17,7 +17,6 @@ use crate::{
         *,
     },
 };
-use move_binary_format::file_format;
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
 use std::{
@@ -232,13 +231,20 @@ pub struct Function {
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct AccessSpecifier_ {
-    pub kind: file_format::AccessKind,
+    pub kind: AccessSpecifierKind,
     pub negated: bool,
     pub module_address: Option<Address>,
     pub module_name: Option<ModuleName>,
     pub resource_name: Option<Name>,
     pub type_args: Option<Vec<Type>>,
     pub address: AddressSpecifier,
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub enum AccessSpecifierKind {
+    Reads,
+    Writes,
+    LegacyAcquires,
 }
 
 pub type AccessSpecifier = Spanned<AccessSpecifier_>;

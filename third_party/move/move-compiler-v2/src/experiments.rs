@@ -204,10 +204,10 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         },
         Experiment {
             name: Experiment::GEN_ACCESS_SPECIFIERS.to_string(),
-            description: "Whether to generate access specifiers in the file format.\
-             This is currently off by default to mitigate bug #12623."
+            description: "Whether to generate access specifiers in the file format if \
+            language version supports them."
                 .to_string(),
-            default: Given(false),
+            default: Given(true),
         },
         Experiment {
             name: Experiment::ATTACH_COMPILED_MODULE.to_string(),
