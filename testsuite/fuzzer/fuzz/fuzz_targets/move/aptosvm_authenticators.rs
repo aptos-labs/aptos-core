@@ -97,7 +97,7 @@ fn run_case(input: TransactionState) -> Result<(), Corpus> {
     let raw_tx = tx.raw();
     let tx = match tx_auth_type {
         FuzzerTransactionAuthenticator::Ed25519 { sender: _ } => raw_tx
-            .sign(&sender_acc.privkey, sender_acc.pubkey.as_ed25519().unwrap())
+            .sign(sender_acc.private_key(), sender_acc.public_key().clone())
             .map_err(|_| Corpus::Keep)?
             .into_inner(),
         FuzzerTransactionAuthenticator::Keyless {
@@ -402,10 +402,10 @@ fn run_case(input: TransactionState) -> Result<(), Corpus> {
                 .map(|acc| acc.convert_account(&mut vm))
                 .collect();
             let secondary_signers = secondary_accs.iter().map(|acc| *acc.address()).collect();
-            let secondary_private_keys = secondary_accs.iter().map(|acc| &acc.privkey).collect();
+            let secondary_private_keys = secondary_accs.iter().map(|acc| acc.private_key()).collect();
             raw_tx
                 .sign_multi_agent(
-                    &sender_acc.privkey,
+                    sender_acc.private_key(),
                     secondary_signers,
                     secondary_private_keys,
                 )
@@ -427,15 +427,15 @@ fn run_case(input: TransactionState) -> Result<(), Corpus> {
                 .collect();
 
             let secondary_signers = secondary_accs.iter().map(|acc| *acc.address()).collect();
-            let secondary_private_keys = secondary_accs.iter().map(|acc| &acc.privkey).collect();
+            let secondary_private_keys = secondary_accs.iter().map(|acc| acc.private_key()).collect();
             let fee_payer_acc = fee_payer.convert_account(&mut vm);
             raw_tx
                 .sign_fee_payer(
-                    &sender_acc.privkey,
+                    sender_acc.private_key(),
                     secondary_signers,
                     secondary_private_keys,
                     *fee_payer_acc.address(),
-                    &fee_payer_acc.privkey,
+                    fee_payer_acc.private_key(),
                 )
                 .map_err(|_| Corpus::Keep)?
                 .into_inner()
