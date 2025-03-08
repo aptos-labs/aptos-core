@@ -24,7 +24,7 @@ use aptos_validator_interface::{
     AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView, RestDebuggerInterface,
 };
 use aptos_vm::{
-    aptos_vm::AptosVMBlockExecutor, data_cache::AsMoveResolver, AptosVM, VMBlockExecutor,
+    aptos_vm::AptosVMBlockExecutor, data_cache::AsMoveResolver, AptosVm, VMBlockExecutor,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -132,7 +132,7 @@ impl AptosDebugger {
         }
 
         let env = AptosEnvironment::new(&state_view);
-        let vm = AptosVM::new(&env, &state_view);
+        let vm = AptosVm::new(&env, &state_view);
         let resolver = state_view.as_move_resolver();
         let code_storage = state_view.as_aptos_code_storage(&env);
 

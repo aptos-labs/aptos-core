@@ -7,7 +7,7 @@ use crate::{
         session::view_with_change_set::ExecutorViewWithChangeSet, AptosMoveResolver, SessionExt,
         SessionId,
     },
-    AptosVM,
+    AptosVm,
 };
 use aptos_types::transaction::user_transaction_context::UserTransactionContext;
 use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
@@ -36,7 +36,7 @@ pub struct RespawnedSession<'r> {
 
 impl<'r> RespawnedSession<'r> {
     pub fn spawn(
-        vm: &AptosVM,
+        vm: &AptosVm,
         session_id: SessionId,
         base: &'r impl AptosMoveResolver,
         previous_session_change_set: VMChangeSet,

@@ -45,7 +45,7 @@ use aptos_transaction_generator_lib::{
     TransactionType::{self, CoinTransfer},
 };
 use aptos_types::on_chain_config::{FeatureFlag, Features};
-use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
+use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVm, VMBlockExecutor};
 use db_generator::create_db_with_accounts;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use metrics::TIMER;
@@ -819,9 +819,9 @@ pub fn run_single_with_default_params(
 ) {
     aptos_logger::Logger::new().init();
 
-    AptosVM::set_num_shards_once(1);
-    AptosVM::set_concurrency_level_once(concurrency_level);
-    AptosVM::set_processed_transactions_detailed_counters();
+    AptosVm::set_num_shards_once(1);
+    AptosVm::set_concurrency_level_once(concurrency_level);
+    AptosVm::set_processed_transactions_detailed_counters();
 
     rayon::ThreadPoolBuilder::new()
         .thread_name(|index| format!("rayon-global-{}", index))
@@ -935,7 +935,7 @@ mod tests {
         state_store::state_key::inner::StateKeyInner,
         transaction::{Transaction, TransactionPayload},
     };
-    use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
+    use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVm, VMBlockExecutor};
     use itertools::Itertools;
     use move_core_types::language_storage::StructTag;
     use rand::thread_rng;
@@ -1221,9 +1221,9 @@ mod tests {
 
     #[test]
     fn test_publish_transaction() {
-        AptosVM::set_num_shards_once(1);
-        AptosVM::set_concurrency_level_once(4);
-        AptosVM::set_processed_transactions_detailed_counters();
+        AptosVm::set_num_shards_once(1);
+        AptosVm::set_concurrency_level_once(4);
+        AptosVm::set_processed_transactions_detailed_counters();
         test_generic_benchmark::<AptosVMBlockExecutor>(
             Some(TransactionTypeArg::RepublishAndCall),
             true,
@@ -1232,9 +1232,9 @@ mod tests {
 
     #[test]
     fn test_benchmark_transaction() {
-        AptosVM::set_num_shards_once(4);
-        AptosVM::set_concurrency_level_once(4);
-        AptosVM::set_processed_transactions_detailed_counters();
+        AptosVm::set_num_shards_once(4);
+        AptosVm::set_concurrency_level_once(4);
+        AptosVm::set_processed_transactions_detailed_counters();
         NativeConfig::set_concurrency_level_once(4);
         test_generic_benchmark::<AptosVMBlockExecutor>(
             Some(TransactionTypeArg::ModifyGlobalMilestoneAggV2),

@@ -38,7 +38,7 @@ use aptos_types::{
     vm_status::StatusCode,
     AptosCoinType, CoinType,
 };
-use aptos_vm::{AptosSimulationVM, AptosVM};
+use aptos_vm::{AptosSimulationVM, AptosVm};
 use move_core_types::{ident_str, language_storage::ModuleId, vm_status::VMStatus};
 use poem_openapi::{
     param::{Path, Query},
@@ -563,7 +563,7 @@ impl TransactionsApi {
                             AptosErrorCode::InvalidInput,
                         )
                     })?;
-                let output = AptosVM::execute_view_function(
+                let output = AptosVm::execute_view_function(
                     &state_view,
                     ModuleId::new(AccountAddress::ONE, ident_str!("coin").into()),
                     ident_str!("balance").into(),

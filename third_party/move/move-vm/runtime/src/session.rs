@@ -4,10 +4,10 @@
 
 use crate::{
     data_cache::TransactionDataCache, loader::LoadedFunction, module_traversal::TraversalContext,
-    move_vm::MoveVM, native_extensions::NativeContextExtensions,
+    move_vm::MoveVm, native_extensions::NativeContextExtensions,
     storage::module_storage::ModuleStorage, CodeStorage,
 };
-use move_binary_format::{errors::*, file_format::LocalIndex};
+use move_binary_format::errors::*;
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Changes},
@@ -28,9 +28,6 @@ pub struct Session<'r> {
 /// Simple struct is designed just to convey meaning behind serialized values
 #[derive(Debug)]
 pub struct SerializedReturnValues {
-    /// The value of any arguments that were mutably borrowed.
-    /// Non-mut borrowed values are not included
-    pub mutable_reference_outputs: Vec<(LocalIndex, Vec<u8>, MoveTypeLayout)>,
     /// The return values from the function
     pub return_values: Vec<(Vec<u8>, MoveTypeLayout)>,
 }
@@ -62,7 +59,7 @@ impl<'r> Session<'r> {
             .finish(Location::Module(module_id)));
         }
 
-        MoveVM::execute_loaded_function(
+        MoveVm::execute_loaded_function(
             func,
             args,
             &mut self.data_cache,
@@ -86,7 +83,7 @@ impl<'r> Session<'r> {
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
         let func = module_storage.load_function(module_id, function_name, &ty_args)?;
-        MoveVM::execute_loaded_function(
+        MoveVm::execute_loaded_function(
             func,
             args,
             &mut self.data_cache,
@@ -105,7 +102,7 @@ impl<'r> Session<'r> {
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
-        MoveVM::execute_loaded_function(
+        MoveVm::execute_loaded_function(
             func,
             args,
             &mut self.data_cache,
@@ -142,7 +139,7 @@ impl<'r> Session<'r> {
         code_storage: &impl CodeStorage,
     ) -> VMResult<()> {
         let main = code_storage.load_script(script.borrow(), &ty_args)?;
-        MoveVM::execute_loaded_function(
+        MoveVm::execute_loaded_function(
             main,
             args,
             &mut self.data_cache,

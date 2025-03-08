@@ -5,7 +5,7 @@ use crate::compiler::{as_module, as_script, compile_units};
 use move_bytecode_verifier::VerifierConfig;
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::{
-    config::VMConfig, module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage,
+    config::VMConfig, module_traversal::*, move_vm::MoveVm, AsUnsyncCodeStorage,
     AsUnsyncModuleStorage, RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
@@ -108,10 +108,9 @@ fn test_run_script_with_nested_loops() {
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
-        let vm = MoveVM::new();
         let code_storage = storage.as_unsync_code_storage();
 
-        let mut sess = vm.new_session(&storage);
+        let mut sess = MoveVm::new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];
         sess.load_and_execute_script(
             s_blob.clone(),
@@ -135,10 +134,9 @@ fn test_run_script_with_nested_loops() {
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
-        let vm = MoveVM::new();
         let code_storage = storage.as_unsync_code_storage();
 
-        let mut sess = vm.new_session(&storage);
+        let mut sess = MoveVm::new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];
         sess.load_and_execute_script(
             s_blob,

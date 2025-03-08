@@ -11,7 +11,7 @@ pub(crate) mod write_op_converter;
 pub use crate::move_vm_ext::{
     resolver::{AptosMoveResolver, AsExecutorView, AsResourceGroupView, ResourceGroupResolver},
     session::{convert_modules_into_write_ops, SessionExt},
-    vm::{GenesisMoveVM, GenesisRuntimeBuilder, MoveVmExt},
+    vm::{GenesisMoveVm, GenesisRuntimeBuilder, MoveVmExt},
 };
 use aptos_types::state_store::state_key::StateKey;
 pub use aptos_types::transaction::user_transaction_context::UserTransactionContext;
