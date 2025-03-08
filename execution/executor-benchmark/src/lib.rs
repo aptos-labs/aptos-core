@@ -830,6 +830,10 @@ pub fn run_single_with_default_params(
 
     let verify_sequence_numbers = false;
     let is_keyless = false;
+    let print_transactions = match mode {
+        SingleRunMode::TEST => true,
+        SingleRunMode::BENCHMARK { .. } => false,
+    };
     let num_accounts = match mode {
         SingleRunMode::TEST => 100,
         SingleRunMode::BENCHMARK { .. } => 100000,
@@ -859,12 +863,13 @@ pub fn run_single_with_default_params(
 
     let init_pipeline_config = PipelineConfig {
         num_sig_verify_threads: std::cmp::max(1, num_cpus::get() / 3),
+        print_transactions,
         ..Default::default()
     };
 
     create_db_with_accounts::<AptosVMBlockExecutor>(
         num_accounts,   /* num_accounts */
-        10_000_000_000, /* init_account_balance */
+        100_000_0000_0000, /* init_account_balance */
         10000,          /* block_size */
         &storage_dir,
         NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
@@ -880,6 +885,7 @@ pub fn run_single_with_default_params(
     let execute_pipeline_config = PipelineConfig {
         generate_then_execute: true,
         num_sig_verify_threads: std::cmp::max(1, num_cpus::get() / 3),
+        print_transactions,
         ..Default::default()
     };
 
