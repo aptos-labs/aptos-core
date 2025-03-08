@@ -31,8 +31,6 @@ use aptos_types::{block_info::Round, validator_signer::ValidatorSigner};
 /// 2. [`OrderedBlockWindow`](aptos_consensus_types::pipelined_block::OrderedBlockWindow)
 ///    excludes the current block.
 /// 3. Block rounds are in ascending order (oldest -> newest).
-/// 4. Confirm that the genesis block is not included in the
-///    [`OrderedBlockWindow`](aptos_consensus_types::pipelined_block::OrderedBlockWindow).
 #[tokio::test]
 async fn test_execution_pool_block_window_3_no_commit() {
     let window_size: Option<u64> = Some(3);
@@ -54,15 +52,18 @@ async fn test_execution_pool_block_window_3_no_commit() {
     assert_eq!(genesis_pipelined_block.parent_id(), HashValue::zero());
     let mut curr_pipelined_block = genesis_pipelined_block.clone();
 
-    // Getting the ordered block window for a genesis block should return an error
+    // Getting the ordered block window for a genesis block should return an empty window
+    // | blocks inserted | window_size | round | ordered_block_window block count |
+    // |-----------------|-------------|-------|----------------------------------|
+    // | 0               | 3           | 0     | 0                                |
     let block = curr_pipelined_block.block();
-    assert!(block_store
-        .get_ordered_block_window(block, window_size)
-        .is_err());
+    let blocks = get_blocks_from_block_store_and_window(block_store.clone(), block, window_size);
+    assert_eq!(blocks.len(), 0);
+    assert_eq!(round, 0);
 
     // | blocks inserted | window_size | round | ordered_block_window block count |
     // |-----------------|-------------|-------|----------------------------------|
-    // | 1               | 3           | 1     | 0                                |
+    // | 1               | 3           | 1     | 1                                |
     round += 1;
     curr_pipelined_block = inserter
         .insert_block(&curr_pipelined_block, round, None)
@@ -70,13 +71,12 @@ async fn test_execution_pool_block_window_3_no_commit() {
     let block = curr_pipelined_block.block();
     let blocks = get_blocks_from_block_store_and_window(block_store.clone(), block, window_size);
 
-    // Confirm that the genesis block is NOT included in the OrderedBlockWindow
-    assert_eq!(blocks.len(), 0);
+    assert_eq!(blocks.len(), 1);
     assert_eq!(round, 1);
 
     // | blocks inserted | window_size | round | ordered_block_window block count |
     // |-----------------|-------------|-------|----------------------------------|
-    // | 2               | 3           | 2     | 1                                |
+    // | 2               | 3           | 2     | 2                                |
     round += 1;
     curr_pipelined_block = inserter
         .insert_block(&curr_pipelined_block, round, None)
@@ -86,8 +86,8 @@ async fn test_execution_pool_block_window_3_no_commit() {
         curr_pipelined_block.block(),
         window_size,
     );
-    assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks.first().unwrap().round(), 1);
+    assert_eq!(blocks.len(), 2);
+    assert_eq!(blocks.first().unwrap().round(), 0);
     assert_eq!(round, 2);
 
     // | blocks inserted | window_size | round | ordered_block_window block count |
@@ -167,17 +167,18 @@ async fn test_execution_pool_window_size_greater_than_block_store() {
     // Genesis ──> A1 ──> A2 ──> A3
     let (_, block_store, pipelined_blocks) =
         create_block_tree_no_forks::<{ NUM_BLOCKS }>(NUM_BLOCKS as u64, window_size).await;
-    let [_, a1, a2, a3] = pipelined_blocks;
+    let [genesis_block, a1, a2, a3] = pipelined_blocks;
 
-    //            ┌───────────┐
-    // Genesis ─> │ A1 ──> A2 │ ──> A3
-    //            └───────────┘
+    // ┌──────────────────────┐
+    // │ Genesis ─> A1 ──> A2 │ ──> A3
+    // └──────────────────────┘
     let blocks =
         get_blocks_from_block_store_and_window(block_store.clone(), a3.block(), window_size);
 
-    assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks.first().unwrap().id(), a1.id());
-    assert_eq!(blocks.get(1).unwrap().id(), a2.id());
+    assert_eq!(blocks.len(), 3);
+    assert_eq!(blocks.first().unwrap().id(), genesis_block.id());
+    assert_eq!(blocks.get(1).unwrap().id(), a1.id());
+    assert_eq!(blocks.get(2).unwrap().id(), a2.id());
 }
 
 #[tokio::test]
@@ -256,21 +257,24 @@ async fn test_window_root_no_forks() {
         create_block_tree_no_forks::<{ NUM_BLOCKS }>(NUM_BLOCKS as u64, window_size).await;
 
     // Genesis ──> A1 ──> ... ──> A4
-    let [genesis_block, a1, a2, _, a4] = pipelined_blocks;
+    let [genesis_block, _a1, a2, _a3, a4] = pipelined_blocks;
     let (commit_root, window_root) = block_store.get_roots(a4.block(), window_size);
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), a4.block(), window_size);
 
     // commit_root      block_window
     //      ↓                ↓
-    //              ┌──────────────────┐
-    //  Genesis ──> │ A1 ──> A2 ──> A3 │ ──> A4
-    //              └──────────────────┘
-    //                ↑
-    //           window_root
+    //  ┌───────────────────────────────┐
+    //  │ Genesis ──>  A1 ──> A2 ──> A3 │ ──> A4
+    //  └───────────────────────────────┘
+    //      ↑
+    // window_root
     assert_eq!(commit_root.id(), genesis_block.id());
-    assert_eq!(window_root.expect("Window root not found"), a1.id());
-    assert_eq!(block_window.len(), 3);
+    assert_eq!(
+        window_root.expect("Window root not found"),
+        genesis_block.id()
+    );
+    assert_eq!(block_window.len(), 4);
 
     // Prune A2
     block_store.prune_tree(a2.id());
@@ -280,14 +284,17 @@ async fn test_window_root_no_forks() {
 
     //                   commit_root
     //                        │
-    //              ┌──────── ↓ ───────┐
-    //  Genesis ──> │ A1 ──> A2 ──> A3 │ ──> A4
-    //              └──────────────────┘
-    //                ↑
-    //           window_root
+    //  ┌──────────────────── ↓ ───────┐
+    //  │ Genesis ──> A1 ──> A2 ──> A3 │ ──> A4
+    //  └──────────────────────────────┘
+    //       ↑
+    //   window_root
     assert_eq!(commit_root.id(), a2.id());
-    assert_eq!(window_root.expect("Window root not found"), a1.id());
-    assert_eq!(block_window.len(), 3);
+    assert_eq!(
+        window_root.expect("Window root not found"),
+        genesis_block.id()
+    );
+    assert_eq!(block_window.len(), 4);
 
     // ----------------------------------------------------------------------------------------- //
 
@@ -347,16 +354,19 @@ async fn test_window_root_with_forks() {
 
     // commit_root   block_window
     //      ↓             ↓
-    //              ┌───────────┐
-    //  Genesis ──> │ A1 ──> A2 │ ──> A3
-    //              └───────────┘
-    //                ↑
-    //          window_root
+    //  ┌───────────────────────┐
+    //  │ Genesis ──> A1 ──> A2 │ ──> A3
+    //  └───────────────────────┘
+    //      ↑
+    //  window_root
     // NOTE: Window root calculations are done in two places: `find_window_root` and `find_root`, update
     // both if needed
     assert_eq!(commit_root.id(), genesis_block.id());
-    assert_eq!(window_root.expect("Window root not found"), a1.id());
-    assert_eq!(block_window.len(), 2);
+    assert_eq!(
+        window_root.expect("Window root not found"),
+        genesis_block.id()
+    );
+    assert_eq!(block_window.len(), 3);
 
     // Prune A1
     block_store.prune_tree(a1.id());
@@ -366,14 +376,17 @@ async fn test_window_root_with_forks() {
 
     //   commit_root   block_window
     //           └────┐   ↓
-    //              ┌ ↓ ────────┐
-    //  Genesis ──> │ A1 ──> A2 │ ──> A3
-    //              └───────────┘
-    //                ↑
-    //          window_root
+    //  ┌──────────── ↓ ────────┐
+    //  │ Genesis ──> A1 ──> A2 │ ──> A3
+    //  └───────────────────────┘
+    //      ↑
+    //  window_root
     assert_eq!(commit_root.id(), a1.id());
-    assert_eq!(window_root.expect("Window root not found"), a1.id());
-    assert_eq!(block_window.len(), 2);
+    assert_eq!(
+        window_root.expect("Window root not found"),
+        genesis_block.id()
+    );
+    assert_eq!(block_window.len(), 3);
 
     // ----------------------------------------------------------------------------------------- //
 
@@ -480,20 +493,23 @@ async fn test_window_root_with_non_sequential_round_forks() {
 
     //      commit_root  block_window
     //            └───┐       ↓
-    //              ┌ ↓ ────────────────┐
-    //  Genesis ──> │ A1 ──>  A2 ──> A3 │ ──> A4
-    //              └───────────────────┘
-    //                ↑
-    //          window_root
+    //  ┌──────────── ↓ ────────────────┐
+    //  │ Genesis ──> A1 ──>  A2 ──> A3 │ ──> A4
+    //  └───────────────────────────────┘
+    //       ↑
+    //  window_root
     assert_eq!(commit_root.id(), a1_r1.id());
-    assert_eq!(window_root.expect("Window root not found"), a1_r1.id());
-    assert_eq!(block_window.len(), 3);
+    assert_eq!(
+        window_root.expect("Window root not found"),
+        genesis_block.id()
+    );
+    assert_eq!(block_window.len(), 4);
 
     // ----------------------------------------------------------------------------------------- //
 
     let (_, block_store, pipelined_blocks) =
         create_block_tree_with_forks_unordered_parents(window_size).await;
-    let [_genesis_block, a1_r1, a2_r3, _a3_r6, a4_r9, _b1_r2, _b2_r4, _b3_r5, _c1_r7, _d1_r8] =
+    let [genesis_block, _a1_r1, a2_r3, _a3_r6, a4_r9, _b1_r2, _b2_r4, _b3_r5, _c1_r7, _d1_r8] =
         pipelined_blocks;
     let current_block = a4_r9.block();
 
@@ -505,14 +521,17 @@ async fn test_window_root_with_non_sequential_round_forks() {
 
     //            commit_root  block_window
     //                  └──────┐    ↓
-    //              ┌───────── ↓ ───────┐
-    //  Genesis ──> │ A1 ──>  A2 ──> A3 │ ──> A4
-    //              └───────────────────┘
-    //                ↑
-    //          window_root
+    //  ┌───────────────────── ↓ ───────┐
+    //  │ Genesis ──> A1 ──>  A2 ──> A3 │ ──> A4
+    //  └───────────────────────────────┘
+    //       ↑
+    //  window_root
     assert_eq!(commit_root.id(), a2_r3.id());
-    assert_eq!(window_root.expect("Window root not found"), a1_r1.id());
-    assert_eq!(block_window.len(), 3);
+    assert_eq!(
+        window_root.expect("Window root not found"),
+        genesis_block.id()
+    );
+    assert_eq!(block_window.len(), 4);
 }
 
 /// Checks to make sure:
@@ -551,7 +570,7 @@ async fn test_window_root_with_non_sequential_round_forks_and_nil_blocks() {
 
     let (_, block_store, pipelined_blocks) =
         create_block_tree_with_forks_unordered_parents_and_nil_blocks(window_size).await;
-    let [_genesis_block, _a1_r1, _a2_r3, _a3_r6, _a4_r9, b1_r2, b2_r4, b3_r5, _c1_r7, _d1_r8] =
+    let [genesis_block, _a1_r1, _a2_r3, _a3_r6, _a4_r9, _b1_r2, b2_r4, b3_r5, _c1_r7, _d1_r8] =
         pipelined_blocks;
 
     // Nil block is at b2_r4. Setting current block to b3_r5.
@@ -560,10 +579,10 @@ async fn test_window_root_with_non_sequential_round_forks_and_nil_blocks() {
     let block_window =
         get_blocks_from_block_store_and_window(block_store.clone(), current_block, window_size);
 
-    assert_eq!(block_window.first().unwrap().id(), b1_r2.id());
+    assert_eq!(block_window.first().unwrap().id(), genesis_block.id());
 
     // Nil block is included in OrderedBlockWindow
-    assert_eq!(block_window.get(1).unwrap().id(), b2_r4.id());
+    assert_eq!(block_window.get(2).unwrap().id(), b2_r4.id());
     assert!(b2_r4.block().is_nil_block());
-    assert_eq!(block_window.len(), 2);
+    assert_eq!(block_window.len(), 3);
 }
