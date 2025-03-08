@@ -275,7 +275,8 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
                 .map(|acc| acc.convert_account(&mut vm))
                 .collect();
             let secondary_signers = secondary_accs.iter().map(|acc| *acc.address()).collect();
-            let secondary_private_keys = secondary_accs.iter().map(|acc| acc.private_key()).collect();
+            let secondary_private_keys =
+                secondary_accs.iter().map(|acc| acc.private_key()).collect();
             raw_tx
                 .sign_multi_agent(
                     sender_acc.private_key(),
@@ -300,7 +301,8 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
                 .collect();
 
             let secondary_signers = secondary_accs.iter().map(|acc| *acc.address()).collect();
-            let secondary_private_keys = secondary_accs.iter().map(|acc| acc.private_key()).collect();
+            let secondary_private_keys =
+                secondary_accs.iter().map(|acc| acc.private_key()).collect();
             let fee_payer_acc = fee_payer.convert_account(&mut vm);
             raw_tx
                 .sign_fee_payer(
