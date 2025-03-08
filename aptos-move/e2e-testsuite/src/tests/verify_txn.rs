@@ -133,7 +133,7 @@ fn verify_multi_agent_duplicate_secondary_signer() {
             *secondary_signer.address(),
         ],
         10,
-        &sender.account().private_key(),
+        sender.account().private_key(),
         sender.account().public_key().clone(),
         vec![
             secondary_signer.account().private_key(),
