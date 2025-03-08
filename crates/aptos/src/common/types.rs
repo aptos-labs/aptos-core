@@ -1109,9 +1109,9 @@ impl FromStr for OptimizationLevel {
     }
 }
 
-/// Options for compiling a move package dir
+/// Options for compiling a move package.
 #[derive(Debug, Clone, Parser)]
-pub struct MovePackageDir {
+pub struct MovePackageOptions {
     /// Path to a move package (the folder with a Move.toml file).  Defaults to current directory.
     #[clap(long, value_parser)]
     pub package_dir: Option<PathBuf>,
@@ -1155,11 +1155,9 @@ pub struct MovePackageDir {
     #[clap(long)]
     pub dev: bool,
 
-    /// Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code.
-    /// NOTE: this behavior will become the default in the future.
-    /// See <https://github.com/aptos-labs/aptos-core/issues/10335>
-    #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
-    pub check_test_code: bool,
+    /// Skip extended checks (such as checks for the #[view] attribute) on test code.
+    #[clap(long, default_value = "false")]
+    pub skip_checks_on_test_code: bool,
 
     /// Select optimization level.  Choices are "none", "default", or "extra".
     /// Level "extra" may spend more time on expensive optimizations in the future.
@@ -1201,13 +1199,13 @@ pub struct MovePackageDir {
     pub fail_on_warning: bool,
 }
 
-impl Default for MovePackageDir {
+impl Default for MovePackageOptions {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl MovePackageDir {
+impl MovePackageOptions {
     pub fn new() -> Self {
         Self {
             dev: false,
@@ -1220,7 +1218,7 @@ impl MovePackageDir {
             compiler_version: Some(CompilerVersion::latest_stable()),
             language_version: Some(LanguageVersion::latest_stable()),
             skip_attribute_checks: false,
-            check_test_code: false,
+            skip_checks_on_test_code: false,
             optimize: None,
             fail_on_warning: false,
             experiments: vec![],
