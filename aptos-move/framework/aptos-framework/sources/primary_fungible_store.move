@@ -405,4 +405,28 @@ module aptos_framework::primary_fungible_store {
         assert!(balance(user_2_address, metadata) == 10, 0);
         deposit(user_2_address, coins);
     }
+
+    #[test(user_1 = @0xcafe, user_2 = @0xface)]
+    fun test_transfer_epilogue(user_1: &signer, user_2: &signer) acquires DeriveRefPod {
+        let (creator_ref, metadata) = create_test_token(user_1);
+        let (mint_ref, _, _) = init_test_metadata_with_primary_store_enabled(&creator_ref);
+        let user_1_address = signer::address_of(user_1);
+        let user_2_address = signer::address_of(user_2);
+
+        // Mint 100 tokens to user_1
+        mint(&mint_ref, user_1_address, 100);
+        assert!(balance(user_1_address, metadata) == 100, 1);
+        assert!(balance(user_2_address, metadata) == 0, 2);
+
+        // First transfer: user_1 to user_2
+        transfer(user_1, metadata, user_2_address, 50);
+        assert!(balance(user_1_address, metadata) == 50, 3);
+        assert!(balance(user_2_address, metadata) == 50, 4);
+
+        // Second transfer: user_1 to user_2
+        transfer(user_1, metadata, user_2_address, 30);
+        assert!(balance(user_1_address, metadata) == 20, 5);
+        assert!(balance(user_2_address, metadata) == 80, 6);
+    }
+
 }
