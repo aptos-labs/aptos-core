@@ -11,7 +11,7 @@ use move_core_types::{
     value::{MoveTypeLayout, MoveValue},
 };
 use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues, AsUnsyncModuleStorage,
+    module_traversal::*, move_vm::MoveVm, session::SerializedReturnValues, AsUnsyncModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -51,8 +51,7 @@ fn run(
     let mut storage = InMemoryStorage::new();
     storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
-    let vm = MoveVM::new();
-    let mut sess = vm.new_session(&storage);
+    let mut sess = MoveVm::new_session(&storage);
 
     let fun_name = Identifier::new("foo").unwrap();
 
@@ -64,10 +63,7 @@ fn run(
     let module_storage = storage.as_unsync_module_storage();
     let traversal_storage = TraversalStorage::new();
 
-    let SerializedReturnValues {
-        return_values,
-        mutable_reference_outputs: _,
-    } = sess.execute_function_bypass_visibility(
+    let SerializedReturnValues { return_values } = sess.execute_function_bypass_visibility(
         &m.self_id(),
         &fun_name,
         ty_args,

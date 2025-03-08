@@ -10,7 +10,7 @@ use crate::{
         ExecutionFailure::{Expected, Unexpected},
         ExpectedFailure::*,
     },
-    AptosVM,
+    AptosVm,
 };
 use aptos_types::{
     dkg::{DKGState, DKGTrait, DKGTranscript, DefaultDKG},
@@ -48,7 +48,7 @@ enum ExecutionFailure {
     Unexpected(VMStatus),
 }
 
-impl AptosVM {
+impl AptosVm {
     pub(crate) fn process_dkg_result(
         &self,
         resolver: &impl AptosMoveResolver,

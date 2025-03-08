@@ -11,7 +11,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    config::VMConfig, module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage, RuntimeEnvironment,
+    config::VMConfig, module_traversal::*, move_vm::MoveVm, AsUnsyncCodeStorage, RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -135,8 +135,7 @@ fn script_large_ty() {
         struct_name,
     );
 
-    let move_vm = MoveVM::new();
-    let mut session = move_vm.new_session(&storage);
+    let mut session = MoveVm::new_session(&storage);
     let code_storage = storage.as_unsync_code_storage();
     let traversal_storage = TraversalStorage::new();
     let res = session

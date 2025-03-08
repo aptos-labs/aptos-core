@@ -3,7 +3,7 @@
 
 use crate::{
     move_vm_ext::{AptosMoveResolver, SessionId},
-    AptosVM,
+    AptosVm,
 };
 use aptos_types::validator_txn::ValidatorTransaction;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -12,7 +12,7 @@ use aptos_vm_types::{
 };
 use move_core_types::vm_status::VMStatus;
 
-impl AptosVM {
+impl AptosVm {
     pub(crate) fn process_validator_transaction(
         &self,
         resolver: &impl AptosMoveResolver,
