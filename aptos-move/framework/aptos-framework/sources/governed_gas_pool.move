@@ -55,6 +55,11 @@ module aptos_framework::governed_gas_pool {
     ) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
+        // return if the governed gas pool has already been initialized
+        if (exists<GovernedGasPool>(signer::address_of(aptos_framework))) {
+            return
+        };
+
         // generate a seed to be used to create the resource account hosting the delegation pool
         let seed = create_resource_account_seed(delegation_pool_creation_seed);
 
@@ -347,5 +352,13 @@ module aptos_framework::governed_gas_pool {
         assert!(coin::balance<AptosCoin>(governed_gas_pool_address()) == governed_gas_pool_balance, 3);
         assert!(coin::balance<AptosCoin>(signer::address_of(beneficiary)) == 100, 4);
     
+    }
+
+    #[test(aptos_framework = @aptos_framework)]
+    fun test_initialize_is_idempotent(aptos_framework: &signer) {
+        // initialize the governed gas pool
+        initialize_for_test(aptos_framework);
+        // initialize the governed gas pool again, no abort
+        initialize(aptos_framework, vector::empty<u8>());
     }
 }

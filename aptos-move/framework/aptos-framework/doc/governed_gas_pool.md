@@ -18,6 +18,7 @@
 -  [Function `deposit_from`](#0x1_governed_gas_pool_deposit_from)
 -  [Function `deposit_from_fungible_store`](#0x1_governed_gas_pool_deposit_from_fungible_store)
 -  [Function `deposit_gas_fee`](#0x1_governed_gas_pool_deposit_gas_fee)
+-  [Function `deposit_gas_fee_v2`](#0x1_governed_gas_pool_deposit_gas_fee_v2)
 -  [Function `get_balance`](#0x1_governed_gas_pool_get_balance)
 -  [Specification](#@Specification_1)
     -  [Function `initialize`](#@Specification_1_initialize)
@@ -411,12 +412,39 @@ Deposits gas fees into the governed gas pool.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_gas_fee">deposit_gas_fee</a>(gas_payer: <b>address</b>, gas_fee: u64) <b>acquires</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPool">GovernedGasPool</a> {
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operations_default_to_fa_apt_store_enabled">features::operations_default_to_fa_apt_store_enabled</a>()) {
+    // get the sender <b>to</b> preserve the signature but do nothing
+    <a href="governed_gas_pool.md#0x1_governed_gas_pool_governed_gas_pool_address">governed_gas_pool_address</a>();
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_governed_gas_pool_deposit_gas_fee_v2"></a>
+
+## Function `deposit_gas_fee_v2`
+
+Deposits gas fees into the governed gas pool.
+@param gas_payer The address of the account that paid the gas fees.
+@param gas_fee The amount of gas fees to be deposited.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_gas_fee_v2">deposit_gas_fee_v2</a>(gas_payer: <b>address</b>, gas_fee: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_gas_fee_v2">deposit_gas_fee_v2</a>(gas_payer: <b>address</b>, gas_fee: u64) <b>acquires</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPool">GovernedGasPool</a> {
+   <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operations_default_to_fa_apt_store_enabled">features::operations_default_to_fa_apt_store_enabled</a>()) {
         <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_from_fungible_store">deposit_from_fungible_store</a>(gas_payer, gas_fee);
     } <b>else</b> {
         <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_from">deposit_from</a>&lt;AptosCoin&gt;(gas_payer, gas_fee);
     };
-
 }
 </code></pre>
 
