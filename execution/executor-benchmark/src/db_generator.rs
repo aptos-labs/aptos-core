@@ -39,6 +39,10 @@ pub fn create_db_with_accounts<V>(
 ) where
     V: VMBlockExecutor + 'static,
 {
+    (num_accounts as u64)
+        .checked_mul(init_account_balance)
+        .expect("num_accounts * init_account_balance above u64");
+
     println!("Initializing...");
 
     if db_dir.as_ref().exists() {
