@@ -264,7 +264,7 @@ fn call_script_with_args_ty_args_signers(
     let traversal_storage = TraversalStorage::new();
 
     session
-        .execute_script(
+        .load_and_execute_script(
             script,
             ty_args,
             combine_signers_and_args(signers, non_signer_args),

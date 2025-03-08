@@ -140,7 +140,7 @@ fn script_large_ty() {
     let code_storage = storage.as_unsync_code_storage();
     let traversal_storage = TraversalStorage::new();
     let res = session
-        .execute_script(
+        .load_and_execute_script(
             script.as_ref(),
             vec![input_type],
             Vec::<Vec<u8>>::new(),

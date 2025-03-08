@@ -113,7 +113,7 @@ fn test_run_script_with_nested_loops() {
 
         let mut sess = vm.new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];
-        sess.execute_script(
+        sess.load_and_execute_script(
             s_blob.clone(),
             vec![],
             args,
@@ -140,7 +140,7 @@ fn test_run_script_with_nested_loops() {
 
         let mut sess = vm.new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];
-        sess.execute_script(
+        sess.load_and_execute_script(
             s_blob,
             vec![],
             args,

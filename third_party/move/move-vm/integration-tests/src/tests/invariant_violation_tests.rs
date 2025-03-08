@@ -82,7 +82,7 @@ fn merge_borrow_states_infinite_loop() {
     let code_storage = storage.as_unsync_code_storage();
 
     let err = session
-        .execute_script(
+        .load_and_execute_script(
             script_bytes.as_slice(),
             vec![],
             Vec::<Vec<u8>>::new(),

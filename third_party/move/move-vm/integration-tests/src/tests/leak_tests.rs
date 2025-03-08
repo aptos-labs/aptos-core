@@ -57,7 +57,7 @@ fn leak_with_abort() {
     let code_storage = storage.as_unsync_code_storage();
 
     for _ in 0..100_000 {
-        let _ = session.execute_script(
+        let _ = session.load_and_execute_script(
             script_bytes.as_slice(),
             vec![],
             Vec::<Vec<u8>>::new(),
