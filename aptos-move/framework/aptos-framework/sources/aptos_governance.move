@@ -699,8 +699,6 @@ module aptos_framework::aptos_governance {
     public fun get_signer_testnet_only(
         core_resources: &signer, signer_address: address): signer acquires GovernanceResponsbility {
         system_addresses::assert_core_resource(core_resources);
-        // Core resources account only has mint capability in tests/testnets.
-        assert!(aptos_coin::has_mint_capability(core_resources), error::unauthenticated(EUNAUTHORIZED));
         get_signer(signer_address)
     }
 
