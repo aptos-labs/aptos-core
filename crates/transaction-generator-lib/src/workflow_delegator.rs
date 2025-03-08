@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator,
-    TransactionGeneratorCreator, WorkflowProgress,
+    account_generator::AccountGeneratorCreator, accounts_pool_wrapper::AccountsPoolWrapperCreator, call_custom_modules::{CustomModulesDelegationGeneratorCreator, UserModuleTransactionGenerator}, publishing::publish_util::Package, ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator, TransactionGeneratorCreator, WorkflowProgress
 };
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
@@ -272,6 +271,70 @@ impl WorkflowTxnGeneratorCreator {
             creators,
             stage_switch_conditions,
         }
+    }
+
+    pub async fn new_staged_with_account_pool(
+        num_accounts: usize,
+        creation_balance: u64,
+        workers: Vec<Box<dyn UserModuleTransactionGenerator>>,
+        loop_last: bool,
+        packages: Arc<Vec<(Package, LocalAccount)>>,
+        txn_factory: TransactionFactory,
+        init_txn_factory: TransactionFactory,
+        root_account: &dyn RootAccountHandle,
+        txn_executor: &dyn ReliableTransactionSubmitter,
+        stage_tracking: StageTracking,
+    ) -> Self {
+        let created_pool = Arc::new(ObjectPool::new());
+
+        let mut pool_per_stage = vec![created_pool.clone()];
+        let mut creators: Vec<Box<dyn TransactionGeneratorCreator>> = vec![];
+        let mut stage_switch_conditions = vec![
+            StageSwitchCondition::MaxTransactions(Arc::new(AtomicUsize::new(num_accounts))),
+        ];
+
+        creators.push(Box::new(AccountGeneratorCreator::new(
+            txn_factory.clone(),
+            None,
+            Some(created_pool.clone()),
+            num_accounts,
+            creation_balance,
+        )));
+
+        let mut prev_pool = created_pool;
+        let workers_len = workers.len();
+        for (index, mut worker) in workers.into_iter().enumerate() {
+            let next_pool = if loop_last && index == workers_len {
+                prev_pool.clone()
+            } else {
+                Arc::new(ObjectPool::new())
+            };
+            pool_per_stage.push(next_pool.clone());
+
+            let delegation_worker = CustomModulesDelegationGeneratorCreator::create_worker(
+                init_txn_factory.clone(),
+                root_account,
+                txn_executor,
+                &packages,
+                worker.as_mut(),
+            )
+            .await;
+
+            creators.push(Box::new(AccountsPoolWrapperCreator::new(
+                Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
+                    txn_factory.clone(),
+                    packages.clone(),
+                    delegation_worker,
+                )),
+                prev_pool.clone(),
+                Some(next_pool.clone()),
+            )));
+
+            stage_switch_conditions.push(StageSwitchCondition::WhenPoolBecomesEmpty(prev_pool));
+            prev_pool = next_pool;
+        }
+
+        Self::new(stage_tracking, creators, stage_switch_conditions)
     }
 
     pub async fn create_workload(

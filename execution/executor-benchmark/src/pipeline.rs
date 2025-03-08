@@ -44,6 +44,8 @@ pub struct PipelineConfig {
     pub partitioner_config: PartitionerV2Config,
     #[derivative(Default(value = "8"))]
     pub num_sig_verify_threads: usize,
+
+    pub print_transactions: bool,
 }
 
 pub struct Pipeline<V> {
@@ -134,6 +136,8 @@ where
             config.allow_retries,
         );
 
+        let print_transactions = config.print_transactions;
+
         let preparation_thread = std::thread::Builder::new()
             .name("block_preparation".to_string())
             .spawn(move || {
@@ -141,6 +145,12 @@ where
                 let mut processed = 0;
                 while let Ok(txns) = raw_block_receiver.recv() {
                     processed += txns.len() as u64;
+                    if print_transactions {
+                        println!("Transactions:");
+                        for txn in &txns {
+                            println!("{:?}", txn);
+                        }
+                    }
                     let exe_block_msg = preparation_stage.process(txns);
                     executable_block_sender.send(exe_block_msg).unwrap();
                 }
