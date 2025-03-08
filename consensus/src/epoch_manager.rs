@@ -1487,6 +1487,16 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 BlockStage::EPOCH_MANAGER_RECEIVED,
             );
         }
+        if let ConsensusMsg::OptProposalMsg(proposal) = &consensus_msg {
+            observe_block(
+                proposal.timestamp_usecs(),
+                BlockStage::EPOCH_MANAGER_RECEIVED,
+            );
+            observe_block(
+                proposal.timestamp_usecs(),
+                BlockStage::EPOCH_MANAGER_RECEIVED_OPT_PROPOSAL,
+            );
+        }
         // we can't verify signatures from a different epoch
         let maybe_unverified_event = self.check_epoch(peer_id, consensus_msg).await?;
 
@@ -1560,6 +1570,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) -> anyhow::Result<Option<UnverifiedEvent>> {
         match msg {
             ConsensusMsg::ProposalMsg(_)
+            | ConsensusMsg::OptProposalMsg(_)
             | ConsensusMsg::SyncInfo(_)
             | ConsensusMsg::VoteMsg(_)
             | ConsensusMsg::RoundTimeoutMsg(_)
@@ -1672,6 +1683,16 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 BlockStage::EPOCH_MANAGER_VERIFIED,
             );
         }
+        if let VerifiedEvent::OptProposalMsg(proposal) = &event {
+            observe_block(
+                proposal.timestamp_usecs(),
+                BlockStage::EPOCH_MANAGER_VERIFIED,
+            );
+            observe_block(
+                proposal.timestamp_usecs(),
+                BlockStage::EPOCH_MANAGER_VERIFIED_OPT_PROPOSAL,
+            );
+        }
         if let Err(e) = match event {
             quorum_store_event @ (VerifiedEvent::SignedBatchInfo(_)
             | VerifiedEvent::ProofOfStoreMsg(_)
@@ -1692,6 +1713,20 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 }
 
                 Self::forward_event_to(buffered_proposal_tx, peer_id, proposal_event)
+                    .context("proposal precheck sender")
+            },
+            opt_proposal_event @ VerifiedEvent::OptProposalMsg(_) => {
+                if let VerifiedEvent::OptProposalMsg(p) = &opt_proposal_event {
+                    if let Some(payload) = p.block_data().payload() {
+                        payload_manager.prefetch_payload_data(
+                            payload,
+                            p.proposer(),
+                            p.timestamp_usecs(),
+                        );
+                    }
+                }
+
+                Self::forward_event_to(buffered_proposal_tx, peer_id, opt_proposal_event)
                     .context("proposal precheck sender")
             },
             round_manager_event => Self::forward_event_to(
