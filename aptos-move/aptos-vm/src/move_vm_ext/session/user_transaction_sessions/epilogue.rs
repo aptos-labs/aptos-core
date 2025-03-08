@@ -12,7 +12,7 @@ use crate::{
         AptosMoveResolver, SessionId,
     },
     transaction_metadata::TransactionMetadata,
-    AptosVM,
+    AptosVm,
 };
 use aptos_gas_algebra::Fee;
 use aptos_types::{
@@ -38,7 +38,7 @@ pub struct EpilogueSession<'r> {
 
 impl<'r> EpilogueSession<'r> {
     pub fn on_user_session_success(
-        vm: &AptosVM,
+        vm: &AptosVm,
         txn_meta: &TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
         user_session_change_set: UserSessionChangeSet,
@@ -56,7 +56,7 @@ impl<'r> EpilogueSession<'r> {
     }
 
     pub fn on_user_session_failure(
-        vm: &AptosVM,
+        vm: &AptosVm,
         txn_meta: &TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
         previous_session_change_set: SystemSessionChangeSet,
@@ -72,7 +72,7 @@ impl<'r> EpilogueSession<'r> {
     }
 
     fn new(
-        vm: &AptosVM,
+        vm: &AptosVm,
         txn_meta: &TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
         previous_session_change_set: VMChangeSet,

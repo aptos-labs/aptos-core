@@ -8,7 +8,7 @@ use move_binary_format::{
 };
 use move_core_types::vm_status::StatusCode;
 use move_vm_runtime::{
-    config::VMConfig, module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage,
+    config::VMConfig, module_traversal::*, move_vm::MoveVm, AsUnsyncCodeStorage,
     AsUnsyncModuleStorage, RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
@@ -80,8 +80,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
     // Should accept both modules with the default settings
     {
         let storage = InMemoryStorage::new();
-        let vm = MoveVM::new();
-        let mut sess = vm.new_session(&storage);
+        let mut sess = MoveVm::new_session(&storage);
         let code_storage = storage.as_unsync_code_storage();
 
         let args: Vec<Vec<u8>> = vec![];
@@ -117,8 +116,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
-        let vm = MoveVM::new();
-        let mut sess = vm.new_session(&storage);
+        let mut sess = MoveVm::new_session(&storage);
         let code_storage = storage.as_unsync_code_storage();
 
         let args: Vec<Vec<u8>> = vec![];

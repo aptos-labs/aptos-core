@@ -11,7 +11,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_config::ChainIdResource, chain_id::ChainId, on_chain_config::OnChainConfig,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::AptosVm;
 use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
 use std::cmp::min;
 
@@ -59,9 +59,9 @@ pub fn set_aptos_vm_configurations(node_config: &NodeConfig) {
     } else {
         node_config.execution.concurrency_level
     };
-    AptosVM::set_concurrency_level_once(effective_concurrency_level as usize);
-    AptosVM::set_discard_failed_blocks(node_config.execution.discard_failed_blocks);
-    AptosVM::set_num_proof_reading_threads_once(
+    AptosVm::set_concurrency_level_once(effective_concurrency_level as usize);
+    AptosVm::set_discard_failed_blocks(node_config.execution.discard_failed_blocks);
+    AptosVm::set_num_proof_reading_threads_once(
         node_config.execution.num_proof_reading_threads as usize,
     );
 
@@ -69,7 +69,7 @@ pub fn set_aptos_vm_configurations(node_config: &NodeConfig) {
         .execution
         .processed_transactions_detailed_counters
     {
-        AptosVM::set_processed_transactions_detailed_counters();
+        AptosVm::set_processed_transactions_detailed_counters();
     }
 }
 

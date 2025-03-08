@@ -12,7 +12,7 @@ use crate::{
         AptosMoveResolver, SessionId,
     },
     transaction_metadata::TransactionMetadata,
-    AptosVM,
+    AptosVm,
 };
 use aptos_vm_types::{
     change_set::VMChangeSet, module_and_script_storage::module_storage::AptosModuleStorage,
@@ -30,7 +30,7 @@ pub struct PrologueSession<'r> {
 
 impl<'r> PrologueSession<'r> {
     pub fn new<'m>(
-        vm: &AptosVM,
+        vm: &AptosVm,
         txn_meta: &'m TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
     ) -> Self {
@@ -48,7 +48,7 @@ impl<'r> PrologueSession<'r> {
 
     pub fn into_user_session(
         self,
-        vm: &AptosVM,
+        vm: &AptosVm,
         txn_meta: &TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
         gas_feature_version: u64,

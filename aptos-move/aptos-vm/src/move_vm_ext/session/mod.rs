@@ -36,7 +36,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
+    config::VMConfig, move_vm::MoveVm, native_extensions::NativeContextExtensions,
     session::Session, AsFunctionValueExtension, ModuleStorage, VerifiedModuleBundle,
 };
 use move_vm_types::{value_serde::ValueSerDeContext, values::Value};
@@ -70,7 +70,6 @@ pub struct SessionExt<'r> {
 impl<'r> SessionExt<'r> {
     pub(crate) fn new<R: AptosMoveResolver>(
         session_id: SessionId,
-        move_vm: &MoveVM,
         chain_id: ChainId,
         features: &Features,
         vm_config: &VMConfig,
@@ -107,7 +106,7 @@ impl<'r> SessionExt<'r> {
 
         let is_storage_slot_metadata_enabled = features.is_storage_slot_metadata_enabled();
         Self {
-            inner: move_vm.new_session_with_extensions(resolver, extensions),
+            inner: MoveVm::new_session_with_extensions(resolver, extensions),
             resolver,
             is_storage_slot_metadata_enabled,
         }

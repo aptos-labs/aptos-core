@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{aptos_vm::AptosVM, block_executor::AptosTransactionOutput};
+use crate::{aptos_vm::AptosVm, block_executor::AptosTransactionOutput};
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
@@ -22,7 +22,7 @@ use fail::fail_point;
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
 pub struct AptosExecutorTask {
-    vm: AptosVM,
+    vm: AptosVm,
     id: StateViewId,
 }
 
@@ -32,7 +32,7 @@ impl ExecutorTask for AptosExecutorTask {
     type Txn = SignatureVerifiedTransaction;
 
     fn init(environment: &AptosEnvironment, state_view: &impl StateView) -> Self {
-        let vm = AptosVM::new(environment, state_view);
+        let vm = AptosVm::new(environment, state_view);
         let id = state_view.id();
         Self { vm, id }
     }
@@ -76,7 +76,7 @@ impl ExecutorTask for AptosExecutorTask {
                     ExecutionStatus::DelayedFieldsCodeInvariantError(
                         vm_status.message().cloned().unwrap_or_default(),
                     )
-                } else if AptosVM::should_restart_execution(vm_output.events()) {
+                } else if AptosVm::should_restart_execution(vm_output.events()) {
                     speculative_info!(
                         &log_context,
                         "Reconfiguration occurred: restart required".into()

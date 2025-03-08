@@ -19,18 +19,17 @@ use move_core_types::{
     language_storage::ModuleId,
 };
 use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, AsUnsyncModuleStorage, ModuleStorage,
+    module_traversal::*, move_vm::MoveVm, AsUnsyncModuleStorage, ModuleStorage,
     StagingModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 const WORKING_ACCOUNT: AccountAddress = AccountAddress::TWO;
 
 struct Adapter {
     store: InMemoryStorage,
-    vm: Arc<MoveVM>,
     functions: Vec<(ModuleId, Identifier)>,
 }
 
@@ -59,12 +58,7 @@ impl Adapter {
             ),
         ];
 
-        let vm = Arc::new(MoveVM::new());
-        Self {
-            store,
-            vm,
-            functions,
-        }
+        Self { store, functions }
     }
 
     fn publish_modules_using_loader_v2<'a, M: ModuleStorage>(
@@ -98,7 +92,7 @@ impl Adapter {
         name: &IdentStr,
         module_storage: &impl ModuleStorage,
     ) {
-        let mut session = self.vm.new_session(&self.store);
+        let mut session = MoveVm::new_session(&self.store);
         let traversal_storage = TraversalStorage::new();
         session
             .execute_function_bypass_visibility(

@@ -11,10 +11,7 @@ use crate::{
     AsFunctionValueExtension, LayoutConverter, LoadedFunction, ModuleStorage,
     StorageLayoutConverter,
 };
-use move_binary_format::{
-    errors::{Location, PartialVMError, PartialVMResult, VMResult},
-    file_format::LocalIndex,
-};
+use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
@@ -26,15 +23,11 @@ use move_vm_types::{
 };
 use std::borrow::Borrow;
 
-pub struct MoveVM;
+/// Move VM is completely stateless. It is used to execute a single loaded function with its type
+/// arguments fully instantiated.
+pub struct MoveVm;
 
-impl MoveVM {
-    /// Creates a new VM instance.
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
-        Self
-    }
-
+impl MoveVm {
     pub(crate) fn execute_loaded_function(
         function: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
@@ -44,33 +37,20 @@ impl MoveVM {
         extensions: &mut NativeContextExtensions,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
-        let vm_config = module_storage.runtime_environment().vm_config();
-        let ty_builder = &vm_config.ty_builder;
-        let ty_args = function.ty_args();
+        let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
+        let create_ty_with_subst = |tys: &[Type]| -> VMResult<Vec<Type>> {
+            tys.iter()
+                .map(|ty| ty_builder.create_ty_with_subst(ty, function.ty_args()))
+                .collect::<PartialVMResult<Vec<_>>>()
+                .map_err(|err| err.finish(Location::Undefined))
+        };
 
-        let param_tys = function
-            .param_tys()
-            .iter()
-            .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
-            .collect::<PartialVMResult<Vec<_>>>()
-            .map_err(|err| err.finish(Location::Undefined))?;
-        let mut_ref_args = param_tys
-            .iter()
-            .enumerate()
-            .filter_map(|(idx, ty)| match ty {
-                Type::MutableReference(inner) => Some((idx, inner.clone())),
-                _ => None,
-            })
-            .collect::<Vec<_>>();
-        let (mut dummy_locals, deserialized_args) =
+        let param_tys = create_ty_with_subst(function.param_tys())?;
+        let (dummy_locals, deserialized_args) =
             deserialize_args(module_storage, param_tys, serialized_args)
                 .map_err(|e| e.finish(Location::Undefined))?;
-        let return_tys = function
-            .return_tys()
-            .iter()
-            .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
-            .collect::<PartialVMResult<Vec<_>>>()
-            .map_err(|err| err.finish(Location::Undefined))?;
+
+        let return_tys = create_ty_with_subst(function.return_tys())?;
 
         let timer = VM_TIMER.timer_with_label("Interpreter::entrypoint");
         let return_values = Interpreter::entrypoint(
@@ -87,23 +67,11 @@ impl MoveVM {
         let serialized_return_values =
             serialize_return_values(module_storage, &return_tys, return_values)
                 .map_err(|e| e.finish(Location::Undefined))?;
-        let serialized_mut_ref_outputs = mut_ref_args
-            .into_iter()
-            .map(|(idx, ty)| {
-                // serialize return values first in the case that a value points into this local
-                let local_val =
-                    dummy_locals.move_loc(idx, vm_config.check_invariant_in_swap_loc)?;
-                let (bytes, layout) = serialize_return_value(module_storage, &ty, local_val)?;
-                Ok((idx as LocalIndex, bytes, layout))
-            })
-            .collect::<PartialVMResult<_>>()
-            .map_err(|e| e.finish(Location::Undefined))?;
 
         // locals should not be dropped until all return values are serialized
         drop(dummy_locals);
 
         Ok(SerializedReturnValues {
-            mutable_reference_outputs: serialized_mut_ref_outputs,
             return_values: serialized_return_values,
         })
     }
@@ -122,13 +90,12 @@ impl MoveVM {
     ///     cases where this may not be necessary, with the most notable one being the common module
     ///     publishing flow: you can keep using the same Move VM if you publish some modules in a Session
     ///     and apply the effects to the storage when the Session ends.
-    pub fn new_session<'r>(&self, remote: &'r impl ResourceResolver) -> Session<'r> {
-        self.new_session_with_extensions(remote, NativeContextExtensions::default())
+    pub fn new_session(remote: &impl ResourceResolver) -> Session {
+        Self::new_session_with_extensions(remote, NativeContextExtensions::default())
     }
 
     /// Create a new session, as in `new_session`, but provide native context extensions.
     pub fn new_session_with_extensions<'r>(
-        &self,
         remote: &'r impl ResourceResolver,
         native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r> {

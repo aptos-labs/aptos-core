@@ -19,7 +19,7 @@ use aptos_types::{
     transaction::signature_verified_transaction::SignatureVerifiedTransaction,
     write_set::TransactionWrite,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::AptosVm;
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
@@ -238,7 +238,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
         let env = AptosEnvironment::new(&self.base_view);
         let vm = {
             let _timer = PER_WORKER_TIMER.timer_with(&[&idx, "vm_init"]);
-            AptosVM::new(&env, &self.base_view)
+            AptosVm::new(&env, &self.base_view)
         };
 
         loop {
