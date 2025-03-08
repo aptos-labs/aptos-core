@@ -878,12 +878,8 @@ where
                 for k in behavior.reads.iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
                     // TODO: test aggregator reads.
-                    if k.is_module_path() {
-                        match view.get_module_bytes(k) {
-                            Ok(v) => read_results.push(v.map(Into::into)),
-                            Err(_) => read_results.push(None),
-                        }
-                    } else {
+                    if !k.is_module_path() {
+                        // TODO: also prop test modules
                         match view.get_resource_bytes(k, None) {
                             Ok(v) => read_results.push(v.map(Into::into)),
                             Err(_) => read_results.push(None),
