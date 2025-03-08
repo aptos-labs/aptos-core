@@ -283,7 +283,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let verbose = extra_args.verbose;
         let traversal_storage = TraversalStorage::new();
         self.perform_session_action(gas_budget, &code_storage, |session, gas_status| {
-            session.execute_script(
+            session.load_and_execute_script(
                 script_bytes,
                 type_args,
                 args,

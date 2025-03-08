@@ -102,7 +102,7 @@ fn test_malformed_resource() {
     let traversal_storage = TraversalStorage::new();
     let code_storage = storage.clone().into_unsync_code_storage();
 
-    sess.execute_script(
+    sess.load_and_execute_script(
         script_blob,
         vec![],
         vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
@@ -122,7 +122,7 @@ fn test_malformed_resource() {
     s2.serialize(&mut script_blob).unwrap();
     {
         let mut sess = vm.new_session(&storage);
-        sess.execute_script(
+        sess.load_and_execute_script(
             script_blob.clone(),
             vec![],
             vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
@@ -151,7 +151,7 @@ fn test_malformed_resource() {
     {
         let mut sess = vm.new_session(&storage);
         let err = sess
-            .execute_script(
+            .load_and_execute_script(
                 script_blob,
                 vec![],
                 vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
