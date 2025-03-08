@@ -269,10 +269,6 @@ impl BlockTree {
         block: &Block,
         window_size: Option<u64>,
     ) -> anyhow::Result<OrderedBlockWindow> {
-        ensure!(
-            !block.is_genesis_block(),
-            "Genesis block does not have a block window",
-        );
         // Block round should never be less than the commit root round
         ensure!(
             block.round() >= self.commit_root().round(),
@@ -290,20 +286,16 @@ impl BlockTree {
         let window_size = round - window_start_round + 1;
         ensure!(window_size > 0, "window_size must be greater than 0");
 
-        if window_size == 1 {
-            return Ok(OrderedBlockWindow::empty());
-        }
         let mut window = vec![];
         let mut current_block = block.clone();
 
         // Add each block to the window until you reach the start round
-        while current_block.quorum_cert().certified_block().round() >= window_start_round {
-            if let Some(parent_block) = self.get_block(&current_block.parent_id()) {
-                current_block = parent_block.block().clone();
-                if current_block.is_genesis_block() {
-                    break;
-                }
-                window.push(parent_block);
+        while !current_block.is_genesis_block()
+            && current_block.quorum_cert().certified_block().round() >= window_start_round
+        {
+            if let Some(current_pipelined_block) = self.get_block(&current_block.parent_id()) {
+                current_block = current_pipelined_block.block().clone();
+                window.push(current_pipelined_block);
             } else {
                 bail!("Parent block not found for block {}", current_block.id());
             }

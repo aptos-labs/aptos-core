@@ -323,7 +323,8 @@ impl BlockStore {
                 let target_round = calculate_window_start_round(
                     highest_commit_cert.ledger_info().ledger_info().round(),
                     window_size,
-                );
+                )
+                .max(1); // Never retrieve genesis block
                 let num_blocks = highest_quorum_cert.certified_block().round() - target_round + 1;
                 info!(
                     "[FastForwardSync] with window_size: {}, target_round: {}, num_blocks: {}",
