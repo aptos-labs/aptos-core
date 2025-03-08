@@ -586,7 +586,7 @@ impl FakeExecutor {
         &self,
         account: &Account,
     ) -> Option<CoinStoreResource<AptosCoinType>> {
-        self.read_apt_coin_store_resource_at_address(account.address())
+        self.read_apt_coin_store_resource_at_address(&account.address())
     }
 
     /// Reads supply from CoinInfo resource value from this executor's data store.

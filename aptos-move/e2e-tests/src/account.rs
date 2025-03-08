@@ -7,6 +7,8 @@
 use crate::gas_costs;
 use aptos_crypto::ed25519::*;
 use aptos_keygen::KeyGen;
+use aptos_sdk::types::LocalAccount;
+// use aptos_sdk::transaction_builder::TransactionBuilder;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -20,8 +22,8 @@ use aptos_types::{
     keyless::AnyKeylessPublicKey,
     state_store::state_key::StateKey,
     transaction::{
-        authenticator::{AnyPublicKey, AuthenticationKey},
-        EntryFunction, RawTransaction, Script, SignedTransaction, TransactionPayload,
+        authenticator::AnyPublicKey, EntryFunction, RawTransaction, Script, SignedTransaction,
+        TransactionPayload,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
     AptosCoinType,
@@ -80,13 +82,7 @@ impl AccountPublicKey {
 /// TODO: This is pleistocene-age code must be brought up to speed, since our accounts are not just Ed25519-based.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Account {
-    addr: AccountAddress,
-    /// The current private key for this account.
-    /// TODO: Refactor appropriately since, for example, when `pubkey` is of type
-    /// `AccountPublicKey::AnyPublicKey::Keyless`, this `privkey` field will be undefined.
-    pub privkey: Ed25519PrivateKey,
-    /// The current public key for this account.
-    pub pubkey: AccountPublicKey,
+    pub account: LocalAccount,
 }
 
 impl Account {
@@ -102,6 +98,12 @@ impl Account {
         Self::with_keypair(privkey, pubkey)
     }
 
+    pub fn new_from_local_account(local_account: LocalAccount) -> Self {
+        Self {
+            account: local_account,
+        }
+    }
+
     /// Creates a new account in memory given a random seed.
     pub fn new_from_seed(seed: &mut KeyGen) -> Self {
         let (privkey, pubkey) = seed.generate_ed25519_keypair();
@@ -110,13 +112,10 @@ impl Account {
 
     /// Creates an account with a specific address
     /// TODO: Currently stores a dummy SK/PK pair.
-    pub fn new_from_addr(addr: AccountAddress, pubkey: AccountPublicKey) -> Self {
+    pub fn new_from_addr(addr: AccountAddress) -> Self {
         let (privkey, _) = KeyGen::from_os_rng().generate_ed25519_keypair();
-        Self {
-            addr,
-            privkey,
-            pubkey,
-        }
+        let account = LocalAccount::new(addr, privkey.clone(), 0);
+        Self { account }
     }
 
     /// Creates a new account with the given keypair.
@@ -125,27 +124,17 @@ impl Account {
     /// entity.
     pub fn with_keypair(privkey: Ed25519PrivateKey, pubkey: Ed25519PublicKey) -> Self {
         let addr = aptos_types::account_address::from_public_key(&pubkey);
-        Account {
-            addr,
-            privkey,
-            pubkey: AccountPublicKey::Ed25519(pubkey),
-        }
+        let account = LocalAccount::new(addr, privkey.clone(), 0);
+        Account { account }
     }
 
     /// Creates a new account with the given addr and key pair
     ///
     /// Like with [`Account::new`], the account returned by this constructor is a purely logical
     /// entity.
-    pub fn new_validator(
-        addr: AccountAddress,
-        privkey: Ed25519PrivateKey,
-        pubkey: Ed25519PublicKey,
-    ) -> Self {
-        Account {
-            addr,
-            privkey,
-            pubkey: AccountPublicKey::Ed25519(pubkey),
-        }
+    pub fn new_validator(addr: AccountAddress, privkey: Ed25519PrivateKey) -> Self {
+        let account = LocalAccount::new(addr, privkey.clone(), 0);
+        Account { account }
     }
 
     /// Creates a new account in memory representing an account created in the genesis transaction.
@@ -154,9 +143,7 @@ impl Account {
     /// the account will use [`GENESIS_KEYPAIR`][static@@GENESIS_KEYPAIR] as its keypair.
     pub fn new_genesis_account(address: AccountAddress) -> Self {
         Account {
-            addr: address,
-            pubkey: AccountPublicKey::Ed25519(GENESIS_KEYPAIR.1.clone()),
-            privkey: GENESIS_KEYPAIR.0.clone(),
+            account: LocalAccount::new(address, GENESIS_KEYPAIR.0.clone(), 0),
         }
     }
 
@@ -173,14 +160,22 @@ impl Account {
     ///
     /// The address does not change if the account's [keys are rotated][Account::rotate_key].
     pub fn address(&self) -> &AccountAddress {
-        &self.addr
+        self.account.address_ref()
+    }
+
+    pub fn private_key(&self) -> &Ed25519PrivateKey {
+        self.account.private_key()
+    }
+
+    pub fn public_key(&self) -> &Ed25519PublicKey {
+        self.account.public_key()
     }
 
     /// Returns the AccessPath that describes the Account resource instance.
     ///
     /// Use this to retrieve or publish the Account blob.
     pub fn make_account_access_path(&self) -> AccessPath {
-        AccessPath::resource_access_path(self.addr, AccountResource::struct_tag())
+        AccessPath::resource_access_path(*self.address(), AccountResource::struct_tag())
             .expect("access path in test")
     }
 
@@ -189,27 +184,25 @@ impl Account {
     /// Use this to retrieve or publish the Account CoinStore blob.
     pub fn make_coin_store_access_path(&self) -> AccessPath {
         AccessPath::resource_access_path(
-            self.addr,
+            *self.address(),
             CoinStoreResource::<AptosCoinType>::struct_tag(),
         )
         .expect("access path in  test")
     }
 
     /// Changes the keys for this account to the provided ones.
-    pub fn rotate_key(&mut self, privkey: Ed25519PrivateKey, pubkey: Ed25519PublicKey) {
-        self.privkey = privkey;
-        self.pubkey = AccountPublicKey::Ed25519(pubkey);
+    pub fn rotate_key(&mut self, privkey: Ed25519PrivateKey) {
+        let seq_num = self.account.sequence_number();
+        let addr = self.account.address();
+        let account = LocalAccount::new(addr, privkey.clone(), seq_num);
+        self.account = account;
     }
 
     /// Computes the authentication key for this account, as stored on the chain.
     ///
     /// This is the same as the account's address if the keys have never been rotated.
     pub fn auth_key(&self) -> Vec<u8> {
-        match &self.pubkey {
-            AccountPublicKey::Ed25519(pk) => AuthenticationKey::ed25519(pk),
-            AccountPublicKey::AnyPublicKey(pk) => AuthenticationKey::any_key(pk.clone()),
-        }
-        .to_vec()
+        self.account.authentication_key().to_vec()
     }
 
     pub fn transaction(&self) -> TransactionBuilder {
@@ -313,29 +306,23 @@ impl TransactionBuilder {
     }
 
     pub fn sign(self) -> SignedTransaction {
-        self.raw()
-            .sign(
-                &self.sender.privkey,
-                self.sender.pubkey.as_ed25519().unwrap(),
-            )
-            .unwrap()
-            .into_inner()
+        self.sender.account.sign_transaction(self.raw())
     }
 
     pub fn sign_multi_agent(self) -> SignedTransaction {
         let secondary_signer_addresses: Vec<AccountAddress> = self
             .secondary_signers
             .iter()
-            .map(|signer| *signer.address())
+            .map(|signer| signer.account.address())
             .collect();
         let secondary_private_keys: Vec<&Ed25519PrivateKey> = self
             .secondary_signers
             .iter()
-            .map(|signer| &signer.privkey)
+            .map(|signer| signer.account.private_key())
             .collect();
         self.raw()
             .sign_multi_agent(
-                &self.sender.privkey,
+                &self.sender.account.private_key(),
                 secondary_signer_addresses,
                 secondary_private_keys,
             )
@@ -347,21 +334,21 @@ impl TransactionBuilder {
         let secondary_signer_addresses: Vec<AccountAddress> = self
             .secondary_signers
             .iter()
-            .map(|signer| *signer.address())
+            .map(|signer| signer.account.address())
             .collect();
         let secondary_private_keys: Vec<&Ed25519PrivateKey> = self
             .secondary_signers
             .iter()
-            .map(|signer| &signer.privkey)
+            .map(|signer| signer.account.private_key())
             .collect();
         let fee_payer = self.fee_payer.clone().unwrap();
         self.raw()
             .sign_fee_payer(
-                &self.sender.privkey,
+                &self.sender.account.private_key(),
                 secondary_signer_addresses,
                 secondary_private_keys,
-                *fee_payer.address(),
-                &fee_payer.privkey,
+                fee_payer.account.address(),
+                &fee_payer.account.private_key(),
             )
             .unwrap()
             .into_inner()
@@ -490,7 +477,6 @@ impl FungibleStore {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AccountData {
     account: Account,
-    sequence_number: u64,
     coin_register_events: EventHandle,
     key_rotation_events: EventHandle,
     coin_store: Option<CoinStore>,
@@ -510,7 +496,7 @@ impl AccountData {
     }
 
     pub fn increment_sequence_number(&mut self) {
-        self.sequence_number += 1;
+        self.account.account.increment_sequence_number();
     }
 
     /// Creates a new `AccountData` with a new account.
@@ -566,6 +552,7 @@ impl AccountData {
         received_events_count: u64,
     ) -> Self {
         let addr = *account.address();
+        account.account.set_sequence_number(sequence_number);
         Self {
             account,
             coin_store: Some(CoinStore::new(
@@ -574,7 +561,6 @@ impl AccountData {
                 new_event_handle(sent_events_count, addr),
             )),
             fungible_store: None,
-            sequence_number,
             coin_register_events: new_event_handle(0, addr),
             key_rotation_events: new_event_handle(1, addr),
         }
@@ -588,6 +574,7 @@ impl AccountData {
         use_concurrent_balance: bool,
     ) -> Self {
         let addr = *account.address();
+        account.account.set_sequence_number(sequence_number);
         Self {
             account,
             coin_store: None,
@@ -598,21 +585,15 @@ impl AccountData {
                 false,
                 use_concurrent_balance,
             )),
-            sequence_number,
             coin_register_events: new_event_handle(0, addr),
             key_rotation_events: new_event_handle(1, addr),
         }
     }
 
-    /// Changes the keys for this account to the provided ones.
-    pub fn rotate_key(&mut self, privkey: Ed25519PrivateKey, pubkey: Ed25519PublicKey) {
-        self.account.rotate_key(privkey, pubkey)
-    }
-
     /// Creates and returns the top-level resources to be published under the account
     pub fn to_bytes(&self) -> Vec<u8> {
         let account = AccountResource::new(
-            self.sequence_number,
+            self.sequence_number(),
             self.account.auth_key(),
             self.coin_register_events.clone(),
             self.key_rotation_events.clone(),
@@ -638,13 +619,13 @@ impl AccountData {
     /// directly.
     pub fn to_writeset(&self) -> WriteSet {
         let mut write_set = vec![(
-            StateKey::resource_typed::<AccountResource>(self.address()).unwrap(),
+            StateKey::resource_typed::<AccountResource>(&self.address()).unwrap(),
             WriteOp::legacy_modification(self.to_bytes().into()),
         )];
 
         if let Some(coin_store) = &self.coin_store {
             write_set.push((
-                StateKey::resource_typed::<CoinStoreResource<AptosCoinType>>(self.address())
+                StateKey::resource_typed::<CoinStoreResource<AptosCoinType>>(&self.address())
                     .unwrap(),
                 WriteOp::legacy_modification(coin_store.to_bytes().into()),
             ));
@@ -694,7 +675,7 @@ impl AccountData {
 
     /// Returns the initial sequence number.
     pub fn sequence_number(&self) -> u64 {
-        self.sequence_number
+        self.account.account.sequence_number()
     }
 
     /// Returns the unique key for this sent events stream.

@@ -108,7 +108,7 @@ fn mint_nft_e2e() {
     let mint_proof_msg = bcs::to_bytes(&mint_proof);
     let resource_account = h.new_account_at(resource_address);
     let mint_proof_signature = resource_account
-        .privkey
+        .private_key()
         .sign_arbitrary_message(&mint_proof_msg.unwrap());
 
     // call mint_event_ticket function with the user's mint proof signature and public key
@@ -196,12 +196,12 @@ fn sample_mint_nft_part4_unit_test_signature() {
     // sign the MintProofChallenge using the resource account's private key
     let mint_proof_msg1 = bcs::to_bytes(&mint_proof1);
     let mint_proof_signature1 = resource_account
-        .privkey
+        .private_key()
         .sign_arbitrary_message(&mint_proof_msg1.unwrap());
 
     let mint_proof_msg2 = bcs::to_bytes(&mint_proof2);
     let mint_proof_signature2 = resource_account
-        .privkey
+        .private_key()
         .sign_arbitrary_message(&mint_proof_msg2.unwrap());
 
     println!(

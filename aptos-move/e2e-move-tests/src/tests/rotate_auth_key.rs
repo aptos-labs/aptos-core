@@ -35,8 +35,8 @@ fn rotate_auth_key_ed25519_to_ed25519() {
         account1.clone(),
         *account1.address(),
         0,
-        account2.privkey.clone(),
-        account2.pubkey.to_bytes(),
+        account2.private_key().clone(),
+        account2.public_key().to_bytes().to_vec(),
     );
 
     // verify that we can still get to account1's originating address
@@ -81,11 +81,11 @@ fn rotate_auth_key_twice() {
         account1.clone(),
         *account1.address(),
         0,
-        account2.privkey.clone(),
-        account2.pubkey.to_bytes(),
+        account2.private_key().clone(),
+        account2.public_key().to_bytes().to_vec(),
     );
     // rotate account1's keypair to account2
-    account1.rotate_key(account2.privkey, account2.pubkey.as_ed25519().unwrap());
+    account1.rotate_key(account2.private_key().clone());
     // verify that we can still get to account1's originating address
     verify_originating_address(&mut harness, account1.auth_key(), *account1.address());
 
@@ -97,10 +97,10 @@ fn rotate_auth_key_twice() {
         account1.clone(),
         *account1.address(),
         1,
-        account3.privkey.clone(),
-        account3.pubkey.to_bytes(),
+        account3.private_key().clone(),
+        account3.public_key().to_bytes().to_vec(),
     );
-    account1.rotate_key(account3.privkey, account3.pubkey.as_ed25519().unwrap());
+    account1.rotate_key(account3.private_key().clone());
     verify_originating_address(&mut harness, account1.auth_key(), *account1.address());
 }
 
@@ -120,7 +120,7 @@ fn rotate_auth_key_with_rotation_capability_e2e() {
         &new_private_key,
         &new_public_key
     ));
-    offerer_account.rotate_key(new_private_key.clone(), new_public_key.clone());
+    offerer_account.rotate_key(new_private_key.clone());
     verify_originating_address(
         &mut harness,
         offerer_account.auth_key(),
@@ -199,7 +199,7 @@ pub fn assert_successful_key_rotation_transaction<S: SigningKey + ValidCryptoMat
 
     // Sign the rotation message by the current private key and the new private key.
     let signature_by_curr_privkey = current_account
-        .privkey
+        .private_key()
         .sign_arbitrary_message(&rotation_msg);
     let signature_by_new_privkey = new_private_key.sign_arbitrary_message(&rotation_msg);
 
@@ -207,7 +207,7 @@ pub fn assert_successful_key_rotation_transaction<S: SigningKey + ValidCryptoMat
         &current_account,
         aptos_stdlib::account_rotate_authentication_key(
             from_scheme,
-            current_account.pubkey.to_bytes(),
+            current_account.public_key().to_bytes().to_vec(),
             to_scheme,
             new_public_key_bytes,
             signature_by_curr_privkey.to_bytes().to_vec(),

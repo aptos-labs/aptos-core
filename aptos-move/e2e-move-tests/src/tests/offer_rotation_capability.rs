@@ -51,7 +51,7 @@ pub fn offer_rotation_capability_v2(
 
     let rotation_capability_proof_msg = bcs::to_bytes(&rotation_capability_proof);
     let rotation_proof_signed = offerer_account
-        .privkey
+        .private_key()
         .sign_arbitrary_message(&rotation_capability_proof_msg.unwrap());
 
     assert_success!(harness.run_transaction_payload(
@@ -59,7 +59,7 @@ pub fn offer_rotation_capability_v2(
         aptos_stdlib::account_offer_rotation_capability(
             rotation_proof_signed.to_bytes().to_vec(),
             0,
-            offerer_account.pubkey.to_bytes(),
+            offerer_account.public_key().to_bytes().to_vec(),
             *delegate_account.address(),
         )
     ));
