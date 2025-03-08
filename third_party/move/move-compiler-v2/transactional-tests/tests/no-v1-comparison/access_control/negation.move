@@ -10,7 +10,7 @@ module 0x42::test {
         borrow_global<R>(@0x1).value
     }
 
-    fun ok2(): bool acquires *, !reads 0x43::*::* {
+    fun ok2(): bool writes *, !reads 0x43::*::* {
         borrow_global<R>(@0x1).value
     }
 

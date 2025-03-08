@@ -1,7 +1,0 @@
-
-Diagnostics:
-error: captured variable `product` cannot be modified inside of a lambda
-   ┌─ tests/lambda/inline-parity/lambda.move:30:18
-   │
-30 │     foreach(&v, |e| product = LambdaTest1::inline_mul(product, *e));
-   │                     ^^^^^^^

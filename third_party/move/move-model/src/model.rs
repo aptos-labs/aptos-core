@@ -17,9 +17,10 @@
 
 use crate::{
     ast::{
-        AccessSpecifier, Address, AddressSpecifier, Attribute, ConditionKind, Exp, ExpData,
-        FriendDecl, GlobalInvariant, ModuleName, PropertyBag, PropertyValue, ResourceSpecifier,
-        Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl, Value,
+        AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Attribute, ConditionKind,
+        Exp, ExpData, FriendDecl, GlobalInvariant, ModuleName, PropertyBag, PropertyValue,
+        ResourceSpecifier, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl,
+        Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -53,9 +54,9 @@ use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     file_format::{
-        AccessKind, Bytecode, CodeOffset, Constant as VMConstant, ConstantPoolIndex,
-        FunctionDefinitionIndex, FunctionHandleIndex, MemberCount, SignatureIndex, SignatureToken,
-        StructDefinitionIndex, VariantIndex,
+        Bytecode, CodeOffset, Constant as VMConstant, ConstantPoolIndex, FunctionDefinitionIndex,
+        FunctionHandleIndex, MemberCount, SignatureIndex, SignatureToken, StructDefinitionIndex,
+        VariantIndex,
     },
     views::{FunctionDefinitionView, FunctionHandleView, StructHandleView},
     CompiledModule,
@@ -1957,6 +1958,18 @@ impl GlobalEnv {
         data.def = Some(def);
     }
 
+    /// Sets the inferred acquired structs of this function.
+    pub fn set_acquired_structs(&mut self, fun: QualifiedId<FunId>, acquires: BTreeSet<StructId>) {
+        let data = self
+            .module_data
+            .get_mut(fun.module_id.to_usize())
+            .unwrap()
+            .function_data
+            .get_mut(&fun.id)
+            .unwrap();
+        data.acquired_structs = Some(acquires)
+    }
+
     /// Adds a new function definition.
     pub fn add_function_def(
         &mut self,
@@ -1990,6 +2003,7 @@ impl GlobalEnv {
             params,
             result_type,
             access_specifiers: None,
+            acquired_structs: None,
             spec: RefCell::new(Default::default()),
             def: Some(def),
             called_funs: Some(called_funs),
@@ -2656,9 +2670,9 @@ impl GlobalEnv {
                     emit!(writer, "!")
                 }
                 match &spec.kind {
-                    AccessKind::Reads => emit!(writer, "reads "),
-                    AccessKind::Writes => emit!(writer, "writes "),
-                    AccessKind::Acquires => emit!(writer, "acquires "),
+                    AccessSpecifierKind::Reads => emit!(writer, "reads "),
+                    AccessSpecifierKind::Writes => emit!(writer, "writes "),
+                    AccessSpecifierKind::LegacyAcquires => emit!(writer, "acquires "),
                 }
                 match &spec.resource.1 {
                     ResourceSpecifier::Any => emit!(writer, "*"),
@@ -4260,6 +4274,9 @@ pub struct FunctionData {
     /// Access specifiers.
     pub(crate) access_specifiers: Option<Vec<AccessSpecifier>>,
 
+    /// Acquires information, if available.
+    pub(crate) acquired_structs: Option<BTreeSet<StructId>>,
+
     /// Specification associated with this function.
     pub(crate) spec: RefCell<Spec>,
 
@@ -4301,6 +4318,7 @@ impl FunctionData {
             params: vec![],
             result_type: Type::unit(),
             access_specifiers: None,
+            acquired_structs: None,
             spec: RefCell::new(Default::default()),
             def: None,
             called_funs: None,
@@ -4776,6 +4794,11 @@ impl<'env> FunctionEnv<'env> {
     /// specifiers disallows it (intersection of exclusion specifiers).
     pub fn get_access_specifiers(&self) -> Option<&[AccessSpecifier]> {
         self.data.access_specifiers.as_deref()
+    }
+
+    /// Returns the inferred acquired structs of this function.
+    pub fn get_acquired_structs(&self) -> Option<&BTreeSet<StructId>> {
+        self.data.acquired_structs.as_ref()
     }
 
     /// Get the name to be used for a local by index, if available.

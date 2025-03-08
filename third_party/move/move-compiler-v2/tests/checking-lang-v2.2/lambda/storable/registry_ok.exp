@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: unexpected token
+   ┌─ tests/checking-lang-v2.2/lambda/storable/registry_ok.move:32:118
+   │
+32 │     fun replace_or_add_function(v: &mut vector<Function>, k: u64, new_f: |u64| u64 has store+copy): Option<|u64| u64 with store+copy> {
+   │                                                                                                           -          ^ Expected '>'
+   │                                                                                                           │
+   │                                                                                                           To match this '<'
