@@ -904,7 +904,10 @@ module aptos_framework::stake {
         };
     }
 
-    /// Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
+    /// Update the lockup duration of the stake pool to now + the recurring lockup duration of the network.
+    /// Note that this is named increase_lockup as an artifact of the previous implementation.
+    /// update_lockup is now preferred unless user specifically wants to set the lockup to the recurring lockup
+    /// duration.
     public entry fun increase_lockup(owner: &signer) acquires OwnerCapability, StakePool {
         check_stake_permission(owner);
         let owner_address = signer::address_of(owner);
@@ -913,16 +916,32 @@ module aptos_framework::stake {
         increase_lockup_with_cap(ownership_cap);
     }
 
-    /// Unlock from active delegation, it's moved to pending_inactive if locked_until_secs < current_time or
-    /// directly inactive if it's not from an active validator.
+    /// Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
+    /// Note that this is named increase_lockup as an artifact of the previous implementation.
+    /// update_lockup is now preferred unless user specifically wants to set the lockup to the recurring lockup
+    /// duration.
     public fun increase_lockup_with_cap(owner_cap: &OwnerCapability) acquires StakePool {
+        let config = staking_config::get();
+        let new_locked_until_secs = timestamp::now_seconds() + staking_config::get_recurring_lockup_duration(&config);
+        update_lockup_with_cap(owner_cap, new_locked_until_secs);
+    }
+
+    /// Update the lockup duration of the stake pool to `new_locked_until_secs`.
+    public entry fun update_lockup(owner: &signer, new_locked_until_secs: u64) acquires OwnerCapability, StakePool {
+        check_stake_permission(owner);
+        let owner_address = signer::address_of(owner);
+        assert_owner_cap_exists(owner_address);
+        let ownership_cap = borrow_global<OwnerCapability>(owner_address);
+        update_lockup_with_cap(ownership_cap, new_locked_until_secs);
+    }
+
+    /// Similar to update_lockup but will use ownership capability from the signing account.
+    public fun update_lockup_with_cap(owner_cap: &OwnerCapability, new_locked_until_secs: u64) acquires StakePool {
         let pool_address = owner_cap.pool_address;
         assert_stake_pool_exists(pool_address);
-        let config = staking_config::get();
 
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         let old_locked_until_secs = stake_pool.locked_until_secs;
-        let new_locked_until_secs = timestamp::now_seconds() + staking_config::get_recurring_lockup_duration(&config);
         assert!(old_locked_until_secs < new_locked_until_secs, error::invalid_argument(EINVALID_LOCKUP));
         stake_pool.locked_until_secs = new_locked_until_secs;
 
@@ -2164,8 +2183,50 @@ module aptos_framework::stake {
         increase_lockup(validator);
         // Reduce recurring lockup to 0.
         staking_config::update_recurring_lockup_duration_secs(aptos_framework, 1);
-        // INcrease lockup should now fail because the new lockup < old lockup.
+        // Increase lockup should now fail because the new lockup < old lockup.
         increase_lockup(validator);
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    fun test_update_lockup(
+        aptos_framework: &signer,
+        validator: &signer,
+    ) acquires AllowedValidators, OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        initialize_for_test(aptos_framework);
+        let (_sk, pk, pop) = generate_identity();
+        initialize_test_validator(&pk, &pop, validator, 100, false, false);
+
+        update_lockup(validator, 1000);
+        assert!(get_lockup_secs(signer::address_of(validator)) == 1000);
+        update_lockup(validator, 2000);
+        assert!(get_lockup_secs(signer::address_of(validator)) == 2000);
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    #[expected_failure(abort_code = 0x10012, location = Self)]
+    fun test_update_lockup_too_short(
+        aptos_framework: &signer,
+        validator: &signer,
+    ) acquires AllowedValidators, OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        initialize_for_test(aptos_framework);
+        let (_sk, pk, pop) = generate_identity();
+        initialize_test_validator(&pk, &pop, validator, 100, false, false);
+
+        update_lockup(validator, 0);
+    }
+
+    // Test unauthorized update_lockup call
+    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    #[expected_failure(abort_code = 0x6000F, location = Self)]
+    fun test_update_lockup_unauthorized(
+        aptos_framework: &signer,
+        validator: &signer,
+    ) acquires AllowedValidators, OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        initialize_for_test(aptos_framework);
+        let (_sk, pk, pop) = generate_identity();
+        initialize_test_validator(&pk, &pop, validator, 100, false, false);
+
+        update_lockup(&account::create_signer_for_test(@0x1234), 1000);
     }
 
     #[test(aptos_framework = @aptos_framework, validator_1 = @0x123, validator_2 = @0x234)]

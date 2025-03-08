@@ -37,6 +37,7 @@ module aptos_framework::staking_contract {
     use aptos_framework::account::{Self, SignerCapability};
     use aptos_framework::aptos_account;
     use aptos_framework::aptos_coin::AptosCoin;
+    use aptos_framework::aptos_governance;
     use aptos_framework::coin::{Self, Coin};
     use aptos_framework::event::{EventHandle, emit, emit_event};
     use aptos_framework::stake::{Self, OwnerCapability};
@@ -143,6 +144,13 @@ module aptos_framework::staking_contract {
     struct ResetLockup has drop, store {
         operator: address,
         pool_address: address,
+    }
+
+    #[event]
+    struct ExtendLockup has drop, store {
+        operator: address,
+        pool_address: address,
+        new_lockup_secs: u64
     }
 
     #[event]
@@ -477,8 +485,8 @@ module aptos_framework::staking_contract {
         let staker_address = signer::address_of(staker);
         assert_staking_contract_exists(staker_address, operator);
 
-        let store = borrow_global_mut<Store>(staker_address);
-        let staking_contract = simple_map::borrow_mut(&mut store.staking_contracts, &operator);
+        let store = &mut Store[staker_address];
+        let staking_contract = store.staking_contracts.borrow_mut(&operator);
         let pool_address = staking_contract.pool_address;
         stake::increase_lockup_with_cap(&staking_contract.owner_cap);
 
@@ -487,6 +495,42 @@ module aptos_framework::staking_contract {
         } else {
             emit_event(&mut store.reset_lockup_events, ResetLockupEvent { operator, pool_address });
         };
+    }
+
+    /// Update the lockup period of the stake pool to the new_lockup_secs.
+    /// Can only be called by the staker.
+    public entry fun update_lockup(staker: &signer, operator: address, new_lockup_secs: u64) acquires Store {
+        let staker_address = signer::address_of(staker);
+        assert_staking_contract_exists(staker_address, operator);
+
+        let staking_contract = Store[staker_address].staking_contracts.borrow_mut(&operator);
+        stake::update_lockup_with_cap(&staking_contract.owner_cap, new_lockup_secs);
+
+        emit(ExtendLockup {
+            operator,
+            pool_address: staking_contract.pool_address,
+            new_lockup_secs
+        });
+    }
+
+    /// Convenience function to allow a staker to vote on a proposal and extend the lockup period if necessary.
+    public entry fun extend_lockup_and_vote(
+        staker_voter: &signer,
+        operator: address,
+        proposal_id: u64,
+        should_pass: bool
+    ) acquires Store {
+        let proposal_expiration = aptos_governance::get_proposal_expiration(proposal_id);
+        let staker_addr = signer::address_of(staker_voter);
+        let pool_address = stake_pool_address(staker_addr, operator);
+        let current_lockup = stake::get_lockup_secs(pool_address);
+
+        // Only extend the lockup if it ends before the proposal expiration.
+        if (current_lockup < proposal_expiration) {
+            update_lockup(staker_voter, operator, proposal_expiration);
+        };
+
+        aptos_governance::vote(staker_voter, pool_address, proposal_id, should_pass);
     }
 
     /// Convenience function to allow a staker to update the commission percentage paid to the operator.
@@ -963,6 +1007,8 @@ module aptos_framework::staking_contract {
 
     #[test_only]
     use aptos_framework::stake::with_rewards;
+    #[test_only]
+    use aptos_framework::timestamp;
 
     #[test_only]
     const INITIAL_BALANCE: u64 = 100000000000000; // 1M APT coins with 8 decimals.
@@ -1238,6 +1284,63 @@ module aptos_framework::staking_contract {
         let origin_lockup_expiration = stake::get_lockup_secs(pool_address);
         reset_lockup(staker, operator_address);
         assert!(origin_lockup_expiration < stake::get_lockup_secs(pool_address), 0);
+    }
+
+    #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
+    fun test_update_lockup(
+        aptos_framework: &signer,
+        staker: &signer,
+        operator: &signer,
+    ) acquires Store {
+        setup_staking_contract(aptos_framework, staker, operator, INITIAL_BALANCE, 10);
+        let staker_address = signer::address_of(staker);
+        let operator_address = signer::address_of(operator);
+        let pool_address = stake_pool_address(staker_address, operator_address);
+
+        update_lockup(staker, operator_address, 100000);
+        assert!(stake::get_lockup_secs(pool_address) == 100000);
+        update_lockup(staker, operator_address, 200000);
+        assert!(stake::get_lockup_secs(pool_address) == 200000);
+    }
+
+    #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
+    fun test_update_lockup_and_vote(
+        aptos_framework: &signer,
+        staker: &signer,
+        operator: &signer,
+    ) acquires Store {
+        setup_staking_contract(aptos_framework, staker, operator, INITIAL_BALANCE, 10);
+        let staker_address = signer::address_of(staker);
+        let operator_address = signer::address_of(operator);
+        let pool_address = stake_pool_address(staker_address, operator_address);
+
+        account::create_account_for_test(@0x1);
+        aptos_governance::initialize_for_test(
+            aptos_framework,
+            1,
+            1,
+            1000,
+        );
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[features::get_partial_governance_voting(), features::get_delegation_pool_partial_governance_voting(
+            )],
+            vector[]);
+        update_voter(staker, operator_address, staker_address);
+        update_lockup(staker, operator_address, timestamp::now_seconds() + aptos_governance::get_voting_duration_secs());
+        let proposal_id = aptos_governance::create_proposal_v2_impl(
+            staker,
+            pool_address,
+            vector[1, 2, 3],
+            b"",
+            b"",
+            true,
+        );
+        let new_expiration = timestamp::now_seconds() + 86400 * 365;
+        aptos_governance::extend_voting_duration_for_test(proposal_id, new_expiration);
+
+        extend_lockup_and_vote(staker, operator_address, proposal_id, true);
+        assert!(stake::get_lockup_secs(pool_address) == new_expiration);
     }
 
     #[test(aptos_framework = @0x1, staker = @0x123, operator_1 = @0x234, operator_2 = @0x345)]
