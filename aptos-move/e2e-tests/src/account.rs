@@ -322,7 +322,7 @@ impl TransactionBuilder {
             .collect();
         self.raw()
             .sign_multi_agent(
-                &self.sender.account.private_key(),
+                self.sender.account.private_key(),
                 secondary_signer_addresses,
                 secondary_private_keys,
             )
@@ -344,11 +344,11 @@ impl TransactionBuilder {
         let fee_payer = self.fee_payer.clone().unwrap();
         self.raw()
             .sign_fee_payer(
-                &self.sender.account.private_key(),
+                self.sender.account.private_key(),
                 secondary_signer_addresses,
                 secondary_private_keys,
                 fee_payer.account.address(),
-                &fee_payer.account.private_key(),
+                fee_payer.account.private_key(),
             )
             .unwrap()
             .into_inner()
@@ -619,13 +619,13 @@ impl AccountData {
     /// directly.
     pub fn to_writeset(&self) -> WriteSet {
         let mut write_set = vec![(
-            StateKey::resource_typed::<AccountResource>(&self.address()).unwrap(),
+            StateKey::resource_typed::<AccountResource>(self.address()).unwrap(),
             WriteOp::legacy_modification(self.to_bytes().into()),
         )];
 
         if let Some(coin_store) = &self.coin_store {
             write_set.push((
-                StateKey::resource_typed::<CoinStoreResource<AptosCoinType>>(&self.address())
+                StateKey::resource_typed::<CoinStoreResource<AptosCoinType>>(self.address())
                     .unwrap(),
                 WriteOp::legacy_modification(coin_store.to_bytes().into()),
             ));
