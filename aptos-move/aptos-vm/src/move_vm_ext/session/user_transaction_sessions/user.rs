@@ -59,20 +59,21 @@ impl<'r, 'l> UserSession<'r, 'l> {
         }
     }
 
-    pub fn finish(
+    /// Finishes the user session if there is no module publishing request.
+    pub(crate) fn finish(
         self,
         change_set_configs: &ChangeSetConfigs,
         module_storage: &impl ModuleStorage,
-    ) -> Result<UserSessionChangeSet, VMStatus> {
+    ) -> Result<VMChangeSet, VMStatus> {
         let Self { session } = self;
         let change_set =
             session.finish_with_squashed_change_set(change_set_configs, module_storage, false)?;
-        UserSessionChangeSet::new(change_set, ModuleWriteSet::empty(), change_set_configs)
+        Ok(change_set)
     }
 
     /// Finishes the session while also processing the publish request, and running module
-    /// initialization if necessary. This function is used by the new loader and code cache.
-    pub fn finish_with_module_publishing_and_initialization(
+    /// initialization if necessary.
+    pub(crate) fn finish_with_module_publishing_and_initialization(
         mut self,
         resolver: &impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,

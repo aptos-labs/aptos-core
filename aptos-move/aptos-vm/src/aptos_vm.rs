@@ -1464,19 +1464,12 @@ impl AptosVM {
     ) -> Result<UserSessionChangeSet, VMStatus> {
         let maybe_publish_request = session.execute(|session| session.extract_publish_request());
         if maybe_publish_request.is_none() {
-            let user_change_set = session.finish(change_set_configs, module_storage)?;
-
-            user_change_set
-                .module_write_set_is_empty_or_invariant_violation()
-                .map_err(|err| {
-                    err.with_message(
-                        "No modules should be published if there is no publish request".to_string(),
-                    )
-                    .finish(Location::Undefined)
-                    .into_vm_status()
-                })?;
-
-            return Ok(user_change_set);
+            let change_set = session.finish(change_set_configs, module_storage)?;
+            return UserSessionChangeSet::new(
+                change_set,
+                ModuleWriteSet::empty(),
+                change_set_configs,
+            );
         }
 
         let PublishRequest {
