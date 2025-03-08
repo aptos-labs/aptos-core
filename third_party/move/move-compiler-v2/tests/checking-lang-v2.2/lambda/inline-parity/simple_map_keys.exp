@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: captured variable `result` cannot be modified inside of a lambda
+   ┌─ tests/checking-lang-v2.2/lambda/inline-parity/simple_map_keys.move:28:55
+   │
+28 │         for_each_ref(v, |elem| vector::push_back(&mut result, f(elem)));
+   │                                                       ^^^^^^

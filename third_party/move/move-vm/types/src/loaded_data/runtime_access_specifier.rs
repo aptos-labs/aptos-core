@@ -231,10 +231,9 @@ impl AccessSpecifierClause {
             instance,
             address,
         } = access;
-        if self.kind != AccessKind::Acquires && &self.kind != kind {
-            return false;
-        }
-        self.resource.enables(resource, instance) && self.address.enables(address)
+        self.kind.subsumes(kind)
+            && self.resource.enables(resource, instance)
+            && self.address.enables(address)
     }
 
     /// Specializes this clause.
