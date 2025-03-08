@@ -281,7 +281,7 @@ impl AptosVM {
         resolver: &'r S,
         session_id: SessionId,
         user_transaction_context_opt: Option<UserTransactionContext>,
-    ) -> SessionExt<'r, '_> {
+    ) -> SessionExt<'r> {
         self.move_vm
             .new_session(resolver, session_id, user_transaction_context_opt)
     }
@@ -834,7 +834,7 @@ impl AptosVM {
             self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
         )?;
 
-        session.execute_script(
+        session.load_and_execute_script(
             script.code(),
             script.ty_args().to_vec(),
             args,
@@ -928,11 +928,11 @@ impl AptosVM {
         Ok(())
     }
 
-    fn execute_script_or_entry_function<'a, 'r, 'l>(
-        &'l self,
+    fn execute_script_or_entry_function<'a, 'r>(
+        &self,
         resolver: &'r impl AptosMoveResolver,
         code_storage: &impl AptosCodeStorage,
-        mut session: UserSession<'r, 'l>,
+        mut session: UserSession<'r>,
         serialized_signers: &SerializedSigners,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext<'a>,
@@ -1046,14 +1046,14 @@ impl AptosVM {
         Ok(storage_refund)
     }
 
-    fn charge_change_set_and_respawn_session<'r, 'l>(
-        &'l self,
+    fn charge_change_set_and_respawn_session<'r>(
+        &self,
         mut user_session_change_set: UserSessionChangeSet,
         resolver: &'r impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
         gas_meter: &mut impl AptosGasMeter,
-        txn_data: &'l TransactionMetadata,
-    ) -> Result<EpilogueSession<'r, 'l>, VMStatus> {
+        txn_data: &TransactionMetadata,
+    ) -> Result<EpilogueSession<'r>, VMStatus> {
         let storage_refund = self.charge_change_set(
             &mut user_session_change_set,
             gas_meter,
@@ -1072,11 +1072,11 @@ impl AptosVM {
         ))
     }
 
-    fn simulate_multisig_transaction<'a, 'r, 'l>(
-        &'l self,
+    fn simulate_multisig_transaction<'a, 'r>(
+        &self,
         resolver: &'r impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
-        session: UserSession<'r, 'l>,
+        session: UserSession<'r>,
         serialized_signers: &SerializedSigners,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext<'a>,
@@ -1138,11 +1138,11 @@ impl AptosVM {
     // failure object. In case of success, keep the session and also do any necessary module publish
     // cleanup.
     // 3. Call post transaction cleanup function in multisig account module with the result from (2)
-    fn execute_multisig_transaction<'r, 'l>(
-        &'l self,
+    fn execute_multisig_transaction<'r>(
+        &self,
         resolver: &'r impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
-        mut session: UserSession<'r, 'l>,
+        mut session: UserSession<'r>,
         serialized_signers: &SerializedSigners,
         prologue_session_change_set: &SystemSessionChangeSet,
         gas_meter: &mut impl AptosGasMeter,
@@ -1303,11 +1303,11 @@ impl AptosVM {
         )
     }
 
-    fn execute_or_simulate_multisig_transaction<'a, 'r, 'l>(
-        &'l self,
+    fn execute_or_simulate_multisig_transaction<'a, 'r>(
+        &self,
         resolver: &'r impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
-        session: UserSession<'r, 'l>,
+        session: UserSession<'r>,
         serialized_signers: &SerializedSigners,
         prologue_session_change_set: &SystemSessionChangeSet,
         gas_meter: &mut impl AptosGasMeter,
@@ -1357,7 +1357,7 @@ impl AptosVM {
         &self,
         resolver: &impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
-        mut session: UserSession<'_, '_>,
+        mut session: UserSession<'_>,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         multisig_address: AccountAddress,
@@ -1389,16 +1389,16 @@ impl AptosVM {
         )
     }
 
-    fn failure_multisig_payload_cleanup<'r, 'l>(
-        &'l self,
+    fn failure_multisig_payload_cleanup<'r>(
+        &self,
         resolver: &'r impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
         prologue_session_change_set: &SystemSessionChangeSet,
         execution_error: VMStatus,
-        txn_data: &'l TransactionMetadata,
+        txn_data: &TransactionMetadata,
         mut cleanup_args: Vec<Vec<u8>>,
         traversal_context: &mut TraversalContext,
-    ) -> Result<EpilogueSession<'r, 'l>, VMStatus> {
+    ) -> Result<EpilogueSession<'r>, VMStatus> {
         // Start a fresh session for running cleanup that does not contain any changes from
         // the inner function call earlier (since it failed).
         let mut epilogue_session = EpilogueSession::on_user_session_failure(
@@ -1454,7 +1454,7 @@ impl AptosVM {
     /// Resolve a pending code publish request registered via the NativeCodeContext.
     fn resolve_pending_code_publish_and_finish_user_session(
         &self,
-        mut session: UserSession<'_, '_>,
+        mut session: UserSession<'_>,
         resolver: &impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
         gas_meter: &mut impl AptosGasMeter,

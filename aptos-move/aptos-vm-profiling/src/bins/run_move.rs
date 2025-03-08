@@ -193,7 +193,7 @@ fn main() -> Result<()> {
     let args: Vec<Vec<u8>> = vec![];
     match entrypoint {
         Entrypoint::Script(script_blob) => {
-            sess.execute_script(
+            sess.load_and_execute_script(
                 script_blob,
                 vec![],
                 args,

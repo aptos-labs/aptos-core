@@ -85,7 +85,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
         let code_storage = storage.as_unsync_code_storage();
 
         let args: Vec<Vec<u8>> = vec![];
-        sess.execute_script(
+        sess.load_and_execute_script(
             b_new.clone(),
             vec![],
             args.clone(),
@@ -95,7 +95,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
         )
         .unwrap();
 
-        sess.execute_script(
+        sess.load_and_execute_script(
             b_old.clone(),
             vec![],
             args,
@@ -123,7 +123,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
 
         let args: Vec<Vec<u8>> = vec![];
         assert_eq!(
-            sess.execute_script(
+            sess.load_and_execute_script(
                 b_new.clone(),
                 vec![],
                 args.clone(),
@@ -136,7 +136,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
             StatusCode::CODE_DESERIALIZATION_ERROR
         );
 
-        sess.execute_script(
+        sess.load_and_execute_script(
             b_old.clone(),
             vec![],
             args,
