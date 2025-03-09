@@ -28,7 +28,10 @@ use aptos_types::{
         WriteSetPayload,
     },
 };
-use move_core_types::{ident_str, language_storage::StructTag};
+use move_core_types::{
+    ident_str,
+    language_storage::{StructTag, TypeTag},
+};
 use rand::SeedableRng;
 use std::{fmt::Debug, str::FromStr, sync::Arc};
 
@@ -176,6 +179,25 @@ fn test_db_indexer_data() {
     let x = internal_indexer_db.get_event_by_key_iter().unwrap();
     let res: Vec<_> = x.collect();
     assert_eq!(res.len(), 16);
+
+    let type_tag = TypeTag::from_str("0x1::coin::DepositEvent").unwrap();
+    let res = db_indexer
+        .get_events_by_type(&type_tag, 0, 100, total_version)
+        .unwrap();
+    assert_eq!(res.len(), 7);
+    assert_eq!(res[0].1.len(), 2);
+
+    let type_tag = TypeTag::from_str("0x1::coin::NonExist").unwrap();
+    let res = db_indexer
+        .get_events_by_type(&type_tag, 0, 100, total_version)
+        .unwrap();
+    assert_eq!(res.len(), 0);
+
+    let type_tag = TypeTag::from_str("0x0000000000001::transaction_fee::FeeStatement").unwrap();
+    let res = db_indexer
+        .get_events_by_type(&type_tag, 0, 100, total_version)
+        .unwrap();
+    assert_eq!(res.len(), 10);
 
     let core_kv_iter = db_indexer
         .get_prefixed_state_value_iterator(
