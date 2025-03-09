@@ -13,6 +13,7 @@ It interacts with the other modules in the following ways:
 -  [Constants](#@Constants_0)
 -  [Function `set_time_has_started`](#0x1_timestamp_set_time_has_started)
 -  [Function `update_global_time`](#0x1_timestamp_update_global_time)
+-  [Function `is_expired`](#0x1_timestamp_is_expired)
 -  [Function `now_microseconds`](#0x1_timestamp_now_microseconds)
 -  [Function `now_seconds`](#0x1_timestamp_now_seconds)
 -  [Specification](#@Specification_1)
@@ -21,7 +22,8 @@ It interacts with the other modules in the following ways:
     -  [Function `update_global_time`](#@Specification_1_update_global_time)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<pre><code><b>use</b> <a href="aggregator_v2.md#0x1_aggregator_v2">0x1::aggregator_v2</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 </code></pre>
 
@@ -45,7 +47,7 @@ A singleton resource holding the current Unix time in microseconds
 
 <dl>
 <dt>
-<code>microseconds: u64</code>
+<code>microseconds: <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;u64&gt;</code>
 </dt>
 <dd>
 
@@ -108,7 +110,7 @@ Marks that time has started. This can only be called from genesis and with the a
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="timestamp.md#0x1_timestamp_set_time_has_started">set_time_has_started</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
-    <b>let</b> timer = <a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a> { microseconds: 0 };
+    <b>let</b> timer = <a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a> { microseconds: <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator_with_value">aggregator_v2::create_unbounded_aggregator_with_value</a>(0) };
     <b>move_to</b>(aptos_framework, timer);
 }
 </code></pre>
@@ -142,15 +144,40 @@ Updates the wall clock time by consensus. Requires VM privilege and will be invo
     <a href="system_addresses.md#0x1_system_addresses_assert_vm">system_addresses::assert_vm</a>(<a href="account.md#0x1_account">account</a>);
 
     <b>let</b> global_timer = <b>borrow_global_mut</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
-    <b>let</b> now = global_timer.microseconds;
+    <b>let</b> now = <a href="aggregator_v2.md#0x1_aggregator_v2_read">aggregator_v2::read</a>(&global_timer.microseconds);
     <b>if</b> (proposer == @vm_reserved) {
         // NIL <a href="block.md#0x1_block">block</a> <b>with</b> null <b>address</b> <b>as</b> proposer. Timestamp must be equal.
         <b>assert</b>!(now == <a href="timestamp.md#0x1_timestamp">timestamp</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="timestamp.md#0x1_timestamp_EINVALID_TIMESTAMP">EINVALID_TIMESTAMP</a>));
     } <b>else</b> {
         // Normal <a href="block.md#0x1_block">block</a>. Time must advance
         <b>assert</b>!(now &lt; <a href="timestamp.md#0x1_timestamp">timestamp</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="timestamp.md#0x1_timestamp_EINVALID_TIMESTAMP">EINVALID_TIMESTAMP</a>));
-        global_timer.microseconds = <a href="timestamp.md#0x1_timestamp">timestamp</a>;
+        <a href="aggregator_v2.md#0x1_aggregator_v2_add">aggregator_v2::add</a>(&<b>mut</b> global_timer.microseconds, <a href="timestamp.md#0x1_timestamp">timestamp</a> - now);
     };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_timestamp_is_expired"></a>
+
+## Function `is_expired`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="timestamp.md#0x1_timestamp_is_expired">is_expired</a>(<a href="timestamp.md#0x1_timestamp">timestamp</a>: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="timestamp.md#0x1_timestamp_is_expired">is_expired</a>(<a href="timestamp.md#0x1_timestamp">timestamp</a>: u64): bool <b>acquires</b> <a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a> {
+    <b>let</b> global_timer = <b>borrow_global_mut</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
+    <a href="aggregator_v2.md#0x1_aggregator_v2_is_at_least">aggregator_v2::is_at_least</a>(&global_timer.microseconds, <a href="timestamp.md#0x1_timestamp">timestamp</a>)
 }
 </code></pre>
 
@@ -176,7 +203,7 @@ Gets the current time in microseconds.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="timestamp.md#0x1_timestamp_now_microseconds">now_microseconds</a>(): u64 <b>acquires</b> <a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a> {
-    <b>borrow_global</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@aptos_framework).microseconds
+    <a href="aggregator_v2.md#0x1_aggregator_v2_read">aggregator_v2::read</a>(&<b>borrow_global</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@aptos_framework).microseconds)
 }
 </code></pre>
 
@@ -315,7 +342,8 @@ Gets the current time in seconds.
 
 
 <pre><code><b>fun</b> <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">spec_now_microseconds</a>(): u64 {
-   <b>global</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@aptos_framework).microseconds
+   <b>use</b> aptos_framework::aggregator_v2;
+   <a href="aggregator_v2.md#0x1_aggregator_v2_read">aggregator_v2::read</a>(<b>global</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@aptos_framework).microseconds)
 }
 </code></pre>
 
