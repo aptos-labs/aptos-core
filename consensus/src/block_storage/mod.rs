@@ -18,6 +18,7 @@ use std::{sync::Arc, time::Duration};
 
 mod block_store;
 mod block_tree;
+mod execution_pool;
 pub mod pending_blocks;
 pub mod tracing;
 

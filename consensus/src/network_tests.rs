@@ -535,7 +535,10 @@ mod tests {
     };
     use aptos_config::network_id::{NetworkId, PeerNetworkId};
     use aptos_consensus_types::{
-        block_retrieval::{BlockRetrievalRequestV1, BlockRetrievalResponse, BlockRetrievalStatus},
+        block_retrieval::{
+            BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse,
+            BlockRetrievalStatus,
+        },
         common::Payload,
     };
     use aptos_crypto::HashValue;
@@ -829,7 +832,12 @@ mod tests {
                     IncomingRpcRequest::DeprecatedBlockRetrieval(request) => {
                         request.response_sender.send(Ok(bytes)).unwrap()
                     },
-                    _ => panic!("unexpected message"),
+                    // TODO @bchocho @hariria fix after release, this is a sanity check to make sure
+                    // we're not making new BlockRetrievalRequest network requests anywhere
+                    IncomingRpcRequest::BlockRetrieval(request) => {
+                        request.response_sender.send(Ok(bytes)).unwrap()
+                    },
+                    request => panic!("test_rpc unexpected message {:?}", request),
                 }
             }
         };
@@ -838,12 +846,12 @@ mod tests {
         timed_block_on(&runtime, async {
             let response = nodes[0]
                 .request_block(
-                    BlockRetrievalRequestV1::new(HashValue::zero(), 1),
+                    BlockRetrievalRequest::V1(BlockRetrievalRequestV1::new(HashValue::zero(), 1)),
                     peer,
                     Duration::from_secs(5),
                 )
-                .await
-                .unwrap();
+                .await;
+            let response = response.unwrap();
             assert_eq!(response.status(), BlockRetrievalStatus::IdNotFound);
         });
     }
@@ -880,6 +888,7 @@ mod tests {
             .push((peer_id, protocol_id), bad_msg)
             .unwrap();
 
+        // TODO @bchocho @hariria change in new release once new ConsensusMsg is available (ConsensusMsg::BlockRetrievalRequest)
         let liveness_check_msg = ConsensusMsg::DeprecatedBlockRetrievalRequest(Box::new(
             BlockRetrievalRequestV1::new(HashValue::random(), 1),
         ));
