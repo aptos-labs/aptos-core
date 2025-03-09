@@ -39,6 +39,8 @@ module aptos_std::ordered_map {
     const EITER_OUT_OF_BOUNDS: u64 = 3;
     /// New key used in replace_key_inplace doesn't respect the order
     const ENEW_KEY_NOT_IN_ORDER: u64 = 4;
+    /// Arrays doesn't have same length.
+    const EARRAYS_DIFFERENT_LENGTH: u64 = 5;
 
     /// Individual entry holding (key, value) pair
     struct Entry<K, V> has drop, copy, store {
@@ -167,21 +169,77 @@ module aptos_std::ordered_map {
     }
 
     /// Add multiple key/value pairs to the map. The keys must not already exist.
+    /// Aborts with EARRAYS_DIFFERENT_LENGTH if arrays doesn't have the same length.
     /// Aborts with EKEY_ALREADY_EXISTS if key already exist, or duplicate keys are passed in.
     public fun add_all<K, V>(self: &mut OrderedMap<K, V>, keys: vector<K>, values: vector<V>) {
-        // TODO: Can be optimized, by sorting keys and values, and then creating map.
-        vector::zip(keys, values, |key, value| {
-            self.add(key, value);
-        });
+        assert!(keys.length() == values.length(), error::invalid_argument(EARRAYS_DIFFERENT_LENGTH));
+        let len = keys.length();
+        let entries_len = self.entries.length();
+        let last_index: u64 = 0;
+
+        quick_sort_with_companion_array(&mut keys, &mut values, 0, (len-1));
+        
+        keys.reverse();
+        values.reverse();
+
+        // Now arrays are in descending ordered
+        // Handy for using pop_back vector function
+        // Can now consume the array without requesti the drop abilities to keys and values parameters
+        
+        for (i in 0..len) {
+            let key = keys.pop_back();
+            let value = values.pop_back();
+
+            let insertion_index = binary_search(&key, &self.entries, last_index, entries_len);
+            // Key must not already be inside
+            assert!(insertion_index >= entries_len || &self.entries[insertion_index].key != &key, error::invalid_argument(EKEY_ALREADY_EXISTS));
+            self.entries.insert(insertion_index, Entry {key, value});
+
+            last_index = insertion_index;
+            entries_len += 1;
+        };
+
+
+        keys.destroy_empty();
+        values.destroy_empty();
     }
 
     /// Add multiple key/value pairs to the map, overwrites values if they exist already,
     /// or if duplicate keys are passed in.
+    /// Aborts with EARRAYS_DIFFERENT_LENGTH if arrays doesn't have the same length.
     public fun upsert_all<K: drop, V: drop>(self: &mut OrderedMap<K, V>, keys: vector<K>, values: vector<V>) {
-        // TODO: Can be optimized, by sorting keys and values, and then creating map.
-        vector::zip(keys, values, |key, value| {
-            self.upsert(key, value);
-        });
+        assert!(keys.length() == values.length(), error::invalid_argument(EARRAYS_DIFFERENT_LENGTH));
+        let len = keys.length();
+        let entries_len = self.entries.length();
+        let last_index: u64 = 0;
+
+        quick_sort_with_companion_array(&mut keys, &mut values, 0, (len-1));
+        
+        keys.reverse();
+        values.reverse();
+
+        // Now arrays are in descending ordered
+        // Handy for using pop_back vector function
+        // Can now consume the array without requesti the drop abilities to keys and values parameters
+        
+        for (i in 0..len) {
+            let key = keys.pop_back();
+            let value = values.pop_back();
+
+            let insertion_index = binary_search(&key, &self.entries, last_index, entries_len);
+
+            if (insertion_index < entries_len && &self.entries[insertion_index].key == &key) {
+                self.entries.replace(insertion_index, Entry { key, value });
+            } else {
+                self.entries.insert(insertion_index, Entry { key, value });
+                entries_len += 1;
+            };
+
+            last_index = insertion_index;
+        };
+
+        keys.destroy_empty();
+        values.destroy_empty();
     }
 
     /// Takes all elements from `other` and adds them to `self`,
@@ -615,6 +673,83 @@ module aptos_std::ordered_map {
     //     }
     // }
 
+    /// Execute a quick sort with companion.
+    /// It sort the first array and reflects the changes on companion one.
+    /// Aborts if array and companion are of different length.
+    /// Aborts if parameter lo greater than parameter hi.
+    /// Aborts if parameter hi greater than array length.
+    fun quick_sort_with_companion_array<K, V>(array: &mut vector<K>, companion: &mut vector<V>, lo: u64, hi: u64) {
+        let len = array.length();
+        assert!(lo <= hi);
+        assert!(len == companion.length());
+        assert!(hi < array.length() || hi == 0);
+
+        if (lo == hi) return;
+        if (lo == 0 && hi == (len-1) && is_ordered(array)) return;
+
+        let p_idx = partition_with_companion_array(array, companion, lo, hi);
+        
+        quick_sort_with_companion_array(array, companion, lo, p_idx);
+        quick_sort_with_companion_array(array, companion, p_idx+1, hi);
+    }
+    
+    /// Partition function that implements Hoare Partition Algorithm.
+    /// Return the partition index.
+    /// Aborts if array and companion are of different length.
+    /// Aborts if parameter lo greater than parameter hi.
+    /// Aborts if parameter hi greater than array length.
+    fun partition_with_companion_array<T, E>(array: &mut vector<T>, companion: &mut vector<E>, lo: u64, hi: u64): u64 {
+        assert!(array.length() == companion.length());
+        assert!(lo <= hi);
+        assert!(hi < array.length() || hi == 0);
+
+        let i = lo;
+        let j = hi;
+
+        loop {
+            let pivot = array.borrow(lo);
+
+            while (i < hi) {    
+                let comparison = cmp::compare(array.borrow(i), pivot);
+                if (comparison.is_ge()) break;
+                i +=1 ;
+            };
+
+            while (j > lo) {
+                let comparison = cmp::compare(array.borrow(j), pivot);
+                if (comparison.is_le()) break;
+                j -= 1;
+            };
+
+            if (i >= j) return j;
+
+            array.swap(i, j);
+            companion.swap(i, j);
+
+            i += 1;
+
+            if (j >= lo && j != 0) j -= 1; // For preventing underflow
+        }
+    }  
+    
+    /// Return true if a vector is in a not descending order, else false.
+    fun is_ordered<T>(array: &vector<T>): bool {
+        let len = array.length();
+        if (len == 0 || len == 1) return true;
+
+        
+        for (i in 0..(len-1)) {
+            let curr = array.borrow(i);
+            let next = array.borrow(i+1);
+
+            let comparison = cmp::compare(curr, next);
+            
+            if (!comparison.is_le()) return false
+        };
+
+        return true
+    }
+
     spec module {
         pragma verify = false;
     }
@@ -735,7 +870,50 @@ module aptos_std::ordered_map {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x20002, location = Self)] /// EKEY_ALREADY_EXISTS
+    fun test_add_all_branches() {
+        // Test inserting all new keys when map is empty
+        {
+            let map = new<u64, u64>();
+            map.add_all(vector[1, 3, 5], vector[10, 30, 50]);
+            assert!(map == new_from(vector[1, 3, 5], vector[10, 30, 50]), 1);
+        };
+        
+        // Test inserting at the end of the map
+        // This tests the branch: insertion_index >= entries_len
+        {
+            let map = new_from(vector[1, 2], vector[10, 20]);
+            map.add_all(vector[3, 4, 5], vector[30, 40, 50]);
+            assert!(map == new_from(vector[1, 2, 3, 4, 5], vector[10, 20, 30, 40, 50]), 2);
+        };
+        
+        // Test inserting new keys in the middle
+        // This tests the branch: &self.entries[insertion_index].key != &key
+        {
+            let map = new_from(vector[1, 5], vector[10, 50]);
+            map.add_all(vector[2, 3, 4], vector[20, 30, 40]);
+            assert!(map == new_from(vector[1, 2, 3, 4, 5], vector[10, 20, 30, 40, 50]), 3);
+        };
+        
+        // Test for optimal last_index usage
+        // This ensures the last_index optimization is working
+        {
+            let map = new<u64, u64>();
+            map.add_all(vector[1, 2, 3, 4, 5], vector[10, 20, 30, 40, 50]);
+            assert!(map == new_from(vector[1, 2, 3, 4, 5], vector[10, 20, 30, 40, 50]), 4);
+        };
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10001, location = Self)] // EKEY_ALREADY_EXISTS
+    fun test_add_all_existing_key() {
+        // Test error when key already exists
+        // This tests the assertion failure branch
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        map.add_all(vector[2, 3, 4], vector[20, 35, 40]); // Should abort since key 3 exists
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10005, location = Self)] /// EARRAYS_DIFFERENT_LENGTH
     public fun test_add_all_mismatch() {
         new_from(vector[1, 3], vector[10]);
     }
@@ -743,8 +921,39 @@ module aptos_std::ordered_map {
     #[test]
     public fun test_upsert_all() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
-        upsert_all(&mut map, vector[7, 2, 3], vector[70, 20, 35]);
+        map.upsert_all(vector[7, 2, 3], vector[70, 20, 35]);
         assert!(map == new_from(vector[1, 2, 3, 5, 7], vector[10, 20, 35, 50, 70]), 1);
+    }
+
+    #[test]
+    fun test_upsert_all_branches() {
+        // Test for the branch where keys don't exist (insertion case)
+        {
+            let map = new<u64, u64>();
+            map.upsert_all(vector[1, 3, 5], vector[10, 30, 50]);
+            assert!(map == new_from(vector[1, 3, 5], vector[10, 30, 50]), 1);
+        };
+
+        // Test for the branch where keys already exist (replacement case)
+        {
+            let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+            map.upsert_all(vector[1, 3, 5], vector[15, 35, 55]);
+            assert!(map == new_from(vector[1, 3, 5], vector[15, 35, 55]), 2);
+        };
+
+        // Test for mixed case - some keys exist, some don't
+        {
+            let map = new_from(vector[1, 5], vector[10, 50]);
+            map.upsert_all(vector[1, 3, 5], vector[15, 30, 55]);
+            assert!(map == new_from(vector[1, 3, 5], vector[15, 30, 55]), 3);
+        };
+        
+        // Test for insertion at different positions (beginning, middle, end)
+        {
+            let map = new_from(vector[3], vector[30]);
+            map.upsert_all(vector[1, 5], vector[10, 50]);
+            assert!(map == new_from(vector[1, 3, 5], vector[10, 30, 50]), 4);
+        };
     }
 
     #[test]
@@ -754,7 +963,7 @@ module aptos_std::ordered_map {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x20002, location = Self)] /// EKEY_ALREADY_EXISTS
+    #[expected_failure(abort_code = 0x10005, location = Self)] /// EARRAYS_DIFFERENT_LENGTH
     public fun test_upsert_all_mismatch() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
         upsert_all(&mut map, vector[2], vector[20, 35]);
@@ -1171,5 +1380,295 @@ module aptos_std::ordered_map {
         };
 
         map.destroy_empty();
+    }
+
+    #[test]
+    fun test_is_ordered_empty() {
+        let vec = vector::empty<u64>();
+        assert!(is_ordered(&vec), 0);
+    }
+
+    #[test]
+    fun test_is_ordered_single_element() {
+        let vec = vector[42];
+        assert!(is_ordered(&vec), 0);
+    }
+
+    #[test]
+    fun test_is_ordered_ascending() {
+        let vec = vector[1, 2, 3, 4, 5];
+        assert!(is_ordered(&vec), 0);
+    }
+
+    #[test]
+    fun test_is_ordered_with_duplicates() {
+        let vec = vector[1, 2, 2, 3, 4, 4, 5];
+        assert!(is_ordered(&vec), 0);
+    }
+
+    #[test]
+    fun test_is_ordered_equal_elements() {
+        let vec = vector[5, 5, 5, 5, 5];
+        assert!(is_ordered(&vec), 0);
+    }
+
+    #[test]
+    fun test_is_ordered_descending() {
+        let vec = vector[5, 4, 3, 2, 1];
+        assert!(!is_ordered(&vec), 0);
+    }
+
+    #[test]
+    fun test_is_ordered_partially_ordered() {
+        let vec = vector[1, 2, 5, 4, 6];
+        assert!(!is_ordered(&vec), 0);
+    }
+
+    #[test]
+    fun test_is_ordered_already_sorted() {
+        let vec = vector[10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+        assert!(is_ordered(&vec), 0);
+    }
+
+    #[test]
+    fun test_partition_already_sorted() {
+        let keys = vector[1, 2, 3, 4, 5];
+        let values = vector[10, 20, 30, 40, 50];
+        
+        let p_idx = partition_with_companion_array(&mut keys, &mut values, 0, 4);
+        
+        assert!(p_idx == 0, 0);
+        
+        assert!(is_ordered(&keys), 1);
+        
+        for (i in 0..keys.length()) {
+            assert!(keys[i] * 10 == values[i], 2);
+        };
+    }
+
+    #[test]
+    fun test_partition_single_element() {
+        let keys = vector[42];
+        let values = vector[420];
+        
+        let p_idx = partition_with_companion_array(&mut keys, &mut values, 0, 0);
+        
+        assert!(p_idx == 0, 0);
+        
+        assert!(keys[0] == 42, 1);
+        assert!(values[0] == 420, 2);
+    }
+
+    #[test]
+    fun test_partition_subarray() {
+        let keys = vector[5, 4, 3, 2, 1, 0];
+        let values = vector[50, 40, 30, 20, 10, 0];
+        
+        let p_idx = partition_with_companion_array(&mut keys, &mut values, 1, 4);
+        
+        assert!(keys[0] == 5, 0);
+        assert!(values[0] == 50, 1);
+        assert!(keys[5] == 0, 2);
+        assert!(values[5] == 0, 3);
+        
+        for (i in 1..(p_idx + 1)) {
+            let comparison = cmp::compare(keys.borrow(i), keys.borrow(1));
+            assert!(comparison.is_le(), 4);
+        };
+        
+        if (p_idx < 4) {
+            for (i in (p_idx + 1)..5) {
+                let comparison = cmp::compare(keys.borrow(i), keys.borrow(1));
+                assert!(comparison.is_gt(), 5);
+            };
+        };
+    }
+
+    #[test]
+    #[expected_failure]
+    fun test_partition_invalid_range() {
+        let keys = vector[1, 2, 3];
+        let values = vector[10, 20, 30];
+        
+        partition_with_companion_array(&mut keys, &mut values, 2, 1);
+    }
+
+    #[test]
+    #[expected_failure]
+    fun test_partition_out_of_bounds() {
+        let keys = vector[1, 2, 3];
+        let values = vector[10, 20, 30];
+        
+        partition_with_companion_array(&mut keys, &mut values, 0, 3);
+    }
+
+    #[test]
+    #[expected_failure]
+    fun test_partition_length_mismatch() {
+        let keys = vector[1, 2, 3];
+        let values = vector[10, 20];
+        
+        partition_with_companion_array(&mut keys, &mut values, 0, 2);
+    }
+    #[test]
+    fun test_quicksort_empty() {
+        let keys = vector::empty<u64>();
+        let values = vector::empty<u64>();
+        
+        quick_sort_with_companion_array(&mut keys, &mut values, 0, 0);
+        
+        assert!(keys.length() == 0, 0);
+        assert!(values.length() == 0, 1);
+        assert!(is_ordered(&keys), 2);
+    }
+    
+    #[test]
+    fun test_quicksort_single_element() {
+        let keys = vector[42];
+        let values = vector[100];
+        
+        quick_sort_with_companion_array(&mut keys, &mut values, 0, 0);
+        
+        assert!(keys.length() == 1, 0);
+        assert!(values.length() == 1, 1);
+        assert!(keys[0] == 42, 2);
+        assert!(values[0] == 100, 3);
+        assert!(is_ordered(&keys), 4);
+    }
+
+    #[test]
+    fun test_quicksort_already_sorted() {
+        let keys = vector[1, 2, 3, 4, 5];
+        let values = vector[10, 20, 30, 40, 50];
+        let len = keys.length();
+        
+        quick_sort_with_companion_array(&mut keys, &mut values, 0, len - 1);
+        
+        assert!(keys == vector[1, 2, 3, 4, 5], 0);
+        assert!(values == vector[10, 20, 30, 40, 50], 1);
+        assert!(is_ordered(&keys), 2);
+    }
+
+    #[test]
+    fun test_quicksort_reverse_order() {
+        let keys = vector[5, 4, 3, 2, 1];
+        let values = vector[50, 40, 30, 20, 10];
+        let len = keys.length();
+        
+        quick_sort_with_companion_array(&mut keys, &mut values, 0, len - 1);
+        
+        assert!(keys == vector[1, 2, 3, 4, 5], 0);
+        assert!(values == vector[10, 20, 30, 40, 50], 1);
+        assert!(is_ordered(&keys), 2);
+    }
+
+    #[test]
+    fun test_quicksort_random_order() {
+        let keys = vector[3, 1, 4, 5, 2];
+        let values = vector[30, 10, 40, 50, 20];
+        let len = keys.length();
+        
+        quick_sort_with_companion_array(&mut keys, &mut values, 0, len - 1);
+        
+        assert!(keys == vector[1, 2, 3, 4, 5], 0);
+        assert!(values == vector[10, 20, 30, 40, 50], 1);
+        assert!(is_ordered(&keys), 2);
+    }
+
+    #[test]
+    fun test_quicksort_with_duplicates() {
+        let keys = vector[3, 2, 3, 1, 2];
+        let values = vector[30, 20, 35, 10, 25];
+        let len = keys.length();
+        
+        quick_sort_with_companion_array(&mut keys, &mut values, 0, len - 1);
+        
+        assert!(keys == vector[1, 2, 2, 3, 3], 0);
+        assert!(values[0] == 10, 1); 
+        assert!((values[3] == 30 && values[4] == 35) || (values[3] == 35 && values[4] == 30), 3);
+        assert!(is_ordered(&keys), 4);
+    }
+
+    #[test]
+    fun test_quicksort_larger_array() {
+        let keys = vector[9, 3, 7, 1, 5, 8, 2, 4, 6, 0];
+        let values = vector[90, 30, 70, 10, 50, 80, 20, 40, 60, 0];
+        let len = keys.length();
+        
+        quick_sort_with_companion_array(&mut keys, &mut values, 0, len - 1);
+        
+        assert!(keys == vector[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], 0);
+        assert!(values == vector[0, 10, 20, 30, 40, 50, 60, 70, 80, 90], 1);
+        assert!(is_ordered(&keys), 2);
+    }
+
+    #[test]
+    #[expected_failure] 
+    fun test_quicksort_invalid_range() {
+        let keys = vector[1, 2, 3];
+        let values = vector[10, 20, 30];
+        
+        quick_sort_with_companion_array(&mut keys, &mut values, 2, 1); // lo > hi
+    }
+
+    #[test]
+    #[expected_failure]
+    fun test_quicksort_out_of_bounds() {
+        let keys = vector[1, 2, 3];
+        let values = vector[10, 20, 30];
+        
+        quick_sort_with_companion_array(&mut keys, &mut values, 0, 3);
+    }
+
+    #[test]
+    #[expected_failure]
+    fun test_quicksort_length_mismatch() {
+        let keys = vector[1, 2, 3];
+        let values = vector[10, 20];
+        
+        quick_sort_with_companion_array(&mut keys, &mut values, 0, 2);
+    }
+
+    #[test]
+    fun test_quicksort_large_vector() {
+        let keys = vector::empty<u64>();
+        let values = vector::empty<u64>();
+        
+        let i = 0;
+        let size = 1000;
+        
+        while (i < size) {
+            let key = (i * 31 + 17) % size;
+            keys.push_back(key);
+            values.push_back(key * 100);
+            i = i + 1;
+        };
+
+        
+        let original_keys = *&keys;
+        let original_values = *&values;
+        
+        let len = keys.length();
+        quick_sort_with_companion_array(&mut keys, &mut values, 0, len - 1);
+        
+        assert!(is_ordered(&keys), 0);
+        
+        i = 0;
+        while (i < len) {
+            let key = keys[i];
+            let value = values[i];
+            
+            let j = 0;
+            let found = false;
+            while (j < len && !found) {
+                if (original_keys[j] == key && original_values[j] == value) {
+                    found = true;
+                };
+                j = j + 1;
+            };
+            
+            assert!(found, 1);
+            i = i + 1;
+        };
     }
 }
