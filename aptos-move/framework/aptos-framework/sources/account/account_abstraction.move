@@ -77,7 +77,7 @@ module aptos_framework::account_abstraction {
         let resource_addr = resource_addr(addr);
         if (exists<DispatchableAuthenticator>(resource_addr)) {
             option::some(
-                ordered_map::keys(&borrow_global<DispatchableAuthenticator>(resource_addr).auth_functions)
+                DispatchableAuthenticator[resource_addr].auth_functions.keys()
             )
         } else { option::none() }
     }
@@ -178,7 +178,7 @@ module aptos_framework::account_abstraction {
     ) acquires DomainDispatchableAuthenticator {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        borrow_global_mut<DomainDispatchableAuthenticator>(@aptos_framework).auth_functions.add(
+        DomainDispatchableAuthenticator[@aptos_framework].auth_functions.add(
             function_info::new_function_info_from_address(module_address, module_name, function_name),
             DomainRegisterValue::Empty,
         );
@@ -219,19 +219,19 @@ module aptos_framework::account_abstraction {
             );
         };
         assert!(exists<DispatchableAuthenticator>(resource_addr), error::not_found(EFUNCTION_INFO_EXISTENCE));
-        let current_map = &mut borrow_global_mut<DispatchableAuthenticator>(resource_addr).auth_functions;
+        let current_map = &mut DispatchableAuthenticator[resource_addr].auth_functions;
         if (is_add) {
             assert!(
-                !ordered_map::contains(current_map, &auth_function),
+                !current_map.contains(&auth_function),
                 error::already_exists(EFUNCTION_INFO_EXISTENCE)
             );
-            ordered_map::add(current_map, auth_function, true);
+            current_map.add(auth_function, true);
         } else {
             assert!(
-                ordered_map::contains(current_map, &auth_function),
+                current_map.contains(&auth_function),
                 error::not_found(EFUNCTION_INFO_EXISTENCE)
             );
-            ordered_map::remove(current_map, &auth_function);
+            current_map.remove(&auth_function);
         };
         event::emit(
             UpdateDispatchableAuthenticator {
@@ -240,19 +240,19 @@ module aptos_framework::account_abstraction {
                 auth_function,
             }
         );
-        if (ordered_map::length(current_map) == 0) {
-                remove_authenticator(account);
+        if (current_map.length() == 0) {
+            remove_authenticator(account);
         }
     }
 
     inline fun dispatchable_authenticator_internal(addr: address): &OrderedMap<FunctionInfo, bool> {
         assert!(using_dispatchable_authenticator(addr), error::not_found(EDISPATCHABLE_AUTHENTICATOR_IS_NOT_USED));
-        &borrow_global<DispatchableAuthenticator>(resource_addr(addr)).auth_functions
+        &DispatchableAuthenticator[resource_addr(addr)].auth_functions
     }
 
     inline fun dispatchable_domain_authenticator_internal(): &BigOrderedMap<FunctionInfo, DomainRegisterValue> {
         assert!(exists<DomainDispatchableAuthenticator>(@aptos_framework), error::not_found(EDOMAIN_AA_NOT_INITIALIZED));
-        &borrow_global<DomainDispatchableAuthenticator>(@aptos_framework).auth_functions
+        &DomainDispatchableAuthenticator[@aptos_framework].auth_functions
     }
 
     fun authenticate(
@@ -269,7 +269,7 @@ module aptos_framework::account_abstraction {
             assert!(func_infos.contains(&func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
         } else {
             let func_infos = dispatchable_authenticator_internal(master_signer_addr);
-            assert!(ordered_map::contains(func_infos, &func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
+            assert!(func_infos.contains(&func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
         };
 
         function_info::load_module_from_function(&func_info);
@@ -295,16 +295,16 @@ module aptos_framework::account_abstraction {
     ) acquires DispatchableAuthenticator {
         let bob_addr = signer::address_of(bob);
         create_account_for_test(bob_addr);
-        assert!(!using_dispatchable_authenticator(bob_addr), 0);
+        assert!(!using_dispatchable_authenticator(bob_addr));
         add_authentication_function(
             bob,
             @aptos_framework,
             string::utf8(b"account_abstraction_tests"),
             string::utf8(b"test_auth")
         );
-        assert!(using_dispatchable_authenticator(bob_addr), 0);
+        assert!(using_dispatchable_authenticator(bob_addr));
         remove_authenticator(bob);
-        assert!(!using_dispatchable_authenticator(bob_addr), 0);
+        assert!(!using_dispatchable_authenticator(bob_addr));
     }
 
     #[deprecated]
