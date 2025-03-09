@@ -255,6 +255,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             description: "Enable json format for compiler messages".to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::FAIL_ON_WARNING.to_string(),
+            description: "Fail compilation if there is a warning".to_string(),
+            default: Given(false),
+        },
     ];
     experiments
         .into_iter()
@@ -275,6 +280,7 @@ impl Experiment {
     pub const COPY_PROPAGATION: &'static str = "copy-propagation";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
     pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";
+    pub const FAIL_ON_WARNING: &'static str = "fail-on-warning";
     pub const FLUSH_WRITES_OPTIMIZATION: &'static str = "flush-writes-optimization";
     pub const GEN_ACCESS_SPECIFIERS: &'static str = "gen-access-specifiers";
     pub const INLINING: &'static str = "inlining";

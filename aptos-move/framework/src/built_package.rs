@@ -308,7 +308,10 @@ impl BuiltPackage {
             }
 
             if let Some(model_options) = model.get_extension::<Options>() {
-                if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
+                if model_options.experiment_on(Experiment::FAIL_ON_WARNING) && model.has_warnings()
+                {
+                    bail!("found warning(s), and `--fail-on-warning` is set")
+                } else if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
                     std::process::exit(if model.has_warnings() { 1 } else { 0 })
                 }
             }
