@@ -30,7 +30,7 @@ pub struct TransactionMetadata {
     pub chain_id: ChainId,
     pub script_hash: Vec<u8>,
     pub script_size: NumBytes,
-    pub is_keyless: bool,
+    pub num_keyless_authenticators: u8,
     pub entry_function_payload: Option<EntryFunction>,
     pub multisig_payload: Option<Multisig>,
 }
@@ -71,9 +71,9 @@ impl TransactionMetadata {
                 TransactionPayload::Script(s) => (s.code().len() as u64).into(),
                 _ => NumBytes::zero(),
             },
-            is_keyless: aptos_types::keyless::get_authenticators(txn)
-                .map(|res| !res.is_empty())
-                .unwrap_or(false),
+            num_keyless_authenticators: aptos_types::keyless::get_authenticators(txn)
+                .map(|res| res.len())
+                .unwrap_or(0) as u8,
             entry_function_payload: match txn.payload() {
                 TransactionPayload::EntryFunction(e) => Some(e.clone()),
                 _ => None,
@@ -146,7 +146,7 @@ impl TransactionMetadata {
     }
 
     pub fn is_keyless(&self) -> bool {
-        self.is_keyless
+        self.num_keyless_authenticators > 0
     }
 
     pub fn entry_function_payload(&self) -> Option<EntryFunction> {

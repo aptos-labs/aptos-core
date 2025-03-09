@@ -24,8 +24,8 @@ use aptos_types::{
     event::EventKey,
     function_info::FunctionInfo,
     keyless::{
-        Claims, Configuration, EphemeralCertificate, IdCommitment, KeylessPublicKey,
-        KeylessSignature, OpenIdSig, Pepper, ZeroKnowledgeSig,
+        AnyKeylessPublicKey, Claims, Configuration, EphemeralCertificate, IdCommitment,
+        KeylessPublicKey, KeylessSignature, OpenIdSig, Pepper, ZeroKnowledgeSig,
     },
     transaction::{
         authenticator::{AnyPublicKey, EphemeralPublicKey, EphemeralSignature},
@@ -57,7 +57,7 @@ lazy_static! {
     };
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum LocalAccountAuthenticator {
     PrivateKey(AccountKey),
     Keyless(KeylessAccount),
@@ -132,6 +132,26 @@ pub struct LocalAccount {
     /// Latest known sequence number of the account, it can be different from validator.
     sequence_number: AtomicU64,
 }
+
+impl Clone for LocalAccount {
+    fn clone(&self) -> Self {
+        Self {
+            address: self.address,
+            auth: self.auth.clone(),
+            sequence_number: AtomicU64::new(self.sequence_number.load(Ordering::SeqCst)),
+        }
+    }
+}
+
+impl PartialEq for LocalAccount {
+    fn eq(&self, other: &Self) -> bool {
+        self.address == other.address
+            // && self.auth == other.auth
+            && self.sequence_number.load(Ordering::SeqCst) == other.sequence_number.load(Ordering::SeqCst)
+    }
+}
+
+impl Eq for LocalAccount {}
 
 pub fn get_apt_primary_store_address(address: AccountAddress) -> AccountAddress {
     let mut bytes = address.to_vec();
@@ -450,6 +470,10 @@ impl LocalAccount {
         self.address
     }
 
+    pub fn address_ref(&self) -> &AccountAddress {
+        &self.address
+    }
+
     pub fn private_key(&self) -> &Ed25519PrivateKey {
         match &self.auth {
             LocalAccountAuthenticator::PrivateKey(key) => key.private_key(),
@@ -465,6 +489,20 @@ impl LocalAccount {
             LocalAccountAuthenticator::PrivateKey(key) => key.public_key(),
             LocalAccountAuthenticator::Keyless(_) => todo!(),
             LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
+            LocalAccountAuthenticator::Abstraction(..) => todo!(),
+            LocalAccountAuthenticator::DomainAbstraction(..) => todo!(),
+        }
+    }
+
+    pub fn keyless_public_key(&self) -> AnyKeylessPublicKey {
+        match &self.auth {
+            LocalAccountAuthenticator::PrivateKey(_) => todo!(),
+            LocalAccountAuthenticator::Keyless(keyless_account) => {
+                AnyKeylessPublicKey::Normal(keyless_account.public_key().clone())
+            },
+            LocalAccountAuthenticator::FederatedKeyless(federated_keyless_account) => {
+                AnyKeylessPublicKey::Federated(federated_keyless_account.public_key().clone())
+            },
             LocalAccountAuthenticator::Abstraction(..) => todo!(),
             LocalAccountAuthenticator::DomainAbstraction(..) => todo!(),
         }
@@ -675,7 +713,7 @@ impl HardwareWalletAccount {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AccountKey {
     private_key: Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
@@ -721,7 +759,7 @@ impl From<Ed25519PrivateKey> for AccountKey {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Deserialize, Clone)]
 pub enum EphemeralPrivateKey {
     Ed25519 {
         inner_private_key: Ed25519PrivateKey,
@@ -768,7 +806,7 @@ impl EphemeralPrivateKey {
         }
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EphemeralKeyPair {
     private_key: EphemeralPrivateKey,
     public_key: EphemeralPublicKey,
@@ -821,7 +859,7 @@ impl EphemeralKeyPair {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct KeylessAccount {
     public_key: KeylessPublicKey,
     ephemeral_key_pair: EphemeralKeyPair,
@@ -830,7 +868,7 @@ pub struct KeylessAccount {
     jwt: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FederatedKeylessAccount {
     public_key: FederatedKeylessPublicKey,
     ephemeral_key_pair: EphemeralKeyPair,
@@ -839,6 +877,7 @@ pub struct FederatedKeylessAccount {
     jwt: Option<String>,
 }
 
+#[derive(Clone)]
 pub struct AbstractedAccount {
     function_info: FunctionInfo,
     sign_func: Arc<dyn Fn(&[u8]) -> Vec<u8> + Send + Sync>,
@@ -853,6 +892,7 @@ impl fmt::Debug for AbstractedAccount {
     }
 }
 
+#[derive(Clone)]
 pub struct DomainAbstractedAccount {
     function_info: FunctionInfo,
     account_identity: Vec<u8>,

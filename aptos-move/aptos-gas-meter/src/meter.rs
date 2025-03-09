@@ -565,13 +565,22 @@ where
             .map_err(|e| e.finish(Location::Undefined))
     }
 
-    fn charge_keyless(&mut self) -> VMResult<()> {
+    fn charge_keyless(&mut self, num_authenticators: u8) -> VMResult<()> {
         if self.feature_version() < RELEASE_V1_12 {
             return Ok(());
         }
-
-        self.algebra
-            .charge_execution(KEYLESS_BASE_COST)
-            .map_err(|e| e.finish(Location::Undefined))
+        if self.feature_version() < RELEASE_V1_29 {
+            self.algebra
+                .charge_execution(KEYLESS_BASE_COST)
+                .map_err(|e| e.finish(Location::Undefined))
+        } else {
+            // Charge KEYLESS_BASE_COST for each authenticator
+            for _ in 0..num_authenticators {
+                self.algebra
+                    .charge_execution(KEYLESS_BASE_COST)
+                    .map_err(|e| e.finish(Location::Undefined))?;
+            }
+            Ok(())
+        }
     }
 }
