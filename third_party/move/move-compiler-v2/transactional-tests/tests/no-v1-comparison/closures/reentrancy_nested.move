@@ -71,13 +71,13 @@ module 0x42::tests {
 //# run 0x42::tests::init --signers 0x42
 
 // task 4
-//# run 0x42::tests::direct_failure --verbose
+//# run 0x42::tests::direct_failure
 
 // task 5
-//# run 0x42::tests::worker1_failure --verbose
+//# run 0x42::tests::worker1_failure
 
 // task 6
-//# run 0x42::tests::worker2_failure --verbose
+//# run 0x42::tests::worker2_failure
 
 // task 7
 //# run 0x42::tests::worker2_ok
