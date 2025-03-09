@@ -69,7 +69,7 @@ use move_core_types::{
     value::MoveValue,
 };
 use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
-use move_vm_types::{gas::UnmeteredGasMeter, resolver::ModuleResolver};
+use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use serde::Serialize;
@@ -338,9 +338,8 @@ fn patch_module<F>(
 where
     F: FnOnce(&mut CompiledModule) -> Result<()>,
 {
-    let resolver = state_view.as_move_resolver();
-    let blob = resolver
-        .get_module(module_id)?
+    let blob = state_view
+        .get_state_value_bytes(&StateKey::module_id(module_id))?
         .ok_or_else(|| anyhow!("module {} does not exist", module_id))?;
 
     let mut m = CompiledModule::deserialize_with_config(&blob, deserializer_config)?;
