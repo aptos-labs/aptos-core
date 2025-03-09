@@ -108,6 +108,11 @@ impl BinaryUpdater for AptosUpdateTool {
                     "Detected this CLI comes from homebrew, use `brew upgrade aptos` instead"
                 ));
             },
+            InstallationMethod::PackageManager => {
+                return Err(anyhow!(
+                    "Detected this CLI comes from a package manager, use your package manager to update instead"
+                ));
+            },
             InstallationMethod::Other => {},
         }
 
@@ -178,6 +183,7 @@ impl BinaryUpdater for AptosUpdateTool {
 pub enum InstallationMethod {
     Source,
     Homebrew,
+    PackageManager,
     Other,
 }
 
@@ -189,6 +195,8 @@ impl InstallationMethod {
             InstallationMethod::Homebrew
         } else if exe_path.to_string_lossy().contains("target") {
             InstallationMethod::Source
+        } else if exe_path.to_string_lossy().contains("/usr/bin") {
+            InstallationMethod::PackageManager
         } else {
             InstallationMethod::Other
         };
