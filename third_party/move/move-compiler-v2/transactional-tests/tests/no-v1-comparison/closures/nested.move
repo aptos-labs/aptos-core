@@ -14,6 +14,6 @@ module 0x42::test {
     }
 }
 
-//# run 0x42::test::nested --verbose --args 3
+//# run 0x42::test::nested --args 3
 
-//# run 0x42::test::nested_capture --verbose --args 4
+//# run 0x42::test::nested_capture --args 4

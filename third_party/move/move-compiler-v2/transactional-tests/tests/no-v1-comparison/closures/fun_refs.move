@@ -26,6 +26,6 @@ module 0x42::test {
 
 }
 
-//# run 0x42::test::ref --verbose
+//# run 0x42::test::ref
 
-//# run 0x42::test::ref_mut --verbose
+//# run 0x42::test::ref_mut
