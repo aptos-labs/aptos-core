@@ -4,8 +4,8 @@
 
 use anyhow::anyhow;
 use codespan_reporting::term::termcolor::Buffer;
-use datatest_stable::Requirements;
 use itertools::Itertools;
+use libtest_mimic::{Arguments, Trial};
 use log::{info, warn};
 use move_command_line_common::{env::read_env_var, testing::EXP_EXT};
 use move_model::metadata::LanguageVersion;
@@ -44,7 +44,7 @@ struct Feature {
     /// A static function pointer to the runner to be used for datatest. Since datatest
     /// does not support function values and closures, we need to have a different runner for
     /// each feature
-    runner: fn(&Path) -> datatest_stable::Result<()>,
+    runner: fn(&Path) -> anyhow::Result<()>,
     /// A predicate to be called on the path determining whether the feature is enabled.
     /// The first name is the name of the test group, the second the path to the test
     /// source.
@@ -101,7 +101,7 @@ fn get_feature_by_name(name: &str) -> &'static Feature {
 }
 
 /// Test runner for a given feature.
-fn test_runner_for_feature(path: &Path, feature: &Feature) -> datatest_stable::Result<()> {
+fn test_runner_for_feature(path: &Path, feature: &Feature) -> anyhow::Result<()> {
     // Use the below + `cargo test -- --test-threads=1` to identify a long running test
     // println!(">>> testing {}", path.to_string_lossy().to_string());
 
@@ -163,7 +163,10 @@ fn test_runner_for_feature(path: &Path, feature: &Feature) -> datatest_stable::R
         if let Some(ref path) = baseline_path {
             verify_or_update_baseline(path.as_path(), &diags)?
         } else if !diags.is_empty() {
-            return Err(anyhow!("Unexpected prover output (expected none): {}", diags).into());
+            return Err(anyhow!(
+                "Unexpected prover output (expected none): {}",
+                diags
+            ));
         }
     }
 
@@ -232,12 +235,8 @@ fn get_flags_and_baseline(
     Ok((flags, baseline_path))
 }
 
-/// Collects the enabled tests, accumulating them as datatest requirements.
-/// We collect the test data sources ourselves instead of letting datatest
-/// do it because we want to select them based on enabled feature as indicated
-/// in the source. We still use datatest to finally run the tests to utilize its
-/// execution engine.
-fn collect_enabled_tests(reqs: &mut Vec<Requirements>, group: &str, feature: &Feature, path: &str) {
+/// Collects the enabled tests.
+fn collect_enabled_tests(tests: &mut Vec<Trial>, group: &str, feature: &Feature, path: &str) {
     let mut test_groups: BTreeMap<&'static str, Vec<String>> = BTreeMap::new();
     let mut p = PathBuf::new();
     p.push(path);
@@ -279,18 +278,20 @@ fn collect_enabled_tests(reqs: &mut Vec<Requirements>, group: &str, feature: &Fe
 
     for (name, files) in test_groups {
         let feature = get_feature_by_name(name);
-        reqs.push(Requirements::new(
-            feature.runner,
-            format!("prover {}[{}]", group, feature.name),
-            path.to_string(),
-            files.into_iter().map(|s| s + "$").join("|"),
-        ));
+        for file in files {
+            let prompt = format!("prover {}[{}]::{}", group, feature.name, file);
+            let runner = feature.runner;
+            let path = PathBuf::from(file);
+            tests.push(Trial::test(prompt, move || {
+                runner(&path).map_err(|err| format!("{:?}", err).into())
+            }))
+        }
     }
 }
 
-// Test entry point based on datatest runner.
+// Test entry point based on lbtest-mimic.
 fn main() {
-    let mut reqs = vec![];
+    let mut tests = vec![];
     for feature in get_features() {
         // Evaluate whether the user narrowed which feature to test.
         let feature_narrow = read_env_var(ENV_TEST_FEATURE);
@@ -302,10 +303,12 @@ fn main() {
         }
         // Check whether we are running extended tests
         if read_env_var(ENV_TEST_EXTENDED) == "1" {
-            collect_enabled_tests(&mut reqs, "extended", feature, "tests/xsources");
+            collect_enabled_tests(&mut tests, "extended", feature, "tests/xsources");
         } else {
-            collect_enabled_tests(&mut reqs, "unit", feature, "tests/sources");
+            collect_enabled_tests(&mut tests, "unit", feature, "tests/sources");
         }
     }
-    datatest_stable::runner(&reqs);
+    tests.sort_unstable_by(|a, b| a.name().cmp(b.name()));
+    let args = Arguments::from_args();
+    libtest_mimic::run(&args, tests).exit()
 }

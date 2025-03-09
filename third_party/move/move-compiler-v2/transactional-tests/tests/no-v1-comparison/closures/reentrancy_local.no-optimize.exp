@@ -1,0 +1,12 @@
+processed 3 tasks
+
+task 2 'run'. lines 20-20:
+Error: Function execution failed with VMError: {
+    message: Resource `0x42::tests::R` cannot be accessed because of active reentrancy of defining module.,
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x42::tests,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(2), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000042, name: Identifier("tests") }), FunctionDefinitionIndex(1), 6)] }),
+}
