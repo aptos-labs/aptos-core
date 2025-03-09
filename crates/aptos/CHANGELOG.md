@@ -5,6 +5,8 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 # Unreleased
 - Compiler v1 is now deprecated. It is now removed from the Aptos CLI.
 
+- Add beta simulate command to simulate any transaction from anyone
+
 ## [6.2.0]
 - Several compiler parsing bugs fixed, including in specifications for receiver style functions
 - Remove support for OpenSSL 1.x.x and Ubuntu 20.04, add warning appropriately
