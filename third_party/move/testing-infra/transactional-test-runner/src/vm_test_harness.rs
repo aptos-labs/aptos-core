@@ -43,7 +43,7 @@ use move_vm_runtime::{
     move_vm::MoveVM,
     session::{SerializedReturnValues, Session},
     AsUnsyncCodeStorage, AsUnsyncModuleStorage, ModuleStorage, RuntimeEnvironment,
-    StagingModuleStorage, WithRuntimeEnvironment,
+    StagingModuleStorage,
 };
 use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
@@ -150,7 +150,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let vm_config = vm_config();
         let runtime_environment = create_runtime_environment(vm_config);
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
-        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
+        let vm = MoveVM::new();
 
         let mut adapter = Self {
             compiled_state: CompiledState::new(

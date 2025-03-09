@@ -10,9 +10,8 @@ use bytes::Bytes;
 use move_binary_format::errors::*;
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{AccountChanges, ChangeSet, Changes, Op},
+    effects::{AccountChanges, ChangeSet, Changes},
     gas_algebra::NumBytes,
-    identifier::Identifier,
     language_storage::TypeTag,
     value::MoveTypeLayout,
     vm_status::StatusCode,
@@ -29,14 +28,12 @@ pub struct AccountDataCache {
     // The bool flag in the `data_map` indicates whether the resource contains
     // an aggregator or snapshot.
     data_map: BTreeMap<Type, (MoveTypeLayout, GlobalValue, bool)>,
-    module_map: BTreeMap<Identifier, (Bytes, bool)>,
 }
 
 impl AccountDataCache {
     fn new() -> Self {
         Self {
             data_map: BTreeMap::new(),
-            module_map: BTreeMap::new(),
         }
     }
 }
@@ -98,19 +95,9 @@ impl<'r> TransactionDataCache<'r> {
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
         module_storage: &dyn ModuleStorage,
-    ) -> PartialVMResult<Changes<Bytes, Resource>> {
-        let mut change_set = Changes::<Bytes, Resource>::new();
+    ) -> PartialVMResult<Changes<Resource>> {
+        let mut change_set = Changes::<Resource>::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
-            let mut modules = BTreeMap::new();
-            for (module_name, (module_blob, is_republishing)) in account_data_cache.module_map {
-                let op = if is_republishing {
-                    Op::Modify(module_blob)
-                } else {
-                    Op::New(module_blob)
-                };
-                modules.insert(module_name, op);
-            }
-
             let mut resources = BTreeMap::new();
             for (ty, (layout, gv, has_aggregator_lifting)) in account_data_cache.data_map {
                 if let Some(op) = gv.into_effect_with_layout(layout) {
@@ -128,12 +115,9 @@ impl<'r> TransactionDataCache<'r> {
                     );
                 }
             }
-            if !modules.is_empty() || !resources.is_empty() {
+            if !resources.is_empty() {
                 change_set
-                    .add_account_changeset(
-                        addr,
-                        AccountChanges::from_modules_resources(modules, resources),
-                    )
+                    .add_account_changeset(addr, AccountChanges::from_resources(resources))
                     .expect("accounts should be unique");
             }
         }

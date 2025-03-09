@@ -11,7 +11,6 @@ use move_core_types::{
 use move_vm_runtime::{
     config::VMConfig, module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction,
     session::Session, AsUnsyncCodeStorage, ModuleStorage, RuntimeEnvironment, StagingModuleStorage,
-    WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, natives::function::NativeResult};
@@ -71,7 +70,7 @@ fn test_publish_module_with_nested_loops() {
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
-        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
+        let vm = MoveVM::new();
 
         let mut sess = vm.new_session(&storage);
         let module_storage = storage.as_unsync_code_storage();
