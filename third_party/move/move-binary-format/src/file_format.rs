@@ -838,26 +838,12 @@ pub struct AccessSpecifier {
     derive(proptest_derive::Arbitrary, dearbitrary::Dearbitrary)
 )]
 pub enum AccessKind {
+    /// The resource is read. If used in negation context, this
+    /// means the resource is neither read nor written.
     Reads,
-    Writes, // Includes reading
-}
-
-impl AccessKind {
-    /// Returns true if this access kind subsumes the other.
-    pub fn subsumes(&self, other: &Self) -> bool {
-        use AccessKind::*;
-        matches!((self, other), (_, Reads) | (Writes, Writes))
-    }
-
-    /// Tries to join two kinds, returns None if no intersection.
-    pub fn try_join(self, other: Self) -> Option<Self> {
-        use AccessKind::*;
-        if matches!((self, other), (Writes, Writes)) {
-            Some(self)
-        } else {
-            Some(Reads)
-        }
-    }
+    /// The resource is read or written. If used in negation context,
+    /// this means the resource is not written to.
+    Writes,
 }
 
 impl fmt::Display for AccessKind {

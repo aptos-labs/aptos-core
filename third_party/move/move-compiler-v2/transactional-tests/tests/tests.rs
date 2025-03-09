@@ -101,6 +101,8 @@ const SEPARATE_BASELINE: &[&str] = &[
     "no-v1-comparison/enum/enum_field_select.move",
     "no-v1-comparison/enum/enum_field_select_different_offsets.move",
     "no-v1-comparison/assert_one.move",
+    "no-v1-comparison/closures/reentrancy",
+    "no-v1-comparison/closures/reentrancy",
     "control_flow/for_loop_non_terminating.move",
     "control_flow/for_loop_nested_break.move",
     "evaluation_order/lazy_assert.move",

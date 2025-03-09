@@ -58,11 +58,11 @@ Error: Function execution failed with VMError: {
 
 task 10 'run'. lines 73-73:
 Error: Function execution failed with VMError: {
-    message: not allowed to call `0x0000000000000000000000000000000000000000000000000000000000000042::test::fail_no_subsumes`,
+    message: not allowed to perform `reads 0x42::test::R(@0x1)`,
     major_status: ACCESS_DENIED,
     sub_status: None,
-    location: undefined,
+    location: 0x42::test,
     indices: [],
-    offsets: [],
-    exec_state: None,
+    offsets: [(FunctionDefinitionIndex(6), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000042, name: Identifier("test") }), FunctionDefinitionIndex(5), 0)] }),
 }
