@@ -4,7 +4,6 @@
 /// It also supports deserializing property value to it original type.
 module aptos_token::property_map {
     use std::bcs;
-    use std::vector;
     use std::error;
     use std::string::{Self, String};
     use aptos_std::from_bcs;
@@ -62,23 +61,20 @@ module aptos_token::property_map {
         values: vector<vector<u8>>,
         types: vector<String>
     ): PropertyMap {
-        let length = vector::length(&keys);
+        let length = keys.length();
         assert!(length <= MAX_PROPERTY_MAP_SIZE, error::invalid_argument(EPROPERTY_NUMBER_EXCEED_LIMIT));
-        assert!(length == vector::length(&values), error::invalid_argument(EKEY_COUNT_NOT_MATCH_VALUE_COUNT));
-        assert!(length == vector::length(&types), error::invalid_argument(EKEY_COUNT_NOT_MATCH_TYPE_COUNT));
+        assert!(length == values.length(), error::invalid_argument(EKEY_COUNT_NOT_MATCH_VALUE_COUNT));
+        assert!(length == types.length(), error::invalid_argument(EKEY_COUNT_NOT_MATCH_TYPE_COUNT));
 
         let properties = empty();
 
-        let i = 0;
-        while (i < length) {
-            let key = *vector::borrow(&keys, i);
-            assert!(string::length(&key) <= MAX_PROPERTY_NAME_LENGTH, error::invalid_argument(EPROPERTY_MAP_NAME_TOO_LONG));
-            simple_map::add(
-                &mut properties.map,
+        for (i in 0..length) {
+            let key = keys[i];
+            assert!(key.length() <= MAX_PROPERTY_NAME_LENGTH, error::invalid_argument(EPROPERTY_MAP_NAME_TOO_LONG));
+            properties.map.add(
                 key,
-                PropertyValue { value: *vector::borrow(&values, i), type: *vector::borrow(&types, i) }
+                PropertyValue { value: values[i], type: types[i] }
             );
-            i = i + 1;
         };
         properties
     }
@@ -88,19 +84,17 @@ module aptos_token::property_map {
         keys: vector<String>,
         values: vector<PropertyValue>
     ): PropertyMap {
-        let length = vector::length(&keys);
+        let length = keys.length();
         assert!(length <= MAX_PROPERTY_MAP_SIZE, error::invalid_argument(EPROPERTY_NUMBER_EXCEED_LIMIT));
-        assert!(length == vector::length(&values), error::invalid_argument(EKEY_COUNT_NOT_MATCH_VALUE_COUNT));
+        assert!(length == values.length(), error::invalid_argument(EKEY_COUNT_NOT_MATCH_VALUE_COUNT));
 
         let properties = empty();
 
-        let i = 0;
-        while (i < length) {
-            let key = *vector::borrow(&keys, i);
-            let val = *vector::borrow(&values, i);
-            assert!(string::length(&key) <= MAX_PROPERTY_NAME_LENGTH, error::invalid_argument(EPROPERTY_MAP_NAME_TOO_LONG));
-            add(&mut properties, key, val);
-            i = i + 1;
+        for (i in 0..length) {
+            let key = keys[i];
+            let val = values[i];
+            assert!(key.length() <= MAX_PROPERTY_NAME_LENGTH, error::invalid_argument(EPROPERTY_MAP_NAME_TOO_LONG));
+            properties.add(key, val);
         };
         properties
     }
@@ -111,136 +105,132 @@ module aptos_token::property_map {
         }
     }
 
-    public fun contains_key(map: &PropertyMap, key: &String): bool {
-        simple_map::contains_key(&map.map, key)
+    public fun contains_key(self: &PropertyMap, key: &String): bool {
+        self.map.contains_key(key)
     }
 
-    public fun add(map: &mut PropertyMap, key: String, value: PropertyValue) {
-        assert!(string::length(&key) <= MAX_PROPERTY_NAME_LENGTH, error::invalid_argument(EPROPERTY_MAP_NAME_TOO_LONG));
-        assert!(simple_map::length(&map.map) < MAX_PROPERTY_MAP_SIZE, error::invalid_state(EPROPERTY_NUMBER_EXCEED_LIMIT));
-        simple_map::add(&mut map.map, key, value);
+    public fun add(self: &mut PropertyMap, key: String, value: PropertyValue) {
+        assert!(key.length() <= MAX_PROPERTY_NAME_LENGTH, error::invalid_argument(EPROPERTY_MAP_NAME_TOO_LONG));
+        assert!(self.map.length() < MAX_PROPERTY_MAP_SIZE, error::invalid_state(EPROPERTY_NUMBER_EXCEED_LIMIT));
+        self.map.add(key, value);
     }
 
-    public fun length(map: &PropertyMap): u64 {
-        simple_map::length(&map.map)
+    public fun length(self: &PropertyMap): u64 {
+        self.map.length()
     }
 
-    public fun borrow(map: &PropertyMap, key: &String): &PropertyValue {
-        let found = contains_key(map, key);
+    public fun borrow(self: &PropertyMap, key: &String): &PropertyValue {
+        let found = self.contains_key(key);
         assert!(found, EPROPERTY_NOT_EXIST);
-        simple_map::borrow(&map.map, key)
+        self.map.borrow(key)
     }
 
     /// Return all the keys in the property map in the order they are added.
-    public fun keys(map: &PropertyMap): vector<String> {
-        simple_map::keys(&map.map)
+    public fun keys(self: &PropertyMap): vector<String> {
+        self.map.keys()
     }
 
     /// Return the types of all properties in the property map in the order they are added.
-    public fun types(map: &PropertyMap): vector<String> {
-        vector::map_ref(&simple_map::values(&map.map), |v| {
-            let v: &PropertyValue = v;
+    public fun types(self: &PropertyMap): vector<String> {
+        self.map.values().map_ref(|v| {
             v.type
         })
     }
 
     /// Return the values of all properties in the property map in the order they are added.
-    public fun values(map: &PropertyMap): vector<vector<u8>> {
-        vector::map_ref(&simple_map::values(&map.map), |v| {
-            let v: &PropertyValue = v;
+    public fun values(self: &PropertyMap): vector<vector<u8>> {
+        self.map.values().map_ref(|v| {
             v.value
         })
     }
 
-    public fun read_string(map: &PropertyMap, key: &String): String {
-        let prop = borrow(map, key);
+    public fun read_string(self: &PropertyMap, key: &String): String {
+        let prop = self.borrow(key);
         assert!(prop.type == string::utf8(b"0x1::string::String"), error::invalid_state(ETYPE_NOT_MATCH));
         from_bcs::to_string(prop.value)
     }
 
-    public fun read_u8(map: &PropertyMap, key: &String): u8 {
-        let prop = borrow(map, key);
+    public fun read_u8(self: &PropertyMap, key: &String): u8 {
+        let prop = self.borrow(key);
         assert!(prop.type == string::utf8(b"u8"), error::invalid_state(ETYPE_NOT_MATCH));
         from_bcs::to_u8(prop.value)
     }
 
-    public fun read_u64(map: &PropertyMap, key: &String): u64 {
-        let prop = borrow(map, key);
+    public fun read_u64(self: &PropertyMap, key: &String): u64 {
+        let prop = self.borrow(key);
         assert!(prop.type == string::utf8(b"u64"), error::invalid_state(ETYPE_NOT_MATCH));
         from_bcs::to_u64(prop.value)
     }
 
-    public fun read_address(map: &PropertyMap, key: &String): address {
-        let prop = borrow(map, key);
+    public fun read_address(self: &PropertyMap, key: &String): address {
+        let prop = self.borrow(key);
         assert!(prop.type == string::utf8(b"address"), error::invalid_state(ETYPE_NOT_MATCH));
         from_bcs::to_address(prop.value)
     }
 
-    public fun read_u128(map: &PropertyMap, key: &String): u128 {
-        let prop = borrow(map, key);
+    public fun read_u128(self: &PropertyMap, key: &String): u128 {
+        let prop = self.borrow(key);
         assert!(prop.type == string::utf8(b"u128"), error::invalid_state(ETYPE_NOT_MATCH));
         from_bcs::to_u128(prop.value)
     }
 
-    public fun read_bool(map: &PropertyMap, key: &String): bool {
-        let prop = borrow(map, key);
+    public fun read_bool(self: &PropertyMap, key: &String): bool {
+        let prop = self.borrow(key);
         assert!(prop.type == string::utf8(b"bool"), error::invalid_state(ETYPE_NOT_MATCH));
         from_bcs::to_bool(prop.value)
     }
 
-    public fun borrow_value(property: &PropertyValue): vector<u8> {
-        property.value
+    public fun borrow_value(self: &PropertyValue): vector<u8> {
+        self.value
     }
 
-    public fun borrow_type(property: &PropertyValue): String {
-        property.type
+    public fun borrow_type(self: &PropertyValue): String {
+        self.type
     }
 
     public fun remove(
-        map: &mut PropertyMap,
+        self: &mut PropertyMap,
         key: &String
     ): (String, PropertyValue) {
-        let found = contains_key(map, key);
+        let found = self.contains_key(key);
         assert!(found, error::not_found(EPROPERTY_NOT_EXIST));
-        simple_map::remove(&mut map.map, key)
+        self.map.remove(key)
     }
 
     /// Update the property in the existing property map
     /// Allow updating existing keys' value and add new key-value pairs
     public fun update_property_map(
-        map: &mut PropertyMap,
+        self: &mut PropertyMap,
         keys: vector<String>,
         values: vector<vector<u8>>,
         types: vector<String>,
     ) {
-        let key_len = vector::length(&keys);
-        let val_len = vector::length(&values);
-        let typ_len = vector::length(&types);
+        let key_len = keys.length();
+        let val_len = values.length();
+        let typ_len = types.length();
         assert!(key_len == val_len, error::invalid_state(EKEY_COUNT_NOT_MATCH_VALUE_COUNT));
         assert!(key_len == typ_len, error::invalid_state(EKEY_COUNT_NOT_MATCH_TYPE_COUNT));
 
-        let i = 0;
-        while (i < key_len) {
-            let key = vector::borrow(&keys, i);
+        for (i in 0..key_len) {
+            let key = &keys[i];
             let prop_val = PropertyValue {
-                value: *vector::borrow(&values, i),
-                type: *vector::borrow(&types, i),
+                value: values[i],
+                type: types[i],
             };
-            if (contains_key(map, key)) {
-                update_property_value(map, key, prop_val);
+            if (self.contains_key(key)) {
+                self.update_property_value(key, prop_val);
             } else {
-                add(map, *key, prop_val);
+                self.add(*key, prop_val);
             };
-            i = i + 1;
         }
     }
 
     public fun update_property_value(
-        map: &mut PropertyMap,
+        self: &mut PropertyMap,
         key: &String,
         value: PropertyValue
     ) {
-        let property_val = simple_map::borrow_mut(&mut map.map, key);
+        let property_val = self.map.borrow_mut(key);
         *property_val = value;
     }
 
@@ -297,39 +287,37 @@ module aptos_token::property_map {
     #[test]
     fun test_add_property(): PropertyMap {
         let properties = create_property_list();
-        add(
-            &mut properties, utf8(b"level"),
-            PropertyValue {
-                value: b"1",
-                type: utf8(b"integer")
-            });
+        properties.add(utf8(b"level"), PropertyValue {
+            value: b"1",
+            type: utf8(b"integer")
+        });
         assert!(
-            borrow(&properties, &utf8(b"level")).value == b"1",
+            properties.borrow(&utf8(b"level")).value == b"1",
             EPROPERTY_NOT_EXIST);
         properties
     }
 
     #[test]
     fun test_get_property_keys() {
-        assert!(keys(&create_property_list()) == test_keys(), 0);
+        assert!(create_property_list().keys() == test_keys(), 0);
     }
 
     #[test]
     fun test_get_property_types() {
-        assert!(types(&create_property_list()) == test_types(), 0);
+        assert!(create_property_list().types() == test_types(), 0);
     }
 
     #[test]
     fun test_get_property_values() {
-        assert!(values(&create_property_list()) == test_values(), 0);
+        assert!(create_property_list().values() == test_values(), 0);
     }
 
     #[test]
     fun test_update_property(): PropertyMap {
         let properties = create_property_list();
-        update_property_value(&mut properties, &utf8(b"attack"), PropertyValue { value: b"7", type: utf8(b"integer") });
+        properties.update_property_value(&utf8(b"attack"), PropertyValue { value: b"7", type: utf8(b"integer") });
         assert!(
-            borrow(&properties, &utf8(b"attack")).value == b"7",
+            properties.borrow(&utf8(b"attack")).value == b"7",
             1
         );
         properties
@@ -338,9 +326,9 @@ module aptos_token::property_map {
     #[test]
     fun test_remove_property(): PropertyMap {
         let properties = create_property_list();
-        assert!(length(&mut properties) == 3, 1);
-        let (_, _) = remove(&mut properties, &utf8(b"attack"));
-        assert!(length(&properties) == 2, 1);
+        assert!(properties.length() == 3, 1);
+        let (_, _) = properties.remove(&utf8(b"attack"));
+        assert!(properties.length() == 2, 1);
         properties
     }
 
@@ -358,8 +346,8 @@ module aptos_token::property_map {
         let values = vector<vector<u8>>[ bcs::to_bytes<u8>(&10), bcs::to_bytes<bool>(&false) ];
         let types = vector<String>[ utf8(b"u8"), utf8(b"bool")];
         let plist = new(keys, values, types);
-        assert!(!read_bool(&plist, &utf8(b"mutable")), 1);
-        assert!(read_u8(&plist, &utf8(b"attack")) == 10, 1);
+        assert!(!plist.read_bool(&utf8(b"mutable")), 1);
+        assert!(plist.read_u8(&utf8(b"attack")) == 10, 1);
     }
 
     #[test]
@@ -367,8 +355,8 @@ module aptos_token::property_map {
         let data: address = @0xcafe;
         let pv = create_property_value(&data);
         let pm = create_property_list();
-        add(&mut pm, string::utf8(b"addr"), pv);
-        assert!(read_address(&pm, &string::utf8(b"addr")) == data, 1)
+        pm.add(string::utf8(b"addr"), pv);
+        assert!(pm.read_address(&string::utf8(b"addr")) == data, 1)
     }
 
     #[test]
@@ -378,6 +366,6 @@ module aptos_token::property_map {
         let pvs = vector<PropertyValue>[create_property_value(&data1), create_property_value(&data2)];
         let keys = vector<String>[string::utf8(b"addr"), string::utf8(b"flag")];
         let pm = new_with_key_and_property_value(keys, pvs);
-        assert!(length(&pm) == 2, 1);
+        assert!(pm.length() == 2, 1);
     }
 }

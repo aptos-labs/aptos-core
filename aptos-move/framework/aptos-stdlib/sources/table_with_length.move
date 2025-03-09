@@ -28,27 +28,27 @@ module aptos_std::table_with_length {
     public fun destroy_empty<K: copy + drop, V>(self: TableWithLength<K, V>) {
         assert!(self.length == 0, error::invalid_state(ENOT_EMPTY));
         let TableWithLength { inner, length: _ } = self;
-        table::destroy_known_empty_unsafe(inner)
+        inner.destroy_known_empty_unsafe()
     }
 
     /// Add a new entry to the table. Aborts if an entry for this
     /// key already exists. The entry itself is not stored in the
     /// table, and cannot be discovered from it.
     public fun add<K: copy + drop, V>(self: &mut TableWithLength<K, V>, key: K, val: V) {
-        table::add(&mut self.inner, key, val);
-        self.length = self.length + 1;
+        self.inner.add(key, val);
+        self.length += 1;
     }
 
     /// Acquire an immutable reference to the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun borrow<K: copy + drop, V>(self: &TableWithLength<K, V>, key: K): &V {
-        table::borrow(&self.inner, key)
+        self.inner.borrow(key)
     }
 
     /// Acquire a mutable reference to the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun borrow_mut<K: copy + drop, V>(self: &mut TableWithLength<K, V>, key: K): &mut V {
-        table::borrow_mut(&mut self.inner, key)
+        self.inner.borrow_mut(key)
     }
 
     /// Returns the length of the table, i.e. the number of entries.
@@ -64,22 +64,22 @@ module aptos_std::table_with_length {
     /// Acquire a mutable reference to the value which `key` maps to.
     /// Insert the pair (`key`, `default`) first if there is no entry for `key`.
     public fun borrow_mut_with_default<K: copy + drop, V: drop>(self: &mut TableWithLength<K, V>, key: K, default: V): &mut V {
-        if (table::contains(&self.inner, key)) {
-            table::borrow_mut(&mut self.inner, key)
+        if (self.inner.contains(key)) {
+            self.inner.borrow_mut(key)
         } else {
-            table::add(&mut self.inner, key, default);
-            self.length = self.length + 1;
-            table::borrow_mut(&mut self.inner, key)
+            self.inner.add(key, default);
+            self.length += 1;
+            self.inner.borrow_mut(key)
         }
     }
 
     /// Insert the pair (`key`, `value`) if there is no entry for `key`.
     /// update the value of the entry for `key` to `value` otherwise
     public fun upsert<K: copy + drop, V: drop>(self: &mut TableWithLength<K, V>, key: K, value: V) {
-        if (!table::contains(&self.inner, key)) {
-            add(self, copy key, value)
+        if (!self.inner.contains(key)) {
+            self.add(copy key, value)
         } else {
-            let ref = table::borrow_mut(&mut self.inner, key);
+            let ref = self.inner.borrow_mut(key);
             *ref = value;
         };
     }
@@ -87,14 +87,14 @@ module aptos_std::table_with_length {
     /// Remove from `table` and return the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun remove<K: copy + drop, V>(self: &mut TableWithLength<K, V>, key: K): V {
-        let val = table::remove(&mut self.inner, key);
-        self.length = self.length - 1;
+        let val = self.inner.remove(key);
+        self.length -= 1;
         val
     }
 
     /// Returns true iff `table` contains an entry for `key`.
     public fun contains<K: copy + drop, V>(self: &TableWithLength<K, V>, key: K): bool {
-        table::contains(&self.inner, key)
+        self.inner.contains(key)
     }
 
     #[test_only]
@@ -103,39 +103,39 @@ module aptos_std::table_with_length {
         // Unpack table with length, dropping length count but not
         // inner table.
         let TableWithLength{inner, length: _} = self;
-        table::drop_unchecked(inner); // Drop inner table.
+        inner.drop_unchecked(); // Drop inner table.
     }
 
     #[test]
     /// Verify test-only drop functionality.
     fun test_drop_unchecked() {
         let table = new<bool, bool>(); // Declare new table.
-        add(&mut table, true, false); // Add table entry.
-        drop_unchecked(table); // Drop table.
+        table.add(true, false); // Add table entry.
+        table.drop_unchecked(); // Drop table.
     }
 
     #[test]
     fun test_upsert() {
         let t = new<u8, u8>();
         // Table should not have key 0 yet
-        assert!(!contains(&t, 0), 1);
+        assert!(!t.contains(0), 1);
         // This should insert key 0, with value 10, and length should be 1
-        upsert(&mut t, 0, 10);
+        t.upsert(0, 10);
         // Ensure the value is correctly set to 10
-        assert!(*borrow(&t, 0) == 10, 1);
+        assert!(*t.borrow(0) == 10, 1);
         // Ensure the length is correctly set
-        assert!(length(&t) == 1, 1);
+        assert!(t.length() == 1, 1);
         // Lets upsert the value to something else, and verify it's correct
-        upsert(&mut t, 0, 23);
-        assert!(*borrow(&t, 0) == 23, 1);
+        t.upsert(0, 23);
+        assert!(*t.borrow(0) == 23, 1);
         // Since key 0 already existed, the length should not have changed
-        assert!(length(&t) == 1, 1);
+        assert!(t.length() == 1, 1);
         // If we upsert a non-existing key, the length should increase
-        upsert(&mut t, 1, 7);
-        assert!(length(&t) == 2, 1);
+        t.upsert(1, 7);
+        assert!(t.length() == 2, 1);
 
-        remove(&mut t, 0);
-        remove(&mut t, 1);
-        destroy_empty(t);
+        t.remove(0);
+        t.remove(1);
+        t.destroy_empty();
     }
 }
