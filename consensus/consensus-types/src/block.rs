@@ -3,11 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_data::{BlockData, BlockType},
-    common::{Author, Payload, Round},
-    quorum_cert::QuorumCert,
+    block_data::{BlockData, BlockType}, common::{Author, Payload, Round}, opt_block_data::OptBlockData, quorum_cert::QuorumCert
 };
-use anyhow::{bail, ensure, format_err};
+use anyhow::{bail, ensure, format_err, Result};
 use aptos_bitvec::BitVec;
 use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
 use aptos_infallible::duration_since_epoch;
@@ -168,6 +166,10 @@ impl Block {
         self.block_data.is_nil_block()
     }
 
+    pub fn is_opt_block(&self) -> bool {
+        self.block_data.is_opt_block()
+    }
+
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn make_genesis_block() -> Self {
         Self::make_genesis_block_from_ledger_info(&LedgerInfo::mock_genesis(None))
@@ -308,6 +310,19 @@ impl Block {
         }
     }
 
+    pub fn new_from_opt(
+        block_data: OptBlockData,
+        quorum_cert: QuorumCert,
+        failed_authors: Vec<(Round, Author)>,
+    ) -> Result<Self> {
+        let block_data = BlockData::new_from_opt(block_data, quorum_cert, failed_authors)?;
+        Ok(Block {
+            id: block_data.hash(),
+            block_data,
+            signature: None,
+        })
+    }
+
     pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
         self.block_data.validator_txns()
     }
@@ -332,6 +347,14 @@ impl Block {
                     .as_ref()
                     .ok_or_else(|| format_err!("Missing signature in Proposal"))?;
                 validator.verify(*proposal_ext.author(), &self.block_data, signature)?;
+                self.quorum_cert().verify(validator)
+            },
+            BlockType::OptProposal { .. } => {
+                // Optimistic proposal is not signed by proposer
+                self.quorum_cert().verify(validator)
+            },
+            BlockType::OptProposalExt(_) => {
+                // Optimistic proposal is not signed by proposer
                 self.quorum_cert().verify(validator)
             },
             BlockType::DAGBlock { .. } => bail!("We should not accept DAG block from others"),

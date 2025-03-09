@@ -12,15 +12,7 @@ use crate::{
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
-    block_retrieval::{BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse},
-    epoch_retrieval::EpochRetrievalRequest,
-    order_vote_msg::OrderVoteMsg,
-    pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
-    proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
-    proposal_msg::ProposalMsg,
-    round_timeout::RoundTimeoutMsg,
-    sync_info::SyncInfo,
-    vote_msg::VoteMsg,
+    block_retrieval::{BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse}, epoch_retrieval::EpochRetrievalRequest, opt_proposal_msg::OptProposalMsg, order_vote_msg::OrderVoteMsg, pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote}, proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, round_timeout::RoundTimeoutMsg, sync_info::SyncInfo, vote_msg::VoteMsg
 };
 use aptos_network::{
     application::{error::Error, interface::NetworkClientInterface},
@@ -47,6 +39,8 @@ pub enum ConsensusMsg {
     /// ProposalMsg contains the required information for the proposer election protocol to make
     /// its choice (typically depends on round and proposer info).
     ProposalMsg(Box<ProposalMsg>),
+    /// OptProposalMsg contains the optimistic proposal and sync info.
+    OptProposalMsg(Box<OptProposalMsg>),
     /// This struct describes basic synchronization metadata.
     SyncInfo(Box<SyncInfo>),
     /// A vector of LedgerInfo with contiguous increasing epoch numbers to prove a sequence of
@@ -100,6 +94,7 @@ impl ConsensusMsg {
             ConsensusMsg::BlockRetrievalResponse(_) => "BlockRetrievalResponse",
             ConsensusMsg::EpochRetrievalRequest(_) => "EpochRetrievalRequest",
             ConsensusMsg::ProposalMsg(_) => "ProposalMsg",
+            ConsensusMsg::OptProposalMsg(_) => "OptProposalMsg",
             ConsensusMsg::SyncInfo(_) => "SyncInfo",
             ConsensusMsg::EpochChangeProof(_) => "EpochChangeProof",
             ConsensusMsg::VoteMsg(_) => "VoteMsg",

@@ -88,6 +88,15 @@ pub static COMMITTED_BLOCKS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the committed opt blocks since last restart.
+pub static COMMITTED_OPT_BLOCKS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_committed_opt_blocks_count",
+        "Count of the committed opt blocks since last restart."
+    )
+    .unwrap()
+});
+
 /// Count of the committed transactions since last restart.
 pub static COMMITTED_TXNS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
@@ -1262,6 +1271,11 @@ pub fn update_counters_for_block(block: &Block) {
     observe_block(block.timestamp_usecs(), BlockStage::COMMITTED);
     NUM_BYTES_PER_BLOCK.observe(block.payload().map_or(0, |payload| payload.size()) as f64);
     COMMITTED_BLOCKS_COUNT.inc();
+    if block.is_opt_block() {
+        println!("[OptProposal] round {} committed", block.round());
+        observe_block(block.timestamp_usecs(), BlockStage::COMMITTED_OPT_BLOCK);
+        COMMITTED_OPT_BLOCKS_COUNT.inc();
+    }
     LAST_COMMITTED_ROUND.set(block.round() as i64);
     let failed_rounds = block
         .block_data()
