@@ -1588,21 +1588,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TModuleView for LatestView
             state_key,
         );
 
-        // Enforce feature gating V2 loader implementation: TModuleView is no longer used in
-        // V2 interfaces because we implement storage traits directly. Use a debug assert to
-        // panic in tests, adn invariant violation for non-debug builds.
-        if self.runtime_environment.vm_config().use_loader_v2 {
-            let msg =
-                "ModuleView trait should not be used when loader V2 implementation is enabled"
-                    .to_string();
-            let err = Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(msg),
-            );
-            debug_assert!(err.is_ok());
-            return err;
-        }
-
         match &self.latest_view {
             ViewState::Sync(state) => {
                 use MVModulesError::*;
