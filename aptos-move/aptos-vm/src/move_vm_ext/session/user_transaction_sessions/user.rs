@@ -127,10 +127,14 @@ impl<'r, 'l> UserSession<'r, 'l> {
             })?;
         }
 
-        // Get the changes from running module initialization.
+        // Get the changes from running module initialization. Note that here we use the staged
+        // module storage to ensure resource group metadata from new modules is visible.
         let Self { session } = self;
-        let change_set =
-            session.finish_with_squashed_change_set(change_set_configs, module_storage, false)?;
+        let change_set = session.finish_with_squashed_change_set(
+            change_set_configs,
+            &staging_module_storage,
+            false,
+        )?;
 
         let write_ops = convert_modules_into_write_ops(
             resolver,
