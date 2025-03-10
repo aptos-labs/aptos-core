@@ -225,7 +225,12 @@ function coverage() {
     
     info "Generating coverage for $fuzz_target"
 
-    fuzz_target_bin=$(find ./target/*/coverage -name $fuzz_target -type f -perm +111)
+    PERM="/111"
+    if [[ $OSTYPE == 'darwin'* ]]; then
+        PERM="+111"
+    fi
+
+    fuzz_target_bin=$(find ./target/*/coverage -name $fuzz_target -type f -perm $PERM)
     echo "Found fuzz target binary: $fuzz_target_bin"
     # Generate the coverage report
     cargo +$NIGHTLY_VERSION cov -- show $fuzz_target_bin \
