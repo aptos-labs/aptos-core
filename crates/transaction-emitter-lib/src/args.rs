@@ -122,7 +122,7 @@ pub struct EmitArgs {
     #[clap(long)]
     pub target_tps: Option<usize>,
 
-    #[clap(long, default_value_t = 30)]
+    #[clap(long, default_value_t = 120)]
     pub txn_expiration_time_secs: u64,
 
     /// Time to run --emit-tx for in seconds.
