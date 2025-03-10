@@ -55,7 +55,8 @@ spec aptos_framework::timestamp {
     }
 
     spec fun spec_now_microseconds(): u64 {
-        global<CurrentTimeMicroseconds>(@aptos_framework).microseconds
+        use aptos_framework::aggregator_v2;
+        aggregator_v2::read(global<CurrentTimeMicroseconds>(@aptos_framework).microseconds)
     }
 
     spec fun spec_now_seconds(): u64 {

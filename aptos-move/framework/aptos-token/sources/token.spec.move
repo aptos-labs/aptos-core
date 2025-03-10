@@ -479,7 +479,8 @@ spec aptos_token::token {
     spec withdraw_with_capability(
         withdraw_proof: WithdrawCapability,
     ): Token {
-        let now_seconds = global<timestamp::CurrentTimeMicroseconds>(@aptos_framework).microseconds;
+        use aptos_framework::aggregator_v2;
+        let now_seconds = aggregator_v2::read(global<timestamp::CurrentTimeMicroseconds>(@aptos_framework).microseconds);
         aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         aborts_if now_seconds / timestamp::MICRO_CONVERSION_FACTOR > withdraw_proof.expiration_sec;
         include WithdrawWithEventInternalAbortsIf{
@@ -492,7 +493,8 @@ spec aptos_token::token {
         withdraw_proof: WithdrawCapability,
         withdraw_amount: u64,
     ): (Token, Option<WithdrawCapability>) {
-        let now_seconds = global<timestamp::CurrentTimeMicroseconds>(@aptos_framework).microseconds;
+        use aptos_framework::aggregator_v2;
+        let now_seconds = aggregator_v2::read(global<timestamp::CurrentTimeMicroseconds>(@aptos_framework).microseconds);
         aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         aborts_if now_seconds / timestamp::MICRO_CONVERSION_FACTOR > withdraw_proof.expiration_sec;
         aborts_if withdraw_amount > withdraw_proof.amount;
