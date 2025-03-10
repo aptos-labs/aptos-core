@@ -192,9 +192,11 @@ impl PipelineBackpressureConfig {
         max_block_txns: u64,
     ) -> Option<u64> {
         self.execution.as_ref().and_then(|config| {
-            let lookback_config = config.txn_limit_lookback.lookback_config;
+            let config = config.txn_limit.as_ref()?;
+
+            let lookback_config = &config.lookback_config;
             let min_calibrated_txns_per_block =
-                config.txn_limit_lookback.min_calibrated_txns_per_block;
+                config.min_calibrated_txns_per_block;
             let sizes = self.compute_lookback_blocks(block_execution_times, |summary| {
                 let execution_time_ms = summary.execution_time.as_millis();
                 // Only block above the time threshold are considered giving enough signal to support calibration
@@ -226,7 +228,7 @@ impl PipelineBackpressureConfig {
                         block_execution_times = format!("{:?}", block_execution_times),
                         estimated_calibrated_block_sizes = format!("{:?}", sizes),
                         calibrated_block_size = calibrated_block_size,
-                        "Execution backpressure recalibration: proposing reducing from {} to {}",
+                        "Execution backpressure recalibration: txn limit: proposing reducing from {} to {}",
                         max_block_txns,
                         calibrated_block_size,
                     );
@@ -246,10 +248,12 @@ impl PipelineBackpressureConfig {
         max_block_gas_limit: u64,
     ) -> Option<u64> {
         self.execution.as_ref().and_then(|config| {
-            let lookback_config = config.gas_limit_lookback.lookback_config;
-            let block_execution_overhead_ms = config.gas_limit_lookback.block_execution_overhead_ms;
+            let config = config.gas_limit.as_ref()?;
+
+            let lookback_config = &config.lookback_config;
+            let block_execution_overhead_ms = config.block_execution_overhead_ms;
             let min_calibrated_block_gas_limit =
-                config.gas_limit_lookback.min_calibrated_block_gas_limit;
+                config.min_calibrated_block_gas_limit;
             let gas_limit_estimates =
                 self.compute_lookback_blocks(block_execution_times, |summary| {
                     let execution_time_ms = summary.execution_time.as_millis() as u64;
@@ -289,7 +293,7 @@ impl PipelineBackpressureConfig {
                         block_execution_times = format!("{:?}", block_execution_times),
                         computed_target_block_gas_limits = format!("{:?}", gas_limit_estimates),
                         computed_target_block_gas_limit = calibrated_gas_limit,
-                        "Execution backpressure recalibration: proposing reducing from {} to {}",
+                        "Execution backpressure recalibration: gas limit: proposing reducing from {} to {}",
                         max_block_gas_limit,
                         calibrated_gas_limit,
                     );
@@ -304,18 +308,26 @@ impl PipelineBackpressureConfig {
     }
 
     pub fn num_blocks_to_look_at(&self) -> Option<usize> {
-        self.execution.as_ref().map(|config| {
-            std::cmp::max(
+        let config = self.execution.as_ref()?;
+
+        let mut num_blocks_to_look_at = None;
+        if let Some(config) = &config.txn_limit {
+            num_blocks_to_look_at = Some(
                 config
-                    .txn_limit_lookback
                     .lookback_config
-                    .num_blocks_to_look_at,
+                    .num_blocks_to_look_at
+                    .max(num_blocks_to_look_at.unwrap_or(0)),
+            );
+        }
+        if let Some(config) = &config.gas_limit {
+            num_blocks_to_look_at = Some(
                 config
-                    .gas_limit_lookback
                     .lookback_config
-                    .num_blocks_to_look_at,
-            )
-        })
+                    .num_blocks_to_look_at
+                    .max(num_blocks_to_look_at.unwrap_or(0)),
+            );
+        }
+        num_blocks_to_look_at
     }
 
     pub fn get_execution_block_txn_and_gas_limit_backoff(
