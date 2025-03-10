@@ -13,7 +13,7 @@ use crate::{
             MultiSigVerificationFailed, NotEnoughVotingPower,
         },
     },
-    AptosVM,
+    AptosVm,
 };
 use aptos_logger::debug;
 use aptos_types::{
@@ -54,7 +54,7 @@ enum ExecutionFailure {
     Unexpected(VMStatus),
 }
 
-impl AptosVM {
+impl AptosVm {
     pub(crate) fn process_jwk_update(
         &self,
         resolver: &impl AptosMoveResolver,

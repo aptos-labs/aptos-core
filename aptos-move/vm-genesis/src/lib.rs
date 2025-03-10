@@ -43,7 +43,7 @@ use aptos_types::{
 use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{
-        convert_modules_into_write_ops, GenesisMoveVM, GenesisRuntimeBuilder, SessionExt,
+        convert_modules_into_write_ops, GenesisMoveVm, GenesisRuntimeBuilder, SessionExt,
     },
 };
 use aptos_vm_types::{
@@ -899,7 +899,7 @@ fn code_to_writes_for_publishing(
 ///  1. Resources containing package information.
 ///  2. Module write set with published code.
 fn publish_framework(
-    genesis_vm: &GenesisMoveVM,
+    genesis_vm: &GenesisMoveVm,
     genesis_runtime_environment: &RuntimeEnvironment,
     hash_value: HashValue,
     framework: &ReleaseBundle,
