@@ -199,7 +199,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 .set_experiment(Experiment::KEEP_INLINE_FUNS, false)
                 .set_experiment(Experiment::SPEC_REWRITE, true)
                 .set_experiment(Experiment::LIFT_INLINE_FUNS, true)
-                .set_language_version(LanguageVersion::V2_LAMBDA),
+                .set_language_version(LanguageVersion::V2_2),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,
             dump_bytecode: DumpLevel::EndStage,
