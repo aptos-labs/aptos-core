@@ -1,12 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::extended_checks::ResourceGroupScope;
-use aptos_types::{
+use crate::{
     on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures},
     transaction::AbortInfo,
 };
-use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use lru::LruCache;
 use move_binary_format::{
     access::ModuleAccess,
@@ -23,9 +21,12 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
 };
-use move_model::metadata::{CompilationMetadata, COMPILATION_METADATA_KEY};
+use move_model::{
+    metadata::{CompilationMetadata, COMPILATION_METADATA_KEY},
+    model::StructEnv,
+};
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, collections::BTreeMap, env, sync::Arc};
+use std::{cell::RefCell, collections::BTreeMap, env, str::FromStr, sync::Arc};
 use thiserror::Error;
 
 /// The minimal file format version from which the V1 metadata is supported
@@ -225,28 +226,6 @@ pub fn get_metadata_v0(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> 
     } else {
         None
     }
-}
-
-/// Extract metadata from the VM, upgrading V0 to V1 representation as needed
-pub fn get_vm_metadata(
-    module_storage: &impl AptosModuleStorage,
-    module_id: &ModuleId,
-) -> Option<Arc<RuntimeModuleMetadataV1>> {
-    let metadata = module_storage
-        .fetch_module_metadata(module_id.address(), module_id.name())
-        .ok()??;
-    get_metadata(&metadata)
-}
-
-/// Extract metadata from the VM, legacy V0 format upgraded to V1
-pub fn get_vm_metadata_v0(
-    module_storage: &impl AptosModuleStorage,
-    module_id: &ModuleId,
-) -> Option<Arc<RuntimeModuleMetadataV1>> {
-    let metadata = module_storage
-        .fetch_module_metadata(module_id.address(), module_id.name())
-        .ok()??;
-    get_metadata_v0(&metadata)
 }
 
 /// Check if the metadata has unknown key/data types
@@ -740,3 +719,65 @@ impl RandomnessAnnotation {
         Self { max_gas }
     }
 }
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum ResourceGroupScope {
+    Global,
+    Address,
+    Module,
+}
+
+impl ResourceGroupScope {
+    pub fn is_less_strict(&self, other: &ResourceGroupScope) -> bool {
+        match self {
+            ResourceGroupScope::Global => other != self,
+            ResourceGroupScope::Address => other == &ResourceGroupScope::Module,
+            ResourceGroupScope::Module => false,
+        }
+    }
+
+    pub fn are_equal_envs(&self, resource: &StructEnv, group: &StructEnv) -> bool {
+        match self {
+            ResourceGroupScope::Global => true,
+            ResourceGroupScope::Address => {
+                resource.module_env.get_name().addr() == group.module_env.get_name().addr()
+            },
+            ResourceGroupScope::Module => {
+                resource.module_env.get_name() == group.module_env.get_name()
+            },
+        }
+    }
+
+    pub fn are_equal_module_ids(&self, resource: &ModuleId, group: &ModuleId) -> bool {
+        match self {
+            ResourceGroupScope::Global => true,
+            ResourceGroupScope::Address => resource.address() == group.address(),
+            ResourceGroupScope::Module => resource == group,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ResourceGroupScope::Global => "global",
+            ResourceGroupScope::Address => "address",
+            ResourceGroupScope::Module => "module_",
+        }
+    }
+}
+
+impl FromStr for ResourceGroupScope {
+    type Err = ResourceGroupScopeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "global" => Ok(ResourceGroupScope::Global),
+            "address" => Ok(ResourceGroupScope::Address),
+            "module_" => Ok(ResourceGroupScope::Module),
+            _ => Err(ResourceGroupScopeError(s.to_string())),
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+#[error("Invalid resource group scope: {0}")]
+pub struct ResourceGroupScopeError(String);
