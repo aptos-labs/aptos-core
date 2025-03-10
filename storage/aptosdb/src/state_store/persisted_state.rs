@@ -20,7 +20,7 @@ pub struct PersistedState {
 impl PersistedState {
     const MAX_PENDING_DROPS: usize = 8;
 
-    pub fn new_dummy() -> Self {
+    pub fn new_empty() -> Self {
         let state = State::new_empty();
         let hot_state = Arc::new(HotState::new(state));
         let summary = Arc::new(Mutex::new(StateSummary::new_empty()));
