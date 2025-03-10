@@ -11,7 +11,10 @@ use crate::{
     AsFunctionValueExtension, LayoutConverter, LoadedFunction, ModuleStorage,
     StorageLayoutConverter,
 };
-use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
+use move_binary_format::{
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    file_format::LocalIndex,
+};
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
@@ -37,7 +40,9 @@ impl MoveVm {
         extensions: &mut NativeContextExtensions,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
-        let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
+        let vm_config = module_storage.runtime_environment().vm_config();
+        let ty_builder = &vm_config.ty_builder;
+
         let create_ty_with_subst = |tys: &[Type]| -> VMResult<Vec<Type>> {
             tys.iter()
                 .map(|ty| ty_builder.create_ty_with_subst(ty, function.ty_args()))
@@ -46,8 +51,8 @@ impl MoveVm {
         };
 
         let param_tys = create_ty_with_subst(function.param_tys())?;
-        let (dummy_locals, deserialized_args) =
-            deserialize_args(module_storage, param_tys, serialized_args)
+        let (mut dummy_locals, deserialized_args) =
+            deserialize_args(module_storage, &param_tys, serialized_args)
                 .map_err(|e| e.finish(Location::Undefined))?;
 
         let return_tys = create_ty_with_subst(function.return_tys())?;
@@ -64,15 +69,31 @@ impl MoveVm {
         )?;
         drop(timer);
 
-        let serialized_return_values =
-            serialize_return_values(module_storage, &return_tys, return_values)
-                .map_err(|e| e.finish(Location::Undefined))?;
+        let return_values = serialize_return_values(module_storage, &return_tys, return_values)
+            .map_err(|e| e.finish(Location::Undefined))?;
+        let mutable_reference_outputs = param_tys
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, ty)| match ty {
+                Type::MutableReference(inner_ty) => Some((idx, inner_ty.as_ref())),
+                _ => None,
+            })
+            .map(|(idx, ty)| {
+                // serialize return values first in the case that a value points into this local
+                let local_val =
+                    dummy_locals.move_loc(idx, vm_config.check_invariant_in_swap_loc)?;
+                let (bytes, layout) = serialize_return_value(module_storage, ty, local_val)?;
+                Ok((idx as LocalIndex, bytes, layout))
+            })
+            .collect::<PartialVMResult<_>>()
+            .map_err(|e| e.finish(Location::Undefined))?;
 
         // locals should not be dropped until all return values are serialized
         drop(dummy_locals);
 
         Ok(SerializedReturnValues {
-            return_values: serialized_return_values,
+            mutable_reference_outputs,
+            return_values,
         })
     }
 
@@ -147,7 +168,7 @@ fn deserialize_arg(
 
 fn deserialize_args(
     module_storage: &impl ModuleStorage,
-    param_tys: Vec<Type>,
+    param_tys: &[Type],
     serialized_args: Vec<impl Borrow<[u8]>>,
 ) -> PartialVMResult<(Locals, Vec<Value>)> {
     if param_tys.len() != serialized_args.len() {
@@ -167,7 +188,7 @@ fn deserialize_args(
     // Arguments for the invoked function. These can be owned values or references
     let vm_config = module_storage.runtime_environment().vm_config();
     let deserialized_args = param_tys
-        .into_iter()
+        .iter()
         .zip(serialized_args)
         .enumerate()
         .map(|(idx, (ty, arg_bytes))| match ty.get_ref_inner_ty() {
@@ -179,7 +200,7 @@ fn deserialize_args(
                 )?;
                 dummy_locals.borrow_loc(idx)
             },
-            None => deserialize_arg(module_storage, &ty, arg_bytes),
+            None => deserialize_arg(module_storage, ty, arg_bytes),
         })
         .collect::<PartialVMResult<Vec<_>>>()?;
     Ok((dummy_locals, deserialized_args))

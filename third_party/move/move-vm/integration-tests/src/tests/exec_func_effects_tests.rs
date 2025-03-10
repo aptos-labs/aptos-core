@@ -52,6 +52,17 @@ fn fail_arg_deserialize() {
     }
 }
 
+// check happy path for writing to mut ref args - may be unecessary / covered by other tests
+#[test]
+fn mutref_output_success() {
+    let mod_code = setup_module();
+    let result = run(&mod_code, USE_MUTREF_LABEL, MoveValue::U64(1));
+    let (_, ret_values) = result.unwrap();
+    assert_eq!(1, ret_values.mutable_reference_outputs.len());
+    let parsed = parse_u64_arg(&ret_values.mutable_reference_outputs.first().unwrap().1);
+    assert_eq!(EXPECT_MUTREF_OUT_VALUE, parsed);
+}
+
 // TODO - how can we cause serialization errors in values returned from Move ?
 // that would allow us to test error paths for outputs as well
 
@@ -121,4 +132,11 @@ fn compile_module(storage: &mut InMemoryStorage, mod_id: &ModuleId, code: &str) 
     let mut blob = vec![];
     module.serialize(&mut blob).unwrap();
     storage.add_module_bytes(mod_id.address(), mod_id.name(), blob.into());
+}
+
+fn parse_u64_arg(arg: &[u8]) -> u64 {
+    let as_arr: [u8; 8] = arg[..8]
+        .try_into()
+        .expect("wrong u64 length, must be 8 bytes");
+    u64::from_le_bytes(as_arr)
 }
