@@ -185,7 +185,6 @@ impl ProofWithDataWithTxnLimit {
 
     pub fn extend(&mut self, other: ProofWithDataWithTxnLimit) {
         self.proof_with_data.extend(other.proof_with_data);
-        // InQuorumStoreWithLimit TODO: what is the right logic here ???
         if self.max_txns_to_execute.is_none() {
             self.max_txns_to_execute = other.max_txns_to_execute;
         }
@@ -375,7 +374,6 @@ impl Payload {
                 b3.extend(b2);
                 let mut p3 = p1;
                 p3.extend(p2);
-                // TODO: What's the right logic here?
                 let m3 = sum_options(m1, m2);
                 Payload::QuorumStoreInlineHybrid(b3, p3, m3)
             },
@@ -392,19 +390,16 @@ impl Payload {
                 Payload::QuorumStoreInlineHybridV2(b3, p3, l3)
             },
             (Payload::QuorumStoreInlineHybrid(b1, p1, m1), Payload::InQuorumStore(p2)) => {
-                // TODO: How to update m1?
                 let mut p3 = p1;
                 p3.extend(p2);
                 Payload::QuorumStoreInlineHybrid(b1, p3, m1)
             },
             (Payload::QuorumStoreInlineHybridV2(b1, p1, l1), Payload::InQuorumStore(p2)) => {
-                // TODO: How to update m1?
                 let mut p3 = p1;
                 p3.extend(p2);
                 Payload::QuorumStoreInlineHybridV2(b1, p3, l1)
             },
             (Payload::QuorumStoreInlineHybrid(b1, p1, m1), Payload::InQuorumStoreWithLimit(p2)) => {
-                // TODO: What's the right logic here?
                 let m3 = sum_options(m1, p2.max_txns_to_execute);
                 let mut p3 = p1;
                 p3.extend(p2.proof_with_data);
@@ -414,7 +409,6 @@ impl Payload {
                 Payload::QuorumStoreInlineHybridV2(b1, p1, l1),
                 Payload::InQuorumStoreWithLimit(p2),
             ) => {
-                // TODO: What's the right logic here?
                 let m3 = sum_options(l1.max_txns_to_execute(), p2.max_txns_to_execute);
                 let g3 = l1.block_gas_limit();
                 let l3 = PayloadExecutionLimit::TxnAndGasLimits(TxnAndGasLimits {
@@ -436,7 +430,6 @@ impl Payload {
                 Payload::QuorumStoreInlineHybridV2(b2, p3, l2)
             },
             (Payload::InQuorumStoreWithLimit(p1), Payload::QuorumStoreInlineHybrid(b2, p2, m2)) => {
-                // TODO: What's the right logic here?
                 let m3 = sum_options(p1.max_txns_to_execute, m2);
                 let mut p3 = p1.proof_with_data;
                 p3.extend(p2);
@@ -446,7 +439,6 @@ impl Payload {
                 Payload::InQuorumStoreWithLimit(p1),
                 Payload::QuorumStoreInlineHybridV2(b2, p2, l2),
             ) => {
-                // TODO: What's the right logic here?
                 let m3 = sum_options(p1.max_txns_to_execute, l2.max_txns_to_execute());
                 let g3 = l2.block_gas_limit();
                 let l3 = PayloadExecutionLimit::TxnAndGasLimits(TxnAndGasLimits {
