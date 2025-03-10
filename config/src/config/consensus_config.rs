@@ -133,7 +133,7 @@ pub struct ExecutionBackpressureLookbackConfig {
 /// Execution backpressure which handles txn/s variance,
 /// and adjusts block sizes to "recalibrate it" to wanted range.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct ExecutionBackpressureTxnLimitLookbackConfig {
+pub struct ExecutionBackpressureTxnLimitConfig {
     pub lookback_config: ExecutionBackpressureLookbackConfig,
     /// A minimal number of transactions per block, even if calibration suggests otherwise
     /// To make sure backpressure doesn't become too aggressive.
@@ -143,7 +143,7 @@ pub struct ExecutionBackpressureTxnLimitLookbackConfig {
 /// Execution backpressure which handles gas/s variance,
 /// and adjusts gas limit to "recalibrate it" to wanted range.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct ExecutionBackpressureGasLimitLookbackConfig {
+pub struct ExecutionBackpressureGasLimitConfig {
     pub lookback_config: ExecutionBackpressureLookbackConfig,
     pub block_execution_overhead_ms: u64,
     pub min_calibrated_block_gas_limit: u64,
@@ -151,8 +151,8 @@ pub struct ExecutionBackpressureGasLimitLookbackConfig {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ExecutionBackpressureConfig {
-    pub txn_limit_lookback: ExecutionBackpressureTxnLimitLookbackConfig,
-    pub gas_limit_lookback: ExecutionBackpressureGasLimitLookbackConfig,
+    pub txn_limit: Option<ExecutionBackpressureTxnLimitConfig>,
+    pub gas_limit: Option<ExecutionBackpressureGasLimitConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -218,23 +218,27 @@ impl Default for ConsensusConfig {
             vote_back_pressure_limit: 7,
             min_max_txns_in_block_after_filtering_from_backpressure: MIN_BLOCK_TXNS_AFTER_FILTERING,
             execution_backpressure: Some(ExecutionBackpressureConfig {
-                txn_limit_lookback: ExecutionBackpressureLookbackConfig {
-                    num_blocks_to_look_at: 12,
-                    min_block_time_ms_to_activate: 100,
-                    min_blocks_to_activate: 4,
-                    metric: ExecutionBackpressureMetric::Percentile(0.5),
-                    target_block_time_ms: 200,
-                },
-                min_calibrated_txns_per_block: 8,
-                gas_limit_lookback: ExecutionBackpressureLookbackConfig {
-                    num_blocks_to_look_at: 20,
-                    min_block_time_ms_to_activate: 10,
-                    min_blocks_to_activate: 4,
-                    metric: ExecutionBackpressureMetric::Mean,
-                    target_block_time_ms: 200,
-                },
-                block_execution_overhead_ms: 10,
-                min_calibrated_block_gas_limit: 2000,
+                txn_limit: Some(ExecutionBackpressureTxnLimitConfig {
+                    lookback_config: ExecutionBackpressureLookbackConfig {
+                        num_blocks_to_look_at: 12,
+                        min_block_time_ms_to_activate: 100,
+                        min_blocks_to_activate: 4,
+                        metric: ExecutionBackpressureMetric::Percentile(0.5),
+                        target_block_time_ms: 200,
+                    },
+                    min_calibrated_txns_per_block: 8,
+                }),
+                gas_limit: Some(ExecutionBackpressureGasLimitConfig {
+                    lookback_config: ExecutionBackpressureLookbackConfig {
+                        num_blocks_to_look_at: 20,
+                        min_block_time_ms_to_activate: 10,
+                        min_blocks_to_activate: 4,
+                        metric: ExecutionBackpressureMetric::Mean,
+                        target_block_time_ms: 200,
+                    },
+                    block_execution_overhead_ms: 10,
+                    min_calibrated_block_gas_limit: 2000,
+                }),
             }),
             pipeline_backpressure: vec![
                 PipelineBackpressureValues {
