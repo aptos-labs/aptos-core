@@ -518,6 +518,5 @@ pub struct ExecutionSummary {
     pub to_retry: u64,
     pub execution_time: Duration,
     pub root_hash: HashValue,
-    // TODO: when is it None?
     pub gas_used: Option<u64>,
 }
