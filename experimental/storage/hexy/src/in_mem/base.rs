@@ -104,7 +104,7 @@ impl HexyBase {
         self.height() as u8
     }
 
-    unsafe fn unsafe_get_hash(&self, position: NodePosition) -> Result<HashValue> {
+    pub(crate) unsafe fn unsafe_get_hash(&self, position: NodePosition) -> Result<HashValue> {
         ensure!(
             position.level_height < self.height_u8(),
             "level_height out of bound. num_of_leaves: {:?}, requested position: {:?}",
@@ -116,14 +116,13 @@ impl HexyBase {
         if position.index_in_level < level.len() as u32 {
             Ok(*level.unsafe_expect(position.index_in_level as usize))
         } else {
+            let parent_position = position.parent();
             ensure!(
-                position.level_height < self.height_u8(),
-                "index_in_level out of bound. num_of_leaves: {:?}, requested position: {:?}",
+                parent_position.level_height < self.height_u8(),
+                "index_in_level out of bound for root level. num_of_leaves: {:?}, requested position: {:?}",
                 self.num_leaves(),
                 position,
             );
-
-            let parent_position = position.parent();
             let parent_level = self.expect_level(parent_position);
 
             ensure!(
