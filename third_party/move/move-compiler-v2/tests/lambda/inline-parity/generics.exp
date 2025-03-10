@@ -1,7 +1,0 @@
-
-Diagnostics:
-error: captured variable `sum` cannot be modified inside of a lambda
-   ┌─ tests/lambda/inline-parity/generics.move:16:30
-   │
-16 │         foreach<u64>(&v, |e| sum = sum + *e);
-   │                              ^^^

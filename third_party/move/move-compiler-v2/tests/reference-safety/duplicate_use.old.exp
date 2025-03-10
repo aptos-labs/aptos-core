@@ -1,9 +1,0 @@
-
-Diagnostics:
-error: same mutable reference in local `x` is also used in other value in argument list
-  ┌─ tests/reference-safety/duplicate_use.move:8:9
-  │
-7 │     fun fail(x: &mut u64) {
-  │              - previous mutable local borrow
-8 │         mut_ref(x, x)
-  │         ^^^^^^^^^^^^^ requirement enforced here

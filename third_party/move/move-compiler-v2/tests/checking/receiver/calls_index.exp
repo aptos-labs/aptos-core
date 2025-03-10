@@ -66,7 +66,7 @@ module 0x42::m {
         m::greater(Freeze(false)(Borrow(Mutable)(select m::T.w<T>(select m::S.t<S>(BorrowGlobal(Mutable)<S>(account))))), w)
     }
     private fun foo_greater_2(account: address,w: W): bool
-        acquires S(*)
+        acquires W(*)
      {
         m::greater(BorrowGlobal(Immutable)<W>(account), w)
     }
@@ -156,7 +156,7 @@ module 0x42::m {
         greater(/*freeze*/&mut borrow_global_mut<S>(account).t.w, w)
     }
     fun foo_greater_2(account: address, w: W): bool
-        acquires S
+        acquires W
     {
         greater(borrow_global<W>(account), w)
     }
