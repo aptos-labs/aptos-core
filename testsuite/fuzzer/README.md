@@ -33,6 +33,7 @@ The script includes several functions to manage and execute fuzz tests:
     ```bash
     ./fuzz.sh coverage <fuzz_target>
     ```
+    > rustup +nightly-2024-04-06 component add llvm-tools-preview
 - `coverage-cleanup`:
     ```bash
     ./fuzz.sh clean-coverage <fuzz_target|all>
@@ -128,6 +129,15 @@ The CSV file is structured as follows:
 - Column 2: Module address  
 - Column 3: Base64-encoded bytecode of the module
 
+You can generate a test case from any valid Move project (arguments to function calls might need attention TODO). It's helpful for testing new functionalities or increasing coverage completeness. For native functions, please follow the structure in the data folder.
+
+> Create an entry function, which may accept a signer or no parameters. Generic T functions are not allowed as entry.
+
+The first argument is the project, and the second one is the target directory.
+`./fuzz.sh block-builder generate_runnable_state_from_project data/0x1/string/generic fuzz/corpus/move_aptosvm_publish_and_run`
+
+> Verify your testcase runs as expected by appending `DEBUG=1` while calling the fuzzer and using the newly generated test case as the second parameter.
+
 ## Debug Crashes
 Flamegraph and GDB are integrated into fuzz.sh for advanced metrics and debugging. A more rudimentary option is also available: since we have symbolized binaries, we can directly use the stack trace produced by the fuzzer. However, for INVARIANT_VIOLATIONS, the stack trace is incorrect. To obtain the correct stack trace, you can use the following command:
 ```bash
@@ -139,6 +149,7 @@ This command is selective, so only the specified, comma-separated statuses will 
 - [Rust Fuzz Book](https://rust-fuzz.github.io/book/)
 - [Google OSS-Fuzz](https://google.github.io/oss-fuzz/)
 - [Arbitrary](https://docs.rs/arbitrary/latest/arbitrary/)
+- [Native Functions](https://aptos.dev/en/build/smart-contracts/move-reference?branch=mainnet&page=move-stdlib%2Fdoc%2Fmem.md)
 
 ## Contribute
 Contributions to enhance the `fuzz.sh` script and the fuzz testing suite are welcome.
