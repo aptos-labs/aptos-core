@@ -119,11 +119,7 @@ impl Mempool {
             .reject_transaction(sender, sequence_number, hash);
     }
 
-    pub fn log_txn_latency(
-        insertion_info: &InsertionInfo,
-        bucket: &str,
-        stage: &'static str,
-    ) {
+    pub fn log_txn_latency(insertion_info: &InsertionInfo, bucket: &str, stage: &'static str) {
         if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
             counters::core_mempool_txn_commit_latency(
                 stage,
@@ -304,13 +300,13 @@ impl Mempool {
     /// `exclude_transactions` - transactions that were sent to Consensus but were not committed yet
     ///  mempool should filter out such transactions.
     #[allow(clippy::explicit_counter_loop)]
-    pub fn get_batch(
+    pub fn get_batch_with_ranking_score(
         &self,
         max_txns: u64,
         max_bytes: u64,
         return_non_full: bool,
         exclude_transactions: BTreeMap<TransactionSummary, TransactionInProgress>,
-    ) -> Vec<SignedTransaction> {
+    ) -> Vec<(SignedTransaction, u64)> {
         let start_time = Instant::now();
         let exclude_size = exclude_transactions.len();
         let mut inserted = HashSet::new();
@@ -381,7 +377,7 @@ impl Mempool {
                     break;
                 }
                 total_bytes += txn_size;
-                block.push(txn);
+                block.push((txn, ranking_score));
                 if total_bytes == max_bytes {
                     full_bytes = true;
                 }
@@ -435,10 +431,29 @@ impl Mempool {
 
         counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, block.len());
         counters::MEMPOOL_SERVICE_BYTES_GET_BLOCK.observe(total_bytes as f64);
-        for transaction in &block {
+        for (transaction, _) in &block {
             self.log_consensus_pulled_latency(transaction.sender(), transaction.sequence_number());
         }
         block
+    }
+
+    pub fn get_batch(
+        &self,
+        max_txns: u64,
+        max_bytes: u64,
+        return_non_full: bool,
+        exclude_transactions: BTreeMap<TransactionSummary, TransactionInProgress>,
+    ) -> Vec<SignedTransaction> {
+        let batch_with_ranking_score = self.get_batch_with_ranking_score(
+            max_txns,
+            max_bytes,
+            return_non_full,
+            exclude_transactions,
+        );
+        batch_with_ranking_score
+            .into_iter()
+            .map(|(txn, _)| txn)
+            .collect()
     }
 
     /// Periodic core mempool garbage collection.
@@ -465,10 +480,7 @@ impl Mempool {
     }
 
     /// Read transactions from timeline from `start_id` (exclusive) to `end_id` (inclusive).
-    pub fn timeline_range(
-        &self,
-        start_end_pairs: &Vec<(u64, u64)>,
-    ) -> Vec<SignedTransaction> {
+    pub fn timeline_range(&self, start_end_pairs: &Vec<(u64, u64)>) -> Vec<SignedTransaction> {
         self.transactions.timeline_range(start_end_pairs)
     }
 

@@ -487,7 +487,7 @@ bcs = { git = "https://github.com/movementlabsxyz/bcs.git", rev = "bc16d2d39caba
 better_any = "0.1.1"
 bellman = { version = "0.13.1", default-features = false }
 # Bumped down to 0.3 due to https://github.com/diesel-rs/diesel/issues/4477
-bigdecimal = { version = "0.3", features = ["serde"] }
+bigdecimal = { version = "0.4.0", features = ["serde"] }
 version-compare = "0.1.1"
 bitvec = "1.0.1"
 blake2 = "0.10.4"
@@ -532,7 +532,7 @@ derivation-path = "0.2.0"
 derive_builder = "0.20.0"
 determinator = "0.12.0"
 derive_more = "0.99.11"
-diesel = "2.2.7"
+diesel = "2.2.3"
 diesel-async = { version = "0.5", features = [
     "async-connection-wrapper",
     "postgres",
