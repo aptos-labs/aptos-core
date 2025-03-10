@@ -58,6 +58,9 @@ pub enum LogEvent {
     // randomness fast path
     BroadcastRandShareFastPath,
     ReceiveRandShareFastPath,
+    // optimistic proposal
+    OptPropose,
+    ReceiveOptProposal,
 }
 
 impl LogSchema {

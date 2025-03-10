@@ -23,15 +23,7 @@ use anyhow::{anyhow, bail, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
-    block_retrieval::{BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse},
-    common::Author,
-    order_vote_msg::OrderVoteMsg,
-    pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
-    proof_of_store::{ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg},
-    proposal_msg::ProposalMsg,
-    round_timeout::RoundTimeoutMsg,
-    sync_info::SyncInfo,
-    vote_msg::VoteMsg,
+    block_retrieval::{BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse}, common::Author, opt_proposal_msg::OptProposalMsg, order_vote_msg::OrderVoteMsg, pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote}, proof_of_store::{ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, round_timeout::RoundTimeoutMsg, sync_info::SyncInfo, vote_msg::VoteMsg
 };
 use aptos_logger::prelude::*;
 use aptos_network::{
@@ -391,6 +383,12 @@ impl NetworkSender {
     pub async fn broadcast_proposal(&self, proposal_msg: ProposalMsg) {
         fail_point!("consensus::send::broadcast_proposal", |_| ());
         let msg = ConsensusMsg::ProposalMsg(Box::new(proposal_msg));
+        self.broadcast(msg).await
+    }
+
+    pub async fn broadcast_opt_proposal(&self, proposal_msg: OptProposalMsg) {
+        fail_point!("consensus::send::broadcast_opt_proposal", |_| ());
+        let msg = ConsensusMsg::OptProposalMsg(Box::new(proposal_msg));
         self.broadcast(msg).await
     }
 
@@ -780,6 +778,7 @@ impl NetworkTask {
                             };
                         },
                         consensus_msg @ (ConsensusMsg::ProposalMsg(_)
+                        | ConsensusMsg::OptProposalMsg(_)
                         | ConsensusMsg::VoteMsg(_)
                         | ConsensusMsg::RoundTimeoutMsg(_)
                         | ConsensusMsg::OrderVoteMsg(_)

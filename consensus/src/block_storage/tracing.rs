@@ -30,6 +30,16 @@ impl BlockStage {
     pub const SIGNED: &'static str = "signed";
     pub const SYNCED: &'static str = "synced";
     pub const VOTED: &'static str = "voted";
+    // Optimistic Proposal
+    pub const OPT_PROPOSED: &'static str = "opt_proposed";
+    pub const EPOCH_MANAGER_RECEIVED_OPT_PROPOSAL: &'static str = "epoch_manager_received_opt_proposal";
+    pub const EPOCH_MANAGER_VERIFIED_OPT_PROPOSAL: &'static str = "epoch_manager_verified_opt_proposal";
+    pub const ROUND_MANAGER_RECEIVED_OPT_PROPOSAL: &'static str = "round_manager_received_opt_proposal";
+    pub const PROCESS_OPT_PROPOSAL: &'static str = "process_opt_proposal";
+    pub const VOTED_OPT_BLOCK: &'static str = "voted_opt_block";
+    pub const ORDER_VOTED_OPT_BLOCK: &'static str = "order_voted_opt_block";
+    pub const ORDERED_OPT_BLOCK: &'static str = "ordered_opt_block";
+    pub const COMMITTED_OPT_BLOCK: &'static str = "committed_opt_block";
 }
 
 /// Record the time during each stage of a block.
