@@ -186,6 +186,15 @@ impl PipelineBackpressureConfig {
         }
     }
 
+    /// TODO: disable txn limit backoff and use only gas limit based backoff once execution pool is deployed.
+    ///
+    /// Until then, we need to compute wanted block size to create.
+    /// Unfortunately, there is multiple layers where transactions are filtered.
+    /// After deduping/reordering logic is applied, max_txns_to_execute limits the transactions
+    /// passed to executor (`summary.payload_len` here), and then some are discarded for various
+    /// reasons, which we approximate are cheaply ignored.
+    /// For the rest, only `summary.to_commit` fraction of `summary.to_commit + summary.to_retry`
+    /// was executed. And so assuming same discard rate, we scale `summary.payload_len` with it.
     fn get_execution_block_size_backoff(
         &self,
         block_execution_times: &[ExecutionSummary],
@@ -242,6 +251,10 @@ impl PipelineBackpressureConfig {
         })
     }
 
+    /// TODO: once execution pool is deployed, enable gas limit based backoff in execution (via onchain config).
+    ///
+    /// Until it is enabled in execution, the printed log is useful for auditing and calibrating
+    /// the computed backoff.
     fn get_execution_gas_limit_backoff(
         &self,
         block_execution_times: &[ExecutionSummary],
