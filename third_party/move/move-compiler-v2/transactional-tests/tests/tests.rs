@@ -195,19 +195,19 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
     } else {
         None
     };
-    let mut v2_experiments = config
+    let mut experiments = config
         .experiments
         .iter()
         .map(|(s, v)| (s.to_string(), *v))
         .collect_vec();
     if path.to_string_lossy().contains("/access_control/") {
         // Enable access control file format generation for those tests
-        v2_experiments.push((Experiment::GEN_ACCESS_SPECIFIERS.to_string(), true))
+        experiments.push((Experiment::GEN_ACCESS_SPECIFIERS.to_string(), true))
     }
     let language_version = config.language_version;
     let vm_test_config = TestRunConfig::CompilerV2 {
         language_version,
-        v2_experiments,
+        experiments,
     };
 
     vm_test_harness::run_test_with_config_and_exp_suffix(vm_test_config, path, &exp_suffix)

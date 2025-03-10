@@ -94,7 +94,6 @@ MOVE_CRATES="\
   -p move-bytecode-verifier\
   -p move-binary-format\
   -p move-compiler\
-  -p move-compiler-transactional-tests\
   -p move-compiler-v2\
   -p move-compiler-v2-transactional-tests\
   -p move-ir-compiler-transactional-tests\
