@@ -591,7 +591,7 @@ pub struct SignedTransaction {
 
     /// A cached hash of the transaction.
     #[serde(skip)]
-    committed_hash: OnceCell<HashValue>,
+    committed_hash: Arc<OnceCell<HashValue>>,
 }
 
 /// PartialEq ignores the cached OnceCell fields that may or may not be initialized.
@@ -650,7 +650,7 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
+            committed_hash: Arc::new(OnceCell::new()),
         }
     }
 
@@ -665,7 +665,7 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
+            committed_hash: Arc::new(OnceCell::new()),
         }
     }
 
