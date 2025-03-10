@@ -382,6 +382,100 @@ fn invalid_type_param_for_vector_operation() {
     }
 }
 
+#[test]
+fn invalid_rac_declared_at() {
+    let m = module_with_rac(AccessSpecifier {
+        kind: AccessKind::Reads,
+        negated: false,
+        resource: ResourceSpecifier::DeclaredAtAddress(AddressIdentifierIndex::new(2)),
+        address: AddressSpecifier::Any,
+    });
+    assert_eq!(
+        BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+        StatusCode::INDEX_OUT_OF_BOUNDS
+    );
+}
+
+#[test]
+fn invalid_rac_declared_in() {
+    let m = module_with_rac(AccessSpecifier {
+        kind: AccessKind::Reads,
+        negated: false,
+        resource: ResourceSpecifier::DeclaredInModule(ModuleHandleIndex::new(5)),
+        address: AddressSpecifier::Any,
+    });
+    assert_eq!(
+        BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+        StatusCode::INDEX_OUT_OF_BOUNDS
+    );
+}
+
+#[test]
+fn invalid_rac_resource() {
+    let m = module_with_rac(AccessSpecifier {
+        kind: AccessKind::Reads,
+        negated: false,
+        resource: ResourceSpecifier::Resource(StructHandleIndex::new(5)),
+        address: AddressSpecifier::Any,
+    });
+    assert_eq!(
+        BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+        StatusCode::INDEX_OUT_OF_BOUNDS
+    );
+}
+
+#[test]
+fn invalid_rac_resource_inst() {
+    let m = module_with_rac(AccessSpecifier {
+        kind: AccessKind::Reads,
+        negated: false,
+        resource: ResourceSpecifier::ResourceInstantiation(
+            StructHandleIndex::new(0),
+            SignatureIndex::new(3),
+        ),
+        address: AddressSpecifier::Any,
+    });
+    assert_eq!(
+        BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+        StatusCode::INDEX_OUT_OF_BOUNDS
+    );
+}
+
+#[test]
+fn invalid_rac_addr_literal() {
+    let m = module_with_rac(AccessSpecifier {
+        kind: AccessKind::Reads,
+        negated: false,
+        resource: ResourceSpecifier::Any,
+        address: AddressSpecifier::Literal(AddressIdentifierIndex::new(3)),
+    });
+    assert_eq!(
+        BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+        StatusCode::INDEX_OUT_OF_BOUNDS
+    );
+}
+
+#[test]
+fn invalid_rac_parameter() {
+    let m = module_with_rac(AccessSpecifier {
+        kind: AccessKind::Reads,
+        negated: false,
+        resource: ResourceSpecifier::Any,
+        address: AddressSpecifier::Parameter(0, None),
+    });
+    assert_eq!(
+        BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+        StatusCode::INDEX_OUT_OF_BOUNDS
+    );
+}
+
+fn module_with_rac(spec: AccessSpecifier) -> CompiledModule {
+    let mut module = basic_test_module();
+    module.address_identifiers.push(AccountAddress::FOUR);
+    module.function_handles[0].access_specifiers = Some(vec![spec]);
+    module
+}
+
 proptest! {
     #[test]
     fn valid_bounds(_module in CompiledModule::valid_strategy(20)) {
