@@ -63,6 +63,7 @@ pub struct QuorumStorePayloadManager {
     maybe_consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ordered_authors: Vec<PeerId>,
     address_to_validator_index: HashMap<PeerId, usize>,
+    enable_payload_v2: bool,
 }
 
 impl QuorumStorePayloadManager {
@@ -72,6 +73,7 @@ impl QuorumStorePayloadManager {
         maybe_consensus_publisher: Option<Arc<ConsensusPublisher>>,
         ordered_authors: Vec<PeerId>,
         address_to_validator_index: HashMap<PeerId, usize>,
+        enable_payload_v2: bool,
     ) -> Self {
         Self {
             batch_reader,
@@ -79,6 +81,7 @@ impl QuorumStorePayloadManager {
             maybe_consensus_publisher,
             ordered_authors,
             address_to_validator_index,
+            enable_payload_v2,
         }
     }
 
@@ -154,6 +157,7 @@ impl QuorumStorePayloadManager {
             *max_txns_to_execute,
             *block_gas_limit_override,
             inline_batches,
+            self.enable_payload_v2,
         ))
     }
 }

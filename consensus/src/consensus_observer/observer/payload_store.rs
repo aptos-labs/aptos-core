@@ -1103,6 +1103,7 @@ mod test {
                 None,
                 None,
                 vec![],
+                true,
             );
 
             // Insert the block payload into the store

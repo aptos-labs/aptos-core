@@ -536,12 +536,23 @@ impl BlockTransactionPayload {
         transaction_limit: Option<u64>,
         gas_limit: Option<u64>,
         inline_batches: Vec<BatchInfo>,
+        enable_payload_v2: bool,
     ) -> Self {
         let payload_with_proof = PayloadWithProof::new(transactions, proofs);
-        let proof_with_limits = TransactionsWithProof::TransactionsWithProofAndLimits(
-            TransactionsWithProofAndLimits::new(payload_with_proof, transaction_limit, gas_limit),
-        );
-        Self::QuorumStoreInlineHybridV2(proof_with_limits, inline_batches)
+        if enable_payload_v2 {
+            let proof_with_limits = TransactionsWithProof::TransactionsWithProofAndLimits(
+                TransactionsWithProofAndLimits::new(
+                    payload_with_proof,
+                    transaction_limit,
+                    gas_limit,
+                ),
+            );
+            Self::QuorumStoreInlineHybridV2(proof_with_limits, inline_batches)
+        } else {
+            let proof_with_limit =
+                PayloadWithProofAndLimit::new(payload_with_proof, transaction_limit);
+            Self::QuorumStoreInlineHybrid(proof_with_limit, inline_batches)
+        }
     }
 
     pub fn new_opt_quorum_store(
@@ -1161,6 +1172,7 @@ mod test {
             transaction_limit,
             gas_limit,
             inline_batches.clone(),
+            true,
         );
 
         // Create a quorum store payload with a single proof
@@ -1773,6 +1785,7 @@ mod test {
             None,
             None,
             vec![],
+            true,
         );
 
         // Create a block payload
@@ -1847,6 +1860,7 @@ mod test {
             None,
             None,
             inline_batches.to_vec(),
+            true,
         );
 
         // Determine the block info to use
