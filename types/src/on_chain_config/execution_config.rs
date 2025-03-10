@@ -88,7 +88,7 @@ impl OnChainExecutionConfig {
         OnChainExecutionConfig::V5(ExecutionConfigV5 {
             transaction_shuffler_type: TransactionShufflerType::default_for_genesis(),
             block_gas_limit_type: BlockGasLimitType::default_for_genesis(),
-            enable_per_block_gas_limit: true,
+            enable_per_block_gas_limit: false,
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
         })
     }
