@@ -12,8 +12,9 @@ pub(crate) mod cli {
     use arbitrary::Arbitrary;
     use base64::{engine::general_purpose::STANDARD, Engine as _};
     use dearbitrary::Dearbitrary;
-    use move_binary_format::file_format::{
-        CompiledModule, CompiledScript, FunctionDefinitionIndex,
+    use move_binary_format::{
+        access::ModuleAccess,
+        file_format::{CompiledModule, CompiledScript, FunctionDefinitionIndex, SignatureToken},
     };
     use move_core_types::{
         ident_str,
@@ -23,7 +24,6 @@ pub(crate) mod cli {
     };
     use sha2::{Digest, Sha256};
     use std::{collections::HashMap, fs::File, io::Write, path::PathBuf};
-    use move_binary_format::{file_format::SignatureToken, access::ModuleAccess};
 
     /// Compiles a Move module from source code.
     /// The compiled module and its metadata are returned serialized.
@@ -282,27 +282,26 @@ pub(crate) mod cli {
         }
     }
 
-
     fn to_runnablestate_from_package(package: &BuiltPackage) -> Result<RunnableState, String> {
         let modules = package.extract_code();
-        
+
         // Create a vector to hold all compiled modules
         let mut compiled_modules = Vec::new();
-        
+
         for module_bytes in modules {
             if let Ok(module) = CompiledModule::deserialize(&module_bytes) {
                 compiled_modules.push(module);
             }
         }
-        
+
         if compiled_modules.is_empty() {
             return Err("No valid modules found in package".to_string());
         }
-        
+
         // Find the first module with an entry function
         let mut primary_module = None;
         let mut function_def_idx = None;
-        
+
         for module in &compiled_modules {
             for (idx, func_def) in module.function_defs.iter().enumerate() {
                 if func_def.is_entry {
@@ -315,53 +314,59 @@ pub(crate) mod cli {
                 break;
             }
         }
-        
+
         // If no entry function found, use the first function of the first module
-        let (primary_module, function_def_idx) = if let (Some(module), Some(idx)) = (primary_module, function_def_idx) {
+        let (primary_module, function_def_idx) = if let (Some(module), Some(idx)) =
+            (primary_module, function_def_idx)
+        {
             (module, idx)
         } else if !compiled_modules.is_empty() && !compiled_modules[0].function_defs.is_empty() {
             (&compiled_modules[0], 0)
         } else {
             return Err("No functions found in any module".to_string());
         };
-        
+
         let module_id = primary_module.self_id();
         let function_def = &primary_module.function_defs[function_def_idx];
         let function_handle = &primary_module.function_handles[function_def.function.0 as usize];
-        
+
         // Check if the function has type parameters (is generic)
         let has_type_params = !function_handle.type_parameters.is_empty();
-        
+
         // Return error if the function is generic
         if has_type_params {
             return Err(format!(
                 "Entry function {}::{} has {} type parameters. Generic entry functions are not supported.",
-                module_id, 
+                module_id,
                 primary_module.identifier_at(function_handle.name),
                 function_handle.type_parameters.len()
             ));
         }
-        
+
         let type_args = vec![];
-        
+
         let function_signature = &primary_module.signatures[function_handle.parameters.0 as usize];
-        
+
         // Check if there are any non-signer parameters after the signer parameters
         let has_non_signer_params = if !function_signature.0.is_empty() {
             !is_signer_or_reference(&function_signature.0[0])
         } else {
             false
         };
-        
+
         let args = if has_non_signer_params {
-            return Err("Entry function has non-signer parameters after signer parameters".to_string());
+            return Err(
+                "Entry function has non-signer parameters after signer parameters".to_string(),
+            );
         } else {
             vec![]
         };
-        
-        println!("Using module: {}, function idx: {}", 
-                 module_id, function_def_idx);
-        
+
+        println!(
+            "Using module: {}, function idx: {}",
+            module_id, function_def_idx
+        );
+
         // Create a single runnable state with all modules as dependencies
         let runnable_state = RunnableState {
             dep_modules: compiled_modules,
@@ -378,14 +383,11 @@ pub(crate) mod cli {
                 },
             },
         };
-        
+
         Ok(runnable_state)
     }
 
-
-    fn compile_source_code_from_project(
-        project_path: &str,
-    ) -> Result<BuiltPackage, String> {
+    fn compile_source_code_from_project(project_path: &str) -> Result<BuiltPackage, String> {
         let package = BuiltPackage::build(PathBuf::from(project_path), BuildOptions::default())
             .map_err(|e| e.to_string())?;
 
@@ -403,18 +405,18 @@ pub(crate) mod cli {
 
         let package = compile_source_code_from_project(project_path)?;
         let runnable_state = to_runnablestate_from_package(&package)?;
-        
+
         println!("Generated runnable state from package");
-        
+
         // Serialize the runnable state
         let bytes = runnable_state.dearbitrary_first().finish();
-        
+
         // Generate a filename based on hash
         let mut hasher = Sha256::new();
         hasher.update(&bytes);
         let hash = hasher.finalize();
         let filename = format!("{}/{}.bytes", destination_path, hex::encode(hash));
-        
+
         // Write to file
         let mut file = File::create(&filename).map_err(|e| e.to_string())?;
         file.write_all(&bytes).map_err(|e| e.to_string())?;
