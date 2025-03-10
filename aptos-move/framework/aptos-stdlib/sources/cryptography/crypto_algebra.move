@@ -287,7 +287,7 @@ module aptos_std::crypto_algebra {
     }
 
     fun handles_from_elements<S>(elements: &vector<Element<S>>): vector<u64> {
-        let num_elements = std::vector::length(elements);
+        let num_elements = elements.length();
         let element_handles = std::vector::empty();
         let i = 0;
         while ({
@@ -297,8 +297,8 @@ module aptos_std::crypto_algebra {
             };
             i < num_elements
         }) {
-            std::vector::push_back(&mut element_handles, std::vector::borrow(elements, i).handle);
-            i = i + 1;
+            element_handles.push_back(elements[i].handle);
+            i += 1;
         };
         element_handles
     }

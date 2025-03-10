@@ -195,7 +195,7 @@ module aptos_std::storage_slots_allocator {
         if (slot_index != NULL_INDEX) {
             let Link::Vacant { next } = self.remove_link(slot_index);
             self.reuse_head_index = next;
-            self.reuse_spare_count = self.reuse_spare_count - 1;
+            self.reuse_spare_count -= 1;
         };
         slot_index
     }
@@ -205,13 +205,13 @@ module aptos_std::storage_slots_allocator {
             let link = Link::Vacant { next: self.reuse_head_index };
             self.add_link(slot_index, link);
             self.reuse_head_index = slot_index;
-            self.reuse_spare_count = self.reuse_spare_count + 1;
+            self.reuse_spare_count += 1;
         };
     }
 
     fun next_slot_index<T: store>(self: &mut StorageSlotsAllocator<T>): u64 {
         let slot_index = self.new_slot_index;
-        self.new_slot_index = self.new_slot_index + 1;
+        self.new_slot_index += 1;
         if (self.slots.is_none()) {
             self.slots.fill(table_with_length::new<u64, Link<T>>());
         };
