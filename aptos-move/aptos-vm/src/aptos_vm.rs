@@ -3027,17 +3027,16 @@ fn create_account_if_does_not_exist(
     account: AccountAddress,
     traversal_context: &mut TraversalContext,
 ) -> VMResult<()> {
-    session
-        .execute_function_bypass_visibility(
-            &ACCOUNT_MODULE,
-            CREATE_ACCOUNT_IF_DOES_NOT_EXIST,
-            vec![],
-            serialize_values(&vec![MoveValue::Address(account)]),
-            gas_meter,
-            traversal_context,
-            module_storage,
-        )
-        .map(|_return_vals| ())
+    session.execute_function_bypass_visibility(
+        &ACCOUNT_MODULE,
+        CREATE_ACCOUNT_IF_DOES_NOT_EXIST,
+        vec![],
+        serialize_values(&vec![MoveValue::Address(account)]),
+        gas_meter,
+        traversal_context,
+        module_storage,
+    )?;
+    Ok(())
 }
 
 fn dispatchable_authenticate(
@@ -3066,9 +3065,9 @@ fn dispatchable_authenticate(
             module_storage,
         )
         .map(|mut return_vals| {
-            assert_eq!(
-                return_vals.return_values.len(),
-                1,
+            assert!(
+                return_vals.mutable_reference_outputs.is_empty()
+                    && return_vals.return_values.len() == 1,
                 "Abstraction authentication function must only have 1 return value"
             );
             let (signer_data, signer_layout) = return_vals.return_values.pop().expect("Must exist");

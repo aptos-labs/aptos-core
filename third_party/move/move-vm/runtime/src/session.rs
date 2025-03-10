@@ -7,7 +7,7 @@ use crate::{
     move_vm::MoveVm, native_extensions::NativeContextExtensions,
     storage::module_storage::ModuleStorage, CodeStorage,
 };
-use move_binary_format::errors::*;
+use move_binary_format::{errors::*, file_format::LocalIndex};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Changes},
@@ -28,6 +28,9 @@ pub struct Session<'r> {
 /// Simple struct is designed just to convey meaning behind serialized values
 #[derive(Debug)]
 pub struct SerializedReturnValues {
+    /// The value of any arguments that were mutably borrowed.
+    /// Non-mut borrowed values are not included
+    pub mutable_reference_outputs: Vec<(LocalIndex, Vec<u8>, MoveTypeLayout)>,
     /// The return values from the function
     pub return_values: Vec<(Vec<u8>, MoveTypeLayout)>,
 }
