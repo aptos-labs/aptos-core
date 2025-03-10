@@ -571,6 +571,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-framework",
+ "aptos-infallible",
  "aptos-logger",
  "aptos-openapi",
  "aptos-resource-viewer",

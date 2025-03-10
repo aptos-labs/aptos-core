@@ -5,10 +5,9 @@ use crate::{
     accept_type::AcceptType,
     context::{api_spawn_blocking, Context},
     generate_error_response, generate_success_response,
-    response::{InternalError, ServiceUnavailableError},
+    response::ServiceUnavailableError,
     ApiTags,
 };
-use anyhow::Context as AnyhowContext;
 use aptos_api_types::AptosErrorCode;
 use poem_openapi::{
     param::Query,
@@ -16,12 +15,7 @@ use poem_openapi::{
     Object, OpenApi,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    ops::Sub,
-    sync::Arc,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 const OPEN_API_HTML: &str = include_str!("../doc/spec.html");
 
@@ -143,22 +137,10 @@ impl BasicApi {
 
         // If we have a duration, check that it's close to the current time, otherwise it's ok
         if let Some(max_skew) = duration_secs.0 {
-            let ledger_timestamp = Duration::from_micros(ledger_info.timestamp());
-            let skew_threshold = SystemTime::now()
-                .sub(Duration::from_secs(max_skew as u64))
-                .duration_since(UNIX_EPOCH)
-                .context("Failed to determine absolute unix time based on given duration")
-                .map_err(|err| {
-                    HealthCheckError::internal_with_code(
-                        err,
-                        AptosErrorCode::InternalError,
-                        &ledger_info,
-                    )
-                })?;
-
-            if ledger_timestamp < skew_threshold {
+            let duration_since_onchain_timestamp = ledger_info.duration_since_timestamp();
+            if duration_since_onchain_timestamp > Duration::from_secs(max_skew as u64) {
                 return Err(HealthCheckError::service_unavailable_with_code(
-                    format!("The latest ledger info timestamp is {:?}, which is beyond the allowed skew ({}s).", ledger_timestamp, max_skew),
+                    format!("The latest ledger info timestamp is {:?} old, which is beyond the allowed skew ({}s).", duration_since_onchain_timestamp, max_skew),
                     AptosErrorCode::HealthCheckFailed,
                     &ledger_info,
                 ));

@@ -509,6 +509,17 @@ impl TransactionsApi {
         let context = self.context.clone();
         api_spawn_blocking(move || {
             let ledger_info = context.get_latest_ledger_info()?;
+
+            context
+                .validate_ledger_for_move_code_execution(&ledger_info)
+                .map_err(|message| {
+                    SubmitTransactionError::forbidden_with_code(
+                        message,
+                        AptosErrorCode::InternalError,
+                        &ledger_info,
+                    )
+                })?;
+
             let mut signed_transaction = api.get_signed_transaction(&ledger_info, data)?;
 
             // Confirm the simulation filter allows the transaction. We use HashValue::zero()
