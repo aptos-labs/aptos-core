@@ -6,7 +6,7 @@ use crate::{
     consensusdb::ConsensusDB, epoch_manager::LivenessStorageData, error::DbError,
     util::calculate_window_start_round,
 };
-use anyhow::{ensure, format_err, Context, Result};
+use anyhow::{bail, format_err, Context, Result};
 use aptos_config::config::NodeConfig;
 use aptos_consensus_types::{
     block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
@@ -169,21 +169,17 @@ impl LedgerRecoveryData {
             id_to_blocks.insert(block.id(), block);
         });
 
-        let mut curr_id = latest_commit_id;
-        let mut window_start_id = HashValue::zero();
-        while let Some(block) = id_to_blocks.get(&curr_id) {
-            if block.quorum_cert().certified_block().round() < window_start_round {
-                window_start_id = curr_id;
-                break;
+        let mut current_block = &commit_block;
+        while !current_block.is_genesis_block()
+            && current_block.quorum_cert().certified_block().round() >= window_start_round
+        {
+            if let Some(parent_block) = id_to_blocks.get(&current_block.parent_id()) {
+                current_block = *parent_block;
+            } else {
+                bail!("Parent block not found for block {}", current_block.id());
             }
-
-            window_start_id = curr_id;
-            curr_id = block.parent_id();
         }
-        ensure!(
-            window_start_id != HashValue::zero(),
-            "Window start block not found"
-        );
+        let window_start_id = current_block.id();
 
         let window_start_idx = blocks
             .iter()

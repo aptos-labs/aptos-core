@@ -24,7 +24,7 @@ use crate::{
     pipeline::execution_client::TExecutionClient,
     util::calculate_window_start_round,
 };
-use anyhow::{anyhow, bail, Context};
+use anyhow::{anyhow, bail, ensure, Context};
 use aptos_consensus_types::{
     block::Block,
     block_retrieval::{
@@ -837,17 +837,17 @@ impl BlockRetriever {
         // Slightly different logic if using execution pool and not
         match target_block_retrieval_payload {
             TargetBlockRetrieval::TargetBlockId(target_block_id) => {
-                assert_eq!(
+                ensure!(
                     result_blocks
                         .last()
                         .expect("Expected at least a result_block")
-                        .id(),
-                    target_block_id
+                        .id()
+                        == target_block_id
                 );
             },
             TargetBlockRetrieval::TargetRound(target_round) => {
                 let last_block = result_blocks.last().expect("blocks are empty");
-                assert!(
+                ensure!(
                     last_block.round() == target_round || last_block.quorum_cert().certified_block().round() < target_round,
                     "Expecting in the retrieval response, last block should be == {} or its parent should be < {}, but got {} and parent {}",
                     target_round,

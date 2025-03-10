@@ -207,7 +207,7 @@ impl BlockStore {
         ));
         assert_eq!(result.root_hash(), root_metadata.accu_hash);
 
-        let pipelined_root_block = match window_root_block {
+        let window_root = match window_root_block {
             None => {
                 PipelinedBlock::new(
                     *commit_root_block,
@@ -229,12 +229,12 @@ impl BlockStore {
         if let Some(pipeline_builder) = &pipeline_builder {
             let pipeline_fut =
                 pipeline_builder.build_root(result, root_commit_cert.ledger_info().clone());
-            pipelined_root_block.set_pipeline_futs(pipeline_fut);
+            window_root.set_pipeline_futs(pipeline_fut);
         }
 
         let tree = BlockTree::new(
             root_block_id,
-            pipelined_root_block,
+            window_root,
             root_qc,
             root_ordered_cert,
             root_commit_cert,
@@ -417,7 +417,7 @@ impl BlockStore {
             return Ok(existing_block);
         }
         ensure!(
-            self.inner.read().commit_root().round() < block.round(),
+            self.inner.read().ordered_root().round() < block.round(),
             "Block with old round"
         );
 
