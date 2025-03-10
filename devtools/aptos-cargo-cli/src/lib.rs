@@ -511,6 +511,7 @@ fn run_targeted_unit_tests(
     // Create the command to run the unit tests
     let mut command = Cargo::command("nextest");
     command.args(["run"]);
+    command.args(["--no-tests=warn"]); // Don't fail if no tests are run!
     command.args(direct_args).pass_through(push_through_args);
 
     // Run the unit tests
