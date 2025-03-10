@@ -1432,8 +1432,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             }
             let access_specifiers = et.translate_access_specifiers(&def.access_specifiers);
             let result = et.translate_seq(&loc, seq, &result_type, &ErrorMessageContext::Return);
-            et.finalize_types();
             let translated = et.post_process_body(result.into_exp());
+            et.finalize_types();
             et.check_mutable_borrow_field(&translated);
             assert!(self.fun_defs.insert(full_name.symbol, translated).is_none());
             if let Some(specifiers) = access_specifiers {
@@ -2249,12 +2249,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 (et.translate_exp(exp, &expected_type).into_exp(), vec![])
             },
         };
-        et.finalize_types();
         let translated = et.post_process_body(translated);
         let translated_additional = translated_additional
             .into_iter()
             .map(|e| et.post_process_body(e))
             .collect();
+        et.finalize_types();
         self.add_conditions_to_context(
             context,
             loc,
@@ -2411,8 +2411,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 }
                 let translated =
                     et.translate_seq(&loc, seq, &result_type, &ErrorMessageContext::Return);
-                et.finalize_types();
                 let translated = et.post_process_body(translated.into_exp());
+                et.finalize_types();
                 self.spec_funs[self.spec_fun_index].body = Some(translated);
             },
             EA::FunctionBody_::Native => {
