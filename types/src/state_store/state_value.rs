@@ -189,7 +189,7 @@ pub struct ExistingStateValue {
 
 /// Shared memory layout between StateValue and DbStateValue. Avoids unnecessary memory movement
 /// when converting between the two.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum Store {
     Existing(ExistingStateValue),
     /// Non-existent, cached in the hot tier.
@@ -234,7 +234,7 @@ impl Store {
 ///
 /// 1. It's guaranteed by constructors that it's not `HotNonExistent`.
 /// 2. Access time is just placeholder, must be set when converting to DbStateValue.
-#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, PartialEq, RefCast)]
+#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, RefCast)]
 #[repr(transparent)]
 pub struct StateValue(Store);
 
@@ -260,6 +260,16 @@ impl Deref for StateValue {
         self.inner()
     }
 }
+
+impl PartialEq for StateValue {
+    fn eq(&self, other: &Self) -> bool {
+        // Ignoring access_time_secs for equality check for now.
+        // TODO: change after access time is actual part of the metadata.
+        self.data == other.data && self.metadata == other.metadata
+    }
+}
+
+impl Eq for StateValue {}
 
 #[cfg(any(test, feature = "fuzzing"))]
 impl Arbitrary for StateValue {
