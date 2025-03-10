@@ -63,7 +63,10 @@ fn run(
     let module_storage = storage.as_unsync_module_storage();
     let traversal_storage = TraversalStorage::new();
 
-    let SerializedReturnValues { return_values } = sess.execute_function_bypass_visibility(
+    let SerializedReturnValues {
+        return_values,
+        mutable_reference_outputs: _,
+    } = sess.execute_function_bypass_visibility(
         &m.self_id(),
         &fun_name,
         ty_args,
