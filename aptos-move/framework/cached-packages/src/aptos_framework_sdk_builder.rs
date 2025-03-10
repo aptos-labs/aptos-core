@@ -552,7 +552,7 @@ pub enum EntryFunctionCall {
     /// ```
     ///
     /// We can call update_federated_jwk_set for Google's `iss` - "https://accounts.google.com" and for each vector
-    /// argument `kid_vec`, `alg_vec`, `e_vec`, `n_vec`, we set in index 0 the corresponding attribute in the first JWK and we set in index 1 the
+    /// argument `kid_vec`, `alg_vec`, `e_vec`, `n_vec`, we set in index 0 the corresponding attribute in the first JWK and we set in index 1
     /// the corresponding attribute in the second JWK as shown below.
     ///
     /// ```move
@@ -3346,7 +3346,7 @@ pub fn delegation_pool_withdraw(pool_address: AccountAddress, amount: u64) -> Tr
 /// ```
 ///
 /// We can call update_federated_jwk_set for Google's `iss` - "https://accounts.google.com" and for each vector
-/// argument `kid_vec`, `alg_vec`, `e_vec`, `n_vec`, we set in index 0 the corresponding attribute in the first JWK and we set in index 1 the
+/// argument `kid_vec`, `alg_vec`, `e_vec`, `n_vec`, we set in index 0 the corresponding attribute in the first JWK and we set in index 1
 /// the corresponding attribute in the second JWK as shown below.
 ///
 /// ```move
