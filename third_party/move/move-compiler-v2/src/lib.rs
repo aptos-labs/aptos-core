@@ -57,7 +57,7 @@ use move_compiler::{
         FunctionInfo, NamedCompiledModule, NamedCompiledScript,
     },
     diagnostics::FilesSourceText,
-    shared::{known_attributes::KnownAttribute, unique_map::UniqueMap},
+    shared::known_attributes::KnownAttribute,
 };
 use move_core_types::vm_status::StatusType;
 use move_disassembler::disassembler::Disassembler;
@@ -641,7 +641,6 @@ pub fn annotate_units(units: Vec<CompiledUnit>) -> Vec<AnnotatedCompiledUnit> {
                     module_name_loc: loc,
                     address_name: None,
                     named_module,
-                    function_infos: UniqueMap::new(),
                 })
             },
             CompiledUnit::Script(named_script) => {

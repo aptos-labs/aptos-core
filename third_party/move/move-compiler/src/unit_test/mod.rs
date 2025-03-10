@@ -15,7 +15,6 @@ use move_core_types::{
 use std::{collections::BTreeMap, fmt};
 
 pub mod filter_test_members;
-pub mod plan_builder;
 
 pub type TestName = String;
 

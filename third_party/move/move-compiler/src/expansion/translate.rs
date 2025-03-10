@@ -17,10 +17,11 @@ use crate::{
     },
     parser::ast::{
         self as P, Ability, AccessSpecifier_, AddressSpecifier_, CallKind, ConstantName, Field,
-        FunctionName, LeadingNameAccess, LeadingNameAccess_, ModuleMember, ModuleName,
-        NameAccessChain, NameAccessChain_, StructName, Var,
+        FunctionName, LeadingNameAccess_, ModuleMember, ModuleName, NameAccessChain,
+        NameAccessChain_, StructName, Var,
     },
     shared::{
+        builtins,
         known_attributes::{AttributeKind, AttributePosition, KnownAttribute},
         parse_u128, parse_u64, parse_u8,
         unique_map::UniqueMap,
@@ -1635,14 +1636,7 @@ fn function_(context: &mut Context, pfunction: P::Function) -> (FunctionName, E:
     let attributes = flatten_attributes(context, AttributePosition::Function, pattributes);
     let visibility = visibility(pvisibility);
     let (old_aliases, signature) = function_signature(context, psignature);
-    let (acquires, access_specifiers) = if context.env.flags().compiler_v2() {
-        (vec![], access_specifier_list(context, access_specifiers))
-    } else {
-        (
-            access_specifier_list_as_acquires(context, access_specifiers),
-            None,
-        )
-    };
+    let (acquires, access_specifiers) = (vec![], access_specifier_list(context, access_specifiers));
     let body = function_body(context, pbody);
     let specs = context.extract_exp_specs();
     let fdef = E::Function {
@@ -1672,80 +1666,6 @@ fn access_specifier_list(
             .map(|s| access_specifier(context, s))
             .collect::<Vec<_>>()
     })
-}
-
-// Interpret an access specifier as an acquires, for the v1 compiler chain
-fn access_specifier_list_as_acquires(
-    context: &mut Context,
-    access_specifiers: Option<Vec<P::AccessSpecifier>>,
-) -> Vec<E::ModuleAccess> {
-    fn invalid_acquires(context: &mut Context, loc: Loc) {
-        context.env.add_diag(diag!(
-            Syntax::InvalidAccessSpecifier,
-            (
-                loc,
-                "language version 1 only supports simple 'acquires <resource_name>' clauses"
-                    .to_owned()
-            )
-        ));
-    }
-
-    fn check_wildcard(context: &mut Context, name: &Name) -> bool {
-        if name.value.as_str() == "*" {
-            invalid_acquires(context, name.loc);
-            false
-        } else {
-            true
-        }
-    }
-
-    fn check_wildcard_leading(context: &mut Context, leading: &LeadingNameAccess) -> bool {
-        if let LeadingNameAccess_::Name(name) = &leading.value {
-            check_wildcard(context, name)
-        } else {
-            false
-        }
-    }
-
-    let mut acquires = vec![];
-    for specifier in access_specifiers.unwrap_or_default() {
-        if let AccessSpecifier_::Acquires(negated, chain, type_args, address) = specifier.value {
-            if negated || type_args.is_some() || !matches!(address.value, AddressSpecifier_::Empty)
-            {
-                invalid_acquires(context, specifier.loc)
-            } else {
-                let ok = match &chain.value {
-                    NameAccessChain_::One(name) => check_wildcard(context, name),
-                    NameAccessChain_::Two(leading, second) => {
-                        check_wildcard_leading(context, leading) && check_wildcard(context, second)
-                    },
-                    NameAccessChain_::Three(prefix, third) => {
-                        let (leading, second) = &prefix.value;
-                        check_wildcard_leading(context, leading)
-                            && check_wildcard(context, second)
-                            && check_wildcard(context, third)
-                    },
-                    NameAccessChain_::Four(..) => {
-                        invalid_variant_access(context, specifier.loc);
-                        false
-                    },
-                };
-                if ok {
-                    if let Some(maccess) = name_access_chain(
-                        context,
-                        Access::Type,
-                        chain,
-                        Some(DeprecatedItem::Struct),
-                    ) {
-                        acquires.push(maccess)
-                    } else {
-                        debug_assert!(context.env.has_errors())
-                    }
-                }
-            }
-        }
-    }
-    acquires
 }
 
 fn invalid_variant_access(context: &mut Context, loc: Loc) {
@@ -3725,18 +3645,8 @@ fn check_valid_module_member_name_impl(
     }
 
     // TODO move these names to a more central place?
-    check_restricted_names(
-        context,
-        case,
-        n,
-        crate::naming::ast::BuiltinFunction_::all_names(),
-    )?;
-    check_restricted_names(
-        context,
-        case,
-        n,
-        crate::naming::ast::BuiltinTypeName_::all_names(),
-    )?;
+    check_restricted_names(context, case, n, builtins::all_function_names())?;
+    check_restricted_names(context, case, n, builtins::all_type_names())?;
 
     // Restricting Self for now in the case where we ever have impls
     // Otherwise, we could allow it
@@ -3766,9 +3676,7 @@ fn check_restricted_name_all_cases_(
 ) -> Result<(), ()> {
     let n_str = n.value.as_str();
     let can_be_vector = matches!(case, NameCase::Module | NameCase::ModuleAlias);
-    if n_str == ModuleName::SELF_NAME
-        || (!can_be_vector && n_str == crate::naming::ast::BuiltinTypeName_::VECTOR)
-    {
+    if n_str == ModuleName::SELF_NAME || (!can_be_vector && n_str == builtins::VECTOR) {
         env.add_diag(restricted_name_error(case, n.loc, n_str));
         Err(())
     } else {
