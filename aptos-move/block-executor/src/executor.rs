@@ -95,10 +95,12 @@ where
         executor_thread_pool: Arc<ThreadPool>,
         transaction_commit_hook: Option<L>,
     ) -> Self {
+        let num_cpus = num_cpus::get();
         assert!(
-            config.local.concurrency_level > 0 && config.local.concurrency_level <= num_cpus::get(),
-            "Parallel execution concurrency level {} should be between 1 and number of CPUs",
-            config.local.concurrency_level
+            config.local.concurrency_level > 0 && config.local.concurrency_level <= num_cpus,
+            "Parallel execution concurrency level {} should be between 1 and number of CPUs ({})",
+            config.local.concurrency_level,
+            num_cpus,
         );
         Self {
             config,
