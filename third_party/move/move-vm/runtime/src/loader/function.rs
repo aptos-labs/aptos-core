@@ -31,6 +31,7 @@ use move_vm_types::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
     },
+    resolver::ResourceResolver,
     values::{AbstractFunction, SerializedFunctionData},
 };
 use std::{cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc, sync::Arc};
@@ -72,6 +73,12 @@ pub struct LoadedFunction {
     pub ty_args: Vec<Type>,
     // Definition of the loaded function.
     pub function: Arc<Function>,
+}
+
+impl LoadedFunction {
+    pub fn owner(&self) -> &LoadedFunctionOwner {
+        &self.owner
+    }
 }
 
 /// A lazy loaded function, which can either be unresolved (as resulting
@@ -410,13 +417,17 @@ impl LoadedFunction {
         }
     }
 
-    pub(crate) fn get_resolver<'a>(&self, module_storage: &'a impl ModuleStorage) -> Resolver<'a> {
+    pub(crate) fn get_resolver<'a>(
+        &self,
+        module_storage: &'a impl ModuleStorage,
+        resource_resolver: &'a impl ResourceResolver,
+    ) -> Resolver<'a> {
         match &self.owner {
             LoadedFunctionOwner::Module(module) => {
-                Resolver::for_module(module_storage, module.clone())
+                Resolver::for_module(module.clone(), module_storage, resource_resolver)
             },
             LoadedFunctionOwner::Script(script) => {
-                Resolver::for_script(module_storage, script.clone())
+                Resolver::for_script(script.clone(), module_storage, resource_resolver)
             },
         }
     }

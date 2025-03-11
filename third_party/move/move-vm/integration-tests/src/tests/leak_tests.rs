@@ -48,7 +48,11 @@ fn leak_with_abort() {
     move_bytecode_verifier::verify_script(&cs).expect("verify failed");
     let storage = InMemoryStorage::new();
 
+<<<<<<< HEAD
     let mut session = MoveVM::new_session(&storage);
+=======
+    let mut session = MoveVm::new_session();
+>>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
     let mut script_bytes = vec![];
     cs.serialize(&mut script_bytes).unwrap();
 
@@ -63,6 +67,7 @@ fn leak_with_abort() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &code_storage,
+            &storage,
         );
     }
 

@@ -161,7 +161,11 @@ fn runtime_reentrancy_check() {
     let args: Vec<Vec<u8>> = vec![];
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("A").unwrap());
 
+<<<<<<< HEAD
     let mut sess = MoveVM::new_session(&storage);
+=======
+    let mut sess = MoveVm::new_session();
+>>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
     let module_storage = storage.as_unsync_module_storage();
     let traversal_storage = TraversalStorage::new();
 
@@ -176,6 +180,7 @@ fn runtime_reentrancy_check() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &module_storage,
+            &storage,
         )
         .unwrap_err()
         .major_status(),
@@ -195,6 +200,7 @@ fn runtime_reentrancy_check() {
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
         &module_storage,
+        &storage,
     )
     .unwrap();
 
@@ -210,6 +216,7 @@ fn runtime_reentrancy_check() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &module_storage,
+            &storage,
         )
         .unwrap_err()
         .major_status(),

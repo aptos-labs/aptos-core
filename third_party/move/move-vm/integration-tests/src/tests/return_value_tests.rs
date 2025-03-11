@@ -51,7 +51,11 @@ fn run(
     let mut storage = InMemoryStorage::new();
     storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
+<<<<<<< HEAD
     let mut sess = MoveVM::new_session(&storage);
+=======
+    let mut sess = MoveVm::new_session();
+>>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
 
     let fun_name = Identifier::new("foo").unwrap();
 
@@ -74,6 +78,7 @@ fn run(
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
         &module_storage,
+        &storage,
     )?;
 
     Ok(return_values

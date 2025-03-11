@@ -80,7 +80,11 @@ fn test_run_script_with_custom_max_binary_format_version() {
     // Should accept both modules with the default settings
     {
         let storage = InMemoryStorage::new();
+<<<<<<< HEAD
         let mut sess = MoveVM::new_session(&storage);
+=======
+        let mut sess = MoveVm::new_session();
+>>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
         let code_storage = storage.as_unsync_code_storage();
 
         let args: Vec<Vec<u8>> = vec![];
@@ -91,6 +95,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &code_storage,
+            &storage,
         )
         .unwrap();
 
@@ -101,6 +106,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &code_storage,
+            &storage,
         )
         .unwrap();
     }
@@ -116,7 +122,11 @@ fn test_run_script_with_custom_max_binary_format_version() {
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
+<<<<<<< HEAD
         let mut sess = MoveVM::new_session(&storage);
+=======
+        let mut sess = MoveVm::new_session();
+>>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
         let code_storage = storage.as_unsync_code_storage();
 
         let args: Vec<Vec<u8>> = vec![];
@@ -128,6 +138,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
                 &code_storage,
+                &storage,
             )
             .unwrap_err()
             .major_status(),
@@ -141,6 +152,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &code_storage,
+            &storage,
         )
         .unwrap();
     }

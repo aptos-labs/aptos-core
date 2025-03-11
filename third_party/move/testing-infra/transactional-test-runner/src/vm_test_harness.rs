@@ -276,7 +276,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
         let verbose = extra_args.verbose;
         let traversal_storage = TraversalStorage::new();
-        self.perform_session_action(gas_budget, &code_storage, |session, gas_status| {
+        self.perform_session_action(gas_budget, &code_storage, |session, storage, gas_status| {
             session.load_and_execute_script(
                 script_bytes,
                 type_args,
@@ -284,6 +284,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 gas_status,
                 &mut TraversalContext::new(&traversal_storage),
                 &code_storage,
+                storage,
             )
         })
         .map_err(|vm_error| {
@@ -325,17 +326,22 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let verbose = extra_args.verbose;
         let traversal_storage = TraversalStorage::new();
         let serialized_return_values = self
-            .perform_session_action(gas_budget, &module_storage, |session, gas_status| {
-                session.execute_function_bypass_visibility(
-                    module,
-                    function,
-                    type_args,
-                    args,
-                    gas_status,
-                    &mut TraversalContext::new(&traversal_storage),
-                    &module_storage,
-                )
-            })
+            .perform_session_action(
+                gas_budget,
+                &module_storage,
+                |session, storage, gas_status| {
+                    session.execute_function_bypass_visibility(
+                        module,
+                        function,
+                        type_args,
+                        args,
+                        gas_status,
+                        &mut TraversalContext::new(&traversal_storage),
+                        &module_storage,
+                        storage,
+                    )
+                },
+            )
             .map_err(|vm_error| {
                 anyhow!(
                     "Function execution failed with VMError: {}",
@@ -383,7 +389,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
         &mut self,
         gas_budget: Option<u64>,
         module_storage: &impl ModuleStorage,
-        f: impl FnOnce(&mut Session, &mut GasStatus) -> VMResult<Ret>,
+        f: impl FnOnce(&mut Session, &InMemoryStorage, &mut GasStatus) -> VMResult<Ret>,
     ) -> VMResult<Ret> {
         let (mut session, mut gas_status) = {
             let gas_status = get_gas_status(
@@ -391,12 +397,16 @@ impl<'a> SimpleVMTestAdapter<'a> {
                 gas_budget,
             )
             .unwrap();
+<<<<<<< HEAD
             let session = MoveVM::new_session(&self.storage);
             (session, gas_status)
+=======
+            (MoveVm::new_session(), gas_status)
+>>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
         };
 
         // perform op
-        let res = f(&mut session, &mut gas_status)?;
+        let res = f(&mut session, &self.storage, &mut gas_status)?;
 
         // save changeset
         let changeset = session.finish(module_storage)?;

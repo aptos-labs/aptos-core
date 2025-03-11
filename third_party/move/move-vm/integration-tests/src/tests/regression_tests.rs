@@ -135,7 +135,11 @@ fn script_large_ty() {
         struct_name,
     );
 
+<<<<<<< HEAD
     let mut session = MoveVM::new_session(&storage);
+=======
+    let mut session = MoveVm::new_session();
+>>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
     let code_storage = storage.as_unsync_code_storage();
     let traversal_storage = TraversalStorage::new();
     let res = session
@@ -146,6 +150,7 @@ fn script_large_ty() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &code_storage,
+            &storage,
         )
         .unwrap_err();
 

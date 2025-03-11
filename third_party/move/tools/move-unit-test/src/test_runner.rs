@@ -249,8 +249,12 @@ impl SharedTestingConfig {
         let module_storage = self.starting_storage_state.as_unsync_module_storage();
 
         let extensions = extensions::new_extensions();
+<<<<<<< HEAD
         let mut session =
             MoveVM::new_session_with_extensions(&self.starting_storage_state, extensions);
+=======
+        let mut session = MoveVm::new_session_with_extensions(extensions);
+>>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
         let mut gas_meter = factory.lock().unwrap().new_gas_meter();
 
         // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
@@ -265,6 +269,7 @@ impl SharedTestingConfig {
             &mut gas_meter,
             &mut TraversalContext::new(&traversal_storage),
             &module_storage,
+            &self.starting_storage_state,
         );
         let mut return_result = serialized_return_values_result.map(|res| {
             res.return_values
