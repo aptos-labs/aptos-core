@@ -397,21 +397,23 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             .update_node_instantiation(node_id, instantiation);
     }
 
-    /// Finalizes types in this translator, producing errors if some could not be inferred
+    /// Finalizes types in this translator, producing errors if post_process is true and
+    /// some could not be inferred
     /// and remained incomplete.
-    pub fn finalize_types(&mut self) {
+    /// TODO: refactor `finalize_types` to avoid running it two times before and after post processing
+    pub fn finalize_types(&mut self, post_process: bool) {
         if !*self.had_errors.borrow() {
             let mut reported_vars = BTreeSet::new();
             for i in self.node_counter_start..self.env().next_free_node_number() {
                 let node_id = NodeId::new(i);
                 if let Some(ty) = self.get_node_type_opt(node_id) {
-                    let ty = self.finalize_type(node_id, &ty, &mut reported_vars);
+                    let ty = self.finalize_type(node_id, &ty, &mut reported_vars, post_process);
                     self.update_node_type(node_id, ty);
                 }
                 if let Some(inst) = self.get_node_instantiation_opt(node_id) {
                     let inst = inst
                         .iter()
-                        .map(|ty| self.finalize_type(node_id, ty, &mut reported_vars))
+                        .map(|ty| self.finalize_type(node_id, ty, &mut reported_vars, post_process))
                         .collect_vec();
                     self.update_node_instantiation(node_id, inst);
                 }
@@ -427,6 +429,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         node_id: NodeId,
         ty: &Type,
         reported_vars: &mut BTreeSet<u32>,
+        post_process: bool,
     ) -> Type {
         let ty = self.subs.specialize_with_defaults(ty);
         let mut incomplete = false;
@@ -440,7 +443,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             }
         };
         ty.visit(&mut visitor);
-        if incomplete {
+        if incomplete && post_process {
             let displayed_ty = format!("{}", ty.display(&self.type_display_context()));
             // Skip displaying the error message if there is already an error in the type;
             // we must have another message about it already.
@@ -2139,12 +2142,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             if ok {
                 receiver_param_type = subs.specialize(&receiver_param_type);
                 self.subs = subs;
-                let inst = inst
-                    .type_inst
-                    .iter()
-                    .map(|t| self.finalize_type(id, t, &mut BTreeSet::new()))
-                    .collect();
-                self.env().set_node_instantiation(id, inst)
+                self.env()
+                    .set_node_instantiation(id, inst.type_inst.clone())
             }
         }
         // Inject borrow operation if required.

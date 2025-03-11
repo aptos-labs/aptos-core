@@ -796,7 +796,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         et.enter_scope();
         let params = et.analyze_and_add_params(&signature.parameters, for_move_fun);
         let result_type = et.translate_type(&signature.return_type);
-        et.finalize_types();
+        et.finalize_types(true);
         (type_params, params, result_type)
     }
 
@@ -1215,7 +1215,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let mut et = ExpTranslator::new(self);
             et.set_translate_move_fun();
             let exp = et.translate_exp(&def.value, &ty).into_exp();
-            et.finalize_types();
+            et.finalize_types(true);
             let mut reasons: Vec<(Loc, String)> = Vec::new();
             let mut ok = true;
             if !exp.is_valid_for_constant(self.parent.env, &mut reasons) {
@@ -1432,8 +1432,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             }
             let access_specifiers = et.translate_access_specifiers(&def.access_specifiers);
             let result = et.translate_seq(&loc, seq, &result_type, &ErrorMessageContext::Return);
+            // Run type inference finalization so post processing has all available type information,
+            // but do not report errors yet because receiver functions can add more type bindings.
+            et.finalize_types(false);
             let translated = et.post_process_body(result.into_exp());
-            et.finalize_types();
+            // Run finalization again, this time with reporting errors.
+            et.finalize_types(true);
             et.check_mutable_borrow_field(&translated);
             assert!(self.fun_defs.insert(full_name.symbol, translated).is_none());
             if let Some(specifiers) = access_specifiers {
@@ -1555,7 +1559,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         };
         let mut et = self.exp_translator_for_context(loc, context, &kind);
         let (_, def) = et.translate_exp_free(def);
-        et.finalize_types();
+        et.finalize_types(true);
 
         // Check whether a let of this name is already defined, and add it to the
         // map which tracks lets in this block.
@@ -2254,7 +2258,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             .into_iter()
             .map(|e| et.post_process_body(e))
             .collect();
-        et.finalize_types();
+        et.finalize_types(true);
         self.add_conditions_to_context(
             context,
             loc,
@@ -2411,8 +2415,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 }
                 let translated =
                     et.translate_seq(&loc, seq, &result_type, &ErrorMessageContext::Return);
+                // Run type inference finalization so post processing has all available type information,
+                // but do not report errors yet because receiver functions can add more type bindings.
+                // TODO: refactor `finalize_types` to run it only once.
+                et.finalize_types(false);
                 let translated = et.post_process_body(translated.into_exp());
-                et.finalize_types();
+                // Run finalization again, this time with reporting errors.
+                et.finalize_types(true);
                 self.spec_funs[self.spec_fun_index].body = Some(translated);
             },
             EA::FunctionBody_::Native => {
@@ -2442,7 +2451,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let mut et = ExpTranslator::new(self);
             et.define_type_params(loc, &entry.type_params, false);
             let translated = et.translate_exp(exp, &entry.type_);
-            et.finalize_types();
+            et.finalize_types(true);
             // Store the translated init expression into the declaration.
             let decl = self
                 .spec_vars
@@ -2464,7 +2473,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let mut et = self.exp_translator_for_context(loc, context, &ConditionKind::Requires);
         let (expected_ty, translated_lhs) = et.translate_exp_free(lhs);
         let translated_rhs = et.translate_exp(rhs, &expected_ty);
-        et.finalize_types();
+        et.finalize_types(true);
         if translated_lhs
             .extract_ghost_mem_access(self.parent.env)
             .is_some()
@@ -2751,7 +2760,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             ) => {
                 let mut et = self.exp_translator_for_schema(&loc, context_type_params, vars);
                 let lhs_exp = et.translate_exp(lhs, &BOOL_TYPE).into_exp();
-                et.finalize_types();
+                et.finalize_types(true);
                 let path_cond = Some(self.extend_path_condition(&loc, path_cond, lhs_exp));
                 self.def_ana_schema_exp_oper(
                     context_type_params,
@@ -2793,7 +2802,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             EA::Exp_::IfElse(c, t, e) => {
                 let mut et = self.exp_translator_for_schema(&loc, context_type_params, vars);
                 let c_exp = et.translate_exp(c, &BOOL_TYPE).into_exp();
-                et.finalize_types();
+                et.finalize_types(true);
                 let t_path_cond =
                     Some(self.extend_path_condition(&loc, path_cond.clone(), c_exp.clone()));
                 self.def_ana_schema_exp_oper(
@@ -2923,7 +2932,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         // Note we currently only use the vars defined so far in this context. Variables
                         // which are introduced by schemas after the inclusion of this one are not in scope.
                         let exp = et.translate_exp(exp, &schema_type).into_exp();
-                        et.finalize_types();
+                        et.finalize_types(true);
                         (schema_sym, exp)
                     })
                     .collect()
@@ -2976,7 +2985,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             }
         }
         // Done with expression build; ensure all types are inferred correctly.
-        et.finalize_types();
+        et.finalize_types(true);
 
         // Go over all conditions in the schema, rewrite them, and add to the inclusion conditions.
         for Condition {
