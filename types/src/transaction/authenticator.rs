@@ -1475,14 +1475,24 @@ mod tests {
         PrivateKey, SigningKey, Uniform,
     };
     use hex::FromHex;
+    use rstest::rstest;
 
     #[test]
     fn test_from_str_should_not_panic_by_given_empty_string() {
         assert!(AuthenticationKey::from_str("").is_err());
     }
 
-    #[test]
-    fn verify_ed25519_single_key_auth() {
+    #[rstest(
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+        case(false, false),
+        case(true, false),
+        case(true, true)
+    )]
+    fn verify_ed25519_single_key_auth(
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
+    ) {
         let sender = Ed25519PrivateKey::generate_for_testing();
         let sender_pub = sender.public_key();
 
@@ -1503,6 +1513,8 @@ mod tests {
             0,
             0,
             None,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
         )
         .into_raw_transaction();
 
@@ -1516,8 +1528,17 @@ mod tests {
         signed_txn.verify_signature().unwrap();
     }
 
-    #[test]
-    fn verify_secp256k1_ecdsa_single_key_auth() {
+    #[rstest(
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+        case(false, false),
+        case(true, false),
+        case(true, true)
+    )]
+    fn verify_secp256k1_ecdsa_single_key_auth(
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
+    ) {
         let fake_sender = Ed25519PrivateKey::generate_for_testing();
         let fake_sender_pub = fake_sender.public_key();
 
@@ -1537,6 +1558,8 @@ mod tests {
             0,
             0,
             None,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
         )
         .into_raw_transaction();
 
@@ -1550,8 +1573,14 @@ mod tests {
         signed_txn.verify_signature().unwrap();
     }
 
-    #[test]
-    fn verify_multi_key_auth() {
+    #[rstest(
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+        case(false, false),
+        case(true, false),
+        case(true, true)
+    )]
+    fn verify_multi_key_auth(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
         let sender0 = Ed25519PrivateKey::generate_for_testing();
         let sender0_pub = sender0.public_key();
         let any_sender0_pub = AnyPublicKey::ed25519(sender0_pub.clone());
@@ -1578,6 +1607,8 @@ mod tests {
             0,
             0,
             None,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
         )
         .into_raw_transaction();
 
@@ -1655,8 +1686,17 @@ mod tests {
         .unwrap_err();
     }
 
-    #[test]
-    fn verify_fee_payer_with_optional_fee_payer_address() {
+    #[rstest(
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+        case(false, false),
+        case(true, false),
+        case(true, true)
+    )]
+    fn verify_fee_payer_with_optional_fee_payer_address(
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
+    ) {
         // This massive test basically verifies that various combinations of signatures work
         // with the appropriate verifiers:
         let sender = Ed25519PrivateKey::generate_for_testing();
@@ -1688,6 +1728,8 @@ mod tests {
             0,
             0,
             None,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
         )
         .into_raw_transaction();
 
@@ -1820,8 +1862,17 @@ mod tests {
         fee_payer_bad_2.verify(&raw_txn).unwrap_err();
     }
 
-    #[test]
-    fn to_single_key_authenticators() {
+    #[rstest(
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+        case(false, false),
+        case(true, false),
+        case(true, true)
+    )]
+    fn to_single_key_authenticators(
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
+    ) {
         let sender = Ed25519PrivateKey::generate_for_testing();
         let sender_pub = sender.public_key();
         let second_any_pub = AnyPublicKey::ed25519(sender_pub.clone());
@@ -1871,6 +1922,8 @@ mod tests {
             0,
             0,
             None,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
         )
         .into_raw_transaction();
 
@@ -2002,8 +2055,14 @@ mod tests {
         assert!(verification_result.is_ok());
     }
 
-    #[test]
-    fn test_keyless_openid_txn() {
+    #[rstest(
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+        case(false, false),
+        case(true, false),
+        case(true, true)
+    )]
+    fn test_keyless_openid_txn(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
         let esk = get_sample_esk();
         let (mut sig, pk) = get_sample_openid_sig_and_pk();
         let sender_addr =
@@ -2015,6 +2074,8 @@ mod tests {
             None,
             None,
             None,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
         );
         sig.ephemeral_signature = EphemeralSignature::ed25519(
             esk.sign(&TransactionAndProof {
@@ -2037,8 +2098,14 @@ mod tests {
         assert!(signed_txn.verify_signature().is_err());
     }
 
-    #[test]
-    fn test_keyless_groth16_txn() {
+    #[rstest(
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+        case(false, false),
+        case(true, false),
+        case(true, true)
+    )]
+    fn test_keyless_groth16_txn(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
         let esk = get_sample_esk();
         let (mut sig, pk) = get_sample_groth16_sig_and_pk();
         let sender_addr =
@@ -2050,6 +2117,8 @@ mod tests {
             None,
             None,
             None,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
         );
         let mut txn_and_zkp = TransactionAndProof {
             message: raw_txn.clone(),
@@ -2077,8 +2146,17 @@ mod tests {
         assert!(signed_txn.verify_signature().is_err());
     }
 
-    #[test]
-    fn test_groth16_txn_fails_non_malleability_check() {
+    #[rstest(
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+        case(false, false),
+        case(true, false),
+        case(true, true)
+    )]
+    fn test_groth16_txn_fails_non_malleability_check(
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
+    ) {
         let (sig, pk) = get_sample_groth16_sig_and_pk();
         let sender_addr =
             AuthenticationKey::any_key(AnyPublicKey::keyless(pk.clone())).account_address();
@@ -2089,6 +2167,8 @@ mod tests {
             None,
             None,
             None,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
         );
         let signed_txn = maul_raw_groth16_txn(pk, sig, raw_txn);
 

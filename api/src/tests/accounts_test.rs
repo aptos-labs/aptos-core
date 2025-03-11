@@ -220,6 +220,7 @@ async fn test_get_account_balance() {
         .await;
     assert_eq!(coin_balance_after, fa_balance);
     // upgrade to concurrent store
+    // TODO[Orderless]: Change this transaction payload v2 format.
     let txn = root_account.sign_with_transaction_builder(context.transaction_factory().payload(
         TransactionPayload::EntryFunction(EntryFunction::new(
             ModuleId::new(
@@ -246,8 +247,15 @@ async fn test_get_account_modules_by_ledger_version_with_context(mut context: Te
         aptos_stdlib::publish_module_source("test_module", "module 0xa550c18::test_module {}");
 
     let root_account = context.root_account().await;
-    let txn =
-        root_account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
+    let txn = root_account.sign_with_transaction_builder(
+        context
+            .transaction_factory()
+            .payload(payload)
+            .upgrade_payload(
+                context.use_txn_payload_v2_format,
+                context.use_orderless_transactions,
+            ),
+    );
     context.commit_block(&vec![txn.clone()]).await;
 
     if let Some(indexer_reader) = context.context.indexer_reader.as_ref() {
@@ -289,7 +297,9 @@ async fn test_get_core_account_data() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_core_account_data_not_found() {
     let mut context = new_test_context(current_function_name!());
-    let resp = context.expect_status_code(404).get("/accounts/0xf").await;
+    // To accommodate stateless accounts, fetching non-existing data should still succeed with 200.
+    // For stateless_accounts, the output should contain `state_exists: false`.
+    let resp = context.expect_status_code(200).get("/accounts/0xf").await;
     context.check_golden_output(resp);
 }
 

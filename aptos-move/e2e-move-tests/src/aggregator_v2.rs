@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, harness::MoveHarness, BlockSplit};
+use aptos_framework::BuildOptions;
 use aptos_language_e2e_tests::{
     account::Account,
     executor::{assert_outputs_equal, ExecutorMode, FakeExecutor},
@@ -23,9 +24,17 @@ pub fn initialize(
     aggregator_execution_enabled: bool,
     txns: usize,
     allow_block_executor_fallback: bool,
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> AggV2TestHarness {
-    let (mut harness, account) =
-        initialize_harness(mode, aggregator_execution_enabled, path.clone());
+    let (mut harness, account) = initialize_harness(
+        mode,
+        aggregator_execution_enabled,
+        path.clone(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     if !allow_block_executor_fallback {
         harness.executor.disable_block_executor_fallback();
     }
@@ -38,7 +47,7 @@ pub fn initialize(
         path,
     };
 
-    result.initialize_issuer_accounts(txns);
+    result.initialize_issuer_accounts(txns, stateless_account);
     result
 }
 
@@ -47,9 +56,24 @@ pub fn initialize_enabled_disabled_comparison(
     mode: ExecutorMode,
     txns: usize,
     allow_block_executor_fallback: bool,
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> AggV2TestHarness {
-    let (mut harness_base, account_base) = initialize_harness(mode, false, path.clone());
-    let (mut harness_comp, _account_comp) = initialize_harness(mode, true, path.clone());
+    let (mut harness_base, account_base) = initialize_harness(
+        mode,
+        false,
+        path.clone(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let (mut harness_comp, _account_comp) = initialize_harness(
+        mode,
+        true,
+        path.clone(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     if !allow_block_executor_fallback {
         harness_base.executor.disable_block_executor_fallback();
         harness_comp.executor.disable_block_executor_fallback();
@@ -63,7 +87,7 @@ pub fn initialize_enabled_disabled_comparison(
         path,
     };
 
-    agg_harness.initialize_issuer_accounts(txns);
+    agg_harness.initialize_issuer_accounts(txns, stateless_account);
     agg_harness
 }
 
@@ -71,10 +95,16 @@ fn initialize_harness(
     mode: ExecutorMode,
     aggregator_execution_enabled: bool,
     path: PathBuf,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> (MoveHarness, Account) {
     let executor = FakeExecutor::from_head_genesis().set_executor_mode(mode);
 
-    let mut harness = MoveHarness::new_with_executor(executor);
+    let mut harness = MoveHarness::new_with_executor_and_flags(
+        executor,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     // Reduce gas scaling, so that smaller differences in gas are caught in comparison testing.
     harness.modify_gas_scaling(1000);
 
@@ -100,7 +130,7 @@ fn initialize_harness(
             FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
         ]);
     }
-    let account = harness.new_account_at(AccountAddress::ONE);
+    let account = harness.new_account_at(AccountAddress::ONE, Some(0));
     assert_success!(harness.publish_package_cache_building(&account, &path));
     (harness, account)
 }
@@ -219,22 +249,29 @@ impl AggV2TestHarness {
         result
     }
 
-    pub fn initialize_issuer_accounts(&mut self, num_accounts: usize) {
+    pub fn initialize_issuer_accounts(&mut self, num_accounts: usize, stateless_account: bool) {
         self.txn_accounts = (0..num_accounts)
-            .map(|_i| self.new_account_with_key_pair())
+            .map(|_i| self.new_account_with_key_pair(stateless_account))
             .collect();
     }
 
-    pub fn new_account_with_key_pair(&mut self) -> Account {
+    pub fn new_account_with_key_pair(&mut self, stateless_account: bool) -> Account {
         let acc = Account::new();
-        let seq_num = 0;
         // Mint the account 10M Aptos coins (with 8 decimals).
         let balance = 1_000_000_000_000_000;
 
-        let result = self.harness.store_and_fund_account(&acc, balance, seq_num);
+        let result = self.harness.store_and_fund_account(
+            &acc,
+            balance,
+            if stateless_account { None } else { Some(0) },
+        );
 
         for (h, _name) in self.comparison_harnesses.iter_mut() {
-            h.store_and_fund_account(&acc, balance, seq_num);
+            h.store_and_fund_account(
+                &acc,
+                balance,
+                if stateless_account { None } else { Some(0) },
+            );
         }
 
         result
@@ -285,8 +322,12 @@ impl AggV2TestHarness {
     }
 
     pub fn republish(&mut self) -> SignedTransaction {
-        self.harness
-            .create_publish_package_cache_building(&self.account, &self.path, |_| {})
+        self.harness.create_publish_package_cache_building(
+            &self.account,
+            &self.path,
+            |_| {},
+            BuildOptions::default(),
+        )
     }
 
     fn create_entry_agg_func_with_args(

@@ -87,7 +87,8 @@ pub fn publish(
     identifier: &String,
 ) {
     //// publish test-package under module address
-    let creator = executor.new_account_at(address);
+    // TODO[Orderless]: Check if this needs modification to accommodate stateless accounts
+    let creator = executor.new_account_at(address, Some(0));
 
     //// iterate over all the functions that satisfied the requirements above
     for (sequence_num_counter, func_identifier) in func_identifiers.into_iter().enumerate() {

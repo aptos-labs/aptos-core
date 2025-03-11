@@ -548,7 +548,8 @@ pub async fn simulate_multistep_proposal(
     std::io::stdout().flush()?;
     let mut rng = aptos_keygen::KeyGen::from_seed([0; 32]);
     let balance = 100 * 1_0000_0000; // 100 APT
-    let account = AccountData::new_from_seed(&mut rng, balance, 0);
+                                     // TODO[Orderless]: Check if this needs modification to accommodate stateless accounts
+    let account = AccountData::new_from_seed(&mut rng, balance, Some(0));
     state_view.apply_write_set(account.to_writeset());
     // TODO: should update coin info (total supply)
     println!("done");
