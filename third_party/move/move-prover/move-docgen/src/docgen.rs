@@ -5,8 +5,7 @@
 use clap::ValueEnum;
 use codespan::{ByteIndex, Span};
 use itertools::Itertools;
-#[allow(unused_imports)]
-use log::{debug, info, warn};
+use log::info;
 use move_compiler::parser::keywords::{BUILTINS, CONTEXTUAL_KEYWORDS, KEYWORDS};
 use move_core_types::{ability::AbilitySet, account_address::AccountAddress};
 use move_model::{
@@ -96,7 +95,7 @@ pub struct DocgenOptions {
     /// documentation.
     ///
     /// A root document is a markdown file which contains placeholders for generated
-    /// documentation content. It is also processed following the same rules as 
+    /// documentation content. It is also processed following the same rules as
     /// documentation comments in Move, including creation of cross-references and
     /// Move code highlighting.
     ///
@@ -125,7 +124,10 @@ pub struct DocgenOptions {
     pub include_call_diagrams: bool,
     /// If this is being compiled relative to a different place where it will be stored (output directory).
     pub compile_relative_to_output_dir: bool,
+    /// Output format for docs, either MD or MDX
     pub output_format: Option<OutputFormat>,
+    /// Ensure Unix paths
+    pub ensure_unix_paths: bool,
 }
 
 impl Default for DocgenOptions {
@@ -146,6 +148,7 @@ impl Default for DocgenOptions {
             include_dep_diagrams: false,
             include_call_diagrams: false,
             output_format: None,
+            ensure_unix_paths: false,
         }
     }
 }
@@ -513,18 +516,14 @@ impl<'env> Docgen<'env> {
                 let mut path = PathBuf::from(dir);
                 path.push(&file_name);
                 if path.exists() {
-                    Some(
-                        self.path_relative_to(&path, &output_path)
-                            .to_string_lossy()
-                            .to_string(),
-                    )
+                    Some(self.path_to_string(self.path_relative_to(&path, &output_path).as_path()))
                 } else {
                     None
                 }
             })
         } else {
             // We will generate this file in the provided output directory.
-            Some(file_name.to_string_lossy().to_string())
+            Some(self.path_to_string(file_name.as_ref()))
         }
     }
 
@@ -535,8 +534,22 @@ impl<'env> Docgen<'env> {
         } else {
             let mut path = PathBuf::from(&self.options.output_directory);
             path.push(name);
-            path.to_string_lossy().to_string()
+
+            self.path_to_string(path.as_path())
         }
+    }
+
+    fn path_to_string(&self, path: &Path) -> String {
+        #[cfg(not(unix))]
+        {
+            if self.options.ensure_unix_paths {
+                path.to_string_lossy().replace('\\', "/")
+            } else {
+                path.to_string_lossy().to_string()
+            }
+        }
+        #[cfg(unix)]
+        path.to_string_lossy().to_string()
     }
 
     /// Makes path relative to other path.
