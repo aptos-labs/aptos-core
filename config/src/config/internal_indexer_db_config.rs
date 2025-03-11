@@ -75,13 +75,16 @@ impl InternalIndexerDBConfig {
 impl Default for InternalIndexerDBConfig {
     fn default() -> Self {
         Self {
-            // TODO: Reset this to false when landing the code
+            // TODO[Orderless]: Reset this to false when landing the code
             enable_transaction: true,
             enable_transaction_summaries: true,
-            enable_event: false,
-            enable_event_v2_translation: false,
+            // TODO[Orderless]: Reset this to false when landing the code
+            enable_event: true,
+            // TODO[Orderless]: Reset this to false when landing the code
+            enable_event_v2_translation: true,
             event_v2_translation_ignores_below_version: 0,
-            enable_statekeys: false,
+            // TODO[Orderless]: Reset this to false when landing the code
+            enable_statekeys: true,
             batch_size: 10_000,
         }
     }
