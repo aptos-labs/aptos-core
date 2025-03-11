@@ -110,7 +110,7 @@ fn test_run_script_with_nested_loops() {
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
         let code_storage = storage.as_unsync_code_storage();
 
-        let mut sess = MoveVm::new_session(&storage);
+        let mut sess = MoveVm::new_session();
         let args: Vec<Vec<u8>> = vec![];
         sess.load_and_execute_script(
             s_blob.clone(),
@@ -119,6 +119,7 @@ fn test_run_script_with_nested_loops() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &code_storage,
+            &storage,
         )
         .unwrap();
     }
@@ -136,7 +137,7 @@ fn test_run_script_with_nested_loops() {
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
         let code_storage = storage.as_unsync_code_storage();
 
-        let mut sess = MoveVm::new_session(&storage);
+        let mut sess = MoveVm::new_session();
         let args: Vec<Vec<u8>> = vec![];
         sess.load_and_execute_script(
             s_blob,
@@ -145,6 +146,7 @@ fn test_run_script_with_nested_loops() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &code_storage,
+            &storage,
         )
         .unwrap_err();
     }

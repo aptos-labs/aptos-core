@@ -48,7 +48,7 @@ fn leak_with_abort() {
     move_bytecode_verifier::verify_script(&cs).expect("verify failed");
     let storage = InMemoryStorage::new();
 
-    let mut session = MoveVm::new_session(&storage);
+    let mut session = MoveVm::new_session();
     let mut script_bytes = vec![];
     cs.serialize(&mut script_bytes).unwrap();
 
@@ -63,6 +63,7 @@ fn leak_with_abort() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &code_storage,
+            &storage,
         );
     }
 

@@ -20,7 +20,7 @@ const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGT
 fn call_non_existent_module() {
     let storage = InMemoryStorage::new();
 
-    let mut sess = MoveVm::new_session(&storage);
+    let mut sess = MoveVm::new_session();
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
     let fun_name = Identifier::new("foo").unwrap();
     let traversal_storage = TraversalStorage::new();
@@ -35,6 +35,7 @@ fn call_non_existent_module() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &module_storage,
+            &storage,
         )
         .unwrap_err();
 
@@ -57,7 +58,7 @@ fn call_non_existent_function() {
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
     storage.add_module_bytes(module_id.address(), module_id.name(), blob.into());
 
-    let mut sess = MoveVm::new_session(&storage);
+    let mut sess = MoveVm::new_session();
 
     let fun_name = Identifier::new("foo").unwrap();
 
@@ -73,6 +74,7 @@ fn call_non_existent_function() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &module_storage,
+            &storage,
         )
         .unwrap_err();
 

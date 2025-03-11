@@ -95,7 +95,7 @@ fn test_malformed_resource() {
     // Execute the first script to publish a resource Foo.
     let mut script_blob = vec![];
     s1.serialize(&mut script_blob).unwrap();
-    let mut sess = MoveVm::new_session(&storage);
+    let mut sess = MoveVm::new_session();
 
     let traversal_storage = TraversalStorage::new();
     let code_storage = storage.clone().into_unsync_code_storage();
@@ -107,8 +107,8 @@ fn test_malformed_resource() {
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
         &code_storage,
+        &storage,
     )
-    .map(|_| ())
     .unwrap();
     let changeset = sess.finish(&code_storage).unwrap();
     storage.apply(changeset).unwrap();
@@ -119,7 +119,7 @@ fn test_malformed_resource() {
     let mut script_blob = vec![];
     s2.serialize(&mut script_blob).unwrap();
     {
-        let mut sess = MoveVm::new_session(&storage);
+        let mut sess = MoveVm::new_session();
         sess.load_and_execute_script(
             script_blob.clone(),
             vec![],
@@ -127,8 +127,8 @@ fn test_malformed_resource() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &code_storage,
+            &storage,
         )
-        .map(|_| ())
         .unwrap();
     }
 
@@ -147,7 +147,7 @@ fn test_malformed_resource() {
     // Run the second script again.
     // The test will be successful if it fails with an invariant violation.
     {
-        let mut sess = MoveVm::new_session(&storage);
+        let mut sess = MoveVm::new_session();
         let err = sess
             .load_and_execute_script(
                 script_blob,
@@ -156,8 +156,8 @@ fn test_malformed_resource() {
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
                 &code_storage,
+                &storage,
             )
-            .map(|_| ())
             .unwrap_err();
         assert_eq!(err.status_type(), StatusType::InvariantViolation);
     }
@@ -189,7 +189,7 @@ fn test_malformed_module() {
         let mut storage = InMemoryStorage::new();
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob.clone().into());
 
-        let mut sess = MoveVm::new_session(&storage);
+        let mut sess = MoveVm::new_session();
         let module_storage = storage.as_unsync_module_storage();
 
         sess.execute_function_bypass_visibility(
@@ -200,6 +200,7 @@ fn test_malformed_module() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &module_storage,
+            &storage,
         )
         .unwrap();
     }
@@ -218,7 +219,7 @@ fn test_malformed_module() {
         let mut storage = InMemoryStorage::new();
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
-        let mut sess = MoveVm::new_session(&storage);
+        let mut sess = MoveVm::new_session();
         let module_storage = storage.as_unsync_module_storage();
 
         let err = sess
@@ -230,6 +231,7 @@ fn test_malformed_module() {
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
                 &module_storage,
+                &storage,
             )
             .unwrap_err();
         assert_eq!(err.status_type(), StatusType::InvariantViolation);
@@ -261,7 +263,7 @@ fn test_unverifiable_module() {
         m.serialize(&mut blob).unwrap();
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
-        let mut sess = MoveVm::new_session(&storage);
+        let mut sess = MoveVm::new_session();
         let module_storage = storage.as_unsync_module_storage();
 
         sess.execute_function_bypass_visibility(
@@ -272,6 +274,7 @@ fn test_unverifiable_module() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &module_storage,
+            &storage,
         )
         .unwrap();
     }
@@ -287,7 +290,7 @@ fn test_unverifiable_module() {
         m.serialize(&mut blob).unwrap();
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
-        let mut sess = MoveVm::new_session(&storage);
+        let mut sess = MoveVm::new_session();
         let module_storage = storage.as_unsync_module_storage();
 
         let err = sess
@@ -299,6 +302,7 @@ fn test_unverifiable_module() {
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
                 &module_storage,
+                &storage,
             )
             .unwrap_err();
 
@@ -341,7 +345,7 @@ fn test_missing_module_dependency() {
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
 
-        let mut sess = MoveVm::new_session(&storage);
+        let mut sess = MoveVm::new_session();
         let module_storage = storage.as_unsync_module_storage();
 
         sess.execute_function_bypass_visibility(
@@ -352,6 +356,7 @@ fn test_missing_module_dependency() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &module_storage,
+            &storage,
         )
         .unwrap();
     }
@@ -362,7 +367,7 @@ fn test_missing_module_dependency() {
         let mut storage = InMemoryStorage::new();
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
 
-        let mut sess = MoveVm::new_session(&storage);
+        let mut sess = MoveVm::new_session();
         let module_storage = storage.as_unsync_module_storage();
 
         let err = sess
@@ -374,6 +379,7 @@ fn test_missing_module_dependency() {
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
                 &module_storage,
+                &storage,
             )
             .unwrap_err();
 
@@ -416,7 +422,7 @@ fn test_malformed_module_dependency() {
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.clone().into());
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
 
-        let mut sess = MoveVm::new_session(&storage);
+        let mut sess = MoveVm::new_session();
         let module_storage = storage.as_unsync_module_storage();
 
         sess.execute_function_bypass_visibility(
@@ -427,6 +433,7 @@ fn test_malformed_module_dependency() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &module_storage,
+            &storage,
         )
         .unwrap();
     }
@@ -443,7 +450,7 @@ fn test_malformed_module_dependency() {
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
 
-        let mut sess = MoveVm::new_session(&storage);
+        let mut sess = MoveVm::new_session();
         let module_storage = storage.as_unsync_module_storage();
 
         let err = sess
@@ -455,6 +462,7 @@ fn test_malformed_module_dependency() {
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
                 &module_storage,
+                &storage,
             )
             .unwrap_err();
 
@@ -498,7 +506,7 @@ fn test_unverifiable_module_dependency() {
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
 
-        let mut sess = MoveVm::new_session(&storage);
+        let mut sess = MoveVm::new_session();
         let module_storage = storage.as_unsync_module_storage();
 
         sess.execute_function_bypass_visibility(
@@ -509,6 +517,7 @@ fn test_unverifiable_module_dependency() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &module_storage,
+            &storage,
         )
         .unwrap();
     }
@@ -525,7 +534,7 @@ fn test_unverifiable_module_dependency() {
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
 
-        let mut sess = MoveVm::new_session(&storage);
+        let mut sess = MoveVm::new_session();
         let module_storage = storage.as_unsync_module_storage();
 
         let err = sess
@@ -537,6 +546,7 @@ fn test_unverifiable_module_dependency() {
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
                 &module_storage,
+                &storage,
             )
             .unwrap_err();
 
@@ -617,7 +627,7 @@ fn test_storage_returns_bogus_error_when_loading_module() {
             bad_status_code: *error_code,
         };
 
-        let mut sess = MoveVm::new_session(&storage);
+        let mut sess = MoveVm::new_session();
         let module_storage = storage.as_unsync_module_storage();
 
         let err = sess
@@ -629,6 +639,7 @@ fn test_storage_returns_bogus_error_when_loading_module() {
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
                 &module_storage,
+                &storage,
             )
             .unwrap_err();
 
@@ -707,7 +718,7 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
             bad_status_code: *error_code,
         };
 
-        let mut sess = MoveVm::new_session(&storage);
+        let mut sess = MoveVm::new_session();
         let module_storage = storage.module_storage.as_unsync_module_storage();
 
         sess.execute_function_bypass_visibility(
@@ -718,6 +729,7 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &module_storage,
+            &storage,
         )
         .unwrap();
 
@@ -730,6 +742,7 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
                 &module_storage,
+                &storage,
             )
             .unwrap_err();
 

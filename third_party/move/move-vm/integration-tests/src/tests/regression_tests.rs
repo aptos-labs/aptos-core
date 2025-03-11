@@ -135,7 +135,7 @@ fn script_large_ty() {
         struct_name,
     );
 
-    let mut session = MoveVm::new_session(&storage);
+    let mut session = MoveVm::new_session();
     let code_storage = storage.as_unsync_code_storage();
     let traversal_storage = TraversalStorage::new();
     let res = session
@@ -146,6 +146,7 @@ fn script_large_ty() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &code_storage,
+            &storage,
         )
         .unwrap_err();
 

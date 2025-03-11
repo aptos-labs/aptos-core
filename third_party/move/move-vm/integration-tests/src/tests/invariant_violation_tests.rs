@@ -73,7 +73,7 @@ fn merge_borrow_states_infinite_loop() {
     move_bytecode_verifier::verify_script(&cs).expect("verify failed");
     let storage = InMemoryStorage::new();
 
-    let mut session = MoveVm::new_session(&storage);
+    let mut session = MoveVm::new_session();
     let mut script_bytes = vec![];
     cs.serialize(&mut script_bytes).unwrap();
 
@@ -88,6 +88,7 @@ fn merge_borrow_states_infinite_loop() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &code_storage,
+            &storage,
         )
         .unwrap_err();
 

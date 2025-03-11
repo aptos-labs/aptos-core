@@ -96,7 +96,7 @@ fn run(
     let mut storage = InMemoryStorage::new();
     compile_modules(&mut storage, &modules);
 
-    let mut session = MoveVm::new_session(&storage);
+    let mut session = MoveVm::new_session();
 
     let fun_name = Identifier::new(fun_name).unwrap();
     let traversal_storage = TraversalStorage::new();
@@ -111,6 +111,7 @@ fn run(
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &module_storage,
+            &storage,
         )
         .and_then(|ret_values| {
             let change_set = session.finish(&module_storage)?;

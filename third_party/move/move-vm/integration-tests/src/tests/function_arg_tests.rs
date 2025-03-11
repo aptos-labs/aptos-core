@@ -58,7 +58,7 @@ fn run(
     let mut storage = InMemoryStorage::new();
     storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
-    let mut sess = MoveVm::new_session(&storage);
+    let mut sess = MoveVm::new_session();
 
     let fun_name = Identifier::new("foo").unwrap();
     let traversal_storage = TraversalStorage::new();
@@ -77,6 +77,7 @@ fn run(
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
         &module_storage,
+        &storage,
     )?;
 
     Ok(())
