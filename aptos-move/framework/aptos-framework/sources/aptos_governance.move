@@ -302,6 +302,15 @@ module aptos_framework::aptos_governance {
     }
 
     #[view]
+    public fun used_voting_power(stake_pool: address, proposal_id: u64): u64 acquires VotingRecordsV2 {
+        let record_key = RecordKey {
+            stake_pool,
+            proposal_id,
+        };
+        *VotingRecordsV2[@aptos_framework].votes.borrow_with_default(record_key, &0)
+    }
+
+    #[view]
     /// Return true if a stake pool has already voted on a proposal before partial governance voting is enabled.
     public fun has_entirely_voted(stake_pool: address, proposal_id: u64): bool acquires VotingRecords {
         let record_key = RecordKey {

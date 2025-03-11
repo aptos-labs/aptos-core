@@ -1339,8 +1339,13 @@ module aptos_framework::staking_contract {
         let new_expiration = timestamp::now_seconds() + 86400 * 365;
         aptos_governance::extend_voting_duration_for_test(proposal_id, new_expiration);
 
+        let total_voting_power = aptos_governance::get_voting_power(pool_address);
+        assert!(total_voting_power > 0);
+        assert!(stake::get_lockup_secs(pool_address) < new_expiration);
         extend_lockup_and_vote(staker, operator_address, proposal_id, true);
         assert!(stake::get_lockup_secs(pool_address) == new_expiration);
+        assert!(aptos_governance::used_voting_power(pool_address, proposal_id) == total_voting_power);
+        assert!(aptos_governance::get_remaining_voting_power(pool_address, proposal_id) == 0);
     }
 
     #[test(aptos_framework = @0x1, staker = @0x123, operator_1 = @0x234, operator_2 = @0x345)]
