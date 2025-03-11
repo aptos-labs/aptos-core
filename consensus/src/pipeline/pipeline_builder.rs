@@ -241,7 +241,7 @@ impl PipelineBuilder {
         compute_result: StateComputeResult,
         commit_proof: LedgerInfoWithSignatures,
     ) -> PipelineFutures {
-        let prepare_fut = spawn_ready_fut(Arc::new(vec![]));
+        let prepare_fut = spawn_ready_fut((Arc::new(vec![]), None));
         let execute_fut = spawn_ready_fut(Duration::from_millis(0));
         let ledger_update_fut =
             spawn_ready_fut((compute_result.clone(), Duration::from_millis(0), None));
@@ -432,7 +432,7 @@ impl PipelineBuilder {
         }
         .shared();
         // the loop can only be abort by the caller
-        let input_txns = loop {
+        let (input_txns, block_gas_limit) = loop {
             match preparer.prepare_block(&block, qc_rx.clone()).await {
                 Ok(input_txns) => break input_txns,
                 Err(e) => {
@@ -456,7 +456,7 @@ impl PipelineBuilder {
         });
         counters::PREPARE_BLOCK_SIG_VERIFICATION_TIME
             .observe_duration(sig_verification_start.elapsed());
-        Ok(Arc::new(sig_verified_txns))
+        Ok((Arc::new(sig_verified_txns), block_gas_limit))
     }
 
     /// Precondition: 1. prepare finishes, 2. parent block's phase finishes 3. randomness is available
@@ -473,7 +473,9 @@ impl PipelineBuilder {
     ) -> TaskResult<ExecuteResult> {
         let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_phase.await?;
-        let user_txns = prepare_phase.await?;
+        let (user_txns, block_gas_limit) = prepare_phase.await?;
+        let onchain_execution_config =
+            onchain_execution_config.with_block_gas_limit_override(block_gas_limit);
         let maybe_rand = randomness_rx
             .await
             .map_err(|_| anyhow!("randomness tx cancelled"))?;
@@ -556,7 +558,7 @@ impl PipelineBuilder {
         block: Arc<Block>,
     ) -> TaskResult<PostLedgerUpdateResult> {
         let mut tracker = Tracker::start_waiting("post_ledger_update", &block);
-        let user_txns = prepare_fut.await?;
+        let (user_txns, _) = prepare_fut.await?;
         let (compute_result, _, _) = ledger_update.await?;
 
         tracker.start_working();

@@ -914,6 +914,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config.max_failed_authors_to_store(),
             self.config
                 .min_max_txns_in_block_after_filtering_from_backpressure,
+            onchain_execution_config
+                .block_executor_onchain_config()
+                .block_gas_limit_type
+                .block_gas_limit(),
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
