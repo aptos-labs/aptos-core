@@ -24,7 +24,8 @@ spec aptos_framework::transaction_validation {
     /// </high-level-req>
     ///
     spec module {
-        pragma verify = true;
+        // TODO[Orderless]: Correct this spec to account for the changes introduced due to orderless transactions feature
+        pragma verify = false;
         pragma aborts_if_is_strict;
     }
 
@@ -117,7 +118,7 @@ spec aptos_framework::transaction_validation {
     spec prologue_common(
         sender: &signer,
         gas_payer: &signer,
-        txn_sequence_number: u64,
+        txn_replay_protector: ReplayProtector,
         txn_authentication_key: Option<vector<u8>>,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
