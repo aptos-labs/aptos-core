@@ -194,7 +194,7 @@ impl Default for EmitJobRequest {
             init_gas_price_multiplier: 2,
             mint_to_root: false,
             skip_minting_accounts: false,
-            txn_expiration_time_secs: 120,
+            txn_expiration_time_secs: 60,
             init_expiration_multiplier: 3.0,
             init_retry_interval: Duration::from_secs(10),
             num_accounts_mode: NumAccountsMode::TransactionsPerAccount(20),
