@@ -37,6 +37,15 @@ impl From<aptos_protos::indexer::v1::TransactionRootFilter> for TransactionRootF
     }
 }
 
+impl Into<aptos_protos::indexer::v1::TransactionRootFilter> for TransactionRootFilter {
+    fn into(self) -> aptos_protos::indexer::v1::TransactionRootFilter {
+        aptos_protos::indexer::v1::TransactionRootFilter {
+            success: self.success,
+            transaction_type: self.txn_type.map(Into::into),
+        }
+    }
+}
+
 impl Filterable<Transaction> for TransactionRootFilter {
     #[inline]
     fn validate_state(&self) -> Result<(), FilterError> {

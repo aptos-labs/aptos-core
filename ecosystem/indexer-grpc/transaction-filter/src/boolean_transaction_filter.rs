@@ -46,6 +46,50 @@ impl From<EventFilter> for BooleanTransactionFilter {
     }
 }
 
+impl Into<aptos_protos::indexer::v1::BooleanTransactionFilter> for BooleanTransactionFilter {
+    fn into(self) -> aptos_protos::indexer::v1::BooleanTransactionFilter {
+        match self {
+            BooleanTransactionFilter::And(logical_and) => {
+                aptos_protos::indexer::v1::BooleanTransactionFilter {
+                    filter: Some(
+                        aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalAnd(
+                            logical_and.into(),
+                        ),
+                    ),
+                }
+            },
+            BooleanTransactionFilter::Or(logical_or) => {
+                aptos_protos::indexer::v1::BooleanTransactionFilter {
+                    filter: Some(
+                        aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalOr(
+                            logical_or.into(),
+                        ),
+                    ),
+                }
+            },
+            BooleanTransactionFilter::Not(logical_not) => {
+                aptos_protos::indexer::v1::BooleanTransactionFilter {
+                    filter: Some(
+                        aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalNot(
+                            // We do not `impl Into` for `LogicalNot` because it is a recursive type that only contains a `Box<BooleanTransactionFilter>`
+                            Box::new((*logical_not.not).into()),
+                        ),
+                    ),
+                }
+            },
+            BooleanTransactionFilter::Filter(api_filter) => {
+                aptos_protos::indexer::v1::BooleanTransactionFilter {
+                    filter: Some(
+                        aptos_protos::indexer::v1::boolean_transaction_filter::Filter::ApiFilter(
+                            api_filter.into(),
+                        ),
+                    ),
+                }
+            },
+        }
+    }
+}
+
 impl BooleanTransactionFilter {
     pub fn new_from_proto(
         proto_filter: aptos_protos::indexer::v1::BooleanTransactionFilter,
@@ -76,6 +120,10 @@ impl BooleanTransactionFilter {
                 ) => BooleanTransactionFilter::Not(logical_not.try_into()?),
             },
         )
+    }
+
+    pub fn into_proto(self) -> aptos_protos::indexer::v1::BooleanTransactionFilter {
+        self.into()
     }
 
     /// Combines the current filter with another filter using a logical AND.
@@ -224,6 +272,14 @@ impl TryFrom<aptos_protos::indexer::v1::LogicalAndFilters> for LogicalAnd {
     }
 }
 
+impl Into<aptos_protos::indexer::v1::LogicalAndFilters> for LogicalAnd {
+    fn into(self) -> aptos_protos::indexer::v1::LogicalAndFilters {
+        aptos_protos::indexer::v1::LogicalAndFilters {
+            filters: self.and.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
 impl Filterable<Transaction> for LogicalAnd {
     fn validate_state(&self) -> Result<(), FilterError> {
         for filter in &self.and {
@@ -253,6 +309,14 @@ impl TryFrom<aptos_protos::indexer::v1::LogicalOrFilters> for LogicalOr {
                 .map(|f| BooleanTransactionFilter::new_from_proto(f, None))
                 .collect::<Result<_>>()?,
         })
+    }
+}
+
+impl Into<aptos_protos::indexer::v1::LogicalOrFilters> for LogicalOr {
+    fn into(self) -> aptos_protos::indexer::v1::LogicalOrFilters {
+        aptos_protos::indexer::v1::LogicalOrFilters {
+            filters: self.or.into_iter().map(Into::into).collect(),
+        }
     }
 }
 
@@ -347,6 +411,39 @@ impl From<UserTransactionFilter> for APIFilter {
 impl From<EventFilter> for APIFilter {
     fn from(filter: EventFilter) -> Self {
         APIFilter::EventFilter(filter)
+    }
+}
+
+impl Into<aptos_protos::indexer::v1::ApiFilter> for APIFilter {
+    fn into(self) -> aptos_protos::indexer::v1::ApiFilter {
+        match self {
+            APIFilter::TransactionRootFilter(transaction_root_filter) => {
+                aptos_protos::indexer::v1::ApiFilter {
+                    filter: Some(
+                        aptos_protos::indexer::v1::api_filter::Filter::TransactionRootFilter(
+                            transaction_root_filter.into(),
+                        ),
+                    ),
+                }
+            },
+            APIFilter::UserTransactionFilter(user_transaction_filter) => {
+                aptos_protos::indexer::v1::ApiFilter {
+                    filter: Some(
+                        aptos_protos::indexer::v1::api_filter::Filter::UserTransactionFilter(
+                            user_transaction_filter.into(),
+                        ),
+                    ),
+                }
+            },
+            APIFilter::EventFilter(event_filter) => aptos_protos::indexer::v1::ApiFilter {
+                filter: Some(aptos_protos::indexer::v1::api_filter::Filter::EventFilter(
+                    aptos_protos::indexer::v1::EventFilter {
+                        struct_type: event_filter.struct_type.map(Into::into),
+                        data_substring_filter: event_filter.data_substring_filter,
+                    },
+                )),
+            },
+        }
     }
 }
 

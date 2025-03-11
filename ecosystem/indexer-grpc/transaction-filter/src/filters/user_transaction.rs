@@ -40,6 +40,15 @@ impl From<aptos_protos::indexer::v1::UserTransactionFilter> for UserTransactionF
     }
 }
 
+impl Into<aptos_protos::indexer::v1::UserTransactionFilter> for UserTransactionFilter {
+    fn into(self) -> aptos_protos::indexer::v1::UserTransactionFilter {
+        aptos_protos::indexer::v1::UserTransactionFilter {
+            sender: self.sender,
+            payload_filter: self.payload.map(Into::into),
+        }
+    }
+}
+
 impl Filterable<Transaction> for UserTransactionFilter {
     #[inline]
     fn validate_state(&self) -> Result<(), FilterError> {
@@ -120,6 +129,16 @@ impl From<aptos_protos::indexer::v1::EntryFunctionFilter> for EntryFunctionFilte
     }
 }
 
+impl Into<aptos_protos::indexer::v1::EntryFunctionFilter> for EntryFunctionFilter {
+    fn into(self) -> aptos_protos::indexer::v1::EntryFunctionFilter {
+        aptos_protos::indexer::v1::EntryFunctionFilter {
+            address: self.address,
+            module_name: self.module,
+            function: self.function,
+        }
+    }
+}
+
 impl Filterable<EntryFunctionId> for EntryFunctionFilter {
     #[inline]
     fn validate_state(&self) -> Result<(), FilterError> {
@@ -179,6 +198,16 @@ impl From<aptos_protos::indexer::v1::UserTransactionPayloadFilter>
     fn from(proto_filter: aptos_protos::indexer::v1::UserTransactionPayloadFilter) -> Self {
         Self {
             function: proto_filter.entry_function_filter.map(|f| f.into()),
+        }
+    }
+}
+
+impl Into<aptos_protos::indexer::v1::UserTransactionPayloadFilter>
+    for UserTransactionPayloadFilter
+{
+    fn into(self) -> aptos_protos::indexer::v1::UserTransactionPayloadFilter {
+        aptos_protos::indexer::v1::UserTransactionPayloadFilter {
+            entry_function_filter: self.function.map(Into::into),
         }
     }
 }

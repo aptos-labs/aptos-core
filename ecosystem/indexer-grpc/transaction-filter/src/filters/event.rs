@@ -51,6 +51,15 @@ impl From<aptos_protos::indexer::v1::EventFilter> for EventFilter {
     }
 }
 
+impl Into<aptos_protos::indexer::v1::EventFilter> for EventFilter {
+    fn into(self) -> aptos_protos::indexer::v1::EventFilter {
+        aptos_protos::indexer::v1::EventFilter {
+            data_substring_filter: self.data_substring_filter,
+            struct_type: self.struct_type.map(Into::into),
+        }
+    }
+}
+
 impl Filterable<Event> for EventFilter {
     #[inline]
     fn validate_state(&self) -> Result<(), FilterError> {

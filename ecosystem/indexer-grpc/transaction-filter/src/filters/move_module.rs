@@ -40,6 +40,16 @@ impl From<aptos_protos::indexer::v1::MoveStructTagFilter> for MoveStructTagFilte
     }
 }
 
+impl Into<aptos_protos::indexer::v1::MoveStructTagFilter> for MoveStructTagFilter {
+    fn into(self) -> aptos_protos::indexer::v1::MoveStructTagFilter {
+        aptos_protos::indexer::v1::MoveStructTagFilter {
+            address: self.address,
+            module: self.module,
+            name: self.name,
+        }
+    }
+}
+
 impl Filterable<MoveStructTag> for MoveStructTagFilter {
     #[inline]
     fn validate_state(&self) -> Result<(), FilterError> {
