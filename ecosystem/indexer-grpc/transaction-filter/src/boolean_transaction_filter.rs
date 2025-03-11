@@ -46,9 +46,9 @@ impl From<EventFilter> for BooleanTransactionFilter {
     }
 }
 
-impl Into<aptos_protos::indexer::v1::BooleanTransactionFilter> for BooleanTransactionFilter {
-    fn into(self) -> aptos_protos::indexer::v1::BooleanTransactionFilter {
-        match self {
+impl From<BooleanTransactionFilter> for aptos_protos::indexer::v1::BooleanTransactionFilter {
+    fn from(boolean_transaction_filter: BooleanTransactionFilter) -> Self {
+        match boolean_transaction_filter {
             BooleanTransactionFilter::And(logical_and) => {
                 aptos_protos::indexer::v1::BooleanTransactionFilter {
                     filter: Some(
@@ -71,7 +71,7 @@ impl Into<aptos_protos::indexer::v1::BooleanTransactionFilter> for BooleanTransa
                 aptos_protos::indexer::v1::BooleanTransactionFilter {
                     filter: Some(
                         aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalNot(
-                            // We do not `impl Into` for `LogicalNot` because it is a recursive type that only contains a `Box<BooleanTransactionFilter>`
+                            // We do not `impl From` for `LogicalNot` because it is a recursive type that only contains a `Box<BooleanTransactionFilter>`
                             Box::new((*logical_not.not).into()),
                         ),
                     ),
@@ -272,10 +272,10 @@ impl TryFrom<aptos_protos::indexer::v1::LogicalAndFilters> for LogicalAnd {
     }
 }
 
-impl Into<aptos_protos::indexer::v1::LogicalAndFilters> for LogicalAnd {
-    fn into(self) -> aptos_protos::indexer::v1::LogicalAndFilters {
+impl From<LogicalAnd> for aptos_protos::indexer::v1::LogicalAndFilters {
+    fn from(logical_and: LogicalAnd) -> Self {
         aptos_protos::indexer::v1::LogicalAndFilters {
-            filters: self.and.into_iter().map(Into::into).collect(),
+            filters: logical_and.and.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -312,10 +312,10 @@ impl TryFrom<aptos_protos::indexer::v1::LogicalOrFilters> for LogicalOr {
     }
 }
 
-impl Into<aptos_protos::indexer::v1::LogicalOrFilters> for LogicalOr {
-    fn into(self) -> aptos_protos::indexer::v1::LogicalOrFilters {
+impl From<LogicalOr> for aptos_protos::indexer::v1::LogicalOrFilters {
+    fn from(logical_or: LogicalOr) -> Self {
         aptos_protos::indexer::v1::LogicalOrFilters {
-            filters: self.or.into_iter().map(Into::into).collect(),
+            filters: logical_or.or.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -414,9 +414,9 @@ impl From<EventFilter> for APIFilter {
     }
 }
 
-impl Into<aptos_protos::indexer::v1::ApiFilter> for APIFilter {
-    fn into(self) -> aptos_protos::indexer::v1::ApiFilter {
-        match self {
+impl From<APIFilter> for aptos_protos::indexer::v1::ApiFilter {
+    fn from(api_filter: APIFilter) -> Self {
+        match api_filter {
             APIFilter::TransactionRootFilter(transaction_root_filter) => {
                 aptos_protos::indexer::v1::ApiFilter {
                     filter: Some(

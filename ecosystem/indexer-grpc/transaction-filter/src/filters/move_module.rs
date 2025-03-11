@@ -40,12 +40,12 @@ impl From<aptos_protos::indexer::v1::MoveStructTagFilter> for MoveStructTagFilte
     }
 }
 
-impl Into<aptos_protos::indexer::v1::MoveStructTagFilter> for MoveStructTagFilter {
-    fn into(self) -> aptos_protos::indexer::v1::MoveStructTagFilter {
-        aptos_protos::indexer::v1::MoveStructTagFilter {
-            address: self.address,
-            module: self.module,
-            name: self.name,
+impl From<MoveStructTagFilter> for aptos_protos::indexer::v1::MoveStructTagFilter {
+    fn from(move_struct_tag_filter: MoveStructTagFilter) -> Self {
+        Self {
+            address: move_struct_tag_filter.address,
+            module: move_struct_tag_filter.module,
+            name: move_struct_tag_filter.name,
         }
     }
 }

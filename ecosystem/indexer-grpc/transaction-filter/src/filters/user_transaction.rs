@@ -40,11 +40,11 @@ impl From<aptos_protos::indexer::v1::UserTransactionFilter> for UserTransactionF
     }
 }
 
-impl Into<aptos_protos::indexer::v1::UserTransactionFilter> for UserTransactionFilter {
-    fn into(self) -> aptos_protos::indexer::v1::UserTransactionFilter {
-        aptos_protos::indexer::v1::UserTransactionFilter {
-            sender: self.sender,
-            payload_filter: self.payload.map(Into::into),
+impl From<UserTransactionFilter> for aptos_protos::indexer::v1::UserTransactionFilter {
+    fn from(user_transaction_filter: UserTransactionFilter) -> Self {
+        Self {
+            sender: user_transaction_filter.sender,
+            payload_filter: user_transaction_filter.payload.map(Into::into),
         }
     }
 }
@@ -129,12 +129,12 @@ impl From<aptos_protos::indexer::v1::EntryFunctionFilter> for EntryFunctionFilte
     }
 }
 
-impl Into<aptos_protos::indexer::v1::EntryFunctionFilter> for EntryFunctionFilter {
-    fn into(self) -> aptos_protos::indexer::v1::EntryFunctionFilter {
-        aptos_protos::indexer::v1::EntryFunctionFilter {
-            address: self.address,
-            module_name: self.module,
-            function: self.function,
+impl From<EntryFunctionFilter> for aptos_protos::indexer::v1::EntryFunctionFilter {
+    fn from(entry_function_filter: EntryFunctionFilter) -> Self {
+        Self {
+            address: entry_function_filter.address,
+            module_name: entry_function_filter.module,
+            function: entry_function_filter.function,
         }
     }
 }
@@ -202,12 +202,12 @@ impl From<aptos_protos::indexer::v1::UserTransactionPayloadFilter>
     }
 }
 
-impl Into<aptos_protos::indexer::v1::UserTransactionPayloadFilter>
-    for UserTransactionPayloadFilter
+impl From<UserTransactionPayloadFilter>
+    for aptos_protos::indexer::v1::UserTransactionPayloadFilter
 {
-    fn into(self) -> aptos_protos::indexer::v1::UserTransactionPayloadFilter {
-        aptos_protos::indexer::v1::UserTransactionPayloadFilter {
-            entry_function_filter: self.function.map(Into::into),
+    fn from(user_transaction_payload_filter: UserTransactionPayloadFilter) -> Self {
+        Self {
+            entry_function_filter: user_transaction_payload_filter.function.map(Into::into),
         }
     }
 }

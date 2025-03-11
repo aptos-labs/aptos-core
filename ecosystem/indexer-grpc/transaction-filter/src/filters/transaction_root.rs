@@ -37,11 +37,11 @@ impl From<aptos_protos::indexer::v1::TransactionRootFilter> for TransactionRootF
     }
 }
 
-impl Into<aptos_protos::indexer::v1::TransactionRootFilter> for TransactionRootFilter {
-    fn into(self) -> aptos_protos::indexer::v1::TransactionRootFilter {
-        aptos_protos::indexer::v1::TransactionRootFilter {
-            success: self.success,
-            transaction_type: self.txn_type.map(Into::into),
+impl From<TransactionRootFilter> for aptos_protos::indexer::v1::TransactionRootFilter {
+    fn from(transaction_root_filter: TransactionRootFilter) -> Self {
+        Self {
+            success: transaction_root_filter.success,
+            transaction_type: transaction_root_filter.txn_type.map(Into::into),
         }
     }
 }
