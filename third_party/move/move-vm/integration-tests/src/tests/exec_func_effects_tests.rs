@@ -96,7 +96,11 @@ fn run(
     let mut storage = InMemoryStorage::new();
     compile_modules(&mut storage, &modules);
 
+<<<<<<< HEAD
     let mut session = MoveVM::new_session(&storage);
+=======
+    let mut session = MoveVm::new_session();
+>>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
 
     let fun_name = Identifier::new(fun_name).unwrap();
     let traversal_storage = TraversalStorage::new();
@@ -111,6 +115,7 @@ fn run(
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &module_storage,
+            &storage,
         )
         .and_then(|ret_values| {
             let change_set = session.finish(&module_storage)?;

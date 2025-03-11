@@ -258,7 +258,11 @@ fn call_script_with_args_ty_args_signers(
 ) -> VMResult<()> {
     let storage = InMemoryStorage::new();
     let code_storage = storage.as_unsync_code_storage();
+<<<<<<< HEAD
     let mut session = MoveVM::new_session(&storage);
+=======
+    let mut session = MoveVm::new_session();
+>>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
 
     let traversal_storage = TraversalStorage::new();
 
@@ -270,6 +274,7 @@ fn call_script_with_args_ty_args_signers(
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &code_storage,
+            &storage,
         )
         .map(|_| ())
 }
@@ -293,7 +298,11 @@ fn call_function_with_args_ty_args_signers(
 
     storage.add_module_bytes(module_id.address(), module_id.name(), module_blob.into());
     let module_storage = storage.as_unsync_module_storage();
+<<<<<<< HEAD
     let mut session = MoveVM::new_session(&storage);
+=======
+    let mut session = MoveVm::new_session();
+>>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
 
     let traversal_storage = TraversalStorage::new();
     session.execute_function_bypass_visibility(
@@ -304,6 +313,7 @@ fn call_function_with_args_ty_args_signers(
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
         &module_storage,
+        &storage,
     )?;
     Ok(())
 }
@@ -780,7 +790,11 @@ fn call_missing_item() {
 
     let mut storage = InMemoryStorage::new();
     let module_storage = storage.as_unsync_module_storage();
+<<<<<<< HEAD
     let mut session = MoveVM::new_session(&storage);
+=======
+    let mut session = MoveVm::new_session();
+>>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
 
     let traversal_storage = TraversalStorage::new();
     let error = session
@@ -792,9 +806,9 @@ fn call_missing_item() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &module_storage,
+            &storage,
         )
-        .err()
-        .unwrap();
+        .unwrap_err();
     assert_eq!(
         error.major_status(),
         StatusCode::LINKER_ERROR,
@@ -808,7 +822,11 @@ fn call_missing_item() {
 
     storage.add_module_bytes(module_id.address(), module_id.name(), module_blob.into());
     let module_storage = storage.as_unsync_module_storage();
+<<<<<<< HEAD
     let mut session = MoveVM::new_session(&storage);
+=======
+    let mut session = MoveVm::new_session();
+>>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
 
     let traversal_storage = TraversalStorage::new();
     let error = session
@@ -820,9 +838,9 @@ fn call_missing_item() {
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &module_storage,
+            &storage,
         )
-        .err()
-        .unwrap();
+        .unwrap_err();
     assert_eq!(
         error.major_status(),
         StatusCode::FUNCTION_RESOLUTION_FAILURE

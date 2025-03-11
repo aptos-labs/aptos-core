@@ -33,10 +33,7 @@ use aptos_block_executor::{
     txn_provider::{default::DefaultTxnProvider, TxnProvider},
 };
 use aptos_crypto::HashValue;
-use aptos_framework::{
-    natives::{code::PublishRequest, randomness::RandomnessContext},
-    RuntimeModuleMetadataV1,
-};
+use aptos_framework::{natives::code::PublishRequest, RuntimeModuleMetadataV1};
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
 use aptos_gas_schedule::{
@@ -129,7 +126,7 @@ use move_vm_runtime::{
     check_type_tag_dependencies_and_charge_gas,
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
-    ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
+    LoadedFunctionOwner, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use num_cpus;
@@ -201,7 +198,7 @@ pub(crate) fn serialized_signer(account_address: &AccountAddress) -> Vec<u8> {
 }
 
 pub(crate) fn get_system_transaction_output(
-    session: SessionExt,
+    session: SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     change_set_configs: &ChangeSetConfigs,
 ) -> Result<VMOutput, VMStatus> {
@@ -276,12 +273,12 @@ impl AptosVM {
         }
     }
 
-    pub fn new_session<'r, S: AptosMoveResolver>(
+    pub fn new_session<'r, R: AptosMoveResolver>(
         &self,
-        resolver: &'r S,
+        resolver: &'r R,
         session_id: SessionId,
         user_transaction_context_opt: Option<UserTransactionContext>,
-    ) -> SessionExt<'r> {
+    ) -> SessionExt<'r, R> {
         self.move_vm
             .new_session(resolver, session_id, user_transaction_context_opt)
     }
@@ -756,20 +753,20 @@ impl AptosVM {
 
     fn validate_and_execute_script<'a>(
         &self,
-        session: &mut SessionExt,
+        session: &mut SessionExt<impl AptosMoveResolver>,
         serialized_signers: &SerializedSigners,
         code_storage: &impl AptosCodeStorage,
         // Note: cannot use AptosGasMeter because it is not implemented for
         //       UnmeteredGasMeter.
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext<'a>,
-        script: &'a Script,
+        serialized_script: &'a Script,
     ) -> Result<(), VMStatus> {
         if !self
             .features()
             .is_enabled(FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS)
         {
-            for arg in script.args() {
+            for arg in serialized_script.args() {
                 if let TransactionArgument::Serialized(_) = arg {
                     return Err(PartialVMError::new(StatusCode::FEATURE_UNDER_GATING)
                         .finish(Location::Script)
@@ -786,7 +783,7 @@ impl AptosVM {
                 code_storage,
                 gas_meter,
                 traversal_context,
-                script.code(),
+                serialized_script.code(),
             )?;
         }
         if self.gas_feature_version() >= RELEASE_V1_27 {
@@ -794,23 +791,16 @@ impl AptosVM {
                 code_storage,
                 gas_meter,
                 traversal_context,
-                script.ty_args(),
+                serialized_script.ty_args(),
             )?;
         }
 
-        let func = code_storage.load_script(script.code(), script.ty_args())?;
-
-        let compiled_script = match CompiledScript::deserialize_with_config(
-            script.code(),
-            self.deserializer_config(),
-        ) {
-            Ok(script) => script,
-            Err(err) => {
-                let msg = format!("[VM] deserializer for script returned error: {:?}", err);
-                let partial_err = PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
-                    .with_message(msg)
-                    .finish(Location::Script);
-                return Err(partial_err.into_vm_status());
+        let func =
+            code_storage.load_script(serialized_script.code(), serialized_script.ty_args())?;
+        let script = match func.owner() {
+            LoadedFunctionOwner::Script(script) => script,
+            LoadedFunctionOwner::Module(_) => {
+                unreachable!("Function loaded from script cannot come from module")
             },
         };
 
@@ -819,36 +809,29 @@ impl AptosVM {
             .features()
             .is_enabled(FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT)
         {
-            self.reject_unstable_bytecode_for_script(&compiled_script)?;
+            self.reject_unstable_bytecode_for_script(script)?;
         }
 
         // TODO(Gerardo): consolidate the extended validation to verifier.
-        verifier::event_validation::verify_no_event_emission_in_compiled_script(&compiled_script)?;
+        verifier::event_validation::verify_no_event_emission_in_compiled_script(script)?;
 
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
             code_storage,
             serialized_signers,
-            convert_txn_args(script.args()),
+            convert_txn_args(serialized_script.args()),
             &func,
             self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
         )?;
 
-        session.load_and_execute_script(
-            script.code(),
-            script.ty_args().to_vec(),
-            args,
-            gas_meter,
-            traversal_context,
-            code_storage,
-        )?;
+        session.execute_loaded_function(func, args, gas_meter, traversal_context, code_storage)?;
         Ok(())
     }
 
     fn validate_and_execute_entry_function(
         &self,
         module_storage: &impl AptosModuleStorage,
-        session: &mut SessionExt,
+        session: &mut SessionExt<impl AptosMoveResolver>,
         serialized_signers: &SerializedSigners,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
@@ -902,10 +885,7 @@ impl AptosVM {
         if function.is_friend_or_private()
             && get_randomness_annotation(module_storage, entry_fn)?.is_some()
         {
-            let txn_context = session
-                .get_native_extensions()
-                .get_mut::<RandomnessContext>();
-            txn_context.mark_unbiasable();
+            session.mark_unbiasable();
         }
 
         let struct_constructors_enabled =
@@ -1252,16 +1232,29 @@ impl AptosVM {
             MoveValue::vector_u8(payload_bytes),
         ]);
 
-        let epilogue_session = match execution_result {
-            Err(execution_error) => self.failure_multisig_payload_cleanup(
-                resolver,
-                module_storage,
-                prologue_session_change_set,
-                execution_error,
-                txn_data,
-                cleanup_args,
-                traversal_context,
-            )?,
+        match execution_result {
+            Err(execution_error) => {
+                let epilogue_session = self.failure_multisig_payload_cleanup(
+                    resolver,
+                    module_storage,
+                    prologue_session_change_set,
+                    execution_error,
+                    txn_data,
+                    cleanup_args,
+                    traversal_context,
+                )?;
+                // TODO(Gas): Charge for aggregator writes
+                self.success_transaction_cleanup(
+                    epilogue_session,
+                    module_storage,
+                    serialized_signers,
+                    gas_meter,
+                    txn_data,
+                    log_context,
+                    change_set_configs,
+                    traversal_context,
+                )
+            },
             Ok(user_session_change_set) => {
                 // Charge gas for write set before we do cleanup. This ensures we don't charge gas for
                 // cleanup write set changes, which is consistent with outer-level success cleanup
@@ -1286,21 +1279,19 @@ impl AptosVM {
                         )
                         .map_err(|e| e.into_vm_status())
                 })?;
-                epilogue_session
+                // TODO(Gas): Charge for aggregator writes
+                self.success_transaction_cleanup(
+                    epilogue_session,
+                    module_storage,
+                    serialized_signers,
+                    gas_meter,
+                    txn_data,
+                    log_context,
+                    change_set_configs,
+                    traversal_context,
+                )
             },
-        };
-
-        // TODO(Gas): Charge for aggregator writes
-        self.success_transaction_cleanup(
-            epilogue_session,
-            module_storage,
-            serialized_signers,
-            gas_meter,
-            txn_data,
-            log_context,
-            change_set_configs,
-            traversal_context,
-        )
+        }
     }
 
     fn execute_or_simulate_multisig_transaction<'a, 'r>(
@@ -1357,7 +1348,7 @@ impl AptosVM {
         &self,
         resolver: &impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
-        mut session: UserSession<'_>,
+        mut session: UserSession,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         multisig_address: AccountAddress,
@@ -1454,7 +1445,7 @@ impl AptosVM {
     /// Resolve a pending code publish request registered via the NativeCodeContext.
     fn resolve_pending_code_publish_and_finish_user_session(
         &self,
-        mut session: UserSession<'_>,
+        mut session: UserSession,
         resolver: &impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
         gas_meter: &mut impl AptosGasMeter,
@@ -1697,8 +1688,7 @@ impl AptosVM {
 
     fn validate_signed_transaction(
         &self,
-        session: &mut SessionExt,
-        resolver: &impl AptosMoveResolver,
+        session: &mut SessionExt<impl AptosMoveResolver>,
         module_storage: &impl ModuleStorage,
         transaction: &SignedTransaction,
         transaction_data: &TransactionMetadata,
@@ -1724,7 +1714,7 @@ impl AptosVM {
                 &self.pvk,
                 &keyless_authenticators,
                 self.features(),
-                resolver,
+                session.resolver,
                 module_storage,
             )?;
         }
@@ -1820,7 +1810,6 @@ impl AptosVM {
         // end up skipping validation.
         self.run_prologue_with_payload(
             session,
-            resolver,
             module_storage,
             &serialized_signers,
             transaction.payload(),
@@ -1882,7 +1871,6 @@ impl AptosVM {
         let serialized_signers = unwrap_or_discard!(prologue_session.execute(|session| {
             self.validate_signed_transaction(
                 session,
-                resolver,
                 code_storage,
                 txn,
                 &txn_data,
@@ -1910,14 +1898,7 @@ impl AptosVM {
         let storage_gas_params = unwrap_or_discard!(self.storage_gas_params(log_context));
         let change_set_configs = &storage_gas_params.change_set_configs;
         let (prologue_change_set, mut user_session) = unwrap_or_discard!(prologue_session
-            .into_user_session(
-                self,
-                &txn_data,
-                resolver,
-                self.gas_feature_version(),
-                change_set_configs,
-                code_storage,
-            ));
+            .into_user_session(self, &txn_data, resolver, change_set_configs, code_storage,));
 
         let account_init_for_sponsored_transaction_timer =
             VM_TIMER.timer_with_label("AptosVM::account_init_for_sponsored_transaction");
@@ -2475,8 +2456,13 @@ impl AptosVM {
     }
 
     fn execute_view_function_in_vm(
+<<<<<<< HEAD
         session: &mut SessionExt,
         vm: &AptosVM,
+=======
+        session: &mut SessionExt<impl AptosMoveResolver>,
+        vm: &AptosVm,
+>>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
         module_id: ModuleId,
         func_name: Identifier,
         type_args: Vec<TypeTag>,
@@ -2517,8 +2503,7 @@ impl AptosVM {
 
     fn run_prologue_with_payload(
         &self,
-        session: &mut SessionExt,
-        resolver: &impl AptosMoveResolver,
+        session: &mut SessionExt<impl AptosMoveResolver>,
         module_storage: &impl ModuleStorage,
         serialized_signers: &SerializedSigners,
         payload: &TransactionPayload,
@@ -2530,7 +2515,7 @@ impl AptosVM {
         check_gas(
             self.gas_params(log_context)?,
             self.gas_feature_version(),
-            resolver,
+            session.resolver,
             module_storage,
             txn_data,
             self.features(),
@@ -2959,7 +2944,6 @@ impl VMValidator for AptosVM {
         // Increment the counter for transactions verified.
         let (counter_label, result) = match self.validate_signed_transaction(
             &mut session,
-            &resolver,
             module_storage,
             &txn,
             &txn_data,
@@ -3021,7 +3005,7 @@ impl AptosSimulationVM {
 }
 
 fn create_account_if_does_not_exist(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     gas_meter: &mut impl GasMeter,
     account: AccountAddress,
@@ -3040,7 +3024,7 @@ fn create_account_if_does_not_exist(
 }
 
 fn dispatchable_authenticate(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     gas_meter: &mut impl GasMeter,
     account: AccountAddress,
     function_info: FunctionInfo,

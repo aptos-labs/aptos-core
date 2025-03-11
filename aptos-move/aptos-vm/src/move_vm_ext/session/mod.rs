@@ -31,11 +31,13 @@ use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     effects::{AccountChanges, Changes, Op as MoveStorageOp},
-    language_storage::{ModuleId, StructTag},
+    identifier::IdentStr,
+    language_storage::{ModuleId, StructTag, TypeTag},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
+<<<<<<< HEAD
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
     session::Session, AsFunctionValueExtension, ModuleStorage, VerifiedModuleBundle,
 };
@@ -44,7 +46,17 @@ use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
     sync::Arc,
+=======
+    config::VMConfig,
+    module_traversal::TraversalContext,
+    move_vm::MoveVm,
+    native_extensions::NativeContextExtensions,
+    session::{SerializedReturnValues, Session},
+    AsFunctionValueExtension, LoadedFunction, ModuleStorage, VerifiedModuleBundle,
+>>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
 };
+use move_vm_types::{gas::GasMeter, value_serde::ValueSerDeContext, values::Value};
+use std::{borrow::Borrow, collections::BTreeMap, sync::Arc};
 
 pub mod respawned_session;
 pub mod session_id;
@@ -61,14 +73,17 @@ type AccountChangeSet = AccountChanges<BytesWithResourceLayout>;
 type ChangeSet = Changes<BytesWithResourceLayout>;
 pub type BytesWithResourceLayout = (Bytes, Option<Arc<MoveTypeLayout>>);
 
-pub struct SessionExt<'r> {
+pub struct SessionExt<'r, R> {
     inner: Session<'r>,
-    resolver: &'r dyn AptosMoveResolver,
+    pub(crate) resolver: &'r R,
     is_storage_slot_metadata_enabled: bool,
 }
 
-impl<'r> SessionExt<'r> {
-    pub(crate) fn new<R: AptosMoveResolver>(
+impl<'r, R> SessionExt<'r, R>
+where
+    R: AptosMoveResolver,
+{
+    pub(crate) fn new(
         session_id: SessionId,
         chain_id: ChainId,
         features: &Features,
@@ -106,10 +121,72 @@ impl<'r> SessionExt<'r> {
 
         let is_storage_slot_metadata_enabled = features.is_storage_slot_metadata_enabled();
         Self {
+<<<<<<< HEAD
             inner: MoveVM::new_session_with_extensions(resolver, extensions),
+=======
+            inner: MoveVm::new_session_with_extensions(extensions),
+>>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
             resolver,
             is_storage_slot_metadata_enabled,
         }
+    }
+
+    pub fn execute_entry_function(
+        &mut self,
+        func: LoadedFunction,
+        args: Vec<impl Borrow<[u8]>>,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        module_storage: &impl ModuleStorage,
+    ) -> VMResult<()> {
+        self.inner.execute_entry_function(
+            func,
+            args,
+            gas_meter,
+            traversal_context,
+            module_storage,
+            self.resolver,
+        )
+    }
+
+    pub fn execute_function_bypass_visibility(
+        &mut self,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
+        ty_args: Vec<TypeTag>,
+        args: Vec<impl Borrow<[u8]>>,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        module_storage: &impl ModuleStorage,
+    ) -> VMResult<SerializedReturnValues> {
+        self.inner.execute_function_bypass_visibility(
+            module_id,
+            function_name,
+            ty_args,
+            args,
+            gas_meter,
+            traversal_context,
+            module_storage,
+            self.resolver,
+        )
+    }
+
+    pub fn execute_loaded_function(
+        &mut self,
+        func: LoadedFunction,
+        args: Vec<impl Borrow<[u8]>>,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        module_storage: &impl ModuleStorage,
+    ) -> VMResult<SerializedReturnValues> {
+        self.inner.execute_loaded_function(
+            func,
+            args,
+            gas_meter,
+            traversal_context,
+            module_storage,
+            self.resolver,
+        )
     }
 
     pub fn finish(
@@ -185,9 +262,20 @@ impl<'r> SessionExt<'r> {
 
     /// Returns the publish request if it exists. If the provided flag is set to true, disables any
     /// subsequent module publish requests.
-    pub fn extract_publish_request(&mut self) -> Option<PublishRequest> {
-        let ctx = self.get_native_extensions().get_mut::<NativeCodeContext>();
+    pub(crate) fn extract_publish_request(&mut self) -> Option<PublishRequest> {
+        let ctx = self
+            .inner
+            .get_native_extensions()
+            .get_mut::<NativeCodeContext>();
         ctx.extract_publish_request()
+    }
+
+    pub(crate) fn mark_unbiasable(&mut self) {
+        let txn_context = self
+            .inner
+            .get_native_extensions()
+            .get_mut::<RandomnessContext>();
+        txn_context.mark_unbiasable();
     }
 
     fn populate_v0_resource_group_change_set(
@@ -264,7 +352,7 @@ impl<'r> SessionExt<'r> {
     /// V1 Resource group change set behavior keeps ops for individual resources separate, not
     /// merging them into a single op corresponding to the whole resource group (V0).
     fn split_and_merge_resource_groups(
-        resolver: &dyn AptosMoveResolver,
+        resolver: &impl AptosMoveResolver,
         module_storage: &impl ModuleStorage,
         change_set: ChangeSet,
     ) -> PartialVMResult<(ChangeSet, ResourceGroupChangeSet)> {
@@ -464,18 +552,4 @@ pub fn convert_modules_into_write_ops(
 ) -> PartialVMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
     let woc = WriteOpConverter::new(resolver, features.is_storage_slot_metadata_enabled());
     woc.convert_modules_into_write_ops(module_storage, verified_module_bundle.into_iter())
-}
-
-impl<'r> Deref for SessionExt<'r> {
-    type Target = Session<'r>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl<'r> DerefMut for SessionExt<'r> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
 }

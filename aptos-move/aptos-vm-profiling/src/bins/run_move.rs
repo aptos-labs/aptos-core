@@ -184,7 +184,7 @@ fn main() -> Result<()> {
 
     let mut extensions = NativeContextExtensions::default();
     extensions.add(NativeTableContext::new([0; 32], &storage));
-    let mut sess = MoveVM::new_session_with_extensions(&storage, extensions);
+    let mut sess = MoveVm::new_session_with_extensions(extensions);
 
     let traversal_storage = TraversalStorage::new();
     let code_storage = storage.as_unsync_code_storage();
@@ -199,6 +199,7 @@ fn main() -> Result<()> {
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
                 &code_storage,
+                &storage,
             )?;
         },
         Entrypoint::Module(module_id) => {
@@ -210,6 +211,7 @@ fn main() -> Result<()> {
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
                 &code_storage,
+                &storage,
             )?;
             println!("{:?}", res);
         },

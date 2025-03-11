@@ -39,6 +39,7 @@ impl MoveVM {
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         module_storage: &impl ModuleStorage,
+        resource_resolver: &impl ResourceResolver,
     ) -> VMResult<SerializedReturnValues> {
         let vm_config = module_storage.runtime_environment().vm_config();
         let ty_builder = &vm_config.ty_builder;
@@ -64,6 +65,7 @@ impl MoveVM {
                 deserialized_args,
                 data_store,
                 module_storage,
+                resource_resolver,
                 gas_meter,
                 traversal_context,
                 extensions,
@@ -112,17 +114,14 @@ impl MoveVM {
     ///     cases where this may not be necessary, with the most notable one being the common module
     ///     publishing flow: you can keep using the same Move VM if you publish some modules in a Session
     ///     and apply the effects to the storage when the Session ends.
-    pub fn new_session(remote: &impl ResourceResolver) -> Session {
-        Self::new_session_with_extensions(remote, NativeContextExtensions::default())
+    pub fn new_session() -> Session<'static> {
+        Self::new_session_with_extensions(NativeContextExtensions::default())
     }
 
     /// Create a new session, as in `new_session`, but provide native context extensions.
-    pub fn new_session_with_extensions<'r>(
-        remote: &'r impl ResourceResolver,
-        native_extensions: NativeContextExtensions<'r>,
-    ) -> Session<'r> {
+    pub fn new_session_with_extensions(native_extensions: NativeContextExtensions) -> Session {
         Session {
-            data_cache: TransactionDataCache::new(remote),
+            data_cache: TransactionDataCache::empty(),
             native_extensions,
         }
     }

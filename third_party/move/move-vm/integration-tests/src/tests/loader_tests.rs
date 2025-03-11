@@ -92,7 +92,11 @@ impl Adapter {
         name: &IdentStr,
         module_storage: &impl ModuleStorage,
     ) {
+<<<<<<< HEAD
         let mut session = MoveVM::new_session(&self.store);
+=======
+        let mut session = MoveVm::new_session();
+>>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
         let traversal_storage = TraversalStorage::new();
         session
             .execute_function_bypass_visibility(
@@ -103,6 +107,7 @@ impl Adapter {
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
                 module_storage,
+                &self.store,
             )
             .unwrap_or_else(|_| panic!("Failure executing {:?}::{:?}", module, name));
     }
