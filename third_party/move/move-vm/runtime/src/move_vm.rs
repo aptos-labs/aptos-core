@@ -3,13 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache,
-    interpreter::Interpreter,
-    module_traversal::TraversalContext,
-    native_extensions::NativeContextExtensions,
-    session::{SerializedReturnValues, Session},
-    AsFunctionValueExtension, LayoutConverter, LoadedFunction, ModuleStorage,
-    StorageLayoutConverter,
+    data_cache::TransactionDataCache, interpreter::Interpreter, module_traversal::TraversalContext,
+    native_extensions::NativeContextExtensions, AsFunctionValueExtension, LayoutConverter,
+    LoadedFunction, ModuleStorage, StorageLayoutConverter,
 };
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
@@ -26,15 +22,41 @@ use move_vm_types::{
 };
 use std::borrow::Borrow;
 
+/// Return values from function execution in [MoveVm].
+#[derive(Debug)]
+pub struct SerializedReturnValues {
+    /// The value of any arguments that were mutably borrowed. Non-mut borrowed values are not
+    /// included.
+    pub mutable_reference_outputs: Vec<(LocalIndex, Vec<u8>, MoveTypeLayout)>,
+    /// The return values from the function.
+    pub return_values: Vec<(Vec<u8>, MoveTypeLayout)>,
+}
+
 /// Move VM is completely stateless. It is used to execute a single loaded function with its type
 /// arguments fully instantiated.
 pub struct MoveVM;
 
+<<<<<<< HEAD
 impl MoveVM {
     pub(crate) fn execute_loaded_function(
+=======
+impl MoveVm {
+    /// Executes provided function with the specified arguments. The arguments are serialized, and
+    /// are not checked by the VM. It is the responsibility of the caller of this function to
+    /// verify that they are well-formed.
+    ///
+    /// During execution, [MoveVm] can modify values from the global storage. Modified values are
+    /// cached in data store. Reads to the global values are also cached in the data store. The
+    /// caller can decide what to do with the read and written global values after [MoveVm] is done
+    /// executing the function. Additionally, modifications can be made to the native extensions.
+    ///
+    /// When execution finishes, the return values of the function are returned. Additionally, if
+    /// there are any mutable references passed as arguments, these values are also returned.
+    pub fn execute_loaded_function(
+>>>>>>> 35ea878580 (remove move vm session)
         function: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
-        data_store: &mut TransactionDataCache,
+        data_cache: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -63,7 +85,7 @@ impl MoveVM {
             Interpreter::entrypoint(
                 function,
                 deserialized_args,
-                data_store,
+                data_cache,
                 module_storage,
                 resource_resolver,
                 gas_meter,
@@ -98,32 +120,6 @@ impl MoveVM {
             mutable_reference_outputs,
             return_values,
         })
-    }
-
-    /// Create a new Session backed by the given storage.
-    ///
-    /// Right now it is the caller's responsibility to ensure cache coherence of the Move VM Loader
-    ///   - When a module gets published in a Move VM Session, and then gets used by another
-    ///     transaction, it will be loaded into the code cache and stay there even if the resulted
-    ///     effects do not get committed back to the storage when the Session ends.
-    ///   - As a result, if one wants to have multiple sessions at a time, one needs to make sure
-    ///     none of them will try to publish a module. In other words, if there is a module publishing
-    ///     Session it must be the only Session existing.
-    ///   - In general, a new Move VM needs to be created whenever the storage gets modified by an
-    ///     outer environment, or otherwise the states may be out of sync. There are a few exceptional
-    ///     cases where this may not be necessary, with the most notable one being the common module
-    ///     publishing flow: you can keep using the same Move VM if you publish some modules in a Session
-    ///     and apply the effects to the storage when the Session ends.
-    pub fn new_session() -> Session<'static> {
-        Self::new_session_with_extensions(NativeContextExtensions::default())
-    }
-
-    /// Create a new session, as in `new_session`, but provide native context extensions.
-    pub fn new_session_with_extensions(native_extensions: NativeContextExtensions) -> Session {
-        Session {
-            data_cache: TransactionDataCache::empty(),
-            native_extensions,
-        }
     }
 }
 

@@ -48,10 +48,10 @@ use std::{
     sync::Arc,
 =======
     config::VMConfig,
+    data_cache::TransactionDataCache,
     module_traversal::TraversalContext,
-    move_vm::MoveVm,
+    move_vm::{MoveVm, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
-    session::{SerializedReturnValues, Session},
     AsFunctionValueExtension, LoadedFunction, ModuleStorage, VerifiedModuleBundle,
 >>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
 };
@@ -74,7 +74,8 @@ type ChangeSet = Changes<BytesWithResourceLayout>;
 pub type BytesWithResourceLayout = (Bytes, Option<Arc<MoveTypeLayout>>);
 
 pub struct SessionExt<'r, R> {
-    inner: Session<'r>,
+    data_cache: TransactionDataCache,
+    extensions: NativeContextExtensions<'r>,
     pub(crate) resolver: &'r R,
     is_storage_slot_metadata_enabled: bool,
 }
@@ -122,10 +123,15 @@ where
         let is_storage_slot_metadata_enabled = features.is_storage_slot_metadata_enabled();
         Self {
 <<<<<<< HEAD
+<<<<<<< HEAD
             inner: MoveVM::new_session_with_extensions(resolver, extensions),
 =======
             inner: MoveVm::new_session_with_extensions(extensions),
 >>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
+=======
+            data_cache: TransactionDataCache::empty(),
+            extensions,
+>>>>>>> 35ea878580 (remove move vm session)
             resolver,
             is_storage_slot_metadata_enabled,
         }
@@ -139,14 +145,28 @@ where
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<()> {
-        self.inner.execute_entry_function(
+        if !func.is_entry() {
+            let module_id = func
+                .module_id()
+                .cloned()
+                .expect("Entry function always has module id");
+            return Err(PartialVMError::new(
+                StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION,
+            )
+            .finish(Location::Module(module_id)));
+        }
+
+        MoveVm::execute_loaded_function(
             func,
             args,
+            &mut self.data_cache,
             gas_meter,
             traversal_context,
+            &mut self.extensions,
             module_storage,
             self.resolver,
-        )
+        )?;
+        Ok(())
     }
 
     pub fn execute_function_bypass_visibility(
@@ -159,13 +179,14 @@ where
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
-        self.inner.execute_function_bypass_visibility(
-            module_id,
-            function_name,
-            ty_args,
+        let func = module_storage.load_function(module_id, function_name, &ty_args)?;
+        MoveVm::execute_loaded_function(
+            func,
             args,
+            &mut self.data_cache,
             gas_meter,
             traversal_context,
+            &mut self.extensions,
             module_storage,
             self.resolver,
         )
@@ -179,11 +200,13 @@ where
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
-        self.inner.execute_loaded_function(
+        MoveVm::execute_loaded_function(
             func,
             args,
+            &mut self.data_cache,
             gas_meter,
             traversal_context,
+            &mut self.extensions,
             module_storage,
             self.resolver,
         )
@@ -223,12 +246,19 @@ where
             })
         };
 
-        let (change_set, mut extensions) = self
-            .inner
-            .finish_with_extensions_with_custom_effects(&resource_converter, module_storage)?;
+        let Self {
+            data_cache,
+            mut extensions,
+            resolver,
+            is_storage_slot_metadata_enabled,
+        } = self;
+
+        let change_set = data_cache
+            .into_custom_effects(&resource_converter, module_storage)
+            .map_err(|e| e.finish(Location::Undefined))?;
 
         let (change_set, resource_group_change_set) =
-            Self::split_and_merge_resource_groups(self.resolver, module_storage, change_set)
+            Self::split_and_merge_resource_groups(resolver, module_storage, change_set)
                 .map_err(|e| e.finish(Location::Undefined))?;
 
         let table_context: NativeTableContext = extensions.remove();
@@ -244,7 +274,7 @@ where
         let event_context: NativeEventContext = extensions.remove();
         let events = event_context.into_events();
 
-        let woc = WriteOpConverter::new(self.resolver, self.is_storage_slot_metadata_enabled);
+        let woc = WriteOpConverter::new(resolver, is_storage_slot_metadata_enabled);
 
         let change_set = Self::convert_change_set(
             &woc,
@@ -263,18 +293,12 @@ where
     /// Returns the publish request if it exists. If the provided flag is set to true, disables any
     /// subsequent module publish requests.
     pub(crate) fn extract_publish_request(&mut self) -> Option<PublishRequest> {
-        let ctx = self
-            .inner
-            .get_native_extensions()
-            .get_mut::<NativeCodeContext>();
+        let ctx = self.extensions.get_mut::<NativeCodeContext>();
         ctx.extract_publish_request()
     }
 
     pub(crate) fn mark_unbiasable(&mut self) {
-        let txn_context = self
-            .inner
-            .get_native_extensions()
-            .get_mut::<RandomnessContext>();
+        let txn_context = self.extensions.get_mut::<RandomnessContext>();
         txn_context.mark_unbiasable();
     }
 
