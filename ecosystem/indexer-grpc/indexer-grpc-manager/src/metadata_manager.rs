@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::GrpcAddress,
+    config::{GrpcAddress, MAX_MESSAGE_SIZE},
     metrics::{CONNECTED_INSTANCES, COUNTER, KNOWN_LATEST_VERSION, TIMER},
 };
 use anyhow::{bail, Result};
@@ -30,7 +30,7 @@ use std::{
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tonic::transport::channel::Channel;
+use tonic::{codec::CompressionEncoding, transport::channel::Channel};
 use tracing::trace;
 
 // The maximum # of states for each service we keep.
@@ -46,7 +46,11 @@ impl Peer {
         let channel = Channel::from_shared(address)
             .expect("Bad address.")
             .connect_lazy();
-        let client = GrpcManagerClient::new(channel);
+        let client = GrpcManagerClient::new(channel)
+            .send_compressed(CompressionEncoding::Zstd)
+            .accept_compressed(CompressionEncoding::Zstd)
+            .max_encoding_message_size(MAX_MESSAGE_SIZE)
+            .max_decoding_message_size(MAX_MESSAGE_SIZE);
         Self {
             client,
             recent_states: VecDeque::new(),
@@ -64,7 +68,11 @@ impl Fullnode {
         let channel = Channel::from_shared(address)
             .expect("Bad address.")
             .connect_lazy();
-        let client = FullnodeDataClient::new(channel);
+        let client = FullnodeDataClient::new(channel)
+            .send_compressed(CompressionEncoding::Zstd)
+            .accept_compressed(CompressionEncoding::Zstd)
+            .max_encoding_message_size(MAX_MESSAGE_SIZE)
+            .max_decoding_message_size(MAX_MESSAGE_SIZE);
         Self {
             client,
             recent_states: VecDeque::new(),
@@ -82,7 +90,11 @@ impl LiveDataService {
         let channel = Channel::from_shared(address)
             .expect("Bad address.")
             .connect_lazy();
-        let client = DataServiceClient::new(channel);
+        let client = DataServiceClient::new(channel)
+            .send_compressed(CompressionEncoding::Zstd)
+            .accept_compressed(CompressionEncoding::Zstd)
+            .max_encoding_message_size(MAX_MESSAGE_SIZE)
+            .max_decoding_message_size(MAX_MESSAGE_SIZE);
         Self {
             client,
             recent_states: VecDeque::new(),
@@ -100,7 +112,11 @@ impl HistoricalDataService {
         let channel = Channel::from_shared(address)
             .expect("Bad address.")
             .connect_lazy();
-        let client = DataServiceClient::new(channel);
+        let client = DataServiceClient::new(channel)
+            .send_compressed(CompressionEncoding::Zstd)
+            .accept_compressed(CompressionEncoding::Zstd)
+            .max_encoding_message_size(MAX_MESSAGE_SIZE)
+            .max_decoding_message_size(MAX_MESSAGE_SIZE);
         Self {
             client,
             recent_states: VecDeque::new(),
