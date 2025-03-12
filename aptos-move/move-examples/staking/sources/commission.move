@@ -17,6 +17,7 @@ module staking::commission {
     use aptos_std::math64;
     use staking::oracle;
     use std::signer;
+    use aptos_framework::event;
 
     const INITIAL_COMMISSION_AMOUNT: u64 = 100000;
     const ONE_YEAR_IN_SECONDS: u64 = 31536000;
@@ -38,7 +39,33 @@ module staking::commission {
         last_update_secs: u64,
         /// Amount of debt in dollars owed to the operator due to insufficient amount received from node commission.
         /// This can happen if the commission rate is set too high or APT price is too low.
-        commission_debt: u64,
+        commission_debt: u64
+    }
+
+    #[event]
+    struct CommissionConfigUpdated has drop, store {
+        manager: address,
+        operator: address,
+        old_yearly_commission_amount: u64,
+        new_yearly_commission_amount: u64
+    }
+
+    #[event]
+    struct OperatorUpdated has drop, store {
+        requester: address,
+        manager: address,
+        old_operator: address,
+        new_operator: address
+    }
+
+    #[event]
+    struct CommissionDistributed has drop, store {
+        manager: address,
+        operator: address,
+        usd_price: u128,
+        commission_amount_apt: u64,
+        manager_amount_apt: u64,
+        commission_debt_usd: u64
     }
 
     fun init_module(commission_signer: &signer) {
@@ -82,13 +109,31 @@ module staking::commission {
     /// Can be called by the manager to change the yearly commission amount.
     public entry fun set_yearly_commission_amount(manager: &signer, new_commission: u64) acquires CommissionConfig {
         assert_manager(manager);
-        CommissionConfig[@staking].yearly_commission_amount = new_commission;
+        let config = &mut CommissionConfig[@staking];
+        let old_yearly_commission_amount = config.yearly_commission_amount;
+        config.yearly_commission_amount = new_commission;
+
+        event::emit(CommissionConfigUpdated {
+            manager: config.manager,
+            operator: config.operator,
+            old_yearly_commission_amount,
+            new_yearly_commission_amount: new_commission
+        });
     }
 
     /// Can be called by the manager or operator to change the account that receives the commission.
     public entry fun set_operator(account: &signer, new_operator: address) acquires CommissionConfig {
         assert_manager_or_operator(account);
-        CommissionConfig[@staking].operator = new_operator;
+        let config = &mut CommissionConfig[@staking];
+        let old_operator = config.operator;
+        config.operator = new_operator;
+
+        event::emit(OperatorUpdated {
+            requester: signer::address_of(account),
+            manager: config.manager,
+            old_operator,
+            new_operator
+        });
     }
 
     /// Distribute the commission to operator and remaining amount to manager.
@@ -122,7 +167,16 @@ module staking::commission {
         };
 
         let remaining_balance = coin::balance<AptosCoin>(@staking);
-        aptos_account::transfer(commission_signer, config.operator, remaining_balance)
+        aptos_account::transfer(commission_signer, config.operator, remaining_balance);
+
+        event::emit(CommissionDistributed {
+            manager: config.manager,
+            operator: config.operator,
+            usd_price: oracle::get_apt_price(),
+            commission_amount_apt: apt_to_usd(commission_in_apt),
+            manager_amount_apt: apt_to_usd(remaining_balance),
+            commission_debt_usd: config.commission_debt
+        });
     }
 
     inline fun assert_manager(account: &signer) {
