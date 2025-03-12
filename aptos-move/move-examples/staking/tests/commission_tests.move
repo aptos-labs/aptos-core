@@ -44,13 +44,19 @@ module staking::commission_tests {
         assert!(commission::commission_owed() == 1000);
     }
 
-    // Test update operator by manager
     #[test(manager = @0x123)]
     fun test_set_operator(manager: &signer) {
         set_up();
         let new_operator = account::create_signer_for_test(@0x234);
         commission::set_operator(manager, signer::address_of(&new_operator));
         assert!(commission::operator() == signer::address_of(&new_operator));
+    }
+
+    #[test(manager = @0x123)]
+    #[expected_failure(abort_code = staking::commission::EOPERATOR_SAME_AS_OLD)]
+    fun test_set_operator_same_account(manager: &signer) {
+        set_up();
+        commission::set_operator(manager, OPERATOR);
     }
 
     #[test(manager = @0x123)]

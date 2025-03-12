@@ -41,6 +41,8 @@ module staking::commission {
     const EUNAUTHORIZED: u64 = 1;
     /// Contract must have at least the minimum balance required before distributions can happen.
     const EINSUFFICIENT_BALANCE_FOR_DISTRIBUTION: u64 = 2;
+    /// The new operator cannot be the same as the old operator.
+    const EOPERATOR_SAME_AS_OLD: u64 = 3;
 
     struct CommissionConfig has key {
         /// The manager of the contract who can set the commission rate.
@@ -142,6 +144,7 @@ module staking::commission {
         assert_manager_or_operator(account);
         let config = &mut CommissionConfig[@staking];
         let old_operator = config.operator;
+        assert!(old_operator != new_operator, EOPERATOR_SAME_AS_OLD);
         config.operator = new_operator;
 
         event::emit(OperatorUpdated {
