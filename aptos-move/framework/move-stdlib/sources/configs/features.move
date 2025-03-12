@@ -665,6 +665,14 @@ module std::features {
     /// We do not expect use from Move, so for now only for documentation purposes here
     const ENABLE_FUNCTION_VALUES: u64 = 89;
 
+    /// Lifetime: transient
+    const DEFAULT_ACCOUNT_RESOURCE: u64 = 90;
+
+    public fun get_default_account_resource_feature(): u64 { DEFAULT_ACCOUNT_RESOURCE }
+
+    public fun is_default_account_resource_enabled(): bool acquires Features {
+        is_enabled(DEFAULT_ACCOUNT_RESOURCE)
+    }
 
     // ============================================================================================
     // Feature Flag Implementation
