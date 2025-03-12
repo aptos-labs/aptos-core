@@ -312,6 +312,7 @@ impl NodeSetup {
             PayloadTxnsSize::new(5, 500),
             10,
             1,
+            Some(30_000),
             PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
             false,

@@ -76,6 +76,7 @@ pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
     let enable_enum_types = features.is_enabled(FeatureFlag::ENABLE_ENUM_TYPES);
     let enable_resource_access_control =
         features.is_enabled(FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL);
+    let enable_function_values = features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES);
 
     VerifierConfig {
         max_loop_depth: Some(5),
@@ -98,6 +99,7 @@ pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
         sig_checker_v2_fix_script_ty_param_count,
         enable_enum_types,
         enable_resource_access_control,
+        enable_function_values,
     }
 }
 
@@ -144,7 +146,6 @@ pub fn aptos_prod_vm_config(
         ty_builder,
         disallow_dispatch_for_native: features.is_enabled(FeatureFlag::DISALLOW_USER_NATIVES),
         use_compatibility_checker_v2,
-        use_loader_v2: features.is_loader_v2_enabled(),
         use_call_tree_and_instruction_cache: features
             .is_call_tree_and_instruction_vm_cache_enabled(),
     }

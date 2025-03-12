@@ -245,9 +245,11 @@ impl<'a> InstructionConsistency<'a> {
     ) -> PartialVMResult<()> {
         let function_handle = self.resolver.function_handle_at(func_handle_index);
         let signature = self.resolver.signature_at(function_handle.parameters);
-        if mask.max_captured() >= signature.len() {
-            return Err(PartialVMError::new(StatusCode::INVALID_CLOSURE_MASK)
-                .at_code_offset(self.current_function(), offset as CodeOffset));
+        if let Some(max) = mask.max_captured() {
+            if max >= signature.len() {
+                return Err(PartialVMError::new(StatusCode::INVALID_CLOSURE_MASK)
+                    .at_code_offset(self.current_function(), offset as CodeOffset));
+            }
         }
         Ok(())
     }

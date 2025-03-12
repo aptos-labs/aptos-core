@@ -856,6 +856,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 fast_rand_config.clone(),
                 rand_msg_rx,
                 recovery_data.root_block().round(),
+                self.config.enable_pipeline,
             )
             .await;
         let consensus_sk = consensus_key;
@@ -913,6 +914,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config.max_failed_authors_to_store(),
             self.config
                 .min_max_txns_in_block_after_filtering_from_backpressure,
+            onchain_execution_config
+                .block_executor_onchain_config()
+                .block_gas_limit_type
+                .block_gas_limit(),
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
@@ -1411,6 +1416,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 fast_rand_config,
                 rand_msg_rx,
                 highest_committed_round,
+                self.config.enable_pipeline,
             )
             .await;
 
@@ -1680,8 +1686,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             proposal_event @ VerifiedEvent::ProposalMsg(_) => {
                 if let VerifiedEvent::ProposalMsg(p) = &proposal_event {
                     if let Some(payload) = p.proposal().payload() {
-                        payload_manager
-                            .prefetch_payload_data(payload, p.proposal().timestamp_usecs());
+                        payload_manager.prefetch_payload_data(
+                            payload,
+                            p.proposer(),
+                            p.proposal().timestamp_usecs(),
+                        );
                     }
                     pending_blocks.lock().insert_block(p.proposal().clone());
                 }

@@ -4,6 +4,7 @@
 use crate::{
     connection_manager::ConnectionManager,
     live_data_service::{data_manager::DataManager, fetch_manager::FetchManager},
+    metrics::TIMER,
 };
 use aptos_protos::transaction::v1::Transaction;
 use aptos_transaction_filter::{BooleanTransactionFilter, Filterable};
@@ -44,6 +45,8 @@ impl<'a> InMemoryCache<'a> {
         max_bytes_per_batch: usize,
         filter: &Option<BooleanTransactionFilter>,
     ) -> Option<(Vec<Transaction>, usize)> {
+        let _timer = TIMER.with_label_values(&["cache_get_data"]).start_timer();
+
         while starting_version >= self.data_manager.read().await.end_version {
             trace!("Reached head, wait...");
             let num_transactions = self

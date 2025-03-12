@@ -21,23 +21,6 @@ on:
         description: "Dry run - If checked, the release will not be created"
 
 jobs:
-  # TODO: Deprecated, only supports OpenSSL v1, which is deprecated.
-  build-ubuntu20-binary:
-    name: "Build Ubuntu 20.04 binary"
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.source_git_ref_override }}
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-      - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "Ubuntu" "${{inputs.release_version}}"
-      - name: Upload Binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: cli-builds-ubuntu-20.04
-          path: aptos-cli-*.zip
-
   # TODO: Deprecated, please use "Linux" instead as it's more straightforwardly named
   build-ubuntu22-binary:
     name: "Build Ubuntu 22.04 binary"
@@ -132,7 +115,7 @@ jobs:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       # Ensure that long paths work
       - name: Ensure long paths work
-        run: git config --system core.longpaths true
+        run: git config --global core.longpaths true
         shell: bash
       - name: Build CLI
         run: scripts\cli\build_cli_release.ps1
@@ -145,7 +128,6 @@ jobs:
   release-binaries:
     name: "Release binaries"
     needs:
-      - build-ubuntu20-binary
       - build-ubuntu22-binary
       - build-windows-binary
       - build-linux-binary

@@ -7,8 +7,10 @@ mod fetch_manager;
 mod in_memory_cache;
 
 use crate::{
-    config::LiveDataServiceConfig, connection_manager::ConnectionManager,
+    config::LiveDataServiceConfig,
+    connection_manager::ConnectionManager,
     live_data_service::in_memory_cache::InMemoryCache,
+    metrics::{COUNTER, TIMER},
 };
 use aptos_protos::indexer::v1::{GetTransactionsRequest, TransactionsResponse};
 use aptos_transaction_filter::BooleanTransactionFilter;
@@ -63,6 +65,9 @@ impl<'a> LiveDataService<'a> {
                     .await;
             });
             while let Some((request, response_sender)) = handler_rx.blocking_recv() {
+                COUNTER
+                    .with_label_values(&["live_data_service_receive_request"])
+                    .inc();
                 // TODO(grao): Store request metadata.
                 let request = request.into_inner();
                 let id = Uuid::new_v4().to_string();
@@ -76,6 +81,9 @@ impl<'a> LiveDataService<'a> {
                     ));
                     info!("Client error: {err:?}.");
                     let _ = response_sender.blocking_send(err);
+                    COUNTER
+                        .with_label_values(&["live_data_service_requested_data_too_new"])
+                        .inc();
                     continue;
                 }
 
@@ -91,6 +99,9 @@ impl<'a> LiveDataService<'a> {
                             )));
                             info!("Client error: {err:?}.");
                             let _ = response_sender.blocking_send(err);
+                            COUNTER
+                                .with_label_values(&["live_data_service_invalid_filter"])
+                                .inc();
                             continue;
                         },
                     }
@@ -142,6 +153,9 @@ impl<'a> LiveDataService<'a> {
         filter: Option<BooleanTransactionFilter>,
         response_sender: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
     ) {
+        COUNTER
+            .with_label_values(&["live_data_service_new_stream"])
+            .inc();
         info!(stream_id = id, "Start streaming, starting_version: {starting_version}, ending_version: {ending_version:?}.");
         self.connection_manager
             .insert_active_stream(&id, starting_version, ending_version);
@@ -172,6 +186,9 @@ impl<'a> LiveDataService<'a> {
                 )
                 .await
             {
+                let _timer = TIMER
+                    .with_label_values(&["live_data_service_send_batch"])
+                    .start_timer();
                 next_version += transactions.len() as u64;
                 size_bytes += batch_size_bytes as u64;
                 let response = TransactionsResponse {
@@ -180,12 +197,18 @@ impl<'a> LiveDataService<'a> {
                 };
                 if response_sender.send(Ok(response)).await.is_err() {
                     info!(stream_id = id, "Client dropped.");
+                    COUNTER
+                        .with_label_values(&["live_data_service_client_dropped"])
+                        .inc();
                     break;
                 }
             } else {
                 let err = Err(Status::not_found("Requested data is too old."));
                 info!(stream_id = id, "Client error: {err:?}.");
                 let _ = response_sender.send(err).await;
+                COUNTER
+                    .with_label_values(&["terminate_requested_data_too_old"])
+                    .inc();
                 break;
             }
         }

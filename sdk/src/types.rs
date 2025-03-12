@@ -63,6 +63,7 @@ enum LocalAccountAuthenticator {
     Keyless(KeylessAccount),
     FederatedKeyless(FederatedKeylessAccount),
     Abstraction(AbstractedAccount), // TODO: Add support for keyless authentication
+    DomainAbstraction(DomainAbstractedAccount), // TODO: Add support for keyless authentication
 }
 
 impl LocalAccountAuthenticator {
@@ -85,6 +86,7 @@ impl LocalAccountAuthenticator {
                 )
             },
             LocalAccountAuthenticator::Abstraction(..) => unreachable!(),
+            LocalAccountAuthenticator::DomainAbstraction(..) => unreachable!(),
         }
     }
 
@@ -192,6 +194,27 @@ impl LocalAccount {
         Self {
             address,
             auth: LocalAccountAuthenticator::FederatedKeyless(federated_keyless_account),
+            sequence_number: AtomicU64::new(sequence_number),
+        }
+    }
+
+    pub fn new_domain_aa(
+        function_info: FunctionInfo,
+        account_identity: Vec<u8>,
+        sign_func: Arc<dyn Fn(&[u8]) -> Vec<u8> + Send + Sync>,
+        sequence_number: u64,
+    ) -> Self {
+        Self {
+            address: AuthenticationKey::domain_abstraction_address(
+                bcs::to_bytes(&function_info).unwrap(),
+                &account_identity,
+            )
+            .account_address(),
+            auth: LocalAccountAuthenticator::DomainAbstraction(DomainAbstractedAccount {
+                function_info,
+                account_identity,
+                sign_func,
+            }),
             sequence_number: AtomicU64::new(sequence_number),
         }
     }
@@ -433,6 +456,7 @@ impl LocalAccount {
             LocalAccountAuthenticator::Keyless(_) => todo!(),
             LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
             LocalAccountAuthenticator::Abstraction(..) => todo!(),
+            LocalAccountAuthenticator::DomainAbstraction(..) => todo!(),
         }
     }
 
@@ -442,6 +466,7 @@ impl LocalAccount {
             LocalAccountAuthenticator::Keyless(_) => todo!(),
             LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
             LocalAccountAuthenticator::Abstraction(..) => todo!(),
+            LocalAccountAuthenticator::DomainAbstraction(..) => todo!(),
         }
     }
 
@@ -455,6 +480,7 @@ impl LocalAccount {
                 federated_keyless_account.authentication_key()
             },
             LocalAccountAuthenticator::Abstraction(..) => todo!(),
+            LocalAccountAuthenticator::DomainAbstraction(..) => todo!(),
         }
     }
 
@@ -465,6 +491,11 @@ impl LocalAccount {
             LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
             LocalAccountAuthenticator::Abstraction(aa) => {
                 Auth::Abstraction(aa.function_info.clone(), aa.sign_func.clone())
+            },
+            LocalAccountAuthenticator::DomainAbstraction(aa) => Auth::DomainAbstraction {
+                function_info: aa.function_info.clone(),
+                account_identity: aa.account_identity.clone(),
+                sign_function: aa.sign_func.clone(),
             },
         }
     }
@@ -503,6 +534,7 @@ impl LocalAccount {
             LocalAccountAuthenticator::Keyless(_) => todo!(),
             LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
             LocalAccountAuthenticator::Abstraction(..) => todo!(),
+            LocalAccountAuthenticator::DomainAbstraction(..) => todo!(),
         }
     }
 
@@ -816,6 +848,22 @@ impl fmt::Debug for AbstractedAccount {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AbstractedAccount")
             .field("function_info", &self.function_info)
+            .field("sign_func", &"<function pointer>") // Placeholder for the function
+            .finish()
+    }
+}
+
+pub struct DomainAbstractedAccount {
+    function_info: FunctionInfo,
+    account_identity: Vec<u8>,
+    sign_func: Arc<dyn Fn(&[u8]) -> Vec<u8> + Send + Sync>,
+}
+
+impl fmt::Debug for DomainAbstractedAccount {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DomainAbstractedAccount")
+            .field("function_info", &self.function_info)
+            .field("account_identity", &self.account_identity)
             .field("sign_func", &"<function pointer>") // Placeholder for the function
             .finish()
     }

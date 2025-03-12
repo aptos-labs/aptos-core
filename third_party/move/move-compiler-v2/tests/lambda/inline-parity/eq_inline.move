@@ -1,6 +1,6 @@
 module 0x42::m {
 
-    fun foo(f: |&u64|) {
+    fun foo(f: |&u64| has drop) {
     }
 
     fun g() {

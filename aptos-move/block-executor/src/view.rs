@@ -46,7 +46,8 @@ use aptos_types::{
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{
-    ResourceGroupSize, StateStorageView, TModuleView, TResourceGroupView, TResourceView,
+    BlockSynchronizationKillSwitch, ResourceGroupSize, StateStorageView, TModuleView,
+    TResourceGroupView, TResourceView,
 };
 use bytes::Bytes;
 use claims::assert_ok;
@@ -1448,6 +1449,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     }
 }
 
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> BlockSynchronizationKillSwitch
+    for LatestView<'a, T, S>
+{
+    fn interrupt_requested(&self) -> bool {
+        match &self.latest_view {
+            ViewState::Sync(state) => state.scheduler.has_halted(),
+            ViewState::Unsync(_) => false,
+        }
+    }
+}
+
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestView<'a, T, S> {
     type Key = T::Key;
     type Layout = MoveTypeLayout;
@@ -1575,21 +1587,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TModuleView for LatestView
             "Reading a resource {:?} using ModuleView",
             state_key,
         );
-
-        // Enforce feature gating V2 loader implementation: TModuleView is no longer used in
-        // V2 interfaces because we implement storage traits directly. Use a debug assert to
-        // panic in tests, adn invariant violation for non-debug builds.
-        if self.runtime_environment.vm_config().use_loader_v2 {
-            let msg =
-                "ModuleView trait should not be used when loader V2 implementation is enabled"
-                    .to_string();
-            let err = Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(msg),
-            );
-            debug_assert!(err.is_ok());
-            return err;
-        }
 
         match &self.latest_view {
             ViewState::Sync(state) => {

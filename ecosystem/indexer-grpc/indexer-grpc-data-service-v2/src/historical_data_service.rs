@@ -1,7 +1,11 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{config::HistoricalDataServiceConfig, connection_manager::ConnectionManager};
+use crate::{
+    config::HistoricalDataServiceConfig,
+    connection_manager::ConnectionManager,
+    metrics::{COUNTER, TIMER},
+};
 use aptos_indexer_grpc_utils::file_store_operator_v2::file_store_reader::FileStoreReader;
 use aptos_protos::indexer::v1::{GetTransactionsRequest, TransactionsResponse};
 use aptos_transaction_filter::BooleanTransactionFilter;
@@ -49,6 +53,9 @@ impl HistoricalDataService {
         info!("Running HistoricalDataService...");
         tokio_scoped::scope(|scope| {
             while let Some((request, response_sender)) = handler_rx.blocking_recv() {
+                COUNTER
+                    .with_label_values(&["historical_data_service_receive_request"])
+                    .inc();
                 // TODO(grao): Store request metadata.
                 let request = request.into_inner();
                 // TODO(grao): We probably should have a more stable id from the client side.
@@ -59,6 +66,9 @@ impl HistoricalDataService {
                     let err = Err(Status::invalid_argument("Must provide starting_version."));
                     info!("Client error: {err:?}.");
                     let _ = response_sender.blocking_send(err);
+                    COUNTER
+                        .with_label_values(&["historical_data_service_invalid_request"])
+                        .inc();
                     continue;
                 }
                 let starting_version = request.starting_version.unwrap();
@@ -75,6 +85,9 @@ impl HistoricalDataService {
                             )));
                             info!("Client error: {err:?}.");
                             let _ = response_sender.blocking_send(err);
+                            COUNTER
+                                .with_label_values(&["historical_data_service_invalid_filter"])
+                                .inc();
                             continue;
                         },
                     }
@@ -120,6 +133,9 @@ impl HistoricalDataService {
         filter: Option<BooleanTransactionFilter>,
         response_sender: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
     ) {
+        COUNTER
+            .with_label_values(&["historical_data_service_new_stream"])
+            .inc();
         info!(stream_id = id, "Start streaming, starting_version: {starting_version}, ending_version: {ending_version:?}.");
         self.connection_manager
             .insert_active_stream(&id, starting_version, ending_version);
@@ -179,11 +195,17 @@ impl HistoricalDataService {
                                 chain_id: Some(self.chain_id),
                             });
                     for response in responses {
+                        let _timer = TIMER
+                            .with_label_values(&["historical_data_service_send_batch"])
+                            .start_timer();
                         if response_sender.send(Ok(response)).await.is_err() {
                             // NOTE: We are not recalculating the version and size_bytes for the stream
                             // progress since nobody cares about the accurate if client has dropped the
                             // connection.
                             info!(stream_id = id, "Client dropped.");
+                            COUNTER
+                                .with_label_values(&["historical_data_service_client_dropped"])
+                                .inc();
                             break 'out;
                         }
                     }
@@ -194,6 +216,9 @@ impl HistoricalDataService {
                     stream_id = id,
                     "Stream is approaching to the latest transactions, terminate."
                 );
+                COUNTER
+                    .with_label_values(&["terminate_close_to_latest"])
+                    .inc();
                 break;
             }
         }

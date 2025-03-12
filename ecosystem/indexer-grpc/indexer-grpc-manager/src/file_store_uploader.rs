@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::data_manager::DataManager;
+use crate::{
+    data_manager::DataManager,
+    metrics::{FILE_STORE_VERSION, TIMER},
+};
 use anyhow::Result;
 use aptos_indexer_grpc_utils::{
     compression_util::{FileEntry, StorageFormat},
@@ -78,6 +81,8 @@ impl FileStoreUploader {
 
     /// Recovers the batch metadata in memory buffer for the unfinished batch from file store.
     async fn recover(&self) -> Result<(u64, BatchMetadata)> {
+        let _timer = TIMER.with_label_values(&["recover"]).start_timer();
+
         let mut version = self
             .reader
             .get_latest_version()
@@ -126,13 +131,21 @@ impl FileStoreUploader {
             });
             s.spawn(async move {
                 loop {
-                    let transactions = data_manager
-                        .get_transactions_from_cache(
-                            file_store_operator.version(),
-                            MAX_SIZE_PER_FILE,
-                            /*update_file_store_version=*/ true,
-                        )
-                        .await;
+                    let _timer = TIMER
+                        .with_label_values(&["file_store_uploader_main_loop"])
+                        .start_timer();
+                    let transactions = {
+                        let _timer = TIMER
+                            .with_label_values(&["get_transactions_from_cache"])
+                            .start_timer();
+                        data_manager
+                            .get_transactions_from_cache(
+                                file_store_operator.version(),
+                                MAX_SIZE_PER_FILE,
+                                /*update_file_store_version=*/ true,
+                            )
+                            .await
+                    };
                     let len = transactions.len();
                     for transaction in transactions {
                         file_store_operator
@@ -156,6 +169,8 @@ impl FileStoreUploader {
         batch_metadata: BatchMetadata,
         end_batch: bool,
     ) -> Result<()> {
+        let _timer = TIMER.with_label_values(&["do_upload"]).start_timer();
+
         let first_version = transactions.first().unwrap().version;
         let last_version = transactions.last().unwrap().version;
         let data_file =
@@ -211,6 +226,7 @@ impl FileStoreUploader {
 
     /// Updates the file store metadata.
     async fn update_file_store_metadata(&self, version: u64) -> Result<()> {
+        FILE_STORE_VERSION.set(version as i64);
         let metadata = FileStoreMetadata {
             chain_id: self.chain_id,
             num_transactions_per_folder: NUM_TXNS_PER_FOLDER,

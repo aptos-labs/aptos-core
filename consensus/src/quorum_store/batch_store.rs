@@ -23,8 +23,12 @@ use dashmap::{
     DashMap,
 };
 use fail::fail_point;
+use futures::{future::Shared, FutureExt};
 use once_cell::sync::OnceCell;
 use std::{
+    collections::{BTreeSet, HashMap},
+    future::Future,
+    pin::Pin,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -271,12 +275,16 @@ impl BatchStore {
             let cache_entry = self.db_cache.entry(digest);
 
             if let Occupied(entry) = &cache_entry {
-                if entry.get().expiration() >= expiration_time {
-                    debug!(
-                        "QS: already have the digest with higher expiration {}",
-                        digest
-                    );
-                    return Ok(false);
+                match entry.get().expiration().cmp(&expiration_time) {
+                    std::cmp::Ordering::Equal => return Ok(false),
+                    std::cmp::Ordering::Greater => {
+                        debug!(
+                            "QS: already have the digest with higher expiration {}",
+                            digest
+                        );
+                        return Ok(false);
+                    },
+                    std::cmp::Ordering::Less => {},
                 }
             };
             let value_to_be_stored = if self
@@ -493,17 +501,22 @@ pub trait BatchReader: Send + Sync {
 
     fn get_batch(
         &self,
-        digest: HashValue,
-        expiration: u64,
-        signers: Arc<Mutex<Vec<PeerId>>>,
-    ) -> oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>;
+        batch_info: BatchInfo,
+        signers: Vec<PeerId>,
+    ) -> Shared<Pin<Box<dyn Future<Output = ExecutorResult<Vec<SignedTransaction>>> + Send>>>;
 
     fn update_certified_timestamp(&self, certified_time: u64);
+}
+
+struct BatchFetchUnit {
+    responders: Arc<Mutex<BTreeSet<PeerId>>>,
+    fut: Shared<Pin<Box<dyn Future<Output = ExecutorResult<Vec<SignedTransaction>>> + Send>>>,
 }
 
 pub struct BatchReaderImpl<T> {
     batch_store: Arc<BatchStore>,
     batch_requester: Arc<BatchRequester<T>>,
+    inflight_fetch_requests: Arc<Mutex<HashMap<HashValue, BatchFetchUnit>>>,
 }
 
 impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReaderImpl<T> {
@@ -511,7 +524,68 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReaderImpl<T> {
         Self {
             batch_store,
             batch_requester: Arc::new(batch_requester),
+            inflight_fetch_requests: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    fn get_or_fetch_batch(
+        &self,
+        batch_info: BatchInfo,
+        responders: Vec<PeerId>,
+    ) -> Shared<Pin<Box<dyn Future<Output = ExecutorResult<Vec<SignedTransaction>>> + Send>>> {
+        let mut responders = responders.into_iter().collect();
+
+        self.inflight_fetch_requests
+            .lock()
+            .entry(*batch_info.digest())
+            .and_modify(|fetch_unit| {
+                fetch_unit.responders.lock().append(&mut responders);
+            })
+            .or_insert_with(|| {
+                let responders = Arc::new(Mutex::new(responders));
+                let responders_clone = responders.clone();
+
+                let subscriber_rx = self.batch_store.subscribe(*batch_info.digest());
+
+                let inflight_requests_clone = self.inflight_fetch_requests.clone();
+                let batch_store = self.batch_store.clone();
+                let requester = self.batch_requester.clone();
+
+                let fut = async move {
+                    let batch_digest = *batch_info.digest();
+                    defer!({
+                        inflight_requests_clone.lock().remove(&batch_digest);
+                    });
+                    if let Ok(mut value) = batch_store.get_batch_from_local(&batch_digest) {
+                        Ok(value.take_payload().expect("Must have payload"))
+                    } else {
+                        // Quorum store metrics
+                        counters::MISSED_BATCHES_COUNT.inc();
+                        let payload = requester
+                            .request_batch(
+                                batch_digest,
+                                batch_info.expiration(),
+                                responders,
+                                subscriber_rx,
+                            )
+                            .await?;
+                        batch_store
+                            .persist(vec![PersistedValue::new(batch_info, Some(payload.clone()))]);
+                        Ok(payload)
+                    }
+                }
+                .boxed()
+                .shared();
+
+                tokio::spawn(fut.clone());
+
+                BatchFetchUnit {
+                    responders: responders_clone,
+                    fut,
+                }
+            })
+            .fut
+            .clone()
     }
 }
 
@@ -525,37 +599,10 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for Batch
 
     fn get_batch(
         &self,
-        digest: HashValue,
-        expiration: u64,
-        signers: Arc<Mutex<Vec<PeerId>>>,
-    ) -> oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>> {
-        let (tx, rx) = oneshot::channel();
-        let batch_store = self.batch_store.clone();
-        let batch_requester = self.batch_requester.clone();
-        tokio::spawn(async move {
-            if let Ok(mut value) = batch_store.get_batch_from_local(&digest) {
-                if tx
-                    .send(Ok(value.take_payload().expect("Must have payload")))
-                    .is_err()
-                {
-                    debug!(
-                        "Receiver of local batch not available for digest {}",
-                        digest,
-                    )
-                };
-            } else {
-                // Quorum store metrics
-                counters::MISSED_BATCHES_COUNT.inc();
-                let subscriber_rx = batch_store.subscribe(digest);
-                if let Some((batch_info, payload)) = batch_requester
-                    .request_batch(digest, expiration, signers, tx, subscriber_rx)
-                    .await
-                {
-                    batch_store.persist(vec![PersistedValue::new(batch_info, Some(payload))]);
-                }
-            }
-        });
-        rx
+        batch_info: BatchInfo,
+        responders: Vec<PeerId>,
+    ) -> Shared<Pin<Box<dyn Future<Output = ExecutorResult<Vec<SignedTransaction>>> + Send>>> {
+        self.get_or_fetch_batch(batch_info, responders)
     }
 
     fn update_certified_timestamp(&self, certified_time: u64) {

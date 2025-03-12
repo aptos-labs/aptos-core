@@ -31,9 +31,9 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{
-        AbilityInference, AbilityInferer, NoUnificationContext, Type, TypeDisplayContext,
-        TypeUnificationAdapter, Variance,
+        AbilityInference, AbilityInferer, NoUnificationContext, Type, TypeDisplayContext, Variance,
     },
+    ty_invariant_analysis::TypeUnificationAdapter,
     well_known,
 };
 use anyhow::bail;
@@ -1708,8 +1708,29 @@ impl GlobalEnv {
         module: &CompiledModule,
         def_idx: FunctionDefinitionIndex,
     ) -> BTreeSet<QualifiedId<FunId>> {
-        // TODO(LAMBDA) -- fix when we extend bytecode with function values
-        self.get_called_funs_from_bytecode(module, def_idx)
+        let function_definition = module.function_def_at(def_idx);
+        let function_definition_view = FunctionDefinitionView::new(module, function_definition);
+        let used_funs: BTreeSet<QualifiedId<FunId>> = match function_definition_view.code() {
+            Some(unit) => unit
+                .code
+                .iter()
+                .filter_map(|c| {
+                    let handle_idx = match c {
+                        Bytecode::Call(i) | Bytecode::PackClosure(i, ..) => Some(*i),
+                        Bytecode::CallGeneric(i) | Bytecode::PackClosureGeneric(i, ..) => {
+                            Some(module.function_instantiation_at(*i).handle)
+                        },
+                        _ => None,
+                    };
+                    handle_idx.map(|idx| {
+                        ModuleEnv::get_used_function_from_compiled_module(self, idx, module)
+                            .get_qualified_id()
+                    })
+                })
+                .collect(),
+            None => BTreeSet::default(),
+        };
+        used_funs
     }
 
     fn get_called_funs_from_bytecode(
@@ -3554,6 +3575,11 @@ pub struct StructEnv<'env> {
 }
 
 impl<'env> StructEnv<'env> {
+    /// Shortcut to access the env
+    pub fn env(&self) -> &GlobalEnv {
+        self.module_env.env
+    }
+
     /// Returns the name of this struct.
     pub fn get_name(&self) -> Symbol {
         self.data.name
@@ -3866,6 +3892,19 @@ impl<'env> StructEnv<'env> {
             type_param_names: Some(type_param_names),
             ..self.module_env.get_type_display_ctx()
         }
+    }
+
+    /// If this is a function type wrapper (`struct W(|T|R)`), get the underlying
+    /// function type, instantiated.
+    pub fn get_function_wrapper_type(&self, inst: &[Type]) -> Option<Type> {
+        if self.get_field_count() == 1 {
+            let field = self.get_fields().next().unwrap();
+            let ty = field.get_type();
+            if field.is_positional() && ty.is_function() {
+                return Some(ty.instantiate(inst));
+            }
+        }
+        None
     }
 }
 
@@ -4224,8 +4263,7 @@ pub struct FunctionData {
     /// Specification associated with this function.
     pub(crate) spec: RefCell<Spec>,
 
-    /// Optional definition associated with this function. The definition is available if
-    /// the model is build with option `ModelBuilderOptions::compile_via_model`.
+    /// Optional definition associated with this function.
     pub(crate) def: Option<Exp>,
 
     /// A cache for the called functions.
@@ -4293,6 +4331,11 @@ pub struct FunctionEnv<'env> {
 }
 
 impl<'env> FunctionEnv<'env> {
+    /// Shortcut to access the env
+    pub fn env(&self) -> &GlobalEnv {
+        self.module_env.env
+    }
+
     /// Returns the name of this function.
     pub fn get_name(&self) -> Symbol {
         self.data.name
@@ -4813,8 +4856,7 @@ impl<'env> FunctionEnv<'env> {
         self.data.spec.borrow_mut()
     }
 
-    /// Returns associated definition. The definition of the function, in Exp form, is available
-    /// if the model is build with `ModelBuilderOptions::compile_via_model`
+    /// Returns associated definition if available.
     pub fn get_def(&self) -> Option<&Exp> {
         self.data.def.as_ref()
     }

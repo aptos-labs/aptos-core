@@ -30,10 +30,6 @@ pub const TEST_SHORT: char = 't';
 pub const VERIFY: &str = "verify";
 pub const VERIFY_SHORT: char = 'v';
 
-pub const FLAVOR: &str = "flavor";
-
-pub const BYTECODE_VERSION: &str = "bytecode-version";
-
 pub const LANGUAGE_VERSION: &str = "language-version";
 
 /// Color flag interpreted locally in diagnostics/mod.rs.
@@ -67,7 +63,6 @@ pub const WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG: &str = "Wdeprecation-aptos
 pub const WARN_UNUSED_FLAG: &str = "Wunused";
 
 pub const LANG_V2_FLAG: &str = "lang_v2";
-pub const COMPILER_V2_FLAG: &str = "compiler_v2";
 
 // Flag to dump a stacktrace on a compiler error, for users who like
 // to keep RUST_BACKTRACE always enabled.

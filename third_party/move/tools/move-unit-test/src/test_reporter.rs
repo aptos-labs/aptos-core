@@ -107,10 +107,6 @@ pub enum FailureReason {
     },
     // Property checking failed
     Property(String),
-
-    // Failed to compile Move code into EVM bytecode.
-    #[cfg(feature = "evm-backend")]
-    MoveToEVMError(String),
 }
 
 #[derive(Debug, Clone, Ord, PartialOrd, PartialEq, Eq)]
@@ -197,11 +193,6 @@ impl FailureReason {
     pub fn property(details: String) -> Self {
         FailureReason::Property(details)
     }
-
-    #[cfg(feature = "evm-backend")]
-    pub fn move_to_evm_error(diagnostics: String) -> Self {
-        FailureReason::MoveToEVMError(diagnostics)
-    }
 }
 
 impl TestFailure {
@@ -285,14 +276,6 @@ impl TestFailure {
                 )
             },
             FailureReason::Property(message) => message.clone(),
-
-            #[cfg(feature = "evm-backend")]
-            FailureReason::MoveToEVMError(diagnostics) => {
-                format!(
-                    "Failed to compile Move code into EVM bytecode.\n\n{}",
-                    diagnostics
-                )
-            },
         };
 
         match &self.storage_state {
@@ -444,7 +427,7 @@ impl TestFailure {
 
         static MOVE_TEST_DEBUG: Lazy<bool> = Lazy::new(|| read_bool_env_var("MOVE_TEST_DEBUG"));
         if *MOVE_TEST_DEBUG {
-            let full_vm_error_description = vm_error.format_test_output(*MOVE_TEST_DEBUG, false);
+            let full_vm_error_description = vm_error.format_test_output(*MOVE_TEST_DEBUG);
             diags = diags + &full_vm_error_description;
         }
 
