@@ -14,9 +14,11 @@
 /// developers using this contract can also add decimals to the dollar amount (e.g. 2 decimals) to reduce the rounding
 /// errors.
 /// 2. In theory this function can be called very often (e.g. once every few seconds) to use rounding errors
-/// to "rob" the operator because micro amounts are rounded to 0. This is not possible in practice when using this
-/// contract for node operator commission as it's only paid out once in a while (at least a few days) so balance is
-/// zero before then which makes the attack not possible.
+/// to "rob" the operator. This has minimum damage in practice when using this contract for node operator commission
+/// as it's only paid out once in a while (at least a few days) so balance is zero before then which makes the attack
+/// not possible.
+/// This issue is also somewhat mitigated by asserting a min balance before distributing. For other uses of this
+/// contract, consider raising the minimum balance to minimize rounding errors from frequent distribution calls.
 module staking::commission {
     use aptos_framework::account::{Self, SignerCapability};
     use aptos_framework::aptos_account;
@@ -33,9 +35,12 @@ module staking::commission {
     const INITIAL_COMMISSION_AMOUNT: u64 = 100000;
     const ONE_YEAR_IN_SECONDS: u64 = 31536000;
     const OCTAS_IN_ONE_APT: u128 = 100000000; // 1e8
+    const MIN_BALANCE_FOR_DISTRIBUTION: u64 = 100000000; // 1 APT
 
     /// Account is not authorized to call this function.
     const EUNAUTHORIZED: u64 = 1;
+    /// Contract must have at least the minimum balance required before distributions can happen.
+    const EINSUFFICIENT_BALANCE_FOR_DISTRIBUTION: u64 = 2;
 
     struct CommissionConfig has key {
         /// The manager of the contract who can set the commission rate.
@@ -151,11 +156,16 @@ module staking::commission {
     /// Can only be called by the manager or operator.
     ///
     /// Note that in theory this function can be called very often (e.g. once every few seconds) to use rounding errors
-    /// to "rob" the operator because micro amounts are rounded to 0. This is not possible in practice when using this
-    /// contract for node operator commission as it's only paid out once in a while (at least a few days) so balance is
-    /// zero before then which makes the attack not possible.
+    /// to "rob" the operator. This has minimum damage in practice when using this contract for node operator commission
+    /// as it's only paid out once in a while (at least a few days) so balance is zero before then which makes the attack
+    /// not possible.
+    /// This issue is also somewhat mitigated by asserting a min balance before distributing. For other uses of this
+    /// contract, consider raising the minimum balance to minimize rounding errors from frequent distribution calls.
     public entry fun distribute_commission(account: &signer) acquires CommissionConfig {
         assert_manager_or_operator(account);
+
+        let balance = coin::balance<AptosCoin>(@staking);
+        assert!(balance >= MIN_BALANCE_FOR_DISTRIBUTION, EINSUFFICIENT_BALANCE_FOR_DISTRIBUTION);
 
         // Commission owed so far plus any debt.
         // There can be a rounding error of 1 octa here when converting from USD to APT. This is negligible.
@@ -168,7 +178,6 @@ module staking::commission {
         config.commission_debt = 0;
 
         let commission_signer = &account::create_signer_with_capability(&config.signer_cap);
-        let balance = coin::balance<AptosCoin>(@staking);
         // If there's not enough balance to pay the commission, either commission rate is set too high or APT price is low.
         // Otherwise, pay the operator the commission in APT and send remaining balance to the manager.
         if (balance <= commission_in_apt) {

@@ -54,6 +54,19 @@ module staking::commission_tests {
     }
 
     #[test(manager = @0x123)]
+    #[expected_failure(abort_code = staking::commission::EINSUFFICIENT_BALANCE_FOR_DISTRIBUTION)]
+    fun test_distribution_with_insufficient_balance(manager: &signer) {
+        set_up();
+        commission::set_yearly_commission_amount(manager, 100000);
+        assert!(commission::commission_owed() == 0);
+
+        // Mint 0.1 APT. Not enough to cover the min balance for distribution.
+        mint_apt(10000000);
+        timestamp::fast_forward_seconds(ONE_YEAR_IN_SECONDS);
+        commission::distribute_commission(manager);
+    }
+
+    #[test(manager = @0x123)]
     fun test_distribution_with_no_debt(manager: &signer) {
         set_up();
         // Commission is 100,000 USD per year
