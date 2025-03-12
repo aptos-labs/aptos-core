@@ -1,4 +1,8 @@
 /// Module used to read the price of APT from the oracle.
+///
+/// Note that this is the bare minimum implementation of the oracle module. More controls beyond price staleness check
+/// can be added and developers using this module should consider various security and economic implications when using
+/// this oracle in their protocols.
 module staking::oracle {
     use aptos_std::math128;
     use pyth::i64;
