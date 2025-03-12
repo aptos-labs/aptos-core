@@ -2,7 +2,10 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::compiler::{as_module, compile_units};
+use crate::{
+    compiler::{as_module, compile_units},
+    tests::execute_function_with_single_storage_for_test,
+};
 use move_binary_format::errors::VMResult;
 use move_core_types::{
     account_address::AccountAddress,
@@ -10,11 +13,14 @@ use move_core_types::{
     language_storage::TypeTag,
     value::{MoveTypeLayout, MoveValue},
 };
+<<<<<<< HEAD
 use move_vm_runtime::{
     module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues, AsUnsyncModuleStorage,
 };
+=======
+use move_vm_runtime::move_vm::SerializedReturnValues;
+>>>>>>> 35ea878580 (remove move vm session)
 use move_vm_test_utils::InMemoryStorage;
-use move_vm_types::gas::UnmeteredGasMeter;
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 
@@ -52,33 +58,29 @@ fn run(
     storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     let mut sess = MoveVM::new_session(&storage);
 =======
     let mut sess = MoveVm::new_session();
 >>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
 
+=======
+>>>>>>> 35ea878580 (remove move vm session)
     let fun_name = Identifier::new("foo").unwrap();
-
     let args: Vec<_> = args
         .into_iter()
         .map(|val| val.simple_serialize().unwrap())
         .collect();
 
-    let module_storage = storage.as_unsync_module_storage();
-    let traversal_storage = TraversalStorage::new();
-
     let SerializedReturnValues {
         return_values,
         mutable_reference_outputs: _,
-    } = sess.execute_function_bypass_visibility(
+    } = execute_function_with_single_storage_for_test(
+        &storage,
         &m.self_id(),
         &fun_name,
-        ty_args,
+        &ty_args,
         args,
-        &mut UnmeteredGasMeter,
-        &mut TraversalContext::new(&traversal_storage),
-        &module_storage,
-        &storage,
     )?;
 
     Ok(return_values

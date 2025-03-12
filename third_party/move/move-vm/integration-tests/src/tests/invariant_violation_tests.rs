@@ -1,14 +1,17 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::tests::execute_script_for_test;
 use move_binary_format::file_format::{
     Bytecode::*, CodeUnit, CompiledScript, Constant, ConstantPoolIndex, Signature, SignatureIndex,
     SignatureToken::*,
 };
 use move_core_types::vm_status::StatusCode;
+<<<<<<< HEAD
 use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage};
+=======
+>>>>>>> 35ea878580 (remove move vm session)
 use move_vm_test_utils::InMemoryStorage;
-use move_vm_types::gas::UnmeteredGasMeter;
 
 #[test]
 fn merge_borrow_states_infinite_loop() {
@@ -71,33 +74,21 @@ fn merge_borrow_states_infinite_loop() {
     };
 
     move_bytecode_verifier::verify_script(&cs).expect("verify failed");
-    let storage = InMemoryStorage::new();
 
+<<<<<<< HEAD
 <<<<<<< HEAD
     let mut session = MoveVM::new_session(&storage);
 =======
     let mut session = MoveVm::new_session();
 >>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
+=======
+>>>>>>> 35ea878580 (remove move vm session)
     let mut script_bytes = vec![];
     cs.serialize(&mut script_bytes).unwrap();
 
-    let traversal_storage = TraversalStorage::new();
-    let code_storage = storage.as_unsync_code_storage();
-
-    let err = session
-        .load_and_execute_script(
-            script_bytes.as_slice(),
-            vec![],
-            Vec::<Vec<u8>>::new(),
-            &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
-            &code_storage,
-            &storage,
-        )
-        .unwrap_err();
-
-    assert_eq!(
-        err.major_status(),
-        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
-    );
+    let storage = InMemoryStorage::new();
+    let status = execute_script_for_test(&storage, &script_bytes, &[], vec![])
+        .unwrap_err()
+        .major_status();
+    assert_eq!(status, StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR);
 }

@@ -2,6 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::tests::{execute_function_with_single_storage_for_test, execute_script_for_test};
 use move_binary_format::{
     errors::VMResult,
     file_format::{
@@ -22,11 +23,13 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
+<<<<<<< HEAD
 use move_vm_runtime::{
     module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage, AsUnsyncModuleStorage,
 };
+=======
+>>>>>>> 35ea878580 (remove move vm session)
 use move_vm_test_utils::InMemoryStorage;
-use move_vm_types::gas::UnmeteredGasMeter;
 
 // make a script with a given signature for main.
 fn make_script(parameters: Signature) -> Vec<u8> {
@@ -257,6 +260,7 @@ fn call_script_with_args_ty_args_signers(
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
     let storage = InMemoryStorage::new();
+<<<<<<< HEAD
     let code_storage = storage.as_unsync_code_storage();
 <<<<<<< HEAD
     let mut session = MoveVM::new_session(&storage);
@@ -277,6 +281,10 @@ fn call_script_with_args_ty_args_signers(
             &storage,
         )
         .map(|_| ())
+=======
+    let args = combine_signers_and_args(signers, non_signer_args);
+    execute_script_for_test(&storage, &script, &ty_args, args)
+>>>>>>> 35ea878580 (remove move vm session)
 }
 
 fn call_script(script: Vec<u8>, args: Vec<Vec<u8>>) -> VMResult<()> {
@@ -297,23 +305,22 @@ fn call_function_with_args_ty_args_signers(
     module.serialize(&mut module_blob).unwrap();
 
     storage.add_module_bytes(module_id.address(), module_id.name(), module_blob.into());
+<<<<<<< HEAD
     let module_storage = storage.as_unsync_module_storage();
 <<<<<<< HEAD
     let mut session = MoveVM::new_session(&storage);
 =======
     let mut session = MoveVm::new_session();
 >>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
+=======
+>>>>>>> 35ea878580 (remove move vm session)
 
-    let traversal_storage = TraversalStorage::new();
-    session.execute_function_bypass_visibility(
+    execute_function_with_single_storage_for_test(
+        &storage,
         &module_id,
         function_name.as_ident_str(),
-        ty_args,
+        &ty_args,
         combine_signers_and_args(signers, non_signer_args),
-        &mut UnmeteredGasMeter,
-        &mut TraversalContext::new(&traversal_storage),
-        &module_storage,
-        &storage,
     )?;
     Ok(())
 }
@@ -786,9 +793,8 @@ fn call_missing_item() {
     module.serialize(&mut module_blob).unwrap();
 
     // missing module
-    let function_name = ident_str!("foo");
-
     let mut storage = InMemoryStorage::new();
+<<<<<<< HEAD
     let module_storage = storage.as_unsync_module_storage();
 <<<<<<< HEAD
     let mut session = MoveVM::new_session(&storage);
@@ -817,10 +823,22 @@ fn call_missing_item() {
     );
     assert_eq!(error.status_type(), StatusType::Verification);
     drop(session);
+=======
+    let err = execute_function_with_single_storage_for_test(
+        &storage,
+        &module_id,
+        ident_str!("foo"),
+        &[],
+        vec![],
+    )
+    .unwrap_err();
+    assert_eq!(err.major_status(), StatusCode::LINKER_ERROR);
+    assert_eq!(err.status_type(), StatusType::Verification);
+>>>>>>> 35ea878580 (remove move vm session)
 
     // missing function
-
     storage.add_module_bytes(module_id.address(), module_id.name(), module_blob.into());
+<<<<<<< HEAD
     let module_storage = storage.as_unsync_module_storage();
 <<<<<<< HEAD
     let mut session = MoveVM::new_session(&storage);
@@ -846,4 +864,16 @@ fn call_missing_item() {
         StatusCode::FUNCTION_RESOLUTION_FAILURE
     );
     assert_eq!(error.status_type(), StatusType::Verification);
+=======
+    let err = execute_function_with_single_storage_for_test(
+        &storage,
+        &module_id,
+        ident_str!("foo"),
+        &[],
+        vec![],
+    )
+    .unwrap_err();
+    assert_eq!(err.major_status(), StatusCode::FUNCTION_RESOLUTION_FAILURE);
+    assert_eq!(err.status_type(), StatusType::Verification);
+>>>>>>> 35ea878580 (remove move vm session)
 }

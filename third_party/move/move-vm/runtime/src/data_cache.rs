@@ -51,14 +51,14 @@ impl AccountDataCache {
 /// The Move VM takes a `DataStore` in input and this is the default and correct implementation
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
-pub(crate) struct TransactionDataCache {
+pub struct TransactionDataCache {
     account_map: BTreeMap<AccountAddress, AccountDataCache>,
 }
 
 impl TransactionDataCache {
     /// Create a `TransactionDataCache` with a `RemoteCache` that provides access to data
     /// not updated in the transaction.
-    pub(crate) fn empty() -> Self {
+    pub fn empty() -> Self {
         TransactionDataCache {
             account_map: BTreeMap::new(),
         }
@@ -68,10 +68,7 @@ impl TransactionDataCache {
     /// published modules.
     ///
     /// Gives all proper guarantees on lifetime of global data as well.
-    pub(crate) fn into_effects(
-        self,
-        module_storage: &dyn ModuleStorage,
-    ) -> PartialVMResult<ChangeSet> {
+    pub fn into_effects(self, module_storage: &dyn ModuleStorage) -> PartialVMResult<ChangeSet> {
         let resource_converter =
             |value: Value, layout: MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
                 let function_value_extension = FunctionValueExtensionAdapter { module_storage };
@@ -89,7 +86,7 @@ impl TransactionDataCache {
 
     /// Same like `into_effects`, but also allows clients to select the format of
     /// produced effects for resources.
-    pub(crate) fn into_custom_effects<Resource>(
+    pub fn into_custom_effects<Resource>(
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
         module_storage: &dyn ModuleStorage,
