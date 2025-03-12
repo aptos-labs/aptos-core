@@ -18,7 +18,9 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        state_key::StateKey,
+        state_storage_usage::StateStorageUsage,
+        state_value::{StateValue, ARB_STATE_VALUE_MAX_SIZE},
         StateViewId, TStateView,
     },
     transaction::Version,
@@ -451,7 +453,8 @@ fn test_impl(blocks: Vec<Block>) {
     let empty = LedgerStateWithSummary::new_empty();
     let current_state = Arc::new(Mutex::new(empty.clone()));
 
-    let persisted_state = PersistedState::new_empty_with_capacity(NUM_KEYS / 2);
+    let persisted_state =
+        PersistedState::new_empty_with_config(NUM_KEYS / 2, ARB_STATE_VALUE_MAX_SIZE / 2);
     persisted_state.hack_reset(empty.deref().clone());
 
     let (to_summary_update, from_state_update) = channel();
