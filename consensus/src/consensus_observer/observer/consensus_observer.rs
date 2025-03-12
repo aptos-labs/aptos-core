@@ -447,6 +447,19 @@ impl ConsensusObserver {
         // Update the metrics for the received block payload
         update_metrics_for_block_payload_message(peer_network_id, &block_payload);
 
+        // Verify the block payload type is not deprecated
+        if let Err(error) = block_payload.verify_payload_type() {
+            error!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Failed to verify block payload type! Ignoring block: {:?}, from peer: {:?}. Error: {:?}",
+                    block_payload.block(), peer_network_id,
+                    error
+                ))
+            );
+            increment_invalid_message_counter(&peer_network_id, metrics::BLOCK_PAYLOAD_LABEL);
+            return;
+        }
+
         // Verify the block payload digests
         if let Err(error) = block_payload.verify_payload_digests() {
             // Log the error and update the invalid message counter

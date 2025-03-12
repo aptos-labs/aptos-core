@@ -33,7 +33,6 @@ pub struct ProofManager {
     remaining_total_txn_num: u64,
     back_pressure_total_proof_limit: u64,
     remaining_total_proof_num: u64,
-    allow_batches_without_pos_in_proposal: bool,
     enable_payload_v2: bool,
 }
 
@@ -43,7 +42,6 @@ impl ProofManager {
         back_pressure_total_txn_limit: u64,
         back_pressure_total_proof_limit: u64,
         batch_store: Arc<BatchStore>,
-        allow_batches_without_pos_in_proposal: bool,
         enable_payload_v2: bool,
         batch_expiry_gap_when_init_usecs: u64,
     ) -> Self {
@@ -57,7 +55,6 @@ impl ProofManager {
             remaining_total_txn_num: 0,
             back_pressure_total_proof_limit,
             remaining_total_proof_num: 0,
-            allow_batches_without_pos_in_proposal,
             enable_payload_v2,
         }
     }
@@ -152,36 +149,35 @@ impl ProofManager {
             };
 
         let cur_txns = txns_with_proof_size + opt_batch_txns_size;
-        let (inline_block, inline_block_size) =
-            if self.allow_batches_without_pos_in_proposal && proof_queue_fully_utilized {
-                let mut max_inline_txns_to_pull = request
-                    .max_txns
-                    .saturating_sub(cur_txns)
-                    .minimum(request.max_inline_txns);
-                max_inline_txns_to_pull.set_count(min(
-                    max_inline_txns_to_pull.count(),
-                    request
-                        .max_txns_after_filtering
-                        .saturating_sub(cur_unique_txns),
-                ));
-                let (inline_batches, inline_payload_size, _) =
-                    self.batch_proof_queue.pull_batches_with_transactions(
-                        &excluded_batches
-                            .iter()
-                            .cloned()
-                            .chain(proof_block.iter().map(|proof| proof.info().clone()))
-                            .chain(opt_batches.clone())
-                            .collect(),
-                        max_inline_txns_to_pull,
-                        request.max_txns_after_filtering,
-                        request.soft_max_txns_after_filtering,
-                        request.return_non_full,
-                        request.block_timestamp,
-                    );
-                (inline_batches, inline_payload_size)
-            } else {
-                (Vec::new(), PayloadTxnsSize::zero())
-            };
+        let (inline_block, inline_block_size) = if proof_queue_fully_utilized {
+            let mut max_inline_txns_to_pull = request
+                .max_txns
+                .saturating_sub(cur_txns)
+                .minimum(request.max_inline_txns);
+            max_inline_txns_to_pull.set_count(min(
+                max_inline_txns_to_pull.count(),
+                request
+                    .max_txns_after_filtering
+                    .saturating_sub(cur_unique_txns),
+            ));
+            let (inline_batches, inline_payload_size, _) =
+                self.batch_proof_queue.pull_batches_with_transactions(
+                    &excluded_batches
+                        .iter()
+                        .cloned()
+                        .chain(proof_block.iter().map(|proof| proof.info().clone()))
+                        .chain(opt_batches.clone())
+                        .collect(),
+                    max_inline_txns_to_pull,
+                    request.max_txns_after_filtering,
+                    request.soft_max_txns_after_filtering,
+                    request.return_non_full,
+                    request.block_timestamp,
+                );
+            (inline_batches, inline_payload_size)
+        } else {
+            (Vec::new(), PayloadTxnsSize::zero())
+        };
         counters::NUM_INLINE_BATCHES.observe(inline_block.len() as f64);
         counters::NUM_INLINE_TXNS.observe(inline_block_size.count() as f64);
 
@@ -194,7 +190,7 @@ impl ProofManager {
                 PayloadExecutionLimit::None,
             ))
         } else if proof_block.is_empty() && inline_block.is_empty() {
-            Payload::empty(true, self.allow_batches_without_pos_in_proposal)
+            Payload::empty(true)
         } else {
             trace!(
                 "QS: GetBlockRequest excluded len {}, block len {}, inline len {}",

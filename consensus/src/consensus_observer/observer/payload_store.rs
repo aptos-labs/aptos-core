@@ -283,6 +283,7 @@ mod test {
         block::Block,
         block_data::{BlockData, BlockType},
         common::{Author, Payload, ProofWithData},
+        payload::PayloadExecutionLimit,
         pipelined_block::OrderedBlockWindow,
         proof_of_store::{BatchId, BatchInfo, ProofOfStore},
         quorum_cert::QuorumCert,
@@ -1112,7 +1113,11 @@ mod test {
             block_payload_store.insert_block_payload(block_payload, verified_payload_signatures);
 
             // Create the block type
-            let payload = Payload::InQuorumStore(ProofWithData::new(proofs_of_store));
+            let payload = Payload::QuorumStoreInlineHybridV2(
+                vec![],
+                ProofWithData::new(proofs_of_store),
+                PayloadExecutionLimit::None,
+            );
             let block_type = BlockType::DAGBlock {
                 author: Author::random(),
                 failed_authors: vec![],

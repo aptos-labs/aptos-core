@@ -89,18 +89,6 @@ pub fn extract_txns_from_block<'a>(
             Payload::DirectMempool(_) => {
                 bail!("DirectMempool is not supported.");
             },
-            Payload::InQuorumStore(proof_with_data) => extract_txns_from_quorum_store(
-                proof_with_data.proofs.iter().map(|proof| *proof.digest()),
-                all_batches,
-            ),
-            Payload::InQuorumStoreWithLimit(proof_with_data) => extract_txns_from_quorum_store(
-                proof_with_data
-                    .proof_with_data
-                    .proofs
-                    .iter()
-                    .map(|proof| *proof.digest()),
-                all_batches,
-            ),
             Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
             | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
                 let mut all_txns = extract_txns_from_quorum_store(

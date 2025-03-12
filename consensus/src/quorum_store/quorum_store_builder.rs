@@ -364,7 +364,6 @@ impl InnerBuilder {
                 .backlog_per_validator_batch_limit_count
                 * self.num_validators,
             self.batch_store.clone().unwrap(),
-            self.config.allow_batches_without_pos_in_proposal,
             self.config.enable_payload_v2,
             self.config.batch_expiry_gap_when_init_usecs,
         );
