@@ -323,10 +323,7 @@ module aptos_framework::aptos_governance {
     ): u64 acquires VotingRecords, VotingRecordsV2 {
         assert_voting_initialization();
 
-        let proposal_expiration = voting::get_proposal_expiration_secs<GovernanceProposal>(
-            @aptos_framework,
-            proposal_id
-        );
+        let proposal_expiration = get_proposal_expiration(proposal_id);
         let lockup_until = stake::get_lockup_secs(stake_pool);
         // The voter's stake needs to be locked up at least as long as the proposal's expiration.
         // Also no one can vote on a expired proposal.
@@ -351,12 +348,14 @@ module aptos_framework::aptos_governance {
         get_voting_power(stake_pool) - used_voting_power
     }
 
+    #[view]
+    public fun get_proposal_expiration(proposal_id: u64): u64 {
+        voting::get_proposal_expiration_secs<GovernanceProposal>(@aptos_framework, proposal_id)
+    }
+
     public fun assert_proposal_expiration(stake_pool: address, proposal_id: u64) {
         assert_voting_initialization();
-        let proposal_expiration = voting::get_proposal_expiration_secs<GovernanceProposal>(
-            @aptos_framework,
-            proposal_id
-        );
+        let proposal_expiration = get_proposal_expiration(proposal_id);
         // The voter's stake needs to be locked up at least as long as the proposal's expiration.
         assert!(
             proposal_expiration <= stake::get_lockup_secs(stake_pool),
@@ -826,6 +825,11 @@ module aptos_framework::aptos_governance {
         } else {
             resolve(proposal_id, signer_address)
         }
+    }
+
+    #[test_only]
+    public fun extend_voting_duration_for_test(proposal_id: u64, new_voting_duration_secs: u64) {
+        voting::extend_voting<GovernanceProposal>(@aptos_framework, proposal_id, new_voting_duration_secs);
     }
 
     #[test_only]
