@@ -403,7 +403,6 @@ pub struct ProposalGenerator {
     quorum_store_enabled: bool,
     vtxn_config: ValidatorTxnConfig,
 
-    allow_batches_without_pos_in_proposal: bool,
     opt_qs_payload_param_provider: Arc<dyn TOptQSPullParamsProvider>,
 }
 
@@ -425,7 +424,6 @@ impl ProposalGenerator {
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
         vtxn_config: ValidatorTxnConfig,
-        allow_batches_without_pos_in_proposal: bool,
         opt_qs_payload_param_provider: Arc<dyn TOptQSPullParamsProvider>,
     ) -> Self {
         Self {
@@ -445,7 +443,6 @@ impl ProposalGenerator {
             last_round_generated: Mutex::new(0),
             quorum_store_enabled,
             vtxn_config,
-            allow_batches_without_pos_in_proposal,
             opt_qs_payload_param_provider,
         }
     }
@@ -504,10 +501,7 @@ impl ProposalGenerator {
             // after reconfiguration until it's committed
             (
                 vec![],
-                Payload::empty(
-                    self.quorum_store_enabled,
-                    self.allow_batches_without_pos_in_proposal,
-                ),
+                Payload::empty(self.quorum_store_enabled),
                 hqc.certified_block().timestamp_usecs(),
             )
         } else {
@@ -617,12 +611,12 @@ impl ProposalGenerator {
                 && max_txns_from_block_to_execute.is_some()
                 && max_txns_from_block_to_execute.map_or(false, |v| payload.len() as u64 > v)
             {
-                payload = payload.transform_to_quorum_store_v2(
+                payload = payload.transform_to_payload_with_limits(
                     max_txns_from_block_to_execute,
                     block_gas_limit_override,
                 );
             } else if block_gas_limit_override.is_some() {
-                payload = payload.transform_to_quorum_store_v2(None, block_gas_limit_override);
+                payload = payload.transform_to_payload_with_limits(None, block_gas_limit_override);
             }
             (validator_txns, payload, timestamp.as_micros() as u64)
         };

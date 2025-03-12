@@ -174,17 +174,6 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 Payload::DirectMempool(_) => {
                     unreachable!("InQuorumStore should be used");
                 },
-                Payload::InQuorumStore(proof_with_status) => proof_with_status
-                    .proofs
-                    .iter()
-                    .map(|proof| proof.info().clone())
-                    .collect::<Vec<_>>(),
-                Payload::InQuorumStoreWithLimit(proof_with_status) => proof_with_status
-                    .proof_with_data
-                    .proofs
-                    .iter()
-                    .map(|proof| proof.info().clone())
-                    .collect::<Vec<_>>(),
                 Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
                 | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
                     inline_batches
@@ -254,15 +243,6 @@ impl TPayloadManager for QuorumStorePayloadManager {
         }
 
         match payload {
-            Payload::InQuorumStore(proof_with_status) => {
-                request_txns_and_update_status(proof_with_status, self.batch_reader.clone());
-            },
-            Payload::InQuorumStoreWithLimit(proof_with_data) => {
-                request_txns_and_update_status(
-                    &proof_with_data.proof_with_data,
-                    self.batch_reader.clone(),
-                );
-            },
             Payload::QuorumStoreInlineHybrid(_, proof_with_data, _)
             | Payload::QuorumStoreInlineHybridV2(_, proof_with_data, _) => {
                 request_txns_and_update_status(proof_with_data, self.batch_reader.clone());
@@ -298,8 +278,6 @@ impl TPayloadManager for QuorumStorePayloadManager {
             Payload::DirectMempool(_) => {
                 unreachable!("QuorumStore doesn't support DirectMempool payload")
             },
-            Payload::InQuorumStore(_) => Ok(()),
-            Payload::InQuorumStoreWithLimit(_) => Ok(()),
             Payload::QuorumStoreInlineHybrid(inline_batches, proofs, _)
             | Payload::QuorumStoreInlineHybridV2(inline_batches, proofs, _) => {
                 fn update_availability_metrics<'a>(
@@ -379,33 +357,6 @@ impl TPayloadManager for QuorumStorePayloadManager {
         };
 
         let transaction_payload = match payload {
-            Payload::InQuorumStore(proof_with_data) => {
-                let transactions = process_qs_payload(
-                    proof_with_data,
-                    self.batch_reader.clone(),
-                    block,
-                    &self.ordered_authors,
-                )
-                .await?;
-                BlockTransactionPayload::new_in_quorum_store(
-                    transactions,
-                    proof_with_data.proofs.clone(),
-                )
-            },
-            Payload::InQuorumStoreWithLimit(proof_with_data) => {
-                let transactions = process_qs_payload(
-                    &proof_with_data.proof_with_data,
-                    self.batch_reader.clone(),
-                    block,
-                    &self.ordered_authors,
-                )
-                .await?;
-                BlockTransactionPayload::new_in_quorum_store_with_limit(
-                    transactions,
-                    proof_with_data.proof_with_data.proofs.clone(),
-                    proof_with_data.max_txns_to_execute,
-                )
-            },
             Payload::QuorumStoreInlineHybrid(
                 inline_batches,
                 proof_with_data,

@@ -110,9 +110,7 @@ impl Block {
         match self.block_data.payload() {
             None => 0,
             Some(payload) => match payload {
-                Payload::InQuorumStore(pos) => pos.proofs.len(),
                 Payload::DirectMempool(_txns) => 0,
-                Payload::InQuorumStoreWithLimit(pos) => pos.proof_with_data.proofs.len(),
                 Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
                 | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
                     inline_batches.len() + proof_with_data.proofs.len()
