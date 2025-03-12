@@ -37,6 +37,8 @@ use std::{
     thread::spawn,
 };
 
+const NUM_KEYS: usize = 10;
+
 #[derive(Debug)]
 struct Txn {
     reads: Vec<StateKey>,
@@ -449,7 +451,7 @@ fn test_impl(blocks: Vec<Block>) {
     let empty = LedgerStateWithSummary::new_empty();
     let current_state = Arc::new(Mutex::new(empty.clone()));
 
-    let persisted_state = PersistedState::new_empty();
+    let persisted_state = PersistedState::new_empty_with_capacity(NUM_KEYS / 2);
     persisted_state.hack_reset(empty.deref().clone());
 
     let (to_summary_update, from_state_update) = channel();
@@ -520,7 +522,7 @@ proptest! {
 
     #[test]
     fn test_speculative_state_workflow(
-        txns_by_block in arb_key_universe(10).prop_flat_map(move |keys| vec(arb_block(keys, 10, 10, 10), 1..100))
+        txns_by_block in arb_key_universe(NUM_KEYS).prop_flat_map(move |keys| vec(arb_block(keys, NUM_KEYS, NUM_KEYS, NUM_KEYS), 1..100))
     ) {
         let blocks = txns_by_block.into_iter().scan(0, |next_version, txns| {
             let block = Block::from_txns(txns, *next_version);
