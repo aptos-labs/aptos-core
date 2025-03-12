@@ -456,6 +456,11 @@ impl DbStateValue {
             Store::HotNonExistent { access_time_secs } => *access_time_secs,
         }
     }
+
+    pub fn with_access_time_secs(mut self, access_time_secs: u32) -> Self {
+        self.0.set_access_time_secs(access_time_secs);
+        self
+    }
 }
 
 /// TODO(joshlind): add a proof implementation (e.g., verify()) and unit tests
