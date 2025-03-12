@@ -235,7 +235,7 @@ impl BlockData {
     pub fn dummy_with_validator_txns(txns: Vec<ValidatorTransaction>) -> Self {
         Self::new_proposal_ext(
             txns,
-            Payload::empty(false, true),
+            Payload::empty(false),
             Author::ONE,
             vec![],
             1,
@@ -385,7 +385,7 @@ fn test_reconfiguration_suffix() {
         ),
     );
     let reconfig_suffix_block = BlockData::new_proposal(
-        Payload::empty(false, true),
+        Payload::empty(false),
         AccountAddress::random(),
         Vec::new(),
         2,
