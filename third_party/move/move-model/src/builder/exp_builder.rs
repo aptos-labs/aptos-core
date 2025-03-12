@@ -33,8 +33,6 @@ use itertools::Itertools;
 use move_binary_format::file_format::{self};
 use move_compiler::{
     expansion::ast::{self as EA},
-    hlir::ast as HA,
-    naming::ast as NA,
     parser::ast::{self as PA, CallKind, Field},
     shared::{unique_map::UniqueMap, Identifier, Name},
 };
@@ -42,7 +40,6 @@ use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
     function::ClosureMask,
-    value::MoveValue,
 };
 use move_ir_types::{
     location::{sp, Spanned},
@@ -876,95 +873,6 @@ impl<'env, 'builder, 'module_builder> AbilityContext
 /// # Type Translation
 
 impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'module_translator> {
-    /// Translates an hlir type into a target AST type.
-    pub fn translate_hlir_single_type(&mut self, ty: &HA::SingleType) -> Type {
-        use HA::SingleType_::*;
-        match &ty.value {
-            Ref(is_mut, ty) => {
-                let ty = self.translate_hlir_base_type(ty);
-                if ty == Type::Error {
-                    Type::Error
-                } else {
-                    Type::Reference(ReferenceKind::from_is_mut(*is_mut), Box::new(ty))
-                }
-            },
-            Base(ty) => self.translate_hlir_base_type(ty),
-        }
-    }
-
-    fn translate_hlir_base_type(&mut self, ty: &HA::BaseType) -> Type {
-        use HA::{BaseType_::*, TypeName_::*};
-        use NA::{BuiltinTypeName_::*, TParam};
-        match &ty.value {
-            Param(TParam {
-                user_specified_name,
-                ..
-            }) => {
-                let sym = self.symbol_pool().make(user_specified_name.value.as_str());
-                self.type_params_table[&sym].clone()
-            },
-            Apply(_, type_name, args) => {
-                let loc = self.to_loc(&type_name.loc);
-                match &type_name.value {
-                    Builtin(builtin_type_name) => match &builtin_type_name.value {
-                        Address => Type::new_prim(PrimitiveType::Address),
-                        Signer => Type::new_prim(PrimitiveType::Signer),
-                        U8 => Type::new_prim(PrimitiveType::U8),
-                        U16 => Type::new_prim(PrimitiveType::U16),
-                        U32 => Type::new_prim(PrimitiveType::U32),
-                        U64 => Type::new_prim(PrimitiveType::U64),
-                        U128 => Type::new_prim(PrimitiveType::U128),
-                        U256 => Type::new_prim(PrimitiveType::U256),
-                        Vector => Type::Vector(Box::new(self.translate_hlir_base_type(&args[0]))),
-                        Bool => Type::new_prim(PrimitiveType::Bool),
-                        Fun => Type::Fun(
-                            Box::new(Type::tuple(
-                                self.translate_hlir_base_types(&args[0..args.len() - 1]),
-                            )),
-                            Box::new(self.translate_hlir_base_type(&args[args.len() - 1])),
-                            AbilitySet::FUNCTIONS,
-                        ),
-                    },
-                    ModuleType(m, n) => {
-                        let addr_bytes = self.parent.parent.resolve_address(&loc, &m.value.address);
-                        let module_name = ModuleName::from_address_bytes_and_name(
-                            addr_bytes,
-                            self.symbol_pool().make(m.value.module.0.value.as_str()),
-                        );
-                        let symbol = self.symbol_pool().make(n.0.value.as_str());
-                        let qsym = QualifiedSymbol {
-                            module_name,
-                            symbol,
-                        };
-                        let rty = self.parent.parent.lookup_type(&loc, &qsym);
-                        if !args.is_empty() {
-                            // Replace type instantiation.
-                            if let Type::Struct(mid, sid, _) = &rty {
-                                let arg_types = self.translate_hlir_base_types(args);
-                                if arg_types.iter().any(|x| *x == Type::Error) {
-                                    Type::Error
-                                } else {
-                                    Type::Struct(*mid, *sid, arg_types)
-                                }
-                            } else {
-                                Type::Error
-                            }
-                        } else {
-                            rty
-                        }
-                    },
-                }
-            },
-            _ => unreachable!(),
-        }
-    }
-
-    fn translate_hlir_base_types(&mut self, tys: &[HA::BaseType]) -> Vec<Type> {
-        tys.iter()
-            .map(|t| self.translate_hlir_base_type(t))
-            .collect()
-    }
-
     /// Translates a source AST type into a target AST type.
     pub fn translate_type(&mut self, ty: &EA::Type) -> Type {
         use EA::Type_::*;
@@ -5463,65 +5371,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let loc = err.specific_loc().unwrap_or_else(|| loc.clone());
         let (msg, hints, labels) = err.message_with_hints_and_labels(self, context);
         self.error_with_notes_and_labels(&loc, &msg, hints, labels)
-    }
-
-    pub fn translate_from_move_value(&mut self, loc: &Loc, ty: &Type, value: &MoveValue) -> Value {
-        match (ty, value) {
-            (_, MoveValue::U8(n)) => Value::Number(BigInt::from_u8(*n).unwrap()),
-            (_, MoveValue::U16(n)) => Value::Number(BigInt::from_u16(*n).unwrap()),
-            (_, MoveValue::U32(n)) => Value::Number(BigInt::from_u32(*n).unwrap()),
-            (_, MoveValue::U64(n)) => Value::Number(BigInt::from_u64(*n).unwrap()),
-            (_, MoveValue::U128(n)) => Value::Number(BigInt::from_u128(*n).unwrap()),
-            (_, MoveValue::U256(n)) => Value::Number(BigInt::from(n)),
-            (_, MoveValue::Bool(b)) => Value::Bool(*b),
-            (_, MoveValue::Address(a)) => Value::Address(Address::Numerical(*a)),
-            (_, MoveValue::Signer(a)) => Value::Address(Address::Numerical(*a)),
-            (Type::Vector(inner), MoveValue::Vector(vs)) => match **inner {
-                Type::Primitive(PrimitiveType::U8) => {
-                    let b = vs
-                        .iter()
-                        .filter_map(|v| match v {
-                            MoveValue::U8(n) => Some(*n),
-                            _ => {
-                                self.error(loc, &format!("Expected u8 type, buf found: {:?}", v));
-                                None
-                            },
-                        })
-                        .collect::<Vec<u8>>();
-                    Value::ByteArray(b)
-                },
-                Type::Primitive(PrimitiveType::Address) => {
-                    let b = vs
-                        .iter()
-                        .filter_map(|v| match v {
-                            MoveValue::Address(a) => Some(Address::Numerical(*a)),
-                            _ => {
-                                self.error(
-                                    loc,
-                                    &format!("Expected address type, but found: {:?}", v),
-                                );
-                                None
-                            },
-                        })
-                        .collect::<Vec<Address>>();
-                    Value::AddressArray(b)
-                },
-                _ => {
-                    let b = vs
-                        .iter()
-                        .map(|v| self.translate_from_move_value(loc, inner, v))
-                        .collect::<Vec<Value>>();
-                    Value::Vector(b)
-                },
-            },
-            _ => {
-                self.error(
-                    loc,
-                    &format!("Not supported constant value/type combination: {}", value),
-                );
-                Value::Bool(false)
-            },
-        }
     }
 
     fn translate_macro_call(

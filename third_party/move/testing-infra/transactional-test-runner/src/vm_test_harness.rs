@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    framework::{run_test_impl, CompiledState, MoveTestAdapter, PreCompiledModules},
+    framework::{run_test_impl, CompiledState, MoveTestAdapter},
     tasks::{EmptyCommand, InitCommand, SyntaxChoice, TaskInput},
 };
 use anyhow::{anyhow, bail, Result};
@@ -18,7 +18,8 @@ use move_command_line_common::{
     testing::EXP_EXT,
 };
 use move_compiler::{
-    compiled_unit::AnnotatedCompiledUnit, shared::known_attributes::KnownAttribute,
+    compiled_unit::{AnnotatedCompiledModule, AnnotatedCompiledUnit},
+    shared::known_attributes::KnownAttribute,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -457,6 +458,19 @@ impl PrecompiledFilesModules {
 
     pub fn units(&self) -> &Vec<AnnotatedCompiledUnit> {
         &self.1
+    }
+
+    pub fn get_pre_compiled_modules(&self) -> Vec<&AnnotatedCompiledModule> {
+        self.units()
+            .iter()
+            .filter_map(|unit| {
+                if let AnnotatedCompiledUnit::Module(m) = unit {
+                    Some(m)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }
 

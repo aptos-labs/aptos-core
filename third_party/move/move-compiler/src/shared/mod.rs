@@ -5,13 +5,9 @@
 use crate::{
     command_line as cli,
     diagnostics::{codes::Severity, Diagnostic, Diagnostics},
-    naming::ast::ModuleDefinition,
 };
 use clap::*;
-use move_command_line_common::env::{
-    bool_to_str, get_move_compiler_block_v1_from_env, read_bool_env_var,
-    MOVE_COMPILER_BLOCK_V1_FLAG,
-};
+use move_command_line_common::env::{bool_to_str, read_bool_env_var};
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
 use once_cell::sync::Lazy;
@@ -24,6 +20,7 @@ use std::{
 };
 
 pub mod ast_debug;
+pub mod builtins;
 pub mod remembering_unique_map;
 pub mod unique_map;
 pub mod unique_set;
@@ -201,8 +198,6 @@ pub fn string_packagepath_to_symbol_packagepath<T: Clone>(
     }
 }
 
-pub type AttributeDeriver = dyn Fn(&mut CompilationEnv, &mut ModuleDefinition);
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CompilationEnv {
     flags: Flags,
@@ -352,12 +347,6 @@ pub struct Flags {
     )]
     verify: bool,
 
-    /// Bytecode version.
-    #[clap(
-        long = cli::BYTECODE_VERSION,
-    )]
-    bytecode_version: Option<u32>,
-
     /// If set, source files will not shadow dependency files. If the same file is passed to both,
     /// an error will be raised
     #[clap(
@@ -403,17 +392,9 @@ pub struct Flags {
     #[clap(long = cli::LANG_V2_FLAG)]
     lang_v2: bool,
 
-    /// Support compiler v2 (up to expansion phase)
-    #[clap(long = cli::COMPILER_V2_FLAG)]
-    compiler_v2: bool,
-
     /// Language version
-    #[clap(long = cli::LANGUAGE_VERSION, default_value="1")]
+    #[clap(long = cli::LANGUAGE_VERSION)]
     language_version: LanguageVersion,
-
-    /// Block v1 runs past expansion phase
-    #[clap(long = MOVE_COMPILER_BLOCK_V1_FLAG, default_value=bool_to_str(get_move_compiler_block_v1_from_env()))]
-    block_v1_compiler: bool,
 }
 
 impl Flags {
@@ -422,7 +403,6 @@ impl Flags {
             test: false,
             verify: false,
             shadow: false,
-            bytecode_version: None,
             keep_testing_functions: false,
             skip_attribute_checks: false,
             debug: debug_compiler_env_var(),
@@ -430,9 +410,7 @@ impl Flags {
             warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
             warn_unused: false,
             lang_v2: false,
-            compiler_v2: false,
             language_version: LanguageVersion::V1,
-            block_v1_compiler: get_move_compiler_block_v1_from_env(),
         }
     }
 
@@ -512,10 +490,6 @@ impl Flags {
         self.shadow
     }
 
-    pub fn bytecode_version(&self) -> Option<u32> {
-        self.bytecode_version
-    }
-
     pub fn skip_attribute_checks(&self) -> bool {
         self.skip_attribute_checks
     }
@@ -549,17 +523,6 @@ impl Flags {
         }
     }
 
-    pub fn get_block_v1_compiler(&self) -> bool {
-        self.block_v1_compiler
-    }
-
-    pub fn set_block_v1_compiler(self, new_value: bool) -> Self {
-        Self {
-            block_v1_compiler: new_value,
-            ..self
-        }
-    }
-
     pub fn warn_unused(&self) -> bool {
         self.warn_unused
     }
@@ -587,17 +550,6 @@ impl Flags {
         Self {
             language_version,
             lang_v2: language_version >= LanguageVersion::V2_0,
-            ..self
-        }
-    }
-
-    pub fn compiler_v2(&self) -> bool {
-        self.compiler_v2
-    }
-
-    pub fn set_compiler_v2(self, v2: bool) -> Self {
-        Self {
-            compiler_v2: v2,
             ..self
         }
     }

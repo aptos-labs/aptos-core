@@ -25,11 +25,7 @@ use move_command_line_common::{
     types::ParsedType,
     values::{ParsableValue, ParsedValue},
 };
-use move_compiler::{
-    compiled_unit::{AnnotatedCompiledModule, AnnotatedCompiledUnit},
-    shared::{NumericalAddress, PackagePaths},
-    FullyCompiledProgram,
-};
+use move_compiler::{compiled_unit::AnnotatedCompiledUnit, shared::NumericalAddress};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
@@ -108,37 +104,6 @@ fn merge_output(left: Option<String>, right: Option<String>) -> Option<String> {
             left.push_str(&right);
             Some(left)
         },
-    }
-}
-
-pub trait PreCompiledModules {
-    fn get_pre_compiled_modules(&self) -> Vec<&AnnotatedCompiledModule>;
-}
-
-fn annotated_module_from_unit(unit: &AnnotatedCompiledUnit) -> Option<&AnnotatedCompiledModule> {
-    if let AnnotatedCompiledUnit::Module(tmod) = unit {
-        Some(tmod)
-    } else {
-        None
-    }
-}
-
-impl PreCompiledModules for (FullyCompiledProgram, Vec<PackagePaths>) {
-    fn get_pre_compiled_modules(&self) -> Vec<&AnnotatedCompiledModule> {
-        self.0
-            .compiled
-            .iter()
-            .filter_map(annotated_module_from_unit)
-            .collect()
-    }
-}
-
-impl PreCompiledModules for PrecompiledFilesModules {
-    fn get_pre_compiled_modules(&self) -> Vec<&AnnotatedCompiledModule> {
-        self.units()
-            .iter()
-            .filter_map(annotated_module_from_unit)
-            .collect()
     }
 }
 
