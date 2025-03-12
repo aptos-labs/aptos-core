@@ -337,12 +337,13 @@ fn update_state(
 
     for block in blocks {
         let (hot_state, persisted_state) = persisted_state.get_state();
-        let state_view = CachedStateView::new_impl(
+        let state_view = CachedStateView::new_with_config(
             StateViewId::Miscellaneous,
             state_by_version.clone(),
             hot_state.clone(),
             persisted_state.clone(),
             parent_state.deref().clone(),
+            1, // access_time_refresh_interval_secs
         );
         let read_keys = block.all_reads().collect_vec();
         pool.install(|| {
