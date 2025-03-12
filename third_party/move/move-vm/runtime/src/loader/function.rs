@@ -355,7 +355,7 @@ impl LoadedFunction {
     }
 
     /// Returns true if the loaded function is an entry function.
-    pub(crate) fn is_entry(&self) -> bool {
+    pub fn is_entry(&self) -> bool {
         self.function.is_entry()
     }
 
