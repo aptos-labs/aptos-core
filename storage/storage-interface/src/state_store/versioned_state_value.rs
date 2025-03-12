@@ -137,9 +137,11 @@ impl MemorizedStateRead {
         }
     }
 
-    pub fn to_hot_state_refresh(&self, access_time_secs: u32) -> Option<DbStateUpdate> {
-        const READ_CACHE_REFRESH_INTERVAL: u32 = 600;
-
+    pub fn to_hot_state_refresh(
+        &self,
+        access_time_secs: u32,
+        refresh_internal_secs: u32,
+    ) -> Option<DbStateUpdate> {
         match self {
             MemorizedStateRead::NonExistent => {
                 COUNTER.inc_with(&["memorized_read_new_hot_non_existent"]);
@@ -158,7 +160,7 @@ impl MemorizedStateRead {
                     },
                     Some(db_value) => {
                         let old_ts = db_value.access_time_secs();
-                        if old_ts + READ_CACHE_REFRESH_INTERVAL < access_time_secs {
+                        if old_ts + refresh_internal_secs < access_time_secs {
                             if old_ts == 0 {
                                 // comes from DB read
                                 COUNTER.inc_with(&["memorized_read_new_hot"]);
