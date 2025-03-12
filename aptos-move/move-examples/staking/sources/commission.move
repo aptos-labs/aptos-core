@@ -7,10 +7,16 @@
 /// to pay the commission, either commission rate is set too high or APT price is low. In this case, the commission
 /// debt will be updated and the operator will receive the remaining balance in the next distribution.
 ///
-/// Note that there are rounding errors that can lead to 1 octa (1e-8 APT) and $1 rounding errors on conversions during
+/// Important notes:
+///
+/// 1. Tthere are rounding errors that can lead to 1 octa (1e-8 APT) and $1 rounding errors on conversions during
 /// distribution. Although the commission amount can be adjusted to make up for these rounding errors for operators,
 /// developers using this contract can also add decimals to the dollar amount (e.g. 2 decimals) to reduce the rounding
 /// errors.
+/// 2. In theory this function can be called very often (e.g. once every few seconds) to use rounding errors
+/// to "rob" the operator because micro amounts are rounded to 0. This is not possible in practice when using this
+/// contract for node operator commission as it's only paid out once in a while (at least a few days) so balance is
+/// zero before then which makes the attack not possible.
 module staking::commission {
     use aptos_framework::account::{Self, SignerCapability};
     use aptos_framework::aptos_account;
@@ -143,6 +149,11 @@ module staking::commission {
 
     /// Distribute the commission to operator and remaining amount to manager.
     /// Can only be called by the manager or operator.
+    ///
+    /// Note that in theory this function can be called very often (e.g. once every few seconds) to use rounding errors
+    /// to "rob" the operator because micro amounts are rounded to 0. This is not possible in practice when using this
+    /// contract for node operator commission as it's only paid out once in a while (at least a few days) so balance is
+    /// zero before then which makes the attack not possible.
     public entry fun distribute_commission(account: &signer) acquires CommissionConfig {
         assert_manager_or_operator(account);
 
