@@ -835,7 +835,7 @@ module aptos_framework::account {
     /// collision where someone has legitimately produced a private key that maps to a resource account address is less
     /// than `(1/2)^(256)`.
     public fun create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) acquires Account {
-        // TODO: Is permissioned signer allowed to create resource account?
+        // TODO: [signer::address_of] Is permissioned signer allowed to create resource account?
         let resource_addr = create_resource_address(&signer::address_of(source), seed);
         let resource = if (exists_at(resource_addr)) {
             let account = borrow_global<Account>(resource_addr);

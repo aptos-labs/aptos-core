@@ -179,7 +179,7 @@ module aptos_framework::aptos_account {
 
     /// Set whether `account` can receive direct transfers of coins that they have not explicitly registered to receive.
     public entry fun set_allow_direct_coin_transfers(account: &signer, allow: bool) acquires DirectTransferConfig {
-        // TODO: Can this be invoked by permissioned signer?
+        // TODO: [signer::address_of] Is permissioned signer allowed?
         let addr = signer::address_of(account);
         if (exists<DirectTransferConfig>(addr)) {
             let direct_transfer_config = borrow_global_mut<DirectTransferConfig>(addr);

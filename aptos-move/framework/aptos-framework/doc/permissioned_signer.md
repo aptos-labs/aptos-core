@@ -65,6 +65,7 @@ for blind signing.
     -  [Function `create_permissioned_handle`](#@Specification_1_create_permissioned_handle)
     -  [Function `destroy_permissioned_handle`](#@Specification_1_destroy_permissioned_handle)
     -  [Function `is_permissioned_signer`](#@Specification_1_is_permissioned_signer)
+    -  [Function `address_of`](#@Specification_1_address_of)
     -  [Function `revoke_permission_storage_address`](#@Specification_1_revoke_permission_storage_address)
     -  [Function `create_storable_permissioned_handle`](#@Specification_1_create_storable_permissioned_handle)
     -  [Function `destroy_storable_permissioned_handle`](#@Specification_1_destroy_storable_permissioned_handle)
@@ -76,6 +77,7 @@ for blind signing.
     -  [Function `is_permissioned_signer_impl`](#@Specification_1_is_permissioned_signer_impl)
     -  [Function `permission_address`](#@Specification_1_permission_address)
     -  [Function `signer_from_permissioned_handle_impl`](#@Specification_1_signer_from_permissioned_handle_impl)
+    -  [Function `borrow_address`](#@Specification_1_borrow_address)
 
 
 <pre><code><b>use</b> <a href="big_ordered_map.md#0x1_big_ordered_map">0x1::big_ordered_map</a>;
@@ -1692,10 +1694,10 @@ signer::address_of(master) == address_of(signer_from_permissioned_handle(create_
 
 
 
-<a id="0x1_permissioned_signer_spec_is_permissioned_signer_impl"></a>
+<a id="0x1_permissioned_signer_spec_borrow_address"></a>
 
 
-<pre><code><b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer_impl">spec_is_permissioned_signer_impl</a>(s: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): bool;
+<pre><code><b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_borrow_address">spec_borrow_address</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): &<b>address</b>;
 </code></pre>
 
 
@@ -1761,6 +1763,45 @@ signer::address_of(master) == address_of(signer_from_permissioned_handle(create_
 
 
 <pre><code><b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_permission_address">spec_permission_address</a>(s: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <b>address</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_address_of"></a>
+
+### Function `address_of`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_address_of">address_of</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <b>address</b>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(s);
+<b>ensures</b> [abstract] result == <a href="permissioned_signer.md#0x1_permissioned_signer_spec_borrow_address">spec_borrow_address</a>(s);
+</code></pre>
+
+
+
+
+<a id="0x1_permissioned_signer_spec_address_of"></a>
+
+
+<pre><code><b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_address_of">spec_address_of</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): &<b>address</b> {
+   <a href="permissioned_signer.md#0x1_permissioned_signer_spec_borrow_address">spec_borrow_address</a>(s)
+}
+</code></pre>
+
+
+
+
+<a id="0x1_permissioned_signer_spec_is_permissioned_signer_impl"></a>
+
+
+<pre><code><b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer_impl">spec_is_permissioned_signer_impl</a>(s: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): bool;
 </code></pre>
 
 
@@ -2030,6 +2071,23 @@ signer::address_of(master) == address_of(signer_from_permissioned_handle(create_
     == <a href="permissioned_signer.md#0x1_permissioned_signer_spec_signer_from_permissioned_handle_impl">spec_signer_from_permissioned_handle_impl</a>(
         master_account_addr, permissions_storage_addr
     );
+</code></pre>
+
+
+
+<a id="@Specification_1_borrow_address"></a>
+
+### Function `borrow_address`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_borrow_address">borrow_address</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): &<b>address</b>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>ensures</b> [abstract] result == <a href="permissioned_signer.md#0x1_permissioned_signer_spec_borrow_address">spec_borrow_address</a>(s);
 </code></pre>
 
 
