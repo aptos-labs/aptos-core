@@ -9,7 +9,7 @@
 ///
 /// Important notes:
 ///
-/// 1. Tthere are rounding errors that can lead to 1 octa (1e-8 APT) and $1 rounding errors on conversions during
+/// 1. There are rounding errors that can lead to 1 octa (1e-8 APT) and $1 rounding errors on conversions during
 /// distribution. Although the commission amount can be adjusted to make up for these rounding errors for operators,
 /// developers using this contract can also add decimals to the dollar amount (e.g. 2 decimals) to reduce the rounding
 /// errors.
