@@ -57,7 +57,7 @@ use aptos_storage_interface::{
             hot_state_view::HotStateView,
         },
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
-        versioned_state_value::{MemorizedStateRead, StateUpdateRef},
+        versioned_state_value::{DbStateUpdate, MemorizedStateRead, StateUpdateRef},
         NUM_STATE_SHARDS,
     },
     AptosDbError, DbReader, Result, StateSnapshotReceiver,
@@ -881,13 +881,12 @@ impl StateStore {
                         MemorizedStateRead::NonExistent
                     });
 
-                if let MemorizedStateRead::Value {
+                if let MemorizedStateRead::StateUpdate(DbStateUpdate {
                     version: old_version,
-                    value: old_value,
-                } = old_entry
+                    value: old_value_opt,
+                }) = old_entry
                 {
-                    // Non-existing key can be in cache but is currently not persisted
-                    if !old_value.is_hot_non_existent() {
+                    if old_value_opt.map_or(false, |old_val| !old_val.is_hot_non_existent()) {
                         // The value at `old_version` can be pruned once the pruning window hits
                         // this `version`.
                         Self::put_state_kv_index(batch, enable_sharding, version, old_version, key)
