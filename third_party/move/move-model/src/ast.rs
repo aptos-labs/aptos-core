@@ -171,8 +171,7 @@ impl ConditionKind {
     }
 
     pub fn allowed_on_lambda_spec(&self) -> bool {
-        use ConditionKind::*;
-        matches!(self, Requires | Ensures)
+        self.allowed_on_fun_decl(Visibility::Public)
     }
 
     /// Returns true if this condition is allowed on a struct.

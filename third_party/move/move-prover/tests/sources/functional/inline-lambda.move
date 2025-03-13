@@ -36,15 +36,21 @@ module 0x42::Test {
 
     fun call_inline(y: u64) {
         let z = 3 + y;
-        inline_1(y, |x| x > 2, |x| x > z, |x| { while(z < y) {let _x = x;}; x > 5 } spec {ensures result == (x > 5); ensures result != !(x > 5); });
+        inline_1(y, |x| x > 2, |x| x > z, |x| { while(z < y) {let _x = x;}; x > 5 } spec {
+            aborts_if x > 0; // This does not verify
+            ensures result == (x > 5);
+            ensures result != !(x > 5);
+        });
     }
 
     fun call_inline_fail(y: u64) {
         let z = 3 + y;
         inline_1(y, |x| x > 2, |x| x > z, |x| { while(z < y) {let _x = x;}; x > 5 } spec
         {
+            aborts_if false; // This verifies
             requires x > 0; // This does not verify at the call site
             requires z > 5; // This does not verify at the call site
+            invariant x >= 0; // This verifies
             ensures result == (x == 5); //  This does not verify
             ensures result ==> !(x == 5); //  This verifies
         });
