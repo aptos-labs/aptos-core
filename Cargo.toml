@@ -1,3 +1,65 @@
+[package]
+name = "gaptos"
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+aptos-bitvec = { workspace = true }
+aptos-id-generator = { workspace = true }
+aptos-compression = { workspace = true }
+aptos-proptest-helpers = { workspace = true }
+aptos-crash-handler = { workspace = true }
+aptos-bounded-executor = { workspace = true }
+aptos-cached-packages = { workspace = true }
+aptos-channels = { workspace = true }
+aptos-collections = { workspace = true }
+aptos-config = { workspace = true }
+aptos-consensus-notifications = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-crypto-derive = { workspace = true }
+aptos-dkg = { workspace = true }
+aptos-enum-conversion-derive = { workspace = true }
+aptos-event-notifications = { workspace = true }
+aptos-executor = { workspace = true }
+aptos-executor-test-helpers = { workspace = true }
+aptos-executor-types = { workspace = true }
+aptos-experimental-runtimes = { workspace = true }
+aptos-fallible = { workspace = true }
+aptos-global-constants = { workspace = true }
+aptos-infallible = { workspace = true }
+aptos-inspection-service = { workspace = true }
+aptos-build-info = { workspace = true }
+aptos-keygen = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-mempool-notifications = { workspace = true }
+aptos-metrics-core = { workspace = true }
+aptos-peer-monitoring-service-types = { workspace = true }
+aptos-reliable-broadcast = { workspace = true }
+aptos-runtimes = { workspace = true }
+aptos-schemadb = { workspace = true }
+aptos-node-resource-metrics = { workspace = true }
+aptos-secure-net = { workspace = true }
+aptos-secure-storage = { workspace = true }
+aptos-short-hex-str = { workspace = true }
+aptos-storage-interface = { workspace = true }
+aptos-temppath = { workspace = true }
+aptos-time-service = { workspace = true }
+aptos-types = { workspace = true }
+aptos-validator-transaction-pool = { workspace = true }
+aptos-vault-client = { workspace = true }
+aptos-log-derive = { workspace = true }
+aptos-rest-client = { workspace = true }
+move-core-types = { workspace = true }
+aptos-proxy = { workspace = true }
+aptos-num-variants = { workspace = true }
+aptos-telemetry = { workspace = true }
+aptos-telemetry-service = { workspace = true }
+
 [workspace]
 resolver = "2"
 
@@ -914,69 +976,3 @@ futures-sink = { git = "https://github.com/aptos-labs/futures-rs", branch = "bac
 futures-io = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 futures-task = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 futures-macro = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-
-
-[dependencies]
-aptos-bitvec = { workspace = true }
-aptos-id-generator = { workspace = true }
-aptos-compression = { workspace = true }
-aptos-proptest-helpers = { workspace = true }
-aptos-crash-handler = { workspace = true }
-aptos-bounded-executor = { workspace = true }
-aptos-cached-packages = { workspace = true }
-aptos-channels = { workspace = true }
-aptos-collections = { workspace = true }
-aptos-config = { workspace = true }
-aptos-consensus-notifications = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-crypto-derive = { workspace = true }
-aptos-dkg = { workspace = true }
-aptos-enum-conversion-derive = { workspace = true }
-aptos-event-notifications = { workspace = true }
-aptos-executor = { workspace = true }
-aptos-executor-test-helpers = { workspace = true }
-aptos-executor-types = { workspace = true }
-aptos-experimental-runtimes = { workspace = true }
-aptos-fallible = { workspace = true }
-aptos-global-constants = { workspace = true }
-aptos-infallible = { workspace = true }
-aptos-inspection-service = { workspace = true }
-aptos-build-info = { workspace = true }
-aptos-keygen = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-mempool-notifications = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-peer-monitoring-service-types = { workspace = true }
-aptos-reliable-broadcast = { workspace = true }
-aptos-runtimes = { workspace = true }
-aptos-schemadb = { workspace = true }
-aptos-node-resource-metrics = { workspace = true }
-aptos-secure-net = { workspace = true }
-aptos-secure-storage = { workspace = true }
-aptos-short-hex-str = { workspace = true }
-aptos-storage-interface = { workspace = true }
-aptos-temppath = { workspace = true }
-aptos-time-service = { workspace = true }
-aptos-types = { workspace = true }
-aptos-validator-transaction-pool = { workspace = true }
-aptos-vault-client = { workspace = true }
-aptos-log-derive = { workspace = true }
-aptos-rest-client = { workspace = true }
-move-core-types = { workspace = true }
-aptos-proxy = { workspace = true }
-aptos-num-variants = { workspace = true }
-aptos-telemetry = { workspace = true }
-aptos-telemetry-service = { workspace = true }
-
-[package]
-name = "gaptos"
-version = "0.1.0"
-
-# Workspace inherited keys
-authors = { workspace = true }
-edition = { workspace = true }
-homepage = { workspace = true }
-license = { workspace = true }
-publish = { workspace = true }
-repository = { workspace = true }
-rust-version = { workspace = true }
