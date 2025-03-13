@@ -174,6 +174,9 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 Payload::DirectMempool(_) => {
                     unreachable!("InQuorumStore should be used");
                 },
+                Payload::Legacy1 | Payload::Legacy2 => {
+                    unreachable!("Payload is in legacy format");
+                },
                 Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
                 | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
                     inline_batches
@@ -243,12 +246,15 @@ impl TPayloadManager for QuorumStorePayloadManager {
         }
 
         match payload {
+            Payload::DirectMempool(_) => {
+                unreachable!()
+            },
+            Payload::Legacy1 | Payload::Legacy2 => {
+                unreachable!("Payload is in legacy format");
+            },
             Payload::QuorumStoreInlineHybrid(_, proof_with_data, _)
             | Payload::QuorumStoreInlineHybridV2(_, proof_with_data, _) => {
                 request_txns_and_update_status(proof_with_data, self.batch_reader.clone());
-            },
-            Payload::DirectMempool(_) => {
-                unreachable!()
             },
             Payload::OptQuorumStore(opt_qs_payload) => {
                 prefetch_helper(
@@ -277,6 +283,9 @@ impl TPayloadManager for QuorumStorePayloadManager {
         match payload {
             Payload::DirectMempool(_) => {
                 unreachable!("QuorumStore doesn't support DirectMempool payload")
+            },
+            Payload::Legacy1 | Payload::Legacy2 => {
+                unreachable!("Payload is in legacy format");
             },
             Payload::QuorumStoreInlineHybrid(inline_batches, proofs, _)
             | Payload::QuorumStoreInlineHybridV2(inline_batches, proofs, _) => {
