@@ -820,7 +820,7 @@ pub type TypeParameterIndex = u16;
     derive(proptest_derive::Arbitrary, dearbitrary::Dearbitrary)
 )]
 pub struct AccessSpecifier {
-    /// The kind of access: read, write, or both.
+    /// The kind of access.
     pub kind: AccessKind,
     /// Whether the specifier is negated.
     pub negated: bool,

@@ -1712,6 +1712,8 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                     .matches(self.global_env(), &fun_id.inst, global)
                     // For mut global borrows, no access is allowed at all. For
                     // non-mut, write access is not allowed.
+                    // TODO: needs to be update to use acquired resources instead
+                    //   access specifiers (see v3 code).
                     && (is_mut || spec.kind.subsumes(&AccessSpecifierKind::Writes))
                 {
                     self.error_with_hints(

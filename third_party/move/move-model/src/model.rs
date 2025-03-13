@@ -4274,7 +4274,8 @@ pub struct FunctionData {
     /// Access specifiers.
     pub(crate) access_specifiers: Option<Vec<AccessSpecifier>>,
 
-    /// Acquires information, if available.
+    /// Acquires information, if available. This is either inferred or annotated by the
+    /// user via a legacy acquires declaration.
     pub(crate) acquired_structs: Option<BTreeSet<StructId>>,
 
     /// Specification associated with this function.

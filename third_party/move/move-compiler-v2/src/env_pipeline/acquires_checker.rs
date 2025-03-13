@@ -1,11 +1,20 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Performs strict acquires analysis as outlined in the move book, that is:
-//! A Move function `m::f` must be annotated with acquires `T`` if and only if,
-//! - The body of `m::f` contains a `move_from<T>`, `borrow_global_mut<T>`, or `borrow_global<T>` instruction, or
-//! - The body of `m::f` invokes a function `m::g` declared in the same module that is annotated with acquires
-//! Warn if access specifiers other than plain `acquires R` is used.
+//! Performs acquires analysis as outlined in the move book.
+//!
+//! This infers acquires information for each function via a fixpoint analysis, implementing
+//! the following rule: function `f` acquires `T` iff
+//! - The body of `f` contains a `move_from<T>`, `borrow_global_mut<T>`, or
+//!   `borrow_global<T>` instruction, or
+//! - The body of `f` invokes a function `g` declared in the same module that
+//!   acquires `T`
+//!
+//! The inferred acquires information will be stored in the model.
+//!
+//! If a function definition has one or more manual legacy `acquires` annotations, then an error
+//! is produced if the annotations aren't precisely matching the inferred information.
+//!
 //! This check is enabled by flag `Experiment::ACQUIRES_CHECK`.
 
 use crate::Options;
