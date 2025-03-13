@@ -3,7 +3,7 @@
 
 use crate::{
     data_manager::DataManager,
-    metrics::{FILE_STORE_VERSION, TIMER},
+    metrics::{FILE_STORE_UPLOADED_BYTES, FILE_STORE_VERSION, TIMER},
 };
 use anyhow::Result;
 use aptos_indexer_grpc_utils::{
@@ -121,12 +121,14 @@ impl FileStoreUploader {
         )
         .await;
         tokio_scoped::scope(|s| {
-            let (tx, mut rx) = channel(5);
+            let (tx, mut rx) = channel::<(_, BatchMetadata, _)>(5);
             s.spawn(async move {
                 while let Some((transactions, batch_metadata, end_batch)) = rx.recv().await {
+                    let bytes_to_upload = batch_metadata.files.last().unwrap().size_bytes as u64;
                     self.do_upload(transactions, batch_metadata, end_batch)
                         .await
                         .unwrap();
+                    FILE_STORE_UPLOADED_BYTES.inc_by(bytes_to_upload);
                 }
             });
             s.spawn(async move {

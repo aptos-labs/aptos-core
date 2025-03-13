@@ -180,11 +180,12 @@ impl DataManager {
                 "Requesting transactions from fullnodes, starting_version: {}.",
                 request.starting_version.unwrap()
             );
-            let mut fullnode_client = self.metadata_manager.get_fullnode_for_request(&request);
+            let (address, mut fullnode_client) =
+                self.metadata_manager.get_fullnode_for_request(&request);
             let response = fullnode_client.get_transactions_from_node(request).await;
             if response.is_err() {
                 warn!(
-                    "Error when getting transactions from fullnode: {}",
+                    "Error when getting transactions from fullnode ({address}): {}",
                     response.err().unwrap()
                 );
                 tokio::time::sleep(Duration::from_millis(100)).await;
@@ -258,7 +259,7 @@ impl DataManager {
                         transactions_count: Some(5000),
                     };
 
-                    let mut fullnode_client =
+                    let (_, mut fullnode_client) =
                         self.metadata_manager.get_fullnode_for_request(&request);
                     let response = fullnode_client.get_transactions_from_node(request).await?;
                     let mut response = response.into_inner();
@@ -296,14 +297,15 @@ impl DataManager {
                 /*retries=*/ 3,
                 /*max_files=*/ Some(1),
                 /*filter=*/ None,
+                /*ending_version=*/ None,
                 tx,
             )
             .await;
 
-        if let Some((transactions, _, _)) = rx.recv().await {
+        if let Some((transactions, _, _, range)) = rx.recv().await {
             debug!(
-                "Transactions returned from filestore: [{start_version}, {}).",
-                transactions.last().unwrap().version
+                "Transactions returned from filestore: [{}, {}].",
+                range.0, range.1
             );
             let first_version = transactions.first().unwrap().version;
             ensure!(
@@ -352,11 +354,11 @@ impl DataManager {
     async fn update_file_store_version_in_cache(&self, cache: &RwLockReadGuard<'_, Cache>) {
         let file_store_version = self.file_store_reader.get_latest_version().await;
         if let Some(file_store_version) = file_store_version {
-            let file_store_version_after_update = cache
+            let file_store_version_before_update = cache
                 .file_store_version
                 .fetch_max(file_store_version, Ordering::SeqCst);
-            if file_store_version_after_update != file_store_version {
-                panic!("File store version is going backward, data might be corrupted. {file_store_version_after_update} v.s. {file_store_version}");
+            if file_store_version_before_update > file_store_version {
+                panic!("File store version is going backward, data might be corrupted. {file_store_version_before_update} v.s. {file_store_version}");
             };
         }
     }
