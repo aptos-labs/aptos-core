@@ -231,7 +231,7 @@ pub fn run_spec_rewriter_inline(
     env: &mut GlobalEnv,
     module_id: ModuleId,
     lambda_fun_map: BTreeMap<usize, FunctionData>,
-) -> BTreeMap<usize, QualifiedId<SpecFunId>> {
+) -> BTreeMap<usize, (QualifiedId<SpecFunId>, QualifiedId<FunId>)> {
     info!("rewriting specifications in inline functions");
 
     let mut targets = RewriteTargets::create_fun_targets(env, vec![]);
@@ -242,8 +242,9 @@ pub fn run_spec_rewriter_inline(
     for (i, data) in lambda_fun_map {
         // Add lifted lambda expressions into env
         let fun_id = env.add_function_def_from_data(module_id, data);
-        let spec_fun_id = derive_spec_fun(env, module_id.qualified(fun_id), true);
-        function_data_mapping.insert(i, spec_fun_id);
+        let qualified_fun_id = module_id.qualified(fun_id);
+        let spec_fun_id = derive_spec_fun(env, qualified_fun_id, true);
+        function_data_mapping.insert(i, (spec_fun_id, qualified_fun_id));
         // Add new spec fun to targets for later processing
         targets.entry(RewriteTarget::SpecFun(spec_fun_id));
         // For simplicity, we assume that all lambda parameters will be called

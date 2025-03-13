@@ -10,6 +10,10 @@ error: unknown assertion failed
   =         a2 = <redacted>
   =     at tests/sources/functional/inline-lambda.move:6: apply
   =     at tests/sources/functional/inline-lambda.move:7: apply
+  =     at tests/sources/functional/inline-lambda.move:9: apply
+  =     at tests/sources/functional/inline-lambda.move:13: test_apply
+  =         v = <redacted>
+  =         result = <redacted>
   =     at tests/sources/functional/inline-lambda.move:13: test_apply
   =         r1 = <redacted>
   =     at tests/sources/functional/inline-lambda.move:15: test_apply
@@ -27,16 +31,71 @@ error: unknown assertion failed
    =         a2 = <redacted>
    =     at tests/sources/functional/inline-lambda.move:6: apply
    =     at tests/sources/functional/inline-lambda.move:7: apply
+   =     at tests/sources/functional/inline-lambda.move:9: apply
+   =     at tests/sources/functional/inline-lambda.move:13: test_apply
+   =         v = <redacted>
+   =         result = <redacted>
    =     at tests/sources/functional/inline-lambda.move:13: test_apply
    =         r1 = <redacted>
    =     at tests/sources/functional/inline-lambda.move:15: test_apply
    =     at tests/sources/functional/inline-lambda.move:6: apply
    =     at tests/sources/functional/inline-lambda.move:7: apply
+   =     at tests/sources/functional/inline-lambda.move:9: apply
+   =     at tests/sources/functional/inline-lambda.move:18: test_apply
+   =         a1 = <redacted>
+   =         a2 = <redacted>
+   =         v = <redacted>
+   =         result = <redacted>
    =     at tests/sources/functional/inline-lambda.move:18: test_apply
    =         r2 = <redacted>
    =     at tests/sources/functional/inline-lambda.move:20: test_apply
 
-error: precondition of lambda expression does not hold
+error: unknown assertion failed
+   ┌─ tests/sources/functional/inline-lambda.move:32:13
+   │
+32 │             assert w == e(x); // e is translated into an uninterpreted spec fun
+   │             ^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/inline-lambda.move:42: call_inline_fail
+   =         y = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:43: call_inline_fail
+   =         z = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:24: inline_1
+   =         x = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:25: inline_1
+   =     at tests/sources/functional/inline-lambda.move:44: call_inline_fail
+   =         x = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:44: call_inline_fail
+   =         y = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:26: inline_1
+   =     at tests/sources/functional/inline-lambda.move:44: call_inline_fail
+   =         z = <redacted>
+   =         x = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:44: call_inline_fail
+   =         z' = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:46: call_inline_fail
+   =     at tests/sources/functional/inline-lambda.move:47: call_inline_fail
+   =     at tests/sources/functional/inline-lambda.move:27: inline_1
+   =     at tests/sources/functional/inline-lambda.move:46: call_inline_fail
+   =     at tests/sources/functional/inline-lambda.move:47: call_inline_fail
+   =     at tests/sources/functional/inline-lambda.move:44: call_inline_fail
+   =         y = <redacted>
+   =         z = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:44: call_inline_fail
+   =     enter loop
+   =     at tests/sources/functional/inline-lambda.move:44: call_inline_fail
+   =         result = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:50: call_inline_fail
+   =         w = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:29: inline_1
+   =     at tests/sources/functional/inline-lambda.move:30: inline_1
+   =     at tests/sources/functional/inline-lambda.move:31: inline_1
+   =     at tests/sources/functional/inline-lambda.move:32: inline_1
+
+error: precondition does not hold at this call
    ┌─ tests/sources/functional/inline-lambda.move:46:13
    │
 46 │             requires x > 0; // This does not verify at the call site
@@ -48,13 +107,22 @@ error: precondition of lambda expression does not hold
    =         z = <redacted>
    =     at tests/sources/functional/inline-lambda.move:24: inline_1
    =         x = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:25: inline_1
+   =     at tests/sources/functional/inline-lambda.move:44: call_inline_fail
+   =         x = <redacted>
+   =         result = <redacted>
    =     at tests/sources/functional/inline-lambda.move:44: call_inline_fail
    =         y = <redacted>
-   =         z' = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:26: inline_1
+   =     at tests/sources/functional/inline-lambda.move:44: call_inline_fail
+   =         z = <redacted>
    =         x = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:44: call_inline_fail
+   =         z' = <redacted>
    =     at tests/sources/functional/inline-lambda.move:46: call_inline_fail
 
-error: precondition of lambda expression does not hold
+error: precondition does not hold at this call
    ┌─ tests/sources/functional/inline-lambda.move:47:13
    │
 47 │             requires z > 5; // This does not verify at the call site
@@ -66,10 +134,19 @@ error: precondition of lambda expression does not hold
    =         z = <redacted>
    =     at tests/sources/functional/inline-lambda.move:24: inline_1
    =         x = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:25: inline_1
+   =     at tests/sources/functional/inline-lambda.move:44: call_inline_fail
+   =         x = <redacted>
+   =         result = <redacted>
    =     at tests/sources/functional/inline-lambda.move:44: call_inline_fail
    =         y = <redacted>
-   =         z' = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:26: inline_1
+   =     at tests/sources/functional/inline-lambda.move:44: call_inline_fail
+   =         z = <redacted>
    =         x = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:44: call_inline_fail
+   =         z' = <redacted>
    =     at tests/sources/functional/inline-lambda.move:46: call_inline_fail
    =     at tests/sources/functional/inline-lambda.move:47: call_inline_fail
 
