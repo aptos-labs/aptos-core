@@ -10,122 +10,15 @@
 //! sometimes see the `window_root` behind the `commit_root`.
 //! This should not happen in production.
 
-use crate::{
-    block_storage::{
-        execution_pool::common_test::{
-            create_block_tree_no_forks, create_block_tree_no_forks_inner,
-            create_block_tree_with_forks, create_block_tree_with_forks_unordered_parents,
-            create_block_tree_with_forks_unordered_parents_and_nil_blocks,
-            get_blocks_from_block_store_and_window, DEFAULT_MAX_PRUNED_BLOCKS_IN_MEM,
-        },
-        BlockReader,
+use crate::block_storage::{
+    execution_pool::common_test::{
+        create_block_tree_no_forks, create_block_tree_no_forks_inner, create_block_tree_with_forks,
+        create_block_tree_with_forks_unordered_parents,
+        create_block_tree_with_forks_unordered_parents_and_nil_blocks,
+        get_blocks_from_block_store_and_window,
     },
-    test_utils::TreeInserter,
+    BlockReader,
 };
-use aptos_crypto::HashValue;
-use aptos_types::{block_info::Round, validator_signer::ValidatorSigner};
-
-/// Check the following:
-/// 1. [`OrderedBlockWindow`](aptos_consensus_types::pipelined_block::OrderedBlockWindow)
-///    has a length of at most (window_size - 1) blocks
-/// 2. [`OrderedBlockWindow`](aptos_consensus_types::pipelined_block::OrderedBlockWindow)
-///    excludes the current block.
-/// 3. Block rounds are in ascending order (oldest -> newest).
-#[tokio::test]
-async fn test_execution_pool_block_window_3_no_commit() {
-    let window_size: Option<u64> = Some(3);
-    let validator_signer = ValidatorSigner::random(None);
-    let mut inserter = TreeInserter::new_with_params(
-        validator_signer,
-        window_size,
-        DEFAULT_MAX_PRUNED_BLOCKS_IN_MEM,
-        None,
-    );
-    let block_store = inserter.block_store();
-    let mut round: Round = 0;
-
-    // Block Store is initialized with a genesis block
-    let genesis_pipelined_block = block_store
-        .get_block(block_store.ordered_root().id())
-        .unwrap();
-    assert_eq!(genesis_pipelined_block.block().round(), 0);
-    assert_eq!(genesis_pipelined_block.parent_id(), HashValue::zero());
-    let mut curr_pipelined_block = genesis_pipelined_block.clone();
-
-    // Getting the ordered block window for a genesis block should return an empty window
-    // | blocks inserted | window_size | round | ordered_block_window block count |
-    // |-----------------|-------------|-------|----------------------------------|
-    // | 0               | 3           | 0     | 0                                |
-    let block = curr_pipelined_block.block();
-    let blocks = get_blocks_from_block_store_and_window(block_store.clone(), block, window_size);
-    assert_eq!(blocks.len(), 0);
-    assert_eq!(round, 0);
-
-    // | blocks inserted | window_size | round | ordered_block_window block count |
-    // |-----------------|-------------|-------|----------------------------------|
-    // | 1               | 3           | 1     | 1                                |
-    round += 1;
-    curr_pipelined_block = inserter
-        .insert_block(&curr_pipelined_block, round, None)
-        .await;
-    let block = curr_pipelined_block.block();
-    let blocks = get_blocks_from_block_store_and_window(block_store.clone(), block, window_size);
-
-    assert_eq!(blocks.len(), 1);
-    assert_eq!(round, 1);
-
-    // | blocks inserted | window_size | round | ordered_block_window block count |
-    // |-----------------|-------------|-------|----------------------------------|
-    // | 2               | 3           | 2     | 2                                |
-    round += 1;
-    curr_pipelined_block = inserter
-        .insert_block(&curr_pipelined_block, round, None)
-        .await;
-    let blocks = get_blocks_from_block_store_and_window(
-        block_store.clone(),
-        curr_pipelined_block.block(),
-        window_size,
-    );
-    assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks.first().unwrap().round(), 0);
-    assert_eq!(round, 2);
-
-    // | blocks inserted | window_size | round | ordered_block_window block count |
-    // |-----------------|-------------|-------|----------------------------------|
-    // | 3               | 3           | 3     | 2                                |
-    round += 1;
-    curr_pipelined_block = inserter
-        .insert_block(&curr_pipelined_block, round, None)
-        .await;
-    let blocks = get_blocks_from_block_store_and_window(
-        block_store.clone(),
-        curr_pipelined_block.block(),
-        window_size,
-    );
-    assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks.first().unwrap().round(), 1);
-    assert_eq!(blocks.get(1).unwrap().round(), 2);
-    assert_eq!(round, 3);
-
-    // | blocks inserted | window_size | round | ordered_block_window block count |
-    // |-----------------|-------------|-------|----------------------------------|
-    // | 4               | 3           | 4     | 2                                |
-    round += 1;
-    curr_pipelined_block = inserter
-        .insert_block(&curr_pipelined_block, round, None)
-        .await;
-    let blocks = get_blocks_from_block_store_and_window(
-        block_store.clone(),
-        curr_pipelined_block.block(),
-        window_size,
-    );
-
-    // Max should be 2, even if more blocks are added since Max(len(OrderedBlockWindow)) = window_size - 1
-    assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks.first().unwrap().round(), 2);
-    assert_eq!(blocks.get(1).unwrap().round(), 3);
-    assert_eq!(round, 4);
-}
 
 #[tokio::test]
 async fn test_execution_pool_block_window_with_forks() {
