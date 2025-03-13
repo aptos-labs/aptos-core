@@ -171,7 +171,12 @@ impl ConditionKind {
     }
 
     pub fn allowed_on_lambda_spec(&self) -> bool {
-        self.allowed_on_fun_decl(Visibility::Public)
+        // TODO(teng): support all conditions allowed in `allowed_on_fun_decl`
+        use ConditionKind::*;
+        matches!(
+            self,
+            Requires | AbortsIf | Ensures | FunctionInvariant | LetPre(..)
+        )
     }
 
     /// Returns true if this condition is allowed on a struct.

@@ -34,7 +34,45 @@ module 0x42::Test {
         y
     }
 
-    fun call_inline(y: u64) {
+    fun call_inline_1(y: u64) {
+        let z = 3 + y;
+        inline_1(y, |x| x > 2, |x| x > z, |x| { while(z < y) {let _x = x;}; x > 5 } spec {
+            ensures result == (x > 5);
+            ensures result != !(x > 5);
+        });
+    }
+
+    inline fun inline_2(x: u64, e:|u64|bool): bool {
+        if (x > 0) {
+            let w = e(x);
+            spec {
+                assert x > 0;
+                assert w == e(x); // e is translated into an uninterpreted spec fun
+            };
+            true
+        } else {
+            false
+        }
+    }
+
+    fun call_inline_2(y: u64) {
+        let z = 3 + y;
+        inline_2(y, |x| { while(z < y) {let _x = x;}; x > 5 } spec {
+            requires x > 0;
+            ensures result == (x > 5);
+            ensures result != !(x > 5);
+        });
+    }
+
+    fun call_inline_2_aborts_if(y: u64) {
+        inline_2(y, |x| { if (x == 0) { abort 1; }; x > 5  } spec {
+            aborts_if !(x > 0);
+            ensures result == (x > 5);
+            ensures result != !(x > 5);
+        });
+    }
+
+    fun call_inline_fail_1(y: u64) {
         let z = 3 + y;
         inline_1(y, |x| x > 2, |x| x > z, |x| { while(z < y) {let _x = x;}; x > 5 } spec {
             aborts_if x > 0; // This does not verify
@@ -43,7 +81,7 @@ module 0x42::Test {
         });
     }
 
-    fun call_inline_fail(y: u64) {
+    fun call_inline_fail_2(y: u64) {
         let z = 3 + y;
         inline_1(y, |x| x > 2, |x| x > z, |x| { while(z < y) {let _x = x;}; x > 5 } spec
         {

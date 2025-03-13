@@ -1286,15 +1286,17 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
     /// convert the body, formal parameters, and actual arguments into a let expression which
     /// can be used in place of the call.
     fn rewrite_invoke(&mut self, id: NodeId, target: &Exp, args: &[Exp]) -> Option<Exp> {
-        // Rewrite invoke to lambda expression into call to the corresponding spec function
+        // Rewrite invoke to lambda expression into call to the corresponding spec function or move function
         // do it in the spec context
-        if self.in_spec > 0 && self.rewrite_invoke_for_spec {
-            let rewrite_invoke_into_spec_fun = |para_pos| -> Option<Exp> {
-                if let (Some((spec_fun_id, _)), Some(closure)) = (
+        if self.rewrite_invoke_for_spec {
+            let rewrite_invoke_into_fun = |para_pos, call_spec_fun: bool| -> Option<Exp> {
+                if let (Some((spec_fun_id, fn_id)), Some(closure)) = (
                     self.function_value_spec_map.get(para_pos),
                     self.function_value_map.get(para_pos),
                 ) {
                     let spec_fun_decl: &SpecFunDecl = self.env.get_spec_fun(*spec_fun_id);
+                    let fun_env = self.env.get_function(*fn_id);
+                    assert!(fun_env.get_parameters().len() == spec_fun_decl.params.len());
                     if let ExpData::Call(_, Operation::Closure(_, _, mask), captured) =
                         closure.as_ref()
                     {
@@ -1311,60 +1313,23 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                             }
                         }
                         Some(
-                            ExpData::Call(
-                                id,
-                                Operation::SpecFunction(
-                                    spec_fun_id.module_id,
-                                    spec_fun_id.id,
-                                    None,
-                                ),
-                                new_args.clone(),
-                            )
-                            .into_exp(),
-                        )
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            };
-            if let ExpData::LocalVar(_, sym) = target.as_ref() {
-                if let Some(para_pos) = self.sym_para_map.get(sym) {
-                    return rewrite_invoke_into_spec_fun(para_pos);
-                }
-            } else if let ExpData::Temporary(_, para_pos) = target.as_ref() {
-                return rewrite_invoke_into_spec_fun(para_pos);
-            }
-            return None;
-        } else if self.rewrite_invoke_for_spec {
-            let rewrite_invoke_into_move_fun = |para_pos| -> Option<Exp> {
-                if let (Some((_, fn_id)), Some(closure)) = (
-                    self.function_value_spec_map.get(para_pos),
-                    self.function_value_map.get(para_pos),
-                ) {
-                    let fun_env = self.env.get_function(*fn_id);
-                    if let ExpData::Call(_, Operation::Closure(_, _, mask), captured) =
-                        closure.as_ref()
-                    {
-                        let mut new_args = vec![];
-                        let mut captured_num = 0;
-                        let mut free_num = 0;
-                        for i in 0..fun_env.get_parameters().len() {
-                            if mask.is_captured(i) {
-                                new_args.push(captured[captured_num].clone());
-                                captured_num += 1;
+                            if !call_spec_fun {
+                                ExpData::Call(
+                                    id,
+                                    Operation::MoveFunction(fn_id.module_id, fn_id.id),
+                                    new_args.clone(),
+                                )
                             } else {
-                                new_args.push(args[free_num].clone());
-                                free_num += 1;
+                                ExpData::Call(
+                                    id,
+                                    Operation::SpecFunction(
+                                        spec_fun_id.module_id,
+                                        spec_fun_id.id,
+                                        None,
+                                    ),
+                                    new_args.clone(),
+                                )
                             }
-                        }
-                        Some(
-                            ExpData::Call(
-                                id,
-                                Operation::MoveFunction(fn_id.module_id, fn_id.id),
-                                new_args.clone(),
-                            )
                             .into_exp(),
                         )
                     } else {
@@ -1376,10 +1341,10 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
             };
             if let ExpData::LocalVar(_, sym) = target.as_ref() {
                 if let Some(para_pos) = self.sym_para_map.get(sym) {
-                    return rewrite_invoke_into_move_fun(para_pos);
+                    return rewrite_invoke_into_fun(para_pos, self.in_spec > 0);
                 }
             } else if let ExpData::Temporary(_, para_pos) = target.as_ref() {
-                return rewrite_invoke_into_move_fun(para_pos);
+                return rewrite_invoke_into_fun(para_pos, self.in_spec > 0);
             }
             return None;
         }
