@@ -282,7 +282,7 @@ pub struct OptQuorumStorePayloadV1 {
 }
 
 impl OptQuorumStorePayloadV1 {
-    pub fn get_all_batch_infos(self) -> Vec<BatchInfo> {
+    pub fn get_all_batches(&self) -> Vec<BatchInfo> {
         let Self {
             inline_batches,
             opt_batches,
@@ -291,10 +291,11 @@ impl OptQuorumStorePayloadV1 {
         } = self;
         inline_batches
             .0
-            .into_iter()
-            .map(|batch| batch.batch_info)
-            .chain(opt_batches)
-            .chain(proofs.into_iter().map(|proof| proof.info().clone()))
+            .iter()
+            .map(|batch| &batch.batch_info)
+            .chain(opt_batches.batch_summary.iter())
+            .chain(proofs.iter().map(|proof| proof.info()))
+            .cloned()
             .collect()
     }
 
