@@ -226,10 +226,7 @@ impl<'env> Instrumenter<'env> {
 
             // for the return bytecode, the assertion comes before the bytecode
             if matches!(bc, Bytecode::Ret(..)) {
-                self.assert_or_assume_translated_invariants(
-                    &xlated_exitpoint,
-                    PropKind::Assert(None),
-                );
+                self.assert_or_assume_translated_invariants(&xlated_exitpoint, PropKind::Assert);
             }
 
             // the bytecode itself
@@ -237,7 +234,7 @@ impl<'env> Instrumenter<'env> {
 
             // post-instrumentation for assertions
             if let Some(xlated) = xlated_inlined.get(&code_offset) {
-                self.assert_or_assume_translated_invariants(xlated, PropKind::Assert(None));
+                self.assert_or_assume_translated_invariants(xlated, PropKind::Assert);
             }
         }
 
@@ -286,7 +283,7 @@ impl<'env> Instrumenter<'env> {
             loc.display(self.builder.global_env())
         ));
         // No error messages on assumes
-        if matches!(prop_kind, PropKind::Assert(..)) {
+        if matches!(prop_kind, PropKind::Assert) {
             self.builder
                 .set_loc_and_vc_info(loc, GLOBAL_INVARIANT_FAILS_MESSAGE);
         }

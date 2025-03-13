@@ -103,7 +103,7 @@ impl Attribute {
 pub enum ConditionKind {
     LetPost(Symbol, Loc),
     LetPre(Symbol, Loc),
-    Assert(Option<bool>),
+    Assert,
     Assume,
     Decreases,
     AbortsIf,
@@ -130,7 +130,7 @@ impl ConditionKind {
         matches!(
             self,
             LetPost(..)
-                | Assert(..)
+                | Assert
                 | Assume
                 | Emits
                 | Ensures
@@ -163,7 +163,7 @@ impl ConditionKind {
         use ConditionKind::*;
         matches!(
             self,
-            Assert(..) | Assume | Decreases | LoopInvariant | LetPost(..) | LetPre(..) | Update
+            Assert | Assume | Decreases | LoopInvariant | LetPost(..) | LetPre(..) | Update
         )
     }
 
@@ -208,15 +208,7 @@ impl fmt::Display for ConditionKind {
         match self {
             LetPost(sym, _loc) => write!(f, "let({:?})", sym),
             LetPre(sym, _loc) => write!(f, "let old({:?})", sym),
-            Assert(option) => {
-                if option.is_none() {
-                    write!(f, "assert")
-                } else if option.is_some_and(|lambda_requires| lambda_requires) {
-                    write!(f, "requires")
-                } else {
-                    write!(f, "ensures")
-                }
-            },
+            Assert => write!(f, "assert"),
             Assume => write!(f, "assume"),
             Decreases => write!(f, "decreases"),
             AbortsIf => write!(f, "aborts_if"),

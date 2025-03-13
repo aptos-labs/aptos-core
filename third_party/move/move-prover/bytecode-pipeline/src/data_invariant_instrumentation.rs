@@ -111,7 +111,7 @@ impl<'a> Instrumenter<'a> {
                 self.builder
                     .emit(Call(id, dests, Pack(mid, sid, targs), srcs, aa));
                 // Emit a shallow assert of the data invariant.
-                self.emit_data_invariant_for_temp(false, PropKind::Assert(None), struct_temp);
+                self.emit_data_invariant_for_temp(false, PropKind::Assert, struct_temp);
             },
             Call(id, dests, PackVariant(mid, sid, variant, targs), srcs, aa)
                 if self.for_verification =>
@@ -125,15 +125,15 @@ impl<'a> Instrumenter<'a> {
                     aa,
                 ));
                 // Emit a shallow assert of the data invariant.
-                self.emit_data_invariant_for_temp(false, PropKind::Assert(None), struct_temp);
+                self.emit_data_invariant_for_temp(false, PropKind::Assert, struct_temp);
             },
             Call(_, _, PackRef, srcs, _) if self.for_verification => {
                 // Emit a shallow assert of the data invariant.
-                self.emit_data_invariant_for_temp(false, PropKind::Assert(None), srcs[0]);
+                self.emit_data_invariant_for_temp(false, PropKind::Assert, srcs[0]);
             },
             Call(_, _, PackRefDeep, srcs, _) if self.for_verification => {
                 // Emit a deep assert of the data invariant.
-                self.emit_data_invariant_for_temp(true, PropKind::Assert(None), srcs[0]);
+                self.emit_data_invariant_for_temp(true, PropKind::Assert, srcs[0]);
             },
 
             // Augment WellFormed calls in assumptions. Currently those cannot appear in assertions.
@@ -172,7 +172,7 @@ impl<'a> Instrumenter<'a> {
                 "data invariant {}",
                 loc.display(self.builder.global_env())
             ));
-            if matches!(kind, PropKind::Assert(..)) {
+            if matches!(kind, PropKind::Assert) {
                 self.builder
                     .set_loc_and_vc_info(loc, INVARIANT_FAILS_MESSAGE);
             }

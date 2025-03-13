@@ -203,7 +203,7 @@ impl<'a> Instrumenter<'a> {
             .iter()
             .filter_map(|bc| match bc {
                 Bytecode::Prop(id, PropKind::Assume, exp)
-                | Bytecode::Prop(id, PropKind::Assert(..), exp) => Some((*id, exp.clone())),
+                | Bytecode::Prop(id, PropKind::Assert, exp) => Some((*id, exp.clone())),
                 _ => None,
             })
             .collect();
@@ -402,7 +402,7 @@ impl<'a> Instrumenter<'a> {
             | Call(id, _, MoveFrom(mid, sid, targs), srcs, _) => {
                 let addr_exp = self.builder.mk_temporary(srcs[0]);
                 self.generate_modifies_check(
-                    PropKind::Assert(None),
+                    PropKind::Assert,
                     spec,
                     &self.builder.get_loc(*id),
                     &Type::Struct(*mid, *sid, targs.to_owned()),
@@ -413,7 +413,7 @@ impl<'a> Instrumenter<'a> {
             Call(id, _, MoveTo(mid, sid, targs), srcs, _) => {
                 let addr_exp = self.builder.mk_temporary(srcs[1]);
                 self.generate_modifies_check(
-                    PropKind::Assert(None),
+                    PropKind::Assert,
                     spec,
                     &self.builder.get_loc(*id),
                     &Type::Struct(*mid, *sid, targs.to_owned()),
@@ -458,21 +458,22 @@ impl<'a> Instrumenter<'a> {
                 ));
                 self.can_abort = true;
             },
-            Prop(id, kind @ PropKind::Assume, prop)
-            | Prop(id, kind @ PropKind::Assert(..), prop) => match inlined_props.get(&id) {
-                None => {
-                    self.builder.emit(Prop(id, kind, prop));
-                },
-                Some((translated_spec, exp)) => {
-                    let binding = self.builder.fun_env.get_spec();
-                    let cond_opt = binding.update_map.get(&prop.node_id());
-                    if cond_opt.is_some() {
-                        self.emit_updates(translated_spec, Some(prop));
-                    } else {
-                        self.emit_traces(translated_spec, exp);
-                        self.builder.emit(Prop(id, kind, exp.clone()));
-                    }
-                },
+            Prop(id, kind @ PropKind::Assume, prop) | Prop(id, kind @ PropKind::Assert, prop) => {
+                match inlined_props.get(&id) {
+                    None => {
+                        self.builder.emit(Prop(id, kind, prop));
+                    },
+                    Some((translated_spec, exp)) => {
+                        let binding = self.builder.fun_env.get_spec();
+                        let cond_opt = binding.update_map.get(&prop.node_id());
+                        if cond_opt.is_some() {
+                            self.emit_updates(translated_spec, Some(prop));
+                        } else {
+                            self.emit_traces(translated_spec, exp);
+                            self.builder.emit(Prop(id, kind, exp.clone()));
+                        }
+                    },
+                }
             },
             _ => self.builder.emit(bc),
         }
@@ -524,7 +525,7 @@ impl<'a> Instrumenter<'a> {
                     FunctionVariant::Verification(..) => {
                         self.builder
                             .set_loc_and_vc_info(loc, REQUIRES_FAILS_MESSAGE);
-                        Assert(None)
+                        Assert
                     },
                     FunctionVariant::Baseline => Assume,
                 };
@@ -541,7 +542,7 @@ impl<'a> Instrumenter<'a> {
                 let rty = env.get_node_type(exp.node_id());
                 let new_addr = exp.call_args()[0].clone();
                 self.generate_modifies_check(
-                    PropKind::Assert(None),
+                    PropKind::Assert,
                     &callee_spec,
                     &loc,
                     &rty,
@@ -900,8 +901,7 @@ impl<'a> Instrumenter<'a> {
                 let loc = self.builder.fun_env.get_spec_loc();
                 self.emit_traces(spec, &cond);
                 self.builder.set_loc_and_vc_info(loc, ABORT_NOT_COVERED);
-                self.builder
-                    .emit_with(move |id| Prop(id, Assert(None), cond));
+                self.builder.emit_with(move |id| Prop(id, Assert, cond));
             }
         }
 
@@ -914,7 +914,7 @@ impl<'a> Instrumenter<'a> {
                 self.builder
                     .set_loc_and_vc_info(loc, ABORTS_CODE_NOT_COVERED);
                 self.builder
-                    .emit_with(move |id| Prop(id, Assert(None), code_cond));
+                    .emit_with(move |id| Prop(id, Assert, code_cond));
             }
         }
     }
@@ -985,7 +985,7 @@ impl<'a> Instrumenter<'a> {
                 let exp = self.builder.mk_not(abort_cond.clone());
                 self.builder
                     .set_loc_and_vc_info(loc.clone(), ABORTS_IF_FAILS_MESSAGE);
-                self.builder.emit_with(|id| Prop(id, Assert(None), exp))
+                self.builder.emit_with(|id| Prop(id, Assert, exp))
             }
 
             // Emit all post-conditions which must hold as we do not abort.
@@ -994,15 +994,14 @@ impl<'a> Instrumenter<'a> {
                 self.builder
                     .set_loc_and_vc_info(loc.clone(), ENSURES_FAILS_MESSAGE);
                 self.builder
-                    .emit_with(move |id| Prop(id, Assert(None), cond.clone()))
+                    .emit_with(move |id| Prop(id, Assert, cond.clone()))
             }
 
             // Emit all event `emits` checks.
             for (loc, cond) in spec.emits_conditions(&self.builder) {
                 self.emit_traces(spec, &cond);
                 self.builder.set_loc_and_vc_info(loc, EMITS_FAILS_MESSAGE);
-                self.builder
-                    .emit_with(move |id| Prop(id, Assert(None), cond))
+                self.builder.emit_with(move |id| Prop(id, Assert, cond))
             }
 
             let emits_is_partial = self
@@ -1021,8 +1020,7 @@ impl<'a> Instrumenter<'a> {
                 let loc = self.builder.fun_env.get_spec_loc();
                 self.emit_traces(spec, &cond);
                 self.builder.set_loc_and_vc_info(loc, EMITS_NOT_COVERED);
-                self.builder
-                    .emit_with(move |id| Prop(id, Assert(None), cond));
+                self.builder.emit_with(move |id| Prop(id, Assert, cond));
             }
         }
 
@@ -1055,7 +1053,7 @@ impl<'a> Instrumenter<'a> {
             env.set_node_instantiation(node_id, vec![resource_type.to_owned()]);
             let can_modify =
                 ExpData::Call(node_id, ast::Operation::CanModify, vec![addr]).into_exp();
-            if matches!(kind, PropKind::Assert(..)) {
+            if matches!(kind, PropKind::Assert) {
                 let (mid, sid, inst) = resource_type.require_struct();
                 self.builder.set_loc_and_vc_info(
                     loc.clone(),
