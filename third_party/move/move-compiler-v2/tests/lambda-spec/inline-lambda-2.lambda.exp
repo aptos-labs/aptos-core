@@ -29,14 +29,7 @@ module 0x42::m {
                         let len: u64 = vector::length<T>(v);
                         loop {
                           if Lt<u64>(i, len) {
-                            if {
-                              let (obj: &T): (&T) = Tuple(vector::borrow<T>(v, i));
-                              spec {
-                                assume Gt(Len<u8>($t1), 0);
-                              }
-                              ;
-                              And(Eq<vector<u8>>(select m::T.issuer<&T>(obj), issuer), Gt<u64>(x, 0))
-                            } {
+                            if m::__lambda__1_inline_1_956__test(issuer, x, vector::borrow<T>(v, i)) {
                               find: bool = true;
                               found_index: u64 = i;
                               break
@@ -98,16 +91,7 @@ module 0x42::m {
             let x' = 0x1::vector::length<T>(v);
             let len = 0x1::vector::length<T>(v);
             while (i < len) {
-                if ({
-                    let (obj) = (0x1::vector::borrow<T>(v, i));
-
-                    /* spec {
-                      assume Gt(Len<u8>($t1), 0);
-                    }
-                     */
-                    ;
-                    obj.issuer == issuer && x > 0
-                }) {
+                if (__lambda__1_inline_1_956__test(issuer, x, 0x1::vector::borrow<T>(v, i))) {
                     find = true;
                     found_index = i;
                     break
@@ -152,17 +136,13 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
      var $t13: bool
      var $t14: u64
      var $t15: bool
-     var $t16: &0x42::m::T
-     var $t17: &0x42::m::T
-     var $t18: &vector<0x42::m::T>
-     var $t19: bool
-     var $t20: vector<u8>
-     var $t21: &vector<u8>
+     var $t16: vector<u8>
+     var $t17: u64
+     var $t18: &0x42::m::T
+     var $t19: &vector<0x42::m::T>
+     var $t20: bool
+     var $t21: u64
      var $t22: u64
-     var $t23: u64
-     var $t24: bool
-     var $t25: u64
-     var $t26: u64
   0: $t3 := borrow_field<0x42::m::S>.entries($t0)
   1: $t2 := vector::length<0x42::m::T>($t3)
   2: $t7 := borrow_field<0x42::m::S>.entries($t0)
@@ -175,52 +155,38 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
   9: label L0
  10: $t14 := infer($t10)
  11: $t13 := <($t14, $t12)
- 12: if ($t13) goto 13 else goto 43
+ 12: if ($t13) goto 13 else goto 32
  13: label L2
- 14: $t18 := infer($t6)
- 15: $t17 := vector::borrow<0x42::m::T>($t18, $t10)
- 16: $t16 := infer($t17)
- 17: spec {
-  assume Gt(Len<u8>($t1), 0);
-}
-
- 18: $t21 := borrow_field<0x42::m::T>.issuer($t16)
- 19: $t20 := read_ref($t21)
- 20: $t19 := ==($t20, $t1)
- 21: if ($t19) goto 22 else goto 27
- 22: label L5
- 23: $t22 := infer($t2)
- 24: $t23 := 0
- 25: $t15 := >($t22, $t23)
- 26: goto 29
- 27: label L6
- 28: $t15 := false
- 29: label L7
- 30: if ($t15) goto 31 else goto 37
- 31: label L8
- 32: $t24 := true
- 33: $t8 := infer($t24)
- 34: $t9 := infer($t10)
- 35: goto 47
- 36: goto 38
- 37: label L9
- 38: label L10
- 39: $t26 := infer($t10)
- 40: $t25 := +($t26, $t11)
- 41: $t10 := infer($t25)
- 42: goto 45
- 43: label L3
- 44: goto 47
- 45: label L4
- 46: goto 9
- 47: label L1
- 48: spec {
+ 14: $t16 := infer($t1)
+ 15: $t17 := infer($t2)
+ 16: $t19 := infer($t6)
+ 17: $t18 := vector::borrow<0x42::m::T>($t19, $t10)
+ 18: $t15 := m::__lambda__1_inline_1_956__test($t16, $t17, $t18)
+ 19: if ($t15) goto 20 else goto 26
+ 20: label L5
+ 21: $t20 := true
+ 22: $t8 := infer($t20)
+ 23: $t9 := infer($t10)
+ 24: goto 36
+ 25: goto 27
+ 26: label L6
+ 27: label L7
+ 28: $t22 := infer($t10)
+ 29: $t21 := +($t22, $t11)
+ 30: $t10 := infer($t21)
+ 31: goto 34
+ 32: label L3
+ 33: goto 36
+ 34: label L4
+ 35: goto 9
+ 36: label L1
+ 37: spec {
   assert Implies($t8, m::$inline___lambda__1_inline_1_956__test($t1, $t2, Index($t6, $t9)));
 }
 
- 49: $t4 := infer($t8)
- 50: $t5 := infer($t9)
- 51: return ()
+ 38: $t4 := infer($t8)
+ 39: $t5 := infer($t9)
+ 40: return ()
 }
 
 
@@ -269,17 +235,13 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
      var $t13: bool
      var $t14: u64
      var $t15: bool [unused]
-     var $t16: &0x42::m::T [unused]
-     var $t17: &0x42::m::T
-     var $t18: &vector<0x42::m::T> [unused]
-     var $t19: bool [unused]
-     var $t20: vector<u8>
-     var $t21: &vector<u8>
+     var $t16: vector<u8>
+     var $t17: u64 [unused]
+     var $t18: &0x42::m::T
+     var $t19: &vector<0x42::m::T> [unused]
+     var $t20: bool [unused]
+     var $t21: u64 [unused]
      var $t22: u64 [unused]
-     var $t23: u64
-     var $t24: bool
-     var $t25: u64 [unused]
-     var $t26: u64 [unused]
      # live vars: $t0, $t1
   0: $t3 := borrow_field<0x42::m::S>.entries($t0)
      # live vars: $t0, $t1, $t3
@@ -307,75 +269,52 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12, $t13
  12: if ($t13) goto 15 else goto 13
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12
- 13: label L11
+ 13: label L8
      # live vars: $t1, $t2, $t6, $t8, $t9
- 14: goto 33
+ 14: goto 26
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12
  15: label L2
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12
- 16: $t3 := copy($t6)
-     # live vars: $t1, $t2, $t3, $t6, $t8, $t9, $t10, $t11, $t12
- 17: $t17 := vector::borrow<0x42::m::T>($t3, $t10)
-     # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12, $t17
- 18: spec {
-  assume Gt(Len<u8>($t1), 0);
-}
-
-     # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12, $t17
- 19: $t21 := borrow_field<0x42::m::T>.issuer($t17)
-     # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12, $t21
- 20: $t20 := read_ref($t21)
-     # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12, $t20
- 21: $t13 := ==($t20, $t1)
+ 16: $t16 := copy($t1)
+     # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12, $t16
+ 17: $t14 := copy($t2)
+     # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12, $t14, $t16
+ 18: $t3 := copy($t6)
+     # live vars: $t1, $t2, $t3, $t6, $t8, $t9, $t10, $t11, $t12, $t14, $t16
+ 19: $t18 := vector::borrow<0x42::m::T>($t3, $t10)
+     # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12, $t14, $t16, $t18
+ 20: $t13 := m::__lambda__1_inline_1_956__test($t16, $t14, $t18)
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12, $t13
- 22: if ($t13) goto 23 else goto 42
+ 21: if ($t13) goto 22 else goto 30
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12
- 23: label L5
-     # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12
- 24: $t14 := copy($t2)
-     # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12, $t14
- 25: $t23 := 0
-     # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12, $t14, $t23
- 26: $t13 := >($t14, $t23)
-     # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12, $t13
- 27: label L7
-     # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12, $t13
- 28: if ($t13) goto 29 else goto 37
-     # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12
- 29: label L8
+ 22: label L5
      # live vars: $t1, $t2, $t6, $t10
- 30: $t24 := true
-     # live vars: $t1, $t2, $t6, $t10, $t24
- 31: $t8 := move($t24)
+ 23: $t13 := true
+     # live vars: $t1, $t2, $t6, $t10, $t13
+ 24: $t8 := move($t13)
      # live vars: $t1, $t2, $t6, $t8, $t10
- 32: $t9 := move($t10)
+ 25: $t9 := move($t10)
      # live vars: $t1, $t2, $t6, $t8, $t9
- 33: label L1
+ 26: label L1
      # live vars: $t1, $t2, $t6, $t8, $t9
- 34: spec {
+ 27: spec {
   assert Implies($t8, m::$inline___lambda__1_inline_1_956__test($t1, $t2, Index($t6, $t9)));
 }
 
      # live vars: $t6
- 35: drop($t6)
+ 28: drop($t6)
      # live vars:
- 36: return ()
+ 29: return ()
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12
- 37: label L10
+ 30: label L7
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12
- 38: $t14 := move($t10)
+ 31: $t14 := move($t10)
      # live vars: $t1, $t2, $t6, $t8, $t9, $t11, $t12, $t14
- 39: $t14 := +($t14, $t11)
+ 32: $t14 := +($t14, $t11)
      # live vars: $t1, $t2, $t6, $t8, $t9, $t11, $t12, $t14
- 40: $t10 := move($t14)
+ 33: $t10 := move($t14)
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12
- 41: goto 9
-     # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12
- 42: label L6
-     # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12
- 43: $t13 := false
-     # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12, $t13
- 44: goto 27
+ 34: goto 9
 }
 
 
@@ -443,7 +382,6 @@ L5:	found_index: u64
 L6:	i: u64
 L7:	x': u64
 L8:	len: u64
-L9:	$t13: bool
 B0:
 	0: CopyLoc[0](s: &mut S)
 	1: ImmBorrowField[0](S.entries: vector<T>)
@@ -470,45 +408,31 @@ B1:
 	21: Lt
 	22: BrTrue(24)
 B2:
-	23: Branch(43)
+	23: Branch(35)
 B3:
-	24: CopyLoc[3](v: &vector<T>)
-	25: CopyLoc[6](i: u64)
-	26: VecImmBorrow(2)
-	27: Nop
-	28: ImmBorrowField[1](T.issuer: vector<u8>)
-	29: ReadRef
-	30: CopyLoc[1](issuer: vector<u8>)
-	31: Eq
-	32: BrFalse(52)
+	24: CopyLoc[1](issuer: vector<u8>)
+	25: CopyLoc[2](x: u64)
+	26: CopyLoc[3](v: &vector<T>)
+	27: CopyLoc[6](i: u64)
+	28: VecImmBorrow(2)
+	29: Call __lambda__1_inline_1_956__test(vector<u8>, u64, &T): bool
+	30: BrFalse(39)
 B4:
-	33: CopyLoc[2](x: u64)
-	34: LdU64(0)
-	35: Gt
-	36: StLoc[9]($t13: bool)
+	31: LdTrue
+	32: StLoc[4](find: bool)
+	33: MoveLoc[6](i: u64)
+	34: StLoc[5](found_index: u64)
 B5:
-	37: MoveLoc[9]($t13: bool)
-	38: BrFalse(47)
+	35: Nop
+	36: MoveLoc[3](v: &vector<T>)
+	37: Pop
+	38: Ret
 B6:
-	39: LdTrue
-	40: StLoc[4](find: bool)
-	41: MoveLoc[6](i: u64)
-	42: StLoc[5](found_index: u64)
-B7:
-	43: Nop
-	44: MoveLoc[3](v: &vector<T>)
-	45: Pop
-	46: Ret
-B8:
-	47: MoveLoc[6](i: u64)
-	48: CopyLoc[7](x': u64)
-	49: Add
-	50: StLoc[6](i: u64)
-	51: Branch(19)
-B9:
-	52: LdFalse
-	53: StLoc[9]($t13: bool)
-	54: Branch(37)
+	39: MoveLoc[6](i: u64)
+	40: CopyLoc[7](x': u64)
+	41: Add
+	42: StLoc[6](i: u64)
+	43: Branch(19)
 }
 __lambda__1_inline_1_956__test(issuer: vector<u8>, x: u64, obj: &T): bool /* def_idx: 1 */ {
 L3:	$t4: bool
