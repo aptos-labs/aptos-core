@@ -448,7 +448,7 @@ impl BorrowEdge {
 /// A specification property kind.
 #[derive(Debug, Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
 pub enum PropKind {
-    Assert(Option<bool>),
+    Assert,
     Assume,
     Modifies,
 }
@@ -1083,7 +1083,7 @@ impl<'env> fmt::Display for BytecodeDisplay<'env> {
                 let exp_display = exp.display(self.func_target.func_env.module_env.env);
                 match kind {
                     PropKind::Assume => write!(f, "assume {}", exp_display)?,
-                    PropKind::Assert(_) => write!(f, "assert {}", exp_display)?,
+                    PropKind::Assert => write!(f, "assert {}", exp_display)?,
                     PropKind::Modifies => write!(f, "modifies {}", exp_display)?,
                 }
             },

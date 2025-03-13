@@ -1292,18 +1292,12 @@ impl<'env> FunctionTranslator<'env> {
                 panic!("spec var snapshot NYI")
             },
             Prop(id, kind, exp) => match kind {
-                PropKind::Assert(lambda_rewritten_opt) => {
+                PropKind::Assert => {
                     emit!(writer, "assert ");
-                    let default_info =
-                        if lambda_rewritten_opt.is_some_and(|lambda_requires| lambda_requires) {
-                            "precondition of lambda expression does not hold"
-                        } else {
-                            "unknown assertion failed"
-                        };
                     let info = fun_target
                         .get_vc_info(*id)
                         .map(|s| s.as_str())
-                        .unwrap_or(default_info);
+                        .unwrap_or("unknown assertion failed");
                     emit!(
                         writer,
                         "{{:msg \"assert_failed{}: {}\"}}\n  ",

@@ -322,7 +322,7 @@ impl PerFunctionRelevance {
                     _ => continue,
                 },
 
-                Prop(_, PropKind::Assert(_), exp) | Prop(_, PropKind::Assume, exp) => (
+                Prop(_, PropKind::Assert, exp) | Prop(_, PropKind::Assume, exp) => (
                     exp.used_memory(env)
                         .into_iter()
                         .map(|(usage, _)| usage)

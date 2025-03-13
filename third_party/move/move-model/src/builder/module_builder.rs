@@ -2365,7 +2365,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         use ConditionKind::*;
         use EA::SpecConditionKind_ as PK;
         let converted = match &kind.value {
-            PK::Assert => Assert(None),
+            PK::Assert => Assert,
             PK::Assume => Assume,
             PK::Decreases => Decreases,
             PK::Modifies => Modifies,
