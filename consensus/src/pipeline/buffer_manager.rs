@@ -562,7 +562,7 @@ impl BufferManager {
         while let Some(item) = self.buffer.pop_front() {
             for b in item.get_blocks() {
                 if let Some(futs) = b.abort_pipeline() {
-                    futs.wait_until_executor_finishes().await;
+                    futs.wait_until_finishes().await;
                 }
             }
         }
