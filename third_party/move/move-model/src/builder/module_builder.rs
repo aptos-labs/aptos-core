@@ -2183,7 +2183,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     SpecBlockContext::Module => ConditionKind::GlobalInvariant(vec![]),
                     SpecBlockContext::Struct(..) => ConditionKind::StructInvariant,
                     SpecBlockContext::Function(..) => ConditionKind::FunctionInvariant,
-                    SpecBlockContext::FunctionCodeV2(..) => ConditionKind::LoopInvariant,
+                    SpecBlockContext::FunctionCodeV2(_, _, Some(..)) => {
+                        ConditionKind::FunctionInvariant
+                    },
+                    SpecBlockContext::FunctionCodeV2(_, _, None) => ConditionKind::LoopInvariant,
                     SpecBlockContext::Schema(..) => {
                         // this is the initial pass that put the condition into the schema context
                         cond.kind.clone()
@@ -2193,8 +2196,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             }
 
             // Expand invariants on functions in requires/ensures
-            let derived_conds = if matches!(context, SpecBlockContext::Function(..))
-                && matches!(cond.kind, FunctionInvariant)
+            let derived_conds = if matches!(
+                context,
+                SpecBlockContext::Function(..) | SpecBlockContext::FunctionCodeV2(_, _, Some(..))
+            ) && matches!(cond.kind, FunctionInvariant)
             {
                 let mut ensures = cond.clone();
                 ensures.kind = ConditionKind::Ensures;
@@ -2397,7 +2402,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         }
                         FunctionInvariant
                     },
-                    SpecBlockContext::FunctionCodeV2(..) => {
+                    SpecBlockContext::FunctionCodeV2(_, _, None) => {
                         if !tys.is_empty() {
                             self.parent.env.error(
                                 &self.parent.to_loc(&kind.loc),
@@ -2405,6 +2410,15 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             )
                         }
                         LoopInvariant
+                    },
+                    SpecBlockContext::FunctionCodeV2(_, _, Some(..)) => {
+                        if !tys.is_empty() {
+                            self.parent.env.error(
+                                &self.parent.to_loc(&kind.loc),
+                                "type parameters are not allowed in function invariants",
+                            )
+                        }
+                        FunctionInvariant
                     },
                     SpecBlockContext::Schema(..) => {
                         if !tys.is_empty() {

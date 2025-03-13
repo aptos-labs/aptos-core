@@ -2069,6 +2069,7 @@ impl GlobalEnv {
             params,
             result_type,
             access_specifiers: None,
+            acquired_structs: None,
             spec: RefCell::new(spec_opt.unwrap_or_default()),
             def: Some(def),
             called_funs: Some(called_funs),
