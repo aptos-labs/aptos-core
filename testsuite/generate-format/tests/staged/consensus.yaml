@@ -766,13 +766,9 @@ Payload:
           SEQ:
             TYPENAME: SignedTransaction
     1:
-      InQuorumStore:
-        NEWTYPE:
-          TYPENAME: ProofWithData
+      Legacy1: UNIT
     2:
-      InQuorumStoreWithLimit:
-        NEWTYPE:
-          TYPENAME: ProofWithDataWithTxnLimit
+      Legacy2: UNIT
     3:
       QuorumStoreInlineHybrid:
         TUPLE:
@@ -829,12 +825,6 @@ ProofWithData:
     - proofs:
         SEQ:
           TYPENAME: ProofOfStore
-ProofWithDataWithTxnLimit:
-  STRUCT:
-    - proof_with_data:
-        TYPENAME: ProofWithData
-    - max_txns_to_execute:
-        OPTION: U64
 ProposalExt:
   ENUM:
     0:

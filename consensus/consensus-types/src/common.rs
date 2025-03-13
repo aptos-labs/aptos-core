@@ -6,7 +6,7 @@ use crate::{
     payload::{OptBatches, OptQuorumStorePayload, PayloadExecutionLimit, TxnAndGasLimits},
     proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
 };
-use anyhow::ensure;
+use anyhow::{bail, ensure};
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,
@@ -200,17 +200,16 @@ fn sum_options(o1: Option<u64>, o2: Option<u64>) -> Option<u64> {
 }
 
 /// The payload in block.
-#[repr(u8)]
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Payload {
     DirectMempool(Vec<SignedTransaction>),
-    // Discriminant 1: Legacy InQuorumStore removed
-    // Discriminant 2: Legacy InQuorumStoreWithLimit removed
+    Legacy1, // Legacy InQuorumStore removed
+    Legacy2, // Legacy InQuorumStoreWithLimit removed
     QuorumStoreInlineHybrid(
         Vec<(BatchInfo, Vec<SignedTransaction>)>,
         ProofWithData,
         Option<u64>,
-    ) = 3,
+    ),
     OptQuorumStore(OptQuorumStorePayload),
     QuorumStoreInlineHybridV2(
         Vec<(BatchInfo, Vec<SignedTransaction>)>,
@@ -228,6 +227,9 @@ impl Payload {
         match self {
             Payload::DirectMempool(_) => {
                 panic!("Payload is in direct mempool format");
+            },
+            Payload::Legacy1 | Payload::Legacy2 => {
+                unreachable!("Payload is in legacy format");
             },
             Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
                 Payload::QuorumStoreInlineHybrid(
@@ -269,6 +271,9 @@ impl Payload {
     pub fn len(&self) -> usize {
         match self {
             Payload::DirectMempool(txns) => txns.len(),
+            Payload::Legacy1 | Payload::Legacy2 => {
+                unreachable!("Payload is in legacy format");
+            },
             Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
             | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
                 proof_with_data.len()
@@ -284,6 +289,9 @@ impl Payload {
     pub fn len_for_execution(&self) -> u64 {
         match self {
             Payload::DirectMempool(txns) => txns.len() as u64,
+            Payload::Legacy1 | Payload::Legacy2 => {
+                unreachable!("Payload is in legacy format");
+            },
             Payload::QuorumStoreInlineHybrid(
                 inline_batches,
                 proof_with_data,
@@ -312,9 +320,28 @@ impl Payload {
         }
     }
 
+    pub fn num_batches(&self) -> usize {
+        match self {
+            Payload::DirectMempool(_txns) => 0,
+            Payload::Legacy1 | Payload::Legacy2 => {
+                unreachable!("Payload is in legacy format");
+            },
+            Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
+            | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
+                inline_batches.len() + proof_with_data.proofs.len()
+            },
+            Payload::OptQuorumStore(opt_quorum_store_payload) => {
+                opt_quorum_store_payload.num_batches()
+            },
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         match self {
             Payload::DirectMempool(txns) => txns.is_empty(),
+            Payload::Legacy1 | Payload::Legacy2 => {
+                unreachable!("Payload is in legacy format");
+            },
             Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
             | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
                 proof_with_data.proofs.is_empty() && inline_batches.is_empty()
@@ -329,6 +356,12 @@ impl Payload {
                 let mut v3 = v1;
                 v3.extend(v2);
                 Payload::DirectMempool(v3)
+            },
+            (Payload::Legacy1, _)
+            | (_, Payload::Legacy1)
+            | (Payload::Legacy2, _)
+            | (_, Payload::Legacy2) => {
+                unreachable!("Payload is in legacy format");
             },
             (Payload::DirectMempool(_), _) | (_, Payload::DirectMempool(_)) => {
                 unimplemented!("Cannot extend DirectMempool with a Quorum Store Payload")
@@ -409,6 +442,9 @@ impl Payload {
                 .with_min_len(100)
                 .map(|txn| txn.raw_txn_bytes_len())
                 .sum(),
+            Payload::Legacy1 | Payload::Legacy2 => {
+                unreachable!("Payload is in legacy format");
+            },
             Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
             | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
                 proof_with_data.num_bytes()
@@ -482,6 +518,12 @@ impl Payload {
     ) -> anyhow::Result<()> {
         match (quorum_store_enabled, self) {
             (false, Payload::DirectMempool(_)) => Ok(()),
+            (_, Payload::Legacy1) => {
+                bail!("Payload is in legacy format: Legacy1");
+            },
+            (_, Payload::Legacy2) => {
+                bail!("Payload is in legacy format: Legacy2");
+            },
             (true, Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _))
             | (true, Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _)) => {
                 Self::verify_with_cache(&proof_with_data.proofs, verifier, proof_cache)?;
@@ -513,6 +555,12 @@ impl Payload {
     pub(crate) fn verify_epoch(&self, epoch: u64) -> anyhow::Result<()> {
         match self {
             Payload::DirectMempool(_) => return Ok(()),
+            Payload::Legacy1 => {
+                bail!("Payload is in legacy format: Legacy1");
+            },
+            Payload::Legacy2 => {
+                bail!("Payload is in legacy format: Legacy2");
+            },
             Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
             | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
                 ensure!(
@@ -537,6 +585,12 @@ impl fmt::Display for Payload {
         match self {
             Payload::DirectMempool(txns) => {
                 write!(f, "InMemory txns: {}", txns.len())
+            },
+            Payload::Legacy1 => {
+                write!(f, "Payload is in legacy format: Legacy1")
+            },
+            Payload::Legacy2 => {
+                write!(f, "Payload is in legacy format: Legacy2")
             },
             Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
             | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
@@ -650,6 +704,9 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                         for (batch_info, _) in inline_batches {
                             exclude_batches.insert(batch_info.clone());
                         }
+                    },
+                    Payload::Legacy1 | Payload::Legacy2 => {
+                        unreachable!("Payload is in legacy format");
                     },
                     Payload::DirectMempool(_) => {
                         error!("DirectMempool payload in InQuorumStore filter");
