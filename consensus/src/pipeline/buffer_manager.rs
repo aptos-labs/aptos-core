@@ -399,7 +399,8 @@ impl BufferManager {
         } = ordered_blocks;
 
         info!(
-            "Receive ordered block {}, the queue size is {}",
+            "Receive {} ordered block ends with {}, the queue size is {}",
+            ordered_blocks.len(),
             ordered_proof.commit_info(),
             self.buffer.len() + 1,
         );

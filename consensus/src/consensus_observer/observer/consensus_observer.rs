@@ -272,22 +272,29 @@ impl ConsensusObserver {
         );
 
         if self.pipeline_enabled() {
-            for block in ordered_block.blocks() {
-                let commit_callback = self.active_observer_state.create_commit_callback(
-                    self.ordered_block_store.clone(),
-                    self.block_payload_store.clone(),
-                );
-                if let Some(futs) = self.get_parent_pipeline_futs(block) {
-                    self.pipeline_builder().build(block, futs, commit_callback);
-                } else {
-                    warn!(
+            let block = ordered_block.first_block();
+            let mut parent_fut = if let Some(futs) = self.get_parent_pipeline_futs(&block) {
+                Some(futs)
+            } else {
+                warn!(
                             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                                 "Parent block's pipeline futures for ordered block is missing! Ignoring: {:?}",
                                 ordered_block.proof_block_info()
                             ))
                         );
-                    return;
-                }
+                return;
+            };
+            for block in ordered_block.blocks() {
+                let commit_callback = self.active_observer_state.create_commit_callback(
+                    self.ordered_block_store.clone(),
+                    self.block_payload_store.clone(),
+                );
+                self.pipeline_builder().build(
+                    block,
+                    parent_fut.take().expect("future should be set"),
+                    commit_callback,
+                );
+                parent_fut = Some(block.pipeline_futs().expect("pipeline futures just built"));
             }
         }
         // Create the commit callback (to be called after the execution pipeline)
