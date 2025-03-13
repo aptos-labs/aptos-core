@@ -89,6 +89,12 @@ pub fn extract_txns_from_block<'a>(
             Payload::DirectMempool(_) => {
                 bail!("DirectMempool is not supported.");
             },
+            Payload::Legacy1 => {
+                bail!("Payload is in legacy format: Legacy1");
+            },
+            Payload::Legacy2 => {
+                bail!("Payload is in legacy format: Legacy2");
+            },
             Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
             | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
                 let mut all_txns = extract_txns_from_quorum_store(

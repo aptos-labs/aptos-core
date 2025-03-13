@@ -495,12 +495,11 @@ impl TransactionsWithProofAndLimits {
 }
 
 /// The transaction payload of each block
-#[repr(u8)]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum BlockTransactionPayload {
-    // Discriminant 0: Legacy InQuorumStore removed
-    // Discriminant 1: Legacy InQuorumStoreWithLimit removed
-    QuorumStoreInlineHybrid(PayloadWithProofAndLimit, Vec<BatchInfo>) = 2,
+    Legacy1, // Legacy InQuorumStore removed
+    Legacy2, // Legacy InQuorumStoreWithLimit removed
+    QuorumStoreInlineHybrid(PayloadWithProofAndLimit, Vec<BatchInfo>),
     OptQuorumStore(
         TransactionsWithProof,
         /* OptQS and Inline Batches */ Vec<BatchInfo>,
@@ -557,6 +556,9 @@ impl BlockTransactionPayload {
     /// Returns the list of inline batches and optimistic batches in the transaction payload
     pub fn optqs_and_inline_batches(&self) -> &[BatchInfo] {
         match self {
+            BlockTransactionPayload::Legacy1 | BlockTransactionPayload::Legacy2 => {
+                unreachable!("Payload is in legacy format")
+            },
             BlockTransactionPayload::QuorumStoreInlineHybrid(_, inline_batches)
             | BlockTransactionPayload::QuorumStoreInlineHybridV2(_, inline_batches)
             | BlockTransactionPayload::OptQuorumStore(_, inline_batches) => inline_batches,
@@ -566,6 +568,9 @@ impl BlockTransactionPayload {
     /// Returns the transaction limit of the payload
     pub fn transaction_limit(&self) -> Option<u64> {
         match self {
+            BlockTransactionPayload::Legacy1 | BlockTransactionPayload::Legacy2 => {
+                unreachable!("Payload is in legacy format")
+            },
             BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _) => {
                 payload.transaction_limit
             },
@@ -577,6 +582,9 @@ impl BlockTransactionPayload {
     /// Returns the block gas limit of the payload
     pub fn gas_limit(&self) -> Option<u64> {
         match self {
+            BlockTransactionPayload::Legacy1 | BlockTransactionPayload::Legacy2 => {
+                unreachable!("Payload is in legacy format")
+            },
             BlockTransactionPayload::QuorumStoreInlineHybrid(_, _) => None,
             BlockTransactionPayload::QuorumStoreInlineHybridV2(payload, _)
             | BlockTransactionPayload::OptQuorumStore(payload, _) => payload.gas_limit(),
@@ -586,6 +594,9 @@ impl BlockTransactionPayload {
     /// Returns the proofs of the transaction payload
     pub fn payload_proofs(&self) -> Vec<ProofOfStore> {
         match self {
+            BlockTransactionPayload::Legacy1 | BlockTransactionPayload::Legacy2 => {
+                unreachable!("Payload is in legacy format")
+            },
             BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _) => {
                 payload.payload_with_proof.proofs.clone()
             },
@@ -597,6 +608,9 @@ impl BlockTransactionPayload {
     /// Returns the transactions in the payload
     pub fn transactions(&self) -> Vec<SignedTransaction> {
         match self {
+            BlockTransactionPayload::Legacy1 | BlockTransactionPayload::Legacy2 => {
+                unreachable!("Payload is in legacy format")
+            },
             BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _) => {
                 payload.payload_with_proof.transactions.clone()
             },
@@ -614,6 +628,11 @@ impl BlockTransactionPayload {
             Payload::DirectMempool(_) => {
                 return Err(Error::InvalidMessageError(
                     "Direct mempool payloads are not supported for consensus observer!".into(),
+                ));
+            },
+            Payload::Legacy1 | Payload::Legacy2 => {
+                return Err(Error::InvalidMessageError(
+                    "Payload is in legacy format".to_string(),
                 ));
             },
             Payload::QuorumStoreInlineHybrid(
@@ -757,6 +776,11 @@ impl BlockTransactionPayload {
     ) -> Result<(), Error> {
         // Get the payload limit
         let limit = match self {
+            BlockTransactionPayload::Legacy1 | BlockTransactionPayload::Legacy2 => {
+                return Err(Error::InvalidMessageError(
+                    "Payload is in legacy format".to_string(),
+                ));
+            },
             BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _) => {
                 payload.transaction_limit
             },
@@ -813,6 +837,9 @@ impl BlockPayload {
 
     pub fn verify_payload_type(&self) -> Result<(), Error> {
         match &self.transaction_payload {
+            BlockTransactionPayload::Legacy1 | BlockTransactionPayload::Legacy2 => Err(
+                Error::InvalidMessageError("Payload is in legacy format".to_string()),
+            ),
             BlockTransactionPayload::QuorumStoreInlineHybrid(_, _)
             | BlockTransactionPayload::QuorumStoreInlineHybridV2(_, _)
             | BlockTransactionPayload::OptQuorumStore(_, _) => Ok(()),
