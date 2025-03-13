@@ -30,7 +30,7 @@ use aptos_types::{
     validator_txn::ValidatorTransaction,
 };
 use derivative::Derivative;
-use futures::future::{join4, BoxFuture, Shared};
+use futures::future::{join5, BoxFuture, Shared};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -74,7 +74,7 @@ pub type LedgerUpdateResult = (StateComputeResult, Duration, Option<u64>);
 pub type PostLedgerUpdateResult = ();
 pub type CommitVoteResult = CommitVote;
 pub type PreCommitResult = StateComputeResult;
-pub type PostPreCommitResult = ();
+pub type NotifyStateSyncResult = ();
 pub type CommitLedgerResult = Option<LedgerInfoWithSignatures>;
 pub type PostCommitResult = ();
 
@@ -86,19 +86,20 @@ pub struct PipelineFutures {
     pub post_ledger_update_fut: TaskFuture<PostLedgerUpdateResult>,
     pub commit_vote_fut: TaskFuture<CommitVoteResult>,
     pub pre_commit_fut: TaskFuture<PreCommitResult>,
-    pub post_pre_commit_fut: TaskFuture<PostPreCommitResult>,
+    pub notify_state_sync_fut: TaskFuture<NotifyStateSyncResult>,
     pub commit_ledger_fut: TaskFuture<CommitLedgerResult>,
     pub post_commit_fut: TaskFuture<PostCommitResult>,
 }
 
 impl PipelineFutures {
-    // Wait for futures involved executor to complete
-    pub async fn wait_until_executor_finishes(self) {
-        let _ = join4(
+    // Wait for futures involved executor/state sync to complete
+    pub async fn wait_until_finishes(self) {
+        let _ = join5(
             self.execute_fut,
             self.ledger_update_fut,
             self.pre_commit_fut,
             self.commit_ledger_fut,
+            self.notify_state_sync_fut,
         )
         .await;
     }
@@ -476,14 +477,20 @@ impl PipelinedBlock {
 
     pub fn abort_pipeline(&self) -> Option<PipelineFutures> {
         if let Some(abort_handles) = self.pipeline_abort_handle.lock().take() {
-            info!(
-                "[Pipeline] Aborting pipeline for block {} {} {}",
-                self.id(),
-                self.epoch(),
-                self.round()
-            );
+            let mut aborted = false;
             for handle in abort_handles {
-                handle.abort();
+                if !handle.is_finished() {
+                    handle.abort();
+                    aborted = true;
+                }
+            }
+            if aborted {
+                info!(
+                    "[Pipeline] Aborting pipeline for block {} {} {}",
+                    self.id(),
+                    self.epoch(),
+                    self.round()
+                );
             }
         }
         self.pipeline_futs.lock().take()
