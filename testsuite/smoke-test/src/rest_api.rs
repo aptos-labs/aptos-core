@@ -341,7 +341,7 @@ async fn test_bcs() {
 
     // Check transactions on an account
     let transactions = client
-        .get_account_transactions(account, Some(0), Some(2))
+        .get_account_ordered_transactions(account, Some(0), Some(2))
         .await
         .unwrap()
         .into_inner();
