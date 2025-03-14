@@ -111,12 +111,38 @@ impl OrderedBlockStore {
         );
     }
 
-    /// Removes the ordered blocks for the given commit ledger info. This will
-    /// remove all blocks up to (and including) the epoch and round of the commit.
-    pub fn remove_blocks_for_commit(&mut self, commit_ledger_info: &LedgerInfoWithSignatures) {
-        // Determine the epoch and round to split off
+    /// Removes the ordered blocks for the given commit ledger info. If
+    /// the execution pool window size is None, all blocks up to (and
+    /// including) the epoch and round of the commit will be removed.
+    /// Otherwise, a buffer of blocks preceding the commit will be retained
+    /// (to ensure we have enough blocks to satisfy the execution window).
+    pub fn remove_blocks_for_commit(
+        &mut self,
+        commit_ledger_info: &LedgerInfoWithSignatures,
+        execution_pool_window_size: Option<u64>,
+    ) {
+        // Determine the epoch to split off (execution pool doesn't buffer across epochs)
         let split_off_epoch = commit_ledger_info.ledger_info().epoch();
-        let split_off_round = commit_ledger_info.commit_info().round().saturating_add(1);
+
+        // Determine the round to split off
+        let commit_round = commit_ledger_info.ledger_info().round();
+        let split_off_round = if let Some(window_size) = execution_pool_window_size {
+            let window_buffer_multiplier = self
+                .consensus_observer_config
+                .observer_block_window_buffer_multiplier;
+            let window_buffer_size = window_buffer_multiplier * window_size;
+            if commit_round < window_buffer_size {
+                0 // Clear everything before this epoch
+            } else {
+                // Retain blocks in the window buffer
+                commit_round
+                    .saturating_sub(window_buffer_size)
+                    .saturating_add(1)
+            }
+        } else {
+            // Execution pool is disabled. Remove everything up to (and including) the commit round.
+            commit_round.saturating_add(1)
+        };
 
         // Remove the blocks from the ordered blocks
         self.ordered_blocks = self
@@ -331,8 +357,8 @@ mod test {
             AggregateSignature::empty(),
         ));
 
-        // Remove the ordered blocks for the commit decision
-        ordered_block_store.remove_blocks_for_commit(commit_decision.commit_proof());
+        // Remove the ordered blocks for the commit decision (without an execution pool window)
+        ordered_block_store.remove_blocks_for_commit(commit_decision.commit_proof(), None);
 
         // Verify the highest committed epoch and round is the last ordered block (in the next epoch)
         verify_highest_committed_epoch_round(&ordered_block_store, &last_ordered_block_info);
@@ -536,8 +562,8 @@ mod test {
             AggregateSignature::empty(),
         ));
 
-        // Remove the ordered blocks for the commit decision
-        ordered_block_store.remove_blocks_for_commit(commit_decision.commit_proof());
+        // Remove the ordered blocks for the commit decision (without an execution pool window)
+        ordered_block_store.remove_blocks_for_commit(commit_decision.commit_proof(), None);
 
         // Verify the first ordered block was removed
         let all_ordered_blocks = ordered_block_store.get_all_ordered_blocks();
@@ -559,8 +585,8 @@ mod test {
             AggregateSignature::empty(),
         ));
 
-        // Remove the ordered blocks for the commit decision
-        ordered_block_store.remove_blocks_for_commit(commit_decision.commit_proof());
+        // Remove the ordered blocks for the commit decision (without an execution pool window)
+        ordered_block_store.remove_blocks_for_commit(commit_decision.commit_proof(), None);
 
         // Verify the ordered blocks for the current epoch were removed
         let all_ordered_blocks = ordered_block_store.get_all_ordered_blocks();
@@ -581,8 +607,8 @@ mod test {
             AggregateSignature::empty(),
         ));
 
-        // Remove the ordered blocks for the commit decision
-        ordered_block_store.remove_blocks_for_commit(commit_decision.commit_proof());
+        // Remove the ordered blocks for the commit decision (without an execution pool window)
+        ordered_block_store.remove_blocks_for_commit(commit_decision.commit_proof(), None);
 
         // Verify the ordered blocks for the next epoch were removed
         let all_ordered_blocks = ordered_block_store.get_all_ordered_blocks();
@@ -591,6 +617,11 @@ mod test {
             assert!(!all_ordered_blocks.contains_key(&(block_info.epoch(), block_info.round())));
         }
         assert_eq!(all_ordered_blocks.len(), num_ordered_blocks_future_epoch);
+    }
+
+    #[test]
+    fn test_remove_blocks_for_commit_execution_pool_window() {
+        panic!("COMPLETE ME!");
     }
 
     #[test]

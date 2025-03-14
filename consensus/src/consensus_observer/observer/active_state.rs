@@ -106,6 +106,7 @@ impl ActiveObserverState {
         &self,
         pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
         block_payload_store: Arc<Mutex<BlockPayloadStore>>,
+        execution_pool_window_size: Option<u64>,
     ) -> Box<dyn FnOnce(LedgerInfoWithSignatures) + Send + Sync> {
         // Clone the root pointer
         let root = self.root.clone();
@@ -115,6 +116,7 @@ impl ActiveObserverState {
             handle_committed_blocks(
                 pending_ordered_blocks,
                 block_payload_store,
+                execution_pool_window_size,
                 root,
                 ledger_info,
             );
@@ -126,8 +128,13 @@ impl ActiveObserverState {
         &self,
         pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
         block_payload_store: Arc<Mutex<BlockPayloadStore>>,
+        execution_pool_window_size: Option<u64>,
     ) -> StateComputerCommitCallBackType {
-        let callback = self.create_commit_callback(pending_ordered_blocks, block_payload_store);
+        let callback = self.create_commit_callback(
+            pending_ordered_blocks,
+            block_payload_store,
+            execution_pool_window_size,
+        );
         Box::new(move |_, ledger_info| callback(ledger_info))
     }
 
@@ -307,6 +314,7 @@ async fn extract_on_chain_configs(
 fn handle_committed_blocks(
     pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
     block_payload_store: Arc<Mutex<BlockPayloadStore>>,
+    execution_pool_window_size: Option<u64>,
     root: Arc<Mutex<LedgerInfoWithSignatures>>,
     ledger_info: LedgerInfoWithSignatures,
 ) {
@@ -317,7 +325,7 @@ fn handle_committed_blocks(
     );
     pending_ordered_blocks
         .lock()
-        .remove_blocks_for_commit(&ledger_info);
+        .remove_blocks_for_commit(&ledger_info, execution_pool_window_size);
 
     // Verify the ledger info is for the same epoch
     let mut root = root.lock();
@@ -447,6 +455,7 @@ mod test {
         handle_committed_blocks(
             ordered_block_store.clone(),
             block_payload_store.clone(),
+            None,
             root.clone(),
             create_ledger_info(epoch + 1, round + 1),
         );
@@ -456,6 +465,7 @@ mod test {
         handle_committed_blocks(
             ordered_block_store.clone(),
             block_payload_store.clone(),
+            None,
             root.clone(),
             create_ledger_info(epoch, round - 1),
         );
@@ -486,10 +496,11 @@ mod test {
             committed_blocks.push(pipelined_block);
         }
 
-        // Handle the committed blocks
+        // Handle the committed blocks (without an execution pool window)
         handle_committed_blocks(
             ordered_block_store.clone(),
             block_payload_store.clone(),
+            None,
             root.clone(),
             committed_ledger_info.clone(),
         );
@@ -503,6 +514,11 @@ mod test {
 
         // Verify the root is updated
         assert_eq!(root.lock().clone(), committed_ledger_info);
+    }
+
+    #[test]
+    fn test_handle_committed_blocks_execution_pool_window() {
+        panic!("COMPLETE ME!")
     }
 
     #[test]
