@@ -584,7 +584,9 @@ pub(crate) mod versioned_data {
                         .with_message("Bad binary header".to_string()));
                 },
             };
-            if version == 0 || version > u32::min(max_version, VERSION_MAX) {
+            // if version == 0 || version > u32::min(max_version, VERSION_MAX) {
+            if version == 0 {
+                println!("unsupported bytecode");
                 Err(PartialVMError::new(StatusCode::UNKNOWN_VERSION)
                     .with_message(format!("bytecode version {} unsupported", version)))
             } else {

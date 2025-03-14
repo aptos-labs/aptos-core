@@ -127,6 +127,8 @@ pub enum FeatureFlag {
     DOMAIN_ACCOUNT_ABSTRACTION = 88,
     /// Whether function values are enabled.
     ENABLE_FUNCTION_VALUES = 89,
+    TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE = 99,
+    FAKE_FEATURE_FOR_COMPARISON_TESTING = 1000,
 }
 
 impl FeatureFlag {
