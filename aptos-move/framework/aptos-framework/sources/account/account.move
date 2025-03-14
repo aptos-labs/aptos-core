@@ -653,7 +653,7 @@ module aptos_framework::account {
 
         // Proof that this account intends to delegate its signer capability to another account.
         let proof_challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: Account[source_address].sequence_number,
+            sequence_number: get_sequence_number(source_address),
             source_address,
             recipient_address,
         };
@@ -1513,7 +1513,7 @@ module aptos_framework::account {
 
         let challenge = RotationCapabilityOfferProofChallengeV2 {
             chain_id: chain_id::get(),
-            sequence_number: Account[alice_addr].sequence_number,
+            sequence_number: get_sequence_number(alice_addr),
             source_address: alice_addr,
             recipient_address: bob_addr,
         };
@@ -1576,7 +1576,7 @@ module aptos_framework::account {
 
         let challenge = RotationCapabilityOfferProofChallengeV2 {
             chain_id: chain_id::get(),
-            sequence_number: Account[alice_addr].sequence_number,
+            sequence_number: get_sequence_number(alice_addr),
             source_address: alice_addr,
             recipient_address: bob_addr,
         };
