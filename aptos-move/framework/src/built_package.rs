@@ -16,12 +16,12 @@ use codespan_reporting::{
     term::termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor},
 };
 use itertools::Itertools;
-use move_binary_format::{file_format_common, file_format_common::VERSION_7, CompiledModule};
-use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
-use move_compiler::{
+use legacy_move_compiler::{
     compiled_unit::{CompiledUnit, NamedCompiledModule},
     shared::NumericalAddress,
 };
+use move_binary_format::{file_format_common, file_format_common::VERSION_7, CompiledModule};
+use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_compiler_v2::{external_checks::ExternalChecks, options::Options, Experiment};
 use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_model::{
