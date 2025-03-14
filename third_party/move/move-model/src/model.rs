@@ -43,6 +43,7 @@ use codespan_reporting::{
     term::{emit, termcolor::WriteColor, Config},
 };
 use itertools::Itertools;
+use legacy_move_compiler::command_line as cli;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 pub use move_binary_format::file_format::Visibility;
@@ -63,7 +64,6 @@ use move_bytecode_source_map::{mapping::SourceMapping, source_map::SourceMap};
 use move_command_line_common::{
     address::NumericalAddress, env::read_bool_env_var, files::FileHash,
 };
-use move_compiler::command_line as cli;
 pub use move_core_types::ability::AbilitySet;
 use move_core_types::{
     account_address::AccountAddress,

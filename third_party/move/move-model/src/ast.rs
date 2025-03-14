@@ -2955,7 +2955,7 @@ impl ModuleName {
     }
 
     pub fn from_address_bytes_and_name(
-        addr: move_compiler::shared::NumericalAddress,
+        addr: legacy_move_compiler::shared::NumericalAddress,
         name: Symbol,
     ) -> ModuleName {
         ModuleName(Address::Numerical(addr.into_inner()), name)

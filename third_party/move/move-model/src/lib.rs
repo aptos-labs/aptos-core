@@ -15,15 +15,7 @@ use builder::module_builder::ModuleBuilder;
 use codespan::ByteIndex;
 use codespan_reporting::diagnostic::{Diagnostic, Label, LabelStyle};
 use itertools::Itertools;
-use move_binary_format::{
-    check_bounds::BoundsChecker,
-    file_format::{
-        AddressIdentifierIndex, CompiledModule, CompiledScript, FunctionDefinition, FunctionHandle,
-        FunctionHandleIndex, IdentifierIndex, ModuleHandle, ModuleHandleIndex, Signature,
-        SignatureIndex, Visibility,
-    },
-};
-use move_compiler::{
+use legacy_move_compiler::{
     self,
     diagnostics::{codes::Severity, Diagnostics},
     expansion::ast::{self as E, ModuleIdent, ModuleIdent_},
@@ -32,6 +24,14 @@ use move_compiler::{
         parse_named_address, unique_map::UniqueMap, CompilationEnv, NumericalAddress, PackagePaths,
     },
     Compiler, Flags, PASS_EXPANSION, PASS_PARSER,
+};
+use move_binary_format::{
+    check_bounds::BoundsChecker,
+    file_format::{
+        AddressIdentifierIndex, CompiledModule, CompiledScript, FunctionDefinition, FunctionHandle,
+        FunctionHandleIndex, IdentifierIndex, ModuleHandle, ModuleHandleIndex, Signature,
+        SignatureIndex, Visibility,
+    },
 };
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_symbol_pool::Symbol as MoveSymbol;
