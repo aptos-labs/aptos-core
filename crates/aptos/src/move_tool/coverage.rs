@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::types::{CliCommand, CliError, CliResult, CliTypedResult, MovePackageDir},
-    move_tool::{experiments_from_opt_level, fix_bytecode_version},
+    common::types::{CliCommand, CliError, CliResult, CliTypedResult, MovePackageOptions},
+    move_tool::fix_bytecode_version,
 };
 use aptos_framework::extended_checks;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
-use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
+use legacy_move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_coverage::{
     coverage_map::CoverageMap,
     format_csv_summary, format_human_summary,
@@ -35,7 +35,7 @@ pub struct SummaryCoverage {
     #[clap(long, short)]
     pub filter: Option<String>,
     #[clap(flatten)]
-    pub move_options: MovePackageDir,
+    pub move_options: MovePackageOptions,
 }
 
 impl SummaryCoverage {
@@ -106,7 +106,7 @@ pub struct SourceCoverage {
     pub tag: TextIndicator,
 
     #[clap(flatten)]
-    pub move_options: MovePackageDir,
+    pub move_options: MovePackageOptions,
 }
 
 #[async_trait]
@@ -147,7 +147,7 @@ pub struct BytecodeCoverage {
     #[clap(long = "module")]
     pub module_name: String,
     #[clap(flatten)]
-    pub move_options: MovePackageDir,
+    pub move_options: MovePackageOptions,
 }
 
 #[async_trait]
@@ -167,13 +167,13 @@ impl CliCommand<()> for BytecodeCoverage {
 }
 
 fn compile_coverage(
-    move_options: MovePackageDir,
+    move_options: MovePackageOptions,
 ) -> CliTypedResult<(CoverageMap, CompiledPackage)> {
     let config = BuildConfig {
         dev_mode: move_options.dev,
         additional_named_addresses: move_options.named_addresses(),
         test_mode: false,
-        full_model_generation: move_options.check_test_code,
+        full_model_generation: !move_options.skip_checks_on_test_code,
         install_dir: move_options.output_dir.clone(),
         skip_fetch_latest_git_deps: move_options.skip_fetch_latest_git_deps,
         compiler_config: CompilerConfig {
@@ -189,7 +189,7 @@ fn compile_coverage(
             language_version: move_options
                 .language_version
                 .or_else(|| Some(LanguageVersion::latest_stable())),
-            experiments: experiments_from_opt_level(&move_options.optimize),
+            experiments: move_options.compute_experiments(),
         },
         ..Default::default()
     };

@@ -461,6 +461,11 @@ where
 
         self.base.charge_drop_frame(locals)
     }
+
+    #[inline]
+    fn charge_heap_memory(&mut self, amount: u64) -> PartialVMResult<()> {
+        self.use_heap_memory(amount.into())
+    }
 }
 
 impl<G> AptosGasMeter for MemoryTrackedGasMeter<G>

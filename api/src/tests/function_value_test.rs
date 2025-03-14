@@ -7,9 +7,7 @@ use aptos_api_test_context::{current_function_name, TestContext};
 use serde_json::json;
 use std::path::PathBuf;
 
-// TODO: figure why this broke after landing successfully
-// #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[allow(unused)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_function_values() {
     let mut context = new_test_context(current_function_name!());
     let mut account = context.create_account().await;

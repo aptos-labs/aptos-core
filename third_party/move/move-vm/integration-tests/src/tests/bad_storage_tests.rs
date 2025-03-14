@@ -18,11 +18,7 @@ use move_vm_runtime::{
     RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
-use move_vm_types::{
-    code::ModuleBytesStorage,
-    gas::UnmeteredGasMeter,
-    resolver::{ModuleResolver, ResourceResolver},
-};
+use move_vm_types::{code::ModuleBytesStorage, gas::UnmeteredGasMeter, resolver::ResourceResolver};
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 
@@ -96,7 +92,7 @@ fn test_malformed_resource() {
     m.serialize(&mut blob).unwrap();
     storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
-    let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
+    let vm = MoveVM::new();
 
     // Execute the first script to publish a resource Foo.
     let mut script_blob = vec![];
@@ -195,7 +191,7 @@ fn test_malformed_module() {
         let mut storage = InMemoryStorage::new();
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob.clone().into());
 
-        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
+        let vm = MoveVM::new();
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage();
@@ -226,7 +222,7 @@ fn test_malformed_module() {
         let mut storage = InMemoryStorage::new();
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
-        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
+        let vm = MoveVM::new();
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage();
@@ -271,7 +267,7 @@ fn test_unverifiable_module() {
         m.serialize(&mut blob).unwrap();
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
-        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
+        let vm = MoveVM::new();
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage();
@@ -299,7 +295,7 @@ fn test_unverifiable_module() {
         m.serialize(&mut blob).unwrap();
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
-        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
+        let vm = MoveVM::new();
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage();
@@ -355,7 +351,7 @@ fn test_missing_module_dependency() {
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
 
-        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
+        let vm = MoveVM::new();
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage();
@@ -378,7 +374,7 @@ fn test_missing_module_dependency() {
         let mut storage = InMemoryStorage::new();
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
 
-        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
+        let vm = MoveVM::new();
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage();
@@ -434,7 +430,7 @@ fn test_malformed_module_dependency() {
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.clone().into());
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
 
-        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
+        let vm = MoveVM::new();
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage();
@@ -463,7 +459,7 @@ fn test_malformed_module_dependency() {
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
 
-        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
+        let vm = MoveVM::new();
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage();
@@ -520,7 +516,7 @@ fn test_unverifiable_module_dependency() {
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
 
-        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
+        let vm = MoveVM::new();
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage();
@@ -549,7 +545,7 @@ fn test_unverifiable_module_dependency() {
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
 
-        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
+        let vm = MoveVM::new();
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage();
@@ -591,16 +587,6 @@ impl ModuleBytesStorage for BogusModuleStorage {
     }
 }
 
-impl ModuleResolver for BogusModuleStorage {
-    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
-        vec![]
-    }
-
-    fn get_module(&self, _module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
-        Err(PartialVMError::new(self.bad_status_code))
-    }
-}
-
 impl ResourceResolver for BogusModuleStorage {
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
@@ -617,16 +603,6 @@ impl ResourceResolver for BogusModuleStorage {
 struct BogusResourceStorage {
     module_storage: InMemoryStorage,
     bad_status_code: StatusCode,
-}
-
-impl ModuleResolver for BogusResourceStorage {
-    fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
-        self.module_storage.get_module_metadata(module_id)
-    }
-
-    fn get_module(&self, module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
-        self.module_storage.get_module(module_id)
-    }
 }
 
 impl ResourceResolver for BogusResourceStorage {
@@ -663,7 +639,7 @@ fn test_storage_returns_bogus_error_when_loading_module() {
             bad_status_code: *error_code,
         };
 
-        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
+        let vm = MoveVM::new();
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage();
@@ -679,25 +655,21 @@ fn test_storage_returns_bogus_error_when_loading_module() {
             )
             .unwrap_err();
 
-        if !vm.vm_config().use_loader_v2 {
-            assert_eq!(err.major_status(), *error_code);
+        // TODO(loader_v2):
+        //   Loader V2 remaps all deserialization and verification errors. Loader V1 does not
+        //   remap them when module resolver is accessed, and only on verification steps.
+        //   Strictly speaking, the storage would never return such an error so V2 behaviour is
+        //   ok. Moreover, the fact that V1 still returns UNKNOWN_BINARY_ERROR and does not
+        //   remap it is weird.
+        if *error_code == StatusCode::UNKNOWN_VERIFICATION_ERROR {
+            assert_eq!(err.major_status(), StatusCode::UNEXPECTED_VERIFIER_ERROR);
+        } else if *error_code == StatusCode::UNKNOWN_BINARY_ERROR {
+            assert_eq!(
+                err.major_status(),
+                StatusCode::UNEXPECTED_DESERIALIZATION_ERROR
+            );
         } else {
-            // TODO(loader_v2):
-            //   Loader V2 remaps all deserialization and verification errors. Loader V1 does not
-            //   remap them when module resolver is accessed, and only on verification steps.
-            //   Strictly speaking, the storage would never return such an error so V2 behaviour is
-            //   ok. Moreover, the fact that V1 still returns UNKNOWN_BINARY_ERROR and does not
-            //   remap it is weird.
-            if *error_code == StatusCode::UNKNOWN_VERIFICATION_ERROR {
-                assert_eq!(err.major_status(), StatusCode::UNEXPECTED_VERIFIER_ERROR);
-            } else if *error_code == StatusCode::UNKNOWN_BINARY_ERROR {
-                assert_eq!(
-                    err.major_status(),
-                    StatusCode::UNEXPECTED_DESERIALIZATION_ERROR
-                );
-            } else {
-                assert_eq!(err.major_status(), *error_code);
-            }
+            assert_eq!(err.major_status(), *error_code);
         }
     }
 }
@@ -758,7 +730,7 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
             bad_status_code: *error_code,
         };
 
-        let vm = MoveVM::new_with_runtime_environment(storage.module_storage.runtime_environment());
+        let vm = MoveVM::new();
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.module_storage.as_unsync_module_storage();

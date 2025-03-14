@@ -59,20 +59,21 @@ impl<'r, 'l> UserSession<'r, 'l> {
         }
     }
 
-    pub fn finish(
+    /// Finishes the user session if there is no module publishing request.
+    pub(crate) fn finish(
         self,
         change_set_configs: &ChangeSetConfigs,
         module_storage: &impl ModuleStorage,
-    ) -> Result<UserSessionChangeSet, VMStatus> {
+    ) -> Result<VMChangeSet, VMStatus> {
         let Self { session } = self;
-        let (change_set, module_write_set) =
+        let change_set =
             session.finish_with_squashed_change_set(change_set_configs, module_storage, false)?;
-        UserSessionChangeSet::new(change_set, module_write_set, change_set_configs)
+        Ok(change_set)
     }
 
     /// Finishes the session while also processing the publish request, and running module
-    /// initialization if necessary. This function is used by the new loader and code cache.
-    pub fn finish_with_module_publishing_and_initialization(
+    /// initialization if necessary.
+    pub(crate) fn finish_with_module_publishing_and_initialization(
         mut self,
         resolver: &impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
@@ -103,8 +104,8 @@ impl<'r, 'l> UserSession<'r, 'l> {
 
             self.session.execute(|session| {
                 let module_id = module.self_id();
-                let init_function_exists = session
-                    .load_function(&staging_module_storage, &module_id, init_func_name, &[])
+                let init_function_exists = staging_module_storage
+                    .load_function(&module_id, init_func_name, &[])
                     .is_ok();
 
                 if init_function_exists {
@@ -126,16 +127,14 @@ impl<'r, 'l> UserSession<'r, 'l> {
             })?;
         }
 
-        // Get the changes from running module initialization.
-        let (change_set, empty_write_set) = self
-            .finish(change_set_configs, &staging_module_storage)?
-            .unpack();
-        empty_write_set
-            .is_empty_or_invariant_violation()
-            .map_err(|e| {
-                e.with_message("init_module cannot publish modules".to_string())
-                    .finish(Location::Undefined)
-            })?;
+        // Get the changes from running module initialization. Note that here we use the staged
+        // module storage to ensure resource group metadata from new modules is visible.
+        let Self { session } = self;
+        let change_set = session.finish_with_squashed_change_set(
+            change_set_configs,
+            &staging_module_storage,
+            false,
+        )?;
 
         let write_ops = convert_modules_into_write_ops(
             resolver,
@@ -144,7 +143,7 @@ impl<'r, 'l> UserSession<'r, 'l> {
             staging_module_storage.release_verified_module_bundle(),
         )
         .map_err(|e| e.finish(Location::Undefined))?;
-        let module_write_set = ModuleWriteSet::new(false, write_ops);
+        let module_write_set = ModuleWriteSet::new(write_ops);
         UserSessionChangeSet::new(change_set, module_write_set, change_set_configs)
     }
 }

@@ -2,12 +2,6 @@ processed 2 tasks
 
 task 0 'publish'. lines 1-21:
 
-
-
-task 1 'run'. lines 23-23:
-return values: true
-
->>> V2 Compiler {
 == BEGIN Bytecode ==
 // Move bytecode v8
 module 42.test {
@@ -96,4 +90,6 @@ B8:
 }
 }
 == END Bytecode ==
-}
+
+task 1 'run'. lines 23-23:
+return values: true

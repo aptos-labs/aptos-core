@@ -85,6 +85,7 @@ impl ShardedStateCache {
         &self,
         state_key: &StateKey,
         value: MemorizedStateRead,
+        access_time_refresh_interval_secs: u32,
     ) -> Option<StateValue> {
         let shard_id = state_key.get_shard_id();
 
@@ -96,7 +97,9 @@ impl ShardedStateCache {
             },
         };
         if try_get_hot_state_refresh {
-            if let Some(refresh) = value.to_hot_state_refresh(self.access_time_secs) {
+            if let Some(refresh) =
+                value.to_hot_state_refresh(self.access_time_secs, access_time_refresh_interval_secs)
+            {
                 self.hot_state_refreshes[shard_id as usize].insert(state_key.clone(), refresh);
             }
         }
@@ -124,6 +127,9 @@ pub struct CachedStateView {
 
     /// State values (with update versions) read across the lifetime of the state view.
     memorized: ShardedStateCache,
+
+    /// Hot state access time updates no more frequent than the set interval.
+    access_time_refresh_interval_secs: u32,
 }
 
 impl Debug for CachedStateView {
@@ -133,6 +139,8 @@ impl Debug for CachedStateView {
 }
 
 impl CachedStateView {
+    const ACCESS_TIME_REFRESH_INTERVAL_SECS: u32 = 600;
+
     /// Constructs a [`CachedStateView`] with persistent state view in the DB and the in-memory
     /// speculative state represented by `speculative_state`. The persistent state view is the
     /// latest one preceding `next_version`
@@ -154,6 +162,24 @@ impl CachedStateView {
         persisted_state: State,
         state: State,
     ) -> Self {
+        Self::new_with_config(
+            id,
+            reader,
+            hot_state,
+            persisted_state,
+            state,
+            Self::ACCESS_TIME_REFRESH_INTERVAL_SECS,
+        )
+    }
+
+    pub fn new_with_config(
+        id: StateViewId,
+        reader: Arc<dyn DbReader>,
+        hot_state: Arc<dyn HotStateView>,
+        persisted_state: State,
+        state: State,
+        access_time_refresh_interval_secs: u32,
+    ) -> Self {
         let version = state.version();
 
         Self {
@@ -162,6 +188,7 @@ impl CachedStateView {
             hot: hot_state,
             cold: reader,
             memorized: ShardedStateCache::new_empty(version),
+            access_time_refresh_interval_secs,
         }
     }
 
@@ -175,6 +202,7 @@ impl CachedStateView {
             hot: Arc::new(EmptyHotState),
             cold: Arc::new(DummyDbReader),
             memorized: ShardedStateCache::new_empty(None),
+            access_time_refresh_interval_secs: Self::ACCESS_TIME_REFRESH_INTERVAL_SECS,
         }
     }
 
@@ -221,6 +249,7 @@ impl CachedStateView {
             hot: _,
             cold: _,
             memorized,
+            access_time_refresh_interval_secs: _,
         } = self;
 
         memorized
@@ -288,7 +317,11 @@ impl TStateView for CachedStateView {
 
         // TODO(aldenhu): reduce duplicated gets
         let value_with_version_opt = self.get_unmemorized(state_key)?;
-        Ok(self.memorized.try_insert(state_key, value_with_version_opt))
+        Ok(self.memorized.try_insert(
+            state_key,
+            value_with_version_opt,
+            self.access_time_refresh_interval_secs,
+        ))
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {

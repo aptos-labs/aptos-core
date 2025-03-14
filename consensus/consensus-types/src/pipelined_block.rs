@@ -68,7 +68,7 @@ impl From<Error> for TaskError {
 pub type TaskResult<T> = Result<T, TaskError>;
 pub type TaskFuture<T> = Shared<BoxFuture<'static, TaskResult<T>>>;
 
-pub type PrepareResult = Arc<Vec<SignatureVerifiedTransaction>>;
+pub type PrepareResult = (Arc<Vec<SignatureVerifiedTransaction>>, Option<u64>);
 pub type ExecuteResult = Duration;
 pub type LedgerUpdateResult = (StateComputeResult, Duration, Option<u64>);
 pub type PostLedgerUpdateResult = ();
@@ -227,6 +227,12 @@ impl PipelinedBlock {
             to_retry,
             execution_time,
             root_hash: self.state_compute_result.root_hash(),
+            gas_used: self
+                .state_compute_result
+                .execution_output
+                .block_end_info
+                .as_ref()
+                .map(|info| info.block_effective_gas_units()),
         };
 
         // We might be retrying execution, so it might have already been set.
@@ -512,4 +518,5 @@ pub struct ExecutionSummary {
     pub to_retry: u64,
     pub execution_time: Duration,
     pub root_hash: HashValue,
+    pub gas_used: Option<u64>,
 }

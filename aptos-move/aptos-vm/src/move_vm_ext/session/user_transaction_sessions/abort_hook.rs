@@ -17,7 +17,6 @@ use aptos_vm_types::{
     storage::change_set_configs::ChangeSetConfigs,
 };
 use derive_more::{Deref, DerefMut};
-use move_binary_format::errors::Location;
 use move_core_types::vm_status::VMStatus;
 
 #[derive(Deref, DerefMut)]
@@ -53,20 +52,10 @@ impl<'r, 'l> AbortHookSession<'r, 'l> {
         module_storage: &impl AptosModuleStorage,
     ) -> Result<SystemSessionChangeSet, VMStatus> {
         let Self { session } = self;
-        let (change_set, empty_module_write_set) =
+        let change_set =
             session.finish_with_squashed_change_set(change_set_configs, module_storage, false)?;
         let abort_hook_session_change_set =
             SystemSessionChangeSet::new(change_set, change_set_configs)?;
-
-        // Abort hook can never publish modules (just like epilogue)! When we move publishing
-        // outside MoveVM, we do not need to have a check here.
-        empty_module_write_set
-            .is_empty_or_invariant_violation()
-            .map_err(|e| {
-                e.with_message("Non-empty module write set in abort hook session".to_string())
-                    .finish(Location::Undefined)
-                    .into_vm_status()
-            })?;
 
         Ok(abort_hook_session_change_set)
     }

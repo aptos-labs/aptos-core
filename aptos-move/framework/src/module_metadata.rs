@@ -24,7 +24,6 @@ use move_core_types::{
     metadata::Metadata,
 };
 use move_model::metadata::{CompilationMetadata, COMPILATION_METADATA_KEY};
-use move_vm_runtime::move_vm::MoveVM;
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, collections::BTreeMap, env, sync::Arc};
 use thiserror::Error;
@@ -230,36 +229,24 @@ pub fn get_metadata_v0(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> 
 
 /// Extract metadata from the VM, upgrading V0 to V1 representation as needed
 pub fn get_vm_metadata(
-    vm: &MoveVM,
     module_storage: &impl AptosModuleStorage,
     module_id: &ModuleId,
 ) -> Option<Arc<RuntimeModuleMetadataV1>> {
-    if module_storage.is_enabled() {
-        let metadata = module_storage
-            .fetch_module_metadata(module_id.address(), module_id.name())
-            .ok()??;
-        get_metadata(&metadata)
-    } else {
-        #[allow(deprecated)]
-        vm.with_module_metadata(module_id, get_metadata)
-    }
+    let metadata = module_storage
+        .fetch_module_metadata(module_id.address(), module_id.name())
+        .ok()??;
+    get_metadata(&metadata)
 }
 
 /// Extract metadata from the VM, legacy V0 format upgraded to V1
 pub fn get_vm_metadata_v0(
-    vm: &MoveVM,
     module_storage: &impl AptosModuleStorage,
     module_id: &ModuleId,
 ) -> Option<Arc<RuntimeModuleMetadataV1>> {
-    if module_storage.is_enabled() {
-        let metadata = module_storage
-            .fetch_module_metadata(module_id.address(), module_id.name())
-            .ok()??;
-        get_metadata_v0(&metadata)
-    } else {
-        #[allow(deprecated)]
-        vm.with_module_metadata(module_id, get_metadata_v0)
-    }
+    let metadata = module_storage
+        .fetch_module_metadata(module_id.address(), module_id.name())
+        .ok()??;
+    get_metadata_v0(&metadata)
 }
 
 /// Check if the metadata has unknown key/data types
