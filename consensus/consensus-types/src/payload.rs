@@ -347,6 +347,10 @@ impl OptQuorumStorePayload {
         self.opt_batches.num_txns() + self.proofs.num_txns() + self.inline_batches.num_txns()
     }
 
+    pub fn num_batches(&self) -> usize {
+        self.opt_batches.len() + self.proofs.len() + self.inline_batches.len()
+    }
+
     pub(crate) fn is_empty(&self) -> bool {
         self.opt_batches.is_empty() && self.proofs.is_empty() && self.inline_batches.is_empty()
     }
