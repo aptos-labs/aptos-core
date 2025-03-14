@@ -34,7 +34,8 @@ mod mock_state_computer;
 mod mock_storage;
 
 use crate::{
-    block_storage::pending_blocks::PendingBlocks, pipeline::execution_client::DummyExecutionClient,
+    block_storage::pending_blocks::PendingBlocks,
+    pipeline::{execution_client::DummyExecutionClient, pipeline_builder::PipelineBuilder},
     util::mock_time_service::SimulatedTimeService,
 };
 use aptos_consensus_types::{block::block_test_utils::gen_test_certificate, common::Payload};
@@ -43,6 +44,7 @@ use aptos_infallible::Mutex;
 use aptos_types::{
     block_info::BlockInfo,
     chain_id::ChainId,
+    on_chain_config::DEFAULT_ENABLED_WINDOW_SIZE,
     transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
 };
 pub use mock_payload_manager::MockPayloadManager;
@@ -74,9 +76,7 @@ pub async fn build_simple_tree() -> (Vec<Arc<PipelinedBlock>>, Arc<BlockStore>) 
         .insert_block_with_qc(certificate_for_genesis(), &genesis_block, 1)
         .await;
     let a2 = inserter.insert_block(&a1, 2, None).await;
-    let a3 = inserter
-        .insert_block(&a2, 3, Some(genesis.block_info()))
-        .await;
+    let a3 = inserter.insert_block(&a2, 3, None).await;
     let b1 = inserter
         .insert_block_with_qc(certificate_for_genesis(), &genesis_block, 4)
         .await;
@@ -89,20 +89,45 @@ pub async fn build_simple_tree() -> (Vec<Arc<PipelinedBlock>>, Arc<BlockStore>) 
     (vec![genesis_block, a1, a2, a3, b1, b2, c1], block_store)
 }
 
-pub fn build_empty_tree() -> Arc<BlockStore> {
+fn build_empty_tree_inner(
+    window_size: Option<u64>,
+    max_pruned_blocks_in_mem: usize,
+    pipeline_builder: Option<PipelineBuilder>,
+) -> BlockStore {
     let (initial_data, storage) = EmptyStorage::start_for_testing();
-    Arc::new(BlockStore::new(
+    BlockStore::new(
         storage,
         initial_data,
         Arc::new(DummyExecutionClient),
-        10, // max pruned blocks in mem
+        max_pruned_blocks_in_mem, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
         Arc::from(DirectMempoolPayloadManager::new()),
         false,
+        window_size,
         Arc::new(Mutex::new(PendingBlocks::new())),
+        pipeline_builder,
+    )
+}
+
+pub fn build_default_empty_tree() -> Arc<BlockStore> {
+    let window_size = DEFAULT_ENABLED_WINDOW_SIZE;
+    let max_pruned_blocks_in_mem: usize = 10;
+    Arc::new(build_empty_tree_inner(
+        window_size,
+        max_pruned_blocks_in_mem,
         None,
     ))
+}
+
+pub fn build_custom_empty_tree(
+    window_size: Option<u64>,
+    max_pruned_blocks_in_mem: usize,
+    pipeline_builder: Option<PipelineBuilder>,
+) -> Arc<BlockStore> {
+    let block_store =
+        build_empty_tree_inner(window_size, max_pruned_blocks_in_mem, pipeline_builder);
+    Arc::new(block_store)
 }
 
 pub struct TreeInserter {
@@ -116,7 +141,21 @@ impl TreeInserter {
     }
 
     pub fn new(signer: ValidatorSigner) -> Self {
-        let block_store = build_empty_tree();
+        let block_store = build_default_empty_tree();
+        Self {
+            signer,
+            block_store,
+        }
+    }
+
+    pub fn new_with_params(
+        signer: ValidatorSigner,
+        window_size: Option<u64>,
+        max_pruned_blocks_in_mem: usize,
+        pipeline_builder: Option<PipelineBuilder>,
+    ) -> Self {
+        let block_store =
+            build_custom_empty_tree(window_size, max_pruned_blocks_in_mem, pipeline_builder);
         Self {
             signer,
             block_store,
@@ -152,6 +191,17 @@ impl TreeInserter {
         self.insert_block_with_qc(parent_qc, parent, round).await
     }
 
+    pub async fn insert_nil_block(
+        &mut self,
+        parent: &PipelinedBlock,
+        round: Round,
+        committed_block: Option<BlockInfo>,
+    ) -> Arc<PipelinedBlock> {
+        // Node must carry a QC to its parent
+        let parent_qc = self.create_qc_for_block(parent, committed_block);
+        self.insert_nil_block_with_qc(parent_qc, round).await
+    }
+
     pub async fn insert_block_with_qc(
         &mut self,
         parent_qc: QuorumCert,
@@ -166,6 +216,17 @@ impl TreeInserter {
                 Payload::empty(false, true),
                 vec![],
             ))
+            .await
+            .unwrap()
+    }
+
+    pub async fn insert_nil_block_with_qc(
+        &mut self,
+        parent_qc: QuorumCert,
+        round: Round,
+    ) -> Arc<PipelinedBlock> {
+        self.block_store
+            .insert_block_with_qc(self.create_nil_block_with_qc(round, parent_qc, vec![]))
             .await
             .unwrap()
     }
@@ -206,6 +267,15 @@ impl TreeInserter {
             failed_authors,
         )
         .unwrap()
+    }
+
+    pub fn create_nil_block_with_qc(
+        &self,
+        round: Round,
+        quorum_cert: QuorumCert,
+        failed_authors: Vec<(Round, Author)>,
+    ) -> Block {
+        Block::new_nil(round, quorum_cert, failed_authors)
     }
 }
 

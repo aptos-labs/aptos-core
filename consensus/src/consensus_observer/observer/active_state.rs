@@ -359,7 +359,7 @@ mod test {
     use aptos_consensus_types::{
         block::Block,
         block_data::{BlockData, BlockType},
-        pipelined_block::PipelinedBlock,
+        pipelined_block::{OrderedBlockWindow, PipelinedBlock},
         quorum_cert::QuorumCert,
     };
     use aptos_crypto::HashValue;
@@ -564,7 +564,10 @@ mod test {
                 BlockType::Genesis,
             );
             let block = Block::new_for_testing(block_info.id(), block_data, None);
-            let pipelined_block = Arc::new(PipelinedBlock::new_ordered(block));
+            let pipelined_block = Arc::new(PipelinedBlock::new_ordered(
+                block,
+                OrderedBlockWindow::empty(),
+            ));
 
             // Create an ordered block
             let blocks = vec![pipelined_block];
@@ -622,7 +625,10 @@ mod test {
             BlockType::Genesis,
         );
         let block = Block::new_for_testing(block_info.id(), block_data, None);
-        Arc::new(PipelinedBlock::new_ordered(block))
+        Arc::new(PipelinedBlock::new_ordered(
+            block,
+            OrderedBlockWindow::empty(),
+        ))
     }
 
     /// Creates and returns a reconfig notifier and listener
