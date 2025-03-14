@@ -117,13 +117,13 @@ module aptos_token::token_transfers {
         };
 
         let pending_claims =
-            &mut borrow_global_mut<PendingClaims>(sender_addr).pending_claims;
+            &mut PendingClaims[sender_addr].pending_claims;
         let token_offer_id = create_token_offer_id(receiver, token_id);
         let token = token::withdraw_token(sender, token_id, amount);
-        if (!table::contains(pending_claims, token_offer_id)) {
-            table::add(pending_claims, token_offer_id, token);
+        if (!pending_claims.contains(token_offer_id)) {
+            pending_claims.add(token_offer_id, token);
         } else {
-            let dst_token = table::borrow_mut(pending_claims, token_offer_id);
+            let dst_token = pending_claims.borrow_mut(token_offer_id);
             token::merge(dst_token, token);
         };
 
@@ -138,7 +138,7 @@ module aptos_token::token_transfers {
             )
         } else {
             event::emit_event<TokenOfferEvent>(
-                &mut borrow_global_mut<PendingClaims>(sender_addr).offer_events,
+                &mut PendingClaims[sender_addr].offer_events,
                 TokenOfferEvent {
                     to_address: receiver,
                     token_id,
@@ -167,10 +167,10 @@ module aptos_token::token_transfers {
     ) acquires PendingClaims {
         assert!(exists<PendingClaims>(sender), ETOKEN_OFFER_NOT_EXIST);
         let pending_claims =
-            &mut borrow_global_mut<PendingClaims>(sender).pending_claims;
+            &mut PendingClaims[sender].pending_claims;
         let token_offer_id = create_token_offer_id(signer::address_of(receiver), token_id);
-        assert!(table::contains(pending_claims, token_offer_id), error::not_found(ETOKEN_OFFER_NOT_EXIST));
-        let tokens = table::remove(pending_claims, token_offer_id);
+        assert!(pending_claims.contains(token_offer_id), error::not_found(ETOKEN_OFFER_NOT_EXIST));
+        let tokens = pending_claims.remove(token_offer_id);
         let amount = token::get_token_amount(&tokens);
         token::deposit_token(receiver, tokens);
 
@@ -185,7 +185,7 @@ module aptos_token::token_transfers {
             )
         } else {
             event::emit_event<TokenClaimEvent>(
-                &mut borrow_global_mut<PendingClaims>(sender).claim_events,
+                &mut PendingClaims[sender].claim_events,
                 TokenClaimEvent {
                     to_address: signer::address_of(receiver),
                     token_id,
@@ -217,8 +217,8 @@ module aptos_token::token_transfers {
         let token_offer_id = create_token_offer_id(receiver, token_id);
         assert!(exists<PendingClaims>(sender_addr), ETOKEN_OFFER_NOT_EXIST);
         let pending_claims =
-            &mut borrow_global_mut<PendingClaims>(sender_addr).pending_claims;
-        let token = table::remove(pending_claims, token_offer_id);
+            &mut PendingClaims[sender_addr].pending_claims;
+        let token = pending_claims.remove(token_offer_id);
         let amount = token::get_token_amount(&token);
         token::deposit_token(sender, token);
 
@@ -233,7 +233,7 @@ module aptos_token::token_transfers {
             )
         } else {
             event::emit_event<TokenCancelOfferEvent>(
-                &mut borrow_global_mut<PendingClaims>(sender_addr).cancel_offer_events,
+                &mut PendingClaims[sender_addr].cancel_offer_events,
                 TokenCancelOfferEvent {
                     to_address: receiver,
                     token_id,

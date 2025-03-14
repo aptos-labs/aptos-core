@@ -874,7 +874,7 @@ NOTE: some hashing methods do not accept a <code>dst</code> and will abort if a 
 
 
 <pre><code><b>fun</b> <a href="crypto_algebra.md#0x1_crypto_algebra_handles_from_elements">handles_from_elements</a>&lt;S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="crypto_algebra.md#0x1_crypto_algebra_Element">Element</a>&lt;S&gt;&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; {
-    <b>let</b> num_elements = std::vector::length(elements);
+    <b>let</b> num_elements = elements.length();
     <b>let</b> element_handles = std::vector::empty();
     <b>let</b> i = 0;
     <b>while</b> ({
@@ -884,8 +884,8 @@ NOTE: some hashing methods do not accept a <code>dst</code> and will abort if a 
         };
         i &lt; num_elements
     }) {
-        std::vector::push_back(&<b>mut</b> element_handles, std::vector::borrow(elements, i).handle);
-        i = i + 1;
+        element_handles.push_back(elements[i].handle);
+        i += 1;
     };
     element_handles
 }
