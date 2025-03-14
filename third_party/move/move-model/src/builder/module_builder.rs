@@ -36,12 +36,12 @@ use crate::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_binary_format::file_format::Visibility;
-use move_compiler::{
+use legacy_move_compiler::{
     expansion::ast as EA,
     parser::ast as PA,
     shared::{unique_map::UniqueMap, Identifier, Name},
 };
+use move_binary_format::file_format::Visibility;
 use move_core_types::ability::{Ability, AbilitySet};
 use move_ir_types::location::{sp, Spanned};
 use regex::Regex;

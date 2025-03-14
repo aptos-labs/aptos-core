@@ -30,12 +30,12 @@ use crate::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_binary_format::file_format::{self};
-use move_compiler::{
+use legacy_move_compiler::{
     expansion::ast::{self as EA},
     parser::ast::{self as PA, CallKind, Field},
     shared::{unique_map::UniqueMap, Identifier, Name},
 };
+use move_binary_format::file_format::{self};
 use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,

@@ -8,6 +8,10 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
+use legacy_move_compiler::{
+    compiled_unit::{AnnotatedCompiledModule, AnnotatedCompiledUnit},
+    shared::known_attributes::KnownAttribute,
+};
 use move_binary_format::{
     access::ModuleAccess, compatibility::Compatibility, errors::VMResult,
     file_format::CompiledScript, file_format_common, CompiledModule,
@@ -16,10 +20,6 @@ use move_bytecode_verifier::VerifierConfig;
 use move_command_line_common::{
     address::ParsedAddress, env::read_bool_env_var, files::verify_and_create_named_address_mapping,
     testing::EXP_EXT,
-};
-use move_compiler::{
-    compiled_unit::{AnnotatedCompiledModule, AnnotatedCompiledUnit},
-    shared::known_attributes::KnownAttribute,
 };
 use move_core_types::{
     account_address::AccountAddress,

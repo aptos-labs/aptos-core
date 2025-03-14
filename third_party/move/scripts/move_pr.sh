@@ -30,7 +30,7 @@ while getopts "htcgdi2a" opt; do
       cat <<EOF
 Performs CI equivalent checks on a local client
 Usage:
-    check_pr <flags>
+    move_pr <flags>
 Flags:
     -h   Print this help
     -t   Run tests
@@ -93,7 +93,6 @@ MOVE_CRATES="\
   -p move-stdlib\
   -p move-bytecode-verifier\
   -p move-binary-format\
-  -p move-compiler\
   -p move-compiler-v2\
   -p move-compiler-v2-transactional-tests\
   -p move-ir-compiler-transactional-tests\
