@@ -46,6 +46,11 @@ export interface GetTransactionsRequest {
   transactionFilter?: BooleanTransactionFilter | undefined;
 }
 
+export interface ProcessedRange {
+  firstVersion?: bigint | undefined;
+  lastVersion?: bigint | undefined;
+}
+
 /** TransactionsResponse is a batch of transactions. */
 export interface TransactionsResponse {
   /** Required; transactions data. */
@@ -54,6 +59,7 @@ export interface TransactionsResponse {
     | undefined;
   /** Required; chain id. */
   chainId?: bigint | undefined;
+  processedRange?: ProcessedRange | undefined;
 }
 
 function createBaseTransactionsInStorage(): TransactionsInStorage {
@@ -327,8 +333,120 @@ export const GetTransactionsRequest = {
   },
 };
 
+function createBaseProcessedRange(): ProcessedRange {
+  return { firstVersion: BigInt("0"), lastVersion: BigInt("0") };
+}
+
+export const ProcessedRange = {
+  encode(message: ProcessedRange, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.firstVersion !== undefined && message.firstVersion !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.firstVersion) !== message.firstVersion) {
+        throw new globalThis.Error("value provided for field message.firstVersion of type uint64 too large");
+      }
+      writer.uint32(8).uint64(message.firstVersion.toString());
+    }
+    if (message.lastVersion !== undefined && message.lastVersion !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.lastVersion) !== message.lastVersion) {
+        throw new globalThis.Error("value provided for field message.lastVersion of type uint64 too large");
+      }
+      writer.uint32(16).uint64(message.lastVersion.toString());
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ProcessedRange {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseProcessedRange();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.firstVersion = longToBigint(reader.uint64() as Long);
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.lastVersion = longToBigint(reader.uint64() as Long);
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<ProcessedRange, Uint8Array>
+  async *encodeTransform(
+    source: AsyncIterable<ProcessedRange | ProcessedRange[]> | Iterable<ProcessedRange | ProcessedRange[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ProcessedRange.encode(p).finish()];
+        }
+      } else {
+        yield* [ProcessedRange.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, ProcessedRange>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<ProcessedRange> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ProcessedRange.decode(p)];
+        }
+      } else {
+        yield* [ProcessedRange.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): ProcessedRange {
+    return {
+      firstVersion: isSet(object.firstVersion) ? BigInt(object.firstVersion) : BigInt("0"),
+      lastVersion: isSet(object.lastVersion) ? BigInt(object.lastVersion) : BigInt("0"),
+    };
+  },
+
+  toJSON(message: ProcessedRange): unknown {
+    const obj: any = {};
+    if (message.firstVersion !== undefined && message.firstVersion !== BigInt("0")) {
+      obj.firstVersion = message.firstVersion.toString();
+    }
+    if (message.lastVersion !== undefined && message.lastVersion !== BigInt("0")) {
+      obj.lastVersion = message.lastVersion.toString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ProcessedRange>): ProcessedRange {
+    return ProcessedRange.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ProcessedRange>): ProcessedRange {
+    const message = createBaseProcessedRange();
+    message.firstVersion = object.firstVersion ?? BigInt("0");
+    message.lastVersion = object.lastVersion ?? BigInt("0");
+    return message;
+  },
+};
+
 function createBaseTransactionsResponse(): TransactionsResponse {
-  return { transactions: [], chainId: undefined };
+  return { transactions: [], chainId: undefined, processedRange: undefined };
 }
 
 export const TransactionsResponse = {
@@ -343,6 +461,9 @@ export const TransactionsResponse = {
         throw new globalThis.Error("value provided for field message.chainId of type uint64 too large");
       }
       writer.uint32(16).uint64(message.chainId.toString());
+    }
+    if (message.processedRange !== undefined) {
+      ProcessedRange.encode(message.processedRange, writer.uint32(26).fork()).ldelim();
     }
     return writer;
   },
@@ -367,6 +488,13 @@ export const TransactionsResponse = {
           }
 
           message.chainId = longToBigint(reader.uint64() as Long);
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.processedRange = ProcessedRange.decode(reader, reader.uint32());
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -417,6 +545,7 @@ export const TransactionsResponse = {
         ? object.transactions.map((e: any) => Transaction.fromJSON(e))
         : [],
       chainId: isSet(object.chainId) ? BigInt(object.chainId) : undefined,
+      processedRange: isSet(object.processedRange) ? ProcessedRange.fromJSON(object.processedRange) : undefined,
     };
   },
 
@@ -428,6 +557,9 @@ export const TransactionsResponse = {
     if (message.chainId !== undefined) {
       obj.chainId = message.chainId.toString();
     }
+    if (message.processedRange !== undefined) {
+      obj.processedRange = ProcessedRange.toJSON(message.processedRange);
+    }
     return obj;
   },
 
@@ -438,6 +570,9 @@ export const TransactionsResponse = {
     const message = createBaseTransactionsResponse();
     message.transactions = object.transactions?.map((e) => Transaction.fromPartial(e)) || [];
     message.chainId = object.chainId ?? undefined;
+    message.processedRange = (object.processedRange !== undefined && object.processedRange !== null)
+      ? ProcessedRange.fromPartial(object.processedRange)
+      : undefined;
     return message;
   },
 };

@@ -1,0 +1,15 @@
+
+Diagnostics:
+error: a reference is expected but `bool` was provided
+   ┌─ tests/checking/typing/issue_12555.move:12:16
+   │
+12 │         *(if (*r1.p) { r1 }
+   │                ^^^^
+
+error: cannot assign `&mut integer` to left-hand side of type `u64`
+   ┌─ tests/checking/typing/issue_12555.move:12:10
+   │
+12 │           *(if (*r1.p) { r1 }
+   │ ╭──────────^
+13 │ │         else { r2 }).x = 15;
+   │ ╰──────────────────────^

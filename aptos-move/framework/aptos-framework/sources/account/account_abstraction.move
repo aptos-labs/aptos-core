@@ -15,9 +15,11 @@ module aptos_framework::account_abstraction {
     use aptos_framework::object;
     use aptos_framework::auth_data::AbstractionAuthData;
     use aptos_framework::system_addresses;
-    use aptos_framework::permissioned_signer::is_permissioned_signer;
+    use aptos_framework::permissioned_signer::{Self, is_permissioned_signer};
     #[test_only]
     use aptos_framework::account::create_account_for_test;
+    #[test_only]
+    use aptos_framework::auth_data;
 
     friend aptos_framework::transaction_validation;
     #[test_only]
@@ -212,37 +214,45 @@ module aptos_framework::account_abstraction {
             function_info::check_dispatch_type_compatibility(&dispatcher_auth_function_info, &auth_function),
             error::invalid_argument(EAUTH_FUNCTION_SIGNATURE_MISMATCH)
         );
-        if (is_add && !exists<DispatchableAuthenticator>(resource_addr)) {
-            move_to(
-                &create_signer::create_signer(resource_addr),
-                DispatchableAuthenticator::V1 { auth_functions: ordered_map::new() }
-            );
-        };
-        assert!(exists<DispatchableAuthenticator>(resource_addr), error::not_found(EFUNCTION_INFO_EXISTENCE));
-        let current_map = &mut borrow_global_mut<DispatchableAuthenticator>(resource_addr).auth_functions;
         if (is_add) {
+            if (!exists<DispatchableAuthenticator>(resource_addr)) {
+                move_to(
+                    &create_signer::create_signer(resource_addr),
+                    DispatchableAuthenticator::V1 { auth_functions: ordered_map::new() }
+                );
+            };
+            let current_map = &mut borrow_global_mut<DispatchableAuthenticator>(resource_addr).auth_functions;
             assert!(
-                !ordered_map::contains(current_map, &auth_function),
+                !current_map.contains(&auth_function),
                 error::already_exists(EFUNCTION_INFO_EXISTENCE)
             );
-            ordered_map::add(current_map, auth_function, true);
+            current_map.add(auth_function, true);
+            event::emit(
+                UpdateDispatchableAuthenticator {
+                    account: addr,
+                    update: b"add",
+                    auth_function,
+                }
+            );
         } else {
+            assert!(exists<DispatchableAuthenticator>(resource_addr), error::not_found(EFUNCTION_INFO_EXISTENCE));
+            let current_map = &mut borrow_global_mut<DispatchableAuthenticator>(resource_addr).auth_functions;
             assert!(
-                ordered_map::contains(current_map, &auth_function),
+                current_map.contains(&auth_function),
                 error::not_found(EFUNCTION_INFO_EXISTENCE)
             );
-            ordered_map::remove(current_map, &auth_function);
-        };
-        event::emit(
-            UpdateDispatchableAuthenticator {
-                account: addr,
-                update: if (is_add) { b"add" } else { b"remove" },
-                auth_function,
-            }
-        );
-        if (ordered_map::length(current_map) == 0) {
+            current_map.remove(&auth_function);
+            event::emit(
+                UpdateDispatchableAuthenticator {
+                    account: addr,
+                    update: b"remove",
+                    auth_function,
+                }
+            );
+            if (current_map.length() == 0) {
                 remove_authenticator(account);
-        }
+            }
+        };
     }
 
     inline fun dispatchable_authenticator_internal(addr: address): &OrderedMap<FunctionInfo, bool> {
@@ -276,7 +286,7 @@ module aptos_framework::account_abstraction {
         let returned_signer = dispatchable_authenticate(account, signing_data, &func_info);
         // Returned signer MUST represent the same account address. Otherwise, it may break the invariant of Aptos blockchain!
         assert!(
-            master_signer_addr == signer::address_of(&returned_signer),
+            master_signer_addr == permissioned_signer::address_of(&returned_signer),
             error::invalid_state(EINCONSISTENT_SIGNER_ADDRESS)
         );
         returned_signer
@@ -305,6 +315,28 @@ module aptos_framework::account_abstraction {
         assert!(using_dispatchable_authenticator(bob_addr), 0);
         remove_authenticator(bob);
         assert!(!using_dispatchable_authenticator(bob_addr), 0);
+    }
+
+    #[test(bob = @0xb0b)]
+    #[expected_failure(abort_code = 0x30005, location = Self)]
+    entry fun test_authenticate_function_returning_invalid_signer(
+        bob: signer,
+    ) acquires DispatchableAuthenticator, DomainDispatchableAuthenticator {
+        let bob_addr = signer::address_of(&bob);
+        create_account_for_test(bob_addr);
+        assert!(!using_dispatchable_authenticator(bob_addr), 0);
+        add_authentication_function(
+            &bob,
+            @aptos_framework,
+            string::utf8(b"account_abstraction_tests"),
+            string::utf8(b"invalid_authenticate")
+        );
+        let function_info = function_info::new_function_info_from_address(
+            @aptos_framework,
+            string::utf8(b"account_abstraction_tests"),
+            string::utf8(b"invalid_authenticate")
+        );
+        authenticate(bob, function_info, auth_data::create_auth_data(vector[], vector[]));
     }
 
     #[deprecated]

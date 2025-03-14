@@ -639,6 +639,28 @@ impl Type {
         }
     }
 
+    /// If the type is a mutable or immutable reference, returns the inner type it points to.
+    /// Otherwise, returns [None].
+    pub fn get_ref_inner_ty(&self) -> Option<&Self> {
+        match self {
+            Type::Reference(ty) | Type::MutableReference(ty) => Some(ty.as_ref()),
+            Type::Bool
+            | Type::U8
+            | Type::U64
+            | Type::U16
+            | Type::U32
+            | Type::U256
+            | Type::U128
+            | Type::Address
+            | Type::Signer
+            | Type::Vector(_)
+            | Type::Struct { .. }
+            | Type::StructInstantiation { .. }
+            | Type::Function { .. }
+            | Type::TyParam(_) => None,
+        }
+    }
+
     pub fn abilities(&self) -> PartialVMResult<AbilitySet> {
         match self {
             Type::Bool

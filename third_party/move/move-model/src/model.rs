@@ -43,6 +43,7 @@ use codespan_reporting::{
     term::{emit, termcolor::WriteColor, Config},
 };
 use itertools::Itertools;
+use legacy_move_compiler::command_line as cli;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 pub use move_binary_format::file_format::Visibility;
@@ -63,7 +64,6 @@ use move_bytecode_source_map::{mapping::SourceMapping, source_map::SourceMap};
 use move_command_line_common::{
     address::NumericalAddress, env::read_bool_env_var, files::FileHash,
 };
-use move_compiler::command_line as cli;
 pub use move_core_types::ability::AbilitySet;
 use move_core_types::{
     account_address::AccountAddress,
@@ -4263,8 +4263,7 @@ pub struct FunctionData {
     /// Specification associated with this function.
     pub(crate) spec: RefCell<Spec>,
 
-    /// Optional definition associated with this function. The definition is available if
-    /// the model is build with option `ModelBuilderOptions::compile_via_model`.
+    /// Optional definition associated with this function.
     pub(crate) def: Option<Exp>,
 
     /// A cache for the called functions.
@@ -4857,8 +4856,7 @@ impl<'env> FunctionEnv<'env> {
         self.data.spec.borrow_mut()
     }
 
-    /// Returns associated definition. The definition of the function, in Exp form, is available
-    /// if the model is build with `ModelBuilderOptions::compile_via_model`
+    /// Returns associated definition if available.
     pub fn get_def(&self) -> Option<&Exp> {
         self.data.def.as_ref()
     }

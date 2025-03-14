@@ -4,8 +4,8 @@
 
 use anyhow::anyhow;
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
+use legacy_move_compiler::shared::known_attributes::KnownAttribute;
 use move_command_line_common::testing::get_compiler_exp_extension;
-use move_compiler::shared::known_attributes::KnownAttribute;
 use move_compiler_v2::{self, run_move_compiler_for_analysis, Options};
 use move_model::metadata::LanguageVersion;
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};

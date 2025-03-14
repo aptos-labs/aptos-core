@@ -4,6 +4,7 @@ metadata:
   name: worker-pod-9
   labels:
     run: some-label
+  annotations: {}
 spec:  
   serviceAccountName: default  
   restartPolicy: Never  # Pod restarts only if it fails  

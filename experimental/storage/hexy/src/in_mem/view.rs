@@ -41,7 +41,7 @@ impl HexyView {
 
         // Reserve space for all hashes to be updated.
         let estimated_total_hashes =
-            Self::estimate_total_hashes(sorted_leaves.len(), self.base.height());
+            Self::estimate_total_hashes(sorted_leaves.len(), self.base.num_levels());
         let mut updates = Vec::with_capacity(estimated_total_hashes);
         let mut this_level_updates = Vec::with_capacity(sorted_leaves.len());
 
@@ -54,7 +54,7 @@ impl HexyView {
 
         // Iteratively calculate updates by level.
         let mut prev_level_begin = 0;
-        for height in 1..self.base.height() {
+        for height in 1..self.base.num_levels() {
             for (parent_idx_in_level, updated_children) in &updates[prev_level_begin..]
                 .iter()
                 .chunk_by(|upd| upd.0.parent_index_in_level())

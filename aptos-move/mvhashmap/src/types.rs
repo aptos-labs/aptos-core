@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::{delta_change_set::DeltaOp, types::DelayedFieldsSpeculativeError};
-use aptos_crypto::hash::HashValue;
 use aptos_types::{
     error::PanicOr,
-    executable::ExecutableDescriptor,
     write_set::{TransactionWrite, WriteOpKind},
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
@@ -25,12 +23,6 @@ pub struct StorageVersion;
 
 // TODO: Find better representations for this, a similar one for TxnIndex.
 pub type Version = Result<(TxnIndex, Incarnation), StorageVersion>;
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) enum Flag {
-    Done = 0,
-    Estimate = 1,
-}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum MVGroupError {
@@ -53,14 +45,6 @@ pub enum MVDataError {
     Dependency(TxnIndex),
     /// Delta application failed, txn execution should fail.
     DeltaApplicationFailure,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum MVModulesError {
-    /// No prior entry is found.
-    NotFound,
-    /// A dependency on other transaction has been found during the read.
-    Dependency(TxnIndex),
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -107,19 +91,6 @@ pub enum MVDataOutput<V> {
     /// Information from the last versioned-write. Note that the version is returned
     /// and not the data to avoid copying big values around.
     Versioned(Version, ValueWithLayout<V>),
-}
-
-/// Returned as Ok(..) when read successfully from the multi-version data-structure.
-#[derive(Debug, PartialEq, Eq)]
-pub enum MVModulesOutput<M, X> {
-    /// Arc to the executable corresponding to the latest module, and a descriptor
-    /// with either the module hash or indicator that the module is from storage.
-    Executable((Arc<X>, ExecutableDescriptor)),
-    /// Arc to the latest module, together with its (cryptographic) hash. Note that
-    /// this can't be a storage-level module, as it's from multi-versioned modules map.
-    /// The Option can be None if HashValue can't be computed, currently may happen
-    /// if the latest entry corresponded to the module deletion.
-    Module((Arc<M>, HashValue)),
 }
 
 // TODO[agg_v2](cleanup): once VersionedAggregators is separated from the MVHashMap,
