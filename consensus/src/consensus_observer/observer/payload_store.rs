@@ -118,8 +118,8 @@ impl BlockPayloadStore {
         *block_payloads = block_payloads.split_off(&(epoch, split_off_round));
     }
 
-    /// Removes the committed blocks from the payload store
-    pub fn remove_committed_blocks(&self, committed_blocks: &[Arc<PipelinedBlock>]) {
+    /// Removes the committed blocks from the payload store (only used internally)
+    fn remove_committed_blocks(&self, committed_blocks: &[Arc<PipelinedBlock>]) {
         // Get the highest epoch and round for the committed blocks
         let (highest_epoch, highest_round) = committed_blocks
             .last()

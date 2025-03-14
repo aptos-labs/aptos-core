@@ -106,6 +106,7 @@ impl ActiveObserverState {
         &self,
         pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
         block_payload_store: Arc<Mutex<BlockPayloadStore>>,
+        execution_pool_window_size: Option<u64>,
     ) -> Box<dyn FnOnce(LedgerInfoWithSignatures) + Send + Sync> {
         // Clone the root pointer
         let root = self.root.clone();
@@ -115,6 +116,7 @@ impl ActiveObserverState {
             handle_committed_blocks(
                 pending_ordered_blocks,
                 block_payload_store,
+                execution_pool_window_size,
                 root,
                 ledger_info,
             );
@@ -126,8 +128,13 @@ impl ActiveObserverState {
         &self,
         pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
         block_payload_store: Arc<Mutex<BlockPayloadStore>>,
+        execution_pool_window_size: Option<u64>,
     ) -> StateComputerCommitCallBackType {
-        let callback = self.create_commit_callback(pending_ordered_blocks, block_payload_store);
+        let callback = self.create_commit_callback(
+            pending_ordered_blocks,
+            block_payload_store,
+            execution_pool_window_size,
+        );
         Box::new(move |_, ledger_info| callback(ledger_info))
     }
 
@@ -307,6 +314,7 @@ async fn extract_on_chain_configs(
 fn handle_committed_blocks(
     pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
     block_payload_store: Arc<Mutex<BlockPayloadStore>>,
+    execution_pool_window_size: Option<u64>,
     root: Arc<Mutex<LedgerInfoWithSignatures>>,
     ledger_info: LedgerInfoWithSignatures,
 ) {
@@ -317,7 +325,7 @@ fn handle_committed_blocks(
     );
     pending_ordered_blocks
         .lock()
-        .remove_blocks_for_commit(&ledger_info);
+        .remove_blocks_for_commit(&ledger_info, execution_pool_window_size);
 
     // Verify the ledger info is for the same epoch
     let mut root = root.lock();
@@ -357,6 +365,7 @@ mod test {
         observer::execution_pool::ObservedOrderedBlock,
     };
     use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+    use aptos_config::config::ConsensusObserverConfig;
     use aptos_consensus_types::{
         block::Block,
         block_data::{BlockData, BlockType},
@@ -447,6 +456,7 @@ mod test {
         handle_committed_blocks(
             ordered_block_store.clone(),
             block_payload_store.clone(),
+            None,
             root.clone(),
             create_ledger_info(epoch + 1, round + 1),
         );
@@ -456,6 +466,7 @@ mod test {
         handle_committed_blocks(
             ordered_block_store.clone(),
             block_payload_store.clone(),
+            None,
             root.clone(),
             create_ledger_info(epoch, round - 1),
         );
@@ -486,10 +497,11 @@ mod test {
             committed_blocks.push(pipelined_block);
         }
 
-        // Handle the committed blocks
+        // Handle the committed blocks (without an execution pool window)
         handle_committed_blocks(
             ordered_block_store.clone(),
             block_payload_store.clone(),
+            None,
             root.clone(),
             committed_ledger_info.clone(),
         );
@@ -500,6 +512,90 @@ mod test {
             block_payload_store.lock().get_block_payloads().lock().len(),
             1
         );
+
+        // Verify the root is updated
+        assert_eq!(root.lock().clone(), committed_ledger_info);
+    }
+
+    #[test]
+    fn test_handle_committed_blocks_execution_pool() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let observer_block_window_buffer_multiplier = 2; // Buffer twice the window
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            observer_block_window_buffer_multiplier,
+            ..ConsensusObserverConfig::default()
+        };
+
+        // Create a node config using the observer config
+        let node_config = NodeConfig {
+            consensus_observer: consensus_observer_config,
+            ..NodeConfig::default()
+        };
+
+        // Create the root ledger info
+        let epoch = 10;
+        let round = 500;
+        let root = Arc::new(Mutex::new(create_ledger_info(epoch, round)));
+
+        // Create the ordered block store and block payload store
+        let ordered_block_store = Arc::new(Mutex::new(OrderedBlockStore::new(
+            node_config.consensus_observer,
+        )));
+        let block_payload_store = Arc::new(Mutex::new(BlockPayloadStore::new(
+            node_config.consensus_observer,
+        )));
+
+        // Add pending ordered blocks
+        let num_ordered_blocks = 50;
+        let ordered_blocks = create_and_add_ordered_blocks(
+            ordered_block_store.clone(),
+            num_ordered_blocks,
+            epoch,
+            round,
+        );
+
+        // Add block payloads for the ordered blocks
+        for ordered_block in &ordered_blocks {
+            create_and_add_payloads_for_ordered_block(block_payload_store.clone(), ordered_block);
+        }
+
+        // Create the commit ledger info (for the last block)
+        let commit_round = round + (num_ordered_blocks as Round) - 1;
+        let committed_ledger_info = create_ledger_info(epoch, commit_round);
+
+        // Create the committed blocks and ledger info
+        let mut committed_blocks = vec![];
+        for ordered_block in ordered_blocks.iter().take(num_ordered_blocks - 1) {
+            let pipelined_block = create_pipelined_block(ordered_block.blocks()[0].block_info());
+            committed_blocks.push(pipelined_block);
+        }
+
+        // Handle the committed blocks (with an execution pool window)
+        let execution_pool_window_size = 10;
+        handle_committed_blocks(
+            ordered_block_store.clone(),
+            block_payload_store.clone(),
+            Some(execution_pool_window_size),
+            root.clone(),
+            committed_ledger_info.clone(),
+        );
+
+        // Verify the committed blocks are removed from the ordered block store
+        let execution_pool_buffer =
+            execution_pool_window_size as usize * observer_block_window_buffer_multiplier as usize;
+        assert_eq!(
+            ordered_block_store.lock().get_all_ordered_blocks().len(),
+            execution_pool_buffer
+        );
+
+        // Verify the committed blocks are removed from the block store
+        assert!(block_payload_store
+            .lock()
+            .get_block_payloads()
+            .lock()
+            .is_empty());
 
         // Verify the root is updated
         assert_eq!(root.lock().clone(), committed_ledger_info);

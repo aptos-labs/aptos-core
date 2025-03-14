@@ -317,11 +317,13 @@ impl ConsensusObserver {
             ))
         );
 
+        // If the new pipeline is enabled, build the pipeline for the ordered blocks
         if self.pipeline_enabled() {
             for block in ordered_block.blocks() {
                 let commit_callback = self.active_observer_state.create_commit_callback(
                     self.ordered_block_store.clone(),
                     self.block_payload_store.clone(),
+                    self.get_execution_pool_window_size(),
                 );
                 if let Some(futs) = self.get_parent_pipeline_futs(block) {
                     self.pipeline_builder().build(block, futs, commit_callback);
@@ -336,12 +338,14 @@ impl ConsensusObserver {
                 }
             }
         }
+
         // Create the commit callback (to be called after the execution pipeline)
         let commit_callback = self
             .active_observer_state
             .create_commit_callback_deprecated(
                 self.ordered_block_store.clone(),
                 self.block_payload_store.clone(),
+                self.get_execution_pool_window_size(),
             );
 
         // Send the ordered block to the execution pipeline
@@ -626,9 +630,10 @@ impl ConsensusObserver {
             self.block_payload_store
                 .lock()
                 .remove_blocks_for_epoch_round(commit_epoch, commit_round);
-            self.ordered_block_store
-                .lock()
-                .remove_blocks_for_commit(commit_decision.commit_proof());
+            self.ordered_block_store.lock().remove_blocks_for_commit(
+                commit_decision.commit_proof(),
+                self.get_execution_pool_window_size(),
+            );
 
             // Start state syncing to the commit decision
             self.state_sync_manager
