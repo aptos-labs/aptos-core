@@ -1612,7 +1612,7 @@ module aptos_framework::account {
 
         let challenge = RotationCapabilityOfferProofChallengeV2 {
             chain_id: chain_id::get(),
-            sequence_number: Account[alice_addr].sequence_number,
+            sequence_number: get_sequence_number(alice_addr),
             source_address: alice_addr,
             recipient_address: bob_addr,
         };
