@@ -1087,7 +1087,7 @@ module aptos_framework::account {
         assert!(&resource_account == &resource_account_from_cap, 1);
 
         move_to(&resource_account_from_cap, DummyResource {});
-        &DummyResource[signer::address_of(&resource_account)];
+        assert!(exists<DummyResource>(signer::address_of(&resource_account));
     }
 
     #[test(user = @0x1)]
