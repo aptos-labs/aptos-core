@@ -1079,7 +1079,7 @@ module aptos_framework::account {
     struct DummyResource has key {}
 
     #[test(user = @0x1)]
-    public entry fun test_module_capability(user: signer) acquires Account, DummyResource {
+    public entry fun test_module_capability(user: signer) acquires Account {
         let (resource_account, signer_cap) = create_resource_account(&user, x"01");
         assert!(signer::address_of(&resource_account) != signer::address_of(&user), 0);
 
