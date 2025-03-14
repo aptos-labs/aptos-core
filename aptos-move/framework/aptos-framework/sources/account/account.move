@@ -939,7 +939,7 @@ module aptos_framework::account {
         recipient_address: address,
     ): SignerCapabilityOfferProofChallengeV2 acquires Account {
         SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: Account[source_address].sequence_number,
+            sequence_number: get_sequence_number(source_address),
             source_address,
             recipient_address,
         }
@@ -1042,7 +1042,7 @@ module aptos_framework::account {
 
         let resource_addr = signer::address_of(&resource);
         let proof_challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: Account[resource_addr].sequence_number,
+            sequence_number: get_sequence_number(resource_addr),
             source_address: resource_addr,
             recipient_address,
         };
