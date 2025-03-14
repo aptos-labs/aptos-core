@@ -60,6 +60,15 @@ aptos-num-variants = { workspace = true }
 aptos-telemetry = { workspace = true }
 aptos-telemetry-service = { workspace = true }
 
+[features]
+default = [
+    "aptos-bitvec/fuzzing",
+    "aptos-config/fuzzing",
+    "aptos-executor-types/fuzzing",
+    "aptos-schemadb/fuzzing",
+    "aptos-time-service/async",
+]
+
 [workspace]
 resolver = "2"
 
