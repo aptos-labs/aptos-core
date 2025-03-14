@@ -35,10 +35,11 @@ pub enum ConsensusAlgorithmConfig {
 
 impl ConsensusAlgorithmConfig {
     pub fn default_for_genesis() -> Self {
-        Self::JolteonV2 {
+        Self::JolteonV3 {
             main: ConsensusConfigV1::default(),
             quorum_store_enabled: true,
             order_vote_enabled: true,
+            opt_proposal_enabled: true,
         }
     }
 
