@@ -1744,7 +1744,7 @@ impl AptosVM {
                         AbstractionAuthData::V1 { .. } => {
                             self.features().is_account_abstraction_enabled()
                         },
-                        AbstractionAuthData::DomainV1 { .. } => {
+                        AbstractionAuthData::DerivableV1 { .. } => {
                             self.features().is_domain_account_abstraction_enabled()
                         },
                     };
@@ -1784,7 +1784,7 @@ impl AptosVM {
                         AbstractionAuthData::V1 { .. } => {
                             self.features().is_account_abstraction_enabled()
                         },
-                        AbstractionAuthData::DomainV1 { .. } => {
+                        AbstractionAuthData::DerivableV1 { .. } => {
                             self.features().is_domain_account_abstraction_enabled()
                         },
                     };

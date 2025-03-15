@@ -63,7 +63,7 @@ enum LocalAccountAuthenticator {
     Keyless(KeylessAccount),
     FederatedKeyless(FederatedKeylessAccount),
     Abstraction(AbstractedAccount), // TODO: Add support for keyless authentication
-    DomainAbstraction(DomainAbstractedAccount), // TODO: Add support for keyless authentication
+    DerivableAbstraction(DomainAbstractedAccount), // TODO: Add support for keyless authentication
 }
 
 impl LocalAccountAuthenticator {
@@ -86,7 +86,7 @@ impl LocalAccountAuthenticator {
                 )
             },
             LocalAccountAuthenticator::Abstraction(..) => unreachable!(),
-            LocalAccountAuthenticator::DomainAbstraction(..) => unreachable!(),
+            LocalAccountAuthenticator::DerivableAbstraction(..) => unreachable!(),
         }
     }
 
@@ -210,7 +210,7 @@ impl LocalAccount {
                 &account_identity,
             )
             .account_address(),
-            auth: LocalAccountAuthenticator::DomainAbstraction(DomainAbstractedAccount {
+            auth: LocalAccountAuthenticator::DerivableAbstraction(DomainAbstractedAccount {
                 function_info,
                 account_identity,
                 sign_func,
@@ -456,7 +456,7 @@ impl LocalAccount {
             LocalAccountAuthenticator::Keyless(_) => todo!(),
             LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
             LocalAccountAuthenticator::Abstraction(..) => todo!(),
-            LocalAccountAuthenticator::DomainAbstraction(..) => todo!(),
+            LocalAccountAuthenticator::DerivableAbstraction(..) => todo!(),
         }
     }
 
@@ -466,7 +466,7 @@ impl LocalAccount {
             LocalAccountAuthenticator::Keyless(_) => todo!(),
             LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
             LocalAccountAuthenticator::Abstraction(..) => todo!(),
-            LocalAccountAuthenticator::DomainAbstraction(..) => todo!(),
+            LocalAccountAuthenticator::DerivableAbstraction(..) => todo!(),
         }
     }
 
@@ -480,7 +480,7 @@ impl LocalAccount {
                 federated_keyless_account.authentication_key()
             },
             LocalAccountAuthenticator::Abstraction(..) => todo!(),
-            LocalAccountAuthenticator::DomainAbstraction(..) => todo!(),
+            LocalAccountAuthenticator::DerivableAbstraction(..) => todo!(),
         }
     }
 
@@ -492,7 +492,7 @@ impl LocalAccount {
             LocalAccountAuthenticator::Abstraction(aa) => {
                 Auth::Abstraction(aa.function_info.clone(), aa.sign_func.clone())
             },
-            LocalAccountAuthenticator::DomainAbstraction(aa) => Auth::DomainAbstraction {
+            LocalAccountAuthenticator::DerivableAbstraction(aa) => Auth::DerivableAbstraction {
                 function_info: aa.function_info.clone(),
                 account_identity: aa.account_identity.clone(),
                 sign_function: aa.sign_func.clone(),
@@ -534,7 +534,7 @@ impl LocalAccount {
             LocalAccountAuthenticator::Keyless(_) => todo!(),
             LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
             LocalAccountAuthenticator::Abstraction(..) => todo!(),
-            LocalAccountAuthenticator::DomainAbstraction(..) => todo!(),
+            LocalAccountAuthenticator::DerivableAbstraction(..) => todo!(),
         }
     }
 
