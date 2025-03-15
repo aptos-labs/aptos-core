@@ -9,6 +9,25 @@ NIGHTLY_VERSION="nightly-2024-04-06"
 # GDRIVE format https://docs.google.com/uc?export=download&id=DOCID
 CORPUS_ZIPS=("https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip" "https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_seed_corpus.zip")
 
+# This save time excluding some features needed only for specific targets
+# Downside: fuzzers which require  specific features need to recompile all dependencies
+function get_features_for_target() {
+    local target=$1
+    local toml_file="fuzz/Cargo.toml"
+
+    # Find the section containing our target and extract required-features if present
+    features=$(sed -n "/name = \"$target\"/,/\[\[bin]]/p" "$toml_file" | \
+              grep "required-features" | \
+              sed -E 's/.*required-features *= *\[(.*)\].*/\1/' | \
+              tr -d '", ')
+
+    if [ -n "$features" ]; then
+        echo "--features $features"
+    else
+        echo ""
+    fi
+}
+
 function info() {
     echo "[info] $1"
 }
@@ -118,7 +137,8 @@ function build() {
     info "Target directory: $target_dir"
     mkdir -p $target_dir
     info "Building $fuzz_target"
-    cargo_fuzz build --sanitizer none --verbose -O --target-dir $target_dir $fuzz_target
+    features=$(get_features_for_target $fuzz_target)
+    cargo_fuzz build --sanitizer none --verbose -O --target-dir $target_dir $features $fuzz_target
 }
 
 function build-oss-fuzz() {
@@ -205,7 +225,12 @@ function coverage() {
     
     info "Generating coverage for $fuzz_target"
 
-    fuzz_target_bin=$(find ./target/*/coverage -name $fuzz_target -type f -perm /111) #$(find target/*/coverage -name $fuzz_target -type f)
+    PERM="/111"
+    if [[ $OSTYPE == 'darwin'* ]]; then
+        PERM="+111"
+    fi
+
+    fuzz_target_bin=$(find ./target/*/coverage -name $fuzz_target -type f -perm $PERM)
     echo "Found fuzz target binary: $fuzz_target_bin"
     # Generate the coverage report
     cargo +$NIGHTLY_VERSION cov -- show $fuzz_target_bin \
@@ -284,13 +309,15 @@ function run() {
         fi
     fi
     info "Running $fuzz_target"
-    cargo_fuzz run --sanitizer address -O $fuzz_target $testcase -- -fork=15 #-ignore_crashes=1
+    features=$(get_features_for_target $fuzz_target)
+    cargo_fuzz run $features --sanitizer address -O $fuzz_target $testcase -- -fork=15 #-ignore_crashes=1
 }
 
 function test() {
     for fuzz_target in $(list); do
         info "Testing $fuzz_target"
-        cargo_fuzz run $fuzz_target -- -max_len=1024 -jobs=4 -workers=4 -runs=1000
+        features=$(get_features_for_target $fuzz_target)
+        cargo_fuzz run $features $fuzz_target -- -max_len=1024 -jobs=4 -workers=4 -runs=1000
         if [ $? -ne 0 ]; then
             error "Failed to run $fuzz_target"
         fi
