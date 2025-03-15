@@ -4797,7 +4797,8 @@ impl<'env> FunctionEnv<'env> {
         self.data.access_specifiers.as_deref()
     }
 
-    /// Returns the inferred acquired structs of this function.
+    /// Returns the inferred acquired structs of this function. This is checked
+    /// against declared acquires from `get_access_specifiers`.
     pub fn get_acquired_structs(&self) -> Option<&BTreeSet<StructId>> {
         self.data.acquired_structs.as_ref()
     }
