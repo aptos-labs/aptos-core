@@ -52,7 +52,7 @@ use move_transactional_test_runner::{
     tasks::{InitCommand, SyntaxChoice, TaskInput},
     vm_test_harness::{PrecompiledFilesModules, TestRunConfig},
 };
-use move_vm_runtime::session::SerializedReturnValues;
+use move_vm_runtime::move_vm::SerializedReturnValues;
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
