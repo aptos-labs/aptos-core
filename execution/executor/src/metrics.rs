@@ -15,7 +15,7 @@ use aptos_types::{
         ExecutionStatus, Transaction, TransactionOutput, TransactionStatus,
     },
 };
-use aptos_vm::AptosVM;
+use aptos_vm::AptosVm;
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, vm_status::StatusCode};
 use once_cell::sync::Lazy;
 use std::time::Duration;
@@ -267,7 +267,7 @@ pub fn update_counters_for_processed_chunk<T>(
 ) where
     T: TransactionProvider,
 {
-    let detailed_counters = AptosVM::get_processed_transactions_detailed_counters();
+    let detailed_counters = AptosVm::get_processed_transactions_detailed_counters();
     let detailed_counters_label = if detailed_counters { "true" } else { "false" };
     if transactions.len() != transaction_outputs.len() {
         warn!(

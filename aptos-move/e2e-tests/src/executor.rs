@@ -58,7 +58,7 @@ use aptos_vm::{
     data_cache::AsMoveResolver,
     gas::make_prod_gas_meter,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
-    AptosVM, VMValidator,
+    AptosVm, VMValidator,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
@@ -825,7 +825,7 @@ impl FakeExecutor {
 
         // TODO(Gas): revisit this.
         let env = AptosEnvironment::new(&self.data_store);
-        let vm = AptosVM::new(&env, self.get_state_view());
+        let vm = AptosVm::new(&env, self.get_state_view());
 
         let resolver = self.data_store.as_move_resolver();
         let code_storage = self.get_state_view().as_aptos_code_storage(&env);
@@ -898,7 +898,7 @@ impl FakeExecutor {
     /// Validates the given transaction by running it through the VM validator.
     pub fn validate_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
         let env = AptosEnvironment::new(&self.data_store);
-        let vm = AptosVM::new(&env, self.get_state_view());
+        let vm = AptosVm::new(&env, self.get_state_view());
         vm.validate_transaction(
             txn,
             &self.data_store,
@@ -1299,7 +1299,7 @@ impl FakeExecutor {
         arguments: Vec<Vec<u8>>,
     ) -> ViewFunctionOutput {
         let max_gas_amount = u64::MAX;
-        AptosVM::execute_view_function(
+        AptosVm::execute_view_function(
             self.get_state_view(),
             fun.module_id,
             fun.member_id,
@@ -1311,7 +1311,7 @@ impl FakeExecutor {
 }
 
 /// Finishes the session, and asserts there has been no modules published (publishing is the
-/// responsibility of the adapter, i.e., [AptosVM]).
+/// responsibility of the adapter, i.e., [AptosVm]).
 fn finish_session_assert_no_modules(
     session: SessionExt,
     module_storage: &impl AptosModuleStorage,

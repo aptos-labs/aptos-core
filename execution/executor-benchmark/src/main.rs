@@ -37,7 +37,7 @@ use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_generator_lib::WorkflowProgress;
 use aptos_transaction_workloads_lib::args::TransactionTypeArg;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
-use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
+use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVm, VMBlockExecutor};
 use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
 use clap::{Parser, Subcommand, ValueEnum};
 use once_cell::sync::Lazy;
@@ -623,10 +623,10 @@ fn main() {
     if opt.skip_paranoid_checks {
         set_paranoid_type_checks(false);
     }
-    AptosVM::set_num_shards_once(execution_shards);
-    AptosVM::set_concurrency_level_once(execution_threads_per_shard);
+    AptosVm::set_num_shards_once(execution_shards);
+    AptosVm::set_concurrency_level_once(execution_threads_per_shard);
     NativeConfig::set_concurrency_level_once(execution_threads_per_shard);
-    AptosVM::set_processed_transactions_detailed_counters();
+    AptosVm::set_processed_transactions_detailed_counters();
 
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);

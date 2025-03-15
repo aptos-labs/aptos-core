@@ -247,14 +247,14 @@ fn is_approved_gov_script(
     }
 }
 
-pub struct AptosVM {
+pub struct AptosVm {
     is_simulation: bool,
     move_vm: MoveVmExt,
     /// For a new chain, or even mainnet, the VK might not necessarily be set.
     pvk: Option<PreparedVerifyingKey<Bn254>>,
 }
 
-impl AptosVM {
+impl AptosVm {
     /// Creates a new VM instance based on the runtime environment. The VM can then be used by
     /// block executor to create multiple tasks sharing the same execution configurations extracted
     /// from the environment.
@@ -281,7 +281,7 @@ impl AptosVM {
         resolver: &'r S,
         session_id: SessionId,
         user_transaction_context_opt: Option<UserTransactionContext>,
-    ) -> SessionExt<'r, '_> {
+    ) -> SessionExt<'r> {
         self.move_vm
             .new_session(resolver, session_id, user_transaction_context_opt)
     }
@@ -630,7 +630,7 @@ impl AptosVM {
                 };
 
                 let fee_statement =
-                    AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
+                    AptosVm::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
 
                 // Verify we charged sufficiently for creating an account slot
                 let gas_params = self.gas_params(log_context)?;
@@ -660,7 +660,7 @@ impl AptosVM {
                 (abort_hook_session_change_set, fee_statement)
             } else {
                 let fee_statement =
-                    AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
+                    AptosVm::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
                 (prologue_session_change_set, fee_statement)
             };
 
@@ -725,7 +725,7 @@ impl AptosVM {
             }
         }
 
-        let fee_statement = AptosVM::fee_statement_from_gas_meter(
+        let fee_statement = AptosVm::fee_statement_from_gas_meter(
             txn_data,
             gas_meter,
             u64::from(epilogue_session.get_storage_fee_refund()),
@@ -834,7 +834,7 @@ impl AptosVM {
             self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
         )?;
 
-        session.execute_script(
+        session.load_and_execute_script(
             script.code(),
             script.ty_args().to_vec(),
             args,
@@ -928,11 +928,11 @@ impl AptosVM {
         Ok(())
     }
 
-    fn execute_script_or_entry_function<'a, 'r, 'l>(
-        &'l self,
+    fn execute_script_or_entry_function<'a, 'r>(
+        &self,
         resolver: &'r impl AptosMoveResolver,
         code_storage: &impl AptosCodeStorage,
-        mut session: UserSession<'r, 'l>,
+        mut session: UserSession<'r>,
         serialized_signers: &SerializedSigners,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext<'a>,
@@ -1046,14 +1046,14 @@ impl AptosVM {
         Ok(storage_refund)
     }
 
-    fn charge_change_set_and_respawn_session<'r, 'l>(
-        &'l self,
+    fn charge_change_set_and_respawn_session<'r>(
+        &self,
         mut user_session_change_set: UserSessionChangeSet,
         resolver: &'r impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
         gas_meter: &mut impl AptosGasMeter,
-        txn_data: &'l TransactionMetadata,
-    ) -> Result<EpilogueSession<'r, 'l>, VMStatus> {
+        txn_data: &TransactionMetadata,
+    ) -> Result<EpilogueSession<'r>, VMStatus> {
         let storage_refund = self.charge_change_set(
             &mut user_session_change_set,
             gas_meter,
@@ -1072,11 +1072,11 @@ impl AptosVM {
         ))
     }
 
-    fn simulate_multisig_transaction<'a, 'r, 'l>(
-        &'l self,
+    fn simulate_multisig_transaction<'a, 'r>(
+        &self,
         resolver: &'r impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
-        session: UserSession<'r, 'l>,
+        session: UserSession<'r>,
         serialized_signers: &SerializedSigners,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext<'a>,
@@ -1138,11 +1138,11 @@ impl AptosVM {
     // failure object. In case of success, keep the session and also do any necessary module publish
     // cleanup.
     // 3. Call post transaction cleanup function in multisig account module with the result from (2)
-    fn execute_multisig_transaction<'r, 'l>(
-        &'l self,
+    fn execute_multisig_transaction<'r>(
+        &self,
         resolver: &'r impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
-        mut session: UserSession<'r, 'l>,
+        mut session: UserSession<'r>,
         serialized_signers: &SerializedSigners,
         prologue_session_change_set: &SystemSessionChangeSet,
         gas_meter: &mut impl AptosGasMeter,
@@ -1303,11 +1303,11 @@ impl AptosVM {
         )
     }
 
-    fn execute_or_simulate_multisig_transaction<'a, 'r, 'l>(
-        &'l self,
+    fn execute_or_simulate_multisig_transaction<'a, 'r>(
+        &self,
         resolver: &'r impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
-        session: UserSession<'r, 'l>,
+        session: UserSession<'r>,
         serialized_signers: &SerializedSigners,
         prologue_session_change_set: &SystemSessionChangeSet,
         gas_meter: &mut impl AptosGasMeter,
@@ -1357,7 +1357,7 @@ impl AptosVM {
         &self,
         resolver: &impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
-        mut session: UserSession<'_, '_>,
+        mut session: UserSession<'_>,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         multisig_address: AccountAddress,
@@ -1389,16 +1389,16 @@ impl AptosVM {
         )
     }
 
-    fn failure_multisig_payload_cleanup<'r, 'l>(
-        &'l self,
+    fn failure_multisig_payload_cleanup<'r>(
+        &self,
         resolver: &'r impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
         prologue_session_change_set: &SystemSessionChangeSet,
         execution_error: VMStatus,
-        txn_data: &'l TransactionMetadata,
+        txn_data: &TransactionMetadata,
         mut cleanup_args: Vec<Vec<u8>>,
         traversal_context: &mut TraversalContext,
-    ) -> Result<EpilogueSession<'r, 'l>, VMStatus> {
+    ) -> Result<EpilogueSession<'r>, VMStatus> {
         // Start a fresh session for running cleanup that does not contain any changes from
         // the inner function call earlier (since it failed).
         let mut epilogue_session = EpilogueSession::on_user_session_failure(
@@ -1454,7 +1454,7 @@ impl AptosVM {
     /// Resolve a pending code publish request registered via the NativeCodeContext.
     fn resolve_pending_code_publish_and_finish_user_session(
         &self,
-        mut session: UserSession<'_, '_>,
+        mut session: UserSession<'_>,
         resolver: &impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
         gas_meter: &mut impl AptosGasMeter,
@@ -2420,7 +2420,7 @@ impl AptosVM {
         max_gas_amount: u64,
     ) -> ViewFunctionOutput {
         let env = AptosEnvironment::new(state_view);
-        let vm = AptosVM::new(&env, state_view);
+        let vm = AptosVm::new(&env, state_view);
 
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
@@ -2476,7 +2476,7 @@ impl AptosVM {
 
     fn execute_view_function_in_vm(
         session: &mut SessionExt,
-        vm: &AptosVM,
+        vm: &AptosVm,
         module_id: ModuleId,
         func_name: Identifier,
         type_args: Vec<TypeTag>,
@@ -2814,9 +2814,9 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let config = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
-                concurrency_level: AptosVM::get_concurrency_level(),
+                concurrency_level: AptosVm::get_concurrency_level(),
                 allow_fallback: true,
-                discard_failed_blocks: AptosVM::get_discard_failed_blocks(),
+                discard_failed_blocks: AptosVm::get_discard_failed_blocks(),
                 module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
             },
             onchain: onchain_config,
@@ -2841,7 +2841,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         let ret = sharded_block_executor.execute_block(
             state_view,
             transactions,
-            AptosVM::get_concurrency_level(),
+            AptosVm::get_concurrency_level(),
             onchain_config,
         );
         if ret.is_ok() {
@@ -2852,7 +2852,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
     }
 }
 
-impl VMValidator for AptosVM {
+impl VMValidator for AptosVm {
     /// Determine if a transaction is valid. Will return `None` if the transaction is accepted,
     /// `Some(Err)` if the VM rejects it, with `Err` as an error code. Verification performs the
     /// following steps:
@@ -3003,7 +3003,7 @@ impl AptosSimulationVM {
         );
 
         let env = AptosEnvironment::new(state_view);
-        let mut vm = AptosVM::new(&env, state_view);
+        let mut vm = AptosVm::new(&env, state_view);
         vm.is_simulation = true;
 
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
@@ -3027,17 +3027,16 @@ fn create_account_if_does_not_exist(
     account: AccountAddress,
     traversal_context: &mut TraversalContext,
 ) -> VMResult<()> {
-    session
-        .execute_function_bypass_visibility(
-            &ACCOUNT_MODULE,
-            CREATE_ACCOUNT_IF_DOES_NOT_EXIST,
-            vec![],
-            serialize_values(&vec![MoveValue::Address(account)]),
-            gas_meter,
-            traversal_context,
-            module_storage,
-        )
-        .map(|_return_vals| ())
+    session.execute_function_bypass_visibility(
+        &ACCOUNT_MODULE,
+        CREATE_ACCOUNT_IF_DOES_NOT_EXIST,
+        vec![],
+        serialize_values(&vec![MoveValue::Address(account)]),
+        gas_meter,
+        traversal_context,
+        module_storage,
+    )?;
+    Ok(())
 }
 
 fn dispatchable_authenticate(
@@ -3115,7 +3114,7 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
 
 #[cfg(test)]
 mod tests {
-    use crate::{move_vm_ext::MoveVmExt, AptosVM};
+    use crate::{move_vm_ext::MoveVmExt, AptosVm};
     use aptos_types::{
         account_address::AccountAddress,
         account_config::{NEW_EPOCH_EVENT_MOVE_TYPE_TAG, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG},
@@ -3128,8 +3127,8 @@ mod tests {
         fn assert_send<T: Send>() {}
         fn assert_sync<T: Sync>() {}
 
-        assert_send::<AptosVM>();
-        assert_sync::<AptosVM>();
+        assert_send::<AptosVm>();
+        assert_sync::<AptosVm>();
         assert_send::<MoveVmExt>();
         assert_sync::<MoveVmExt>();
     }
@@ -3144,11 +3143,11 @@ mod tests {
         );
         let new_epoch_event_v2 =
             ContractEvent::new_v2(NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(), vec![]);
-        assert!(AptosVM::should_restart_execution(&[(
+        assert!(AptosVm::should_restart_execution(&[(
             new_epoch_event,
             None
         )]));
-        assert!(AptosVM::should_restart_execution(&[(
+        assert!(AptosVm::should_restart_execution(&[(
             new_epoch_event_v2,
             None
         )]));
