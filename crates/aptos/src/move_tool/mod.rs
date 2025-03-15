@@ -5,6 +5,7 @@ use crate::{
     account::derive_resource_account::ResourceAccountSeed,
     common::{
         local_simulation,
+        transactions::TxnOptions,
         types::{
             load_account_arg, ArgWithTypeJSON, ChunkedPublishOption, CliConfig, CliError,
             CliTypedResult, ConfigSearchMode, EntryFunctionArguments, EntryFunctionArgumentsJSON,
@@ -125,6 +126,7 @@ pub enum MoveTool {
     Publish(PublishPackage),
     Run(RunFunction),
     RunScript(RunScript),
+    Simulate(Simulate),
     #[clap(subcommand, hide = true)]
     Show(show::ShowTool),
     Test(TestPackage),
@@ -162,6 +164,7 @@ impl MoveTool {
             MoveTool::Publish(tool) => tool.execute_serialized().await,
             MoveTool::Run(tool) => tool.execute_serialized().await,
             MoveTool::RunScript(tool) => tool.execute_serialized().await,
+            MoveTool::Simulate(tool) => tool.execute_serialized().await,
             MoveTool::Show(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
             MoveTool::VerifyPackage(tool) => tool.execute_serialized().await,
@@ -2089,6 +2092,43 @@ impl CliCommand<TransactionSummary> for RunFunction {
             &self.txn_options,
         )
         .await
+    }
+}
+
+/// BETA: Simulate a Move function or script
+///
+/// BETA: subject to change
+///
+/// This allows you to simulate and see the output from any function or Move script all in one command.
+/// It additionally lets you simulate for any account
+///
+/// TODO: This should be simpler than the rest of the commands, soon to move other commands to a flow like this
+#[derive(Parser)]
+pub struct Simulate {
+    #[clap(flatten)]
+    txn_options: TxnOptions,
+    // TODO: Mix entry function and script together with some smarts
+    #[clap(flatten)]
+    entry_function_args: EntryFunctionArguments,
+
+    #[clap(long)]
+    local: bool,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for Simulate {
+    fn command_name(&self) -> &'static str {
+        "Simulate"
+    }
+
+    async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        let payload = TransactionPayload::EntryFunction(self.entry_function_args.try_into()?);
+
+        if self.local {
+            self.txn_options.simulate_locally(payload).await
+        } else {
+            self.txn_options.simulate_remotely(payload).await
+        }
     }
 }
 
