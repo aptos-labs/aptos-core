@@ -119,7 +119,7 @@ module aptos_framework::transaction_validation {
         is_simulation: bool,
     ) {
         assert!(
-            timestamp::now_seconds() < txn_expiration_time,
+            !timestamp::is_expired(txn_expiration_time),
             error::invalid_argument(PROLOGUE_ETRANSACTION_EXPIRED),
         );
         assert!(chain_id::get() == chain_id, error::invalid_argument(PROLOGUE_EBAD_CHAIN_ID));

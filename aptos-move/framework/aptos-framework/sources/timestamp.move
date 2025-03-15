@@ -4,6 +4,7 @@
 /// * block: to reach consensus on the global wall clock time
 module aptos_framework::timestamp {
     use aptos_framework::system_addresses;
+    use aptos_framework::aggregator_v2::{Self, Aggregator};
     use std::error;
 
     friend aptos_framework::genesis;
@@ -11,6 +12,11 @@ module aptos_framework::timestamp {
     /// A singleton resource holding the current Unix time in microseconds
     struct CurrentTimeMicroseconds has key {
         microseconds: u64,
+    }
+
+    /// Current Unix time in microseconds represented as aggregator
+    struct ConflictFreeTimeMicroseconds has key {
+        microseconds: Aggregator<u64>,
     }
 
     /// Conversion factor between seconds and microseconds
@@ -28,12 +34,19 @@ module aptos_framework::timestamp {
         move_to(aptos_framework, timer);
     }
 
+    /// Initializes the conflict-free timer so it can be used for expiration check. This can only be called with the aptos framework account.
+    public(friend) fun initialize_conflict_free_timer(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        let timer = ConflictFreeTimeMicroseconds { microseconds: aggregator_v2::create_unbounded_aggregator_with_value(0) };
+        move_to(aptos_framework, timer);
+    }
+
     /// Updates the wall clock time by consensus. Requires VM privilege and will be invoked during block prologue.
     public fun update_global_time(
         account: &signer,
         proposer: address,
         timestamp: u64
-    ) acquires CurrentTimeMicroseconds {
+    ) acquires CurrentTimeMicroseconds, ConflictFreeTimeMicroseconds {
         // Can only be invoked by AptosVM signer.
         system_addresses::assert_vm(account);
 
@@ -47,6 +60,23 @@ module aptos_framework::timestamp {
             assert!(now < timestamp, error::invalid_argument(EINVALID_TIMESTAMP));
             global_timer.microseconds = timestamp;
         };
+
+        if (exists<ConflictFreeTimeMicroseconds>(@aptos_framework)) {
+            let conflict_free_timer = borrow_global_mut<ConflictFreeTimeMicroseconds>(@aptos_framework);
+            let now = aggregator_v2::read(&conflict_free_timer.microseconds);
+            aggregator_v2::add(&mut conflict_free_timer.microseconds, timestamp - now);
+        }
+    }
+
+    /// Returns true if the given timestamp is smaller than the current time on-chain;
+    public fun is_expired(timestamp_second: u64): bool acquires CurrentTimeMicroseconds, ConflictFreeTimeMicroseconds {
+        if (exists<ConflictFreeTimeMicroseconds>(@aptos_framework)) {
+            let global_timer = borrow_global_mut<ConflictFreeTimeMicroseconds>(@aptos_framework);
+            aggregator_v2::is_at_least(&global_timer.microseconds, timestamp_second * MICRO_CONVERSION_FACTOR)
+        } else {
+            let global_timer = borrow_global_mut<CurrentTimeMicroseconds>(@aptos_framework);
+            global_timer.microseconds >= timestamp_second * MICRO_CONVERSION_FACTOR
+        }
     }
 
     #[test_only]

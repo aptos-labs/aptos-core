@@ -342,6 +342,7 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     <a href="version.md#0x1_version_initialize">version::initialize</a>(&aptos_framework_account, initial_version);
     <a href="stake.md#0x1_stake_initialize">stake::initialize</a>(&aptos_framework_account);
     <a href="timestamp.md#0x1_timestamp_set_time_has_started">timestamp::set_time_has_started</a>(&aptos_framework_account);
+    <a href="timestamp.md#0x1_timestamp_initialize_conflict_free_timer">timestamp::initialize_conflict_free_timer</a>(&aptos_framework_account);
     <a href="staking_config.md#0x1_staking_config_initialize">staking_config::initialize</a>(
         &aptos_framework_account,
         minimum_stake,
@@ -1080,18 +1081,6 @@ The last step of genesis.
     <b>requires</b> <b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>&gt;(@aptos_framework);
     <b>requires</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">coin::CoinInfo</a>&lt;AptosCoin&gt;&gt;(@aptos_framework);
     <b>include</b> <a href="genesis.md#0x1_genesis_CompareTimeRequires">CompareTimeRequires</a>;
-}
-</code></pre>
-
-
-
-
-<a id="0x1_genesis_CompareTimeRequires"></a>
-
-
-<pre><code><b>schema</b> <a href="genesis.md#0x1_genesis_CompareTimeRequires">CompareTimeRequires</a> {
-    <b>let</b> staking_rewards_config = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>&gt;(@aptos_framework);
-    <b>requires</b> staking_rewards_config.last_rewards_rate_period_start_in_secs &lt;= <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>();
 }
 </code></pre>
 
