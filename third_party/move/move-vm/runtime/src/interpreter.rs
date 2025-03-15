@@ -890,6 +890,8 @@ impl InterpreterImpl<'_> {
 
         let result = native_function(&mut native_context, ty_args.to_vec(), args)?;
 
+        gas_meter.charge_heap_memory(native_context.heap_memory_usage())?;
+
         // Note(Gas): The order by which gas is charged / error gets returned MUST NOT be modified
         //            here or otherwise it becomes an incompatible change!!!
         match result {
@@ -2539,6 +2541,11 @@ impl Frame {
                     Bytecode::MoveTo(sd_idx) => {
                         let resource = interpreter.operand_stack.pop()?;
                         let signer_reference = interpreter.operand_stack.pop_as::<SignerRef>()?;
+                        if signer_reference.is_permissioned()? {
+                            return Err(PartialVMError::new(
+                                StatusCode::MOVE_TO_WITH_PERMISSIONED_SIGNER,
+                            ));
+                        }
                         let addr = signer_reference
                             .borrow_signer()?
                             .value_as::<Reference>()?

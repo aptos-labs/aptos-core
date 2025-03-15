@@ -13,7 +13,7 @@ use crate::{
     CompilerConfig,
 };
 use anyhow::{Context, Result};
-use move_compiler::{compiled_unit::AnnotatedCompiledUnit, diagnostics::FilesSourceText};
+use legacy_move_compiler::{compiled_unit::AnnotatedCompiledUnit, diagnostics::FilesSourceText};
 use move_compiler_v2::external_checks::ExternalChecks;
 use move_model::model;
 use petgraph::algo::toposort;

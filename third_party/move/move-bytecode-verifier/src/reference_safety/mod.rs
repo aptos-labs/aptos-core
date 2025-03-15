@@ -23,7 +23,8 @@ use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::{
         Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle, IdentifierIndex,
-        SignatureIndex, SignatureToken, StructDefinition, StructVariantHandle, VariantIndex,
+        MemberCount, SignatureIndex, SignatureToken, StructDefinition, StructVariantHandle,
+        VariantIndex,
     },
     safe_assert, safe_unwrap,
     views::FieldOrVariantIndex,
@@ -302,7 +303,10 @@ fn execute_inner(
                 offset,
                 true,
                 id,
-                FieldOrVariantIndex::FieldIndex(*field_handle_index),
+                get_member_index(
+                    verifier,
+                    FieldOrVariantIndex::FieldIndex(*field_handle_index),
+                )?,
             )?;
             verifier.stack.push(value)
         },
@@ -315,7 +319,7 @@ fn execute_inner(
                 offset,
                 true,
                 id,
-                FieldOrVariantIndex::FieldIndex(field_inst.handle),
+                get_member_index(verifier, FieldOrVariantIndex::FieldIndex(field_inst.handle))?,
             )?;
             verifier.stack.push(value)
         },
@@ -325,7 +329,10 @@ fn execute_inner(
                 offset,
                 false,
                 id,
-                FieldOrVariantIndex::FieldIndex(*field_handle_index),
+                get_member_index(
+                    verifier,
+                    FieldOrVariantIndex::FieldIndex(*field_handle_index),
+                )?,
             )?;
             verifier.stack.push(value)
         },
@@ -338,7 +345,7 @@ fn execute_inner(
                 offset,
                 false,
                 id,
-                FieldOrVariantIndex::FieldIndex(field_inst.handle),
+                get_member_index(verifier, FieldOrVariantIndex::FieldIndex(field_inst.handle))?,
             )?;
             verifier.stack.push(value)
         },
@@ -348,7 +355,10 @@ fn execute_inner(
                 offset,
                 true,
                 id,
-                FieldOrVariantIndex::VariantFieldIndex(*field_handle_index),
+                get_member_index(
+                    verifier,
+                    FieldOrVariantIndex::VariantFieldIndex(*field_handle_index),
+                )?,
             )?;
             verifier.stack.push(value)
         },
@@ -361,7 +371,10 @@ fn execute_inner(
                 offset,
                 true,
                 id,
-                FieldOrVariantIndex::VariantFieldIndex(field_inst.handle),
+                get_member_index(
+                    verifier,
+                    FieldOrVariantIndex::VariantFieldIndex(field_inst.handle),
+                )?,
             )?;
             verifier.stack.push(value)
         },
@@ -371,7 +384,10 @@ fn execute_inner(
                 offset,
                 false,
                 id,
-                FieldOrVariantIndex::VariantFieldIndex(*field_handle_index),
+                get_member_index(
+                    verifier,
+                    FieldOrVariantIndex::VariantFieldIndex(*field_handle_index),
+                )?,
             )?;
             verifier.stack.push(value)
         },
@@ -384,7 +400,10 @@ fn execute_inner(
                 offset,
                 false,
                 id,
-                FieldOrVariantIndex::VariantFieldIndex(field_inst.handle),
+                get_member_index(
+                    verifier,
+                    FieldOrVariantIndex::VariantFieldIndex(field_inst.handle),
+                )?,
             )?;
             verifier.stack.push(value)
         },
@@ -622,6 +641,18 @@ fn execute_inner(
         },
     };
     Ok(())
+}
+
+fn get_member_index(
+    verifier: &ReferenceSafetyAnalysis,
+    index: FieldOrVariantIndex,
+) -> PartialVMResult<MemberCount> {
+    match index {
+        FieldOrVariantIndex::FieldIndex(idx) => Ok(verifier.resolver.field_handle_at(idx)?.field),
+        FieldOrVariantIndex::VariantFieldIndex(idx) => {
+            Ok(verifier.resolver.variant_field_handle_at(idx)?.field)
+        },
+    }
 }
 
 impl<'a> TransferFunctions for ReferenceSafetyAnalysis<'a> {

@@ -62,7 +62,7 @@ module aptos_framework::permissioned_delegation {
                 delegations: big_ordered_map::new_with_config(50, 20, false)
             });
         };
-        let handles = &mut borrow_global_mut<RegisteredDelegations>(addr).delegations;
+        let handles = &mut RegisteredDelegations[addr].delegations;
         assert!(!handles.contains(&key), error::already_exists(EDELEGATION_EXISTENCE));
         let handle = permissioned_signer::create_storable_permissioned_handle(master, expiration_time);
         let permissioned_signer = permissioned_signer::signer_from_storable_permissioned_handle(&handle);
@@ -76,7 +76,7 @@ module aptos_framework::permissioned_delegation {
     ) acquires RegisteredDelegations {
         assert!(!is_permissioned_signer(master), error::permission_denied(ENOT_MASTER_SIGNER));
         let addr = signer::address_of(master);
-        let delegations = &mut borrow_global_mut<RegisteredDelegations>(addr).delegations;
+        let delegations = &mut RegisteredDelegations[addr].delegations;
         assert!(delegations.contains(&key), error::not_found(EDELEGATION_EXISTENCE));
         let delegation = delegations.remove(&key);
         match (delegation) {
@@ -132,7 +132,7 @@ module aptos_framework::permissioned_delegation {
         count_rate: bool
     ): &StorablePermissionedHandle {
         if (exists<RegisteredDelegations>(master)) {
-            let delegations = &mut borrow_global_mut<RegisteredDelegations>(master).delegations;
+            let delegations = &mut RegisteredDelegations[master].delegations;
             if (delegations.contains(&key)) {
                 let delegation = delegations.remove(&key);
                 check_txn_rate(&mut delegation, count_rate);
@@ -180,10 +180,10 @@ module aptos_framework::permissioned_delegation {
             signature,
         };
         let auth_data = auth_data::create_auth_data(vector[1, 2, 3], bcs::to_bytes(&sig_bundle));
-        assert!(!is_permissioned_signer(&account), 1);
+        assert!(!is_permissioned_signer(&account));
         add_permissioned_handle(&account, key, option::none(), 60);
         let permissioned_signer = authenticate(account, auth_data);
-        assert!(is_permissioned_signer(&permissioned_signer), 2);
+        assert!(is_permissioned_signer(&permissioned_signer));
         remove_permissioned_handle(&account_copy, key);
     }
 
@@ -201,7 +201,7 @@ module aptos_framework::permissioned_delegation {
             signature,
         };
         let auth_data = auth_data::create_auth_data(vector[1, 2, 3], bcs::to_bytes(&sig_bundle));
-        assert!(!is_permissioned_signer(&account), 1);
+        assert!(!is_permissioned_signer(&account));
         add_permissioned_handle(&account, key, option::some(rate_limiter::initialize(1, 10)), 60);
         authenticate(account, auth_data);
         authenticate(account_copy, auth_data);

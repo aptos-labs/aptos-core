@@ -13,6 +13,7 @@ use crate::{
 };
 use anyhow::Result;
 use clap::Parser;
+use legacy_move_compiler::{compiled_unit::AnnotatedCompiledUnit, shared::NumericalAddress};
 use move_binary_format::{
     binary_views::BinaryIndexedView,
     file_format::{CompiledModule, CompiledScript},
@@ -24,11 +25,6 @@ use move_command_line_common::{
     testing::{add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT},
     types::ParsedType,
     values::{ParsableValue, ParsedValue},
-};
-use move_compiler::{
-    compiled_unit::{AnnotatedCompiledModule, AnnotatedCompiledUnit},
-    shared::{NumericalAddress, PackagePaths},
-    FullyCompiledProgram,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -108,37 +104,6 @@ fn merge_output(left: Option<String>, right: Option<String>) -> Option<String> {
             left.push_str(&right);
             Some(left)
         },
-    }
-}
-
-pub trait PreCompiledModules {
-    fn get_pre_compiled_modules(&self) -> Vec<&AnnotatedCompiledModule>;
-}
-
-fn annotated_module_from_unit(unit: &AnnotatedCompiledUnit) -> Option<&AnnotatedCompiledModule> {
-    if let AnnotatedCompiledUnit::Module(tmod) = unit {
-        Some(tmod)
-    } else {
-        None
-    }
-}
-
-impl PreCompiledModules for (FullyCompiledProgram, Vec<PackagePaths>) {
-    fn get_pre_compiled_modules(&self) -> Vec<&AnnotatedCompiledModule> {
-        self.0
-            .compiled
-            .iter()
-            .filter_map(annotated_module_from_unit)
-            .collect()
-    }
-}
-
-impl PreCompiledModules for PrecompiledFilesModules {
-    fn get_pre_compiled_modules(&self) -> Vec<&AnnotatedCompiledModule> {
-        self.units()
-            .iter()
-            .filter_map(annotated_module_from_unit)
-            .collect()
     }
 }
 
@@ -689,11 +654,12 @@ impl<'a> CompiledState<'a> {
         self.check_not_precompiled(&id);
         let interface_file = NamedTempFile::new().unwrap();
         let path = interface_file.path().to_str().unwrap().to_owned();
-        let (_id, interface_text) = move_compiler::interface_generator::write_module_to_string(
-            &self.compiled_module_named_address_mapping,
-            &module,
-        )
-        .unwrap();
+        let (_id, interface_text) =
+            legacy_move_compiler::interface_generator::write_module_to_string(
+                &self.compiled_module_named_address_mapping,
+                &module,
+            )
+            .unwrap();
         interface_file
             .reopen()
             .unwrap()

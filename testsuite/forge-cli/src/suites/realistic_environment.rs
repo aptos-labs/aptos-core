@@ -439,7 +439,19 @@ pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                     }
                     OnChainExecutionConfig::V4(config_v4) => {
                         config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
-                        config_v4.transaction_shuffler_type = TransactionShufflerType::SenderAwareV2(256);
+                        config_v4.transaction_shuffler_type = TransactionShufflerType::UseCaseAware {
+                            sender_spread_factor: 256,
+                            platform_use_case_spread_factor: 0,
+                            user_use_case_spread_factor: 0,
+                        };
+                    }
+                    OnChainExecutionConfig::V5(config_v5) => {
+                        config_v5.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                        config_v5.transaction_shuffler_type = TransactionShufflerType::UseCaseAware {
+                            sender_spread_factor: 256,
+                            platform_use_case_spread_factor: 0,
+                            user_use_case_spread_factor: 0,
+                        };
                     }
                 }
                 helm_values["chain"]["on_chain_execution_config"] =

@@ -18,10 +18,10 @@ use crate::{
 };
 use anyhow::{bail, Context, Result};
 use colored::Colorize;
+use legacy_move_compiler::command_line::DEFAULT_OUTPUT_DIR;
 use move_command_line_common::files::{
     extension_equals, find_filenames, find_move_filenames, FileHash, MOVE_COMPILED_EXTENSION,
 };
-use move_compiler::command_line::DEFAULT_OUTPUT_DIR;
 use move_core_types::account_address::AccountAddress;
 use move_symbol_pool::Symbol;
 use petgraph::{algo, graphmap::DiGraphMap};
