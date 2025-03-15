@@ -64,7 +64,7 @@ use std::{
         atomic::{AtomicU64, AtomicUsize, Ordering},
         Arc, RwLock, RwLockWriteGuard,
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 // Context holds application scope context
@@ -1553,6 +1553,27 @@ impl Context {
 
     pub fn simulate_txn_stats(&self) -> &FunctionStats {
         &self.simulate_txn_stats
+    }
+
+    pub fn validate_ledger_for_move_code_execution(
+        &self,
+        ledger_info: &LedgerInfo,
+    ) -> Result<(), String> {
+        let max_stale = Duration::from_secs(
+            self.node_config
+                .api
+                .max_stale_state_to_execute_move_code_on_s,
+        );
+        let duration_since_onchain_timestamp = ledger_info.duration_since_timestamp();
+        if max_stale < duration_since_onchain_timestamp {
+            Err(format!(
+                "Node is too stale ({}s > {}s limit) to be able to execute move code",
+                duration_since_onchain_timestamp.as_secs(),
+                max_stale.as_secs(),
+            ))
+        } else {
+            Ok(())
+        }
     }
 }
 
