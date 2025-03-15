@@ -3,15 +3,15 @@
 
 use crate::{assert_success, assert_vm_status, build_package, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
-use aptos_framework::{
-    BuildOptions, RuntimeModuleMetadata, RuntimeModuleMetadataV1, APTOS_METADATA_KEY,
-    APTOS_METADATA_KEY_V1,
-};
+use aptos_framework::BuildOptions;
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{FeatureFlag, OnChainConfig},
     transaction::{Script, TransactionPayload, TransactionStatus},
+    vm::module_metadata::{
+        RuntimeModuleMetadata, RuntimeModuleMetadataV1, APTOS_METADATA_KEY, APTOS_METADATA_KEY_V1,
+    },
 };
 use move_binary_format::CompiledModule;
 use move_core_types::{
