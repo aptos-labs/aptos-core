@@ -281,6 +281,13 @@ impl BlockStore {
         self.pending_blocks
             .lock()
             .gc(finality_proof.commit_info().round());
+
+        self.inner.write().update_ordered_root(block_to_commit.id());
+        self.inner
+            .write()
+            .insert_ordered_cert(finality_proof_clone.clone());
+        update_counters_for_ordered_blocks(&blocks_to_commit);
+
         // This callback is invoked synchronously with and could be used for multiple batches of blocks.
         self.execution_client
             .finalize_order(
@@ -300,12 +307,6 @@ impl BlockStore {
             )
             .await
             .expect("Failed to persist commit");
-
-        self.inner.write().update_ordered_root(block_to_commit.id());
-        self.inner
-            .write()
-            .insert_ordered_cert(finality_proof_clone.clone());
-        update_counters_for_ordered_blocks(&blocks_to_commit);
 
         Ok(())
     }
