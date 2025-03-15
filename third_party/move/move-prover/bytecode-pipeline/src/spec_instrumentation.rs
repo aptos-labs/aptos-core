@@ -1053,7 +1053,7 @@ impl<'a> Instrumenter<'a> {
             env.set_node_instantiation(node_id, vec![resource_type.to_owned()]);
             let can_modify =
                 ExpData::Call(node_id, ast::Operation::CanModify, vec![addr]).into_exp();
-            if kind == PropKind::Assert {
+            if matches!(kind, PropKind::Assert) {
                 let (mid, sid, inst) = resource_type.require_struct();
                 self.builder.set_loc_and_vc_info(
                     loc.clone(),
