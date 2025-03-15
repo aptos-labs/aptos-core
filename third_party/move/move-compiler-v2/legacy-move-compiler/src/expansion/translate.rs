@@ -10,8 +10,8 @@ use crate::{
     expansion::{
         aliases::{AliasMap, AliasSet},
         ast::{
-            self as E, Address, Fields, LValueOrDotDot_, LValue_, ModuleAccess_, ModuleIdent,
-            ModuleIdent_, SequenceItem_, SpecId,
+            self as E, AccessSpecifierKind, Address, Fields, LValueOrDotDot_, LValue_,
+            ModuleAccess_, ModuleIdent, ModuleIdent_, SequenceItem_, SpecId,
         },
         byte_string, hex_string,
     },
@@ -29,7 +29,6 @@ use crate::{
     },
     FullyCompiledProgram,
 };
-use move_binary_format::file_format;
 use move_command_line_common::parser::{parse_u16, parse_u256, parse_u32};
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
@@ -1679,21 +1678,21 @@ fn access_specifier(context: &mut Context, specifier: P::AccessSpecifier) -> E::
     let (negated, kind, chain, type_args, address) = match specifier.value {
         AccessSpecifier_::Acquires(negated, chain, type_args, address) => (
             negated,
-            file_format::AccessKind::Acquires,
+            AccessSpecifierKind::LegacyAcquires,
             chain,
             type_args,
             address,
         ),
         AccessSpecifier_::Reads(negated, chain, type_args, address) => (
             negated,
-            file_format::AccessKind::Reads,
+            AccessSpecifierKind::Reads,
             chain,
             type_args,
             address,
         ),
         AccessSpecifier_::Writes(negated, chain, type_args, address) => (
             negated,
-            file_format::AccessKind::Writes,
+            AccessSpecifierKind::Writes,
             chain,
             type_args,
             address,

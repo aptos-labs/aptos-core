@@ -22,14 +22,14 @@ move-errmapgen = { workspace = true }
 move-model = { workspace = true }
 move-prover-boogie-backend = { workspace = true }
 move-prover-bytecode-pipeline = { workspace = true }
-move-stackless-bytecode  = { workspace = true }
+move-stackless-bytecode = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 simplelog = { workspace = true }
 toml = { workspace = true }
 
 [dev-dependencies]
-datatest-stable = { workspace = true }
+libtest-mimic = { workspace = true }
 move-prover-test-utils = { workspace = true }
 shell-words = { workspace = true }
 tempfile = { workspace = true }

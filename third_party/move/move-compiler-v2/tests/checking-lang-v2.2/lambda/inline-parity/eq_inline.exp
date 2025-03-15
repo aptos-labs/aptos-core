@@ -1,0 +1,34 @@
+
+Diagnostics:
+warning: Unused parameter `f`. Consider removing or prefixing with an underscore: `_f`
+  ┌─ tests/checking-lang-v2.2/lambda/inline-parity/eq_inline.move:3:13
+  │
+3 │     fun foo(f: |&u64| has drop) {
+  │             ^
+
+// -- Model dump before bytecode pipeline
+module 0x42::m {
+    private fun foo(f: |&u64|) {
+        Tuple()
+    }
+    private fun g() {
+        m::foo(closure#0m::__lambda__1__g());
+        Tuple()
+    }
+    private fun __lambda__1__g(v: &u64) {
+        Eq<u64>(v, Borrow(Immutable)(1));
+        Tuple()
+    }
+} // end 0x42::m
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::m {
+    fun foo(f: |&u64|) {
+    }
+    fun g() {
+        foo(|arg0| __lambda__1__g(arg0));
+    }
+    fun __lambda__1__g(v: &u64) {
+        v == &1;
+    }
+}

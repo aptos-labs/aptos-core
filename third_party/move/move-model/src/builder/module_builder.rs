@@ -3575,6 +3575,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 params: entry.params.clone(),
                 result_type: entry.result_type.clone(),
                 access_specifiers,
+                acquired_structs: None,
                 spec: spec.into(),
                 def,
                 called_funs,

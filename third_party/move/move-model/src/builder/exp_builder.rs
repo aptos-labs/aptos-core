@@ -4,9 +4,9 @@
 
 use crate::{
     ast::{
-        AccessSpecifier, Address, AddressSpecifier, Exp, ExpData, LambdaCaptureKind, MatchArm,
-        ModuleName, Operation, Pattern, QualifiedSymbol, QuantKind, ResourceSpecifier,
-        RewriteResult, Spec, TempIndex, Value,
+        AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Exp, ExpData,
+        LambdaCaptureKind, MatchArm, ModuleName, Operation, Pattern, QualifiedSymbol, QuantKind,
+        ResourceSpecifier, RewriteResult, Spec, TempIndex, Value,
     },
     builder::{
         model_builder::{
@@ -35,7 +35,6 @@ use legacy_move_compiler::{
     parser::ast::{self as PA, CallKind, Field},
     shared::{unique_map::UniqueMap, Identifier, Name},
 };
-use move_binary_format::file_format::{self};
 use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
@@ -1086,21 +1085,25 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             type_args,
             address,
         } = &specifier.value;
-        if *kind != file_format::AccessKind::Acquires {
-            self.check_language_version(
-                &loc,
-                "read/write access specifiers. Try `acquires` instead.",
-                LanguageVersion::V2_0,
-            )?;
-        } else if *negated {
-            self.check_language_version(&loc, "access specifier negation", LanguageVersion::V2_0)?;
-        } else if type_args.is_some() && !type_args.as_ref().unwrap().is_empty() {
-            self.check_language_version(
-                &loc,
-                "access specifier type instantiation. Try removing the type instantiation.",
-                LanguageVersion::V2_0,
-            )?;
-        };
+        match kind {
+            EA::AccessSpecifierKind::LegacyAcquires => {
+                if *negated || type_args.is_some() || address.value != EA::AddressSpecifier_::Empty
+                {
+                    self.error(
+                        &loc,
+                        "only simple resource names can be used with `acquires`",
+                    )
+                }
+            },
+            EA::AccessSpecifierKind::Reads | EA::AccessSpecifierKind::Writes => {
+                self.check_language_version(
+                    &loc,
+                    "read/write access specifiers.",
+                    // TODO: should we move this into 2.3?
+                    LanguageVersion::V2_2,
+                )?;
+            },
+        }
         let resource = match (module_address, module_name, resource_name) {
             (None, None, None) => {
                 // This stems from a  specifier of the form `acquires *(0x1)`
@@ -1195,9 +1198,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             )?;
         };
         let address = self.translate_address_specifier(address)?;
+        let kind = match kind {
+            EA::AccessSpecifierKind::Reads => AccessSpecifierKind::Reads,
+            EA::AccessSpecifierKind::Writes => AccessSpecifierKind::Writes,
+            EA::AccessSpecifierKind::LegacyAcquires => AccessSpecifierKind::LegacyAcquires,
+        };
         Some(AccessSpecifier {
             loc: loc.clone(),
-            kind: *kind,
+            kind,
             negated: *negated,
             resource: (loc, resource),
             address,
