@@ -3,7 +3,9 @@
 
 use anyhow::Result;
 use aptos_config::config::RocksdbConfig;
-use aptos_db_indexer_schemas::schema::{column_families, internal_indexer_column_families};
+use aptos_db_indexer_schemas::schema::{
+    column_families, gen_internal_indexer_cfds, internal_indexer_column_families,
+};
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::DB;
 use std::{mem, path::Path};
@@ -24,11 +26,11 @@ pub fn open_internal_indexer_db<P: AsRef<Path>>(
     db_path: P,
     rocksdb_config: &RocksdbConfig,
 ) -> Result<DB> {
-    Ok(DB::open(
+    Ok(DB::open_cf(
+        &gen_rocksdb_options(rocksdb_config, false),
         db_path,
         INTERNAL_INDEXER_DB_NAME,
-        internal_indexer_column_families(),
-        &gen_rocksdb_options(rocksdb_config, false),
+        gen_internal_indexer_cfds(rocksdb_config, internal_indexer_column_families()),
     )?)
 }
 
