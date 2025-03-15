@@ -90,7 +90,7 @@ pub type AtomicVersion = AtomicU64;
 pub enum Auth<'a> {
     Ed25519(&'a Ed25519PrivateKey),
     Abstraction(FunctionInfo, Arc<dyn Fn(&[u8]) -> Vec<u8>>),
-    DomainAbstraction {
+    DerivableAbstraction {
         function_info: FunctionInfo,
         account_identity: Vec<u8>,
         sign_function: Arc<dyn Fn(&[u8]) -> Vec<u8>>,
@@ -453,14 +453,14 @@ fn gen_auth(
                 sign_function(digest.as_ref()),
             )
         },
-        Auth::DomainAbstraction {
+        Auth::DerivableAbstraction {
             function_info,
             account_identity,
             sign_function,
         } => {
             let digest =
                 HashValue::sha3_256_of(signing_message(user_signed_message)?.as_slice()).to_vec();
-            AccountAuthenticator::domain_abstraction(
+            AccountAuthenticator::derivable_abstraction(
                 function_info.clone(),
                 digest.clone(),
                 sign_function(digest.as_ref()),
