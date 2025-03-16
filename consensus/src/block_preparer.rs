@@ -50,12 +50,8 @@ impl BlockPreparer {
         block_qc_fut: Shared<impl Future<Output = Option<Arc<QuorumCert>>>>,
     ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>, Option<u64>)> {
         let mut all_txns = vec![];
-        let pipelined_blocks = if let Some(block_window) = block_window {
-            if self.is_execution_pool_enabled {
-                block_window.pipelined_blocks()
-            } else {
-                vec![]
-            }
+        let pipelined_blocks = if self.is_execution_pool_enabled {
+            block_window.map_or(vec![], |window| window.pipelined_blocks())
         } else {
             vec![]
         };
@@ -87,17 +83,9 @@ impl BlockPreparer {
             }
         }?;
 
-        loop {
-            match futures.next().await {
-                // max_txns is taken from the current block, not the block window
-                Some(Ok((block_txns, _max_txns, _gas_limit))) => {
-                    all_txns.extend(block_txns);
-                },
-                Some(Err(e)) => {
-                    return Err(e);
-                },
-                None => break,
-            }
+        while let Some(result) = futures.next().await {
+            let (block_txns, _max_txns, _gas_limit) = result?;
+            all_txns.extend(block_txns);
         }
         all_txns.extend(txns);
         Ok((all_txns, max_txns_from_block_to_execute, block_gas_limit))

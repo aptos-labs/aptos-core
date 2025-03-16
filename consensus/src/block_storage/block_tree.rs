@@ -31,8 +31,6 @@ use std::{
 
 /// This structure is a wrapper of [`ExecutedBlock`](aptos_consensus_types::pipelined_block::PipelinedBlock)
 /// that adds `children` field to know the parent-child relationship between blocks.
-// TODO: remove debug
-#[derive(Debug)]
 struct LinkableBlock {
     /// Executed block that has raw block data and execution output.
     executed_block: Arc<PipelinedBlock>,
