@@ -145,7 +145,7 @@ struct K8sSwarm {
     enable_indexer: bool,
     #[clap(
         long,
-        help = "The deployer profile used to spin up and configure forge infrastructure",
+        help = "The deployer profile used to spin up and configure forge infrastructure test",
         default_value = &DEFAULT_FORGE_DEPLOYER_PROFILE,
     )]
     deployer_profile: String,
