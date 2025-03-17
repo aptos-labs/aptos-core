@@ -17,6 +17,56 @@ use std::sync::{
 };
 
 /**
+
+============================== Lifecycle of a Status ==============================
+Each transaction status contains an incarnation number, starting with 0, and goes
+through the following lifecycle:
+- In the beginning status is pending scheduling, which, as the name suggests, means
+the transaction is ready to be picked up by the (BlockSTMv2) scheduler.
+- When the scheduler picks up a transaction in pending scheduling status, it changes
+the status to Executing via the try_start_executing method.
+
+An incarnation of a transaction may be aborted if its execution made a read that was
+later invalidated due to concurrency, whereby the abort signifies the need to perform
+another execution - with an incremented incarnation number (that will hopefully read
+the correct information and produce output consistent with the sequential execution
+of all transactions). In BlockSTMv2, a transaction may be aborted while executing, or
+after it has finished execution. The abort process occurs in two stages:
+
+First, try_abort is called with an incarnation number, which succeeds as long as the
+incarnation (has started executing and) has not already try_abort-ed. In other words,
+try_abort acts as a cheap test-and-set / leader election filter for all abort attempts
+(of which there can be many as each transaction makes multiple distinct reads that can
+each be invalidated by different transactions). Having explicit try_abort step that is
+performed early is also useful as an optimization when the aborted incarnation has
+an ongoing execution, as it already allows ongoing execution to stop (instead of
+spending more time on the execution that is destined to be aborted).
+
+The caller of a successful try_abort is required to follow up with a finish_abort call.
+However, the main reason as to why the original successful try_abort call does not
+perform the finish_abort logic is not in the implementation of finish_abort itself,
+but in the way the aborts happen. When transaction T1 successfully try_aborts
+transaction T2 > T1, it makes sense that:
+(1) T2 stops executing ASAP, if applicable.
+(2) Any subsequent scheduling, processing, execution of T2 may wait until T1 finishes
+execution, as T1's execution is higher priority (lower index), and moreso since T2's
+execution was already aborted due to T1's effects.
+(3) After T1's execution is finished, the worker can do all the post-processing for
+its try_aborts in a batch (including non-successful ones, as BlockSTMv2 scheduler may
+want to record the dependency that could have aborted T2, if wasn't already aborted
+due to some other dependency): this includes calling finish_abort, dependency tracking,
+stall (see below) propagation to appropriate transactions, etc.
+
+When transaction execution is finished (even if it as a result of being aborted while
+executing), finish_execution is called on the status. If the status was Aborted, it
+is updated to PendingScheduling, while if the status is Executing, it is updated to
+Executed. Finishing an abort changes the status to Aborted from Executing, and to
+PendingScheduling from Executed (i.e. both finishing an abort and execution is needed
+to be eligible for scheduling for re-execution). The status transition diagram is also
+provided with the comments of ExecutionStatus / inner_status below.
+
+
+================================= Stall Mechanism =================================
 In BlockSTMv2 scheduler, a transaction (or we may also say its respective status)
 can be `stalled', which means there have been more add_stall than remove_stall calls
 on its status. A successful call to the add_stall method requires a commitment from
@@ -38,7 +88,8 @@ limiting the impact of cascading aborts.
 The mechanism is best-effort, i.e. the caller can decide to incarnate / re-execute a
 transaction even in the stalled state, which can be useful e.g. if the transaction has a
 high enough priority (proximity to the committed prefix). The best-effort nature also
-allows for a more relaxed handling of different concurrency scenarios.
+allows for a more relaxed handling of various concurrency scenarios.
+
 **/
 
 // Integer flag values stored in an atomic variable to allow lock-free reads. The flag is
@@ -160,9 +211,18 @@ impl InnerStatus {
 }
 
 pub(crate) struct ExecutionStatus {
+    // This counter is monotonically increasing, updated in a successful try_abort and allows
+    // filtering the fanned out abort attempts: in BlockSTMv2, multiple workers executing
+    // different transactions may all invalidate different reads of the same transaction and
+    // attempt aborting it. Hence, only one of these will succeed and perform the required
+    // processing for an abort. next_incarnation_to_try_abort information is also used to stop
+    // executing a transaction that already (concurrently) got aborted.
+    next_incarnation_to_try_abort: AtomicU32,
+
     // Synchronizes the writes to incarnation and inner status, as well as changes that affect
     // the dependency shortcut (e.g. when the number of stalls becomes 0 or >0). The dependency
-    // shortcut and the number of stalls are separate atomic variables to allow lock-free reads.
+    // shortcut and the number of stalls are separate atomic variables to allow certain
+    // operations to go lock-free.
     //
     // Inner status transition diagram:
     //
@@ -173,14 +233,18 @@ pub(crate) struct ExecutionStatus {
     //     ↓              finish_execution
     // Executing(i) ---------------------------> Executed(i)
     //     |                                          |
-    //     | try_abort(i)                             | try_abort(i)
+    //     | finish_abort(i)                          | finish_abort(i)
     //     |                                          |
     //     ↓           finish_execution               ↓
     // Aborted(i) ---------------------------> PendingScheduling(i+1)
     //
     inner_status: CachePadded<Mutex<InnerStatus>>,
 
-    // It is guaranteed that each stall has a corresponding remove_stall, which occurs later.
+    // It is guaranteed that each add_stall has a corresponding remove_stall, which occurs later,
+    // whereby add_stall increments num_stalls (by 1), and remove_stall decrements num_stalls.
+    // The status is considered 'stalled' when num_stalls > 0, and 'not stalled' otherwise. We
+    // say the status becomes stalled when num_stalled gets incremented from 0, and unstalled
+    // when it is decremented (back) to 0.
     num_stalls: CachePadded<AtomicU32>,
 
     // Precomputated often-evaluated predicate provides a lock-free common path for the caller
@@ -190,10 +254,6 @@ pub(crate) struct ExecutionStatus {
     // between resolve dependency & finish_execution, relies on ordering with respect to the
     // waiting_queue mutex (below) acquisitions as well.
     dependency_shortcut: AtomicU8,
-    // Abort incarnation shortcut is monotonically increasing, updated after an abort (unlike the
-    // inner status, which gets incremented at PendingScheduling), and allows lock-free fast-path
-    // for outdated aborts (on an already aborted version).
-    abort_incarnation_shortcut: AtomicU32,
 
     // waiting queue is tied to the dependency shortcut. If a dependency resolution is to
     // wait, then a new condvar is stored in the queue and returned to the caller. When the
@@ -215,10 +275,10 @@ pub(crate) struct ExecutionStatus {
 impl ExecutionStatus {
     pub(crate) fn new(scheduler_proxy: Arc<SchedulerProxy>, txn_idx: TxnIndex) -> Self {
         Self {
+            next_incarnation_to_try_abort: AtomicU32::new(0),
             inner_status: CachePadded::new(Mutex::new(InnerStatus::new())),
             num_stalls: CachePadded::new(AtomicU32::new(0)),
             dependency_shortcut: AtomicU8::new(DEPENDENCY_DEFER_FLAG),
-            abort_incarnation_shortcut: AtomicU32::new(0),
             waiting_queue: CachePadded::new(Mutex::new((Vec::new(), false))),
             scheduler_proxy,
             txn_idx,
@@ -306,36 +366,46 @@ impl ExecutionStatus {
         }
     }
 
-    // Returns whether the abort succeeded (the first try_abort), or PanicError.
-    pub(crate) fn try_abort(&self, aborted_incarnation: Incarnation) -> Result<bool, PanicError> {
-        if self.shortcut_already_aborted(aborted_incarnation) {
-            // Shortcut path: already aborted.
-            return Ok(false);
+    pub(crate) fn try_abort(&self, incarnation: Incarnation) -> Result<bool, PanicError> {
+        let prev_value = self
+            .next_incarnation_to_try_abort
+            .fetch_max(incarnation + 1, Ordering::Relaxed);
+        if incarnation < prev_value {
+            Ok(false)
+        } else if incarnation == prev_value {
+            Ok(true)
+        } else {
+            assert!(incarnation > prev_value);
+            Err(code_invariant_error(format!(
+                "Try abort incarnation {} > self.next_incarnation_to_try_abort = {}",
+                incarnation, prev_value,
+            )))
+        }
+    }
+
+    // Must be performed as a follow-up to a successful try_abort.
+    pub(crate) fn finish_abort(&self, aborted_incarnation: Incarnation) -> Result<(), PanicError> {
+        let new_incarnation = aborted_incarnation + 1;
+        if self.next_incarnation_to_try_abort.load(Ordering::Relaxed) != new_incarnation {
+            // The caller must have already successfully performed a try_abort, while
+            // higher incarnation may not have started until the abort finished (here).
+            return Err(code_invariant_error(format!(
+                "Finish abort of incarnation {}, self.next_incarnation_to_try_abort = {}",
+                aborted_incarnation,
+                self.next_incarnation_to_try_abort.load(Ordering::Relaxed),
+            )));
         }
 
         {
             let inner_status = &mut *self.inner_status.lock();
-            if inner_status.already_aborted(aborted_incarnation) {
-                return Ok(false);
-            }
-            if inner_status.never_started_execution(aborted_incarnation) {
+            if inner_status.already_aborted(aborted_incarnation)
+                || inner_status.never_started_execution(aborted_incarnation)
+            {
                 return Err(code_invariant_error(format!(
-                    "Try abort of incarnation {}, but inner status {:?}",
+                    "Finish abort of incarnation {}, but inner status {:?}",
                     aborted_incarnation, inner_status
                 )));
             }
-
-            let new_incarnation = aborted_incarnation + 1;
-            let prev_shortcut = self
-                .abort_incarnation_shortcut
-                .swap(new_incarnation, Ordering::Relaxed);
-            // Assert (not PanicError) due to the earlier checks under lock above.
-            assert!(
-                new_incarnation > prev_shortcut,
-                "New abort incarnation shortcut {} must be > {} (previous)",
-                new_incarnation,
-                prev_shortcut,
-            );
 
             match inner_status.status {
                 StatusEnum::Executing => {
@@ -346,20 +416,20 @@ impl ExecutionStatus {
                         DEPENDENCY_EXECUTING_FLAG,
                         "Incorrect dependency shortcut flag in finish execution"
                     );
-                    Ok(true)
                 },
                 StatusEnum::Executed => {
                     self.incarnate(inner_status, new_incarnation);
-                    Ok(true)
                 },
                 StatusEnum::PendingScheduling | StatusEnum::Aborted => {
-                    Err(code_invariant_error(format!(
+                    return Err(code_invariant_error(format!(
                         "Status update to Aborted failed, previous inner status {:?}",
                         inner_status
-                    )))
+                    )));
                 },
             }
         }
+
+        Ok(())
     }
 
     // Wake up any suspended workers and disallow further waiting. Useful when the scheduler
@@ -567,9 +637,11 @@ impl ExecutionStatus {
         self.inner_status.lock().incarnation()
     }
 
-    // Optimistic check based on the shortuct (has the incarnation already been aborted?).
-    pub(crate) fn shortcut_already_aborted(&self, incarnation: Incarnation) -> bool {
-        self.abort_incarnation_shortcut.load(Ordering::Relaxed) > incarnation
+    // Check that can be invoked during an ongoing execution, of whether a try_abort for its
+    // incarnation has already occured. In this case, it is guaranteed that the execution
+    // results will be discarded, and the caller may e.g. decide to return earlier.
+    pub(crate) fn already_try_aborted(&self, incarnation: Incarnation) -> bool {
+        self.next_incarnation_to_try_abort.load(Ordering::Relaxed) > incarnation
     }
 }
 
@@ -642,7 +714,7 @@ impl ExecutionStatus {
             inner_status: CachePadded::new(Mutex::new(inner_status)),
             num_stalls: CachePadded::new(AtomicU32::new(num_stalls)),
             dependency_shortcut: AtomicU8::new(shortcut),
-            abort_incarnation_shortcut: AtomicU32::new(incarnation),
+            next_incarnation_to_try_abort: AtomicU32::new(incarnation),
             waiting_queue: CachePadded::new(Mutex::new((Vec::new(), false))),
             scheduler_proxy: proxy.clone(),
             txn_idx,
@@ -677,7 +749,7 @@ mod tests {
             exp_dependency_shortcut,
         );
         assert_eq!(
-            status.abort_incarnation_shortcut.load(Ordering::Relaxed),
+            status.next_incarnation_to_try_abort.load(Ordering::Relaxed),
             exp_incarnation
         );
         assert_eq!(status.waiting_queue.lock().0.len(), 0);
@@ -756,16 +828,16 @@ mod tests {
         // Compatible with start (incompatible with abort and finish).
         for i in [0, 2] {
             assert_err!(status.finish_execution(i));
-            assert_err!(status.try_abort(i));
+            assert_err!(status.finish_abort(i));
         }
         assert_some_eq!(status.try_start_executing(), 0);
 
         assert_eq!(status.inner_status.lock().status, StatusEnum::Executing);
         assert_simple_status_state(&status, 0, 0, DEPENDENCY_EXECUTING_FLAG);
 
-        // Compatible with finish(0) & try_abort(0) only. Here, we test finish.
+        // Compatible with finish(0) & finish_abort(0) only. Here, we test finish.
         assert_none!(status.try_start_executing());
-        assert_err!(status.try_abort(1));
+        assert_err!(status.finish_abort(1));
         assert_err!(status.finish_execution(1));
         if stall_before_finish {
             assert_ok_eq!(status.add_stall(), true);
@@ -788,10 +860,11 @@ mod tests {
         assert_none!(status.try_start_executing());
         assert_err!(status.finish_execution(0));
         assert_err!(status.finish_execution(1));
-        assert_err!(status.try_abort(1));
+        assert_err!(status.finish_abort(1));
 
         proxy.assert_execution_queue(&vec![]);
         assert_ok_eq!(status.try_abort(0), true);
+        assert_ok!(status.finish_abort(0));
         if stall_before_finish {
             // Not rescheduled - deferred for remove_stall.
             proxy.assert_execution_queue(&vec![]);
@@ -809,7 +882,7 @@ mod tests {
         let status = ExecutionStatus::new(proxy.clone(), txn_idx);
         *status.inner_status.lock() = InnerStatus::new_for_test(StatusEnum::PendingScheduling, 5);
         status
-            .abort_incarnation_shortcut
+            .next_incarnation_to_try_abort
             .store(5, Ordering::Relaxed);
         assert_simple_status_state(&status, 0, 5, DEPENDENCY_DEFER_FLAG);
 
@@ -817,11 +890,12 @@ mod tests {
         for i in 0..5 {
             // Outdated call.
             assert_ok_eq!(status.try_abort(i), false);
+            assert_err!(status.finish_abort(i));
             // Must have been called already to get to incarnation 5.
             assert_err!(status.finish_execution(i));
             // Impossible calls before 5 has even started execution.
             assert_err!(status.finish_execution(5 + i));
-            assert_err!(status.try_abort(5 + i));
+            assert_err!(status.finish_abort(5 + i));
         }
         assert_some_eq!(status.try_start_executing(), 5);
 
@@ -831,16 +905,19 @@ mod tests {
         );
         assert_simple_status_state(&status, 0, 5, DEPENDENCY_EXECUTING_FLAG);
 
-        // Compatible with finish(5) & try_abort(5) only. Here, we test abort.
+        // Compatible with finish(5) & finish_abort(5) only. Here, we test abort.
         assert_none!(status.try_start_executing());
         assert_ok_eq!(status.try_abort(4), false);
+        assert_err!(status.finish_abort(4));
         assert_err!(status.finish_execution(4));
         assert_err!(status.finish_execution(6));
-        assert_err!(status.try_abort(6));
+        assert_err!(status.finish_abort(6));
 
-        assert_eq!(status.abort_incarnation_shortcut.load(Ordering::Relaxed), 5);
+        assert_eq!(status.next_incarnation_to_try_abort.load(Ordering::Relaxed), 5);
         assert_ok_eq!(status.try_abort(5), true);
-        assert_eq!(status.abort_incarnation_shortcut.load(Ordering::Relaxed), 6);
+        assert_eq!(status.next_incarnation_to_try_abort.load(Ordering::Relaxed), 6);
+        assert_ok!(status.finish_abort(5));
+        assert_eq!(status.next_incarnation_to_try_abort.load(Ordering::Relaxed), 6);
         assert_eq!(status.inner_status.lock().incarnation(), 5);
         // Not re-scheduled because finish_execution has not happened.
         proxy.assert_execution_queue(&vec![]);
@@ -852,14 +929,17 @@ mod tests {
         // Compatible w. finish_execution(5) only.
         assert_none!(status.try_start_executing());
         assert_ok_eq!(status.try_abort(5), false);
+        assert_err!(status.finish_abort(5));
         assert_err!(status.finish_execution(4));
         assert_err!(status.finish_execution(6));
-        assert_err!(status.try_abort(6));
+        assert_err!(status.finish_abort(6));
 
         if stall_before_finish {
             assert_ok_eq!(status.add_stall(), true);
         }
         // Finish execution from aborted, must return Ok(false).
+        assert_ok_eq!(status.try_abort(5), false);
+        assert_err!(status.finish_abort(5));
         assert_ok_eq!(status.finish_execution(5), false);
         assert_eq!(status.inner_status.lock().incarnation(), 6);
 
@@ -925,6 +1005,7 @@ mod tests {
 
             if finish_scenario == 0 {
                 assert_ok_eq!(status.try_abort(5), true);
+                assert_ok!(status.finish_abort(5));
             }
             assert_eq!(status.waiting_queue.lock().0.len(), 2);
             assert!(!status.waiting_queue.lock().1);
@@ -1320,7 +1401,7 @@ mod tests {
             );
             assert!(!status.pending_scheduling_and_not_stalled());
 
-            let new_incarnation = status.abort_incarnation_shortcut.load(Ordering::Relaxed) + 1;
+            let new_incarnation = status.next_incarnation_to_try_abort.load(Ordering::Relaxed) + 1;
             status.incarnate(&mut *status.inner_status.lock(), new_incarnation);
 
             assert_eq!(status.inner_status.lock().incarnation(), new_incarnation);
