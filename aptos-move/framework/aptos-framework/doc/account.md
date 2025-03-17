@@ -1307,6 +1307,13 @@ is returned. This way, the caller of this function can publish additional resour
 
 ## Function `resource_exists_at`
 
+Returns whether an Account resource exists at <code>addr</code>.
+
+Unlike <code>exists_at</code>, this function strictly checks for the presence of the Account resource,
+regardless of the <code>default_account_resource</code> feature flag.
+
+This is useful for operations that specifically need to know if the Account resource
+has been created, rather than just whether the address can be treated as an account.
 
 
 <pre><code><b>fun</b> <a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(addr: <b>address</b>): bool
@@ -2537,6 +2544,16 @@ create the account for system reserved addresses
 ## Function `create_guid`
 
 GUID management methods.
+Creates a new GUID for <code>account_signer</code> and increments the GUID creation number.
+
+When the <code>default_account_resource</code> feature flag is enabled:
+- If no Account resource exists, one will be created automatically
+- This ensures consistent GUID creation behavior for all addresses
+
+When the feature flag is disabled:
+- Aborts if no Account resource exists
+
+Aborts if the maximum number of GUIDs has been reached (0x4000000000000)
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_create_guid">create_guid</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <a href="guid.md#0x1_guid_GUID">guid::GUID</a>
@@ -2569,7 +2586,10 @@ GUID management methods.
 
 ## Function `new_event_handle`
 
-GUID management methods.
+Creates a new event handle for <code><a href="account.md#0x1_account">account</a></code>.
+
+This is a wrapper around <code>create_guid</code> that creates an EventHandle,
+inheriting the same behavior regarding account existence and feature flags.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_new_event_handle">new_event_handle</a>&lt;T: drop, store&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;
