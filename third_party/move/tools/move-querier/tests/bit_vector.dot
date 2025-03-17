@@ -1,0 +1,13 @@
+digraph {
+    0 [ label = "0" label="0x1::bit_vector::length", shape=box, color=blue]
+    1 [ label = "1" label="0x1::bit_vector::is_index_set", shape=box, color=blue]
+    2 [ label = "2" label="0x1::bit_vector::longest_set_sequence_starting_at", shape=box, color=blue]
+    3 [ label = "3" label="0x1::bit_vector::new", shape=box, color=blue]
+    4 [ label = "4" label="0x1::bit_vector::set", shape=box, color=blue]
+    5 [ label = "5" label="0x1::bit_vector::shift_left", shape=box, color=blue]
+    6 [ label = "6" label="0x1::bit_vector::unset", shape=box, color=blue]
+    2 -> 1 [ label = "\"\"" label=""]
+    5 -> 1 [ label = "\"\"" label=""]
+    5 -> 4 [ label = "\"\"" label=""]
+    5 -> 6 [ label = "\"\"" label=""]
+}

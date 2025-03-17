@@ -20,7 +20,7 @@ use crate::{
     },
     governance::CompileScriptFunction,
     move_tool::{
-        bytecode::{Decompile, Disassemble},
+        bytecode::{Decompile, Disassemble, Query},
         coverage::SummaryCoverage,
         fmt::Fmt,
         lint::LintPackage,
@@ -123,6 +123,7 @@ pub enum MoveTool {
     Prove(ProvePackage),
     #[clap(alias = "deploy")]
     Publish(PublishPackage),
+    Query(Query),
     Run(RunFunction),
     RunScript(RunScript),
     Simulate(Simulate),
@@ -161,6 +162,7 @@ impl MoveTool {
             MoveTool::List(tool) => tool.execute_serialized().await,
             MoveTool::Prove(tool) => tool.execute_serialized().await,
             MoveTool::Publish(tool) => tool.execute_serialized().await,
+            MoveTool::Query(tool) => tool.execute_serialized().await,
             MoveTool::Run(tool) => tool.execute_serialized().await,
             MoveTool::RunScript(tool) => tool.execute_serialized().await,
             MoveTool::Simulate(tool) => tool.execute_serialized().await,

@@ -1,0 +1,5 @@
+digraph {
+    0 [ label = "0" label="0xc0ffee::m::foo", shape=box, color=blue]
+    1 [ label = "1" label="0xc0ffee::n::bar", shape=box, color=blue]
+    1 -> 0 [ label = "\"\"" label=""]
+}
