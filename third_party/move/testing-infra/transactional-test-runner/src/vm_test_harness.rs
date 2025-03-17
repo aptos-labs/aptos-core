@@ -287,16 +287,15 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
         let verbose = extra_args.verbose;
 
-        let result = {
-            let func = code_storage.load_script(&script_bytes, &type_args)?;
-            self.execute_loaded_function(func, args, gas_budget, &code_storage)
-        };
-        result.map_err(|vm_error| {
-            anyhow!(
-                "Script execution failed with VMError: {}",
-                vm_error.format_test_output(move_test_debug() || verbose)
-            )
-        })?;
+        code_storage
+            .load_script(&script_bytes, &type_args)
+            .and_then(|func| self.execute_loaded_function(func, args, gas_budget, &code_storage))
+            .map_err(|err| {
+                anyhow!(
+                    "Script execution failed with VMError: {}",
+                    err.format_test_output(move_test_debug() || verbose)
+                )
+            })?;
         Ok(None)
     }
 
@@ -329,16 +328,15 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
         let verbose = extra_args.verbose;
 
-        let result = {
-            let func = module_storage.load_function(module, function, &type_args)?;
-            self.execute_loaded_function(func, args, gas_budget, &module_storage)
-        };
-        let serialized_return_values = result.map_err(|vm_error| {
-            anyhow!(
-                "Function execution failed with VMError: {}",
-                vm_error.format_test_output(move_test_debug() || verbose)
-            )
-        })?;
+        let serialized_return_values = module_storage
+            .load_function(module, function, &type_args)
+            .and_then(|func| self.execute_loaded_function(func, args, gas_budget, &module_storage))
+            .map_err(|err| {
+                anyhow!(
+                    "Function execution failed with VMError: {}",
+                    err.format_test_output(move_test_debug() || verbose)
+                )
+            })?;
         Ok((None, serialized_return_values))
     }
 
