@@ -14,7 +14,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVm, session::SerializedReturnValues, AsUnsyncModuleStorage,
+    module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues, AsUnsyncModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -96,7 +96,7 @@ fn run(
     let mut storage = InMemoryStorage::new();
     compile_modules(&mut storage, &modules);
 
-    let mut session = MoveVm::new_session(&storage);
+    let mut session = MoveVM::new_session(&storage);
 
     let fun_name = Identifier::new(fun_name).unwrap();
     let traversal_storage = TraversalStorage::new();

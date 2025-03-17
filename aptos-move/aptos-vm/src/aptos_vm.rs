@@ -247,14 +247,14 @@ fn is_approved_gov_script(
     }
 }
 
-pub struct AptosVm {
+pub struct AptosVM {
     is_simulation: bool,
     move_vm: MoveVmExt,
     /// For a new chain, or even mainnet, the VK might not necessarily be set.
     pvk: Option<PreparedVerifyingKey<Bn254>>,
 }
 
-impl AptosVm {
+impl AptosVM {
     /// Creates a new VM instance based on the runtime environment. The VM can then be used by
     /// block executor to create multiple tasks sharing the same execution configurations extracted
     /// from the environment.
@@ -630,7 +630,7 @@ impl AptosVm {
                 };
 
                 let fee_statement =
-                    AptosVm::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
+                    AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
 
                 // Verify we charged sufficiently for creating an account slot
                 let gas_params = self.gas_params(log_context)?;
@@ -660,7 +660,7 @@ impl AptosVm {
                 (abort_hook_session_change_set, fee_statement)
             } else {
                 let fee_statement =
-                    AptosVm::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
+                    AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
                 (prologue_session_change_set, fee_statement)
             };
 
@@ -725,7 +725,7 @@ impl AptosVm {
             }
         }
 
-        let fee_statement = AptosVm::fee_statement_from_gas_meter(
+        let fee_statement = AptosVM::fee_statement_from_gas_meter(
             txn_data,
             gas_meter,
             u64::from(epilogue_session.get_storage_fee_refund()),
@@ -2420,7 +2420,7 @@ impl AptosVm {
         max_gas_amount: u64,
     ) -> ViewFunctionOutput {
         let env = AptosEnvironment::new(state_view);
-        let vm = AptosVm::new(&env, state_view);
+        let vm = AptosVM::new(&env, state_view);
 
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
@@ -2476,7 +2476,7 @@ impl AptosVm {
 
     fn execute_view_function_in_vm(
         session: &mut SessionExt,
-        vm: &AptosVm,
+        vm: &AptosVM,
         module_id: ModuleId,
         func_name: Identifier,
         type_args: Vec<TypeTag>,
@@ -2814,9 +2814,9 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let config = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
-                concurrency_level: AptosVm::get_concurrency_level(),
+                concurrency_level: AptosVM::get_concurrency_level(),
                 allow_fallback: true,
-                discard_failed_blocks: AptosVm::get_discard_failed_blocks(),
+                discard_failed_blocks: AptosVM::get_discard_failed_blocks(),
                 module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
             },
             onchain: onchain_config,
@@ -2841,7 +2841,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         let ret = sharded_block_executor.execute_block(
             state_view,
             transactions,
-            AptosVm::get_concurrency_level(),
+            AptosVM::get_concurrency_level(),
             onchain_config,
         );
         if ret.is_ok() {
@@ -2852,7 +2852,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
     }
 }
 
-impl VMValidator for AptosVm {
+impl VMValidator for AptosVM {
     /// Determine if a transaction is valid. Will return `None` if the transaction is accepted,
     /// `Some(Err)` if the VM rejects it, with `Err` as an error code. Verification performs the
     /// following steps:
@@ -2987,9 +2987,9 @@ impl VMValidator for AptosVm {
 }
 
 // Ensure encapsulation of AptosVM APIs by using a wrapper.
-pub struct AptosSimulationVm;
+pub struct AptosSimulationVM;
 
-impl AptosSimulationVm {
+impl AptosSimulationVM {
     /// Simulates a signed transaction (i.e., executes it without performing
     /// signature verification) on a newly created VM instance.
     /// *Precondition:* the transaction must **not** have a valid signature.
@@ -3003,7 +3003,7 @@ impl AptosSimulationVm {
         );
 
         let env = AptosEnvironment::new(state_view);
-        let mut vm = AptosVm::new(&env, state_view);
+        let mut vm = AptosVM::new(&env, state_view);
         vm.is_simulation = true;
 
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
@@ -3114,7 +3114,7 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
 
 #[cfg(test)]
 mod tests {
-    use crate::{move_vm_ext::MoveVmExt, AptosVm};
+    use crate::{move_vm_ext::MoveVmExt, AptosVM};
     use aptos_types::{
         account_address::AccountAddress,
         account_config::{NEW_EPOCH_EVENT_MOVE_TYPE_TAG, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG},
@@ -3127,8 +3127,8 @@ mod tests {
         fn assert_send<T: Send>() {}
         fn assert_sync<T: Sync>() {}
 
-        assert_send::<AptosVm>();
-        assert_sync::<AptosVm>();
+        assert_send::<AptosVM>();
+        assert_sync::<AptosVM>();
         assert_send::<MoveVmExt>();
         assert_sync::<MoveVmExt>();
     }
@@ -3143,11 +3143,11 @@ mod tests {
         );
         let new_epoch_event_v2 =
             ContractEvent::new_v2(NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(), vec![]);
-        assert!(AptosVm::should_restart_execution(&[(
+        assert!(AptosVM::should_restart_execution(&[(
             new_epoch_event,
             None
         )]));
-        assert!(AptosVm::should_restart_execution(&[(
+        assert!(AptosVM::should_restart_execution(&[(
             new_epoch_event_v2,
             None
         )]));

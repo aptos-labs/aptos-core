@@ -11,7 +11,7 @@ use crate::{
         AptosMoveResolver, SessionId,
     },
     transaction_metadata::TransactionMetadata,
-    verifier, AptosVm,
+    verifier, AptosVM,
 };
 use aptos_gas_meter::AptosGasMeter;
 use aptos_types::{on_chain_config::Features, transaction::ModuleBundle};
@@ -35,7 +35,7 @@ pub struct UserSession<'r> {
 
 impl<'r> UserSession<'r> {
     pub fn new(
-        vm: &AptosVm,
+        vm: &AptosVM,
         txn_meta: &TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
         prologue_change_set: VMChangeSet,

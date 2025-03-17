@@ -28,9 +28,9 @@ use std::borrow::Borrow;
 
 /// Move VM is completely stateless. It is used to execute a single loaded function with its type
 /// arguments fully instantiated.
-pub struct MoveVm;
+pub struct MoveVM;
 
-impl MoveVm {
+impl MoveVM {
     pub(crate) fn execute_loaded_function(
         function: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,

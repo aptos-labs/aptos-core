@@ -36,7 +36,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    config::VMConfig, move_vm::MoveVm, native_extensions::NativeContextExtensions,
+    config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
     session::Session, AsFunctionValueExtension, ModuleStorage, VerifiedModuleBundle,
 };
 use move_vm_types::{value_serde::ValueSerDeContext, values::Value};
@@ -106,7 +106,7 @@ impl<'r> SessionExt<'r> {
 
         let is_storage_slot_metadata_enabled = features.is_storage_slot_metadata_enabled();
         Self {
-            inner: MoveVm::new_session_with_extensions(resolver, extensions),
+            inner: MoveVM::new_session_with_extensions(resolver, extensions),
             resolver,
             is_storage_slot_metadata_enabled,
         }

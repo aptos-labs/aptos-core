@@ -19,7 +19,7 @@ use move_core_types::{
     language_storage::ModuleId,
 };
 use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVm, AsUnsyncModuleStorage, ModuleStorage,
+    module_traversal::*, move_vm::MoveVM, AsUnsyncModuleStorage, ModuleStorage,
     StagingModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
@@ -92,7 +92,7 @@ impl Adapter {
         name: &IdentStr,
         module_storage: &impl ModuleStorage,
     ) {
-        let mut session = MoveVm::new_session(&self.store);
+        let mut session = MoveVM::new_session(&self.store);
         let traversal_storage = TraversalStorage::new();
         session
             .execute_function_bypass_visibility(

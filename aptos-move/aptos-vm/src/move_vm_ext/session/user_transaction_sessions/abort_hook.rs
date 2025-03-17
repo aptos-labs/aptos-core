@@ -10,7 +10,7 @@ use crate::{
         AptosMoveResolver, SessionId,
     },
     transaction_metadata::TransactionMetadata,
-    AptosVm,
+    AptosVM,
 };
 use aptos_vm_types::{
     module_and_script_storage::module_storage::AptosModuleStorage,
@@ -28,7 +28,7 @@ pub struct AbortHookSession<'r> {
 
 impl<'r> AbortHookSession<'r> {
     pub fn new(
-        vm: &AptosVm,
+        vm: &AptosVM,
         txn_meta: &TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
         prologue_session_change_set: SystemSessionChangeSet,

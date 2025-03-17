@@ -26,7 +26,7 @@ use move_core_types::{
 use move_resource_viewer::MoveValueAnnotator;
 use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
-    move_vm::MoveVm,
+    move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
     AsFunctionValueExtension, AsUnsyncModuleStorage, RuntimeEnvironment,
@@ -250,7 +250,7 @@ impl SharedTestingConfig {
 
         let extensions = extensions::new_extensions();
         let mut session =
-            MoveVm::new_session_with_extensions(&self.starting_storage_state, extensions);
+            MoveVM::new_session_with_extensions(&self.starting_storage_state, extensions);
         let mut gas_meter = factory.lock().unwrap().new_gas_meter();
 
         // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set

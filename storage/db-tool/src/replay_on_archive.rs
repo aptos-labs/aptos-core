@@ -22,7 +22,7 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVm, VMBlockExecutor};
+use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
 use clap::Parser;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{
@@ -176,7 +176,7 @@ impl Verifier {
             return Ok(vec![]);
         }
 
-        AptosVm::set_concurrency_level_once(self.replay_concurrency_level);
+        AptosVM::set_concurrency_level_once(self.replay_concurrency_level);
         let task_size = self.limit / self.concurrent_replay as u64;
         let ranges: Vec<(u64, u64)> = (0..self.concurrent_replay)
             .map(|i| {

@@ -23,7 +23,7 @@ use move_core_types::{
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVm, AsUnsyncCodeStorage, AsUnsyncModuleStorage,
+    module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage, AsUnsyncModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -258,7 +258,7 @@ fn call_script_with_args_ty_args_signers(
 ) -> VMResult<()> {
     let storage = InMemoryStorage::new();
     let code_storage = storage.as_unsync_code_storage();
-    let mut session = MoveVm::new_session(&storage);
+    let mut session = MoveVM::new_session(&storage);
 
     let traversal_storage = TraversalStorage::new();
 
@@ -293,7 +293,7 @@ fn call_function_with_args_ty_args_signers(
 
     storage.add_module_bytes(module_id.address(), module_id.name(), module_blob.into());
     let module_storage = storage.as_unsync_module_storage();
-    let mut session = MoveVm::new_session(&storage);
+    let mut session = MoveVM::new_session(&storage);
 
     let traversal_storage = TraversalStorage::new();
     session.execute_function_bypass_visibility(
@@ -780,7 +780,7 @@ fn call_missing_item() {
 
     let mut storage = InMemoryStorage::new();
     let module_storage = storage.as_unsync_module_storage();
-    let mut session = MoveVm::new_session(&storage);
+    let mut session = MoveVM::new_session(&storage);
 
     let traversal_storage = TraversalStorage::new();
     let error = session
@@ -808,7 +808,7 @@ fn call_missing_item() {
 
     storage.add_module_bytes(module_id.address(), module_id.name(), module_blob.into());
     let module_storage = storage.as_unsync_module_storage();
-    let mut session = MoveVm::new_session(&storage);
+    let mut session = MoveVM::new_session(&storage);
 
     let traversal_storage = TraversalStorage::new();
     let error = session

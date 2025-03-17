@@ -34,7 +34,7 @@ use move_symbol_pool::Symbol;
 use move_vm_runtime::{
     config::VMConfig,
     module_traversal::*,
-    move_vm::MoveVm,
+    move_vm::MoveVM,
     session::{SerializedReturnValues, Session},
     AsUnsyncCodeStorage, AsUnsyncModuleStorage, ModuleStorage, RuntimeEnvironment,
     StagingModuleStorage,
@@ -391,7 +391,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
                 gas_budget,
             )
             .unwrap();
-            let session = MoveVm::new_session(&self.storage);
+            let session = MoveVM::new_session(&self.storage);
             (session, gas_status)
         };
 

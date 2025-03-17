@@ -17,7 +17,7 @@ use aptos_types::{
     },
     vm_status::VMStatus,
 };
-use aptos_vm::{AptosVm, VMBlockExecutor};
+use aptos_vm::{AptosVM, VMBlockExecutor};
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
@@ -42,7 +42,7 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
         // let features = Features::fetch_config(&state_view).unwrap_or_default();
 
         let env = AptosEnvironment::new(state_view);
-        let vm = AptosVm::new(&env, state_view);
+        let vm = AptosVM::new(&env, state_view);
 
         let transaction_outputs = NATIVE_EXECUTOR_POOL.install(|| {
             txn_provider

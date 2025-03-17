@@ -5,7 +5,7 @@ use crate::compiler::{as_module, as_script, compile_units};
 use move_bytecode_verifier::VerifierConfig;
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::{
-    config::VMConfig, module_traversal::*, move_vm::MoveVm, AsUnsyncCodeStorage,
+    config::VMConfig, module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage,
     AsUnsyncModuleStorage, RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
@@ -110,7 +110,7 @@ fn test_run_script_with_nested_loops() {
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
         let code_storage = storage.as_unsync_code_storage();
 
-        let mut sess = MoveVm::new_session(&storage);
+        let mut sess = MoveVM::new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];
         sess.load_and_execute_script(
             s_blob.clone(),
@@ -136,7 +136,7 @@ fn test_run_script_with_nested_loops() {
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
         let code_storage = storage.as_unsync_code_storage();
 
-        let mut sess = MoveVm::new_session(&storage);
+        let mut sess = MoveVM::new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];
         sess.load_and_execute_script(
             s_blob,

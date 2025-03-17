@@ -3,7 +3,7 @@
 
 #[cfg(any(test, feature = "testing"))]
 use crate::aptos_vm::{serialized_signer, SerializedSigners};
-use crate::AptosVm;
+use crate::AptosVM;
 #[cfg(any(test, feature = "testing"))]
 use crate::{
     data_cache::AsMoveResolver,
@@ -68,7 +68,7 @@ pub mod testing_only {
     }
 }
 
-impl AptosVm {
+impl AptosVM {
     #[cfg(any(test, feature = "testing"))]
     pub fn test_failed_transaction_cleanup(
         &self,

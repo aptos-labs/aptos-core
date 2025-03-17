@@ -38,7 +38,7 @@ use aptos_types::{
 };
 use aptos_vm::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
-    AptosVm, VMBlockExecutor,
+    AptosVM, VMBlockExecutor,
 };
 use move_core_types::vm_status::VMStatus;
 use std::sync::{mpsc::channel, Arc};
@@ -59,7 +59,7 @@ impl VMBlockExecutor for PtxBlockExecutor {
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let _timer = TIMER.timer_with(&["block_total"]);
 
-        let concurrency_level = AptosVm::get_concurrency_level();
+        let concurrency_level = AptosVM::get_concurrency_level();
         // 1. Analyze: annotate read / write sets.
         // 2. Sort: build dependency graph by remembering the latest writes for each key.
         // 3. Schedule: send readily runnable transactions to the runner.

@@ -4,7 +4,7 @@
 
 use crate::{
     data_cache::TransactionDataCache, loader::LoadedFunction, module_traversal::TraversalContext,
-    move_vm::MoveVm, native_extensions::NativeContextExtensions,
+    move_vm::MoveVM, native_extensions::NativeContextExtensions,
     storage::module_storage::ModuleStorage, CodeStorage,
 };
 use move_binary_format::{errors::*, file_format::LocalIndex};
@@ -62,7 +62,7 @@ impl<'r> Session<'r> {
             .finish(Location::Module(module_id)));
         }
 
-        MoveVm::execute_loaded_function(
+        MoveVM::execute_loaded_function(
             func,
             args,
             &mut self.data_cache,
@@ -86,7 +86,7 @@ impl<'r> Session<'r> {
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
         let func = module_storage.load_function(module_id, function_name, &ty_args)?;
-        MoveVm::execute_loaded_function(
+        MoveVM::execute_loaded_function(
             func,
             args,
             &mut self.data_cache,
@@ -105,7 +105,7 @@ impl<'r> Session<'r> {
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
-        MoveVm::execute_loaded_function(
+        MoveVM::execute_loaded_function(
             func,
             args,
             &mut self.data_cache,
@@ -142,7 +142,7 @@ impl<'r> Session<'r> {
         code_storage: &impl CodeStorage,
     ) -> VMResult<()> {
         let main = code_storage.load_script(script.borrow(), &ty_args)?;
-        MoveVm::execute_loaded_function(
+        MoveVM::execute_loaded_function(
             main,
             args,
             &mut self.data_cache,

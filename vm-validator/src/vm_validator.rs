@@ -18,7 +18,7 @@ use aptos_types::{
     transaction::{SignedTransaction, VMValidatorResult},
     vm::modules::AptosModuleExtension,
 };
-use aptos_vm::AptosVm;
+use aptos_vm::AptosVM;
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
@@ -313,7 +313,7 @@ impl PooledVMValidator {
 }
 
 impl TransactionValidation for PooledVMValidator {
-    type ValidationInstance = AptosVm;
+    type ValidationInstance = AptosVM;
 
     fn validate_transaction(&self, txn: SignedTransaction) -> Result<VMValidatorResult> {
         let vm_validator = self.get_next_vm();
@@ -327,7 +327,7 @@ impl TransactionValidation for PooledVMValidator {
         let vm_validator_locked = vm_validator.lock().unwrap();
 
         use aptos_vm::VMValidator;
-        let vm = AptosVm::new(
+        let vm = AptosVM::new(
             &vm_validator_locked.state.environment,
             &vm_validator_locked.state.state_view,
         );

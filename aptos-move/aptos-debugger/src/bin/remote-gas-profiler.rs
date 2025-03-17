@@ -5,7 +5,7 @@ use anyhow::{bail, Result};
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_rest_client::Client;
 use aptos_types::transaction::Transaction;
-use aptos_vm::AptosVm;
+use aptos_vm::AptosVM;
 use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
 use url::Url;
@@ -35,7 +35,7 @@ async fn main() -> Result<()> {
 
     // Initialize the debugger
     aptos_logger::Logger::new().init();
-    AptosVm::set_concurrency_level_once(1);
+    AptosVM::set_concurrency_level_once(1);
 
     let debugger = match args.target {
         Target::Rest { endpoint } => {

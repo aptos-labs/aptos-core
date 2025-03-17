@@ -13,7 +13,7 @@ use move_core_types::{
 };
 use move_ir_compiler::Compiler;
 use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVm, native_extensions::NativeContextExtensions,
+    module_traversal::*, move_vm::MoveVM, native_extensions::NativeContextExtensions,
     native_functions::NativeFunction, AsUnsyncCodeStorage, RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
@@ -184,7 +184,7 @@ fn main() -> Result<()> {
 
     let mut extensions = NativeContextExtensions::default();
     extensions.add(NativeTableContext::new([0; 32], &storage));
-    let mut sess = MoveVm::new_session_with_extensions(&storage, extensions);
+    let mut sess = MoveVM::new_session_with_extensions(&storage, extensions);
 
     let traversal_storage = TraversalStorage::new();
     let code_storage = storage.as_unsync_code_storage();
