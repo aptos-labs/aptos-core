@@ -303,15 +303,41 @@ module aptos_framework::account {
         new_account
     }
 
+    /// Returns whether an account exists at `addr`.
+    ///
+    /// When the `default_account_resource` feature flag is enabled:
+    /// - Always returns true, indicating that any address can be treated as a valid account
+    /// - This reflects a change in the account model where accounts are now considered to exist implicitly
+    /// - The sequence number and other account properties will return default values (0) for addresses without an Account resource
+    ///
+    /// When the feature flag is disabled:
+    /// - Returns true only if an Account resource exists at `addr`
+    /// - This is the legacy behavior where accounts must be explicitly created
     #[view]
     public fun exists_at(addr: address): bool {
         features::is_default_account_resource_enabled() || exists<Account>(addr)
     }
 
+    /// Returns whether an Account resource exists at `addr`.
+    ///
+    /// Unlike `exists_at`, this function strictly checks for the presence of the Account resource,
+    /// regardless of the `default_account_resource` feature flag.
+    ///
+    /// This is useful for operations that specifically need to know if the Account resource
+    /// has been created, rather than just whether the address can be treated as an account.
     inline fun resource_exists_at(addr: address): bool {
         exists<Account>(addr)
     }
 
+    /// Returns the next GUID creation number for `addr`.
+    ///
+    /// When the `default_account_resource` feature flag is enabled:
+    /// - Returns 0 for addresses without an Account resource
+    /// - This allows GUID creation for previously non-existent accounts
+    /// - The first GUID created will start the sequence from 0
+    ///
+    /// When the feature flag is disabled:
+    /// - Aborts if no Account resource exists at `addr`
     #[view]
     public fun get_guid_next_creation_num(addr: address): u64 acquires Account {
         if (resource_exists_at(addr)) {
@@ -966,6 +992,16 @@ module aptos_framework::account {
     /// GUID management methods.
     ///////////////////////////////////////////////////////////////////////////
 
+    /// Creates a new GUID for `account_signer` and increments the GUID creation number.
+    ///
+    /// When the `default_account_resource` feature flag is enabled:
+    /// - If no Account resource exists, one will be created automatically
+    /// - This ensures consistent GUID creation behavior for all addresses
+    ///
+    /// When the feature flag is disabled:
+    /// - Aborts if no Account resource exists
+    ///
+    /// Aborts if the maximum number of GUIDs has been reached (0x4000000000000)
     public fun create_guid(account_signer: &signer): guid::GUID acquires Account {
         let addr = signer::address_of(account_signer);
         ensure_resource_exists(addr);
@@ -978,10 +1014,10 @@ module aptos_framework::account {
         guid
     }
 
-    ///////////////////////////////////////////////////////////////////////////
-    /// GUID management methods.
-    ///////////////////////////////////////////////////////////////////////////
-
+    /// Creates a new event handle for `account`.
+    ///
+    /// This is a wrapper around `create_guid` that creates an EventHandle,
+    /// inheriting the same behavior regarding account existence and feature flags.
     public fun new_event_handle<T: drop + store>(account: &signer): EventHandle<T> acquires Account {
         event::new_event_handle(create_guid(account))
     }
