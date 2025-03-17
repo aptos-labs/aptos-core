@@ -214,7 +214,7 @@ impl FeatureFlag {
             FeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION,
             FeatureFlag::VM_BINARY_FORMAT_V8,
             FeatureFlag::ENABLE_FUNCTION_VALUES,
-            //FeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
+            FeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
         ]
     }
 }

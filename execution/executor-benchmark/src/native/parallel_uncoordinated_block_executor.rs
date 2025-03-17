@@ -264,6 +264,7 @@ pub trait CommonNativeRawTransactionExecutor: Sync + Send {
         address: AccountAddress,
         fail_on_account_existing: bool,
         fail_on_account_missing: bool,
+        create_account_resource: bool,
         state_view: &(impl StateView + Sync),
         output: &mut IncrementalOutput,
     ) -> Result<()>;
@@ -362,6 +363,7 @@ impl<T: CommonNativeRawTransactionExecutor> RawTransactionExecutor for T {
                         recipient,
                         fail_on_recipient_account_existing,
                         fail_on_recipient_account_missing,
+                        !fa_migration_complete,
                         state_view,
                         &mut output,
                     )?;
@@ -403,6 +405,7 @@ impl<T: CommonNativeRawTransactionExecutor> RawTransactionExecutor for T {
                             recipient_address,
                             fail_on_recipient_account_existing,
                             fail_on_recipient_account_missing,
+                            true,
                             state_view,
                             &mut output,
                         )?;
@@ -436,8 +439,8 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
         output: &mut IncrementalOutput,
     ) -> Result<()> {
         let sender_account_key = self.db_util.new_state_key_account(&sender_address);
-        let mut sender_account =
-            DbAccessUtil::get_account(&sender_account_key, state_view)?.unwrap();
+        let mut sender_account = DbAccessUtil::get_account(&sender_account_key, state_view)?
+            .unwrap_or_else(|| DbAccessUtil::new_account_resource(sender_address));
 
         sender_account.sequence_number = sequence_number + 1;
 
@@ -725,6 +728,7 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
         address: AccountAddress,
         fail_on_account_existing: bool,
         fail_on_account_missing: bool,
+        create_account_resource: bool,
         state_view: &(impl StateView + Sync),
         output: &mut IncrementalOutput,
     ) -> Result<()> {
@@ -738,7 +742,7 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
             None => {
                 if fail_on_account_missing {
                     bail!("account missing")
-                } else {
+                } else if create_account_resource {
                     let account = DbAccessUtil::new_account_resource(address);
                     output.write_set.push((
                         account_key,
@@ -800,7 +804,9 @@ impl CommonNativeRawTransactionExecutor for NativeValueCacheRawTransactionExecut
         match self
             .cache_get_mut_or_init(&sender_account_key, |key| {
                 CachedResource::Account(
-                    DbAccessUtil::get_account(key, state_view).unwrap().unwrap(),
+                    DbAccessUtil::get_account(key, state_view)
+                        .unwrap()
+                        .unwrap_or_else(|| DbAccessUtil::new_account_resource(sender_address)),
                 )
             })
             .value_mut()
@@ -820,6 +826,7 @@ impl CommonNativeRawTransactionExecutor for NativeValueCacheRawTransactionExecut
         address: AccountAddress,
         fail_on_account_existing: bool,
         fail_on_account_missing: bool,
+        _create_account_resource: bool,
         state_view: &(impl StateView + Sync),
         _output: &mut IncrementalOutput,
     ) -> Result<()> {
