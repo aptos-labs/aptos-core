@@ -124,7 +124,7 @@ mod transaction_validation;
 pub mod validator_txns;
 pub mod verifier;
 
-pub use crate::aptos_vm::{AptosSimulationVM, AptosVm};
+pub use crate::aptos_vm::{AptosSimulationVm, AptosVm};
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_types::{

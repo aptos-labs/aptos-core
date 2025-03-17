@@ -57,17 +57,18 @@ impl MoveVm {
 
         let return_tys = create_ty_with_subst(function.return_tys())?;
 
-        let timer = VM_TIMER.timer_with_label("Interpreter::entrypoint");
-        let return_values = Interpreter::entrypoint(
-            function,
-            deserialized_args,
-            data_store,
-            module_storage,
-            gas_meter,
-            traversal_context,
-            extensions,
-        )?;
-        drop(timer);
+        let return_values = {
+            let _timer = VM_TIMER.timer_with_label("Interpreter::entrypoint");
+            Interpreter::entrypoint(
+                function,
+                deserialized_args,
+                data_store,
+                module_storage,
+                gas_meter,
+                traversal_context,
+                extensions,
+            )?
+        };
 
         let return_values = serialize_return_values(module_storage, &return_tys, return_values)
             .map_err(|e| e.finish(Location::Undefined))?;
@@ -132,17 +133,12 @@ fn deserialize_arg(
     ty: &Type,
     arg: impl Borrow<[u8]>,
 ) -> PartialVMResult<Value> {
-    let (layout, has_identifier_mappings) = match StorageLayoutConverter::new(module_storage)
+    let (layout, has_identifier_mappings) = StorageLayoutConverter::new(module_storage)
         .type_to_type_layout_with_identifier_mappings(ty)
-    {
-        Ok(layout) => layout,
-        Err(_err) => {
-            return Err(
-                PartialVMError::new(StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION)
-                    .with_message("[VM] failed to get layout from type".to_string()),
-            );
-        },
-    };
+        .map_err(|_| {
+            PartialVMError::new(StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION)
+                .with_message("[VM] failed to get layout from type".to_string())
+        })?;
 
     let deserialization_error = || -> PartialVMError {
         PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)
@@ -157,13 +153,10 @@ fn deserialize_arg(
     }
 
     let function_value_extension = module_storage.as_function_value_extension();
-    match ValueSerDeContext::new()
+    ValueSerDeContext::new()
         .with_func_args_deserialization(&function_value_extension)
         .deserialize(arg.borrow(), &layout)
-    {
-        Some(val) => Ok(val),
-        None => Err(deserialization_error()),
-    }
+        .ok_or_else(deserialization_error)
 }
 
 fn deserialize_args(

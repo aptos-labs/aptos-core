@@ -2987,9 +2987,9 @@ impl VMValidator for AptosVm {
 }
 
 // Ensure encapsulation of AptosVM APIs by using a wrapper.
-pub struct AptosSimulationVM;
+pub struct AptosSimulationVm;
 
-impl AptosSimulationVM {
+impl AptosSimulationVm {
     /// Simulates a signed transaction (i.e., executes it without performing
     /// signature verification) on a newly created VM instance.
     /// *Precondition:* the transaction must **not** have a valid signature.
