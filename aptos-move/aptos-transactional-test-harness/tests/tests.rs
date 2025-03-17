@@ -12,6 +12,6 @@ datatest_stable::harness!(runner, "tests", r".*\.(mvir|move)$");
 fn runner(path: &Path) -> anyhow::Result<(), Box<dyn std::error::Error>> {
     run_aptos_test_with_config(path, TestRunConfig::CompilerV2 {
         language_version: LanguageVersion::latest_stable(),
-        v2_experiments: vec![("attach-compiled-module".to_owned(), true)],
+        experiments: vec![("attach-compiled-module".to_owned(), true)],
     })
 }

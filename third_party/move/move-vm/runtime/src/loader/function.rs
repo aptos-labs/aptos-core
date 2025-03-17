@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    loader::{
-        access_specifier_loader::load_access_specifier, LegacyModuleStorageAdapter, Loader, Module,
-        Resolver, Script,
-    },
+    loader::{access_specifier_loader::load_access_specifier, Module, Resolver, Script},
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
     storage::ty_tag_converter::TypeTagConverter,
     LayoutConverter, ModuleStorage, StorageLayoutConverter,
@@ -61,7 +58,7 @@ pub struct Function {
 
 /// For loaded function representation, specifies the owner: a script or a module.
 #[derive(Clone)]
-pub(crate) enum LoadedFunctionOwner {
+pub enum LoadedFunctionOwner {
     Script(Arc<Script>),
     Module(Arc<Module>),
 }
@@ -69,12 +66,12 @@ pub(crate) enum LoadedFunctionOwner {
 /// A loaded runtime function representation along with type arguments used to instantiate it.
 #[derive(Clone)]
 pub struct LoadedFunction {
-    pub(crate) owner: LoadedFunctionOwner,
+    pub owner: LoadedFunctionOwner,
     // A set of verified type arguments provided for this definition. If
     // function is not generic, an empty vector.
-    pub(crate) ty_args: Vec<Type>,
+    pub ty_args: Vec<Type>,
     // Definition of the loaded function.
-    pub(crate) function: Arc<Function>,
+    pub function: Arc<Function>,
 }
 
 /// A lazy loaded function, which can either be unresolved (as resulting
@@ -171,6 +168,7 @@ impl LazyLoadedFunction {
             LazyLoadedFunctionState::Unresolved {
                 data:
                     SerializedFunctionData {
+                        format_version: _,
                         module_id,
                         fun_id,
                         ty_args,
@@ -412,18 +410,13 @@ impl LoadedFunction {
         }
     }
 
-    pub(crate) fn get_resolver<'a>(
-        &self,
-        loader: &'a Loader,
-        module_store: &'a LegacyModuleStorageAdapter,
-        module_storage: &'a impl ModuleStorage,
-    ) -> Resolver<'a> {
+    pub(crate) fn get_resolver<'a>(&self, module_storage: &'a impl ModuleStorage) -> Resolver<'a> {
         match &self.owner {
             LoadedFunctionOwner::Module(module) => {
-                Resolver::for_module(loader, module_store, module_storage, module.clone())
+                Resolver::for_module(module_storage, module.clone())
             },
             LoadedFunctionOwner::Script(script) => {
-                Resolver::for_script(loader, module_store, module_storage, script.clone())
+                Resolver::for_script(module_storage, script.clone())
             },
         }
     }

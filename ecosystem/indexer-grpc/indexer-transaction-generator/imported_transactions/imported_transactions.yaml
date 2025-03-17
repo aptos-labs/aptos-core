@@ -22,6 +22,8 @@ testnet:
     4462417704: 4462417704_secondary_store_burnt
     646928741: 646928741_no_events
     769222973: 769222973_multisig
+    6643353707: 6643353707_fa_transfer_events_v2
+    6643353877: 6643353877_fa_transfer_2
 
     # account restoration processor
     6617300504: 6617300504_account_restoration_verified_key_rotation_to_multi_ed_txn

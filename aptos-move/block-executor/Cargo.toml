@@ -32,7 +32,6 @@ claims = { workspace = true }
 concurrent-queue = { workspace = true }
 criterion = { workspace = true, optional = true }
 crossbeam = { workspace = true }
-dashmap = { workspace = true }
 derivative = { workspace = true }
 fail = { workspace = true }
 hashbrown = { workspace = true }

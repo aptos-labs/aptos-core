@@ -67,7 +67,7 @@ fn resource_access_control(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>
     let result = h.publish_package_with_options(
         &acc,
         path.path(),
-        BuildOptions::move_2().with_experiment("gen-access-specifiers"),
+        BuildOptions::move_2().set_latest_language(),
     );
     if positive_test {
         assert_success!(result);

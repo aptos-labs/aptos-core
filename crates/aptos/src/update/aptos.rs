@@ -11,7 +11,7 @@
 
 use super::{update_binary, BinaryUpdater, UpdateRequiredInfo};
 use crate::common::{
-    types::{CliCommand, CliTypedResult},
+    types::{CliCommand, CliTypedResult, PromptOptions},
     utils::cli_build_information,
 };
 use anyhow::{anyhow, Context, Result};
@@ -42,6 +42,9 @@ pub struct AptosUpdateTool {
     /// If set, it will check if there are updates for the tool, but not actually update
     #[clap(long, default_value_t = false)]
     check: bool,
+
+    #[clap(flatten)]
+    pub prompt_options: PromptOptions,
 }
 
 impl BinaryUpdater for AptosUpdateTool {
@@ -166,6 +169,7 @@ impl BinaryUpdater for AptosUpdateTool {
             .current_version(current_version)
             .target_version_tag(&format!("aptos-cli-v{}", info.target_version))
             .target(target)
+            .no_confirm(self.prompt_options.assume_yes)
             .build()
             .map_err(|e| anyhow!("Failed to build self-update configuration: {:#}", e))
     }

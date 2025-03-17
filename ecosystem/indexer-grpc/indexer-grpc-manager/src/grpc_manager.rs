@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::{IndexerGrpcManagerConfig, ServiceConfig},
+    config::{IndexerGrpcManagerConfig, ServiceConfig, MAX_MESSAGE_SIZE},
     data_manager::DataManager,
     file_store_uploader::FileStoreUploader,
     metadata_manager::MetadataManager,
@@ -94,7 +94,9 @@ impl GrpcManager {
             self.data_manager.clone(),
         ))
         .send_compressed(CompressionEncoding::Zstd)
-        .accept_compressed(CompressionEncoding::Zstd);
+        .accept_compressed(CompressionEncoding::Zstd)
+        .max_encoding_message_size(MAX_MESSAGE_SIZE)
+        .max_decoding_message_size(MAX_MESSAGE_SIZE);
         let server = Server::builder()
             .http2_keepalive_interval(Some(HTTP2_PING_INTERVAL_DURATION))
             .http2_keepalive_timeout(Some(HTTP2_PING_TIMEOUT_DURATION))

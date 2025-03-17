@@ -1101,7 +1101,9 @@ mod test {
                 vec![],
                 proofs_of_store.clone(),
                 None,
+                None,
                 vec![],
+                true,
             );
 
             // Insert the block payload into the store

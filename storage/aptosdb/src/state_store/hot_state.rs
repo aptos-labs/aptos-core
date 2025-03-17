@@ -20,18 +20,20 @@ use std::{
 };
 
 const MAX_HOT_STATE_COMMIT_BACKLOG: usize = 10;
-const HOT_STATE_MAX_ITEMS: usize = 1_000_000;
-const HOT_STATE_MAX_VALUE_BYTES: usize = 4096;
 
 #[derive(Debug)]
 pub struct HotStateBase {
+    capacity: usize,
+    max_value_bytes: usize,
     inner: DashMap<StateKey, DbStateUpdate>,
 }
 
 impl HotStateBase {
-    fn new_empty() -> Self {
+    fn new_empty(capacity: usize, max_value_bytes: usize) -> Self {
         Self {
-            inner: DashMap::with_capacity(HOT_STATE_MAX_ITEMS),
+            capacity,
+            max_value_bytes,
+            inner: DashMap::with_capacity(capacity),
         }
     }
 
@@ -54,8 +56,8 @@ pub struct HotState {
 }
 
 impl HotState {
-    pub fn new(state: State) -> Self {
-        let base = Arc::new(HotStateBase::new_empty());
+    pub fn new(state: State, capacity: usize, max_item_bytes: usize) -> Self {
+        let base = Arc::new(HotStateBase::new_empty(capacity, max_item_bytes));
         let committed = Arc::new(Mutex::new(state));
         let commit_tx = Committer::spawn(base.clone(), committed.clone());
 
@@ -190,7 +192,7 @@ impl Committer {
                 }
 
                 self.base.inner.remove(&key);
-            } else if update.expect_non_delete().size() > HOT_STATE_MAX_VALUE_BYTES {
+            } else if update.expect_non_delete().size() > self.base.max_value_bytes {
                 // item too large to hold in memory
                 n_too_large += 1;
 
@@ -222,14 +224,14 @@ impl Committer {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["hot_state_evict"]);
 
         let total = self.base.inner.len();
-        if total <= HOT_STATE_MAX_ITEMS {
+        if total <= self.base.capacity {
             return;
         }
 
         let latest = self.key_by_access_time.last().expect("Known Non-empty.").0;
         let mut last_evicted = 0;
 
-        let to_evict = total - HOT_STATE_MAX_ITEMS;
+        let to_evict = total - self.base.capacity;
         for _ in 0..to_evict {
             let (ts, key) = self
                 .key_by_access_time

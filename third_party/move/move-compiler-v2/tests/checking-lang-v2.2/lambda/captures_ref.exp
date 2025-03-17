@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: captured value cannot be a reference, but has type `&u64`
+  ┌─ tests/checking-lang-v2.2/lambda/captures_ref.move:5:21
+  │
+5 │         let f = || *r + 1;
+  │                     ^
+
+error: captured value cannot be a reference, but has type `&u64`
+   ┌─ tests/checking-lang-v2.2/lambda/captures_ref.move:11:33
+   │
+11 │         let f = |y| consume_ref(r, y);
+   │                                 ^
+
+error: captured value cannot be a reference, but has type `&mut u64`
+   ┌─ tests/checking-lang-v2.2/lambda/captures_ref.move:17:21
+   │
+17 │         let f = || *r + 1;
+   │                     ^

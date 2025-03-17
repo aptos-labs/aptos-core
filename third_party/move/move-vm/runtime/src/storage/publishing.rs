@@ -3,8 +3,8 @@
 
 use crate::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, loader::Function,
-    AsUnsyncModuleStorage, Module, ModuleStorage, RuntimeEnvironment, UnsyncModuleStorage,
-    WithRuntimeEnvironment,
+    AsUnsyncModuleStorage, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment,
+    UnsyncModuleStorage, WithRuntimeEnvironment,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
@@ -23,7 +23,10 @@ use move_core_types::{
 };
 use move_vm_types::{
     code::ModuleBytesStorage,
-    loaded_data::runtime_types::{StructType, Type},
+    loaded_data::{
+        runtime_types::{StructType, Type},
+        struct_name_indexing::StructNameIndex,
+    },
     module_linker_error,
 };
 use std::{

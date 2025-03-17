@@ -34,13 +34,13 @@ impl TPayloadManager for DirectMempoolPayloadManager {
         &self,
         block: &Block,
         _block_signers: Option<BitVec>,
-    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>, Option<u64>)> {
         let Some(payload) = block.payload() else {
-            return Ok((Vec::new(), None));
+            return Ok((Vec::new(), None, None));
         };
 
         match payload {
-            Payload::DirectMempool(txns) => Ok((txns.clone(), None)),
+            Payload::DirectMempool(txns) => Ok((txns.clone(), None, None)),
             _ => unreachable!(
                 "DirectMempoolPayloadManager: Unacceptable payload type {}. Epoch: {}, Round: {}, Block: {}",
                 payload,

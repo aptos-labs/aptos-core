@@ -3,7 +3,7 @@
 
 use super::{update_binary, BinaryUpdater, UpdateRequiredInfo};
 use crate::{
-    common::types::{CliCommand, CliTypedResult},
+    common::types::{CliCommand, CliTypedResult, PromptOptions},
     update::update_helper::{build_updater, get_path},
 };
 use anyhow::{Context, Result};
@@ -13,7 +13,7 @@ use self_update::update::ReleaseUpdate;
 use std::path::PathBuf;
 
 const FORMATTER_BINARY_NAME: &str = "movefmt";
-const TARGET_FORMATTER_VERSION: &str = "1.0.6";
+const TARGET_FORMATTER_VERSION: &str = "1.0.7";
 
 const FORMATTER_EXE_ENV: &str = "FORMATTER_EXE";
 #[cfg(target_os = "windows")]
@@ -47,6 +47,9 @@ pub struct FormatterUpdateTool {
     /// If set, it will check if there are updates for the tool, but not actually update
     #[clap(long, default_value_t = false)]
     check: bool,
+
+    #[clap(flatten)]
+    pub prompt_options: PromptOptions,
 }
 
 fn extract_movefmt_version(input: &str) -> String {
@@ -106,6 +109,7 @@ impl BinaryUpdater for FormatterUpdateTool {
             "unknown-linux-gnu",
             "apple-darwin",
             "windows",
+            self.prompt_options.assume_yes,
         )
     }
 }

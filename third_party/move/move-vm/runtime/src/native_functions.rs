@@ -5,9 +5,10 @@
 use crate::{
     data_cache::TransactionDataCache,
     interpreter::InterpreterDebugInterface,
-    loader::{Function, Loader, Resolver},
+    loader::{Function, Resolver},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
+    storage::ty_tag_converter::TypeTagConverter,
 };
 use move_binary_format::errors::{
     ExecutionState, Location, PartialVMError, PartialVMResult, VMResult,
@@ -103,6 +104,13 @@ pub struct NativeContext<'a, 'b, 'c> {
     extensions: &'a mut NativeContextExtensions<'b>,
     gas_balance: InternalGas,
     traversal_context: &'a TraversalContext<'a>,
+
+    /// Counter used to record the (conceptual) heap memory usage by a native functions,
+    /// measured in abstract memory unit.
+    ///
+    /// This is a hack to emulate memory usage tracking, before we could refactor native functions
+    /// and allow them to access the gas meter directly.
+    heap_memory_usage: u64,
 }
 
 impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
@@ -121,6 +129,8 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
             extensions,
             gas_balance,
             traversal_context,
+
+            heap_memory_usage: 0,
         }
     }
 }
@@ -140,13 +150,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         //                     need to actually load bytes.
         let (value, num_bytes) = self
             .data_store
-            .load_resource(
-                self.resolver.loader(),
-                self.resolver.module_storage(),
-                address,
-                ty,
-                self.resolver.module_store(),
-            )
+            .load_resource(self.resolver.module_storage(), address, ty)
             .map_err(|err| err.finish(Location::Undefined))?;
         let exists = value
             .exists()
@@ -155,9 +159,9 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     }
 
     pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
-        self.resolver
-            .loader()
-            .type_to_type_tag(ty, self.resolver.module_storage())
+        let ty_tag_builder =
+            TypeTagConverter::new(self.resolver.module_storage().runtime_environment());
+        ty_tag_builder.ty_to_ty_tag(ty)
     }
 
     pub fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
@@ -194,6 +198,14 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         self.gas_balance
     }
 
+    pub fn use_heap_memory(&mut self, amount: u64) {
+        self.heap_memory_usage = self.heap_memory_usage.saturating_add(amount);
+    }
+
+    pub fn heap_memory_usage(&self) -> u64 {
+        self.heap_memory_usage
+    }
+
     pub fn traversal_context(&self) -> &TraversalContext {
         self.traversal_context
     }
@@ -207,36 +219,17 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         module_id: &ModuleId,
         function_name: &Identifier,
     ) -> PartialVMResult<Arc<Function>> {
-        let (_, function) = match self.resolver.loader() {
-            Loader::V1(loader) => {
-                // Load the module that contains this function regardless of the traversal context.
-                //
-                // This is just a precautionary step to make sure that caching status of the VM will not alter execution
-                // result in case framework code forgot to use LoadFunction result to load the modules into cache
-                // and charge properly.
-                loader
-                    .load_module(module_id, self.data_store, self.resolver.module_store())
-                    .map_err(|_| {
-                        PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                            .with_message(format!("Module {} doesn't exist", module_id))
-                    })?;
-
-                self.resolver
-                    .module_store()
-                    .resolve_module_and_function_by_name(module_id, function_name)?
-            },
-            Loader::V2(_) => self
-                .resolver
-                .module_storage()
-                .fetch_function_definition(module_id.address(), module_id.name(), function_name)
-                // TODO(loader_v2):
-                //   Keeping this consistent with loader V1 implementation which returned that
-                //   error. Check if we can avoid remapping by replaying transactions.
-                .map_err(|_| {
-                    PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                        .with_message(format!("Module {} doesn't exist", module_id))
-                })?,
-        };
+        let (_, function) = self
+            .resolver
+            .module_storage()
+            .fetch_function_definition(module_id.address(), module_id.name(), function_name)
+            // TODO(#16077):
+            //   Keeping this consistent with loader V1 implementation which returned that
+            //   error. Check if we can avoid remapping by replaying transactions.
+            .map_err(|_| {
+                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                    .with_message(format!("Module {} doesn't exist", module_id))
+            })?;
         Ok(function)
     }
 }

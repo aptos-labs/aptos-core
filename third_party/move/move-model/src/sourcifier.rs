@@ -4,8 +4,8 @@
 
 use crate::{
     ast::{
-        AddressSpecifier, Exp, ExpData, LambdaCaptureKind, Operation, Pattern, ResourceSpecifier,
-        TempIndex, Value,
+        AccessSpecifierKind, AddressSpecifier, Exp, ExpData, LambdaCaptureKind, Operation, Pattern,
+        ResourceSpecifier, TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -18,7 +18,6 @@ use crate::{
     ty::{PrimitiveType, ReferenceKind, Type, TypeDisplayContext},
 };
 use itertools::Itertools;
-use move_binary_format::file_format::AccessKind;
 use move_core_types::ability::AbilitySet;
 use std::collections::{BTreeMap, BTreeSet};
 //
@@ -177,9 +176,9 @@ impl<'a> Sourcifier<'a> {
                     emit!(self.writer, "!")
                 }
                 match &spec.kind {
-                    AccessKind::Reads => emit!(self.writer, "reads "),
-                    AccessKind::Writes => emit!(self.writer, "writes "),
-                    AccessKind::Acquires => emit!(self.writer, "acquires "),
+                    AccessSpecifierKind::Reads => emit!(self.writer, "reads "),
+                    AccessSpecifierKind::Writes => emit!(self.writer, "writes "),
+                    AccessSpecifierKind::LegacyAcquires => emit!(self.writer, "acquires "),
                 }
                 match &spec.resource.1 {
                     ResourceSpecifier::Any => emit!(self.writer, "*"),

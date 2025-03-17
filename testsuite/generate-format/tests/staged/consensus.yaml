@@ -794,6 +794,16 @@ Payload:
       OptQuorumStore:
         NEWTYPE:
           TYPENAME: OptQuorumStorePayload
+    5:
+      QuorumStoreInlineHybridV2:
+        TUPLE:
+          - SEQ:
+              TUPLE:
+                - TYPENAME: BatchInfo
+                - SEQ:
+                    TYPENAME: SignedTransaction
+          - TYPENAME: ProofWithData
+          - TYPENAME: PayloadExecutionLimit
 PayloadExecutionLimit:
   ENUM:
     0:
@@ -801,6 +811,10 @@ PayloadExecutionLimit:
     1:
       MaxTransactionsToExecute:
         NEWTYPE: U64
+    2:
+      TxnAndGasLimits:
+        NEWTYPE:
+          TYPENAME: TxnAndGasLimits
 Pepper:
   NEWTYPESTRUCT:
     TUPLEARRAY:
@@ -1171,6 +1185,12 @@ TwoChainTimeoutCertificate:
         TYPENAME: TwoChainTimeout
     - signatures_with_rounds:
         TYPENAME: AggregateSignatureWithRounds
+TxnAndGasLimits:
+  STRUCT:
+    - transaction_limit:
+        OPTION: U64
+    - gas_limit:
+        OPTION: U64
 TypeTag:
   ENUM:
     0:

@@ -20,5 +20,3 @@ return values: []
 
 task 7 'run'. lines 45-45:
 return values: []
-
-==> Compiler v2 delivered same results!

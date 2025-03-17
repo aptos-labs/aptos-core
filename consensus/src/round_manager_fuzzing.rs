@@ -178,6 +178,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         PayloadTxnsSize::new(1, 1024),
         10,
         1,
+        Some(30_000),
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
