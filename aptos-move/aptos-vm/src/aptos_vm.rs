@@ -800,7 +800,14 @@ impl AptosVM {
         let script = match func.owner() {
             LoadedFunctionOwner::Script(script) => script,
             LoadedFunctionOwner::Module(_) => {
-                unreachable!("Function loaded from script cannot come from module")
+                // This should not be reachable because loading a function from the script should
+                // set the owner correctly.
+                let msg = "Function loaded from script cannot come from module".to_string();
+                let err = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Undefined)
+                    .into_vm_status();
+                return Err(err);
             },
         };
 
@@ -1232,29 +1239,16 @@ impl AptosVM {
             MoveValue::vector_u8(payload_bytes),
         ]);
 
-        match execution_result {
-            Err(execution_error) => {
-                let epilogue_session = self.failure_multisig_payload_cleanup(
-                    resolver,
-                    module_storage,
-                    prologue_session_change_set,
-                    execution_error,
-                    txn_data,
-                    cleanup_args,
-                    traversal_context,
-                )?;
-                // TODO(Gas): Charge for aggregator writes
-                self.success_transaction_cleanup(
-                    epilogue_session,
-                    module_storage,
-                    serialized_signers,
-                    gas_meter,
-                    txn_data,
-                    log_context,
-                    change_set_configs,
-                    traversal_context,
-                )
-            },
+        let epilogue_session = match execution_result {
+            Err(execution_error) => self.failure_multisig_payload_cleanup(
+                resolver,
+                module_storage,
+                prologue_session_change_set,
+                execution_error,
+                txn_data,
+                cleanup_args,
+                traversal_context,
+            )?,
             Ok(user_session_change_set) => {
                 // Charge gas for write set before we do cleanup. This ensures we don't charge gas for
                 // cleanup write set changes, which is consistent with outer-level success cleanup
@@ -1279,19 +1273,21 @@ impl AptosVM {
                         )
                         .map_err(|e| e.into_vm_status())
                 })?;
-                // TODO(Gas): Charge for aggregator writes
-                self.success_transaction_cleanup(
-                    epilogue_session,
-                    module_storage,
-                    serialized_signers,
-                    gas_meter,
-                    txn_data,
-                    log_context,
-                    change_set_configs,
-                    traversal_context,
-                )
+                epilogue_session
             },
-        }
+        };
+
+        // TODO(Gas): Charge for aggregator writes
+        self.success_transaction_cleanup(
+            epilogue_session,
+            module_storage,
+            serialized_signers,
+            gas_meter,
+            txn_data,
+            log_context,
+            change_set_configs,
+            traversal_context,
+        )
     }
 
     fn execute_or_simulate_multisig_transaction<'a, 'r>(

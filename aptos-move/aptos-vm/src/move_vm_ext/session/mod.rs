@@ -148,8 +148,13 @@ where
         if !func.is_entry() {
             let module_id = func
                 .module_id()
-                .cloned()
-                .expect("Entry function always has module id");
+                .ok_or_else(|| {
+                    let msg = "Entry function always has module id".to_string();
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(msg)
+                        .finish(Location::Undefined)
+                })?
+                .clone();
             return Err(PartialVMError::new(
                 StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION,
             )
