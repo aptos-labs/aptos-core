@@ -1,0 +1,17 @@
+digraph {
+    0 [ label = "0" label="0x1::fixed_point32::ceil", shape=box, color=blue]
+    1 [ label = "1" label="0x1::fixed_point32::floor", shape=box, color=blue]
+    2 [ label = "2" label="0x1::fixed_point32::create_from_rational", shape=box, color=blue]
+    3 [ label = "3" label="0x1::fixed_point32::create_from_raw_value", shape=box, color=blue]
+    4 [ label = "4" label="0x1::fixed_point32::create_from_u64", shape=box, color=blue]
+    5 [ label = "5" label="0x1::fixed_point32::divide_u64", shape=box, color=blue]
+    6 [ label = "6" label="0x1::fixed_point32::get_raw_value", shape=box, color=blue]
+    7 [ label = "7" label="0x1::fixed_point32::is_zero", shape=box, color=blue]
+    8 [ label = "8" label="0x1::fixed_point32::max", shape=box, color=blue]
+    9 [ label = "9" label="0x1::fixed_point32::min", shape=box, color=blue]
+    10 [ label = "10" label="0x1::fixed_point32::multiply_u64", shape=box, color=blue]
+    11 [ label = "11" label="0x1::fixed_point32::round", shape=box, color=blue]
+    0 -> 1 [ label = "\"\"" label=""]
+    11 -> 0 [ label = "\"\"" label=""]
+    11 -> 1 [ label = "\"\"" label=""]
+}
