@@ -10,8 +10,13 @@ use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::error::{code_invariant_error, PanicError};
 use concurrent_queue::{ConcurrentQueue, PopError};
 use crossbeam::utils::CachePadded;
+use fail::fail_point;
 use std::{
-    collections::BTreeSet,
+    cell::RefCell,
+    collections::{
+        btree_map::Entry::{Occupied, Vacant},
+        {BTreeMap, BTreeSet},
+    },
     sync::{
         atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering},
         Arc,
@@ -36,6 +41,112 @@ enum ExecutionPriority {
     High,
     Medium,
     Low,
+}
+
+// Non-Sync struct designed for a worker executing a particular transaction / incarnation
+// to manage the push-invalidations caused by its output (writes). It dispatches try_abort
+// calls, maintains the appropriate state (based on the outcomes) with interior mutability,
+// and is provided by value to finish_execution call to enforce correct usage pattern.
+pub(crate) struct AbortManager<'a> {
+    owner_txn_idx: TxnIndex,
+    owner_incarnation: Incarnation,
+    scheduler: &'a SchedulerV2,
+    // Transaction index in the map implies a write by (owner_txn_idx, owner_incarnation)
+    // invalidated a read by the said transaction. If the incarnation is stored in the
+    // entry, then try_abort call was successful, implying a promise to call finish_abort.
+    invalidations: RefCell<BTreeMap<TxnIndex, Option<Incarnation>>>,
+}
+
+// TODO: test, put in SchedulerWrapper.
+impl<'a> AbortManager<'a> {
+    fn new(
+        owner_txn_idx: TxnIndex,
+        owner_incarnation: Incarnation,
+        scheduler: &'a SchedulerV2,
+    ) -> Self {
+        Self {
+            owner_txn_idx,
+            owner_incarnation,
+            scheduler,
+            invalidations: RefCell::new(BTreeMap::new()),
+        }
+    }
+
+    fn invalidate(
+        &self,
+        invalidated_txn_idx: TxnIndex,
+        invalidated_incarnation: Incarnation,
+    ) -> Result<(), PanicError> {
+        if invalidated_txn_idx <= self.owner_txn_idx {
+            return Err(code_invariant_error(format!(
+                "Execution of version ({}, {}) may not invalidate lower version ({}, {})",
+                self.owner_txn_idx,
+                self.owner_incarnation,
+                invalidated_txn_idx,
+                invalidated_incarnation,
+            )));
+        }
+
+        let mut invalidations = self.invalidations.borrow_mut();
+        match invalidations.entry(invalidated_txn_idx) {
+            Vacant(vacant_entry) => {
+                // For vacant entries, we always need to try abort
+                let _ = vacant_entry
+                    .insert(self.try_abort(invalidated_txn_idx, invalidated_incarnation)?);
+            },
+            Occupied(mut occupied_entry) => {
+                match occupied_entry.get() {
+                    None => {
+                        // Only try abort if we don't have a stored incarnation
+                        *occupied_entry.get_mut() =
+                            self.try_abort(invalidated_txn_idx, invalidated_incarnation)?;
+                    },
+                    Some(stored_incarnation) => {
+                        if *stored_incarnation < invalidated_incarnation {
+                            // The caller would have to perform finish_execution for the stored incarnation with a
+                            // successful try_abort in order for a higher incarnation to exist (and be invalidated).
+                            return Err(code_invariant_error(format!(
+                                "Lower incarnation {} than {} has already been invalidated by Abort Manager for txn {}",
+                                stored_incarnation, invalidated_incarnation, self.owner_txn_idx
+                            )));
+                        }
+                    },
+                }
+            },
+        }
+
+        Ok(())
+    }
+
+    fn try_abort(
+        &self,
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+    ) -> Result<Option<TxnIndex>, PanicError> {
+        fail_point!("abort-manager-try-abort-none", |_| Ok(None));
+        fail_point!("abort-manager-try-abort-some", |_| Ok(Some(incarnation)));
+        Ok(self
+            .scheduler
+            .try_abort(txn_idx, incarnation)?
+            .then(|| incarnation))
+    }
+
+    // Returns an iterator over invalidated transaction indices, as well as full versions,
+    // i.e. (txn_idx, incarnation) pairs, for which try_abort was successful. For those
+    // versions, the finish abort still needs to be performed.
+    fn take(
+        self,
+    ) -> (
+        TxnIndex,
+        Incarnation,
+        BTreeMap<TxnIndex, Option<Incarnation>>,
+    ) {
+        (
+            self.owner_txn_idx,
+            self.owner_incarnation,
+            self.invalidations.take(),
+        )
+    }
 }
 
 // Describes downstream dependencies for a transaction that have previously gotten aborted
@@ -512,8 +623,12 @@ impl SchedulerV2 {
                     // to only allow increasing scheduler's executed_idx after an execution that
                     // is not speculatively aborted (such as here).
                     if incarnation > 0 && matches!(ret, DependencyResolution::None) {
-                        let to_propagate = self.try_abort(txn_idx, incarnation)?;
-                        self.propagate(to_propagate)?;
+                        // Change the inner status to aborted so finishing execution will make the
+                        // transaction eligible for re-execution. Status was Executing so we keep
+                        // things simple and ignore aborted dependencies / stall propagation.
+                        if self.txn_status[txn_idx as usize].try_abort(incarnation)? {
+                            self.txn_status[txn_idx as usize].finish_abort(incarnation)?;
+                        }
 
                         // The current logic is to just ask caller to speculatively abort.
                         // TODO: complex handling (e.g. scheduler maintenance), also revisit Wait.
@@ -548,27 +663,30 @@ impl SchedulerV2 {
         }
     }
 
-    pub(crate) fn finish_execution(
-        &self,
-        txn_idx: TxnIndex,
-        incarnation: Incarnation,
-        invalidated_versions: BTreeSet<(TxnIndex, Incarnation)>,
+    // Abort manager that the worker / txn execution used to process all invalidations in BlockSTMv2 (while
+    // applying its own output) is provided by value as an argument (to enforce the proper usage pattern).
+    pub(crate) fn finish_execution<'a>(
+        &'a self,
+        abort_manager: AbortManager<'a>,
     ) -> Result<(), PanicError> {
+        let (txn_idx, incarnation, invalidated_set) = abort_manager.take();
+
         if incarnation > 0 {
-            // TODO: make sure we don't kill switch 0-th incarnations.
             // Record aborted dependencies. Only recording for incarnations > 0 is in line with the
             // optimistic value validation principle of Block-STMv2. 0-th incarnation might invalidate
             // due to the first write, but later incarnations could make the same writes - in which case
             // there is no need to record (and stall, etc) the corresponding dependency.
             self.aborted_dependencies[txn_idx as usize]
                 .lock()
-                .record_dependencies(invalidated_versions.iter().map(|(idx, _)| *idx));
+                .record_dependencies(invalidated_set.iter().map(|(txn_idx, _)| *txn_idx));
         }
 
-        let mut propagation_queue = BTreeSet::new();
-        for (invalidated_idx, invalidated_incarnation) in invalidated_versions {
-            let mut to_propagate = self.try_abort(invalidated_idx, invalidated_incarnation)?;
-            propagation_queue.append(&mut to_propagate);
+        let mut propagation_queue: BTreeSet<usize> = BTreeSet::new();
+        for (txn_idx, maybe_incarnation) in invalidated_set {
+            if let Some(incarnation) = maybe_incarnation {
+                self.txn_status[txn_idx as usize].finish_abort(incarnation)?;
+                propagation_queue.insert(txn_idx as usize);
+            }
         }
 
         if self.txn_status[txn_idx as usize].finish_execution(incarnation)? {
@@ -607,7 +725,7 @@ impl SchedulerV2 {
             return false;
         }
 
-        self.txn_status[txn_idx as usize].shortcut_already_aborted(incarnation)
+        self.txn_status[txn_idx as usize].already_try_aborted(incarnation)
     }
 }
 
@@ -641,17 +759,8 @@ impl SchedulerV2 {
         Ok(())
     }
 
-    fn try_abort(
-        &self,
-        txn_idx: TxnIndex,
-        incarnation: Incarnation,
-    ) -> Result<BTreeSet<usize>, PanicError> {
-        let mut ret = BTreeSet::new();
-        let mut aborted_deps_guard = self.aborted_dependencies[txn_idx as usize].lock();
-        if self.txn_status[txn_idx as usize].try_abort(incarnation)? {
-            aborted_deps_guard.add_stall(&self.txn_status, &mut ret)?;
-        }
-        Ok(ret)
+    fn try_abort(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> Result<bool, PanicError> {
+        self.txn_status[txn_idx as usize].try_abort(incarnation)
     }
 
     fn try_start_executing(&self, txn_idx: TxnIndex) -> Option<Incarnation> {
@@ -728,15 +837,29 @@ mod tests {
     use arc_swap::ArcSwapOption;
     use claims::{assert_err, assert_lt, assert_none, assert_ok, assert_ok_eq, assert_some_eq};
     use dashmap::DashMap;
+    use fail::FailScenario;
     use num_cpus;
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use std::{
         cmp::min,
-        collections::{btree_map::Entry, BTreeMap},
         thread,
         time::{Duration, Instant},
     };
     use test_case::test_case;
+
+    // Helper function to invalidate all transactions after a given index
+    fn invalidate_after_index(
+        abort_manager: &AbortManager,
+        invalidated_set: &mut BTreeSet<(TxnIndex, Incarnation)>,
+        after_idx: TxnIndex,
+    ) -> Result<(), PanicError> {
+        for (invalidated_txn_idx, invalidated_incarnation) in
+            invalidated_set.split_off(&(after_idx + 1, 0))
+        {
+            abort_manager.invalidate(invalidated_txn_idx, invalidated_incarnation)?;
+        }
+        Ok(())
+    }
 
     #[test]
     fn record_aborted_dependencies() {
@@ -995,7 +1118,7 @@ mod tests {
         assert!(num_stalls > 0);
 
         assert_some_eq!(scheduler.try_start_executing(dep_idx), 0);
-        assert_ok!(scheduler.finish_execution(dep_idx, 0, BTreeSet::new()));
+        assert_ok!(scheduler.finish_execution(AbortManager::new(dep_idx, 0, scheduler)));
         assert_ok_eq!(scheduler.txn_status[dep_idx as usize].add_stall(), true);
         assert!(scheduler.txn_status[dep_idx as usize].is_stalled());
         for _ in 1..num_stalls {
@@ -1021,7 +1144,7 @@ mod tests {
         stall_and_add_dependency(&scheduler, 0, 2, 1);
         stall_and_add_dependency(&scheduler, 0, 3, 2);
 
-        assert_ok!(scheduler.finish_execution(0, 0, BTreeSet::new()));
+        assert_ok!(scheduler.finish_execution(AbortManager::new(0, 0, &scheduler)));
 
         assert!(!scheduler.aborted_dependencies[0].lock().is_stalled);
         assert!(!scheduler.aborted_dependencies[2].lock().is_stalled);
@@ -1038,6 +1161,107 @@ mod tests {
             );
         }
         assert_eq!(scheduler.next_to_commit_idx.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn test_abort_manager_invalidate() {
+        let scheduler = SchedulerV2::new(10, 1);
+        let abort_manager = AbortManager::new(2, 0, &scheduler);
+
+        // Check initial state - no invalidations should be recorded
+        assert!(abort_manager.invalidations.borrow().is_empty());
+
+        let scenario = FailScenario::setup();
+        assert!(fail::has_failpoints());
+
+        // Test invalidating lower version (error), try_abort (not called) via failpoint.
+        fail::cfg("abort-manager-try-abort-none", "panic").unwrap();
+        assert_err!(abort_manager.invalidate(1, 0));
+        assert_err!(abort_manager.invalidate(2, 0)); // same version
+        assert_err!(abort_manager.invalidate(0, 0));
+
+        // Test case where try_abort returns None (simulating false)
+        fail::cfg("abort-manager-try-abort-none", "return").unwrap();
+        assert_ok!(abort_manager.invalidate(3, 0));
+        assert_some_eq!(abort_manager.invalidations.borrow().get(&3), &None);
+        fail::remove("abort-manager-try-abort-none");
+        // Make sure None can get replaced with an incarnation.
+        fail::cfg("abort-manager-try-abort-some", "return").unwrap();
+        assert_ok!(abort_manager.invalidate(3, 2));
+        assert_some_eq!(abort_manager.invalidations.borrow().get(&3), &Some(2));
+
+        // Test case where try_abort returns Some(incarnation).
+        assert_ok!(abort_manager.invalidate(4, 0));
+        assert_some_eq!(abort_manager.invalidations.borrow().get(&4), &Some(0));
+
+        // Test occupied entry with Some value - error if lower incarnation try_aborted.
+        fail::cfg("abort-manager-try-abort-some", "panic").unwrap();
+        assert_err!(abort_manager.invalidate(4, 1));
+        assert_some_eq!(abort_manager.invalidations.borrow().get(&4), &Some(0));
+
+        // Test invalidating with equal incarnation as stored - should be ignored.
+        // Configure failpoint to panic but it shouldn't be called since incarnation matches.
+        assert_ok!(abort_manager.invalidate(4, 0));
+        assert_some_eq!(abort_manager.invalidations.borrow().get(&4), &Some(0));
+        fail::remove("abort-manager-try-abort");
+
+        // Test multiple invalidations for different transactions
+        fail::cfg("abort-manager-try-abort-some", "return").unwrap();
+        assert_ok!(abort_manager.invalidate(5, 2));
+        assert_ok!(abort_manager.invalidate(6, 4));
+        assert_some_eq!(abort_manager.invalidations.borrow().get(&5), &Some(2));
+        assert_some_eq!(abort_manager.invalidations.borrow().get(&6), &Some(4));
+        fail::remove("abort-manager-try-aborts-some");
+
+        // Test that invalidations are preserved after multiple calls (in different order),
+        // and that lower incarnations are ignored.
+        fail::cfg("abort-manager-try-abort-some", "panic").unwrap();
+        assert_ok!(abort_manager.invalidate(5, 1));
+        assert_err!(abort_manager.invalidate(5, 4));
+        assert_err!(abort_manager.invalidate(6, 6));
+        assert_ok!(abort_manager.invalidate(6, 1));
+        assert_some_eq!(abort_manager.invalidations.borrow().get(&5), &Some(2));
+        assert_some_eq!(abort_manager.invalidations.borrow().get(&6), &Some(4));
+
+        scenario.teardown();
+    }
+
+    #[test]
+    fn test_abort_manager_take() {
+        let scheduler = SchedulerV2::new(10, 1);
+        let abort_manager = AbortManager::new(2, 0, &scheduler);
+
+        // Set up failpoint before running test
+        let scenario = FailScenario::setup();
+        assert!(fail::has_failpoints());
+
+        // Record some invalidations with specific failpoint configurations.
+        fail::cfg("abort-manager-try-abort-none", "return").unwrap();
+        assert_ok!(abort_manager.invalidate(3, 0));
+        fail::remove("abort-manager-try-abort-none");
+        fail::cfg("abort-manager-try-abort-some", "return").unwrap();
+        assert_ok!(abort_manager.invalidate(4, 1));
+        assert_ok!(abort_manager.invalidate(5, 2));
+
+        // Verify the invalidations before taking them.
+        let invalidations = abort_manager.invalidations.borrow();
+        assert_eq!(invalidations.len(), 3);
+        assert_some_eq!(invalidations.get(&3), &None);
+        assert_some_eq!(invalidations.get(&4), &Some(1));
+        assert_some_eq!(invalidations.get(&5), &Some(2));
+        drop(invalidations);
+
+        // Take the invalidations and verify the returned values.
+        let (owner_txn_idx, owner_incarnation, invalidations) = abort_manager.take();
+
+        assert_eq!(owner_txn_idx, 2);
+        assert_eq!(owner_incarnation, 0);
+        assert_eq!(invalidations.len(), 3);
+        assert_some_eq!(invalidations.get(&3), &None);
+        assert_some_eq!(invalidations.get(&4), &Some(1));
+        assert_some_eq!(invalidations.get(&5), &Some(2));
+
+        scenario.teardown();
     }
 
     #[test_case(1)]
@@ -1067,7 +1291,7 @@ mod tests {
                     }
 
                     assert_some_eq!(scheduler.try_start_executing(idx), 0);
-                    assert_ok!(scheduler.finish_execution(idx, 0, BTreeSet::new()));
+                    assert_ok!(scheduler.finish_execution(AbortManager::new(idx, 0, &scheduler)));
                 });
             }
         });
@@ -1140,6 +1364,7 @@ mod tests {
         stall_and_add_dependency(&scheduler, 3, 6, 1);
         stall_and_add_dependency(&scheduler, 6, 9, 1);
         assert_ok_eq!(scheduler.txn_status[6].try_abort(0), true);
+        assert_ok!(scheduler.txn_status[6].finish_abort(0));
 
         assert_ok!(scheduler.propagate(BTreeSet::from([3])));
 
@@ -1168,7 +1393,7 @@ mod tests {
         assert_ok_eq!(scheduler.next_task(), TaskKind::Execute(0, 0));
         assert_none!(scheduler.try_get_sequential_commit_hook().unwrap());
         // After execution is finished, commit hook can be dispatched.
-        assert_ok!(scheduler.finish_execution(0, 0, BTreeSet::new()));
+        assert_ok!(scheduler.finish_execution(AbortManager::new(0, 0, &scheduler)));
         assert_eq!(
             scheduler.committed_marker[0].load(Ordering::Relaxed),
             NOT_COMMITTED
@@ -1288,11 +1513,12 @@ mod tests {
                                 assert!(incarnation < 2);
 
                                 hooks_taken[txn_idx as usize].store(true, Ordering::Relaxed);
-                                let invalidated: BTreeSet<_> = hooks
-                                    .lock()
-                                    .split_off(&(txn_idx + 1, 0))
-                                    .into_iter()
-                                    .collect();
+                                let abort_manager =
+                                    AbortManager::new(txn_idx, incarnation, &scheduler);
+
+                                // Invalidate all hooks after this transaction
+                                invalidate_after_index(&abort_manager, &mut hooks.lock(), txn_idx)
+                                    .unwrap();
 
                                 let mut dep_ok = true;
                                 if let Some(dep_idx) = txn_deps[txn_idx as usize] {
@@ -1300,7 +1526,11 @@ mod tests {
                                         hooks.lock().insert((txn_idx, incarnation));
                                         if hooks_taken[dep_idx].load(Ordering::Relaxed) {
                                             // Hook is not guaraneed to be executed - call abort itself.
-                                            assert_ok!(scheduler.try_abort(txn_idx, incarnation));
+                                            if assert_ok!(scheduler.try_abort(txn_idx, incarnation))
+                                            {
+                                                assert_ok!(scheduler.txn_status[txn_idx as usize]
+                                                    .finish_abort(incarnation));
+                                            }
                                         };
                                         dep_ok = false;
                                     }
@@ -1310,11 +1540,7 @@ mod tests {
                                     observed_executed[txn_idx as usize]
                                         .store(true, Ordering::Relaxed);
                                 }
-                                assert_ok!(scheduler.finish_execution(
-                                    txn_idx,
-                                    incarnation,
-                                    invalidated,
-                                ));
+                                assert_ok!(scheduler.finish_execution(abort_manager));
                             },
                             TaskKind::PostCommitProcessing(txn_idx) => {
                                 num_processed.fetch_add(1, Ordering::Relaxed);
@@ -1514,65 +1740,56 @@ mod tests {
                                         .unwrap();
                                 }
 
-                                // We could record writes only for incarnation 0:
-                                // - In the workload, the writes of all incarnations are the same.
-                                // - No registered reads would be invalidated by incarnations > 0
-                                //   due to value-based validation.
-                                // - Incarnation 0 should always record the writes: we don't check
-                                //   here, but resolve_dependency currently does not instruct to
-                                //   speculatively abort the 0-th incarnation.
-                                // However, in order to measure scalability more fairly, we query
-                                // the DashMap and check that the written value by a prior incarnatio
-                                // is the same, and record writes in any case.
-                                let invalidated_versions: BTreeSet<(TxnIndex, Incarnation)> = {
-                                    let mut ret = BTreeSet::new();
+                                let abort_manager =
+                                    AbortManager::new(txn_idx, incarnation, &scheduler);
 
-                                    for write in &txn_write_keys[txn_idx as usize] {
-                                        let mut key_entries = mv_hashmap.get_mut(write).unwrap();
+                                // Record writes and invalidate affected reads
+                                for write in &txn_write_keys[txn_idx as usize] {
+                                    let mut key_entries = mv_hashmap.get_mut(write).unwrap();
 
-                                        // Write should consider range including itself.
-                                        let mut iter = key_entries.1.range_mut(0..=txn_idx);
-                                        let mut cur_invalidated = match iter.next_back() {
-                                            Some((write_idx, entry)) => {
-                                                if incarnation == 0 {
-                                                    assert_lt!(*write_idx, txn_idx);
-                                                    // No reads can be transferred since write_idx
-                                                    // differs from txn_idx (and indices are the values).
-                                                    // Split at txn_idx + 1 as own reads are unaffected.
-                                                    entry
-                                                        .registered_reads
-                                                        .split_off(&(txn_idx + 1, 0))
-                                                } else {
-                                                    assert_eq!(*write_idx, txn_idx);
-                                                    assert_eq!(entry.txn_idx, txn_idx);
-                                                    assert_eq!(entry.incarnation + 1, incarnation);
-                                                    BTreeSet::new()
-                                                }
-                                            },
-                                            None => key_entries.0.split_off(&(txn_idx + 1, 0)),
-                                        };
-                                        ret.append(&mut cur_invalidated);
-
-                                        if let Entry::Vacant(vacant_entry) =
-                                            key_entries.1.entry(txn_idx)
-                                        {
-                                            assert_eq!(incarnation, 0);
-                                            vacant_entry.insert(CachePadded::new(MockWrite {
+                                    // Write should consider range including itself.
+                                    let mut iter = key_entries.1.range_mut(0..=txn_idx);
+                                    match iter.next_back() {
+                                        Some((write_idx, entry)) => {
+                                            if incarnation == 0 {
+                                                assert_lt!(*write_idx, txn_idx);
+                                                // No reads can be transferred since write_idx
+                                                // differs from txn_idx (and indices are the values).
+                                                // Split at txn_idx + 1 as own reads are unaffected.
+                                                invalidate_after_index(
+                                                    &abort_manager,
+                                                    &mut entry.registered_reads,
+                                                    txn_idx,
+                                                )
+                                                .unwrap();
+                                            } else {
+                                                assert_eq!(*write_idx, txn_idx);
+                                                assert_eq!(entry.txn_idx, txn_idx);
+                                                assert_eq!(entry.incarnation + 1, incarnation);
+                                            }
+                                        },
+                                        None => {
+                                            // Invalidate all reads after this transaction
+                                            invalidate_after_index(
+                                                &abort_manager,
+                                                &mut key_entries.0,
                                                 txn_idx,
-                                                incarnation,
-                                                registered_reads: BTreeSet::new(),
-                                            }));
-                                        }
+                                            )
+                                            .unwrap();
+                                        },
                                     }
 
-                                    ret
-                                };
+                                    if let Vacant(vacant_entry) = key_entries.1.entry(txn_idx) {
+                                        assert_eq!(incarnation, 0);
+                                        vacant_entry.insert(CachePadded::new(MockWrite {
+                                            txn_idx,
+                                            incarnation,
+                                            registered_reads: BTreeSet::new(),
+                                        }));
+                                    }
+                                }
 
-                                assert_ok!(scheduler.finish_execution(
-                                    txn_idx,
-                                    incarnation,
-                                    invalidated_versions,
-                                ));
+                                assert_ok!(scheduler.finish_execution(abort_manager));
                             },
                             TaskKind::PostCommitProcessing(txn_idx) => {
                                 assert_eq!(

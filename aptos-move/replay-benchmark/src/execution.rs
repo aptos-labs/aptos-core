@@ -22,6 +22,7 @@ pub(crate) fn execute_workload(
 ) -> Vec<TransactionOutput> {
     let config = BlockExecutorConfig {
         local: BlockExecutorLocalConfig {
+            block_stm_v2: true,
             concurrency_level,
             allow_fallback: true,
             discard_failed_blocks: false,
