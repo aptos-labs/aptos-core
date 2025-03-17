@@ -13,14 +13,9 @@ use move_core_types::{
 };
 use move_ir_compiler::Compiler;
 use move_vm_runtime::{
-<<<<<<< HEAD
-    module_traversal::*, move_vm::MoveVM, native_extensions::NativeContextExtensions,
-    native_functions::NativeFunction, AsUnsyncCodeStorage, RuntimeEnvironment,
-=======
-    data_cache::TransactionDataCache, module_traversal::*, move_vm::MoveVm,
+    data_cache::TransactionDataCache, module_traversal::*, move_vm::MoveVM,
     native_extensions::NativeContextExtensions, native_functions::NativeFunction,
     AsUnsyncCodeStorage, CodeStorage, ModuleStorage, RuntimeEnvironment,
->>>>>>> 35ea878580 (remove move vm session)
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
@@ -202,7 +197,7 @@ fn main() -> Result<()> {
     };
     let args: Vec<Vec<u8>> = vec![];
 
-    let return_values = MoveVm::execute_loaded_function(
+    let return_values = MoveVM::execute_loaded_function(
         func,
         args,
         &mut TransactionDataCache::empty(),

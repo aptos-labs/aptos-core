@@ -36,11 +36,7 @@ pub struct SerializedReturnValues {
 /// arguments fully instantiated.
 pub struct MoveVM;
 
-<<<<<<< HEAD
 impl MoveVM {
-    pub(crate) fn execute_loaded_function(
-=======
-impl MoveVm {
     /// Executes provided function with the specified arguments. The arguments are serialized, and
     /// are not checked by the VM. It is the responsibility of the caller of this function to
     /// verify that they are well-formed.
@@ -53,7 +49,6 @@ impl MoveVm {
     /// When execution finishes, the return values of the function are returned. Additionally, if
     /// there are any mutable references passed as arguments, these values are also returned.
     pub fn execute_loaded_function(
->>>>>>> 35ea878580 (remove move vm session)
         function: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_cache: &mut TransactionDataCache,

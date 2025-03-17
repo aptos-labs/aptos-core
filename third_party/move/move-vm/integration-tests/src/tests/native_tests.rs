@@ -10,17 +10,7 @@ use move_core_types::{
     account_address::AccountAddress, gas_algebra::InternalGas, ident_str, identifier::Identifier,
 };
 use move_vm_runtime::{
-<<<<<<< HEAD
-<<<<<<< HEAD
-    config::VMConfig, module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction,
-    session::Session, AsUnsyncCodeStorage, ModuleStorage, RuntimeEnvironment, StagingModuleStorage,
-=======
-    config::VMConfig, module_traversal::*, move_vm::MoveVm, native_functions::NativeFunction,
-    AsUnsyncCodeStorage, ModuleStorage, RuntimeEnvironment, StagingModuleStorage,
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-=======
     native_functions::NativeFunction, AsUnsyncCodeStorage, RuntimeEnvironment, StagingModuleStorage,
->>>>>>> 35ea878580 (remove move vm session)
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::natives::function::NativeResult;
@@ -73,14 +63,6 @@ fn test_failed_native() {
         let runtime_environment = RuntimeEnvironment::new(natives);
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-        let mut sess = MoveVM::new_session(&storage);
-=======
-        let mut session = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-=======
->>>>>>> 35ea878580 (remove move vm session)
         let module_storage = storage.as_unsync_code_storage();
         let new_module_storage =
             StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob.clone().into()])

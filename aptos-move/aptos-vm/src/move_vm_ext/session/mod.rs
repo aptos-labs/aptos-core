@@ -37,23 +37,12 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-<<<<<<< HEAD
-    config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
-    session::Session, AsFunctionValueExtension, ModuleStorage, VerifiedModuleBundle,
-};
-use move_vm_types::{value_serde::ValueSerDeContext, values::Value};
-use std::{
-    collections::BTreeMap,
-    ops::{Deref, DerefMut},
-    sync::Arc,
-=======
     config::VMConfig,
     data_cache::TransactionDataCache,
     module_traversal::TraversalContext,
-    move_vm::{MoveVm, SerializedReturnValues},
+    move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
     AsFunctionValueExtension, LoadedFunction, ModuleStorage, VerifiedModuleBundle,
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
 };
 use move_vm_types::{gas::GasMeter, value_serde::ValueSerDeContext, values::Value};
 use std::{borrow::Borrow, collections::BTreeMap, sync::Arc};
@@ -122,16 +111,8 @@ where
 
         let is_storage_slot_metadata_enabled = features.is_storage_slot_metadata_enabled();
         Self {
-<<<<<<< HEAD
-<<<<<<< HEAD
-            inner: MoveVM::new_session_with_extensions(resolver, extensions),
-=======
-            inner: MoveVm::new_session_with_extensions(extensions),
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-=======
             data_cache: TransactionDataCache::empty(),
             extensions,
->>>>>>> 35ea878580 (remove move vm session)
             resolver,
             is_storage_slot_metadata_enabled,
         }
@@ -161,7 +142,7 @@ where
             .finish(Location::Module(module_id)));
         }
 
-        MoveVm::execute_loaded_function(
+        MoveVM::execute_loaded_function(
             func,
             args,
             &mut self.data_cache,
@@ -185,7 +166,7 @@ where
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
         let func = module_storage.load_function(module_id, function_name, &ty_args)?;
-        MoveVm::execute_loaded_function(
+        MoveVM::execute_loaded_function(
             func,
             args,
             &mut self.data_cache,
@@ -205,7 +186,7 @@ where
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
-        MoveVm::execute_loaded_function(
+        MoveVM::execute_loaded_function(
             func,
             args,
             &mut self.data_cache,

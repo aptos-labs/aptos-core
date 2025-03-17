@@ -21,14 +21,7 @@ use move_core_types::{
     value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
-<<<<<<< HEAD
-use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage, AsUnsyncModuleStorage,
-    RuntimeEnvironment, WithRuntimeEnvironment,
-};
-=======
 use move_vm_runtime::{AsUnsyncModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment};
->>>>>>> 35ea878580 (remove move vm session)
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{code::ModuleBytesStorage, resolver::ResourceResolver};
 
@@ -107,14 +100,6 @@ fn test_malformed_resource() {
     // Execute the first script to publish a resource Foo.
     let mut script_blob = vec![];
     s1.serialize(&mut script_blob).unwrap();
-<<<<<<< HEAD
-<<<<<<< HEAD
-    let mut sess = MoveVM::new_session(&storage);
-=======
-    let mut sess = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-=======
->>>>>>> 35ea878580 (remove move vm session)
 
     let args = vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()];
     let result = execute_script_and_commit_change_set_for_test(
@@ -131,26 +116,8 @@ fn test_malformed_resource() {
     let mut script_blob = vec![];
     s2.serialize(&mut script_blob).unwrap();
     {
-<<<<<<< HEAD
-<<<<<<< HEAD
-        let mut sess = MoveVM::new_session(&storage);
-=======
-        let mut sess = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-        sess.load_and_execute_script(
-            script_blob.clone(),
-            vec![],
-            vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
-            &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
-            &code_storage,
-            &storage,
-        )
-        .unwrap();
-=======
         let result = execute_script_for_test(&storage, &script_blob, &[], args.clone());
         assert_ok!(result);
->>>>>>> 35ea878580 (remove move vm session)
     }
 
     // Corrupt the resource in the storage.
@@ -168,30 +135,10 @@ fn test_malformed_resource() {
     // Run the second script again.
     // The test will be successful if it fails with an invariant violation.
     {
-<<<<<<< HEAD
-<<<<<<< HEAD
-        let mut sess = MoveVM::new_session(&storage);
-=======
-        let mut sess = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-        let err = sess
-            .load_and_execute_script(
-                script_blob,
-                vec![],
-                vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
-                &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
-                &code_storage,
-                &storage,
-            )
-            .unwrap_err();
-        assert_eq!(err.status_type(), StatusType::InvariantViolation);
-=======
         let status_type = execute_script_for_test(&storage, &script_blob, &[], args)
             .unwrap_err()
             .status_type();
         assert_eq!(status_type, StatusType::InvariantViolation);
->>>>>>> 35ea878580 (remove move vm session)
     }
 }
 
@@ -219,20 +166,9 @@ fn test_malformed_module() {
     {
         let mut storage = InMemoryStorage::new();
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob.clone().into());
-<<<<<<< HEAD
 
-<<<<<<< HEAD
-        let mut sess = MoveVM::new_session(&storage);
-=======
-        let mut sess = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-        let module_storage = storage.as_unsync_module_storage();
-
-        sess.execute_function_bypass_visibility(
-=======
         let result = execute_function_with_single_storage_for_test(
             &storage,
->>>>>>> 35ea878580 (remove move vm session)
             &module_id,
             &fun_name,
             &[],
@@ -256,27 +192,6 @@ fn test_malformed_module() {
         let mut storage = InMemoryStorage::new();
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-        let mut sess = MoveVM::new_session(&storage);
-=======
-        let mut sess = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-        let module_storage = storage.as_unsync_module_storage();
-
-        let err = sess
-            .execute_function_bypass_visibility(
-                &module_id,
-                &fun_name,
-                vec![],
-                Vec::<Vec<u8>>::new(),
-                &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
-                &module_storage,
-                &storage,
-            )
-            .unwrap_err();
-=======
         let err = execute_function_with_single_storage_for_test(
             &storage,
             &module_id,
@@ -285,7 +200,6 @@ fn test_malformed_module() {
             vec![],
         )
         .unwrap_err();
->>>>>>> 35ea878580 (remove move vm session)
         assert_eq!(err.status_type(), StatusType::InvariantViolation);
     }
 }
@@ -314,19 +228,8 @@ fn test_unverifiable_module() {
         m.serialize(&mut blob).unwrap();
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-        let mut sess = MoveVM::new_session(&storage);
-=======
-        let mut sess = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-        let module_storage = storage.as_unsync_module_storage();
-
-        sess.execute_function_bypass_visibility(
-=======
         let result = execute_function_with_single_storage_for_test(
             &storage,
->>>>>>> 35ea878580 (remove move vm session)
             &module_id,
             &fun_name,
             &[],
@@ -346,28 +249,6 @@ fn test_unverifiable_module() {
         m.serialize(&mut blob).unwrap();
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-        let mut sess = MoveVM::new_session(&storage);
-=======
-        let mut sess = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-        let module_storage = storage.as_unsync_module_storage();
-
-        let err = sess
-            .execute_function_bypass_visibility(
-                &module_id,
-                &fun_name,
-                vec![],
-                Vec::<Vec<u8>>::new(),
-                &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
-                &module_storage,
-                &storage,
-            )
-            .unwrap_err();
-
-=======
         let err = execute_function_with_single_storage_for_test(
             &storage,
             &module_id,
@@ -376,7 +257,6 @@ fn test_unverifiable_module() {
             vec![],
         )
         .unwrap_err();
->>>>>>> 35ea878580 (remove move vm session)
         assert_eq!(err.status_type(), StatusType::InvariantViolation);
     }
 }
@@ -415,19 +295,8 @@ fn test_missing_module_dependency() {
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-        let mut sess = MoveVM::new_session(&storage);
-=======
-        let mut sess = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-        let module_storage = storage.as_unsync_module_storage();
-
-        sess.execute_function_bypass_visibility(
-=======
         let result = execute_function_with_single_storage_for_test(
             &storage,
->>>>>>> 35ea878580 (remove move vm session)
             &module_id,
             &fun_name,
             &[],
@@ -442,28 +311,6 @@ fn test_missing_module_dependency() {
         let mut storage = InMemoryStorage::new();
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-        let mut sess = MoveVM::new_session(&storage);
-=======
-        let mut sess = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-        let module_storage = storage.as_unsync_module_storage();
-
-        let err = sess
-            .execute_function_bypass_visibility(
-                &module_id,
-                &fun_name,
-                vec![],
-                Vec::<Vec<u8>>::new(),
-                &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
-                &module_storage,
-                &storage,
-            )
-            .unwrap_err();
-
-=======
         let err = execute_function_with_single_storage_for_test(
             &storage,
             &module_id,
@@ -472,7 +319,6 @@ fn test_missing_module_dependency() {
             vec![],
         )
         .unwrap_err();
->>>>>>> 35ea878580 (remove move vm session)
         assert_eq!(err.status_type(), StatusType::InvariantViolation);
     }
 }
@@ -510,19 +356,8 @@ fn test_malformed_module_dependency() {
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.clone().into());
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-        let mut sess = MoveVM::new_session(&storage);
-=======
-        let mut sess = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-        let module_storage = storage.as_unsync_module_storage();
-
-        sess.execute_function_bypass_visibility(
-=======
         let result = execute_function_with_single_storage_for_test(
             &storage,
->>>>>>> 35ea878580 (remove move vm session)
             &module_id,
             &fun_name,
             &[],
@@ -542,28 +377,6 @@ fn test_malformed_module_dependency() {
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-        let mut sess = MoveVM::new_session(&storage);
-=======
-        let mut sess = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-        let module_storage = storage.as_unsync_module_storage();
-
-        let err = sess
-            .execute_function_bypass_visibility(
-                &module_id,
-                &fun_name,
-                vec![],
-                Vec::<Vec<u8>>::new(),
-                &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
-                &module_storage,
-                &storage,
-            )
-            .unwrap_err();
-
-=======
         let err = execute_function_with_single_storage_for_test(
             &storage,
             &module_id,
@@ -572,7 +385,6 @@ fn test_malformed_module_dependency() {
             vec![],
         )
         .unwrap_err();
->>>>>>> 35ea878580 (remove move vm session)
         assert_eq!(err.status_type(), StatusType::InvariantViolation);
     }
 }
@@ -611,19 +423,8 @@ fn test_unverifiable_module_dependency() {
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-        let mut sess = MoveVM::new_session(&storage);
-=======
-        let mut sess = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-        let module_storage = storage.as_unsync_module_storage();
-
-        sess.execute_function_bypass_visibility(
-=======
         let result = execute_function_with_single_storage_for_test(
             &storage,
->>>>>>> 35ea878580 (remove move vm session)
             &module_id,
             &fun_name,
             &[],
@@ -643,28 +444,6 @@ fn test_unverifiable_module_dependency() {
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-        let mut sess = MoveVM::new_session(&storage);
-=======
-        let mut sess = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-        let module_storage = storage.as_unsync_module_storage();
-
-        let err = sess
-            .execute_function_bypass_visibility(
-                &module_id,
-                &fun_name,
-                vec![],
-                Vec::<Vec<u8>>::new(),
-                &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
-                &module_storage,
-                &storage,
-            )
-            .unwrap_err();
-
-=======
         let err = execute_function_with_single_storage_for_test(
             &storage,
             &module_id,
@@ -673,7 +452,6 @@ fn test_unverifiable_module_dependency() {
             vec![],
         )
         .unwrap_err();
->>>>>>> 35ea878580 (remove move vm session)
         assert_eq!(err.status_type(), StatusType::InvariantViolation);
     }
 }
@@ -750,27 +528,6 @@ fn test_storage_returns_bogus_error_when_loading_module() {
         };
         let module_storage = data_storage.as_unsync_module_storage();
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-        let mut sess = MoveVM::new_session(&storage);
-=======
-        let mut sess = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-        let module_storage = storage.as_unsync_module_storage();
-
-        let err = sess
-            .execute_function_bypass_visibility(
-                &module_id,
-                &fun_name,
-                vec![],
-                Vec::<Vec<u8>>::new(),
-                &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
-                &module_storage,
-                &storage,
-            )
-            .unwrap_err();
-=======
         let err = execute_function_for_test(
             &data_storage,
             &module_storage,
@@ -780,7 +537,6 @@ fn test_storage_returns_bogus_error_when_loading_module() {
             vec![],
         )
         .unwrap_err();
->>>>>>> 35ea878580 (remove move vm session)
 
         // TODO(loader_v2):
         //   Loader V2 remaps all deserialization and verification errors. Loader V1 does not
@@ -855,15 +611,6 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
             module_storage,
             bad_status_code: *error_code,
         };
-<<<<<<< HEAD
-
-<<<<<<< HEAD
-        let mut sess = MoveVM::new_session(&storage);
-=======
-        let mut sess = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-=======
->>>>>>> 35ea878580 (remove move vm session)
         let module_storage = storage.module_storage.as_unsync_module_storage();
 
         let result =

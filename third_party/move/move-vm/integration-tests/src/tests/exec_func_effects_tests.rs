@@ -15,13 +15,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::StatusCode,
 };
-<<<<<<< HEAD
-use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues, AsUnsyncModuleStorage,
-};
-=======
 use move_vm_runtime::move_vm::SerializedReturnValues;
->>>>>>> 35ea878580 (remove move vm session)
 use move_vm_test_utils::InMemoryStorage;
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
@@ -87,11 +81,7 @@ fn setup_module() -> ModuleCode {
     (module_id, code)
 }
 
-fn run(
-    module: &ModuleCode,
-    fun_name: &str,
-    arg_val0: MoveValue,
-) -> VMResult<SerializedReturnValues> {
+fn run(module: &ModuleCode, fun_name: &str, arg: MoveValue) -> VMResult<SerializedReturnValues> {
     let module_id = &module.0;
     let function_name = Identifier::new(fun_name).unwrap();
 
@@ -99,41 +89,13 @@ fn run(
     let mut storage = InMemoryStorage::new();
     compile_modules(&mut storage, &modules);
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-    let mut session = MoveVM::new_session(&storage);
-=======
-    let mut session = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-
-    let fun_name = Identifier::new(fun_name).unwrap();
-    let traversal_storage = TraversalStorage::new();
-    let module_storage = storage.as_unsync_module_storage();
-
-    session
-        .execute_function_bypass_visibility(
-            module_id,
-            &fun_name,
-            vec![],
-            serialize_values(&vec![arg_val0]),
-            &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
-            &module_storage,
-            &storage,
-        )
-        .and_then(|ret_values| {
-            let change_set = session.finish(&module_storage)?;
-            Ok((change_set, ret_values))
-        })
-=======
     execute_function_with_single_storage_for_test(
         &storage,
         module_id,
         &function_name,
         &[],
-        serialize_values(&vec![arg_val0]),
+        serialize_values(&vec![arg]),
     )
->>>>>>> 35ea878580 (remove move vm session)
 }
 
 type ModuleCode = (ModuleId, String);

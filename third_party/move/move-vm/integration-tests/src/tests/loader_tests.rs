@@ -15,14 +15,7 @@ use move_core_types::{
     ability::AbilitySet, account_address::AccountAddress, ident_str, identifier::Identifier,
     language_storage::ModuleId,
 };
-<<<<<<< HEAD
-use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, AsUnsyncModuleStorage, ModuleStorage,
-    StagingModuleStorage,
-};
-=======
 use move_vm_runtime::{AsUnsyncModuleStorage, ModuleStorage, StagingModuleStorage};
->>>>>>> 35ea878580 (remove move vm session)
 use move_vm_test_utils::InMemoryStorage;
 use std::path::PathBuf;
 
@@ -86,35 +79,6 @@ impl Adapter {
                 .unwrap_or_else(|_| panic!("Failure executing {:?}::{:?}", module_id, name));
         }
     }
-<<<<<<< HEAD
-
-    fn call_function(
-        &self,
-        module: &ModuleId,
-        name: &IdentStr,
-        module_storage: &impl ModuleStorage,
-    ) {
-<<<<<<< HEAD
-        let mut session = MoveVM::new_session(&self.store);
-=======
-        let mut session = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-        let traversal_storage = TraversalStorage::new();
-        session
-            .execute_function_bypass_visibility(
-                module,
-                name,
-                vec![],
-                Vec::<Vec<u8>>::new(),
-                &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
-                module_storage,
-                &self.store,
-            )
-            .unwrap_or_else(|_| panic!("Failure executing {:?}::{:?}", module, name));
-    }
-=======
->>>>>>> 35ea878580 (remove move vm session)
 }
 
 fn get_modules() -> Vec<CompiledModule> {

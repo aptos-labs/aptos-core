@@ -38,17 +38,10 @@ use move_vm_runtime::{
     config::VMConfig,
     data_cache::TransactionDataCache,
     module_traversal::*,
-<<<<<<< HEAD
-    move_vm::MoveVM,
-    session::{SerializedReturnValues, Session},
-    AsUnsyncCodeStorage, AsUnsyncModuleStorage, ModuleStorage, RuntimeEnvironment,
-    StagingModuleStorage,
-=======
-    move_vm::{MoveVm, SerializedReturnValues},
+    move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
     AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage, LoadedFunction, ModuleStorage,
     RuntimeEnvironment, StagingModuleStorage,
->>>>>>> 35ea878580 (remove move vm session)
 };
 use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
@@ -380,36 +373,18 @@ impl<'a> SimpleVMTestAdapter<'a> {
         args: Vec<Vec<u8>>,
         gas_budget: Option<u64>,
         module_storage: &impl ModuleStorage,
-<<<<<<< HEAD
-        f: impl FnOnce(&mut Session, &InMemoryStorage, &mut GasStatus) -> VMResult<Ret>,
-    ) -> VMResult<Ret> {
-        let (mut session, mut gas_status) = {
-            let gas_status = get_gas_status(
-                &move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE,
-                gas_budget,
-            )
-            .unwrap();
-<<<<<<< HEAD
-            let session = MoveVM::new_session(&self.storage);
-            (session, gas_status)
-=======
-            (MoveVm::new_session(), gas_status)
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-        };
-=======
     ) -> VMResult<SerializedReturnValues> {
         let mut gas_status = get_gas_status(
             &move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE,
             gas_budget,
         )
         .unwrap();
->>>>>>> 35ea878580 (remove move vm session)
 
         let traversal_storage = TraversalStorage::new();
         let mut extensions = NativeContextExtensions::default();
 
         let mut data_cache = TransactionDataCache::empty();
-        let return_values = MoveVm::execute_loaded_function(
+        let return_values = MoveVM::execute_loaded_function(
             function,
             args,
             &mut data_cache,

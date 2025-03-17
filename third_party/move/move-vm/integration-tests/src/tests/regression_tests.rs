@@ -13,13 +13,7 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     vm_status::StatusCode,
 };
-<<<<<<< HEAD
-use move_vm_runtime::{
-    config::VMConfig, module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage, RuntimeEnvironment,
-};
-=======
 use move_vm_runtime::{config::VMConfig, RuntimeEnvironment};
->>>>>>> 35ea878580 (remove move vm session)
 use move_vm_test_utils::InMemoryStorage;
 use std::time::Instant;
 
@@ -141,30 +135,8 @@ fn script_large_ty() {
         struct_name,
     );
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-    let mut session = MoveVM::new_session(&storage);
-=======
-    let mut session = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-    let code_storage = storage.as_unsync_code_storage();
-    let traversal_storage = TraversalStorage::new();
-    let res = session
-        .load_and_execute_script(
-            script.as_ref(),
-            vec![input_type],
-            Vec::<Vec<u8>>::new(),
-            &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
-            &code_storage,
-            &storage,
-        )
-        .unwrap_err();
-=======
     let status = execute_script_for_test(&storage, &script, &[input_ty], vec![])
         .unwrap_err()
         .major_status();
->>>>>>> 35ea878580 (remove move vm session)
-
     assert_eq!(status, StatusCode::TOO_MANY_TYPE_NODES);
 }

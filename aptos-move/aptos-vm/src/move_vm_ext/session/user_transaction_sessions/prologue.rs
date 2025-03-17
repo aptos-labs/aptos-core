@@ -29,15 +29,9 @@ pub struct PrologueSession<'r> {
 }
 
 impl<'r> PrologueSession<'r> {
-<<<<<<< HEAD
-    pub fn new<'m>(
-        vm: &AptosVM,
-        txn_meta: &'m TransactionMetadata,
-=======
     pub fn new(
-        vm: &AptosVm,
+        vm: &AptosVM,
         txn_meta: &TransactionMetadata,
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
         resolver: &'r impl AptosMoveResolver,
     ) -> Self {
         let session_id = SessionId::prologue_meta(txn_meta);

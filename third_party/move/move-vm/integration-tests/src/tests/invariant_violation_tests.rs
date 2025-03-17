@@ -7,10 +7,6 @@ use move_binary_format::file_format::{
     SignatureToken::*,
 };
 use move_core_types::vm_status::StatusCode;
-<<<<<<< HEAD
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage};
-=======
->>>>>>> 35ea878580 (remove move vm session)
 use move_vm_test_utils::InMemoryStorage;
 
 #[test]
@@ -75,14 +71,6 @@ fn merge_borrow_states_infinite_loop() {
 
     move_bytecode_verifier::verify_script(&cs).expect("verify failed");
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-    let mut session = MoveVM::new_session(&storage);
-=======
-    let mut session = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-=======
->>>>>>> 35ea878580 (remove move vm session)
     let mut script_bytes = vec![];
     cs.serialize(&mut script_bytes).unwrap();
 

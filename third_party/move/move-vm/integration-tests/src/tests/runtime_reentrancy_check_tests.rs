@@ -12,14 +12,7 @@ use move_core_types::{
     account_address::AccountAddress, gas_algebra::GasQuantity, ident_str, identifier::Identifier,
     language_storage::ModuleId, vm_status::StatusCode,
 };
-<<<<<<< HEAD
-use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction, AsUnsyncModuleStorage,
-    RuntimeEnvironment,
-};
-=======
 use move_vm_runtime::{native_functions::NativeFunction, RuntimeEnvironment};
->>>>>>> 35ea878580 (remove move vm session)
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::natives::function::NativeResult;
 use smallvec::SmallVec;
@@ -167,17 +160,6 @@ fn runtime_reentrancy_check() {
 
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("A").unwrap());
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-    let mut sess = MoveVM::new_session(&storage);
-=======
-    let mut sess = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-    let module_storage = storage.as_unsync_module_storage();
-    let traversal_storage = TraversalStorage::new();
-
-=======
->>>>>>> 35ea878580 (remove move vm session)
     // Call stack look like following:
     // A::foo1 -> B::foo1 -> B::dispatch -> A::foo3, Re-entrancy happens at foo3.
     let status = execute_function_with_single_storage_for_test(
