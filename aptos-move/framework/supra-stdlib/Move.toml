@@ -1,0 +1,9 @@
+[package]
+name = "SupraStdlib"
+version = "1.0.0"
+
+[dependencies]
+AptosStdlib = { local = "../aptos-stdlib" }
+
+[addresses]
+supra_std = "0x1"

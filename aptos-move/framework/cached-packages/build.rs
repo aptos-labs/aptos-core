@@ -51,6 +51,14 @@ fn main() -> Result<()> {
         );
         println!(
             "cargo:rerun-if-changed={}",
+            prev_dir.join("supra-stdlib").join("sources").display()
+        );
+        println!(
+            "cargo:rerun-if-changed={}",
+            prev_dir.join("supra-stdlib").join("Move.toml").display()
+        );
+        println!(
+            "cargo:rerun-if-changed={}",
             prev_dir.join("supra-framework").join("sources").display()
         );
         println!(

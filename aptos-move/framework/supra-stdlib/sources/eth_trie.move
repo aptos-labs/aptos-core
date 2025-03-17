@@ -1,4 +1,4 @@
-module aptos_std::eth_trie {
+module supra_std::eth_trie {
 
     use std::vector;
 
