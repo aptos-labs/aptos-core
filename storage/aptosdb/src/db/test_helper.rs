@@ -21,7 +21,8 @@ use aptos_types::{
     proptest_types::{AccountInfoUniverse, BlockGen},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionToCommit, Version,
+        ReplayProtector, Transaction, TransactionAuxiliaryData, TransactionInfo,
+        TransactionToCommit, Version,
     },
     write_set::TransactionWrite,
 };
@@ -448,6 +449,7 @@ fn get_events_by_event_key(
     db: &AptosDB,
     ledger_info: &LedgerInfo,
     event_key: &EventKey,
+    // TODO[Orderless]: Need to update this to accommodate orderless transactions
     first_seq_num: u64,
     last_seq_num: u64,
     order: Order,
@@ -608,12 +610,15 @@ fn group_events_by_event_key(
     event_key_to_events.into_iter().collect()
 }
 
-fn verify_account_txns(
+fn verify_account_ordered_txns(
     db: &AptosDB,
-    expected_txns_by_account: HashMap<AccountAddress, Vec<(Transaction, Vec<ContractEvent>)>>,
+    expected_ordered_txns_by_account: HashMap<
+        AccountAddress,
+        Vec<(Transaction, Vec<ContractEvent>)>,
+    >,
     ledger_info: &LedgerInfo,
 ) {
-    let actual_txns_by_account = expected_txns_by_account
+    let actual_ordered_txns_by_account = expected_ordered_txns_by_account
         .iter()
         .map(|(account, txns_and_events)| {
             let account = *account;
@@ -628,7 +633,7 @@ fn verify_account_txns(
             let limit = last_seq_num + 1;
 
             let acct_txns_with_proof = db
-                .get_account_transactions(
+                .get_account_ordered_transactions(
                     account,
                     first_seq_num,
                     limit,
@@ -657,20 +662,25 @@ fn verify_account_txns(
         })
         .collect::<HashMap<_, _>>();
 
-    assert_eq!(actual_txns_by_account, expected_txns_by_account);
+    assert_eq!(
+        actual_ordered_txns_by_account,
+        expected_ordered_txns_by_account
+    );
 }
 
-fn group_txns_by_account(
+fn group_ordered_txns_by_account(
     txns_to_commit: &[TransactionToCommit],
 ) -> HashMap<AccountAddress, Vec<(Transaction, Vec<ContractEvent>)>> {
     let mut account_to_txns = HashMap::new();
     for txn in txns_to_commit {
         if let Some(signed_txn) = txn.transaction().try_as_signed_user_txn() {
-            let account = signed_txn.sender();
-            account_to_txns
-                .entry(account)
-                .or_insert_with(Vec::new)
-                .push((txn.transaction().clone(), txn.events().to_vec()));
+            if let ReplayProtector::SequenceNumber(_) = signed_txn.replay_protector() {
+                let account = signed_txn.sender();
+                account_to_txns
+                    .entry(account)
+                    .or_insert_with(Vec::new)
+                    .push((txn.transaction().clone(), txn.events().to_vec()));
+            }
         }
     }
     account_to_txns
@@ -786,44 +796,45 @@ pub fn verify_committed_transactions(
                 txn_to_commit.transaction().hash()
             );
             txn_with_proof
-                .verify_user_txn(ledger_info, cur_ver, txn.sender(), txn.sequence_number())
+                .verify_user_txn(ledger_info, cur_ver, txn.sender(), txn.replay_protector())
                 .unwrap();
             let txn_with_proof = db
                 .get_transaction_with_proof(cur_ver, ledger_version, true)
                 .unwrap();
             txn_with_proof
-                .verify_user_txn(ledger_info, cur_ver, txn.sender(), txn.sequence_number())
+                .verify_user_txn(ledger_info, cur_ver, txn.sender(), txn.replay_protector())
                 .unwrap();
 
-            let txn_with_proof = db
-                .get_account_transaction(txn.sender(), txn.sequence_number(), true, ledger_version)
-                .unwrap()
-                .expect("Should exist.");
-            txn_with_proof
-                .verify_user_txn(ledger_info, cur_ver, txn.sender(), txn.sequence_number())
-                .unwrap();
+            if let ReplayProtector::SequenceNumber(seq_num) = txn.replay_protector() {
+                let txn_with_proof = db
+                    .get_account_ordered_transaction(txn.sender(), seq_num, true, ledger_version)
+                    .unwrap()
+                    .expect("Should exist.");
+                txn_with_proof
+                    .verify_user_txn(ledger_info, cur_ver, txn.sender(), txn.replay_protector())
+                    .unwrap();
 
-            let acct_txns_with_proof = db
-                .get_account_transactions(
-                    txn.sender(),
-                    txn.sequence_number(),
-                    1,
-                    true,
-                    ledger_version,
-                )
-                .unwrap();
-            acct_txns_with_proof
-                .verify(
-                    ledger_info,
-                    txn.sender(),
-                    txn.sequence_number(),
-                    1,
-                    true,
-                    ledger_version,
-                )
-                .unwrap();
-            assert_eq!(acct_txns_with_proof.len(), 1);
-
+                let acct_txns_with_proof = db
+                    .get_account_ordered_transactions(
+                        txn.sender(),
+                        seq_num,
+                        1,
+                        true,
+                        ledger_version,
+                    )
+                    .unwrap();
+                acct_txns_with_proof
+                    .verify(
+                        ledger_info,
+                        txn.sender(),
+                        txn.sequence_number(),
+                        1,
+                        true,
+                        ledger_version,
+                    )
+                    .unwrap();
+                assert_eq!(acct_txns_with_proof.len(), 1);
+            }
             let txn_list_with_proof = db
                 .get_transactions(cur_ver, 1, ledger_version, true /* fetch_events */)
                 .unwrap();
@@ -852,7 +863,11 @@ pub fn verify_committed_transactions(
     );
 
     // Fetch and verify batch transactions by account
-    verify_account_txns(db, group_txns_by_account(txns_to_commit), ledger_info);
+    verify_account_ordered_txns(
+        db,
+        group_ordered_txns_by_account(txns_to_commit),
+        ledger_info,
+    );
 }
 
 pub fn put_transaction_infos(

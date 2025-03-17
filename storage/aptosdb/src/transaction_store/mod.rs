@@ -13,7 +13,7 @@ use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::{
     account_address::AccountAddress,
-    transaction::{Transaction, Version},
+    transaction::{ReplayProtector, Transaction, Version},
 };
 use std::sync::Arc;
 
@@ -56,7 +56,7 @@ impl TransactionStore {
     /// `version <= ledger_version`.
     /// Guarantees that the returned sequence numbers are sequential, i.e.,
     /// `seq_num_{i} + 1 = seq_num_{i+1}`.
-    pub fn get_account_transaction_version_iter(
+    pub fn get_account_ordered_transactions_iter(
         &self,
         address: AccountAddress,
         min_seq_num: u64,
