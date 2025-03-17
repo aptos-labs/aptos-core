@@ -9,6 +9,7 @@ license = "Apache-2.0"
 [dev-dependencies]
 datatest-stable = { workspace = true }
 itertools = { workspace = true }
+libtest-mimic = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-model = { workspace = true }
 move-transactional-test-runner = { workspace = true }

@@ -46,7 +46,7 @@ module 0x42::m {
         S[account].t.w.greater(w)
     }
 
-    fun foo_greater_2(account: address, w: W): bool acquires S {
+    fun foo_greater_2(account: address, w: W): bool acquires W {
         W[account].greater(w)
     }
 

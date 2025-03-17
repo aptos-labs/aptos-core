@@ -1,10 +1,10 @@
 
 Diagnostics:
-error: function reads global `m::R` which is currently mutably borrowed
+error: function acquires global `m::R` which is currently mutably borrowed
    ┌─ tests/reference-safety/call_access_invalid.move:27:9
    │
  5 │     fun reads_any_R(addr: address) reads R {
-   │                                          -- access declared here
+   │         ----------- `acquires` of this function was inferred
    ·
 26 │         let _r1 = borrow_global_mut<R<u64>>(addr);
    │                   ------------------------------- struct `m::R` previously mutably borrowed here
@@ -14,11 +14,11 @@ error: function reads global `m::R` which is currently mutably borrowed
 31 │         *_r1;
    │         ---- conflicting reference `_r1` used here
 
-error: function reads global `m::R` which is currently mutably borrowed
+error: function acquires global `m::R` which is currently mutably borrowed
    ┌─ tests/reference-safety/call_access_invalid.move:28:9
    │
  9 │     fun reads_any_cafe(addr: address) reads 0xcafe::*::* {
-   │                                             ------------- access declared here
+   │         -------------- `acquires` of this function was inferred
    ·
 26 │         let _r1 = borrow_global_mut<R<u64>>(addr);
    │                   ------------------------------- struct `m::R` previously mutably borrowed here
@@ -29,11 +29,11 @@ error: function reads global `m::R` which is currently mutably borrowed
 31 │         *_r1;
    │         ---- conflicting reference `_r1` used here
 
-error: function reads global `m::R` which is currently mutably borrowed
+error: function acquires global `m::R` which is currently mutably borrowed
    ┌─ tests/reference-safety/call_access_invalid.move:29:9
    │
 13 │     fun reads_any_m(addr: address) reads 0xcafe::m::* {
-   │                                          ------------- access declared here
+   │         ----------- `acquires` of this function was inferred
    ·
 26 │         let _r1 = borrow_global_mut<R<u64>>(addr);
    │                   ------------------------------- struct `m::R` previously mutably borrowed here
@@ -44,11 +44,83 @@ error: function reads global `m::R` which is currently mutably borrowed
 31 │         *_r1;
    │         ---- conflicting reference `_r1` used here
 
-error: function writes global `m::R` which is currently borrowed
+error: function acquires global `m::R` which is currently mutably borrowed
+   ┌─ tests/reference-safety/call_access_invalid.move:30:9
+   │
+17 │     fun reads_not_any_m(addr: address) !reads 0xcafe::m::* {
+   │         --------------- `acquires` of this function was inferred
+   ·
+26 │         let _r1 = borrow_global_mut<R<u64>>(addr);
+   │                   ------------------------------- struct `m::R` previously mutably borrowed here
+   ·
+30 │         reads_not_any_m(addr); // no error
+   │         ^^^^^^^^^^^^^^^^^^^^^ function called here
+31 │         *_r1;
+   │         ---- conflicting reference `_r1` used here
+
+error: function acquires global `m::R` which is currently borrowed
+   ┌─ tests/reference-safety/call_access_invalid.move:36:9
+   │
+ 5 │     fun reads_any_R(addr: address) reads R {
+   │         ----------- `acquires` of this function was inferred
+   ·
+35 │         let _r1 = borrow_global<R<u64>>(addr);
+   │                   --------------------------- struct `m::R` previously borrowed here
+36 │         reads_any_R(addr);
+   │         ^^^^^^^^^^^^^^^^^ function called here
+   ·
+40 │         *_r1;
+   │         ---- conflicting reference `_r1` used here
+
+error: function acquires global `m::R` which is currently borrowed
+   ┌─ tests/reference-safety/call_access_invalid.move:37:9
+   │
+ 9 │     fun reads_any_cafe(addr: address) reads 0xcafe::*::* {
+   │         -------------- `acquires` of this function was inferred
+   ·
+35 │         let _r1 = borrow_global<R<u64>>(addr);
+   │                   --------------------------- struct `m::R` previously borrowed here
+36 │         reads_any_R(addr);
+37 │         reads_any_cafe(addr);
+   │         ^^^^^^^^^^^^^^^^^^^^ function called here
+   ·
+40 │         *_r1;
+   │         ---- conflicting reference `_r1` used here
+
+error: function acquires global `m::R` which is currently borrowed
+   ┌─ tests/reference-safety/call_access_invalid.move:38:9
+   │
+13 │     fun reads_any_m(addr: address) reads 0xcafe::m::* {
+   │         ----------- `acquires` of this function was inferred
+   ·
+35 │         let _r1 = borrow_global<R<u64>>(addr);
+   │                   --------------------------- struct `m::R` previously borrowed here
+   ·
+38 │         reads_any_m(addr);
+   │         ^^^^^^^^^^^^^^^^^ function called here
+39 │         reads_not_any_m(addr);
+40 │         *_r1;
+   │         ---- conflicting reference `_r1` used here
+
+error: function acquires global `m::R` which is currently borrowed
+   ┌─ tests/reference-safety/call_access_invalid.move:39:9
+   │
+17 │     fun reads_not_any_m(addr: address) !reads 0xcafe::m::* {
+   │         --------------- `acquires` of this function was inferred
+   ·
+35 │         let _r1 = borrow_global<R<u64>>(addr);
+   │                   --------------------------- struct `m::R` previously borrowed here
+   ·
+39 │         reads_not_any_m(addr);
+   │         ^^^^^^^^^^^^^^^^^^^^^ function called here
+40 │         *_r1;
+   │         ---- conflicting reference `_r1` used here
+
+error: function acquires global `m::R` which is currently borrowed
    ┌─ tests/reference-safety/call_access_invalid.move:45:9
    │
 21 │     fun writes_any_R_u64(addr: address) writes R<u64>(addr) {
-   │                                                ------------ access declared here
+   │         ---------------- `acquires` of this function was inferred
    ·
 44 │         let _r1 = borrow_global<R<u64>>(addr);
    │                   --------------------------- struct `m::R` previously borrowed here
@@ -57,11 +129,11 @@ error: function writes global `m::R` which is currently borrowed
 46 │         *_r1;
    │         ---- conflicting reference `_r1` used here
 
-error: function writes global `m::R` which is currently borrowed
+error: function acquires global `m::R` which is currently borrowed
    ┌─ tests/reference-safety/call_access_invalid.move:51:9
    │
 21 │     fun writes_any_R_u64(addr: address) writes R<u64>(addr) {
-   │                                                ------------ access declared here
+   │         ---------------- `acquires` of this function was inferred
    ·
 50 │         let _r1 = borrow_global<R<u128>>(addr);
    │                   ---------------------------- struct `m::R` previously borrowed here
