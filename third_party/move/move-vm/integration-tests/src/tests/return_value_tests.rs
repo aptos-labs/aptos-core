@@ -13,13 +13,7 @@ use move_core_types::{
     language_storage::TypeTag,
     value::{MoveTypeLayout, MoveValue},
 };
-<<<<<<< HEAD
-use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues, AsUnsyncModuleStorage,
-};
-=======
 use move_vm_runtime::move_vm::SerializedReturnValues;
->>>>>>> 35ea878580 (remove move vm session)
 use move_vm_test_utils::InMemoryStorage;
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
@@ -57,15 +51,6 @@ fn run(
     let mut storage = InMemoryStorage::new();
     storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-    let mut sess = MoveVM::new_session(&storage);
-=======
-    let mut sess = MoveVm::new_session();
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-
-=======
->>>>>>> 35ea878580 (remove move vm session)
     let fun_name = Identifier::new("foo").unwrap();
     let args: Vec<_> = args
         .into_iter()

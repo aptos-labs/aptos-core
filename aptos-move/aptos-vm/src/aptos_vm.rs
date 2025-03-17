@@ -2452,13 +2452,8 @@ impl AptosVM {
     }
 
     fn execute_view_function_in_vm(
-<<<<<<< HEAD
-        session: &mut SessionExt,
-        vm: &AptosVM,
-=======
         session: &mut SessionExt<impl AptosMoveResolver>,
-        vm: &AptosVm,
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
+        vm: &AptosVM,
         module_id: ModuleId,
         func_name: Identifier,
         type_args: Vec<TypeTag>,

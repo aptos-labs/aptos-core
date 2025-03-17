@@ -57,13 +57,8 @@ use aptos_vm::{
     block_executor::{AptosTransactionOutput, AptosVMBlockExecutorWrapper},
     data_cache::AsMoveResolver,
     gas::make_prod_gas_meter,
-<<<<<<< HEAD
-    move_vm_ext::{MoveVmExt, SessionExt, SessionId},
-    AptosVM, VMValidator,
-=======
     move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionExt, SessionId},
-    AptosVm, VMValidator,
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
+    AptosVM, VMValidator,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};

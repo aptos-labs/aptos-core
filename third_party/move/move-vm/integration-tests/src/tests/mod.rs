@@ -11,7 +11,7 @@ use move_core_types::{
 use move_vm_runtime::{
     data_cache::TransactionDataCache,
     module_traversal::{TraversalContext, TraversalStorage},
-    move_vm::{MoveVm, SerializedReturnValues},
+    move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
     AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage, ModuleStorage,
 };
@@ -91,7 +91,7 @@ fn execute_function_for_test(
     let traversal_storage = TraversalStorage::new();
 
     let func = module_storage.load_function(module_id, function_name, ty_args)?;
-    MoveVm::execute_loaded_function(
+    MoveVM::execute_loaded_function(
         func,
         args,
         &mut TransactionDataCache::empty(),
@@ -115,7 +115,7 @@ fn execute_script_impl(
     let function = code_storage.load_script(script, ty_args)?;
     let mut data_cache = TransactionDataCache::empty();
 
-    MoveVm::execute_loaded_function(
+    MoveVM::execute_loaded_function(
         function,
         args,
         &mut data_cache,

@@ -252,17 +252,7 @@ impl SharedTestingConfig {
     ) {
         let module_storage = self.starting_storage_state.as_unsync_module_storage();
 
-<<<<<<< HEAD
-        let extensions = extensions::new_extensions();
-<<<<<<< HEAD
-        let mut session =
-            MoveVM::new_session_with_extensions(&self.starting_storage_state, extensions);
-=======
-        let mut session = MoveVm::new_session_with_extensions(extensions);
->>>>>>> 7bae6066b8 ([refactoring] Remove resolver from session, use impl in sesson_ext and respawned)
-=======
         let mut extensions = extensions::new_extensions();
->>>>>>> 35ea878580 (remove move vm session)
         let mut gas_meter = factory.lock().unwrap().new_gas_meter();
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
@@ -280,7 +270,7 @@ impl SharedTestingConfig {
             )
             .and_then(|function| {
                 let args = serialize_values(test_info.arguments.iter());
-                MoveVm::execute_loaded_function(
+                MoveVM::execute_loaded_function(
                     function,
                     args,
                     &mut data_cache,
