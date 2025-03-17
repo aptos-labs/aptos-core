@@ -146,7 +146,7 @@ impl AccessSpecifier {
         match self {
             Any => true,
             Constraint(incls, excls) => {
-                incls.iter().any(|c| c.includes(access))
+                (incls.is_empty() && !excls.is_empty() || incls.iter().any(|c| c.includes(access)))
                     && excls.iter().all(|c| !c.excludes(access))
             },
         }
