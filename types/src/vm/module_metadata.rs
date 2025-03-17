@@ -29,6 +29,14 @@ use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, collections::BTreeMap, env, str::FromStr, sync::Arc};
 use thiserror::Error;
 
+pub mod prelude {
+    pub use crate::vm::module_metadata::{
+        get_compilation_metadata_from_compiled_module,
+        get_compilation_metadata_from_compiled_script, get_metadata_from_compiled_module,
+        get_metadata_from_compiled_script, RuntimeModuleMetadataV1,
+    };
+}
+
 /// The minimal file format version from which the V1 metadata is supported
 pub const METADATA_V1_MIN_FILE_FORMAT_VERSION: u32 = 6;
 
@@ -229,7 +237,7 @@ pub fn get_metadata_v0(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> 
 }
 
 /// Check if the metadata has unknown key/data types
-pub fn check_metadata_format(
+fn check_metadata_format(
     module: &CompiledModule,
     features: &Features,
 ) -> Result<(), MalformedError> {
@@ -781,3 +789,55 @@ impl FromStr for ResourceGroupScope {
 #[derive(Debug, Error)]
 #[error("Invalid resource group scope: {0}")]
 pub struct ResourceGroupScopeError(String);
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_is_less_strict() {
+        let less_strict = [
+            (ResourceGroupScope::Global, ResourceGroupScope::Address),
+            (ResourceGroupScope::Global, ResourceGroupScope::Module),
+            (ResourceGroupScope::Address, ResourceGroupScope::Module),
+        ];
+        for (scope, other_scope) in less_strict {
+            assert!(scope.is_less_strict(&other_scope));
+        }
+
+        let more_or_as_strict = [
+            (ResourceGroupScope::Global, ResourceGroupScope::Global),
+            (ResourceGroupScope::Address, ResourceGroupScope::Global),
+            (ResourceGroupScope::Address, ResourceGroupScope::Address),
+            (ResourceGroupScope::Module, ResourceGroupScope::Global),
+            (ResourceGroupScope::Module, ResourceGroupScope::Address),
+            (ResourceGroupScope::Module, ResourceGroupScope::Module),
+        ];
+        for (scope, other_scope) in more_or_as_strict {
+            assert!(!scope.is_less_strict(&other_scope));
+        }
+    }
+
+    #[test]
+    fn test_are_equal_module_ids() {
+        let id = |s: &str| -> ModuleId { ModuleId::from_str(s).unwrap() };
+
+        let global_scope = ResourceGroupScope::Global;
+        assert!(global_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x1::foo")));
+        assert!(global_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x1::bar")));
+        assert!(global_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x2::foo")));
+        assert!(global_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x2::bar")));
+
+        let address_scope = ResourceGroupScope::Address;
+        assert!(address_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x1::foo")));
+        assert!(address_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x1::bar")));
+        assert!(!address_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x2::foo")));
+        assert!(!address_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x2::bar")));
+
+        let module_scope = ResourceGroupScope::Module;
+        assert!(module_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x1::foo")));
+        assert!(!module_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x1::bar")));
+        assert!(!module_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x2::foo")));
+        assert!(!module_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x2::bar")));
+    }
+}
