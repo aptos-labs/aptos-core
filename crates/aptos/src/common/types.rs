@@ -306,7 +306,7 @@ pub struct ProfileSummary {
 impl From<&ProfileConfig> for ProfileSummary {
     fn from(config: &ProfileConfig) -> Self {
         ProfileSummary {
-            network: config.network.clone(),
+            network: config.network,
             has_private_key: config.private_key.is_some(),
             public_key: config.public_key.clone(),
             account: config.account,
