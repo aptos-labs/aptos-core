@@ -56,7 +56,6 @@ pub enum BlockType {
 
     /// A virtual block that's constructed by nodes from DAG, this is purely a local thing so
     /// we hide it from serde
-    #[serde(skip_deserializing)]
     DAGBlock {
         author: Author,
         failed_authors: Vec<(Round, Author)>,
