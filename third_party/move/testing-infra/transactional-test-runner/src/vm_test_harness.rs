@@ -55,11 +55,7 @@ const STD_ADDR: AccountAddress = AccountAddress::ONE;
 
 struct SimpleVMTestAdapter<'a> {
     compiled_state: CompiledState<'a>,
-
-    // VM shared by all tasks.
-    vm: MoveVM,
     storage: InMemoryStorage,
-
     default_syntax: SyntaxChoice,
     run_config: TestRunConfig,
 }
@@ -141,13 +137,11 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let vm_config = vm_config();
         let runtime_environment = create_runtime_environment(vm_config);
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
-        let vm = MoveVM::new();
 
         let mut adapter = Self {
             compiled_state: CompiledState::new(named_address_mapping, pre_compiled_deps_v2, None),
             default_syntax,
             run_config,
-            vm,
             storage,
         };
 
@@ -283,7 +277,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let verbose = extra_args.verbose;
         let traversal_storage = TraversalStorage::new();
         self.perform_session_action(gas_budget, &code_storage, |session, gas_status| {
-            session.execute_script(
+            session.load_and_execute_script(
                 script_bytes,
                 type_args,
                 args,
@@ -397,7 +391,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
                 gas_budget,
             )
             .unwrap();
-            let session = self.vm.new_session(&self.storage);
+            let session = MoveVM::new_session(&self.storage);
             (session, gas_status)
         };
 
