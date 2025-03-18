@@ -290,6 +290,8 @@ pub struct ProfileConfig {
 /// ProfileConfig but without the private parts
 #[derive(Debug, Serialize)]
 pub struct ProfileSummary {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network: Option<Network>,
     pub has_private_key: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key: Option<Ed25519PublicKey>,
@@ -304,6 +306,7 @@ pub struct ProfileSummary {
 impl From<&ProfileConfig> for ProfileSummary {
     fn from(config: &ProfileConfig) -> Self {
         ProfileSummary {
+            network: config.network.clone(),
             has_private_key: config.private_key.is_some(),
             public_key: config.public_key.clone(),
             account: config.account,
