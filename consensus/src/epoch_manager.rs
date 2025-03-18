@@ -896,6 +896,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         ));
 
         info!(epoch = epoch, "Create ProposalGenerator");
+        let max_sending_block_txns_after_filtering = if onchain_consensus_config.opt_proposal_enabled() {
+            self.config.max_sending_opt_block_txns_after_filtering
+        } else {
+            self.config.max_sending_block_txns_after_filtering
+        };
         // txn manager is required both by proposal generator (to pull the proposers)
         // and by event processor (to update their status).
         let proposal_generator = ProposalGenerator::new(
@@ -908,7 +913,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.config.max_sending_block_txns,
                 self.config.max_sending_block_bytes,
             ),
-            self.config.max_sending_block_txns_after_filtering,
+            max_sending_block_txns_after_filtering,
             PayloadTxnsSize::new(
                 self.config.max_sending_inline_txns,
                 self.config.max_sending_inline_bytes,

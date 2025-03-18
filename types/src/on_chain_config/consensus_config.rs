@@ -39,7 +39,7 @@ impl ConsensusAlgorithmConfig {
             main: ConsensusConfigV1::default(),
             quorum_store_enabled: true,
             order_vote_enabled: true,
-            opt_proposal_enabled: true,
+            opt_proposal_enabled: false,
         }
     }
 
