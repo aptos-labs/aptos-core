@@ -22,7 +22,7 @@ use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
     block::Block,
     common::Round,
-    pipelined_block::{ExecutionSummary, PipelinedBlock},
+    pipelined_block::{ExecutionSummary, OrderedBlockWindow, PipelinedBlock},
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutCertificate,
@@ -37,7 +37,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, proof::accumulator::InMemoryTransactionAccumulator,
 };
 use futures::executor::block_on;
-#[cfg(test)]
+#[cfg(any(test, feature = "fuzzing"))]
 use std::collections::VecDeque;
 #[cfg(any(test, feature = "fuzzing"))]
 use std::sync::atomic::AtomicBool;
@@ -88,6 +88,8 @@ pub struct BlockStore {
     #[cfg(any(test, feature = "fuzzing"))]
     back_pressure_for_test: AtomicBool,
     order_vote_enabled: bool,
+    /// Window Size for Execution Pool
+    window_size: Option<u64>,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
     pipeline_builder: Option<PipelineBuilder>,
 }
@@ -102,6 +104,7 @@ impl BlockStore {
         vote_back_pressure_limit: Round,
         payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
+        window_size: Option<u64>,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
         pipeline_builder: Option<PipelineBuilder>,
     ) -> Self {
@@ -120,6 +123,7 @@ impl BlockStore {
             vote_back_pressure_limit,
             payload_manager,
             order_vote_enabled,
+            window_size,
             pending_blocks,
             pipeline_builder,
             None,
@@ -161,11 +165,20 @@ impl BlockStore {
         vote_back_pressure_limit: Round,
         payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
+        window_size: Option<u64>,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
         pipeline_builder: Option<PipelineBuilder>,
         tree_to_replace: Option<Arc<RwLock<BlockTree>>>,
     ) -> Self {
-        let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_cert) = root;
+        let (commit_root_block, window_root_block, root_qc, root_ordered_cert, root_commit_cert) = (
+            root.commit_root_block,
+            root.window_root_block,
+            root.quorum_cert,
+            root.ordered_cert,
+            root.commit_cert,
+        );
+        let root_block_id = commit_root_block.id();
+        let root_block_round = commit_root_block.round();
 
         //verify root is correct
         assert!(
@@ -194,21 +207,34 @@ impl BlockStore {
         ));
         assert_eq!(result.root_hash(), root_metadata.accu_hash);
 
-        let pipelined_root_block = PipelinedBlock::new(
-            *root_block,
-            vec![],
-            // Create a dummy state_compute_result with necessary fields filled in.
-            result.clone(),
-        );
+        let window_root = match window_root_block {
+            None => {
+                PipelinedBlock::new(
+                    *commit_root_block,
+                    vec![],
+                    // Create a dummy state_compute_result with necessary fields filled in.
+                    result.clone(),
+                )
+            },
+            Some(window_block) => {
+                PipelinedBlock::new(
+                    *window_block,
+                    vec![],
+                    // Create a dummy state_compute_result with necessary fields filled in.
+                    result.clone(),
+                )
+            },
+        };
 
         if let Some(pipeline_builder) = &pipeline_builder {
             let pipeline_fut =
                 pipeline_builder.build_root(result, root_commit_cert.ledger_info().clone());
-            pipelined_root_block.set_pipeline_futs(pipeline_fut);
+            window_root.set_pipeline_futs(pipeline_fut);
         }
 
         let tree = BlockTree::new(
-            pipelined_root_block,
+            root_block_id,
+            window_root,
             root_qc,
             root_ordered_cert,
             root_commit_cert,
@@ -234,12 +260,25 @@ impl BlockStore {
             order_vote_enabled,
             pending_blocks,
             pipeline_builder,
+            window_size,
         };
 
         for block in blocks {
-            block_store.insert_block(block).await.unwrap_or_else(|e| {
-                panic!("[BlockStore] failed to insert block during build {:?}", e)
-            });
+            if block.round() <= root_block_round {
+                block_store
+                    .insert_committed_block(block)
+                    .await
+                    .unwrap_or_else(|e| {
+                        panic!(
+                            "[BlockStore] failed to insert committed block during build {:?}",
+                            e
+                        )
+                    });
+            } else {
+                block_store.insert_block(block).await.unwrap_or_else(|e| {
+                    panic!("[BlockStore] failed to insert block during build {:?}", e)
+                });
+            }
         }
         for qc in quorum_certs {
             block_store
@@ -288,6 +327,7 @@ impl BlockStore {
             .insert_ordered_cert(finality_proof_clone.clone());
         update_counters_for_ordered_blocks(&blocks_to_commit);
 
+        let window_size = self.window_size;
         // This callback is invoked synchronously with and could be used for multiple batches of blocks.
         self.execution_client
             .finalize_order(
@@ -301,6 +341,7 @@ impl BlockStore {
                             committed_blocks,
                             finality_proof,
                             commit_decision,
+                            window_size,
                         );
                     },
                 ),
@@ -328,6 +369,7 @@ impl BlockStore {
                 .collect::<Vec<_>>()
         );
         let max_pruned_blocks_in_mem = self.inner.read().max_pruned_blocks_in_mem();
+
         // Rollover the previous highest TC from the old tree to the new one.
         let prev_2chain_htc = self
             .highest_2chain_timeout_cert()
@@ -345,6 +387,7 @@ impl BlockStore {
             self.vote_back_pressure_limit,
             self.payload_manager.clone(),
             self.order_vote_enabled,
+            self.window_size,
             self.pending_blocks.clone(),
             self.pipeline_builder.clone(),
             Some(self.inner.clone()),
@@ -352,6 +395,49 @@ impl BlockStore {
         .await;
 
         self.try_send_for_execution().await;
+    }
+
+    pub async fn insert_committed_block(
+        &self,
+        block: Block,
+    ) -> anyhow::Result<Arc<PipelinedBlock>> {
+        ensure!(
+            self.get_block(block.id()).is_none(),
+            "Recovered block already exists"
+        );
+
+        // We don't know if the blocks in the window for a committed block will
+        // be available in memory so we set the OrderedBlockWindow to empty
+        let pipelined_block = PipelinedBlock::new_ordered(block, OrderedBlockWindow::empty());
+        self.insert_block_inner(pipelined_block).await
+    }
+
+    pub async fn insert_block(&self, block: Block) -> anyhow::Result<Arc<PipelinedBlock>> {
+        if let Some(existing_block) = self.get_block(block.id()) {
+            return Ok(existing_block);
+        }
+        ensure!(
+            self.inner.read().ordered_root().round() < block.round(),
+            "Block with old round"
+        );
+
+        let block_window = self
+            .inner
+            .read()
+            .get_ordered_block_window(&block, self.window_size)?;
+        let blocks = block_window.blocks();
+        for block in blocks {
+            if let Some(payload) = block.payload() {
+                self.payload_manager.prefetch_payload_data(
+                    payload,
+                    block.author().expect("Payload block must have author"),
+                    block.timestamp_usecs(),
+                );
+            }
+        }
+
+        let pipelined_block = PipelinedBlock::new_ordered(block, block_window);
+        self.insert_block_inner(pipelined_block).await
     }
 
     /// Insert a block if it passes all validation tests.
@@ -362,36 +448,33 @@ impl BlockStore {
     /// Duplicate inserts will return the previously inserted block (
     /// note that it is considered a valid non-error case, for example, it can happen if a validator
     /// receives a certificate for a block that is currently being added).
-    pub async fn insert_block(&self, block: Block) -> anyhow::Result<Arc<PipelinedBlock>> {
-        if let Some(existing_block) = self.get_block(block.id()) {
-            return Ok(existing_block);
-        }
-        ensure!(
-            self.inner.read().ordered_root().round() < block.round(),
-            "Block with old round"
-        );
-
-        if let Some(payload) = block.payload() {
+    pub async fn insert_block_inner(
+        &self,
+        pipelined_block: PipelinedBlock,
+    ) -> anyhow::Result<Arc<PipelinedBlock>> {
+        if let Some(payload) = pipelined_block.payload() {
             self.payload_manager.prefetch_payload_data(
                 payload,
-                block.author().expect("Payload block must have author"),
-                block.timestamp_usecs(),
+                pipelined_block
+                    .block()
+                    .author()
+                    .expect("Payload block must have author"),
+                pipelined_block.timestamp_usecs(),
             );
         }
-
-        let pipelined_block = PipelinedBlock::new_ordered(block.clone());
 
         // build pipeline
         if let Some(pipeline_builder) = &self.pipeline_builder {
             let parent_block = self
-                .get_block(block.parent_id())
+                .get_block(pipelined_block.parent_id())
                 .ok_or_else(|| anyhow::anyhow!("Parent block not found"))?;
 
             // need weak pointer to break the cycle between block tree -> pipeline block -> callback
             let block_tree = Arc::downgrade(&self.inner);
             let storage = self.storage.clone();
-            let id = block.id();
-            let round = block.round();
+            let id = pipelined_block.id();
+            let round = pipelined_block.round();
+            let window_size = self.window_size;
             let callback = Box::new(move |commit_decision: LedgerInfoWithSignatures| {
                 if let Some(tree) = block_tree.upgrade() {
                     tree.write().commit_callback(
@@ -399,6 +482,7 @@ impl BlockStore {
                         id,
                         round,
                         WrappedLedgerInfo::new(VoteData::dummy(), commit_decision),
+                        window_size,
                     );
                 }
             });
@@ -419,7 +503,7 @@ impl BlockStore {
                 warn!(
                     "Long wait time {}ms for block {}",
                     t.as_millis(),
-                    pipelined_block.block()
+                    pipelined_block
                 );
             }
             self.time_service.wait_until(block_time).await;
@@ -481,38 +565,6 @@ impl BlockStore {
             .context("Timeout certificate insert failed when persisting to DB")?;
         self.inner.write().replace_2chain_timeout_cert(tc);
         Ok(())
-    }
-
-    /// Prune the tree up to next_root_id (keep next_root_id's block).  Any branches not part of
-    /// the next_root_id's tree should be removed as well.
-    ///
-    /// For example, root = B0
-    /// B0--> B1--> B2
-    ///        ╰--> B3--> B4
-    ///
-    /// prune_tree(B3) should be left with
-    /// B3--> B4, root = B3
-    ///
-    /// Returns the block ids of the blocks removed.
-    #[cfg(test)]
-    fn prune_tree(&self, next_root_id: HashValue) -> VecDeque<HashValue> {
-        let id_to_remove = self.inner.read().find_blocks_to_prune(next_root_id);
-        if let Err(e) = self
-            .storage
-            .prune_tree(id_to_remove.clone().into_iter().collect())
-        {
-            // it's fine to fail here, as long as the commit succeeds, the next restart will clean
-            // up dangling blocks, and we need to prune the tree to keep the root consistent with
-            // executor.
-            warn!(error = ?e, "fail to delete block");
-        }
-
-        // synchronously update both root_id and commit_root_id
-        let mut wlock = self.inner.write();
-        wlock.update_ordered_root(next_root_id);
-        wlock.update_commit_root(next_root_id);
-        wlock.process_pruned_blocks(id_to_remove.clone());
-        id_to_remove
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
@@ -743,5 +795,96 @@ impl BlockStore {
                 .await?;
         }
         self.insert_block(block).await
+    }
+
+    /// Prune the tree up to next_root_id (keep next_root_id's block).  Any branches not part of
+    /// the next_root_id's tree should be removed as well.
+    ///
+    /// For example, root = B0
+    /// B0--> B1--> B2
+    ///        ╰--> B3--> B4
+    ///
+    /// prune_tree(B3) should be left with
+    /// B3--> B4, root = B3
+    ///
+    /// Returns the block ids of the blocks removed.
+    pub(crate) fn prune_tree(&self, next_root_id: HashValue) -> VecDeque<HashValue> {
+        let id_to_remove = self.inner.read().find_blocks_to_prune(next_root_id);
+        if let Err(e) = self
+            .storage
+            .prune_tree(id_to_remove.clone().into_iter().collect())
+        {
+            // it's fine to fail here, as long as the commit succeeds, the next restart will clean
+            // up dangling blocks, and we need to prune the tree to keep the root consistent with
+            // executor.
+            warn!(error = ?e, "fail to delete block");
+        }
+
+        // synchronously update both root_id and commit_root_id
+        let mut wlock = self.inner.write();
+        wlock.update_ordered_root(next_root_id);
+        wlock.update_commit_root(next_root_id);
+        wlock.update_window_root(next_root_id);
+        wlock.process_pruned_blocks(id_to_remove.clone());
+        id_to_remove
+    }
+
+    /// Retrieves the `window_root`
+    /// User can provide a `window_size` to override the `BlockStore::window_size`
+    pub(crate) fn window_root(&self) -> Arc<PipelinedBlock> {
+        self.inner.read().window_root()
+    }
+
+    /// Helper function for testing `find_window_root`.
+    /// User can provide a `window_size` to override the `BlockStore::window_size`
+    pub(crate) fn find_window_root(&self, block_id: HashValue, window_size: Option<u64>) {
+        self.inner
+            .read()
+            .find_window_root(block_id, window_size.or(self.window_size));
+    }
+
+    /// Helper function for testing get_ordered_block_window.
+    /// User can provide a `window_size` to override the `BlockStore::window_size`
+    pub(crate) fn get_ordered_block_window(
+        &self,
+        block: &Block,
+        window_size: Option<u64>,
+    ) -> anyhow::Result<OrderedBlockWindow> {
+        self.inner
+            .read()
+            .get_ordered_block_window(block, window_size.or(self.window_size))
+    }
+
+    /// Retrieves the state of the `commit_root` and `window_root`
+    /// User can provide a `window_size` to override the `BlockStore::window_size`
+    pub(crate) fn get_roots(
+        &self,
+        block: &Block,
+        window_size: Option<u64>,
+    ) -> (Arc<PipelinedBlock>, Option<HashValue>) {
+        let block_store_inner_guard = self.inner.read();
+        let commit_root = block_store_inner_guard.commit_root();
+        let window_root =
+            block_store_inner_guard.find_window_root(block.id(), window_size.or(self.window_size));
+
+        (commit_root, Some(window_root))
+    }
+
+    /// Helper function for testing commit_callback
+    /// User can provide a `window_size` to override the `BlockStore::window_size`
+    pub(crate) fn commit_callback(
+        &self,
+        block_id: HashValue,
+        block_round: Round,
+        commit_proof: WrappedLedgerInfo,
+        window_size: Option<u64>,
+    ) {
+        self.inner.write().commit_callback(
+            self.storage.clone(),
+            block_id,
+            block_round,
+            commit_proof,
+            window_size.or(self.window_size),
+        )
     }
 }
