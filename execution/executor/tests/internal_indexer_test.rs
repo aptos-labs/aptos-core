@@ -323,10 +323,6 @@ fn test_db_indexer_data() {
     assert_vec_eq(&code, &expected_code);
 
     let expected_resources = vec![
-        (
-            false,
-            "0x1::account_abstraction::DomainDispatchableAuthenticator",
-        ),
         (false, "0x1::dkg::DKGState"),
         (false, "0x1::jwks::Patches"),
         (false, "0x1::account::Account"),
