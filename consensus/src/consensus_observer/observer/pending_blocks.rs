@@ -7,13 +7,15 @@ use crate::consensus_observer::{
         metrics,
     },
     network::observer_message::OrderedBlock,
-    observer::{execution_pool::ObservedOrderedBlock, payload_store::BlockPayloadStore},
+    observer::{
+        execution_pool, execution_pool::ObservedOrderedBlock, payload_store::BlockPayloadStore,
+    },
 };
 use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, warn};
-use aptos_types::block_info::Round;
+use aptos_types::{block_info::Round, ledger_info::LedgerInfoWithSignatures};
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     sync::Arc,
@@ -99,6 +101,12 @@ impl PendingBlockStore {
             .contains_key(&first_block_epoch_round)
     }
 
+    #[cfg(test)]
+    /// Returns all pending blocks in the store. This is only used for testing.
+    pub fn get_pending_blocks(&self) -> Vec<Arc<PendingBlockWithMetadata>> {
+        self.blocks_without_payloads.values().cloned().collect()
+    }
+
     /// Returns the pending block with the given hash (if it exists)
     pub fn get_pending_block_by_hash(
         &self,
@@ -111,6 +119,32 @@ impl PendingBlockStore {
 
     /// Inserts a pending block (without payloads) into the store
     pub fn insert_pending_block(&mut self, pending_block: Arc<PendingBlockWithMetadata>) {
+        // Verify that both stores have the same number of entries.
+        // If not, log an error as this should never happen.
+        let num_pending_blocks = self.blocks_without_payloads.len();
+        let num_pending_blocks_by_hash = self.blocks_without_payloads_by_hash.len();
+        if num_pending_blocks != num_pending_blocks_by_hash {
+            error!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "The pending block stores have different numbers of entries: {} and {} (by hash)",
+                    num_pending_blocks, num_pending_blocks_by_hash
+                ))
+            );
+        }
+
+        // Verify that the number of payloads doesn't exceed the maximum
+        let max_num_pending_blocks = self.consensus_observer_config.max_num_pending_blocks as usize;
+        if num_pending_blocks >= max_num_pending_blocks {
+            warn!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Exceeded the maximum number of pending blocks: {:?}. Dropping block: {:?}!",
+                    max_num_pending_blocks,
+                    pending_block.ordered_block().first_block().block_info(),
+                ))
+            );
+            return; // Drop the block if we've exceeded the maximum
+        }
+
         // Get the first block in the ordered blocks
         let first_block = pending_block.ordered_block().first_block();
 
@@ -149,50 +183,53 @@ impl PendingBlockStore {
                 entry.insert(pending_block);
             },
         }
-
-        // Perform garbage collection if the store is too large
-        self.garbage_collect_pending_blocks();
     }
 
-    /// Garbage collects the pending blocks store by removing
-    /// the oldest blocks if the store is too large.
-    fn garbage_collect_pending_blocks(&mut self) {
-        // Verify that both stores have the same number of entries.
-        // If not, log an error as this should never happen.
-        let num_pending_blocks = self.blocks_without_payloads.len() as u64;
-        let num_pending_blocks_by_hash = self.blocks_without_payloads_by_hash.len() as u64;
-        if num_pending_blocks != num_pending_blocks_by_hash {
-            error!(
-                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "The pending block stores have different numbers of entries: {} and {} (by hash)",
-                    num_pending_blocks, num_pending_blocks_by_hash
-                ))
+    /// Removes the pending blocks for the given commit ledger info. If
+    /// the execution pool window size is None, all blocks up to (and
+    /// including) the epoch and round of the commit will be removed.
+    /// Otherwise, a buffer of blocks preceding the commit will be retained
+    /// (to ensure we have enough blocks to satisfy the execution window).
+    pub fn remove_blocks_for_commit(
+        &mut self,
+        commit_ledger_info: &LedgerInfoWithSignatures,
+        execution_pool_window_size: Option<u64>,
+    ) {
+        // Determine the epoch and round to split off
+        let window_buffer_multiplier = self
+            .consensus_observer_config
+            .observer_block_window_buffer_multiplier;
+        let (split_off_epoch, split_off_round) =
+            execution_pool::calculate_epoch_round_split_for_commit(
+                commit_ledger_info,
+                execution_pool_window_size,
+                window_buffer_multiplier,
             );
-        }
 
-        // Calculate the number of blocks to remove
-        let max_pending_blocks = self.consensus_observer_config.max_num_pending_blocks;
-        let num_blocks_to_remove = num_pending_blocks.saturating_sub(max_pending_blocks);
+        // Split the blocks at the epoch and round and identify the blocks to retain
+        let blocks_to_retain = self
+            .blocks_without_payloads
+            .split_off(&(split_off_epoch, split_off_round));
 
-        // Remove the oldest blocks if the store is too large
-        for _ in 0..num_blocks_to_remove {
-            if let Some((oldest_epoch_round, pending_block)) =
-                self.blocks_without_payloads.pop_first()
+        // Remove the old blocks from the hash store
+        for pending_block in self.blocks_without_payloads.values() {
+            let first_block = pending_block.ordered_block().first_block();
+            if self
+                .blocks_without_payloads_by_hash
+                .remove(&first_block.id())
+                .is_none()
             {
-                // Log a warning message for the removed block
-                warn!(
+                error!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "The pending block store is too large: {:?} blocks. Removing the block for the oldest epoch and round: {:?}",
-                        num_pending_blocks, oldest_epoch_round
+                        "Failed to remove pending block by hash for block: {:?}",
+                        first_block.block_info()
                     ))
                 );
-
-                // Remove the block from the hash store
-                let first_block = pending_block.ordered_block().first_block();
-                self.blocks_without_payloads_by_hash
-                    .remove(&first_block.id());
             }
         }
+
+        // Update the pending block store with the blocks to retain
+        self.blocks_without_payloads = blocks_to_retain;
     }
 
     /// Removes and returns the block from the store that is now ready
@@ -563,6 +600,9 @@ mod test {
             &pending_blocks,
         );
 
+        // Clear the blocks from the store
+        pending_block_store.lock().clear_missing_blocks();
+
         // Insert the maximum number of blocks into the store again
         let starting_round = (max_num_pending_blocks * 100) as Round;
         let pending_blocks = create_and_add_pending_blocks(
@@ -579,30 +619,12 @@ mod test {
             max_num_pending_blocks,
             &pending_blocks,
         );
-
-        // Insert one more block into the store (for the next epoch)
-        let next_epoch = 1;
-        let starting_round = 0;
-        let new_pending_block = create_and_add_pending_blocks(
-            pending_block_store.clone(),
-            1,
-            next_epoch,
-            starting_round,
-            5,
-        );
-
-        // Verify the new block was inserted correctly
-        verify_pending_blocks(
-            pending_block_store.clone(),
-            max_num_pending_blocks,
-            &new_pending_block,
-        );
     }
 
     #[test]
-    fn test_garbage_collect_pending_blocks() {
+    fn test_insert_pending_block_limit() {
         // Create a new pending block store
-        let max_num_pending_blocks = 100;
+        let max_num_pending_blocks = 10;
         let consensus_observer_config = ConsensusObserverConfig {
             max_num_pending_blocks: max_num_pending_blocks as u64,
             ..ConsensusObserverConfig::default()
@@ -613,8 +635,8 @@ mod test {
 
         // Insert the maximum number of blocks into the store
         let current_epoch = 0;
-        let starting_round = 200;
-        let mut pending_blocks = create_and_add_pending_blocks(
+        let starting_round = 0;
+        let pending_blocks = create_and_add_pending_blocks(
             pending_block_store.clone(),
             max_num_pending_blocks,
             current_epoch,
@@ -629,82 +651,66 @@ mod test {
             &pending_blocks,
         );
 
-        // Insert multiple blocks into the store (one at a time) and
-        // verify that the oldest block is garbage collected each time.
-        for i in 0..20 {
-            // Insert one more block into the store
-            let starting_round = ((max_num_pending_blocks * 10) + (i * 100)) as Round;
-            let new_pending_block = create_and_add_pending_blocks(
-                pending_block_store.clone(),
-                1,
-                current_epoch,
-                starting_round,
-                5,
-            );
+        // Insert the maximum number of blocks into the store (again)
+        let starting_round = (max_num_pending_blocks * 100) as Round;
+        let pending_blocks = create_and_add_pending_blocks(
+            pending_block_store.clone(),
+            max_num_pending_blocks,
+            current_epoch,
+            starting_round,
+            5,
+        );
 
-            // Verify the new block was inserted correctly
-            verify_pending_blocks(
-                pending_block_store.clone(),
-                max_num_pending_blocks,
-                &new_pending_block,
-            );
-
-            // Get the oldest block (that was garbage collected)
-            let oldest_block = pending_blocks.remove(0);
-
-            // Verify that the oldest block was garbage collected
-            let oldest_block_round = oldest_block.first_block().round();
-            let blocks_without_payloads =
-                pending_block_store.lock().blocks_without_payloads.clone();
-            assert!(!blocks_without_payloads.contains_key(&(current_epoch, oldest_block_round)));
-
-            // Verify that the oldest block was garbage collected by hash
-            let oldest_block_hash = oldest_block.first_block().id();
-            let blocks_without_payloads_by_hash = pending_block_store
-                .lock()
-                .blocks_without_payloads_by_hash
-                .clone();
-            assert!(!blocks_without_payloads_by_hash.contains_key(&oldest_block_hash));
+        // Verify that none of the new blocks were inserted (as we've reached the limit)
+        for block in &pending_blocks {
+            assert!(!pending_block_store.lock().existing_pending_block(block));
         }
+        verify_num_pending_blocks(&pending_block_store, max_num_pending_blocks);
 
-        // Insert multiple blocks into the store (for the next epoch) and
-        // verify that the oldest block is garbage collected each time.
-        let next_epoch = 1;
-        for i in 0..20 {
-            // Insert one more block into the store
-            let starting_round = i;
-            let new_pending_block = create_and_add_pending_blocks(
-                pending_block_store.clone(),
-                1,
-                next_epoch,
-                starting_round,
-                5,
-            );
+        // Clear the blocks from the store
+        pending_block_store.lock().clear_missing_blocks();
 
-            // Verify the new block was inserted correctly
-            verify_pending_blocks(
-                pending_block_store.clone(),
-                max_num_pending_blocks,
-                &new_pending_block,
-            );
+        // Insert more than the maximum number of blocks into the store
+        let pending_blocks = create_and_add_pending_blocks(
+            pending_block_store.clone(),
+            max_num_pending_blocks * 2, // Double the limit
+            current_epoch,
+            starting_round,
+            5,
+        );
 
-            // Get the oldest block (that was garbage collected)
-            let oldest_block = pending_blocks.remove(0);
+        // Verify that only the first half of the blocks were inserted
+        verify_pending_blocks(
+            pending_block_store.clone(),
+            max_num_pending_blocks,
+            &pending_blocks[..max_num_pending_blocks].to_vec(),
+        );
 
-            // Verify that the oldest block was garbage collected
-            let oldest_block_round = oldest_block.first_block().round();
-            let blocks_without_payloads =
-                pending_block_store.lock().blocks_without_payloads.clone();
-            assert!(!blocks_without_payloads.contains_key(&(current_epoch, oldest_block_round)));
-
-            // Verify that the oldest block was garbage collected by hash
-            let oldest_block_hash = oldest_block.first_block().id();
-            let blocks_without_payloads_by_hash = pending_block_store
-                .lock()
-                .blocks_without_payloads_by_hash
-                .clone();
-            assert!(!blocks_without_payloads_by_hash.contains_key(&oldest_block_hash));
+        // Verify that the second half of the blocks were not inserted
+        for block in &pending_blocks[max_num_pending_blocks..] {
+            assert!(!pending_block_store.lock().existing_pending_block(block));
         }
+        verify_num_pending_blocks(&pending_block_store, max_num_pending_blocks);
+
+        // Clear the blocks from the store
+        pending_block_store.lock().clear_missing_blocks();
+
+        // Insert less than the number of blocks into the store
+        let num_pending_blocks = max_num_pending_blocks / 2; // Half the limit
+        let pending_blocks = create_and_add_pending_blocks(
+            pending_block_store.clone(),
+            num_pending_blocks,
+            current_epoch,
+            starting_round,
+            5,
+        );
+
+        // Verify that all blocks were inserted correctly
+        verify_pending_blocks(
+            pending_block_store.clone(),
+            num_pending_blocks,
+            &pending_blocks,
+        );
     }
 
     #[test]
@@ -784,6 +790,67 @@ mod test {
                 expected_ordered_block.ordered_block()
             );
         }
+    }
+
+    #[test]
+    fn test_remove_blocks_for_commit() {
+        // Create a new pending block store
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks: max_num_pending_blocks as u64,
+            ..ConsensusObserverConfig::default()
+        };
+        let pending_block_store = Arc::new(Mutex::new(PendingBlockStore::new(
+            consensus_observer_config,
+        )));
+
+        // Insert the maximum number of blocks into the store
+        let current_epoch = 10;
+        let starting_round = 100;
+        let pending_blocks = create_and_add_pending_blocks(
+            pending_block_store.clone(),
+            max_num_pending_blocks,
+            current_epoch,
+            starting_round,
+            1,
+        );
+
+        // Remove the pending blocks for a commit at the first round (without an execution pool window)
+        let commit_ledger_info = create_ledger_info_for_epoch_round(current_epoch, starting_round);
+        pending_block_store
+            .lock()
+            .remove_blocks_for_commit(&commit_ledger_info, None);
+
+        // Verify that the block is removed from the store
+        verify_pending_blocks(
+            pending_block_store.clone(),
+            max_num_pending_blocks - 1,
+            &pending_blocks[1..].to_vec(),
+        );
+
+        // Remove the pending blocks for a commit at the 10th round (without an execution pool window)
+        let commit_ledger_info =
+            create_ledger_info_for_epoch_round(current_epoch, starting_round + 10);
+        pending_block_store
+            .lock()
+            .remove_blocks_for_commit(&commit_ledger_info, None);
+
+        // Verify that the blocks are removed from the store
+        verify_pending_blocks(
+            pending_block_store.clone(),
+            max_num_pending_blocks - 11,
+            &pending_blocks[11..].to_vec(),
+        );
+
+        // Remove the pending blocks for a commit at the last round (without an execution pool window)
+        let commit_ledger_info =
+            create_ledger_info_for_epoch_round(current_epoch, starting_round + 99);
+        pending_block_store
+            .lock()
+            .remove_blocks_for_commit(&commit_ledger_info, None);
+
+        // Verify that the store is empty
+        verify_pending_blocks(pending_block_store.clone(), 0, &vec![]);
     }
 
     #[test]
@@ -1134,6 +1201,17 @@ mod test {
         pending_blocks
     }
 
+    /// Creates and returns a ledger info for the specified epoch and round
+    fn create_ledger_info_for_epoch_round(epoch: u64, round: u64) -> LedgerInfoWithSignatures {
+        LedgerInfoWithSignatures::new(
+            LedgerInfo::new(
+                BlockInfo::random_with_epoch(epoch, round),
+                HashValue::random(),
+            ),
+            AggregateSignature::empty(),
+        )
+    }
+
     /// Creates and returns an ordered block with the specified maximum number of pipelined blocks
     fn create_ordered_block(
         epoch: u64,
@@ -1199,6 +1277,27 @@ mod test {
         }
     }
 
+    /// Verifies that the pending block store contains the expected number of blocks
+    fn verify_num_pending_blocks(
+        pending_block_store: &Arc<Mutex<PendingBlockStore>>,
+        max_num_pending_blocks: usize,
+    ) {
+        // Verify the number of pending blocks
+        assert_eq!(
+            pending_block_store.lock().blocks_without_payloads.len(),
+            max_num_pending_blocks
+        );
+
+        // Verify the number of pending blocks by hash
+        assert_eq!(
+            pending_block_store
+                .lock()
+                .blocks_without_payloads_by_hash
+                .len(),
+            max_num_pending_blocks
+        );
+    }
+
     /// Verifies that the pending block store contains the expected blocks
     fn verify_pending_blocks(
         pending_block_store: Arc<Mutex<PendingBlockStore>>,
@@ -1206,19 +1305,7 @@ mod test {
         pending_blocks: &Vec<OrderedBlock>,
     ) {
         // Check the number of pending blocks
-        assert_eq!(
-            pending_block_store.lock().blocks_without_payloads.len(),
-            num_expected_blocks
-        );
-
-        // Check the number of pending blocks by hash
-        assert_eq!(
-            pending_block_store
-                .lock()
-                .blocks_without_payloads_by_hash
-                .len(),
-            num_expected_blocks
-        );
+        verify_num_pending_blocks(&pending_block_store, num_expected_blocks);
 
         // Check that all pending blocks are in the stores
         for pending_block in pending_blocks {
