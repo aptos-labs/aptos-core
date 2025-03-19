@@ -5,8 +5,8 @@ Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
     location: script,
-    indices: redacted,
-    offsets: redacted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
 }
 
 task 2 'run'. lines 25-31:
@@ -14,8 +14,8 @@ Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
     location: script,
-    indices: redacted,
-    offsets: redacted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
 }
 
 task 4 'run'. lines 48-54:
@@ -23,8 +23,8 @@ Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
     location: script,
-    indices: redacted,
-    offsets: redacted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
 }
 
 task 5 'run'. lines 56-62:
@@ -32,8 +32,8 @@ Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
     location: script,
-    indices: redacted,
-    offsets: redacted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
 }
 
 task 7 'run'. lines 79-85:
@@ -41,8 +41,8 @@ Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
     location: script,
-    indices: redacted,
-    offsets: redacted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
 }
 
 task 10 'run'. lines 112-119:
@@ -50,8 +50,8 @@ Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
     location: script,
-    indices: redacted,
-    offsets: redacted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
 }
 
 task 11 'run'. lines 121-126:
@@ -59,8 +59,8 @@ Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
     location: script,
-    indices: redacted,
-    offsets: redacted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
 }
 
 task 12 'run'. lines 128-134:
@@ -68,8 +68,8 @@ Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
     location: script,
-    indices: redacted,
-    offsets: redacted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
 }
 
 task 14 'run'. lines 152-158:
@@ -77,8 +77,8 @@ Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
     location: script,
-    indices: redacted,
-    offsets: redacted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
 }
 
 task 15 'run'. lines 160-166:
@@ -86,8 +86,8 @@ Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
     location: script,
-    indices: redacted,
-    offsets: redacted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
 }
 
 task 16 'run'. lines 168-174:
@@ -95,8 +95,6 @@ Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
     location: script,
-    indices: redacted,
-    offsets: redacted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
 }
-
-==> Compiler v2 delivered same results!

@@ -3,6 +3,13 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
+- Compiler v1 is now deprecated. It is now removed from the Aptos CLI.
+- Added a new option `aptos move compile --fail-on-warning` which fails the compilation if any warnings are found.
+- We now default to running extended checks when compiling test code (this was previously only done with the option `--check-test-code`, but this is no longer available). However, these checks can be now be skipped with `--skip-checks-on-test-code`.
+
+## [6.2.0]
+- Several compiler parsing bugs fixed, including in specifications for receiver style functions
+- Remove support for OpenSSL 1.x.x and Ubuntu 20.04, add warning appropriately
 
 ## [6.1.1]
 - Added a new feature to `aptos workspace run`: The workspace server now listens for a "stop" command from

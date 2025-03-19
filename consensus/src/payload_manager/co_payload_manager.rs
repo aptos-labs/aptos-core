@@ -29,7 +29,7 @@ async fn get_transactions_for_observer(
     block: &Block,
     block_payloads: &Arc<Mutex<BTreeMap<(u64, Round), BlockPayloadStatus>>>,
     consensus_publisher: &Option<Arc<ConsensusPublisher>>,
-) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
+) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>, Option<u64>)> {
     // The data should already be available (as consensus observer will only ever
     // forward a block to the executor once the data has been received and verified).
     let block_payload = match block_payloads.lock().entry((block.epoch(), block.round())) {
@@ -70,6 +70,7 @@ async fn get_transactions_for_observer(
     Ok((
         transaction_payload.transactions(),
         transaction_payload.transaction_limit(),
+        transaction_payload.gas_limit(),
     ))
 }
 
@@ -104,8 +105,7 @@ impl TPayloadManager for ConsensusObserverPayloadManager {
         &self,
         block: &Block,
         _block_signers: Option<BitVec>,
-    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
-        return get_transactions_for_observer(block, &self.txns_pool, &self.consensus_publisher)
-            .await;
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>, Option<u64>)> {
+        get_transactions_for_observer(block, &self.txns_pool, &self.consensus_publisher).await
     }
 }

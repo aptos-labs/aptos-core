@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{change_set::WriteOpInfo, resolver::ExecutorView};
+use crate::change_set::WriteOpInfo;
 use aptos_types::{
     state_store::state_key::StateKey,
     write_set::{TransactionWrite, WriteOp, WriteOpSize},
@@ -61,30 +61,18 @@ impl<V: TransactionWrite> ModuleWrite<V> {
 /// Represents a set of new modules published by a single transaction.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ModuleWriteSet {
-    // True if there are write ops which write to 0x1, etc. A special flag
-    // is used for performance reasons, as otherwise we would need traverse
-    // the write ops and deserializes access paths. Used by V1 code cache.
-    // TODO(loader_v2): Remove this after rollout.
-    has_writes_to_special_address: bool,
     writes: BTreeMap<StateKey, ModuleWrite<WriteOp>>,
 }
 
 impl ModuleWriteSet {
     pub fn empty() -> Self {
         Self {
-            has_writes_to_special_address: false,
             writes: BTreeMap::new(),
         }
     }
 
-    pub fn new(
-        has_writes_to_special_address: bool,
-        writes: BTreeMap<StateKey, ModuleWrite<WriteOp>>,
-    ) -> Self {
-        Self {
-            has_writes_to_special_address,
-            writes,
-        }
+    pub fn new(writes: BTreeMap<StateKey, ModuleWrite<WriteOp>>) -> Self {
+        Self { writes }
     }
 
     pub fn into_write_ops(self) -> impl IntoIterator<Item = (StateKey, WriteOp)> {
@@ -107,18 +95,13 @@ impl ModuleWriteSet {
 
     pub fn write_op_info_iter_mut<'a>(
         &'a mut self,
-        executor_view: &'a dyn ExecutorView,
         module_storage: &'a impl ModuleStorage,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
         self.writes.iter_mut().map(move |(key, write)| {
-            let prev_size = if module_storage.is_enabled() {
-                module_storage
-                    .fetch_module_size_in_bytes(write.module_address(), write.module_name())
-                    .map_err(|e| e.to_partial())?
-                    .unwrap_or(0) as u64
-            } else {
-                executor_view.get_module_state_value_size(key)?.unwrap_or(0)
-            };
+            let prev_size = module_storage
+                .fetch_module_size_in_bytes(write.module_address(), write.module_name())
+                .map_err(|e| e.to_partial())?
+                .unwrap_or(0) as u64;
             Ok(WriteOpInfo {
                 key,
                 op_size: write.write_op().write_op_size(),
@@ -126,10 +109,6 @@ impl ModuleWriteSet {
                 metadata_mut: write.write_op_mut().metadata_mut(),
             })
         })
-    }
-
-    pub fn has_writes_to_special_address(&self) -> bool {
-        self.has_writes_to_special_address
     }
 
     pub fn is_empty(&self) -> bool {

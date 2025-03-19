@@ -665,23 +665,36 @@ module aptos_std::ordered_map {
     #[test]
     fun test_map_small() {
         let map = new();
-        map.print_map(); map.validate_map();
-        map.add(1, 1); map.print_map(); map.validate_map();
-        map.add(2, 2); map.print_map(); map.validate_map();
-        let r1 = map.upsert(3, 3); map.print_map(); map.validate_map();
+        map.validate_map();
+        map.add(1, 1);
+        map.validate_map();
+        map.add(2, 2);
+        map.validate_map();
+        let r1 = map.upsert(3, 3);
+        map.validate_map();
         assert!(r1 == option::none(), 4);
-        map.add(4, 4); map.print_map(); map.validate_map();
-        let r2 = map.upsert(4, 8); map.print_map(); map.validate_map();
+        map.add(4, 4);
+        map.validate_map();
+        let r2 = map.upsert(4, 8);
+        map.validate_map();
         assert!(r2 == option::some(4), 5);
-        map.add(5, 5); map.print_map(); map.validate_map();
-        map.add(6, 6); map.print_map(); map.validate_map();
+        map.add(5, 5);
+        map.validate_map();
+        map.add(6, 6);
+        map.validate_map();
 
-        map.remove(&5); map.print_map(); map.validate_map();
-        map.remove(&4); map.print_map(); map.validate_map();
-        map.remove(&1); map.print_map(); map.validate_map();
-        map.remove(&3); map.print_map(); map.validate_map();
-        map.remove(&2); map.print_map(); map.validate_map();
-        map.remove(&6); map.print_map(); map.validate_map();
+        map.remove(&5);
+        map.validate_map();
+        map.remove(&4);
+        map.validate_map();
+        map.remove(&1);
+        map.validate_map();
+        map.remove(&3);
+        map.validate_map();
+        map.remove(&2);
+        map.validate_map();
+        map.remove(&6);
+        map.validate_map();
 
         map.destroy_empty();
     }

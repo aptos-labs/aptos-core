@@ -49,7 +49,7 @@ module std::option {
     }
 
     public fun from_vec<Element>(vec: vector<Element>): Option<Element> {
-        assert!(vector::length(&vec) <= 1, EOPTION_VEC_TOO_LONG);
+        assert!(vec.length() <= 1, EOPTION_VEC_TOO_LONG);
         Option { vec }
     }
 
@@ -59,7 +59,7 @@ module std::option {
 
     /// Return true if `self` does not hold a value
     public fun is_none<Element>(self: &Option<Element>): bool {
-        vector::is_empty(&self.vec)
+        self.vec.is_empty()
     }
     spec is_none {
         pragma opaque;
@@ -72,7 +72,7 @@ module std::option {
 
     /// Return true if `self` holds a value
     public fun is_some<Element>(self: &Option<Element>): bool {
-        !vector::is_empty(&self.vec)
+        !self.vec.is_empty()
     }
     spec is_some {
         pragma opaque;
@@ -86,7 +86,7 @@ module std::option {
     /// Return true if the value in `self` is equal to `e_ref`
     /// Always returns `false` if `self` does not hold a value
     public fun contains<Element>(self: &Option<Element>, e_ref: &Element): bool {
-        vector::contains(&self.vec, e_ref)
+        self.vec.contains(e_ref)
     }
     spec contains {
         pragma opaque;
@@ -100,8 +100,8 @@ module std::option {
     /// Return an immutable reference to the value inside `self`
     /// Aborts if `self` does not hold a value
     public fun borrow<Element>(self: &Option<Element>): &Element {
-        assert!(is_some(self), EOPTION_NOT_SET);
-        vector::borrow(&self.vec, 0)
+        assert!(self.is_some(), EOPTION_NOT_SET);
+        &self.vec[0]
     }
     spec borrow {
         pragma opaque;
@@ -116,8 +116,8 @@ module std::option {
     /// Return `default_ref` if `self` does not hold a value
     public fun borrow_with_default<Element>(self: &Option<Element>, default_ref: &Element): &Element {
         let vec_ref = &self.vec;
-        if (vector::is_empty(vec_ref)) default_ref
-        else vector::borrow(vec_ref, 0)
+        if (vec_ref.is_empty()) default_ref
+        else &vec_ref[0]
     }
     spec borrow_with_default {
         pragma opaque;
@@ -132,8 +132,8 @@ module std::option {
         default: Element,
     ): Element {
         let vec_ref = &self.vec;
-        if (vector::is_empty(vec_ref)) default
-        else *vector::borrow(vec_ref, 0)
+        if (vec_ref.is_empty()) default
+        else vec_ref[0]
     }
     spec get_with_default {
         pragma opaque;
@@ -145,7 +145,7 @@ module std::option {
     /// Aborts if `self` already holds a value
     public fun fill<Element>(self: &mut Option<Element>, e: Element) {
         let vec_ref = &mut self.vec;
-        if (vector::is_empty(vec_ref)) vector::push_back(vec_ref, e)
+        if (vec_ref.is_empty()) vec_ref.push_back(e)
         else abort EOPTION_IS_SET
     }
     spec fill {
@@ -158,8 +158,8 @@ module std::option {
     /// Convert a `some` option to a `none` by removing and returning the value stored inside `self`
     /// Aborts if `self` does not hold a value
     public fun extract<Element>(self: &mut Option<Element>): Element {
-        assert!(is_some(self), EOPTION_NOT_SET);
-        vector::pop_back(&mut self.vec)
+        assert!(self.is_some(), EOPTION_NOT_SET);
+        self.vec.pop_back()
     }
     spec extract {
         pragma opaque;
@@ -171,8 +171,8 @@ module std::option {
     /// Return a mutable reference to the value inside `self`
     /// Aborts if `self` does not hold a value
     public fun borrow_mut<Element>(self: &mut Option<Element>): &mut Element {
-        assert!(is_some(self), EOPTION_NOT_SET);
-        vector::borrow_mut(&mut self.vec, 0)
+        assert!(self.is_some(), EOPTION_NOT_SET);
+        self.vec.borrow_mut(0)
     }
     spec borrow_mut {
         include AbortsIfNone<Element>;
@@ -183,10 +183,10 @@ module std::option {
     /// Swap the old value inside `self` with `e` and return the old value
     /// Aborts if `self` does not hold a value
     public fun swap<Element>(self: &mut Option<Element>, e: Element): Element {
-        assert!(is_some(self), EOPTION_NOT_SET);
+        assert!(self.is_some(), EOPTION_NOT_SET);
         let vec_ref = &mut self.vec;
-        let old_value = vector::pop_back(vec_ref);
-        vector::push_back(vec_ref, e);
+        let old_value = vec_ref.pop_back();
+        vec_ref.push_back(e);
         old_value
     }
     spec swap {
@@ -202,9 +202,9 @@ module std::option {
     /// Different from swap(), swap_or_fill() allows for `self` not holding a value.
     public fun swap_or_fill<Element>(self: &mut Option<Element>, e: Element): Option<Element> {
         let vec_ref = &mut self.vec;
-        let old_value = if (vector::is_empty(vec_ref)) none()
-            else some(vector::pop_back(vec_ref));
-        vector::push_back(vec_ref, e);
+        let old_value = if (vec_ref.is_empty()) none()
+            else some(vec_ref.pop_back());
+        vec_ref.push_back(e);
         old_value
     }
     spec swap_or_fill {
@@ -217,8 +217,8 @@ module std::option {
     /// Destroys `self.` If `self` holds a value, return it. Returns `default` otherwise
     public fun destroy_with_default<Element: drop>(self: Option<Element>, default: Element): Element {
         let Option { vec } = self;
-        if (vector::is_empty(&mut vec)) default
-        else vector::pop_back(&mut vec)
+        if (vec.is_empty()) default
+        else vec.pop_back()
     }
     spec destroy_with_default {
         pragma opaque;
@@ -229,10 +229,10 @@ module std::option {
     /// Unpack `self` and return its contents
     /// Aborts if `self` does not hold a value
     public fun destroy_some<Element>(self: Option<Element>): Element {
-        assert!(is_some(&self), EOPTION_NOT_SET);
+        assert!(self.is_some(), EOPTION_NOT_SET);
         let Option { vec } = self;
-        let elem = vector::pop_back(&mut vec);
-        vector::destroy_empty(vec);
+        let elem = vec.pop_back();
+        vec.destroy_empty();
         elem
     }
     spec destroy_some {
@@ -244,9 +244,9 @@ module std::option {
     /// Unpack `self`
     /// Aborts if `self` holds a value
     public fun destroy_none<Element>(self: Option<Element>) {
-        assert!(is_none(&self), EOPTION_IS_SET);
+        assert!(self.is_none(), EOPTION_IS_SET);
         let Option { vec } = self;
-        vector::destroy_empty(vec)
+        vec.destroy_empty()
     }
     spec destroy_none {
         pragma opaque;
@@ -266,24 +266,24 @@ module std::option {
     }
     /// Apply the function to the optional element, consuming it. Does nothing if no value present.
     public inline fun for_each<Element>(self: Option<Element>, f: |Element|) {
-        if (is_some(&self)) {
-            f(destroy_some(self))
+        if (self.is_some()) {
+            f(self.destroy_some())
         } else {
-            destroy_none(self)
+            self.destroy_none()
         }
     }
 
     /// Apply the function to the optional element reference. Does nothing if no value present.
     public inline fun for_each_ref<Element>(self: &Option<Element>, f: |&Element|) {
-        if (is_some(self)) {
-            f(borrow(self))
+        if (self.is_some()) {
+            f(self.borrow())
         }
     }
 
     /// Apply the function to the optional element reference. Does nothing if no value present.
     public inline fun for_each_mut<Element>(self: &mut Option<Element>, f: |&mut Element|) {
-        if (is_some(self)) {
-            f(borrow_mut(self))
+        if (self.is_some()) {
+            f(self.borrow_mut())
         }
     }
 
@@ -293,20 +293,20 @@ module std::option {
         init: Accumulator,
         f: |Accumulator,Element|Accumulator
     ): Accumulator {
-        if (is_some(&self)) {
-            f(init, destroy_some(self))
+        if (self.is_some()) {
+            f(init, self.destroy_some())
         } else {
-            destroy_none(self);
+            self.destroy_none();
             init
         }
     }
 
     /// Maps the content of an option.
     public inline fun map<Element, OtherElement>(self: Option<Element>, f: |Element|OtherElement): Option<OtherElement> {
-        if (is_some(&self)) {
-            some(f(destroy_some(self)))
+        if (self.is_some()) {
+            some(f(self.destroy_some()))
         } else {
-            destroy_none(self);
+            self.destroy_none();
             none()
         }
     }
@@ -314,8 +314,8 @@ module std::option {
     /// Maps the content of an option without destroying the original option.
     public inline fun map_ref<Element, OtherElement>(
         self: &Option<Element>, f: |&Element|OtherElement): Option<OtherElement> {
-        if (is_some(self)) {
-            some(f(borrow(self)))
+        if (self.is_some()) {
+            some(f(self.borrow()))
         } else {
             none()
         }
@@ -323,7 +323,7 @@ module std::option {
 
     /// Filters the content of an option
     public inline fun filter<Element:drop>(self: Option<Element>, f: |&Element|bool): Option<Element> {
-        if (is_some(&self) && f(borrow(&self))) {
+        if (self.is_some() && f(self.borrow())) {
             self
         } else {
             none()
@@ -332,13 +332,13 @@ module std::option {
 
     /// Returns true if the option contains an element which satisfies predicate.
     public inline fun any<Element>(self: &Option<Element>, p: |&Element|bool): bool {
-        is_some(self) && p(borrow(self))
+        self.is_some() && p(self.borrow())
     }
 
     /// Utility function to destroy an option that is not droppable.
     public inline fun destroy<Element>(self: Option<Element>, d: |Element|) {
-        let vec = to_vec(self);
-        vector::destroy(vec, |e| d(e));
+        let vec = self.to_vec();
+        vec.destroy(|e| d(e));
     }
 
     spec module {} // switch documentation context back to module level

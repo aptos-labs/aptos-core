@@ -17,6 +17,7 @@ mod dependencies;
 mod enum_upgrade;
 mod error_map;
 mod fee_payer;
+mod function_values;
 mod fungible_asset;
 mod gas;
 mod generate_upgrade_script;
