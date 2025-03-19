@@ -12,7 +12,6 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues, AsUnsyncModuleStorage,
-    WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -52,8 +51,7 @@ fn run(
     let mut storage = InMemoryStorage::new();
     storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
-    let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
-    let mut sess = vm.new_session(&storage);
+    let mut sess = MoveVM::new_session(&storage);
 
     let fun_name = Identifier::new("foo").unwrap();
 

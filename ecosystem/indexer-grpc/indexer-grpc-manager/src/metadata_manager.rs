@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::GrpcAddress,
+    config::{GrpcAddress, MAX_MESSAGE_SIZE},
     metrics::{CONNECTED_INSTANCES, COUNTER, KNOWN_LATEST_VERSION, TIMER},
 };
 use anyhow::{bail, Result};
@@ -30,8 +30,8 @@ use std::{
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tonic::transport::channel::Channel;
-use tracing::trace;
+use tonic::{codec::CompressionEncoding, transport::channel::Channel};
+use tracing::{trace, warn};
 
 // The maximum # of states for each service we keep.
 const MAX_NUM_OF_STATES_TO_KEEP: usize = 100;
@@ -46,7 +46,11 @@ impl Peer {
         let channel = Channel::from_shared(address)
             .expect("Bad address.")
             .connect_lazy();
-        let client = GrpcManagerClient::new(channel);
+        let client = GrpcManagerClient::new(channel)
+            .send_compressed(CompressionEncoding::Zstd)
+            .accept_compressed(CompressionEncoding::Zstd)
+            .max_encoding_message_size(MAX_MESSAGE_SIZE)
+            .max_decoding_message_size(MAX_MESSAGE_SIZE);
         Self {
             client,
             recent_states: VecDeque::new(),
@@ -64,7 +68,11 @@ impl Fullnode {
         let channel = Channel::from_shared(address)
             .expect("Bad address.")
             .connect_lazy();
-        let client = FullnodeDataClient::new(channel);
+        let client = FullnodeDataClient::new(channel)
+            .send_compressed(CompressionEncoding::Zstd)
+            .accept_compressed(CompressionEncoding::Zstd)
+            .max_encoding_message_size(MAX_MESSAGE_SIZE)
+            .max_decoding_message_size(MAX_MESSAGE_SIZE);
         Self {
             client,
             recent_states: VecDeque::new(),
@@ -82,7 +90,11 @@ impl LiveDataService {
         let channel = Channel::from_shared(address)
             .expect("Bad address.")
             .connect_lazy();
-        let client = DataServiceClient::new(channel);
+        let client = DataServiceClient::new(channel)
+            .send_compressed(CompressionEncoding::Zstd)
+            .accept_compressed(CompressionEncoding::Zstd)
+            .max_encoding_message_size(MAX_MESSAGE_SIZE)
+            .max_decoding_message_size(MAX_MESSAGE_SIZE);
         Self {
             client,
             recent_states: VecDeque::new(),
@@ -100,7 +112,11 @@ impl HistoricalDataService {
         let channel = Channel::from_shared(address)
             .expect("Bad address.")
             .connect_lazy();
-        let client = DataServiceClient::new(channel);
+        let client = DataServiceClient::new(channel)
+            .send_compressed(CompressionEncoding::Zstd)
+            .accept_compressed(CompressionEncoding::Zstd)
+            .max_encoding_message_size(MAX_MESSAGE_SIZE)
+            .max_decoding_message_size(MAX_MESSAGE_SIZE);
         Self {
             client,
             recent_states: VecDeque::new(),
@@ -165,10 +181,13 @@ impl MetadataManager {
             let mut unreachable_historical_data_services = vec![];
             tokio_scoped::scope(|s| {
                 for kv in &self.grpc_managers {
+                    let address = kv.key().clone();
                     let grpc_manager = kv.value();
                     let client = grpc_manager.client.clone();
                     s.spawn(async move {
-                        let _ = self.heartbeat(client).await;
+                        if let Err(e) = self.heartbeat(client).await {
+                            warn!("Failed to send heartbeat to other grpc manager ({address}): {e:?}.");
+                        }
                     });
                 }
 
@@ -184,7 +203,9 @@ impl MetadataManager {
                         let address = address.clone();
                         let client = fullnode.client.clone();
                         s.spawn(async move {
-                            let _ = self.ping_fullnode(address, client).await;
+                            if let Err(e) = self.ping_fullnode(address.clone(), client).await {
+                                warn!("Failed to ping FN ({address}): {e:?}.");
+                            }
                         });
                     }
                 }
@@ -211,7 +232,11 @@ impl MetadataManager {
                         let address = address.clone();
                         let client = live_data_service.client.clone();
                         s.spawn(async move {
-                            let _ = self.ping_live_data_service(address, client).await;
+                            if let Err(e) =
+                                self.ping_live_data_service(address.clone(), client).await
+                            {
+                                warn!("Failed to ping live data service ({address}): {e:?}.");
+                            }
                         });
                     }
                 }
@@ -246,7 +271,12 @@ impl MetadataManager {
                         let address = address.clone();
                         let client = historical_data_service.client.clone();
                         s.spawn(async move {
-                            let _ = self.ping_historical_data_service(address, client).await;
+                            if let Err(e) = self
+                                .ping_historical_data_service(address.clone(), client)
+                                .await
+                            {
+                                warn!("Failed to ping historical data service ({address}): {e:?}.");
+                            }
                         });
                     }
                 }
@@ -304,7 +334,7 @@ impl MetadataManager {
     pub(crate) fn get_fullnode_for_request(
         &self,
         request: &GetTransactionsFromNodeRequest,
-    ) -> FullnodeDataClient<Channel> {
+    ) -> (GrpcAddress, FullnodeDataClient<Channel>) {
         // TODO(grao): Double check the counters to see if we need a different way or additional
         // information.
         let mut rng = thread_rng();
@@ -317,7 +347,7 @@ impl MetadataManager {
                 })
             })
             .choose(&mut rng)
-            .map(|kv| kv.value().client.clone())
+            .map(|kv| (kv.key().clone(), kv.value().client.clone()))
         {
             COUNTER
                 .with_label_values(&["get_fullnode_for_request__happy"])
@@ -331,7 +361,7 @@ impl MetadataManager {
         self.fullnodes
             .iter()
             .choose(&mut rng)
-            .map(|kv| kv.value().client.clone())
+            .map(|kv| (kv.key().clone(), kv.value().client.clone()))
             .unwrap()
     }
 

@@ -5,7 +5,7 @@ use crate::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
     loader::Module,
     storage::environment::{RuntimeEnvironment, WithRuntimeEnvironment},
-    Function, ModuleStorage,
+    Function, LoadedFunction, ModuleStorage,
 };
 use ambassador::Delegate;
 use bytes::Bytes;

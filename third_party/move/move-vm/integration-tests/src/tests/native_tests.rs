@@ -11,7 +11,6 @@ use move_core_types::{
 use move_vm_runtime::{
     config::VMConfig, module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction,
     session::Session, AsUnsyncCodeStorage, ModuleStorage, RuntimeEnvironment, StagingModuleStorage,
-    WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, natives::function::NativeResult};
@@ -71,9 +70,8 @@ fn test_publish_module_with_nested_loops() {
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
-        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
 
-        let mut sess = vm.new_session(&storage);
+        let mut sess = MoveVM::new_session(&storage);
         let module_storage = storage.as_unsync_code_storage();
         let new_module_storage =
             StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob.clone().into()])
@@ -93,13 +91,8 @@ fn load_and_run_functions(
     traversal_storage: &TraversalStorage,
     module_id: &ModuleId,
 ) {
-    let func = session
-        .load_function(
-            module_storage,
-            module_id,
-            &Identifier::new("foo").unwrap(),
-            &[],
-        )
+    let func = module_storage
+        .load_function(module_id, &Identifier::new("foo").unwrap(), &[])
         .unwrap();
     let err1 = session
         .execute_entry_function(
@@ -113,13 +106,8 @@ fn load_and_run_functions(
 
     assert!(err1.exec_state().unwrap().stack_trace().is_empty());
 
-    let func = session
-        .load_function(
-            module_storage,
-            module_id,
-            &Identifier::new("foo2").unwrap(),
-            &[],
-        )
+    let func = module_storage
+        .load_function(module_id, &Identifier::new("foo2").unwrap(), &[])
         .unwrap();
     let err2 = session
         .execute_entry_function(

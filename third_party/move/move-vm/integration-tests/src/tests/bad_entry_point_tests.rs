@@ -10,9 +10,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::StatusType,
 };
-use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, AsUnsyncModuleStorage, WithRuntimeEnvironment,
-};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, AsUnsyncModuleStorage};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -21,9 +19,8 @@ const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGT
 #[test]
 fn call_non_existent_module() {
     let storage = InMemoryStorage::new();
-    let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
 
-    let mut sess = vm.new_session(&storage);
+    let mut sess = MoveVM::new_session(&storage);
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
     let fun_name = Identifier::new("foo").unwrap();
     let traversal_storage = TraversalStorage::new();
@@ -60,8 +57,7 @@ fn call_non_existent_function() {
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
     storage.add_module_bytes(module_id.address(), module_id.name(), blob.into());
 
-    let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
-    let mut sess = vm.new_session(&storage);
+    let mut sess = MoveVM::new_session(&storage);
 
     let fun_name = Identifier::new("foo").unwrap();
 

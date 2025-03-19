@@ -65,6 +65,7 @@ use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, Genes
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
     module_and_script_storage::{module_storage::AptosModuleStorage, AsAptosCodeStorage},
+    module_write_set::ModuleWriteSet,
     resolver::NoopBlockSynchronizationKillSwitch,
     storage::change_set_configs::ChangeSetConfigs,
 };
@@ -1031,8 +1032,7 @@ impl FakeExecutor {
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             // load function name into cache to ensure cache is hot
-            let _ = session.load_function(
-                &module_storage,
+            let _ = module_storage.load_function(
                 module,
                 &Self::name(function_name),
                 &type_params.clone(),
@@ -1317,13 +1317,12 @@ fn finish_session_assert_no_modules(
     module_storage: &impl AptosModuleStorage,
     change_set_configs: &ChangeSetConfigs,
 ) -> (WriteSet, Vec<ContractEvent>) {
-    let (change_set, empty_module_write_set) = session
+    let change_set = session
         .finish(change_set_configs, module_storage)
         .expect("Failed to finish the session");
-    assert_ok!(empty_module_write_set.is_empty_or_invariant_violation());
 
     change_set
-        .try_combine_into_storage_change_set(empty_module_write_set)
+        .try_combine_into_storage_change_set(ModuleWriteSet::empty())
         .expect("Failed to convert to storage ChangeSet")
         .into_inner()
 }
