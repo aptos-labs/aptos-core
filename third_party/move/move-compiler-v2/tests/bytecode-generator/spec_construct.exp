@@ -53,9 +53,9 @@ struct S {
 	data: vector<E>
 }
 
-public foo(Arg0: &S): u8 /* def_idx: 0 */ {
+public foo(v: &S): u8 /* def_idx: 0 */ {
 B0:
-	0: MoveLoc[0](Arg0: &S)
+	0: MoveLoc[0](v: &S)
 	1: ImmBorrowField[0](S.data: vector<E>)
 	2: LdU64(0)
 	3: VecImmBorrow(2)

@@ -17,14 +17,14 @@ fun Demo::f1($t0|addr: address) {
   0: $t1 := copy($t0)
   1: $t2 := exists<0x42::Demo::S1<bool>>($t1)
   2: if ($t2) goto 3 else goto 10
-  3: label L1
+  3: label L0
   4: $t3 := 0
   5: $t4 := copy($t0)
   6: $t5 := borrow_global<0x42::Demo::S1<bool>>($t4)
   7: $t6 := borrow_field<0x42::Demo::S1<bool>>.v($t5)
   8: write_ref($t6, $t3)
   9: goto 10
- 10: label L0
+ 10: label L2
  11: $t7 := copy($t0)
  12: $t8 := exists<0x42::Demo::S1<u64>>($t7)
  13: if ($t8) goto 14 else goto 21
@@ -35,7 +35,7 @@ fun Demo::f1($t0|addr: address) {
  18: $t12 := borrow_field<0x42::Demo::S1<u64>>.v($t11)
  19: write_ref($t12, $t9)
  20: goto 21
- 21: label L2
+ 21: label L5
  22: return ()
 }
 
@@ -54,14 +54,14 @@ fun Demo::f1($t0|addr: address) {
      var $t9: &mut u8
   0: $t1 := exists<0x42::Demo::S1<bool>>($t0)
   1: if ($t1) goto 2 else goto 9
-  2: label L1
+  2: label L0
   3: $t2 := 0
   4: $t3 := borrow_global<0x42::Demo::S1<bool>>($t0) on_abort goto 22 with $t4
   5: $t5 := borrow_field<0x42::Demo::S1<bool>>.v($t3)
   6: write_ref($t5, $t2)
   7: write_back[Reference($t3).v (u8)]($t5)
   8: write_back[0x42::Demo::S1<bool>@]($t3)
-  9: label L0
+  9: label L2
  10: $t6 := exists<0x42::Demo::S1<u64>>($t0)
  11: if ($t6) goto 12 else goto 19
  12: label L3
@@ -71,10 +71,10 @@ fun Demo::f1($t0|addr: address) {
  16: write_ref($t9, $t7)
  17: write_back[Reference($t8).v (u8)]($t9)
  18: write_back[0x42::Demo::S1<u64>@]($t8)
- 19: label L2
- 20: label L4
+ 19: label L5
+ 20: label L6
  21: return ()
- 22: label L5
+ 22: label L7
  23: abort($t4)
 }
 

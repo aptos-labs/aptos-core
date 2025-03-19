@@ -1,9 +1,4 @@
 // -- Model dump before bytecode pipeline
-module 0x815::b {
-    friend fun f() {
-        Tuple()
-    }
-} // end 0x815::b
 module 0x815::a {
     friend fun f() {
         Tuple()
@@ -12,6 +7,11 @@ module 0x815::a {
         Tuple()
     }
 } // end 0x815::a
+module 0x815::b {
+    friend fun f() {
+        Tuple()
+    }
+} // end 0x815::b
 module 0x815::c {
     public fun f() {
         a::f();
@@ -22,16 +22,16 @@ module 0x815::c {
 } // end 0x815::c
 
 // -- Sourcified model before bytecode pipeline
-module 0x815::b {
-    friend 0x815::c;
-    friend fun f() {
-    }
-}
 module 0x815::a {
     friend 0x815::c;
     friend fun f() {
     }
     friend fun g() {
+    }
+}
+module 0x815::b {
+    friend 0x815::c;
+    friend fun f() {
     }
 }
 module 0x815::c {

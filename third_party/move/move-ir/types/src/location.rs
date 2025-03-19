@@ -36,6 +36,7 @@ pub struct Loc {
 
 impl Loc {
     pub fn new(file_hash: FileHash, start: ByteIndex, end: ByteIndex) -> Loc {
+        debug_assert!(start <= end);
         Loc {
             file_hash,
             start,
@@ -59,6 +60,88 @@ impl Loc {
         Range {
             start: self.start as usize,
             end: self.end as usize,
+        }
+    }
+
+    /// Is the `other` location fully contained within this location?
+    pub fn contains(&self, other: &Self) -> bool {
+        if self.file_hash != other.file_hash {
+            false
+        } else {
+            self.start <= other.start && other.end <= self.end
+        }
+    }
+
+    /// Does `other` overlap with this location?
+    pub fn overlaps(&self, other: &Self) -> bool {
+        if self.file_hash != other.file_hash {
+            false
+        } else {
+            other.start <= self.end && self.start <= other.end
+        }
+    }
+
+    /// Does `other` overlap with this location or abut (touch) it?
+    pub fn overlaps_or_abuts(&self, other: &Self) -> bool {
+        if self.file_hash != other.file_hash {
+            false
+        } else {
+            other.start <= self.end + 1 && self.start <= other.end + 1
+        }
+    }
+
+    /// Try to merge this location with `other`.
+    /// Two locations can be merged if they overlap or abut.
+    /// Return `true` if able to merge, `false` otherwise.
+    pub fn try_merge(&mut self, other: &Self) -> bool {
+        if self.overlaps_or_abuts(other) {
+            self.start = std::cmp::min(self.start, other.start);
+            self.end = std::cmp::max(self.end, other.end);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// If `other` overlaps with this, then remove the overlapping part from this location.
+    /// Return 0, 1, or 2 locations, depending on how `other` overlaps with this location.
+    pub fn subtract(self, other: &Self) -> Vec<Loc> {
+        if !self.overlaps(other) {
+            // No overlap, so return self unchanged.
+            vec![self]
+        } else if other.start <= self.start {
+            if self.end <= other.end {
+                //    ------      self
+                // ------------   other
+                vec![]
+            } else {
+                //     ------- self
+                //  ------     other
+                vec![Loc {
+                    start: other.end + 1,
+                    ..self
+                }]
+            }
+        } else if self.end <= other.end {
+            // -----------        self
+            //     ------------   other
+            vec![Loc {
+                end: other.start - 1,
+                ..self
+            }]
+        } else {
+            // ---------------   self
+            //     -----         other
+            vec![
+                Loc {
+                    end: other.start - 1,
+                    ..self
+                },
+                Loc {
+                    start: other.end + 1,
+                    ..self
+                },
+            ]
         }
     }
 }

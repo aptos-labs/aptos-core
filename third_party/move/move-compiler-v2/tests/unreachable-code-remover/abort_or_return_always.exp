@@ -60,9 +60,9 @@ fun m::test($t0: bool): u64 {
 module c0ffee.m {
 
 
-test(Arg0: bool): u64 /* def_idx: 0 */ {
+test(p: bool): u64 /* def_idx: 0 */ {
 B0:
-	0: MoveLoc[0](Arg0: bool)
+	0: MoveLoc[0](p: bool)
 	1: BrFalse(4)
 B1:
 	2: LdU64(0)

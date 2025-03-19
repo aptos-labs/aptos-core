@@ -13,7 +13,7 @@ use aptos_types::{
     dkg::DKG_START_EVENT_MOVE_TYPE_TAG,
     jwks::OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::state_key::StateKey,
     transaction::{
         Transaction, TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
         Version,
@@ -113,7 +113,7 @@ pub trait ChunkExecutorTrait: Send + Sync {
 
 pub struct StateSnapshotDelta {
     pub version: Version,
-    pub smt: SparseMerkleTree<StateValue>,
+    pub smt: SparseMerkleTree,
     pub jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
 }
 

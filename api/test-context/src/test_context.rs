@@ -19,7 +19,7 @@ use aptos_crypto::{ed25519::Ed25519PrivateKey, hash::HashValue, SigningKey};
 use aptos_db::AptosDB;
 use aptos_executor::{block_executor::BlockExecutor, db_bootstrapper};
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_framework::BuiltPackage;
+use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_indexer_grpc_table_info::internal_indexer_db_service::MockInternalIndexerDBService;
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_mempool_notifications::MempoolNotificationSender;
@@ -756,11 +756,28 @@ impl TestContext {
         path: PathBuf,
         named_addresses: Vec<(String, AccountAddress)>,
     ) -> TransactionPayload {
-        let mut build_options = aptos_framework::BuildOptions::default();
+        Self::build_package_with_options(path, named_addresses, BuildOptions::default())
+    }
+
+    pub fn build_package_with_latest_language(
+        path: PathBuf,
+        named_addresses: Vec<(String, AccountAddress)>,
+    ) -> TransactionPayload {
+        Self::build_package_with_options(
+            path,
+            named_addresses,
+            BuildOptions::default().set_latest_language(),
+        )
+    }
+
+    fn build_package_with_options(
+        path: PathBuf,
+        named_addresses: Vec<(String, AccountAddress)>,
+        mut build_options: BuildOptions,
+    ) -> TransactionPayload {
         named_addresses.into_iter().for_each(|(name, address)| {
             build_options.named_addresses.insert(name, address);
         });
-
         let package = BuiltPackage::build(path, build_options).unwrap();
         let code = package.extract_code();
         let metadata = package.extract_metadata().unwrap();

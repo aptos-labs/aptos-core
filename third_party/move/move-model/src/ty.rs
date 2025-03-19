@@ -17,21 +17,18 @@ use itertools::Itertools;
 #[allow(deprecated)]
 use move_binary_format::normalized::Type as MType;
 use move_binary_format::{
-    access::ModuleAccess,
-    file_format::{SignatureToken, TypeParameterIndex},
-    views::StructHandleView,
-    CompiledModule,
+    access::ModuleAccess, file_format::SignatureToken, views::StructHandleView, CompiledModule,
 };
 use move_core_types::{
     ability::{Ability, AbilitySet},
-    language_storage::{StructTag, TypeTag},
+    language_storage::{FunctionTag, StructTag, TypeTag},
     u256::U256,
 };
 use num::BigInt;
 use num_traits::identities::Zero;
 use std::{
     cmp::Ordering,
-    collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
+    collections::{btree_map::Entry, BTreeMap, BTreeSet},
     fmt,
     fmt::{Debug, Formatter},
     iter,
@@ -46,7 +43,7 @@ pub enum Type {
     Struct(ModuleId, StructId, /*type-params*/ Vec<Type>),
     TypeParameter(u16),
     Fun(
-        /* known args */ Box<Type>,
+        /*args*/ Box<Type>,
         /*result*/ Box<Type>,
         AbilitySet,
     ),
@@ -148,6 +145,15 @@ pub enum Constraint {
         /// The argument type
         Vec<Type>,
         /// The result type
+        Type,
+    ),
+    /// The type variable must be instantiated with a function value with the given argument
+    /// and result type. This is used to represent function types for which the ability set
+    /// is unknown.
+    SomeFunctionValue(
+        // The argument type. This is contra-variant.
+        Type,
+        // The result type. This is co-variant.
         Type,
     ),
     /// The type must not be reference because it is used as the type of some field or
@@ -390,6 +396,15 @@ impl Constraint {
                 Box::new(ty.clone()),
             )),
             Constraint::WithDefault(ty) => Some(ty.clone()),
+            Constraint::SomeFunctionValue(arg_type, result_type) => {
+                // For functions, if there is no requirement from the type context, default
+                // to the minimal empty ability set
+                Some(Type::function(
+                    arg_type.clone(),
+                    result_type.clone(),
+                    AbilitySet::EMPTY,
+                ))
+            },
             _ => None,
         }
     }
@@ -529,6 +544,26 @@ impl Constraint {
                         other.clone(),
                     ))
                 }
+            },
+            (
+                Constraint::SomeFunctionValue(arg1, result1),
+                Constraint::SomeFunctionValue(arg2, result2),
+            ) => {
+                subs.unify(
+                    context,
+                    Variance::NoVariance,
+                    WideningOrder::Join,
+                    arg1,
+                    arg2,
+                )?;
+                subs.unify(
+                    context,
+                    Variance::NoVariance,
+                    WideningOrder::Join,
+                    result1,
+                    result2,
+                )?;
+                Ok(true)
             },
             (Constraint::NoReference, Constraint::NoReference) => Ok(true),
             (Constraint::NoTuple, Constraint::NoTuple) => Ok(true),
@@ -688,6 +723,16 @@ impl Constraint {
                     result.display(display_context)
                 )
             },
+            Constraint::SomeFunctionValue(arg, result) => {
+                // Use display for function types with empty abilities, so
+                // we can attach an 'open' ability set, as the abilities are
+                // unknown.
+                format!(
+                    "{} has ..",
+                    Type::function(arg.clone(), result.clone(), AbilitySet::EMPTY)
+                        .display(display_context)
+                )
+            },
             Constraint::NoReference => "no-ref".to_string(),
             Constraint::NoTuple => "no-tuple".to_string(),
             Constraint::NoPhantom => "no-phantom".to_string(),
@@ -704,6 +749,10 @@ impl Constraint {
 pub enum TypeUnificationError {
     /// The two types mismatch: `TypeMismatch(actual, expected)`
     TypeMismatch(Type, Type),
+    /// Same as `TypeMismatch`, but in the context of function arguments
+    FunArgTypeMismatch(Type, Type),
+    /// Same as `TypeMismatch`, but in the context of function result types
+    FunResultTypeMismatch(Type, Type),
     /// The arity  of some construct mismatches: `ArityMismatch(for_type_args, actual, expected)`
     ArityMismatch(/*for_type_args*/ bool, usize, usize),
     /// Two types have different mutability: `MutabilityMismatch(actual, expected)`.
@@ -836,6 +885,11 @@ impl Type {
         Type::Tuple(vec![])
     }
 
+    /// Creates a function type
+    pub fn function(arg_ty: Type, res_ty: Type, abilities: AbilitySet) -> Self {
+        Type::Fun(Box::new(arg_ty), Box::new(res_ty), abilities)
+    }
+
     /// Determines whether this is a type parameter.
     pub fn is_type_parameter(&self) -> bool {
         matches!(self, Type::TypeParameter(..))
@@ -912,6 +966,20 @@ impl Type {
         } else {
             None
         }
+    }
+
+    /// If this is a function wrapper, return the inner function type
+    pub fn get_function_wrapper_ty(&self, env: &GlobalEnv) -> Option<Type> {
+        if let Some((struct_env, inst)) = self.get_struct(env) {
+            let fields = struct_env.get_fields().collect_vec();
+            if fields.len() == 1 && fields[0].is_positional() {
+                let ty = fields[0].get_type();
+                if ty.is_function() {
+                    return Some(ty.instantiate(inst));
+                }
+            }
+        }
+        None
     }
 
     /// Get the target type of a reference
@@ -1167,7 +1235,7 @@ impl Type {
                         if let Some(default_ty) = s.constraints.get(i).and_then(|constrs| {
                             constrs.iter().find_map(|(_, _, c)| c.default_type())
                         }) {
-                            default_ty
+                            default_ty.replace(params, subs, use_constr)
                         } else {
                             self.clone()
                         }
@@ -1333,6 +1401,21 @@ impl Type {
                 Struct(qid.module_id, qid.id, type_args)
             },
             TypeTag::Vector(type_param) => Vector(Box::new(Self::from_type_tag(type_param, env))),
+            TypeTag::Function(fun) => {
+                let FunctionTag {
+                    args,
+                    results,
+                    abilities,
+                } = fun.as_ref();
+                let from_vec = |ts: &[TypeTag]| {
+                    Type::tuple(ts.iter().map(|t| Type::from_type_tag(t, env)).collect_vec())
+                };
+                Fun(
+                    Box::new(from_vec(args)),
+                    Box::new(from_vec(results)),
+                    *abilities,
+                )
+            },
         }
     }
 
@@ -1346,6 +1429,11 @@ impl Type {
         struct_resolver: &impl Fn(ModuleName, Symbol) -> QualifiedId<StructId>,
         sig: &SignatureToken,
     ) -> Self {
+        let from_slice = |ts: &[SignatureToken]| {
+            ts.iter()
+                .map(|t| Self::from_signature_token(env, module, struct_resolver, t))
+                .collect::<Vec<_>>()
+        };
         match sig {
             SignatureToken::Bool => Type::Primitive(PrimitiveType::Bool),
             SignatureToken::U8 => Type::Primitive(PrimitiveType::U8),
@@ -1387,18 +1475,13 @@ impl Type {
                     env.to_module_name(&struct_view.module_id()),
                     env.symbol_pool.make(struct_view.name().as_str()),
                 );
-                Type::Struct(
-                    struct_id.module_id,
-                    struct_id.id,
-                    args.iter()
-                        .map(|t| Self::from_signature_token(env, module, struct_resolver, t))
-                        .collect(),
-                )
+                Type::Struct(struct_id.module_id, struct_id.id, from_slice(args))
             },
-            SignatureToken::Function(..) => {
-                // TODO(#15664): implement function conversion
-                unimplemented!("signature token to model type")
-            },
+            SignatureToken::Function(args, result, abilities) => Type::Fun(
+                Box::new(Type::tuple(from_slice(args))),
+                Box::new(Type::Tuple(from_slice(result))),
+                *abilities,
+            ),
         }
     }
 
@@ -1590,6 +1673,10 @@ pub trait UnificationContext: AbilityContext {
         field_name: Symbol,
     ) -> (Vec<(Option<Symbol>, Type)>, bool);
 
+    /// If this is a function type wrapper (`struct W(|T|R)`), get the underlying
+    /// function type.
+    fn get_function_wrapper_type(&self, id: &QualifiedInstId<StructId>) -> Option<Type>;
+
     /// For a given type, return a receiver style function of the given name, if available.
     /// If the function is generic it will be instantiated with fresh type variables.
     fn get_receiver_function(
@@ -1640,6 +1727,10 @@ impl UnificationContext for NoUnificationContext {
         _field_name: Symbol,
     ) -> (Vec<(Option<Symbol>, Type)>, bool) {
         (vec![], false)
+    }
+
+    fn get_function_wrapper_type(&self, _id: &QualifiedInstId<StructId>) -> Option<Type> {
+        None
     }
 
     fn get_receiver_function(
@@ -1896,6 +1987,33 @@ impl Substitution {
                         constraint_unsatisfied_error()
                     }
                 },
+                (
+                    Constraint::SomeFunctionValue(ctr_arg_ty, ctr_result_ty),
+                    Type::Fun(arg_ty, result_ty, _),
+                ) => {
+                    self.unify(context, variance, order.swap(), arg_ty, ctr_arg_ty)
+                        .map_err(TypeUnificationError::map_to_fun_arg_mismatch)?;
+                    self.unify(context, variance, order, result_ty, ctr_result_ty)
+                        .map_err(TypeUnificationError::map_to_fun_result_mismatch)?;
+                    Ok(())
+                },
+                (
+                    Constraint::SomeFunctionValue(ctr_arg_ty, ctr_result_ty),
+                    Type::Struct(mid, sid, inst),
+                ) => {
+                    let sid = &mid.qualified_inst(*sid, inst.clone());
+                    if let Some(Type::Fun(arg_ty, result_ty, _)) =
+                        context.get_function_wrapper_type(sid)
+                    {
+                        self.unify(context, variance, order.swap(), &arg_ty, ctr_arg_ty)
+                            .map_err(TypeUnificationError::map_to_fun_arg_mismatch)?;
+                        self.unify(context, variance, order, &result_ty, ctr_result_ty)
+                            .map_err(TypeUnificationError::map_to_fun_result_mismatch)?;
+                        Ok(())
+                    } else {
+                        constraint_unsatisfied_error()
+                    }
+                },
                 (Constraint::HasAbilities(required_abilities, scope), ty) => self
                     .eval_ability_constraint(
                         context,
@@ -2035,10 +2153,7 @@ impl Substitution {
                     Ok(())
                 }
             },
-            Fun(_, _, abilities) => {
-                assert!(AbilitySet::FUNCTIONS.is_subset(*abilities));
-                check(*abilities)
-            },
+            Fun(_, _, abilities) => check(*abilities),
             Reference(_, _) => check(AbilitySet::REFERENCES),
             TypeDomain(_) | ResourceDomain(_, _, _) => check(AbilitySet::EMPTY),
             Error => Ok(()),
@@ -2109,13 +2224,13 @@ impl Substitution {
         self.unify_vec(
             context,
             variance,
+            // Arguments are contra-variant, hence LeftToRight
             WideningOrder::LeftToRight,
             // Pass in locations of arguments for better error messages
             Some(args_loc),
             &args,
             &receiver.arg_types,
         )?;
-        // Result is contra-variant, hence RightToLeft
         self.unify(
             context,
             variance,
@@ -2312,11 +2427,11 @@ impl Substitution {
                 return Ok(Type::Fun(
                     Box::new(
                         self.unify(context, variance, order.swap(), a1, a2)
-                            .map_err(TypeUnificationError::lift(order, t1, t2))?,
+                            .map_err(TypeUnificationError::map_to_fun_arg_mismatch)?,
                     ),
                     Box::new(
                         self.unify(context, variance, order, r1, r2)
-                            .map_err(TypeUnificationError::lift(order, t1, t2))?,
+                            .map_err(TypeUnificationError::map_to_fun_result_mismatch)?,
                     ),
                     {
                         // Widening/conversion can remove abilities, not add them.  So check that
@@ -2485,201 +2600,6 @@ impl Substitution {
                 false
             }
         })
-    }
-}
-
-/// Helper to unify types which stem from different generic contexts.
-///
-/// Both comparison side may have type parameters (equally named as #0, #1, ...).
-/// The helper converts the type parameter from or both sides into variables
-/// and then performs unification of the terms. The resulting substitution
-/// is converted back to parameter instantiations.
-///
-/// Example: consider a function `f<X>` which uses memory `M<X, u64>`, and invariant
-/// `invariant<X>` which uses memory `M<bool, X>`. Using this helper to unify both
-/// memories will result in instantiations which when applied create `f<bool>`
-/// and `invariant<u64>` respectively.
-pub struct TypeUnificationAdapter {
-    type_vars_map: BTreeMap<u32, (bool, TypeParameterIndex)>,
-    types_adapted_lhs: Vec<Type>,
-    types_adapted_rhs: Vec<Type>,
-}
-
-impl TypeUnificationAdapter {
-    /// Initialize the context for the type unifier.
-    ///
-    /// If `treat_lhs_type_param_as_var_after_index` is set to P,
-    /// - any type parameter on the LHS with index < P will be treated as concrete types and
-    /// - only type parameters on the LHS with index >= P are treated as variables and thus,
-    ///   participate in the type unification process.
-    /// The same rule applies to the RHS parameters via `treat_rhs_type_param_as_var_after_index`.
-    fn new<'a, I>(
-        lhs_types: I,
-        rhs_types: I,
-        treat_lhs_type_param_as_var_after_index: Option<TypeParameterIndex>,
-        treat_rhs_type_param_as_var_after_index: Option<TypeParameterIndex>,
-    ) -> Self
-    where
-        I: Iterator<Item = &'a Type> + Clone,
-    {
-        debug_assert!(
-            treat_lhs_type_param_as_var_after_index.is_some()
-                || treat_rhs_type_param_as_var_after_index.is_some(),
-            "At least one side of the unification must be treated as variable"
-        );
-
-        // Check the input types do not contain type variables.
-        debug_assert!(
-            lhs_types.clone().chain(rhs_types.clone()).all(|ty| {
-                let mut b = true;
-                ty.visit(&mut |t| b = b && !matches!(t, Type::Var(_)));
-                b
-            }),
-            "unexpected type variable"
-        );
-
-        // Compute the number of type parameters for each side.
-        let mut lhs_type_param_count = 0;
-        let mut rhs_type_param_count = 0;
-        let count_type_param = |t: &Type, current: &mut u16| {
-            if let Type::TypeParameter(idx) = t {
-                *current = (*current).max(*idx + 1);
-            }
-        };
-        for ty in lhs_types.clone() {
-            ty.visit(&mut |t| count_type_param(t, &mut lhs_type_param_count));
-        }
-        for ty in rhs_types.clone() {
-            ty.visit(&mut |t| count_type_param(t, &mut rhs_type_param_count));
-        }
-
-        // Create a type variable instantiation for each side.
-        let mut var_count = 0;
-        let mut type_vars_map = BTreeMap::new();
-        let lhs_inst = match treat_lhs_type_param_as_var_after_index {
-            None => vec![],
-            Some(boundary) => (0..boundary)
-                .map(Type::TypeParameter)
-                .chain((boundary..lhs_type_param_count).map(|i| {
-                    let idx = var_count;
-                    var_count += 1;
-                    type_vars_map.insert(idx, (true, i));
-                    Type::Var(idx)
-                }))
-                .collect(),
-        };
-        let rhs_inst = match treat_rhs_type_param_as_var_after_index {
-            None => vec![],
-            Some(boundary) => (0..boundary)
-                .map(Type::TypeParameter)
-                .chain((boundary..rhs_type_param_count).map(|i| {
-                    let idx = var_count;
-                    var_count += 1;
-                    type_vars_map.insert(idx, (false, i));
-                    Type::Var(idx)
-                }))
-                .collect(),
-        };
-
-        // Do the adaptation.
-        let types_adapted_lhs = lhs_types.map(|t| t.instantiate(&lhs_inst)).collect();
-        let types_adapted_rhs = rhs_types.map(|t| t.instantiate(&rhs_inst)).collect();
-
-        Self {
-            type_vars_map,
-            types_adapted_lhs,
-            types_adapted_rhs,
-        }
-    }
-
-    /// Create a TypeUnificationAdapter with the goal of unifying a pair of types.
-    ///
-    /// If `treat_lhs_type_param_as_var` is True, treat all type parameters on the LHS as variables.
-    /// If `treat_rhs_type_param_as_var` is True, treat all type parameters on the RHS as variables.
-    pub fn new_pair(
-        lhs_type: &Type,
-        rhs_type: &Type,
-        treat_lhs_type_param_as_var: bool,
-        treat_rhs_type_param_as_var: bool,
-    ) -> Self {
-        Self::new(
-            std::iter::once(lhs_type),
-            std::iter::once(rhs_type),
-            treat_lhs_type_param_as_var.then_some(0),
-            treat_rhs_type_param_as_var.then_some(0),
-        )
-    }
-
-    /// Create a TypeUnificationAdapter with the goal of unifying a pair of type tuples.
-    ///
-    /// If `treat_lhs_type_param_as_var` is True, treat all type parameters on the LHS as variables.
-    /// If `treat_rhs_type_param_as_var` is True, treat all type parameters on the RHS as variables.
-    pub fn new_vec(
-        lhs_types: &[Type],
-        rhs_types: &[Type],
-        treat_lhs_type_param_as_var: bool,
-        treat_rhs_type_param_as_var: bool,
-    ) -> Self {
-        Self::new(
-            lhs_types.iter(),
-            rhs_types.iter(),
-            treat_lhs_type_param_as_var.then_some(0),
-            treat_rhs_type_param_as_var.then_some(0),
-        )
-    }
-
-    /// Consume the TypeUnificationAdapter and produce the unification result. If type unification
-    /// is successful, return a pair of instantiations for type parameters on each side which
-    /// unify the LHS and RHS respectively. If the LHS and RHS cannot unify, None is returned.
-    pub fn unify(
-        self,
-        context: &mut impl UnificationContext,
-        variance: Variance,
-        shallow_subst: bool,
-    ) -> Option<(BTreeMap<u16, Type>, BTreeMap<u16, Type>)> {
-        let mut subst = Substitution::new();
-        match subst.unify_vec(
-            context,
-            variance,
-            WideningOrder::LeftToRight,
-            None,
-            &self.types_adapted_lhs,
-            &self.types_adapted_rhs,
-        ) {
-            Ok(_) => {
-                let mut inst_lhs = BTreeMap::new();
-                let mut inst_rhs = BTreeMap::new();
-                for (var_idx, (is_lhs, param_idx)) in &self.type_vars_map {
-                    let subst_ty = match subst.get_substitution(*var_idx, shallow_subst) {
-                        None => continue,
-                        Some(Type::Var(subst_var_idx)) => {
-                            match self.type_vars_map.get(&subst_var_idx) {
-                                None => {
-                                    // If the original types do not contain free type
-                                    // variables, this should not happen.
-                                    panic!("unexpected type variable");
-                                },
-                                Some((_, subs_param_idx)) => {
-                                    // There can be either lhs or rhs type parameters left, but
-                                    // not both sides, so it is unambiguous to just return it here.
-                                    Type::TypeParameter(*subs_param_idx)
-                                },
-                            }
-                        },
-                        Some(subst_ty) => subst_ty.clone(),
-                    };
-                    let inst = if *is_lhs {
-                        &mut inst_lhs
-                    } else {
-                        &mut inst_rhs
-                    };
-                    inst.insert(*param_idx, subst_ty);
-                }
-
-                Some((inst_lhs, inst_rhs))
-            },
-            Err(_) => None,
-        }
     }
 }
 
@@ -2971,6 +2891,22 @@ impl TypeUnificationError {
         }
     }
 
+    pub fn map_to_fun_arg_mismatch(self) -> Self {
+        if let TypeUnificationError::TypeMismatch(t1, t2) = self {
+            TypeUnificationError::FunArgTypeMismatch(t1, t2)
+        } else {
+            self
+        }
+    }
+
+    pub fn map_to_fun_result_mismatch(self) -> Self {
+        if let TypeUnificationError::TypeMismatch(t1, t2) = self {
+            TypeUnificationError::FunResultTypeMismatch(t1, t2)
+        } else {
+            self
+        }
+    }
+
     /// If this error is associated with a specific location and the error
     /// is better reported at that location, return it.
     pub fn specific_loc(&self) -> Option<Loc> {
@@ -3012,6 +2948,25 @@ impl TypeUnificationError {
         match self {
             TypeUnificationError::TypeMismatch(actual, expected) => (
                 error_context.type_mismatch(display_context, actual, expected),
+                vec![],
+                vec![],
+            ),
+            TypeUnificationError::FunArgTypeMismatch(expected, actual) => (
+                // Because of contra-variance, switches actual/expected order
+                format!(
+                    "function takes arguments of type `{}` but `{}` was expected",
+                    actual.display(display_context),
+                    expected.display(display_context)
+                ),
+                vec![],
+                vec![],
+            ),
+            TypeUnificationError::FunResultTypeMismatch(actual, expected) => (
+                format!(
+                    "function returns value of type `{}` but `{}` was expected",
+                    actual.display(display_context),
+                    expected.display(display_context)
+                ),
                 vec![],
                 vec![],
             ),
@@ -3139,6 +3094,14 @@ impl TypeUnificationError {
                             "undeclared receiver function `{}` for type `{}`",
                             name.display(display_context.env.symbol_pool()),
                             ty.display(display_context)
+                        )
+                    },
+                    Constraint::SomeFunctionValue(arg_ty, result_ty) => {
+                        format!(
+                            "expected function of type `{}` but found `{}`",
+                            Type::function(arg_ty.clone(), result_ty.clone(), AbilitySet::EMPTY)
+                                .display(display_context),
+                            ty.display(display_context),
                         )
                     },
                     Constraint::NoTuple => {
@@ -3295,165 +3258,6 @@ impl TypeUnificationError {
         names
             .map(|n| format!("field `{}`", n.display(env.symbol_pool()),))
             .join(" and ")
-    }
-}
-
-/// A helper to derive the set of instantiations for type parameters
-pub struct TypeInstantiationDerivation {}
-
-impl TypeInstantiationDerivation {
-    /// Find what the instantiations should we have for the type parameter at `target_param_index`.
-    ///
-    /// The invariant is, forall type parameters whose index < target_param_index, it should either
-    /// - be assigned with a concrete type already and hence, ceases to be a type parameter, or
-    /// - does not have any matching instantiation and hence, either remains a type parameter or is
-    ///   represented as a type error.
-    /// But in anyway, these type parameters no longer participate in type unification anymore.
-    ///
-    /// If `target_lhs` is True, derive instantiations for the type parameter with
-    /// `target_param_index` on the `lhs_types`. Otherwise, target the `rhs_types`.
-    fn derive_instantiations_for_target_parameter(
-        lhs_types: &BTreeSet<Type>,
-        rhs_types: &BTreeSet<Type>,
-        treat_lhs_type_param_as_var: bool,
-        treat_rhs_type_param_as_var: bool,
-        target_param_index: TypeParameterIndex,
-        target_lhs: bool,
-    ) -> BTreeSet<Type> {
-        // progressively increase the boundary
-        let treat_lhs_type_param_as_var_after_index =
-            treat_lhs_type_param_as_var.then_some(if target_lhs { target_param_index } else { 0 });
-        let treat_rhs_type_param_as_var_after_index =
-            treat_rhs_type_param_as_var.then_some(if target_lhs { 0 } else { target_param_index });
-
-        let mut target_param_insts = BTreeSet::new();
-        for t_lhs in lhs_types {
-            for t_rhs in rhs_types {
-                // Try to unify the instantiations
-                let adapter = TypeUnificationAdapter::new(
-                    std::iter::once(t_lhs),
-                    std::iter::once(t_rhs),
-                    treat_lhs_type_param_as_var_after_index,
-                    treat_rhs_type_param_as_var_after_index,
-                );
-                let rel = adapter.unify(&mut NoUnificationContext, Variance::SpecVariance, false);
-                if let Some((subst_lhs, subst_rhs)) = rel {
-                    let subst = if target_lhs { subst_lhs } else { subst_rhs };
-                    for (param_idx, inst_ty) in subst.into_iter() {
-                        if param_idx != target_param_index {
-                            // this parameter will be unified at a later stage.
-                            //
-                            // NOTE: this code is inefficient when we have multiple type parameters,
-                            // but a vast majority of Move code we see so far have at most one type
-                            // parameter, so we trade-off efficiency with simplicity in code.
-                            assert!(param_idx > target_param_index);
-                            continue;
-                        }
-                        target_param_insts.insert(inst_ty);
-                    }
-                }
-            }
-        }
-        target_param_insts
-    }
-
-    /// Find the set of valid instantiation combinations for all the type parameters.
-    ///
-    /// The algorithm is progressive. For a list of parameters with arity `params_arity = N`, it
-    /// - first finds all possible instantiation for parameter at index 0 (`inst_param_0`) and,'
-    /// - for each instantiation in `inst_param_0`,
-    ///   - refines LHS or RHS types and
-    ///   - finds all possible instantiations for parameter at index 1 (`inst_param_1`)
-    ///   - for each instantiation in `inst_param_1`,
-    ///     - refines LHS or RHS types and
-    ///     - finds all possible instantiations for parameter at index 2 (`inst_param_2`)
-    ///     - for each instantiation in `inst_param_2`,
-    ///       - ......
-    /// The process continues until all type parameters are analyzed (i.e., reaching the type
-    /// parameter at index `N`).
-    ///
-    /// If `refine_lhs` is True, refine the `lhs_types` after each round; same for `refine_rhs`.
-    ///
-    /// If `target_lhs` is True, find instantiations for the type parameters in the `lhs_types`,
-    /// otherwise, target the `rhs_types`.
-    ///
-    /// If `mark_irrelevant_param_as_error` is True, type parameters that do not have any valid
-    /// instantiation will be marked as `Type::Error`. Otherwise, leave the type parameter as it is.
-    pub fn progressive_instantiation<'a, I>(
-        lhs_types: I,
-        rhs_types: I,
-        treat_lhs_type_param_as_var: bool,
-        treat_rhs_type_param_as_var: bool,
-        refine_lhs: bool,
-        refine_rhs: bool,
-        params_arity: usize,
-        target_lhs: bool,
-        mark_irrelevant_param_as_error: bool,
-    ) -> BTreeSet<Vec<Type>>
-    where
-        I: Iterator<Item = &'a Type> + Clone,
-    {
-        let initial_param_insts: Vec<_> = (0..params_arity).map(Type::new_param).collect();
-
-        let mut work_queue = VecDeque::new();
-        work_queue.push_back(initial_param_insts);
-        for target_param_index in 0..params_arity {
-            let mut for_next_round = vec![];
-            while let Some(param_insts) = work_queue.pop_front() {
-                // refine the memory usage sets with current param instantiations
-                let refined_lhs = lhs_types
-                    .clone()
-                    .map(|t| {
-                        if refine_lhs {
-                            t.instantiate(&param_insts)
-                        } else {
-                            t.clone()
-                        }
-                    })
-                    .collect();
-                let refined_rhs = rhs_types
-                    .clone()
-                    .map(|t| {
-                        if refine_rhs {
-                            t.instantiate(&param_insts)
-                        } else {
-                            t.clone()
-                        }
-                    })
-                    .collect();
-
-                // find type instantiations for the target parameter index
-                let mut target_param_insts = Self::derive_instantiations_for_target_parameter(
-                    &refined_lhs,
-                    &refined_rhs,
-                    treat_lhs_type_param_as_var,
-                    treat_rhs_type_param_as_var,
-                    target_param_index as TypeParameterIndex,
-                    target_lhs,
-                );
-
-                // decide what to do with an irrelevant type parameter
-                if target_param_insts.is_empty() {
-                    let irrelevant_type = if mark_irrelevant_param_as_error {
-                        Type::Error
-                    } else {
-                        Type::new_param(target_param_index)
-                    };
-                    target_param_insts.insert(irrelevant_type);
-                }
-
-                // instantiate the target type parameter in every possible way
-                for inst in target_param_insts {
-                    let mut next_insts = param_insts.clone();
-                    next_insts[target_param_index] = inst;
-                    for_next_round.push(next_insts);
-                }
-            }
-            work_queue.extend(for_next_round);
-        }
-
-        // the final workqueue contains possible instantiations for all type parameters
-        work_queue.into_iter().collect()
     }
 }
 

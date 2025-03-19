@@ -17,7 +17,7 @@ fn get_values(num_bits: usize, batch_size: usize) -> (Vec<u64>, Vec<Scalar>) {
         .map(|_| rng.gen_range(0u64, (2u128.pow(num_bits as u32) - 1u128) as u64))
         .collect::<Vec<u64>>();
 
-    // Sigh, some RngCore incompatibilites I don't want to deal with right now.
+    // Sigh, some RngCore incompatibilities I don't want to deal with right now.
     let b = (0..batch_size)
         .map(|_| Scalar::hash_from_bytes::<sha3::Sha3_512>(b"some random blinder"))
         .collect::<Vec<Scalar>>();

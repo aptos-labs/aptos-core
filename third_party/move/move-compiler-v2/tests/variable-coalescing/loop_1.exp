@@ -197,29 +197,29 @@ fun m::test($t0: u64): u64 {
 module c0ffee.m {
 
 
-test(Arg0: u64): u64 /* def_idx: 0 */ {
-L1:	loc0: u64
-L2:	loc1: u64
+test(p: u64): u64 /* def_idx: 0 */ {
+L1:	a: u64
+L2:	count: u64
 B0:
 	0: LdU64(0)
-	1: StLoc[1](loc0: u64)
+	1: StLoc[1](a: u64)
 	2: LdU64(0)
-	3: StLoc[2](loc1: u64)
+	3: StLoc[2](count: u64)
 B1:
-	4: CopyLoc[2](loc1: u64)
+	4: CopyLoc[2](count: u64)
 	5: LdU64(10)
 	6: Lt
 	7: BrFalse(15)
 B2:
-	8: CopyLoc[0](Arg0: u64)
-	9: StLoc[1](loc0: u64)
-	10: MoveLoc[2](loc1: u64)
+	8: CopyLoc[0](p: u64)
+	9: StLoc[1](a: u64)
+	10: MoveLoc[2](count: u64)
 	11: LdU64(1)
 	12: Add
-	13: StLoc[2](loc1: u64)
+	13: StLoc[2](count: u64)
 	14: Branch(4)
 B3:
-	15: MoveLoc[1](loc0: u64)
+	15: MoveLoc[1](a: u64)
 	16: Ret
 }
 }

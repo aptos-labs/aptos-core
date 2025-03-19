@@ -12,8 +12,8 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 codespan-reporting = { workspace = true, features = ["serde", "serialization"] }
+legacy-move-compiler = { workspace = true }
 move-command-line-common = { workspace = true }
-move-compiler = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-model = { workspace = true }
 move-prover-test-utils = { workspace = true }

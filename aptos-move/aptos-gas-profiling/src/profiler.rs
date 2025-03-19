@@ -503,6 +503,10 @@ where
 
         res
     }
+
+    fn charge_heap_memory(&mut self, amount: u64) -> PartialVMResult<()> {
+        self.base.charge_heap_memory(amount)
+    }
 }
 
 fn write_op_type(op: &WriteOpSize) -> WriteOpType {

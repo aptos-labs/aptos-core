@@ -34,6 +34,7 @@ uint = { workspace = true }
 
 [dev-dependencies]
 arbitrary = { workspace = true, features = ["derive_arbitrary"] }
+dearbitrary = { workspace = true, features = ["derive"] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 regex = { workspace = true }

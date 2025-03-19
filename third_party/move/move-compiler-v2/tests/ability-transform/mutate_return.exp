@@ -307,20 +307,20 @@ fun m::g<#0>($t0: &mut vector<#0>) {
 module c0ffee.m {
 
 
-public singleton<Ty0>(Arg0: Ty0): vector<Ty0> /* def_idx: 0 */ {
-L1:	loc0: vector<Ty0>
+public singleton<Element>(e: Element): vector<Element> /* def_idx: 0 */ {
+L1:	v: vector<Element>
 B0:
-	0: MoveLoc[0](Arg0: Ty0)
+	0: MoveLoc[0](e: Element)
 	1: VecPack(0, 1)
-	2: StLoc[1](loc0: vector<Ty0>)
-	3: MutBorrowLoc[1](loc0: vector<Ty0>)
-	4: Call g<Ty0>(&mut vector<Ty0>)
-	5: MoveLoc[1](loc0: vector<Ty0>)
+	2: StLoc[1](v: vector<Element>)
+	3: MutBorrowLoc[1](v: vector<Element>)
+	4: Call g<Element>(&mut vector<Element>)
+	5: MoveLoc[1](v: vector<Element>)
 	6: Ret
 }
-g<Ty0>(Arg0: &mut vector<Ty0>) /* def_idx: 1 */ {
+g<A>(_v: &mut vector<A>) /* def_idx: 1 */ {
 B0:
-	0: MoveLoc[0](Arg0: &mut vector<Ty0>)
+	0: MoveLoc[0](_v: &mut vector<A>)
 	1: Pop
 	2: Ret
 }

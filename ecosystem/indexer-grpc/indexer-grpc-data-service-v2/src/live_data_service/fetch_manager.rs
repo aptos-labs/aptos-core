@@ -4,6 +4,7 @@
 use crate::{
     connection_manager::ConnectionManager,
     live_data_service::{data_client::DataClient, data_manager::DataManager},
+    metrics::TIMER,
 };
 use futures::future::{BoxFuture, FutureExt, Shared};
 use std::{sync::Arc, time::Duration};
@@ -31,6 +32,7 @@ impl<'a> FetchManager<'a> {
     }
 
     pub(super) async fn fetch_past_data(&self, version: u64) -> usize {
+        let _timer = TIMER.with_label_values(&["fetch_past_data"]).start_timer();
         Self::fetch_and_update_cache(self.data_client.clone(), self.data_manager.clone(), version)
             .await
     }
@@ -65,12 +67,17 @@ impl<'a> FetchManager<'a> {
         let version = self.data_manager.read().await.end_version;
         info!("Fetching latest data starting from version {version}.");
         loop {
-            let num_transactions = Self::fetch_and_update_cache(
-                self.data_client.clone(),
-                self.data_manager.clone(),
-                version,
-            )
-            .await;
+            let num_transactions = {
+                let _timer = TIMER
+                    .with_label_values(&["fetch_latest_data"])
+                    .start_timer();
+                Self::fetch_and_update_cache(
+                    self.data_client.clone(),
+                    self.data_manager.clone(),
+                    version,
+                )
+                .await
+            };
             if num_transactions != 0 {
                 info!("Finished fetching latest data, got {num_transactions} num_transactions starting from version {version}.");
                 return num_transactions;

@@ -1,45 +1,17 @@
-Move prover returns: exiting with model building errors
-error: unsupported language construct
-  ┌─ tests/sources/functional/enum_positional.move:3:5
-  │
-3 │     enum Positional has drop {
-  │     ^^^^ Move 2 language construct is not enabled: enum types
-
-error: unsupported language construct
-  ┌─ tests/sources/functional/enum_positional.move:4:10
-  │
-4 │         A(u8),
-  │          ^ Move 2 language construct is not enabled: positional fields
-
-error: unsupported language construct
-  ┌─ tests/sources/functional/enum_positional.move:5:10
-  │
-5 │         B(u8),
-  │          ^ Move 2 language construct is not enabled: positional fields
-
-error: unsupported language construct
-  ┌─ tests/sources/functional/enum_positional.move:9:24
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+  ┌─ tests/sources/functional/enum_positional.move:9:9
   │
 9 │         invariant self.0 > 20;
-  │                        ^ Move 2 language construct is not enabled: positional field
-
-error: unsupported language construct
-   ┌─ tests/sources/functional/enum_positional.move:15:21
-   │
-15 │            assert x.0 == 42;
-   │                     ^ Move 2 language construct is not enabled: positional field
-
-error: unsupported language construct
-   ┌─ tests/sources/functional/enum_positional.move:17:9
-   │
-17 │         match (&mut x) {
-   │         ^^^^^ Move 2 language construct is not enabled: match expression
-
-error: unexpected token
-   ┌─ tests/sources/functional/enum_positional.move:18:26
-   │
-18 │             Positional::A(y) => *y = 3, // aborts
-   │                          ^
-   │                          │
-   │                          Unexpected '('
-   │                          Expected '{'
+  │         ^^^^^^^^^^^^^^^^^^^^^^
+  │
+  =     at tests/sources/functional/enum_positional.move:13: test_positional_incorrect
+  =     at tests/sources/functional/enum_positional.move:9
+  =     at tests/sources/functional/enum_positional.move:13: test_positional_incorrect
+  =         x = <redacted>
+  =     at tests/sources/functional/enum_positional.move:15: test_positional_incorrect
+  =     at tests/sources/functional/enum_positional.move:17: test_positional_incorrect
+  =         <redacted> = <redacted>
+  =     at tests/sources/functional/enum_positional.move:18: test_positional_incorrect
+  =         y = <redacted>
+  =     at tests/sources/functional/enum_positional.move:9

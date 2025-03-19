@@ -20,7 +20,7 @@ public fun m::test($t0: bool): u32 {
 
 
 Diagnostics:
-warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
+warning: Unused assignment/binding to `y`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_y`), or binding to `_`
    ┌─ tests/variable-coalescing/dead_assignment_3.move:10:13
    │
 10 │             y = y;
@@ -114,23 +114,23 @@ public fun m::test($t0: bool): u32 {
 module c0ffee.m {
 
 
-public test(Arg0: bool): u32 /* def_idx: 0 */ {
-L1:	loc0: u32
-L2:	loc1: u32
+public test(p: bool): u32 /* def_idx: 0 */ {
+L1:	y: u32
+L2:	return: u32
 B0:
 	0: LdU32(1)
-	1: StLoc[1](loc0: u32)
-	2: MoveLoc[0](Arg0: bool)
+	1: StLoc[1](y: u32)
+	2: MoveLoc[0](p: bool)
 	3: BrFalse(8)
 B1:
-	4: MoveLoc[1](loc0: u32)
-	5: StLoc[2](loc1: u32)
+	4: MoveLoc[1](y: u32)
+	5: StLoc[2](return: u32)
 B2:
-	6: MoveLoc[2](loc1: u32)
+	6: MoveLoc[2](return: u32)
 	7: Ret
 B3:
 	8: LdU32(9)
-	9: StLoc[2](loc1: u32)
+	9: StLoc[2](return: u32)
 	10: Branch(6)
 }
 }

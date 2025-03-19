@@ -1,12 +1,7 @@
-Move prover returns: exiting with model building errors
-error: unsupported language construct
-   ┌─ tests/sources/functional/bitwise_operators_enum.move:39:5
+warning: pragma bv is currently not support in enum types and will be ignored
+   ┌─ tests/sources/functional/bitwise_operators_enum.move:43:5
    │
-39 │     enum A has copy, drop {
-   │     ^^^^ Move 2 language construct is not enabled: enum types
-
-error: unsupported language construct
-   ┌─ tests/sources/functional/bitwise_operators_enum.move:47:5
-   │
-47 │     enum B has drop {
-   │     ^^^^ Move 2 language construct is not enabled: enum types
+43 │ ╭     spec A {
+44 │ │       pragma bv=b"1"; // this leads to a warning
+45 │ │     }
+   │ ╰─────^

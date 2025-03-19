@@ -98,13 +98,15 @@ the state. Currently, the only supported overrides are the following:
   1. Forcefully enable a feature flag (`--enable-features F1 F2 ...`).
   2. Forcefully disable a feature flag (`--disable-features F1 F2 ...`).
   3. Forcefully override the gas feature version (`--gas-feature-version V`).
+  4. Override existing on-chain packages (`--override-packages P1 P2 P3`). The paths to the
+     packages must be the path to the source directories.
 
 Feature flags should be spelled in capital letters, e.g., `ENABLE_LOADER_V2`. For the full list of
 available features, see [here](../../types/src/on_chain_config/aptos_features.rs).
 
-Overriding the feature flags can be very useful if you want to experiment with a new feature and
-check its performance as well as the gas usage. For example, if there is a new feature that makes
-MoveVM faster, overriding it for past transactions it is possible to see the execution performance
+Overriding the state can be very useful if you want to experiment with a new feature or Move code,
+and check its performance as well as the gas usage. For example, if there is a new feature that
+makes MoveVM faster, overriding it for past transactions it is possible to see the execution performance
 on historical workloads.
 
 #### Example
@@ -209,9 +211,12 @@ of transactions. Typically, you want to have the concurrency level to match the 
 multiple concurrency levels are provided, the benchmark reports the measurements for each level.
 This way it is possible to see how concurrency affects the runtime. 
 
-Finally, in order to differentiate between cold and warm starts, there is an option to skip the
-measurement for the first few blocks. By specifying `--num-block-to-skip N`, the tool will ignore
-measurements for the first `N` blocks (the blocks will still be executed as a "warm-up").
+In order to differentiate between cold and warm starts, there is an option to skip the measurement
+for the first few blocks. By specifying `--num-block-to-skip N`, the tool will ignore measurements
+for the first `N` blocks (the blocks will still be executed as a "warm-up").
+
+Execution can also be configured. By using `--disable-paranoid-mode`, the Move VM will not use
+runtime type checks, possible making execution faster.
 
 #### Example
 

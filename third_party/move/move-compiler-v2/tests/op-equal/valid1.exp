@@ -531,140 +531,140 @@ module 42.test {
 struct Coin has drop, key {
 	_0: u256
 }
-struct Wrapper<Ty0> has drop, key {
-	_0: Ty0
+struct Wrapper<T> has drop, key {
+	_0: T
 }
 
-bitand_vec_coin_new(Arg0: vector<Coin>, Arg1: u64) /* def_idx: 0 */ {
-L2:	loc0: &mut u256
+bitand_vec_coin_new(x: vector<Coin>, index: u64) /* def_idx: 0 */ {
+L2:	$t1: &mut u256
 B0:
-	0: MutBorrowLoc[0](Arg0: vector<Coin>)
-	1: MoveLoc[1](Arg1: u64)
+	0: MutBorrowLoc[0](x: vector<Coin>)
+	1: MoveLoc[1](index: u64)
 	2: VecMutBorrow(2)
 	3: MutBorrowField[0](Coin._0: u256)
-	4: StLoc[2](loc0: &mut u256)
-	5: CopyLoc[2](loc0: &mut u256)
+	4: StLoc[2]($t1: &mut u256)
+	5: CopyLoc[2]($t1: &mut u256)
 	6: ReadRef
 	7: LdU256(42)
 	8: BitAnd
-	9: MoveLoc[2](loc0: &mut u256)
+	9: MoveLoc[2]($t1: &mut u256)
 	10: WriteRef
 	11: Ret
 }
-bitor_vec_new(Arg0: &mut vector<u256>, Arg1: u64) /* def_idx: 1 */ {
-L2:	loc0: &mut u256
+bitor_vec_new(x: &mut vector<u256>, index: u64) /* def_idx: 1 */ {
+L2:	$t1: &mut u256
 B0:
-	0: MoveLoc[0](Arg0: &mut vector<u256>)
-	1: MoveLoc[1](Arg1: u64)
+	0: MoveLoc[0](x: &mut vector<u256>)
+	1: MoveLoc[1](index: u64)
 	2: VecMutBorrow(5)
-	3: StLoc[2](loc0: &mut u256)
-	4: CopyLoc[2](loc0: &mut u256)
+	3: StLoc[2]($t1: &mut u256)
+	4: CopyLoc[2]($t1: &mut u256)
 	5: ReadRef
 	6: LdU256(42)
 	7: BitOr
-	8: MoveLoc[2](loc0: &mut u256)
+	8: MoveLoc[2]($t1: &mut u256)
 	9: WriteRef
 	10: Ret
 }
-coin_double(Arg0: &mut Coin) /* def_idx: 2 */ {
-L1:	loc0: &mut u256
+coin_double(self: &mut Coin) /* def_idx: 2 */ {
+L1:	$t1: &mut u256
 B0:
-	0: MoveLoc[0](Arg0: &mut Coin)
+	0: MoveLoc[0](self: &mut Coin)
 	1: MutBorrowField[0](Coin._0: u256)
-	2: StLoc[1](loc0: &mut u256)
-	3: CopyLoc[1](loc0: &mut u256)
+	2: StLoc[1]($t1: &mut u256)
+	3: CopyLoc[1]($t1: &mut u256)
 	4: ReadRef
 	5: LdU256(2)
 	6: Mul
-	7: MoveLoc[1](loc0: &mut u256)
+	7: MoveLoc[1]($t1: &mut u256)
 	8: WriteRef
 	9: Ret
 }
-coin_mod_2(Arg0: &mut Coin) /* def_idx: 3 */ {
-L1:	loc0: &mut u256
+coin_mod_2(self: &mut Coin) /* def_idx: 3 */ {
+L1:	$t1: &mut u256
 B0:
-	0: MoveLoc[0](Arg0: &mut Coin)
+	0: MoveLoc[0](self: &mut Coin)
 	1: MutBorrowField[0](Coin._0: u256)
-	2: StLoc[1](loc0: &mut u256)
-	3: CopyLoc[1](loc0: &mut u256)
+	2: StLoc[1]($t1: &mut u256)
+	3: CopyLoc[1]($t1: &mut u256)
 	4: ReadRef
 	5: LdU256(2)
 	6: Mod
-	7: MoveLoc[1](loc0: &mut u256)
+	7: MoveLoc[1]($t1: &mut u256)
 	8: WriteRef
 	9: Ret
 }
-half_wrapped_coin_new(Arg0: &mut Wrapper<Coin>) /* def_idx: 4 */ {
-L1:	loc0: &mut u256
+half_wrapped_coin_new(x: &mut Wrapper<Coin>) /* def_idx: 4 */ {
+L1:	$t1: &mut u256
 B0:
-	0: MoveLoc[0](Arg0: &mut Wrapper<Coin>)
-	1: MutBorrowFieldGeneric[0](Wrapper._0: Ty0)
+	0: MoveLoc[0](x: &mut Wrapper<Coin>)
+	1: MutBorrowFieldGeneric[0](Wrapper._0: T)
 	2: MutBorrowField[0](Coin._0: u256)
-	3: StLoc[1](loc0: &mut u256)
-	4: CopyLoc[1](loc0: &mut u256)
+	3: StLoc[1]($t1: &mut u256)
+	4: CopyLoc[1]($t1: &mut u256)
 	5: ReadRef
 	6: LdU256(2)
 	7: Div
-	8: MoveLoc[1](loc0: &mut u256)
+	8: MoveLoc[1]($t1: &mut u256)
 	9: WriteRef
 	10: Ret
 }
-shl_vec_wrapped_coin_old(Arg0: vector<Wrapper<Coin>>, Arg1: u64) /* def_idx: 5 */ {
-L2:	loc0: &mut u256
+shl_vec_wrapped_coin_old(x: vector<Wrapper<Coin>>, index: u64) /* def_idx: 5 */ {
+L2:	$t1: &mut u256
 B0:
-	0: MutBorrowLoc[0](Arg0: vector<Wrapper<Coin>>)
-	1: MoveLoc[1](Arg1: u64)
+	0: MutBorrowLoc[0](x: vector<Wrapper<Coin>>)
+	1: MoveLoc[1](index: u64)
 	2: VecMutBorrow(9)
-	3: MutBorrowFieldGeneric[0](Wrapper._0: Ty0)
+	3: MutBorrowFieldGeneric[0](Wrapper._0: T)
 	4: MutBorrowField[0](Coin._0: u256)
-	5: StLoc[2](loc0: &mut u256)
-	6: CopyLoc[2](loc0: &mut u256)
+	5: StLoc[2]($t1: &mut u256)
+	6: CopyLoc[2]($t1: &mut u256)
 	7: ReadRef
 	8: LdU8(1)
 	9: Shl
-	10: MoveLoc[2](loc0: &mut u256)
+	10: MoveLoc[2]($t1: &mut u256)
 	11: WriteRef
 	12: Ret
 }
-shr_coin_at(Arg0: address) /* def_idx: 6 */ {
-L1:	loc0: &mut u256
+shr_coin_at(addr: address) /* def_idx: 6 */ {
+L1:	$t1: &mut u256
 B0:
-	0: MoveLoc[0](Arg0: address)
+	0: MoveLoc[0](addr: address)
 	1: MutBorrowGlobal[0](Coin)
 	2: MutBorrowField[0](Coin._0: u256)
-	3: StLoc[1](loc0: &mut u256)
-	4: CopyLoc[1](loc0: &mut u256)
+	3: StLoc[1]($t1: &mut u256)
+	4: CopyLoc[1]($t1: &mut u256)
 	5: ReadRef
 	6: LdU8(1)
 	7: Shr
-	8: MoveLoc[1](loc0: &mut u256)
+	8: MoveLoc[1]($t1: &mut u256)
 	9: WriteRef
 	10: Ret
 }
-sub1(Arg0: &mut u256) /* def_idx: 7 */ {
+sub1(x: &mut u256) /* def_idx: 7 */ {
 B0:
-	0: CopyLoc[0](Arg0: &mut u256)
+	0: CopyLoc[0](x: &mut u256)
 	1: ReadRef
 	2: LdU256(1)
 	3: Sub
-	4: MoveLoc[0](Arg0: &mut u256)
+	4: MoveLoc[0](x: &mut u256)
 	5: WriteRef
 	6: Ret
 }
-xor_vec_wrapped_coin_new(Arg0: vector<Wrapper<Coin>>, Arg1: u64) /* def_idx: 8 */ {
-L2:	loc0: &mut u256
+xor_vec_wrapped_coin_new(x: vector<Wrapper<Coin>>, index: u64) /* def_idx: 8 */ {
+L2:	$t1: &mut u256
 B0:
-	0: MutBorrowLoc[0](Arg0: vector<Wrapper<Coin>>)
-	1: MoveLoc[1](Arg1: u64)
+	0: MutBorrowLoc[0](x: vector<Wrapper<Coin>>)
+	1: MoveLoc[1](index: u64)
 	2: VecMutBorrow(9)
-	3: MutBorrowFieldGeneric[0](Wrapper._0: Ty0)
+	3: MutBorrowFieldGeneric[0](Wrapper._0: T)
 	4: MutBorrowField[0](Coin._0: u256)
-	5: StLoc[2](loc0: &mut u256)
-	6: CopyLoc[2](loc0: &mut u256)
+	5: StLoc[2]($t1: &mut u256)
+	6: CopyLoc[2]($t1: &mut u256)
 	7: ReadRef
 	8: LdU256(1)
 	9: Xor
-	10: MoveLoc[2](loc0: &mut u256)
+	10: MoveLoc[2]($t1: &mut u256)
 	11: WriteRef
 	12: Ret
 }

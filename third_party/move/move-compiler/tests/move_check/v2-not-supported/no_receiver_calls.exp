@@ -1,6 +1,0 @@
-error[E01013]: unsupported language construct
-  ┌─ tests/move_check/v2-not-supported/no_receiver_calls.move:7:11
-  │
-7 │         t.receiver(1);
-  │           ^^^^^^^^ receiver style syntax not supported by this compiler
-

@@ -195,11 +195,11 @@ module 42.explicate_drop {
 
 
 test0(): u8 /* def_idx: 0 */ {
-L0:	loc0: u8
+L0:	$t2: u8
 B0:
 	0: LdU8(42)
-	1: StLoc[0](loc0: u8)
-	2: ImmBorrowLoc[0](loc0: u8)
+	1: StLoc[0]($t2: u8)
+	2: ImmBorrowLoc[0]($t2: u8)
 	3: ReadRef
 	4: Ret
 }

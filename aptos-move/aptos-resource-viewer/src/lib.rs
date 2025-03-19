@@ -19,7 +19,9 @@ use move_core_types::{
     value::{MoveTypeLayout, MoveValue},
 };
 use move_resource_viewer::MoveValueAnnotator;
-pub use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
+pub use move_resource_viewer::{
+    AnnotatedMoveClosure, AnnotatedMoveStruct, AnnotatedMoveValue, RawMoveStruct,
+};
 use std::sync::Arc;
 
 pub struct AptosValueAnnotator<'a, S>(MoveValueAnnotator<ModuleView<'a, S>>);

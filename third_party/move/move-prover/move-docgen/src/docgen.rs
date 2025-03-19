@@ -5,9 +5,8 @@
 use clap::ValueEnum;
 use codespan::{ByteIndex, Span};
 use itertools::Itertools;
-#[allow(unused_imports)]
-use log::{debug, info, warn};
-use move_compiler::parser::keywords::{BUILTINS, CONTEXTUAL_KEYWORDS, KEYWORDS};
+use legacy_move_compiler::parser::keywords::{BUILTINS, CONTEXTUAL_KEYWORDS, KEYWORDS};
+use log::info;
 use move_core_types::{ability::AbilitySet, account_address::AccountAddress};
 use move_model::{
     ast::{Address, Attribute, AttributeValue, ModuleName, SpecBlockInfo, SpecBlockTarget},
@@ -96,7 +95,7 @@ pub struct DocgenOptions {
     /// documentation.
     ///
     /// A root document is a markdown file which contains placeholders for generated
-    /// documentation content. It is also processed following the same rules than
+    /// documentation content. It is also processed following the same rules as
     /// documentation comments in Move, including creation of cross-references and
     /// Move code highlighting.
     ///
@@ -117,7 +116,7 @@ pub struct DocgenOptions {
     /// module/script content work transparently.
     pub root_doc_templates: Vec<String>,
     /// An optional file containing reference definitions. The content of this file will
-    /// be added to each generated markdown doc.
+    /// be added to each generated Markdown doc.
     pub references_file: Option<String>,
     /// Whether to include dependency diagrams in the generated docs.
     pub include_dep_diagrams: bool,
@@ -125,7 +124,10 @@ pub struct DocgenOptions {
     pub include_call_diagrams: bool,
     /// If this is being compiled relative to a different place where it will be stored (output directory).
     pub compile_relative_to_output_dir: bool,
+    /// Output format for docs, either MD or MDX
     pub output_format: Option<OutputFormat>,
+    /// Ensure Unix paths
+    pub ensure_unix_paths: bool,
 }
 
 impl Default for DocgenOptions {
@@ -146,6 +148,7 @@ impl Default for DocgenOptions {
             include_dep_diagrams: false,
             include_call_diagrams: false,
             output_format: None,
+            ensure_unix_paths: false,
         }
     }
 }
@@ -513,18 +516,14 @@ impl<'env> Docgen<'env> {
                 let mut path = PathBuf::from(dir);
                 path.push(&file_name);
                 if path.exists() {
-                    Some(
-                        self.path_relative_to(&path, &output_path)
-                            .to_string_lossy()
-                            .to_string(),
-                    )
+                    Some(self.path_to_string(self.path_relative_to(&path, &output_path).as_path()))
                 } else {
                     None
                 }
             })
         } else {
             // We will generate this file in the provided output directory.
-            Some(file_name.to_string_lossy().to_string())
+            Some(self.path_to_string(file_name.as_ref()))
         }
     }
 
@@ -535,8 +534,22 @@ impl<'env> Docgen<'env> {
         } else {
             let mut path = PathBuf::from(&self.options.output_directory);
             path.push(name);
-            path.to_string_lossy().to_string()
+
+            self.path_to_string(path.as_path())
         }
+    }
+
+    fn path_to_string(&self, path: &Path) -> String {
+        #[cfg(not(unix))]
+        {
+            if self.options.ensure_unix_paths {
+                path.to_string_lossy().replace('\\', "/")
+            } else {
+                path.to_string_lossy().to_string()
+            }
+        }
+        #[cfg(unix)]
+        path.to_string_lossy().to_string()
     }
 
     /// Makes path relative to other path.
@@ -878,7 +891,7 @@ impl<'env> Docgen<'env> {
     fn convert_to_anchor(&self, input: &str) -> String {
         // Regular expression to match Markdown link format [text](link)
         let re = Regex::new(r"\[(.*?)\]\((.*?)\)").unwrap();
-        re.replace_all(input, |caps: &regex::Captures| {
+        re.replace_all(input, |caps: &Captures| {
             let tag = &caps[1];
             let text = &caps[2];
 
@@ -968,7 +981,7 @@ impl<'env> Docgen<'env> {
             .join(format!(
                 "{}_{}_call_graph.svg",
                 fun_env.get_name_string().to_string().replace("::", "_"),
-                (if is_forward { "forward" } else { "backward" })
+                if is_forward { "forward" } else { "backward" }
             ));
 
         self.gen_svg_file(&out_file_path, &dot_src_lines.join("\n"));
@@ -1016,7 +1029,7 @@ impl<'env> Docgen<'env> {
             .join(format!(
                 "{}_{}_dep.svg",
                 module_name,
-                (if is_forward { "forward" } else { "backward" })
+                if is_forward { "forward" } else { "backward" }
             ));
 
         self.gen_svg_file(&out_file_path, &dot_src_lines.join("\n"));
@@ -1143,7 +1156,7 @@ impl<'env> Docgen<'env> {
         for (id, _) in sorted_infos {
             let module_env = self.env.get_module(*id);
             if !module_env.is_primary_target() {
-                // Do not include modules which are not target (outside of the package)
+                // Do not include modules which are not target (outside the package)
                 // into the index.
                 continue;
             }
@@ -1720,7 +1733,7 @@ impl<'env> Docgen<'env> {
         *self.section_nest.borrow_mut() += 1;
     }
 
-    /// Decrements section nest, committing sub-sections to the table-of-contents map.
+    /// Decrements section nest, committing subsections to the table-of-contents map.
     fn decrement_section_nest(&self) {
         *self.section_nest.borrow_mut() -= 1;
     }
@@ -1894,11 +1907,11 @@ impl<'env> Docgen<'env> {
         decorated_text
     }
 
-    /// Begins a code block. This uses html, not markdown code blocks, so we are able to
+    /// Begins a code block. This uses html, not Markdown code blocks, so we are able to
     /// insert style and links into the code.
     fn begin_code(&self) {
         emitln!(self.writer);
-        // If we newline after <pre><code>, an empty line will be created. So we don't.
+        // If we add a newline after <pre><code>, an empty line will be created. So we don't.
         // This, however, creates some ugliness with indented code.
         emit!(self.writer, "<pre><code>");
     }
@@ -1950,7 +1963,7 @@ impl<'env> Docgen<'env> {
         r
     }
 
-    /// Decorates a code fragment, for use in an html block. Replaces < and >, bolds keywords and
+    /// Decorates a code fragment, for use in a html block. Replaces < and >, bolds keywords and
     /// tries to resolve and cross-link references.
     /// If the output format is MDX, replace all html entities to make the doc mdx compatible
     fn decorate_code(&self, code: &str) -> String {
@@ -2052,7 +2065,7 @@ impl<'env> Docgen<'env> {
             |module: &ModuleEnv<'_>, name: Symbol, is_qualified: bool| {
                 // Below we only resolve a simple name to a hyperref if it is followed by a ( or <,
                 // or if it is a named constant in the module.
-                // Otherwise we get too many false positives where names are resolved to functions
+                // Otherwise, we get too many false positives where names are resolved to functions
                 // but are actually fields.
                 if module.find_struct(name).is_some()
                     || module.find_named_constant(name).is_some()
@@ -2222,7 +2235,7 @@ impl<'env> Docgen<'env> {
     }
 
     /// Retrieves source of code fragment with adjusted indentation.
-    /// Typically code has the first line unindented because location tracking starts
+    /// Typically, code has the first line unindented because location tracking starts
     /// at the first keyword of the item (e.g. `public fun`), but subsequent lines are then
     /// indented. This uses a heuristic by guessing the indentation from the context.
     fn get_source_with_indent(&self, loc: &Loc) -> String {

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
+   ┌─ tests/checking/receiver/call_errors_2.move:12:9
+   │
+12 │         s.receiver_needs_type_args(x)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

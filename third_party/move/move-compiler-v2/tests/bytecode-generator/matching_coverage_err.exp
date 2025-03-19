@@ -301,7 +301,6 @@ error: match not exhaustive
    │                ^^^^^^
    │
    = missing `(_,Inner::Inner1{..})`
-   = missing `(Inner::Inner2{..},_)`
 
 error: unreachable pattern
    ┌─ tests/bytecode-generator/matching_coverage_err.move:78:14

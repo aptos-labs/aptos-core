@@ -3,31 +3,34 @@
 
 use crate::{
     config::VMConfig,
-    loader::check_natives,
     native_functions::{NativeFunction, NativeFunctions},
-    storage::{ty_tag_converter::TypeTagCache, verified_module_cache::VERIFIED_MODULES_V2},
+    storage::{
+        ty_tag_converter::{TypeTagCache, TypeTagConverter},
+        verified_module_cache::VERIFIED_MODULES_V2,
+    },
     Module, Script,
 };
 use ambassador::delegatable_trait;
 use bytes::Bytes;
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
-    errors::{Location, PartialVMError, PartialVMResult, VMResult},
-    file_format::CompiledScript,
-    CompiledModule,
+    errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
+    file_format::{CompiledScript, StructFieldInformation, TableIndex},
+    CompiledModule, IndexKind,
 };
 use move_bytecode_verifier::dependencies;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
+    language_storage::{ModuleId, TypeTag},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
 use move_vm_metrics::{Timer, VM_TIMER};
-use move_vm_types::loaded_data::struct_name_indexing::StructNameIndexMap;
 #[cfg(any(test, feature = "testing"))]
 use move_vm_types::loaded_data::{
     runtime_types::StructIdentifier, struct_name_indexing::StructNameIndex,
 };
+use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndexMap};
 use std::sync::Arc;
 
 /// [MoveVM] runtime environment encapsulating different configurations. Shared between the VM and
@@ -234,6 +237,7 @@ impl RuntimeEnvironment {
     }
 
     /// Returns native functions available to this runtime.
+    #[allow(dead_code)]
     pub(crate) fn natives(&self) -> &NativeFunctions {
         &self.natives
     }
@@ -248,6 +252,42 @@ impl RuntimeEnvironment {
     /// tags.
     pub(crate) fn ty_tag_cache(&self) -> &TypeTagCache {
         &self.ty_tag_cache
+    }
+
+    /// Returns the type tag for the given type. Construction of the tag can fail if it is too
+    /// "complex": i.e., too deeply nested, or has large struct identifiers.
+    pub fn ty_to_ty_tag(&self, ty: &Type) -> VMResult<TypeTag> {
+        let ty_tag_builder = TypeTagConverter::new(self);
+        ty_tag_builder
+            .ty_to_ty_tag(ty)
+            .map_err(|e| e.finish(Location::Undefined))
+    }
+
+    /// If type is a (generic or non-generic) struct or enum, returns its name. Otherwise, returns
+    /// [None].
+    pub fn get_struct_name(&self, ty: &Type) -> PartialVMResult<Option<(ModuleId, Identifier)>> {
+        use Type::*;
+
+        Ok(match ty {
+            Struct { idx, .. } | StructInstantiation { idx, .. } => {
+                let struct_identifier = self.struct_name_index_map().idx_to_struct_name(*idx)?;
+                Some((struct_identifier.module, struct_identifier.name))
+            },
+            Bool
+            | U8
+            | U16
+            | U32
+            | U64
+            | U128
+            | U256
+            | Address
+            | Signer
+            | TyParam(_)
+            | Vector(_)
+            | Reference(_)
+            | MutableReference(_)
+            | Function { .. } => None,
+        })
     }
 
     /// Returns the size of the struct name re-indexing cache. Can be used to bound the size of the
@@ -326,4 +366,20 @@ impl LocallyVerifiedScript {
     ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
         self.0.immediate_dependencies_iter()
     }
+}
+
+fn check_natives(module: &CompiledModule) -> VMResult<()> {
+    // TODO: fix check and error code if we leave something around for native structs.
+    // For now this generates the only error test cases care about...
+    for (idx, struct_def) in module.struct_defs().iter().enumerate() {
+        if struct_def.field_information == StructFieldInformation::Native {
+            return Err(verification_error(
+                StatusCode::MISSING_DEPENDENCY,
+                IndexKind::FunctionHandle,
+                idx as TableIndex,
+            )
+            .finish(Location::Module(module.self_id())));
+        }
+    }
+    Ok(())
 }

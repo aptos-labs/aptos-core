@@ -49,6 +49,12 @@ impl StateWithSummary {
     pub fn is_descendant_of(&self, other: &Self) -> bool {
         self.state.is_descendant_of(&other.state) && self.summary.is_descendant_of(&other.summary)
     }
+
+    pub fn into_inner(self) -> (State, StateSummary) {
+        let Self { state, summary } = self;
+
+        (state, summary)
+    }
 }
 
 #[derive(Clone, Debug, Deref, DerefMut)]
@@ -75,7 +81,7 @@ impl LedgerStateWithSummary {
         Self::from_latest_and_last_checkpoint(checkpoint.clone(), checkpoint)
     }
 
-    pub fn new_dummy() -> Self {
+    pub fn new_empty() -> Self {
         let empty = StateWithSummary::new_empty();
         Self::from_latest_and_last_checkpoint(empty.clone(), empty)
     }

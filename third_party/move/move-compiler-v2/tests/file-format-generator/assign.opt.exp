@@ -10,39 +10,39 @@ struct S has drop {
 	g: T
 }
 
-assign_field(Arg0: &mut S, Arg1: u64) /* def_idx: 0 */ {
-L2:	loc0: &mut u64
+assign_field(s: &mut S, f: u64) /* def_idx: 0 */ {
+L2:	$t2: &mut u64
 B0:
-	0: MoveLoc[0](Arg0: &mut S)
+	0: MoveLoc[0](s: &mut S)
 	1: MutBorrowField[0](S.f: u64)
-	2: StLoc[2](loc0: &mut u64)
-	3: MoveLoc[1](Arg1: u64)
-	4: MoveLoc[2](loc0: &mut u64)
+	2: StLoc[2]($t2: &mut u64)
+	3: MoveLoc[1](f: u64)
+	4: MoveLoc[2]($t2: &mut u64)
 	5: WriteRef
 	6: Ret
 }
-assign_int(Arg0: &mut u64) /* def_idx: 1 */ {
+assign_int(x: &mut u64) /* def_idx: 1 */ {
 B0:
 	0: LdU64(42)
-	1: MoveLoc[0](Arg0: &mut u64)
+	1: MoveLoc[0](x: &mut u64)
 	2: WriteRef
 	3: Ret
 }
-assign_pattern(Arg0: S, Arg1: u64, Arg2: u64): u64 /* def_idx: 2 */ {
+assign_pattern(s: S, f: u64, h: u64): u64 /* def_idx: 2 */ {
 B0:
-	0: MoveLoc[0](Arg0: S)
+	0: MoveLoc[0](s: S)
 	1: Unpack[1](S)
 	2: Unpack[0](T)
 	3: Add
 	4: Ret
 }
-assign_struct(Arg0: &mut S) /* def_idx: 3 */ {
+assign_struct(s: &mut S) /* def_idx: 3 */ {
 B0:
 	0: LdU64(42)
 	1: LdU64(42)
 	2: Pack[0](T)
 	3: Pack[1](S)
-	4: MoveLoc[0](Arg0: &mut S)
+	4: MoveLoc[0](s: &mut S)
 	5: WriteRef
 	6: Ret
 }

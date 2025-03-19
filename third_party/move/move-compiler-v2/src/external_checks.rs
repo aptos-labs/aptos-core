@@ -4,7 +4,7 @@
 //! This module contains the interface for externally specified checks
 //! that can be run by the Move compiler.
 
-use move_compiler::shared::known_attributes::LintAttribute;
+use legacy_move_compiler::shared::known_attributes::LintAttribute;
 use move_model::{
     ast::ExpData,
     model::{GlobalEnv, Loc},

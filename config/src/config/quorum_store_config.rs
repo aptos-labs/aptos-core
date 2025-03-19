@@ -98,6 +98,7 @@ pub struct QuorumStoreConfig {
     pub allow_batches_without_pos_in_proposal: bool,
     pub enable_opt_quorum_store: bool,
     pub opt_qs_minimum_batch_age_usecs: u64,
+    pub enable_payload_v2: bool,
 }
 
 impl Default for QuorumStoreConfig {
@@ -138,6 +139,7 @@ impl Default for QuorumStoreConfig {
             allow_batches_without_pos_in_proposal: true,
             enable_opt_quorum_store: false,
             opt_qs_minimum_batch_age_usecs: Duration::from_millis(20).as_micros() as u64,
+            enable_payload_v2: false,
         }
     }
 }

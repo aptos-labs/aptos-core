@@ -16,7 +16,7 @@ use move_binary_format::{
 use move_core_types::{
     ability::{Ability, AbilitySet},
     identifier::Identifier,
-    language_storage::{ModuleId, StructTag, TypeTag},
+    language_storage::{FunctionTag, ModuleId, StructTag, TypeTag},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
 use serde::Serialize;
@@ -279,6 +279,11 @@ pub enum Type {
         ty_args: TriompheArc<Vec<Type>>,
         ability: AbilityInfo,
     },
+    Function {
+        args: Vec<Type>,
+        results: Vec<Type>,
+        abilities: AbilitySet,
+    },
     Reference(Box<Type>),
     MutableReference(Box<Type>),
     TyParam(u16),
@@ -321,6 +326,11 @@ impl<'a> Iterator for TypePreorderTraversalIter<'a> {
                     },
 
                     StructInstantiation { ty_args, .. } => self.stack.extend(ty_args.iter().rev()),
+
+                    Function { args, results, .. } => {
+                        self.stack.extend(args.iter());
+                        self.stack.extend(results.iter())
+                    },
                 }
                 Some(ty)
             },
@@ -461,6 +471,44 @@ impl Type {
         Ok(())
     }
 
+    pub fn paranoid_check_assignable(&self, expected_ty: &Self) -> PartialVMResult<()> {
+        let ok = match (expected_ty, self) {
+            (
+                Type::Function {
+                    args,
+                    results,
+                    abilities,
+                },
+                Type::Function {
+                    args: given_args,
+                    results: given_results,
+                    abilities: given_abilities,
+                },
+            ) => {
+                args == given_args
+                    && results == given_results
+                    && abilities.is_subset(*given_abilities)
+            },
+            (Type::Reference(ty), Type::Reference(given)) => {
+                given.paranoid_check_assignable(ty)?;
+                true
+            },
+            (Type::MutableReference(ty), Type::MutableReference(given)) => {
+                given.paranoid_check_assignable(ty)?;
+                true
+            },
+            _ => expected_ty == self,
+        };
+        if !ok {
+            let msg = format!(
+                "Expected type {}, got {} which is not assignable ",
+                expected_ty, self
+            );
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
     pub fn paranoid_check_is_vec_ty(&self, expected_elem_ty: &Self) -> PartialVMResult<()> {
         if let Self::Vector(elem_ty) = self {
             return elem_ty.paranoid_check_eq(expected_elem_ty);
@@ -591,6 +639,28 @@ impl Type {
         }
     }
 
+    /// If the type is a mutable or immutable reference, returns the inner type it points to.
+    /// Otherwise, returns [None].
+    pub fn get_ref_inner_ty(&self) -> Option<&Self> {
+        match self {
+            Type::Reference(ty) | Type::MutableReference(ty) => Some(ty.as_ref()),
+            Type::Bool
+            | Type::U8
+            | Type::U64
+            | Type::U16
+            | Type::U32
+            | Type::U256
+            | Type::U128
+            | Type::Address
+            | Type::Signer
+            | Type::Vector(_)
+            | Type::Struct { .. }
+            | Type::StructInstantiation { .. }
+            | Type::Function { .. }
+            | Type::TyParam(_) => None,
+        }
+    }
+
     pub fn abilities(&self) -> PartialVMResult<AbilitySet> {
         match self {
             Type::Bool
@@ -643,6 +713,7 @@ impl Type {
                         .with_message(e.to_string())
                 })
             },
+            Type::Function { abilities, .. } => Ok(*abilities),
         }
     }
 
@@ -709,7 +780,8 @@ impl Type {
                     | Struct { .. }
                     | Reference(..)
                     | MutableReference(..)
-                    | StructInstantiation { .. } => n += 1,
+                    | StructInstantiation { .. }
+                    | Function { .. } => n += 1,
                 }
             }
 
@@ -753,6 +825,17 @@ impl fmt::Display for Type {
                 "s#{}<{}>",
                 idx,
                 ty_args.iter().map(|t| t.to_string()).join(",")
+            ),
+            Function {
+                args,
+                results,
+                abilities,
+            } => write!(
+                f,
+                "|{}|{}{}",
+                args.iter().map(|t| t.to_string()).join(","),
+                results.iter().map(|t| t.to_string()).join(","),
+                abilities.display_postfix()
             ),
             Reference(t) => write!(f, "&{}", t),
             MutableReference(t) => write!(f, "&mut {}", t),
@@ -1133,6 +1216,28 @@ impl TypeBuilder {
                     ability: ability.clone(),
                 }
             },
+            Function {
+                args,
+                results,
+                abilities,
+            } => {
+                let subs_elem = |count: &mut u64, ty: &Type| -> PartialVMResult<Type> {
+                    Self::apply_subst(ty, subst, count, depth + 1, check)
+                };
+                let args = args
+                    .iter()
+                    .map(|ty| subs_elem(count, ty))
+                    .collect::<PartialVMResult<Vec<_>>>()?;
+                let results = results
+                    .iter()
+                    .map(|ty| subs_elem(count, ty))
+                    .collect::<PartialVMResult<Vec<_>>>()?;
+                Function {
+                    args,
+                    results,
+                    abilities: *abilities,
+                }
+            },
         })
     }
 
@@ -1190,6 +1295,23 @@ impl TypeBuilder {
                             struct_ty.phantom_ty_params_mask.clone(),
                         ),
                     }
+                }
+            },
+            T::Function(fun) => {
+                let FunctionTag {
+                    args,
+                    results,
+                    abilities,
+                } = fun.as_ref();
+                let mut to_list = |ts: &[TypeTag]| {
+                    ts.iter()
+                        .map(|t| self.create_ty_impl(t, resolver, count, depth + 1))
+                        .collect::<VMResult<Vec<_>>>()
+                };
+                Function {
+                    args: to_list(args)?,
+                    results: to_list(results)?,
+                    abilities: *abilities,
                 }
             },
         })

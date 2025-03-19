@@ -33,6 +33,7 @@ fuzz_target!(|code_unit: CodeUnit| {
         return_: SignatureIndex(1),
         type_parameters: vec![],
         access_specifiers: None,
+        attributes: vec![],
     };
 
     module.function_handles.push(fun_handle);

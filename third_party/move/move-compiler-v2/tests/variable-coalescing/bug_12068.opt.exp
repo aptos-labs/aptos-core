@@ -220,20 +220,20 @@ module 32.m {
 
 
 main() /* def_idx: 0 */ {
-L0:	loc0: u64
+L0:	x: u64
 B0:
 	0: LdU64(0)
-	1: StLoc[0](loc0: u64)
+	1: StLoc[0](x: u64)
 	2: Branch(4)
 B1:
 	3: Branch(8)
 B2:
-	4: MoveLoc[0](loc0: u64)
+	4: MoveLoc[0](x: u64)
 	5: LdU64(1)
 	6: Add
-	7: StLoc[0](loc0: u64)
+	7: StLoc[0](x: u64)
 B3:
-	8: MoveLoc[0](loc0: u64)
+	8: MoveLoc[0](x: u64)
 	9: LdU64(1)
 	10: Eq
 	11: BrFalse(13)

@@ -11,13 +11,10 @@ use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 use move_abigen::Abigen;
-use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
-use move_compiler_v2::{env_pipeline::rewrite_target::RewritingScope, Experiment};
 use move_docgen::Docgen;
 use move_errmapgen::ErrmapGen;
 use move_model::{
     code_writer::CodeWriter, metadata::LATEST_STABLE_COMPILER_VERSION_VALUE, model::GlobalEnv,
-    parse_addresses_from_options, run_model_builder_with_options,
 };
 use move_prover_boogie_backend::{
     add_prelude, boogie_wrapper::BoogieWrapper, bytecode_translator::BoogieTranslator,
@@ -40,31 +37,6 @@ pub mod cli;
 pub fn run_move_prover_errors_to_stderr(options: Options) -> anyhow::Result<()> {
     let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
     run_move_prover_v2(&mut error_writer, options)
-}
-
-pub fn run_move_prover<W: WriteColor>(
-    error_writer: &mut W,
-    options: Options,
-) -> anyhow::Result<()> {
-    let now = Instant::now();
-    let addrs = parse_addresses_from_options(options.move_named_address_values.clone())?;
-    let mut env = run_model_builder_with_options(
-        vec![PackagePaths {
-            name: None,
-            paths: options.move_sources.clone(),
-            named_address_map: addrs.clone(),
-        }],
-        vec![],
-        vec![PackagePaths {
-            name: None,
-            paths: options.move_deps.clone(),
-            named_address_map: addrs,
-        }],
-        options.model_builder.clone(),
-        options.skip_attribute_checks,
-        KnownAttribute::get_all_attribute_names(),
-    )?;
-    run_move_prover_with_model(&mut env, error_writer, options, Some(now))
 }
 
 pub fn run_move_prover_v2<W: WriteColor>(
@@ -119,29 +91,6 @@ pub fn create_init_num_operation_state(env: &GlobalEnv) {
         }
     }
     env.set_extension(global_state);
-}
-
-pub fn run_move_prover_with_model<W: WriteColor>(
-    env: &mut GlobalEnv,
-    error_writer: &mut W,
-    options: Options,
-    timer: Option<Instant>,
-) -> anyhow::Result<()> {
-    let now = timer.unwrap_or_else(Instant::now);
-    debug!("global env before prover run: {}", env.dump_env_all());
-
-    // Run the compiler v2 checking and rewriting pipeline
-    let compiler_options = move_compiler_v2::Options::default()
-        .set_experiment(Experiment::OPTIMIZE, false)
-        .set_experiment(Experiment::SPEC_REWRITE, true);
-    env.set_extension(compiler_options.clone());
-    let pipeline = move_compiler_v2::check_and_rewrite_pipeline(
-        &compiler_options,
-        true,
-        RewritingScope::Everything,
-    );
-    pipeline.run(env);
-    run_move_prover_with_model_v2(env, error_writer, options, now)
 }
 
 pub fn run_move_prover_with_model_v2<W: WriteColor>(

@@ -28,11 +28,16 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
         ..Default::default()
     };
 
+    let utc = UnitTestingConfig {
+        filter: std::env::var("TEST_FILTER").ok(),
+        report_statistics: matches!(std::env::var("REPORT_STATS"), Ok(s) if s.as_str() == "1"),
+        ..Default::default()
+    };
     let ok = run_move_unit_tests(
         &pkg_path,
         build_config.clone(),
         // TODO(Gas): double check if this is correct
-        UnitTestingConfig::default(),
+        utc,
         aptos_test_natives(),
         aptos_test_feature_flags_genesis(),
         /* gas limit */ Some(100_000),

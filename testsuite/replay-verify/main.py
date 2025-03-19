@@ -1,16 +1,17 @@
-import yaml
+import argparse
+import datetime
+from enum import Enum
+from google.cloud import storage
+import json
 from kubernetes import client, config as KubernetesConfig
 from kubernetes.client.rest import ApiException
-from google.cloud import storage
-import time
 import logging
 import os
-from enum import Enum
-import urllib.parse
-import json
-import argparse
 import sys
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
+import time
+import urllib.parse
+import yaml
 
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -23,12 +24,14 @@ from archive_disk_utils import (
     get_kubectl_credentials,
 )
 
-SHARDING_ENABLED = False
+SHARDING_ENABLED = True
 MAX_RETRIES = 5
 RETRY_DELAY = 20  # seconds
 QUERY_DELAY = 5  # seconds
 
 REPLAY_CONCURRENCY_LEVEL = 1
+
+INT64_MAX = 9_223_372_036_854_775_807
 
 
 class Network(Enum):
@@ -145,7 +148,8 @@ class WorkerPod:
                 return True
         except Exception as e:
             logger.error(f"Failed to get pod status: {e}")
-        return False    
+        return False
+
     def is_failed(self) -> bool:
         self.update_status()
         if self.status and self.status.status.phase == "Failed":
@@ -202,6 +206,8 @@ class WorkerPod:
         pod_manifest["metadata"]["name"] = self.name  # Unique name for each pod
         pod_manifest["metadata"]["labels"]["run"] = self.label
         pod_manifest["spec"]["containers"][0]["image"] = self.image
+        pod_ttl = self.config.timeout_secs + 30 * 60 # 30 minutes slack to allow for pod setup and teardown
+        pod_manifest["metadata"]["annotations"]["k8s-ttl-controller.twin.sh/ttl"] = f"{pod_ttl}s"
         pod_manifest["spec"]["volumes"][0]["persistentVolumeClaim"][
             "claimName"
         ] = self.get_claim_name()
@@ -301,6 +307,7 @@ class TaskStats:
         self.end_time: float | None = None
         self.retry_count: int = 0
         self.durations: list[float] = []
+        self.succeeded: bool = False
 
     def set_end_time(self) -> None:
         self.end_time = time.time()
@@ -309,8 +316,11 @@ class TaskStats:
     def increment_retry_count(self) -> None:
         self.retry_count += 1
 
+    def set_succeeded(self):
+        self.succeeded = True
+
     def __str__(self) -> str:
-        return f"Start time: {self.start_time}, End time: {self.end_time}, Duration: {self.durations}, Retry count: {self.retry_count}"
+        return f"Succeeded: {self.succeeded}, Start time: {self.start_time}, End time: {self.end_time}, Duration: {self.durations}, Retry count: {self.retry_count}"
 
 
 class ReplayScheduler:
@@ -362,34 +372,72 @@ class ReplayScheduler:
     def get_label(self):
         return f"{self.id}-{self.network}"
 
+    def humio_hash_mismatch_url(self, start_time: float, end_time: float) -> str:
+        query = (
+            f'k8s.labels.run = "{self.get_label()}" | "TransactionOutput does not match"'
+        )
+
+        params = {
+            "live": "false",
+            "query": query,
+            "start": f"{int(start_time*1000)}",
+            "end": f"{int(end_time*1000)}",
+        }
+
+        encoded_params = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
+        url = f"https://cloud.us.humio.com/k8s/search?{encoded_params}"
+
+        return url
+
+    def sorted_ranges_to_skip(self):
+        if len(self.ranges_to_skip) == 0:
+            return []
+
+        sorted_skips = [
+            list(r) for r in sorted(self.ranges_to_skip) if r[1] >= self.start_version
+        ]
+
+        # merge skip ranges
+        ret = []
+        current_skip = sorted_skips.pop(0)
+        for next_skip in sorted_skips:
+            if next_skip[0] > current_skip[1] + 1:
+                ret.append(current_skip)
+                current_skip = next_skip
+            else:
+                current_skip[1] = max(current_skip[1], next_skip[1])
+        ret.append(current_skip)
+
+        return sorted_skips
+
     def create_tasks(self) -> None:
         current = self.start_version
 
-        sorted_skips = [
-            r
-            for r in sorted(self.ranges_to_skip, key=lambda x: x[0])
-            if r[0] > self.start_version
-        ]
+        skips = self.sorted_ranges_to_skip()
 
-        while current < self.end_version:
-            while sorted_skips and sorted_skips[0][0] <= current < sorted_skips[0][1]:
-                current = sorted_skips[0][1] + 1
-                sorted_skips.pop(0)
+        while current <= self.end_version:
+            (skip_start, skip_end) = (
+                (INT64_MAX, INT64_MAX) if len(skips) == 0 else skips[0]
+            )
+            if skip_start <= current:
+                skips.pop(0)
+                current = skip_end + 1
+                continue
 
-            range_end = min(
-                (
-                    current + self.range_size,
-                    self.end_version,
-                    sorted_skips[0][0] if sorted_skips else self.end_version,
-                )
+            next_current = min(
+                current + self.range_size, self.end_version + 1, skip_start
             )
 
-            if current < range_end:
-                # avoid having too many small tasks, simply skip the task
-                if range_end - current >= self.config.min_range_size:
-                    self.tasks.append((current, range_end))
-                current = range_end
-        logger.info(self.tasks)
+            # avoid having too many small tasks, simply skip the task
+            range = (current, next_current - 1)
+            if next_current - current >= self.config.min_range_size:
+                self.tasks.append(range)
+            else:
+                logger.info(f"Skipping small range {range}")
+
+            current = next_current
+
+        logger.info(f"Task ranges: {self.tasks}")
 
     def create_pvc_from_snapshot(self):
         snapshot_name = (
@@ -466,7 +514,7 @@ class ReplayScheduler:
                     self.task_stats[worker_pod.name] = TaskStats(worker_pod.name)
 
                 if self.current_workers[i] is not None:
-                    try: 
+                    try:
                         phase = self.current_workers[i].get_phase()
                         logger.info(
                             f"Checking worker {i}: {self.current_workers[i].name}: {phase}"
@@ -499,6 +547,9 @@ class ReplayScheduler:
             else:
                 self.failed_workpod_logs.append(worker_pod.get_humio_log_link())
                 self.current_workers[worker_idx] = None
+        else:
+            self.task_stats[worker_pod.name].set_succeeded()
+
         self.task_stats[worker_pod.name].set_end_time()
 
     def cleanup(self):
@@ -553,7 +604,16 @@ def read_skip_ranges(network: str) -> tuple[int, int, list[tuple[int, int]]]:
         (int(range["start_version"]), int(range["end_version"]))
         for range in data["skip_ranges"]
     ]
-    return (data["start"], data["end"], skip_ranges)
+
+    end = int(
+        json.loads(
+            urllib.request.urlopen(f"https://fullnode.{network}.aptoslabs.com/v1")
+            .read()
+            .decode()
+        )["ledger_version"]
+    )
+
+    return (data["start"], end, skip_ranges)
 
 
 def parse_args() -> argparse.Namespace:
@@ -611,7 +671,7 @@ if __name__ == "__main__":
     get_kubectl_credentials("aptos-devinfra-0", "us-central1", "devinfra-usce1-0")
     (start, end, skip_ranges) = read_skip_ranges(args.network)
     image = get_image(args.image_tag) if args.image_tag is not None else get_image()
-    run_id = image[-5:]
+    run_id = f"{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}-{image[-5:]}"
     network = Network.from_string(args.network)
     config = ReplayConfig(network)
     worker_cnt = args.worker_cnt if args.worker_cnt else config.pvc_number * 7
@@ -646,13 +706,17 @@ if __name__ == "__main__":
     else:
         scheduler.create_pvc_from_snapshot()
         try:
+            start_time = time.time()
             scheduler.schedule(from_scratch=True)
             (failed_logs, txn_mismatch_logs) = scheduler.collect_all_failed_logs()
             scheduler.print_stats()
             print_logs(failed_logs, txn_mismatch_logs)
             if txn_mismatch_logs:
-                logger.error("Transaction mismatch logs found.")
+                url = scheduler.humio_hash_mismatch_url(start_time, time.time())
+                logger.error(f"Transaction mismatch logs found. All mismatch logs: {url}")
+                exit(2)
+            if len(failed_logs) > 0:
+                logger.error("Failed tasks found.")
                 exit(1)
-
         finally:
             scheduler.cleanup()

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::types::{AccountAddressWrapper, CliCommand, CliTypedResult, MovePackageDir},
+    common::types::{AccountAddressWrapper, CliCommand, CliTypedResult, MovePackageOptions},
     move_tool::IncludedArtifacts,
 };
 use aptos_framework::{BuildOptions, BuiltPackage};
@@ -70,19 +70,13 @@ pub struct LintPackage {
     #[clap(long)]
     pub dev: bool,
 
-    /// Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code.
-    /// NOTE: this behavior will become the default in the future.
-    /// See <https://github.com/aptos-labs/aptos-core/issues/10335>
-    #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
-    pub check_test_code: bool,
-
     /// Experiments
     #[clap(long, hide(true))]
     pub experiments: Vec<String>,
 }
 
 impl LintPackage {
-    fn to_move_options(&self) -> MovePackageDir {
+    fn to_move_options(&self) -> MovePackageOptions {
         let LintPackage {
             dev,
             package_dir,
@@ -92,10 +86,9 @@ impl LintPackage {
             skip_fetch_latest_git_deps,
             language_version,
             skip_attribute_checks,
-            check_test_code,
             experiments,
         } = self.clone();
-        MovePackageDir {
+        MovePackageOptions {
             dev,
             package_dir,
             output_dir,
@@ -104,9 +97,8 @@ impl LintPackage {
             skip_fetch_latest_git_deps,
             language_version,
             skip_attribute_checks,
-            check_test_code,
             experiments,
-            ..MovePackageDir::new()
+            ..MovePackageOptions::new()
         }
     }
 }
@@ -118,7 +110,7 @@ impl CliCommand<&'static str> for LintPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        let move_options = MovePackageDir {
+        let move_options = MovePackageOptions {
             compiler_version: Some(CompilerVersion::latest_stable()),
             ..self.to_move_options()
         };
@@ -138,9 +130,17 @@ impl CliCommand<&'static str> for LintPackage {
                 true,
             )?
         };
-        BuiltPackage::build_with_external_checks(package_path, build_options, vec![
-            MoveLintChecks::make(),
-        ])?;
+
+        let build_config = BuiltPackage::create_build_config(&build_options)?;
+        let resolved_graph =
+            BuiltPackage::prepare_resolution_graph(package_path, build_config.clone())?;
+        BuiltPackage::build_with_external_checks(
+            resolved_graph,
+            build_options,
+            build_config,
+            vec![MoveLintChecks::make()],
+        )?;
+
         Ok("succeeded")
     }
 }

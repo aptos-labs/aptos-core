@@ -3,19 +3,12 @@
 
 use crate::proof_of_store::{BatchInfo, ProofOfStore};
 use anyhow::ensure;
-use aptos_executor_types::ExecutorResult;
-use aptos_infallible::Mutex;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use core::fmt;
-use futures::{
-    future::{BoxFuture, Shared},
-    FutureExt,
-};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::Debug,
     ops::{Deref, DerefMut},
-    sync::Arc,
 };
 
 pub type OptBatches = BatchPointer<BatchInfo>;
@@ -32,37 +25,9 @@ pub trait TDataInfo {
     fn signers(&self, ordered_authors: &[PeerId]) -> Vec<PeerId>;
 }
 
-pub struct DataFetchFut {
-    pub iteration: u32,
-    pub responders: Vec<Arc<Mutex<Vec<PeerId>>>>,
-    pub fut: Shared<BoxFuture<'static, ExecutorResult<Vec<SignedTransaction>>>>,
-}
-
-impl fmt::Debug for DataFetchFut {
-    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Ok(())
-    }
-}
-
-impl DataFetchFut {
-    pub fn extend(&mut self, other: DataFetchFut) {
-        let self_fut = self.fut.clone();
-        self.fut = async move {
-            let result1 = self_fut.await?;
-            let result2 = other.fut.await?;
-            let result = [result1, result2].concat();
-            Ok(result)
-        }
-        .boxed()
-        .shared();
-    }
-}
-
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct BatchPointer<T> {
     pub batch_summary: Vec<T>,
-    #[serde(skip)]
-    pub data_fut: Arc<Mutex<Option<DataFetchFut>>>,
 }
 
 impl<T> BatchPointer<T>
@@ -72,21 +37,11 @@ where
     pub fn new(metadata: Vec<T>) -> Self {
         Self {
             batch_summary: metadata,
-            data_fut: Arc::new(Mutex::new(None)),
         }
     }
 
     pub fn extend(&mut self, other: BatchPointer<T>) {
-        let other_data_status = other.data_fut.lock().take().expect("must be initialized");
         self.batch_summary.extend(other.batch_summary);
-        let mut status = self.data_fut.lock();
-        *status = match &mut *status {
-            None => Some(other_data_status),
-            Some(status) => {
-                status.extend(other_data_status);
-                return;
-            },
-        };
     }
 
     pub fn num_txns(&self) -> usize {
@@ -115,7 +70,6 @@ where
     fn from(value: Vec<T>) -> Self {
         Self {
             batch_summary: value,
-            data_fut: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -123,7 +77,6 @@ where
 impl<T: PartialEq> PartialEq for BatchPointer<T> {
     fn eq(&self, other: &Self) -> bool {
         self.batch_summary == other.batch_summary
-            && Arc::as_ptr(&self.data_fut) == Arc::as_ptr(&other.data_fut)
     }
 }
 
@@ -147,12 +100,36 @@ impl<T> IntoIterator for BatchPointer<T> {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct TxnAndGasLimits {
+    pub transaction_limit: Option<u64>,
+    pub gas_limit: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum PayloadExecutionLimit {
     None,
     MaxTransactionsToExecute(u64),
+    TxnAndGasLimits(TxnAndGasLimits),
 }
 
 impl PayloadExecutionLimit {
+    pub fn new(max_txns: Option<u64>, _max_gas: Option<u64>) -> Self {
+        // TODO: on next release, start using TxnAndGasLimits
+        match max_txns {
+            Some(max_txns) => PayloadExecutionLimit::MaxTransactionsToExecute(max_txns),
+            None => PayloadExecutionLimit::None,
+        }
+    }
+
+    fn extend_options(o1: Option<u64>, o2: Option<u64>) -> Option<u64> {
+        match (o1, o2) {
+            (Some(v1), Some(v2)) => Some(v1 + v2),
+            (Some(v), None) => Some(v),
+            (None, Some(v)) => Some(v),
+            _ => None,
+        }
+    }
+
     pub(crate) fn extend(&mut self, other: PayloadExecutionLimit) {
         *self = match (&self, &other) {
             (PayloadExecutionLimit::None, _) => other,
@@ -161,13 +138,48 @@ impl PayloadExecutionLimit {
                 PayloadExecutionLimit::MaxTransactionsToExecute(limit1),
                 PayloadExecutionLimit::MaxTransactionsToExecute(limit2),
             ) => PayloadExecutionLimit::MaxTransactionsToExecute(*limit1 + *limit2),
+            (
+                PayloadExecutionLimit::TxnAndGasLimits(block1_limits),
+                PayloadExecutionLimit::TxnAndGasLimits(block2_limits),
+            ) => PayloadExecutionLimit::TxnAndGasLimits(TxnAndGasLimits {
+                transaction_limit: Self::extend_options(
+                    block1_limits.transaction_limit,
+                    block2_limits.transaction_limit,
+                ),
+                gas_limit: Self::extend_options(block1_limits.gas_limit, block2_limits.gas_limit),
+            }),
+            (
+                PayloadExecutionLimit::MaxTransactionsToExecute(limit1),
+                PayloadExecutionLimit::TxnAndGasLimits(block2_limits),
+            ) => PayloadExecutionLimit::TxnAndGasLimits(TxnAndGasLimits {
+                transaction_limit: Some(*limit1 + block2_limits.transaction_limit.unwrap_or(0)),
+                gas_limit: block2_limits.gas_limit,
+            }),
+            (
+                PayloadExecutionLimit::TxnAndGasLimits(block1_limits),
+                PayloadExecutionLimit::MaxTransactionsToExecute(limit2),
+            ) => PayloadExecutionLimit::TxnAndGasLimits(TxnAndGasLimits {
+                transaction_limit: Some(*limit2 + block1_limits.transaction_limit.unwrap_or(0)),
+                gas_limit: block1_limits.gas_limit,
+            }),
         };
     }
 
-    pub(crate) fn max_txns_to_execute(limit: Option<u64>) -> Self {
-        limit.map_or(PayloadExecutionLimit::None, |val| {
-            PayloadExecutionLimit::MaxTransactionsToExecute(val)
-        })
+    pub fn max_txns_to_execute(&self) -> Option<u64> {
+        match self {
+            PayloadExecutionLimit::None => None,
+            PayloadExecutionLimit::MaxTransactionsToExecute(max) => Some(*max),
+            PayloadExecutionLimit::TxnAndGasLimits(limits) => limits.transaction_limit,
+        }
+    }
+
+    pub fn block_gas_limit(&self) -> Option<u64> {
+        match self {
+            PayloadExecutionLimit::None | PayloadExecutionLimit::MaxTransactionsToExecute(_) => {
+                None
+            },
+            PayloadExecutionLimit::TxnAndGasLimits(limits) => limits.gas_limit,
+        }
     }
 }
 
@@ -287,10 +299,7 @@ impl OptQuorumStorePayloadV1 {
     }
 
     pub fn max_txns_to_execute(&self) -> Option<u64> {
-        match self.execution_limits {
-            PayloadExecutionLimit::None => None,
-            PayloadExecutionLimit::MaxTransactionsToExecute(max) => Some(max),
-        }
+        self.execution_limits.max_txns_to_execute()
     }
 
     pub fn check_epoch(&self, epoch: u64) -> anyhow::Result<()> {

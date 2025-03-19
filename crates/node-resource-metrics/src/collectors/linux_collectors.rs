@@ -32,6 +32,10 @@ const LINUX_TIME_WRITING_MS: &str = "time_writing_ms";
 const LINUX_PROGRESS_IO: &str = "io_in_progress";
 const LINUX_TOTAL_IO_TIME_MS: &str = "total_io_time_ms";
 
+const LINUX_RLIMIT_NOFILE_SOFT: &str = "rlimit_nofile_soft";
+
+const LINUX_RLIMIT_NOFILE_HARD: &str = "rlimit_nofile_hard";
+
 /// A Collector for exposing Linux CPU metrics
 pub(crate) struct LinuxCpuMetricsCollector {
     cpu: Desc,
@@ -126,6 +130,8 @@ pub(crate) struct LinuxDiskMetricsCollector {
     time_writing_ms: Desc,
     io_in_progress: Desc,
     total_io_time_ms: Desc,
+    rlimit_nofile_soft: ConstMetric,
+    rlimit_nofile_hard: ConstMetric,
 }
 
 impl LinuxDiskMetricsCollector {
@@ -141,6 +147,7 @@ impl LinuxDiskMetricsCollector {
             };
         }
 
+        let (soft, hard) = rlimit::Resource::NOFILE.get().unwrap_or((0, 0));
         Self {
             num_reads: disk_desc!(
                 LINUX_NUM_READS,
@@ -179,6 +186,26 @@ impl LinuxDiskMetricsCollector {
                 LINUX_TOTAL_IO_TIME_MS,
                 "Total number of milliseconds spent in IO"
             ),
+            rlimit_nofile_soft: ConstMetric::new_gauge(
+                Opts::new(LINUX_RLIMIT_NOFILE_SOFT, "RLIMIT_NOFILE soft limit.")
+                    .namespace(NAMESPACE)
+                    .subsystem(LINUX_DISK_SUBSYSTEM)
+                    .describe()
+                    .unwrap(),
+                soft as f64,
+                None,
+            )
+            .unwrap(),
+            rlimit_nofile_hard: ConstMetric::new_gauge(
+                Opts::new(LINUX_RLIMIT_NOFILE_HARD, "RLIMIT_NOFILE hard limit.")
+                    .namespace(NAMESPACE)
+                    .subsystem(LINUX_DISK_SUBSYSTEM)
+                    .describe()
+                    .unwrap(),
+                hard as f64,
+                None,
+            )
+            .unwrap(),
         }
     }
 }
@@ -228,6 +255,8 @@ impl Collector for LinuxDiskMetricsCollector {
         }
 
         let mut mfs = Vec::new();
+        mfs.extend(self.rlimit_nofile_soft.collect());
+        mfs.extend(self.rlimit_nofile_hard.collect());
 
         let disk_stats: HashMap<String, DiskStat> = match procfs::diskstats() {
             Ok(disk_stats) => HashMap::from_iter(disk_stats.into_iter().filter_map(|stat| {

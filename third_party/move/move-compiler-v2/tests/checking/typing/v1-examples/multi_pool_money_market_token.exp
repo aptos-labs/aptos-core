@@ -17,6 +17,16 @@ warning: unused type parameter
   │                        Unused type parameter `V`. Consider declaring it as phantom
 
 // -- Model dump before bytecode pipeline
+module 0x2::Map {
+    struct T<K,V> {
+    }
+    public native fun empty<K,V>(): T<K, V>;
+    public native fun remove<K,V>(m: &T<K, V>,k: &K): V;
+    public native fun contains_key<K,V>(m: &T<K, V>,k: &K): bool;
+    public native fun get<K,V>(m: &T<K, V>,k: &K): &V;
+    public native fun get_mut<K,V>(m: &mut T<K, V>,k: &K): &mut V;
+    public native fun insert<K,V>(m: &T<K, V>,k: K,v: V);
+} // end 0x2::Map
 module 0x2::Token {
     struct Coin<AssetType> {
         type: AssetType,
@@ -70,16 +80,6 @@ module 0x2::Token {
         pack Token::Coin<ATy>(Deref(Borrow(Immutable)(select Token::Coin.type<&mut Coin<ATy>>(coin))), amount)
     }
 } // end 0x2::Token
-module 0x2::Map {
-    struct T<K,V> {
-    }
-    public native fun empty<K,V>(): T<K, V>;
-    public native fun remove<K,V>(m: &T<K, V>,k: &K): V;
-    public native fun contains_key<K,V>(m: &T<K, V>,k: &K): bool;
-    public native fun get<K,V>(m: &T<K, V>,k: &K): &V;
-    public native fun get_mut<K,V>(m: &mut T<K, V>,k: &K): &mut V;
-    public native fun insert<K,V>(m: &T<K, V>,k: K,v: V);
-} // end 0x2::Map
 module 0x3::OneToOneMarket {
     use std::signer;
     use 0x2::Map; // resolved as: 0x2::Map
@@ -300,6 +300,16 @@ module 0x70dd::ToddNickels {
 } // end 0x70dd::ToddNickels
 
 // -- Sourcified model before bytecode pipeline
+module 0x2::Map {
+    struct T<K, V> has copy, drop, store {
+    }
+    public native fun empty<K, V>(): T<K, V>;
+    public native fun remove<K, V>(m: &T<K, V>, k: &K): V;
+    public native fun contains_key<K, V>(m: &T<K, V>, k: &K): bool;
+    public native fun get<K, V>(m: &T<K, V>, k: &K): &V;
+    public native fun get_mut<K, V>(m: &mut T<K, V>, k: &K): &mut V;
+    public native fun insert<K, V>(m: &T<K, V>, k: K, v: V);
+}
 module 0x2::Token {
     struct Coin<AssetType: copy + drop> has store {
         type: AssetType,
@@ -334,19 +344,9 @@ module 0x2::Token {
         Coin<ATy>{type: *&coin.type,value: amount}
     }
 }
-module 0x2::Map {
-    struct T<K, V> has copy, drop, store {
-    }
-    public native fun empty<K, V>(): T<K, V>;
-    public native fun remove<K, V>(m: &T<K, V>, k: &K): V;
-    public native fun contains_key<K, V>(m: &T<K, V>, k: &K): bool;
-    public native fun get<K, V>(m: &T<K, V>, k: &K): &V;
-    public native fun get_mut<K, V>(m: &mut T<K, V>, k: &K): &mut V;
-    public native fun insert<K, V>(m: &T<K, V>, k: K, v: V);
-}
 module 0x3::OneToOneMarket {
-    use 0x2::Token;
     use 0x2::Map;
+    use 0x2::Token;
     struct BorrowRecord<phantom InputAsset: copy + drop, phantom OutputAsset: copy + drop> has key {
         record: Map::T<address, u64>,
     }

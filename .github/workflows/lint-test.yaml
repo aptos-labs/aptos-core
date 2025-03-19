@@ -86,7 +86,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-      - uses: EmbarkStudios/cargo-deny-action@e2f4ede4a4e60ea15ff31bc0647485d80c66cfba
+      - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check licenses
       - run: echo "Skipping cargo deny! Unrelated changes detected."

@@ -13,10 +13,11 @@ use crate::{
         boogie_modifies_memory_name, boogie_num_literal, boogie_num_type_base,
         boogie_num_type_string_capital, boogie_reflection_type_info, boogie_reflection_type_name,
         boogie_resource_memory_name, boogie_struct_name, boogie_struct_variant_name, boogie_temp,
-        boogie_temp_from_suffix, boogie_type, boogie_type_param, boogie_type_suffix,
-        boogie_type_suffix_bv, boogie_type_suffix_for_struct,
-        boogie_type_suffix_for_struct_variant, boogie_well_formed_check,
-        boogie_well_formed_expr_bv, TypeIdentToken,
+        boogie_temp_from_suffix, boogie_type, boogie_type_for_struct_field, boogie_type_param,
+        boogie_type_suffix, boogie_type_suffix_bv, boogie_type_suffix_for_struct,
+        boogie_type_suffix_for_struct_variant, boogie_variant_field_update,
+        boogie_well_formed_check, boogie_well_formed_expr_bv, field_bv_flag_global_state,
+        TypeIdentToken,
     },
     options::BoogieOptions,
     spec_translator::SpecTranslator,
@@ -24,17 +25,14 @@ use crate::{
 use codespan::LineIndex;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
+use legacy_move_compiler::interface_generator::NATIVE_INTERFACE;
 #[allow(unused_imports)]
 use log::{debug, info, log, warn, Level};
-use move_compiler::interface_generator::NATIVE_INTERFACE;
 use move_model::{
     ast::{Attribute, TempIndex, TraceKind},
     code_writer::CodeWriter,
     emit, emitln,
-    model::{
-        FieldEnv, FieldId, FunctionEnv, GlobalEnv, Loc, NodeId, QualifiedInstId, StructEnv,
-        StructId,
-    },
+    model::{FieldEnv, FunctionEnv, GlobalEnv, Loc, NodeId, QualifiedInstId, StructEnv, StructId},
     pragmas::{
         ADDITION_OVERFLOW_UNCHECKED_PRAGMA, SEED_PRAGMA, TIMEOUT_PRAGMA,
         VERIFY_DURATION_ESTIMATE_PRAGMA,
@@ -444,7 +442,7 @@ impl<'env> StructTranslator<'env> {
         &self,
         struct_env: &StructEnv,
         variant: Symbol,
-        field_variant_map: &mut BTreeMap<(String, String), Vec<String>>,
+        field_variant_map: &mut BTreeMap<(String, (String, String)), Vec<String>>,
     ) {
         let writer = self.parent.writer;
         let env = self.parent.env;
@@ -461,15 +459,31 @@ impl<'env> StructTranslator<'env> {
                 env,
                 &self.inst(&field_env.get_type()),
             );
-            if field_variant_map.contains_key(&(field_name.clone(), field_type_name.clone())) {
+            // The type name of the field is required when generating the corresponding update function
+            // cannot use inst here because the caller side does not know the type instantiation info
+            let field_type_name_uninst =
+                self.boogie_type_for_struct_field(&field_env, env, &field_env.get_type());
+            if field_variant_map.contains_key(&(
+                field_name.clone(),
+                (field_type_name.clone(), field_type_name_uninst.clone()),
+            )) {
                 let variants_vec = field_variant_map
-                    .get_mut(&(field_name.clone(), field_type_name.clone()))
+                    .get_mut(&(
+                        field_name.clone(),
+                        (field_type_name.clone(), field_type_name_uninst.clone()),
+                    ))
                     .unwrap();
                 variants_vec.push(struct_variant_name.clone());
             } else {
                 let variants_vec = vec![struct_variant_name.clone()];
                 field_variant_map.insert(
-                    (field_name.to_string(), field_type_name.to_string()),
+                    (
+                        field_name.to_string(),
+                        (
+                            field_type_name.to_string(),
+                            field_type_name_uninst.to_string(),
+                        ),
+                    ),
                     variants_vec,
                 );
             }
@@ -509,10 +523,12 @@ impl<'env> StructTranslator<'env> {
                     emitln!(writer, "true")
                 } else {
                     let mut sep = "";
+                    emitln!(writer, "if s is {} then", suffix_variant);
                     for field in &fields {
                         emitln!(writer, "{}", self.boogie_field_is_valid(field, sep));
                         sep = "  && ";
                     }
+                    emitln!(writer, "else false");
                 }
             },
         );
@@ -537,7 +553,8 @@ impl<'env> StructTranslator<'env> {
     /// Emit $Update and $IsValid for enum
     fn emit_update_is_valid_for_enum(&self, struct_env: &StructEnv, struct_name: &str) {
         let writer = self.parent.writer;
-        let mut field_variant_map: BTreeMap<(String, String), Vec<String>> = BTreeMap::new();
+        let mut field_variant_map: BTreeMap<(String, (String, String)), Vec<String>> =
+            BTreeMap::new();
         for variant in struct_env.get_variants() {
             self.emit_struct_variant_is_valid_and_update(
                 struct_env,
@@ -545,11 +562,19 @@ impl<'env> StructTranslator<'env> {
                 &mut field_variant_map,
             );
         }
-        for ((field, field_type), variant_name) in field_variant_map {
+        for ((field, (field_type, field_type_uninst)), variant_name) in field_variant_map {
             self.emit_function(
                 &format!(
-                    "$Update'{}'_{}(s: {}, x: {}): {}",
-                    struct_name, field, struct_name, field_type, struct_name
+                    "$Update'{}'_{}_{}(s: {}, x: {}): {}",
+                    struct_name,
+                    // type name is needed in the update function name
+                    // to distinguish fields with the same name but different types in different variants
+                    // remove parentheses and spaces from field type name
+                    field_type_uninst.replace(['(', ')'], "").replace(' ', "_"),
+                    field,
+                    struct_name,
+                    field_type,
+                    struct_name
                 ),
                 || {
                     let mut else_symbol = "";
@@ -623,26 +648,7 @@ impl<'env> StructTranslator<'env> {
             .env
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
-        let operation_map = &global_state.struct_operation_map;
-        let mid = self.struct_env.module_env.get_id();
-        let sid = self.struct_env.get_id();
-        let field_id = if field_env.struct_env.has_variants() {
-            let variant = field_env
-                .get_variant()
-                .expect("each field of enum must have a corresponding variant");
-            let pool = self.struct_env.symbol_pool();
-            FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
-                pool.string(variant).as_str(),
-                pool.string(field_env.get_name()).as_str(),
-            )))
-        } else {
-            field_env.get_id()
-        };
-        if let Some(struct_info) = operation_map.get(&(mid, sid)) {
-            matches!(struct_info.get(&field_id), Some(&Bitwise))
-        } else {
-            false
-        }
+        field_bv_flag_global_state(global_state, field_env)
     }
 
     /// Return boogie type for a struct
@@ -1395,6 +1401,10 @@ impl<'env> FunctionTranslator<'env> {
             Call(_, dests, oper, srcs, aa) => {
                 use Operation::*;
                 match oper {
+                    Closure(..) | Invoke => {
+                        // TODO(#15664): implement closures for prover
+                        panic!("closures not yet supported")
+                    },
                     TestVariant(mid, sid, variant, inst) => {
                         let inst = &self.inst_slice(inst);
                         let src_type = self.get_local_type(srcs[0]);
@@ -1751,28 +1761,33 @@ impl<'env> FunctionTranslator<'env> {
                         let dest_str = str_local(dests[0]);
                         let struct_env = env.get_module(*mid).into_struct(*sid);
                         self.check_intrinsic_select(attr_id, &struct_env);
-                        emit!(writer, "if (");
-                        let mut select_condition = vec![];
+                        let mut else_symbol = "";
+                        // Need to go through all variants to find the correct field
                         for variant in variants {
+                            emit!(writer, "{} if (", else_symbol);
                             let struct_variant_name =
                                 boogie_struct_variant_name(&struct_env, inst, *variant);
-                            let call = format!("{} is {}", deref_src_str, struct_variant_name);
-                            select_condition.push(call.clone());
+                            let field_env = struct_env.get_field_by_offset_optional_variant(
+                                Some(*variant),
+                                *field_offset,
+                            );
+                            let field_sel = boogie_field_sel(&field_env);
+                            emitln!(writer, "{} is {}) {{", deref_src_str, struct_variant_name);
+                            emitln!(
+                                writer,
+                                "{} := $ChildMutation({}, {}, {}->{});",
+                                dest_str,
+                                src_str,
+                                field_offset,
+                                deref_src_str,
+                                field_sel,
+                            );
+                            emitln!(writer, "}");
+                            if else_symbol.is_empty() {
+                                else_symbol = " else ";
+                            }
                         }
-                        let field_env = struct_env
-                            .get_field_by_offset_optional_variant(Some(variants[0]), *field_offset);
-                        let field_sel = boogie_field_sel(&field_env);
-                        emitln!(writer, "{}) {{", select_condition.join(" || "));
-                        emitln!(
-                            writer,
-                            "{} := $ChildMutation({}, {}, {}->{});",
-                            dest_str,
-                            src_str,
-                            field_offset,
-                            deref_src_str,
-                            field_sel,
-                        );
-                        emitln!(writer, "} else { call $ExecFailureAbort(); }");
+                        emitln!(writer, "else { call $ExecFailureAbort(); }");
                     },
                     GetField(mid, sid, _, field_offset) => {
                         let src = srcs[0];
@@ -1794,23 +1809,28 @@ impl<'env> FunctionTranslator<'env> {
                         let dest_str = str_local(dests[0]);
                         let struct_env = env.get_module(*mid).into_struct(*sid);
                         self.check_intrinsic_select(attr_id, &struct_env);
-                        emit!(writer, "if (");
-                        let mut select_condition = vec![];
+                        let mut else_symbol = "";
+                        // Need to go through all variants to find the correct field
                         for variant in variants {
-                            let struct_variant_name =
-                                boogie_struct_variant_name(&struct_env, inst, *variant);
+                            emitln!(writer, "{} if (", else_symbol);
                             if self.get_local_type(src).is_reference() {
                                 src_str = format!("$Dereference({})", src_str);
                             };
-                            let call = format!("{} is {}", src_str, struct_variant_name);
-                            select_condition.push(call.clone());
+                            let struct_variant_name =
+                                boogie_struct_variant_name(&struct_env, inst, *variant);
+                            let field_env = struct_env.get_field_by_offset_optional_variant(
+                                Some(*variant),
+                                *field_offset,
+                            );
+                            let field_sel = boogie_field_sel(&field_env);
+                            emit!(writer, "{} is {}) {{", src_str, struct_variant_name);
+                            emitln!(writer, "{} := {}->{};", dest_str, src_str, field_sel);
+                            emitln!(writer, "}");
+                            if else_symbol.is_empty() {
+                                else_symbol = " else ";
+                            }
                         }
-                        let field_env = struct_env
-                            .get_field_by_offset_optional_variant(Some(variants[0]), *field_offset);
-                        let field_sel = boogie_field_sel(&field_env);
-                        emitln!(writer, "{}) {{", select_condition.join(" || "));
-                        emitln!(writer, "{} := {}->{};", dest_str, src_str, field_sel);
-                        emitln!(writer, "} else { call $ExecFailureAbort(); }");
+                        emitln!(writer, "else { call $ExecFailureAbort(); }");
                     },
                     Exists(mid, sid, inst) => {
                         let inst = self.inst_slice(inst);
@@ -2794,7 +2814,25 @@ impl<'env> FunctionTranslator<'env> {
                         edges,
                         at + 1,
                     );
-                    let update_fun = boogie_field_update(&field_env, &memory.inst);
+                    let update_fun = if variant.is_none() {
+                        boogie_field_update(&field_env, &memory.inst)
+                    } else {
+                        // When updating a field of an enum variant,
+                        // the type of the field is required to call the correct update function
+                        let global_state = &self
+                            .parent
+                            .env
+                            .get_extension::<GlobalNumberOperationState>()
+                            .expect("global number operation state");
+                        let type_name = boogie_type_for_struct_field(
+                            global_state,
+                            &field_env,
+                            self.parent.env,
+                            &field_env.get_type(),
+                        );
+                        boogie_variant_field_update(&field_env, type_name, &memory.inst)
+                    };
+
                     if new_dest_needed {
                         format!(
                             "(var $$sel{} := {}; {}({}, {}))",

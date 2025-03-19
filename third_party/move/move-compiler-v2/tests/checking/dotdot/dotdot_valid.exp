@@ -468,11 +468,3 @@ error: match not exhaustive
     │                ^
     │
     = missing `E1::C{..}`
-
-error: match not exhaustive
-    ┌─ tests/checking/dotdot/dotdot_valid.move:153:16
-    │
-153 │         match (x) {
-    │                ^
-    │
-    = missing `E1::C{..}`

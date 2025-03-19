@@ -626,6 +626,9 @@ with tempfile.TemporaryDirectory() as tmpdirname:
     move_e2e_benchmark_failed = False
     if not SKIP_MOVE_E2E:
         execute_command(f"cargo build {BUILD_FLAG} --package aptos-move-e2e-benchmark")
+        move_e2e_flags = (
+            "--only-landblocking" if SELECTED_FLOW == Flow.LAND_BLOCKING else ""
+        )
         try:
             execute_command(f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-move-e2e-benchmark")
         except:

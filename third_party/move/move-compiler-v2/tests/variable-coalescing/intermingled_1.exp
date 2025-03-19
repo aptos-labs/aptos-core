@@ -22,7 +22,7 @@ fun m::test(): u64 {
 
 
 Diagnostics:
-warning: Unused assignment to `t`. Consider removing or prefixing with an underscore: `_t`
+warning: Unused assignment/binding to `t`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_t`), or binding to `_`
   ┌─ tests/variable-coalescing/intermingled_1.move:5:9
   │
 5 │         t = t + u;
@@ -135,16 +135,16 @@ module c0ffee.m {
 
 
 test(): u64 /* def_idx: 0 */ {
-L0:	loc0: u64
+L0:	u: u64
 B0:
 	0: LdU64(1)
 	1: LdU64(2)
-	2: StLoc[0](loc0: u64)
-	3: CopyLoc[0](loc0: u64)
+	2: StLoc[0](u: u64)
+	3: CopyLoc[0](u: u64)
 	4: Add
 	5: Pop
-	6: CopyLoc[0](loc0: u64)
-	7: MoveLoc[0](loc0: u64)
+	6: CopyLoc[0](u: u64)
+	7: MoveLoc[0](u: u64)
 	8: Add
 	9: Ret
 }

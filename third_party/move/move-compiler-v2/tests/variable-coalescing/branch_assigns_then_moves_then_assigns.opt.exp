@@ -228,12 +228,12 @@ script {
 
 
 main() /* def_idx: 0 */ {
-L0:	loc0: u64
+L0:	$t5: u64
 B0:
 	0: LdU64(5)
-	1: StLoc[0](loc0: u64)
+	1: StLoc[0]($t5: u64)
 B1:
-	2: CopyLoc[0](loc0: u64)
+	2: CopyLoc[0]($t5: u64)
 	3: LdU64(5)
 	4: Eq
 	5: BrFalse(7)
@@ -244,7 +244,7 @@ B3:
 	8: Abort
 B4:
 	9: LdU64(0)
-	10: StLoc[0](loc0: u64)
+	10: StLoc[0]($t5: u64)
 	11: Branch(2)
 }
 }

@@ -1,7 +1,10 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::{LIVE_DATA_SERVICE, MAX_MESSAGE_SIZE};
+use crate::{
+    config::{LIVE_DATA_SERVICE, MAX_MESSAGE_SIZE},
+    metrics::NUM_CONNECTED_STREAMS,
+};
 use aptos_indexer_grpc_utils::{system_time_to_proto, timestamp_now_proto};
 use aptos_protos::indexer::v1::{
     grpc_manager_client::GrpcManagerClient, service_info::Info, ActiveStream, HeartbeatRequest,
@@ -202,10 +205,22 @@ impl ConnectionManager {
                 StreamProgressSamples::new(),
             ),
         );
+        let label = if self.is_live_data_service {
+            ["live_data_service"]
+        } else {
+            ["historical_data_service"]
+        };
+        NUM_CONNECTED_STREAMS.with_label_values(&label).inc();
     }
 
     pub(crate) fn remove_active_stream(&self, id: &String) {
         self.active_streams.remove(id);
+        let label = if self.is_live_data_service {
+            ["live_data_service"]
+        } else {
+            ["historical_data_service"]
+        };
+        NUM_CONNECTED_STREAMS.with_label_values(&label).dec();
     }
 
     pub(crate) fn update_stream_progress(&self, id: &str, version: u64, size_bytes: u64) {

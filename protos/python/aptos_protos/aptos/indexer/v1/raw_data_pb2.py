@@ -18,7 +18,7 @@ from aptos.transaction.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n\x1f\x61ptos/indexer/v1/raw_data.proto\x12\x10\x61ptos.indexer.v1\x1a\x1d\x61ptos/indexer/v1/filter.proto\x1a&aptos/transaction/v1/transaction.proto"\x84\x01\n\x15TransactionsInStorage\x12\x37\n\x0ctransactions\x18\x01 \x03(\x0b\x32!.aptos.transaction.v1.Transaction\x12\x1d\n\x10starting_version\x18\x02 \x01(\x04H\x00\x88\x01\x01\x42\x13\n\x11_starting_version"\x98\x02\n\x16GetTransactionsRequest\x12!\n\x10starting_version\x18\x01 \x01(\x04\x42\x02\x30\x01H\x00\x88\x01\x01\x12#\n\x12transactions_count\x18\x02 \x01(\x04\x42\x02\x30\x01H\x01\x88\x01\x01\x12\x17\n\nbatch_size\x18\x03 \x01(\x04H\x02\x88\x01\x01\x12K\n\x12transaction_filter\x18\x04 \x01(\x0b\x32*.aptos.indexer.v1.BooleanTransactionFilterH\x03\x88\x01\x01\x42\x13\n\x11_starting_versionB\x15\n\x13_transactions_countB\r\n\x0b_batch_sizeB\x15\n\x13_transaction_filter"w\n\x14TransactionsResponse\x12\x37\n\x0ctransactions\x18\x01 \x03(\x0b\x32!.aptos.transaction.v1.Transaction\x12\x19\n\x08\x63hain_id\x18\x02 \x01(\x04\x42\x02\x30\x01H\x00\x88\x01\x01\x42\x0b\n\t_chain_id2p\n\x07RawData\x12\x65\n\x0fGetTransactions\x12(.aptos.indexer.v1.GetTransactionsRequest\x1a&.aptos.indexer.v1.TransactionsResponse0\x01\x62\x06proto3'
+    b'\n\x1f\x61ptos/indexer/v1/raw_data.proto\x12\x10\x61ptos.indexer.v1\x1a\x1d\x61ptos/indexer/v1/filter.proto\x1a&aptos/transaction/v1/transaction.proto"\x84\x01\n\x15TransactionsInStorage\x12\x37\n\x0ctransactions\x18\x01 \x03(\x0b\x32!.aptos.transaction.v1.Transaction\x12\x1d\n\x10starting_version\x18\x02 \x01(\x04H\x00\x88\x01\x01\x42\x13\n\x11_starting_version"\x98\x02\n\x16GetTransactionsRequest\x12!\n\x10starting_version\x18\x01 \x01(\x04\x42\x02\x30\x01H\x00\x88\x01\x01\x12#\n\x12transactions_count\x18\x02 \x01(\x04\x42\x02\x30\x01H\x01\x88\x01\x01\x12\x17\n\nbatch_size\x18\x03 \x01(\x04H\x02\x88\x01\x01\x12K\n\x12transaction_filter\x18\x04 \x01(\x0b\x32*.aptos.indexer.v1.BooleanTransactionFilterH\x03\x88\x01\x01\x42\x13\n\x11_starting_versionB\x15\n\x13_transactions_countB\r\n\x0b_batch_sizeB\x15\n\x13_transaction_filter"=\n\x0eProcessedRange\x12\x15\n\rfirst_version\x18\x01 \x01(\x04\x12\x14\n\x0clast_version\x18\x02 \x01(\x04"\xcb\x01\n\x14TransactionsResponse\x12\x37\n\x0ctransactions\x18\x01 \x03(\x0b\x32!.aptos.transaction.v1.Transaction\x12\x19\n\x08\x63hain_id\x18\x02 \x01(\x04\x42\x02\x30\x01H\x00\x88\x01\x01\x12>\n\x0fprocessed_range\x18\x03 \x01(\x0b\x32 .aptos.indexer.v1.ProcessedRangeH\x01\x88\x01\x01\x42\x0b\n\t_chain_idB\x12\n\x10_processed_range2p\n\x07RawData\x12\x65\n\x0fGetTransactions\x12(.aptos.indexer.v1.GetTransactionsRequest\x1a&.aptos.indexer.v1.TransactionsResponse0\x01\x62\x06proto3'
 )
 
 _globals = globals()
@@ -42,8 +42,10 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _globals["_TRANSACTIONSINSTORAGE"]._serialized_end = 257
     _globals["_GETTRANSACTIONSREQUEST"]._serialized_start = 260
     _globals["_GETTRANSACTIONSREQUEST"]._serialized_end = 540
-    _globals["_TRANSACTIONSRESPONSE"]._serialized_start = 542
-    _globals["_TRANSACTIONSRESPONSE"]._serialized_end = 661
-    _globals["_RAWDATA"]._serialized_start = 663
-    _globals["_RAWDATA"]._serialized_end = 775
+    _globals["_PROCESSEDRANGE"]._serialized_start = 542
+    _globals["_PROCESSEDRANGE"]._serialized_end = 603
+    _globals["_TRANSACTIONSRESPONSE"]._serialized_start = 606
+    _globals["_TRANSACTIONSRESPONSE"]._serialized_end = 809
+    _globals["_RAWDATA"]._serialized_start = 811
+    _globals["_RAWDATA"]._serialized_end = 923
 # @@protoc_insertion_point(module_scope)

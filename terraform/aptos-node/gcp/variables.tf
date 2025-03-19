@@ -307,6 +307,12 @@ variable "num_fullnode_groups" {
   default     = 1
 }
 
+variable "validator_storage_size" {
+  description = "Disk size for validators and validator fullnodes"
+  type        = string
+  default     = "2048Gi"
+}
+
 variable "enable_storage_sharding" {
   description = "Enable storage sharding for VN and VFN nodes"
   type        = bool

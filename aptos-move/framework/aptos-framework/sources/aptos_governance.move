@@ -415,7 +415,7 @@ module aptos_framework::aptos_governance {
         is_multi_step_proposal: bool,
     ): u64 acquires GovernanceConfig, GovernanceEvents {
         check_governance_permission(proposer);
-        let proposer_address = signer::address_of(proposer);
+        let proposer_address = permissioned_signer::address_of(proposer);
         assert!(
             stake::get_delegated_voter(stake_pool) == proposer_address,
             error::invalid_argument(ENOT_DELEGATED_VOTER)

@@ -24,10 +24,6 @@ on:
         required: false
         type: string
         description: The git SHA1 to checkout. This affects the Forge test runner that is used. If not specified, the latest main will be used
-  # NOTE: to support testing different branches on different schedules, you need to specify the cron schedule in the 'determine-test-branch' step as well below
-  # Reference: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule
-  schedule:
-    - cron: "30 */2 * * *" # Run this on an aggressive cadence to get signal on the tests. They should be fully evaluated (moved to forge stable or removed entirely) after baking
   pull_request:
     paths:
       - ".github/workflows/forge-unstable.yaml"

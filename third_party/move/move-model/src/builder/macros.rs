@@ -4,13 +4,12 @@
 
 //! Module for expanding macros, as `assert!(cond, code)`. This are expanded to
 //! the input AST before type checking.  We also allow `assert!(cond)`, for Move 2,
-//! which generates the "well-known" abort code `UNSPECIFIED_ABORT_CODDE`,
-//! which is `(0xD8CA26CBD9BE << 16)`.
+//! which generates the "well-known" abort code `UNSPECIFIED_ABORT_CODE`.
 
 use crate::{
     builder::exp_builder::ExpTranslator, well_known::UNSPECIFIED_ABORT_CODE, LanguageVersion,
 };
-use move_compiler::expansion::ast as EA;
+use legacy_move_compiler::expansion::ast as EA;
 use move_ir_types::location::{sp, Loc, Spanned};
 
 impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'module_translator> {

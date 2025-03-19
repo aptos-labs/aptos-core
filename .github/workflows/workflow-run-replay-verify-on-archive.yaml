@@ -41,12 +41,15 @@ on:
         description: The end version to use for the backup. If not specified, it will use the latest version.
 jobs:
   run-replay-verify:
-    runs-on: ubuntu-latest-32-core
+    runs-on: ubuntu-latest-32-core # consider moving this to a smaller machien since the compute runs on GKE
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          # get the last 10 commits to find images that have been built
+          # we can optionally use the IMAGE_TAG to find the exact commit to checkout
+          fetch-depth: 10
 
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         id: docker-setup

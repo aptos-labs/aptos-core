@@ -1,9 +1,12 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metrics::{
+    CACHE_END_VERSION, CACHE_SIZE_BYTES, CACHE_SIZE_LIMIT_BYTES, CACHE_START_VERSION, COUNTER,
+};
 use aptos_protos::transaction::v1::Transaction;
 use prost::Message;
-use tracing::trace;
+use tracing::{error, trace, warn};
 
 // TODO(grao): Naive implementation for now. This can be replaced by a more performant
 // implementation in the future.
@@ -20,6 +23,7 @@ pub(super) struct DataManager {
 
 impl DataManager {
     pub(super) fn new(end_version: u64, num_slots: usize, size_limit_bytes: usize) -> Self {
+        CACHE_SIZE_LIMIT_BYTES.set(size_limit_bytes as i64);
         Self {
             start_version: end_version.saturating_sub(num_slots as u64),
             end_version,
@@ -43,12 +47,20 @@ impl DataManager {
             transactions.len(),
         );
         if start_version > self.end_version {
-            // TODO(grao): unexpected
+            error!(
+                "The data is in the future, cache end_version: {}, data start_version: {start_version}.",
+                self.end_version
+            );
+            COUNTER.with_label_values(&["data_too_new"]).inc();
             return;
         }
 
         if end_version <= self.start_version {
-            // TODO(grao): Log and counter.
+            warn!(
+                "The data is too old, cache start_version: {}, data end_version: {end_version}.",
+                self.start_version
+            );
+            COUNTER.with_label_values(&["data_too_old"]).inc();
             return;
         }
 
@@ -93,5 +105,13 @@ impl DataManager {
                 self.start_version += 1;
             }
         }
+
+        self.update_cache_metrics();
+    }
+
+    fn update_cache_metrics(&self) {
+        CACHE_START_VERSION.set(self.start_version as i64);
+        CACHE_END_VERSION.set(self.end_version as i64);
+        CACHE_SIZE_BYTES.set(self.total_size as i64);
     }
 }

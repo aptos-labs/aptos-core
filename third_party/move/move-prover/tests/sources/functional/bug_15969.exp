@@ -1,0 +1,18 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/bug_15969.move:23:9
+   │
+23 │         ensures result != spec_empty(s); // this does not verify
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/bug_15969.move:18: test_empty
+   =         s = <redacted>
+   =     at tests/sources/functional/bug_15969.move:19: test_empty
+   =     at tests/sources/functional/bug_15969.move:9: empty
+   =         self = <redacted>
+   =     at tests/sources/functional/bug_15969.move:10: empty
+   =         result = <redacted>
+   =     at tests/sources/functional/bug_15969.move:11: empty
+   =         result = <redacted>
+   =     at tests/sources/functional/bug_15969.move:20: test_empty
+   =     at tests/sources/functional/bug_15969.move:23: test_empty (spec)

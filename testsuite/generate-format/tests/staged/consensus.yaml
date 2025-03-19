@@ -1,4 +1,6 @@
 ---
+AbilitySet:
+  NEWTYPESTRUCT: U8
 AbstractionAuthData:
   ENUM:
     0:
@@ -6,6 +8,13 @@ AbstractionAuthData:
         STRUCT:
           - signing_message_digest: BYTES
           - authenticator: BYTES
+    1:
+      DomainV1:
+        STRUCT:
+          - signing_message_digest: BYTES
+          - authenticator: BYTES
+          - account:
+              TYPENAME: DomainAccount
 AccessPath:
   STRUCT:
     - address:
@@ -499,6 +508,12 @@ DKGTranscriptMetadata:
 DeprecatedPayload:
   STRUCT:
     - dummy_value: U64
+DomainAccount:
+  ENUM:
+    0:
+      V1:
+        STRUCT:
+          - account_identity: BYTES
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
@@ -580,6 +595,16 @@ FunctionInfo:
         TYPENAME: AccountAddress
     - module_name: STR
     - function_name: STR
+FunctionTag:
+  STRUCT:
+    - args:
+        SEQ:
+          TYPENAME: TypeTag
+    - results:
+        SEQ:
+          TYPENAME: TypeTag
+    - abilities:
+        TYPENAME: AbilitySet
 G1Bytes:
   NEWTYPESTRUCT:
     TUPLEARRAY:
@@ -769,6 +794,16 @@ Payload:
       OptQuorumStore:
         NEWTYPE:
           TYPENAME: OptQuorumStorePayload
+    5:
+      QuorumStoreInlineHybridV2:
+        TUPLE:
+          - SEQ:
+              TUPLE:
+                - TYPENAME: BatchInfo
+                - SEQ:
+                    TYPENAME: SignedTransaction
+          - TYPENAME: ProofWithData
+          - TYPENAME: PayloadExecutionLimit
 PayloadExecutionLimit:
   ENUM:
     0:
@@ -776,6 +811,10 @@ PayloadExecutionLimit:
     1:
       MaxTransactionsToExecute:
         NEWTYPE: U64
+    2:
+      TxnAndGasLimits:
+        NEWTYPE:
+          TYPENAME: TxnAndGasLimits
 Pepper:
   NEWTYPESTRUCT:
     TUPLEARRAY:
@@ -1146,6 +1185,12 @@ TwoChainTimeoutCertificate:
         TYPENAME: TwoChainTimeout
     - signatures_with_rounds:
         TYPENAME: AggregateSignatureWithRounds
+TxnAndGasLimits:
+  STRUCT:
+    - transaction_limit:
+        OPTION: U64
+    - gas_limit:
+        OPTION: U64
 TypeTag:
   ENUM:
     0:
@@ -1174,6 +1219,10 @@ TypeTag:
       u32: UNIT
     10:
       u256: UNIT
+    11:
+      Function:
+        NEWTYPE:
+          TYPENAME: FunctionTag
 ValidatorConsensusInfo:
   STRUCT:
     - address:

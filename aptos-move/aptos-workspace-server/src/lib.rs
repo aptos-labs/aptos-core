@@ -36,8 +36,58 @@ use services::{
     processors::start_all_processors,
 };
 use std::time::Duration;
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
+
+#[derive(Parser)]
+enum ControlCommand {
+    Stop,
+}
+
+/// Starts an async task that reads and processes commands from stdin.
+///
+/// Currently there is only one command:
+/// - stop: shuts down the services gracefully.
+async fn start_command_processor(shutdown: CancellationToken) {
+    let reader = BufReader::new(tokio::io::stdin());
+    let mut lines = reader.lines();
+
+    loop {
+        tokio::select! {
+            line = lines.next_line() => {
+                match line {
+                    Ok(Some(input)) => {
+                        let res = ControlCommand::try_parse_from(format!("dummy {}", input).split_whitespace());
+                        // Note: clap expects a program name so we add a dummy one.
+                        match res {
+                            Ok(cmd) => match cmd {
+                                ControlCommand::Stop => {
+                                    no_panic_println!("\nStop command received. Shutting down services. This may take a while.\n");
+                                    shutdown.cancel();
+                                    break;
+                                }
+                            }
+                            Err(_) => {
+                                no_panic_eprintln!("Invalid command: \"{}\"", input);
+                            }
+                        }
+                    }
+                    Ok(None) => {
+                        break;
+                    }
+                    Err(err) => {
+                        no_panic_eprintln!("Error reading from stdin: {}", err);
+                        break;
+                    }
+                }
+            }
+            _ = shutdown.cancelled() => {
+                break;
+            }
+        }
+    }
+}
 
 async fn run_all_services(timeout: u64) -> Result<()> {
     let test_dir = tempfile::tempdir()?;
@@ -46,7 +96,9 @@ async fn run_all_services(timeout: u64) -> Result<()> {
 
     let instance_id = Uuid::new_v4();
 
-    // Phase 0: Register the signal handler for ctrl-c.
+    // Phase 0: Start the background services
+
+    // Register the signal handler for ctrl-c.
     let shutdown = CancellationToken::new();
     {
         // TODO: Find a way to register the signal handler in a blocking manner without
@@ -65,6 +117,12 @@ async fn run_all_services(timeout: u64) -> Result<()> {
 
             shutdown.cancel();
         });
+    }
+
+    // Start the command processor.
+    {
+        let shutdown = shutdown.clone();
+        tokio::spawn(start_command_processor(shutdown));
     }
 
     // Phase 1: Start all services.

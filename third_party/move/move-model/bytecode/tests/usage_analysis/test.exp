@@ -2,16 +2,20 @@
 
 [variant baseline]
 public fun Test::update<#0>($t0|x: #0) {
-     var $t1: #0
+     var $t1|$t1: &mut #0
      var $t2: address
      var $t3: &mut 0x123::Test::A<#0, #0>
      var $t4: &mut #0
-  0: $t1 := move($t0)
-  1: $t2 := 0x1
-  2: $t3 := borrow_global<0x123::Test::A<#0, #0>>($t2)
-  3: $t4 := borrow_field<0x123::Test::A<#0, #0>>.x1($t3)
-  4: write_ref($t4, $t1)
-  5: return ()
+     var $t5: #0
+     var $t6: &mut #0
+  0: $t2 := 0x1
+  1: $t3 := borrow_global<0x123::Test::A<#0, #0>>($t2)
+  2: $t4 := borrow_field<0x123::Test::A<#0, #0>>.x1($t3)
+  3: $t1 := $t4
+  4: $t5 := move($t0)
+  5: $t6 := move($t1)
+  6: write_ref($t6, $t5)
+  7: return ()
 }
 
 
@@ -78,16 +82,20 @@ public fun Test::update_ints() {
 
 [variant baseline]
 public fun Test::update<#0>($t0|x: #0) {
-     var $t1: #0
+     var $t1|$t1: &mut #0
      var $t2: address
      var $t3: &mut 0x123::Test::A<#0, #0>
      var $t4: &mut #0
-  0: $t1 := move($t0)
-  1: $t2 := 0x1
-  2: $t3 := borrow_global<0x123::Test::A<#0, #0>>($t2)
-  3: $t4 := borrow_field<0x123::Test::A<#0, #0>>.x1($t3)
-  4: write_ref($t4, $t1)
-  5: return ()
+     var $t5: #0
+     var $t6: &mut #0
+  0: $t2 := 0x1
+  1: $t3 := borrow_global<0x123::Test::A<#0, #0>>($t2)
+  2: $t4 := borrow_field<0x123::Test::A<#0, #0>>.x1($t3)
+  3: $t1 := $t4
+  4: $t5 := move($t0)
+  5: $t6 := move($t1)
+  6: write_ref($t6, $t5)
+  7: return ()
 }
 
 

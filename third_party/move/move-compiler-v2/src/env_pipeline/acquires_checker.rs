@@ -1,55 +1,98 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Performs strict acquires analysis as outlined in the move book, that is:
-//! A Move function `m::f` must be annotated with acquires `T`` if and only if,
-//! - The body of `m::f` contains a `move_from<T>`, `borrow_global_mut<T>`, or `borrow_global<T>` instruction, or
-//! - The body of `m::f` invokes a function `m::g` declared in the same module that is annotated with acquires
-//! Warn if access specifiers other than plain `acquires R` is used.
+//! Performs acquires analysis as outlined in the move book.
+//!
+//! This infers acquires information for each function via a fixpoint analysis, implementing
+//! the following rule: function `f` acquires `T` iff
+//! - The body of `f` contains a `move_from<T>`, `borrow_global_mut<T>`, or
+//!   `borrow_global<T>` instruction, or
+//! - The body of `f` invokes a function `g` declared in the same module that
+//!   acquires `T`
+//!
+//! The inferred acquires information will be stored in the model.
+//!
+//! If a function definition has one or more manual legacy `acquires` annotations, then an error
+//! is produced if the annotations aren't precisely matching the inferred information.
+//!
 //! This check is enabled by flag `Experiment::ACQUIRES_CHECK`.
 
+use crate::Options;
+use codespan_reporting::diagnostic::Severity;
 use move_model::{
-    ast::{ExpData, Operation, ResourceSpecifier, VisitorPosition},
+    ast::{AccessSpecifierKind, ExpData, Operation, ResourceSpecifier, VisitorPosition},
+    metadata::LanguageVersion,
     model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, StructId},
     ty::Type,
 };
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 /// Performs acquires checking
-pub fn acquires_checker(env: &GlobalEnv) {
+pub fn acquires_checker(env: &mut GlobalEnv) {
+    let options = env
+        .get_extension::<Options>()
+        .expect("Options is available");
+    let acquires_relaxed = options
+        .language_version
+        .unwrap_or_default()
+        .is_at_least(LanguageVersion::V2_2);
+    // Map of inferred acquires which need to be updated in the environment after analysis.
+    // We can't do this during analysis since we keep references into env.
+    let mut acquired_updates = BTreeMap::new();
     for module in env.get_modules() {
         if module.is_target() {
             let analyzer = AcquireChecker::new(module.clone());
-            let acquires = analyzer.analyze();
-            for (fun_id, acquires) in acquires.into_iter() {
+            let inferred_acquires = analyzer.analyze();
+            acquired_updates.extend(inferred_acquires.iter().map(|(id, a)| {
+                (
+                    module.get_id().qualified(*id),
+                    a.0.iter().map(|a| *a.0).collect::<BTreeSet<_>>(),
+                )
+            }));
+            for (fun_id, acquires) in inferred_acquires.into_iter() {
                 let fun_env = module.get_function(fun_id);
-                if fun_env.is_inline() {
+                if fun_env.is_inline() || fun_env.is_native() {
                     continue;
                 }
                 let mut declared_acquires = get_acquired_resources(&fun_env);
-                for (sid, acquired) in acquires.0 {
-                    if declared_acquires.remove(&sid).is_none() {
-                        let s_name = module.get_struct(sid).get_name();
-                        let note = match acquired {
-                            AcquiredAt::Directly(loc) => (loc, "acquired here".to_owned()),
+                if acquires_relaxed && declared_acquires.is_empty() {
+                    // No checking needed
+                    continue;
+                }
+                for (sid, acquired) in &acquires.0 {
+                    if declared_acquires.remove(sid).is_none() {
+                        let s_name = module.get_struct(*sid).get_name();
+                        let label = match acquired {
+                            AcquiredAt::Directly(loc) => (loc.clone(), "acquired here".to_owned()),
                             AcquiredAt::Indirectly(loc, callee_id) => (
-                                loc,
+                                loc.clone(),
                                 format!(
                                     "acquired by the call to `{}`",
                                     module
-                                        .get_function(callee_id)
+                                        .get_function(*callee_id)
                                         .get_name()
                                         .display(module.symbol_pool())
                                 ),
                             ),
                         };
-                        env.error_with_labels(
+                        env.diag_with_primary_notes_and_labels(
+                            Severity::Error,
                             &fun_env.get_id_loc(),
                             &format!(
                                 "missing acquires annotation for `{}`",
                                 s_name.display(env.symbol_pool())
                             ),
-                            vec![note],
+                            "",
+                            if acquires_relaxed {
+                                vec![format!(
+                                    "since Move {}, `acquires` is inferred by the compiler \
+                                     and can be omitted from the function declaration.",
+                                    LanguageVersion::V2_2
+                                )]
+                            } else {
+                                vec![]
+                            },
+                            vec![label],
                         )
                     }
                 }
@@ -59,6 +102,11 @@ pub fn acquires_checker(env: &GlobalEnv) {
             }
         }
     }
+    // Update acquires for all target functions. We can't do this in the loop because of
+    // borrows.
+    for (fun_id, acquires) in acquired_updates {
+        env.set_acquired_structs(fun_id, acquires)
+    }
 }
 
 /// Gets the acquired resources declared by `acquires R`
@@ -67,6 +115,9 @@ fn get_acquired_resources(fun_env: &FunctionEnv) -> BTreeMap<StructId, Loc> {
         access_specifiers
             .iter()
             .filter_map(|access_specifier| {
+                if access_specifier.kind != AccessSpecifierKind::LegacyAcquires {
+                    return None;
+                }
                 if let ResourceSpecifier::Resource(inst_qid) = &access_specifier.resource.1 {
                     if inst_qid.module_id != fun_env.module_env.get_id() {
                         fun_env.module_env.env.error(
@@ -215,7 +266,7 @@ impl<'a> AcquireChecker<'a> {
 
 /// Suppose the given function is defined in module M.
 /// Returns
-/// - the calles of the given function that are defined in M
+/// - the callees of the given function that are defined in M
 /// - resources acquired by move_from\<T>, borrow_global_mut\<T>, or borrow_global\<T>,
 /// where T is define in M
 fn get_callees_and_acquired_resources(

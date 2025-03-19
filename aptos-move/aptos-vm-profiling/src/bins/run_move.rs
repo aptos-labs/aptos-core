@@ -160,8 +160,7 @@ fn main() -> Result<()> {
     ));
 
     let runtime_environment = RuntimeEnvironment::new(natives);
-    let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
-    let mut storage = InMemoryStorage::new();
+    let mut storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
 
     let test_modules = compile_test_modules();
     for module in &test_modules {
@@ -185,15 +184,15 @@ fn main() -> Result<()> {
 
     let mut extensions = NativeContextExtensions::default();
     extensions.add(NativeTableContext::new([0; 32], &storage));
-    let mut sess = vm.new_session_with_extensions(&storage, extensions);
+    let mut sess = MoveVM::new_session_with_extensions(&storage, extensions);
 
     let traversal_storage = TraversalStorage::new();
-    let code_storage = storage.as_unsync_code_storage(runtime_environment);
+    let code_storage = storage.as_unsync_code_storage();
 
     let args: Vec<Vec<u8>> = vec![];
     match entrypoint {
         Entrypoint::Script(script_blob) => {
-            sess.execute_script(
+            sess.load_and_execute_script(
                 script_blob,
                 vec![],
                 args,

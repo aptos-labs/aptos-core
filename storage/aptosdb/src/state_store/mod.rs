@@ -52,9 +52,12 @@ use aptos_storage_interface::{
         state::{LedgerState, State},
         state_summary::{ProvableStateSummary, StateSummary},
         state_update_refs::{PerVersionStateUpdateRefs, StateUpdateRefs},
-        state_view::cached_state_view::{ShardedStateCache, StateCacheShard},
+        state_view::{
+            cached_state_view::{ShardedStateCache, StateCacheShard},
+            hot_state_view::HotStateView,
+        },
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
-        versioned_state_value::{StateCacheEntry, StateUpdateRef},
+        versioned_state_value::{DbStateUpdate, MemorizedStateRead, StateUpdateRef},
         NUM_STATE_SHARDS,
     },
     AptosDbError, DbReader, Result, StateSnapshotReceiver,
@@ -83,9 +86,10 @@ pub(crate) mod buffered_state;
 mod state_merkle_batch_committer;
 mod state_snapshot_committer;
 
+pub mod hot_state;
 mod persisted_state;
 #[cfg(test)]
-mod state_store_test;
+mod tests;
 
 type StateValueBatch = crate::state_restore::StateValueBatch<StateKey, Option<StateValue>>;
 
@@ -116,7 +120,7 @@ pub(crate) struct StateStore {
     /// On read, we don't need to lock the `buffered_state` to get the latest state.
     current_state: Arc<Mutex<LedgerStateWithSummary>>,
     /// Tracks a persisted smt, any state older than that is guaranteed to be found in RocksDB
-    persisted_state: Arc<Mutex<PersistedState>>,
+    persisted_state: PersistedState,
     buffered_state_target_items: usize,
     internal_indexer_db: Option<InternalIndexerDB>,
 }
@@ -215,12 +219,12 @@ impl DbReader for StateDb {
 }
 
 impl DbReader for StateStore {
-    fn get_persisted_state(&self) -> Result<State> {
-        Ok(self.persisted_state_locked().state().clone())
+    fn get_persisted_state(&self) -> Result<(Arc<dyn HotStateView>, State)> {
+        Ok(self.persisted_state.get_state())
     }
 
     fn get_persisted_state_summary(&self) -> Result<StateSummary> {
-        Ok(self.persisted_state_locked().summary().clone())
+        Ok(self.persisted_state.get_state_summary())
     }
 
     /// Returns the latest state snapshot strictly before `next_version` if any.
@@ -325,8 +329,8 @@ impl StateStore {
             state_kv_pruner,
             skip_usage,
         });
-        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_dummy()));
-        let persisted_state = Arc::new(Mutex::new(PersistedState::new_dummy()));
+        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty()));
+        let persisted_state = PersistedState::new_empty();
         let buffered_state = if empty_buffered_state_for_restore {
             BufferedState::new_at_snapshot(
                 &state_db,
@@ -482,8 +486,8 @@ impl StateStore {
             state_kv_pruner,
             skip_usage: false,
         });
-        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_dummy()));
-        let persisted_state = Arc::new(Mutex::new(PersistedState::new_dummy()));
+        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty()));
+        let persisted_state = PersistedState::new_empty();
         let _ = Self::create_buffered_state_from_latest_snapshot(
             &state_db,
             0,
@@ -502,7 +506,7 @@ impl StateStore {
         hack_for_tests: bool,
         check_max_versions_after_snapshot: bool,
         out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
-        out_persisted_state: Arc<Mutex<PersistedState>>,
+        out_persisted_state: PersistedState,
     ) -> Result<BufferedState> {
         let num_transactions = state_db
             .ledger_db
@@ -539,7 +543,7 @@ impl StateStore {
             state.clone(),
             buffered_state_target_items,
             out_current_state.clone(),
-            out_persisted_state,
+            out_persisted_state.clone(),
         );
 
         // In some backup-restore tests we hope to open the db without consistency check.
@@ -593,13 +597,16 @@ impl StateStore {
                 last_checkpoint_index,
             );
             let current_state = out_current_state.lock().clone();
+            let (hot_state, state) = out_persisted_state.get_state();
             let (new_state, _state_reads) = current_state.ledger_state().update_with_db_reader(
                 &state,
+                hot_state,
                 &state_update_refs,
                 state_db.clone(),
             )?;
+            let state_summary = out_persisted_state.get_state_summary();
             let new_state_summary = current_state.ledger_state_summary().update(
-                &ProvableStateSummary::new(state.summary().clone(), state_db.as_ref()),
+                &ProvableStateSummary::new(state_summary, state_db.as_ref()),
                 &state_update_refs,
             )?;
             let updated =
@@ -644,11 +651,7 @@ impl StateStore {
         self.current_state.lock()
     }
 
-    pub fn persisted_state_locked(&self) -> MutexGuard<PersistedState> {
-        self.persisted_state.lock()
-    }
-
-    /// Returns the key, value pairs for a particular state key prefix at at desired version. This
+    /// Returns the key, value pairs for a particular state key prefix at desired version. This
     /// API can be used to get all resources of an account by passing the account address as the
     /// key prefix.
     pub fn get_prefixed_state_value_iterator(
@@ -686,9 +689,13 @@ impl StateStore {
         sharded_state_kv_batches: &mut ShardedStateKvSchemaBatch,
     ) -> Result<LedgerState> {
         let current = self.current_state_locked().ledger_state();
-        let persisted = self.persisted_state_locked().state().clone();
-        let (new_state, reads) =
-            current.update_with_db_reader(&persisted, state_update_refs, self.state_db.clone())?;
+        let (hot_state, persisted) = self.get_persisted_state()?;
+        let (new_state, reads) = current.update_with_db_reader(
+            &persisted,
+            hot_state,
+            state_update_refs,
+            self.state_db.clone(),
+        )?;
 
         self.put_state_updates(
             &new_state,
@@ -862,24 +869,28 @@ impl StateStore {
                 let old_entry = cache
                     .insert(
                         (*key).clone(),
-                        StateCacheEntry::from_state_update_ref(update),
+                        // TODO(aldenhu): Updates should carry DbStateValue directly which
+                        //     includes hot state eviction, access time refresh, etc.
+                        MemorizedStateRead::dummy_from_state_update_ref(update),
                     )
                     .unwrap_or_else(|| {
                         // n.b. all updated state items must be read and recorded in the state cache,
                         // otherwise we can't calculate the correct usage. The is_untracked() hack
                         // is to allow some db tests without real execution layer to pass.
                         assert!(ignore_state_cache_miss, "Must cache read.");
-                        StateCacheEntry::NonExistent
+                        MemorizedStateRead::NonExistent
                     });
 
-                if let StateCacheEntry::Value {
+                if let MemorizedStateRead::StateUpdate(DbStateUpdate {
                     version: old_version,
-                    value: _,
-                } = old_entry
+                    value: old_value_opt,
+                }) = old_entry
                 {
-                    // The value at `old_version` can be pruned once the pruning window hits
-                    // this `version`.
-                    Self::put_state_kv_index(batch, enable_sharding, version, old_version, key)
+                    if old_value_opt.map_or(false, |old_val| !old_val.is_hot_non_existent()) {
+                        // The value at `old_version` can be pruned once the pruning window hits
+                        // this `version`.
+                        Self::put_state_kv_index(batch, enable_sharding, version, old_version, key)
+                    }
                 }
             }
         }
@@ -1107,7 +1118,7 @@ impl StateStore {
             last_checkpoint.clone(),
         );
 
-        self.persisted_state_locked().set(last_checkpoint.clone());
+        self.persisted_state.hack_reset(last_checkpoint.clone());
         *self.current_state_locked() = current;
         self.buffered_state
             .lock()
@@ -1216,11 +1227,11 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
             match (main_db_progress, progress_opt) {
                 (None, None) => (),
                 (None, Some(_)) => (),
-                (Some(main_progres), Some(indexer_progress)) => {
-                    if main_progres.key_hash > indexer_progress.key_hash {
+                (Some(main_progress), Some(indexer_progress)) => {
+                    if main_progress.key_hash > indexer_progress.key_hash {
                         bail!(
                             "Inconsistent restore progress between main db and internal indexer db. main db: {:?}, internal indexer db: {:?}",
-                            main_progres,
+                            main_progress,
                             indexer_progress,
                         );
                     }
@@ -1303,7 +1314,7 @@ mod test_only {
                 .unwrap();
 
             let current = self.current_state_locked().ledger_state_summary();
-            let persisted = self.persisted_state_locked().summary().clone();
+            let persisted = self.persisted_state.get_state_summary();
 
             let new_state_summary = current
                 .update(

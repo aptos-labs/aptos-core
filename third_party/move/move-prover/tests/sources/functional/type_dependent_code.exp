@@ -3,7 +3,7 @@ error: abort not covered by any of the `aborts_if` clauses
    ┌─ tests/sources/functional/type_dependent_code.move:10:5
    │
  8 │           move_to<S<u8>>(&account, S { x: 0 });
-   │           ------- abort happened here with execution failure
+   │           ------------------------------------ abort happened here with execution failure
  9 │       }
 10 │ ╭     spec test1 {
 11 │ │         aborts_if exists<S<X>>(signer::address_of(account));
@@ -25,7 +25,7 @@ error: abort not covered by any of the `aborts_if` clauses
    ┌─ tests/sources/functional/type_dependent_code.move:26:5
    │
 24 │           move_to<S<T2>>(&account, S { x: t2 });
-   │           ------- abort happened here with execution failure
+   │           ------------------------------------- abort happened here with execution failure
 25 │       }
 26 │ ╭     spec test2 {
 27 │ │         aborts_if exists<S<T1>>(signer::address_of(account));
@@ -55,13 +55,13 @@ error: post-condition does not hold
    =         x = <redacted>
    =     at tests/sources/functional/type_dependent_code.move:45: test1
    =     at tests/sources/functional/type_dependent_code.move:46: test1
-   =     at ../move-stdlib/sources/signer.move:26: address_of
-   =         s = <redacted>
    =     at ../move-stdlib/sources/signer.move:27: address_of
-   =         result = <redacted>
+   =         s = <redacted>
    =     at ../move-stdlib/sources/signer.move:28: address_of
-   =         r = <redacted>
+   =         result = <redacted>
+   =     at ../move-stdlib/sources/signer.move:29: address_of
    =     at tests/sources/functional/type_dependent_code.move:47: test1
+   =         <redacted> = <redacted>
    =     at tests/sources/functional/type_dependent_code.move:48: test1
    =     at tests/sources/functional/type_dependent_code.move:50: test1 (spec)
 
@@ -77,12 +77,12 @@ error: post-condition does not hold
    =         t2 = <redacted>
    =     at tests/sources/functional/type_dependent_code.move:61: test2
    =     at tests/sources/functional/type_dependent_code.move:62: test2
-   =     at ../move-stdlib/sources/signer.move:26: address_of
-   =         s = <redacted>
    =     at ../move-stdlib/sources/signer.move:27: address_of
-   =         result = <redacted>
+   =         s = <redacted>
    =     at ../move-stdlib/sources/signer.move:28: address_of
-   =         r = <redacted>
+   =         result = <redacted>
+   =     at ../move-stdlib/sources/signer.move:29: address_of
    =     at tests/sources/functional/type_dependent_code.move:63: test2
+   =         <redacted> = <redacted>
    =     at tests/sources/functional/type_dependent_code.move:64: test2
    =     at tests/sources/functional/type_dependent_code.move:66: test2 (spec)

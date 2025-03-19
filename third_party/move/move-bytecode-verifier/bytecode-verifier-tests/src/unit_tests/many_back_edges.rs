@@ -37,6 +37,7 @@ fn many_backedges() {
         return_: SignatureIndex(2),
         type_parameters: vec![],
         access_specifiers: None,
+        attributes: vec![],
     });
     m.function_defs.push(FunctionDefinition {
         function: FunctionHandleIndex(0),
@@ -60,6 +61,7 @@ fn many_backedges() {
             return_: SignatureIndex(0),
             type_parameters: vec![],
             access_specifiers: None,
+            attributes: vec![],
         });
         m.function_defs.push(FunctionDefinition {
             function: FunctionHandleIndex(i),

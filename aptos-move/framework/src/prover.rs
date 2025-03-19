@@ -142,6 +142,9 @@ impl ProverOptions {
         known_attributes: &BTreeSet<String>,
         experiments: &[String],
     ) -> anyhow::Result<()> {
+        if compiler_version.is_some_and(|v| v == CompilerVersion::V1) {
+            return Err(anyhow::Error::msg("Compiler v1 is not supported"));
+        }
         let now = Instant::now();
         let for_test = self.for_test;
         let benchmark = self.benchmark;
@@ -160,13 +163,6 @@ impl ProverOptions {
         let mut options = self.convert_options(package_path)?;
         options.language_version = language_version;
         options.model_builder.language_version = language_version.unwrap_or_default();
-        if compiler_version.unwrap_or_default() >= CompilerVersion::V2_0
-            || language_version
-                .unwrap_or_default()
-                .is_at_least(LanguageVersion::V2_0)
-        {
-            options.compiler_v2 = true;
-        }
         // Need to ensure a distinct output.bpl file for concurrent execution. In non-test
         // mode, we actually want to use the static output.bpl for debugging purposes
         let _temp_holder = if for_test {
@@ -195,16 +191,7 @@ impl ProverOptions {
             run_prover_benchmark(package_path, &mut model, options)?;
         } else {
             let mut writer = StandardStream::stderr(ColorChoice::Auto);
-            if compiler_version.unwrap_or_default() == CompilerVersion::V1 {
-                move_prover::run_move_prover_with_model(
-                    &mut model,
-                    &mut writer,
-                    options,
-                    Some(now),
-                )?;
-            } else {
-                move_prover::run_move_prover_with_model_v2(&mut model, &mut writer, options, now)?;
-            }
+            move_prover::run_move_prover_with_model_v2(&mut model, &mut writer, options, now)?;
         }
         Ok(())
     }

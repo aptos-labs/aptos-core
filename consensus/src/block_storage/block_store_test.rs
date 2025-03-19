@@ -6,7 +6,8 @@ use crate::{
     block_storage::{block_store::sync_manager::NeedFetchResult, BlockReader},
     pending_votes::{PendingVotes, VoteReceptionResult},
     test_utils::{
-        build_empty_tree, build_simple_tree, consensus_runtime, timed_block_on, TreeInserter,
+        build_default_empty_tree, build_simple_tree, consensus_runtime, timed_block_on,
+        TreeInserter,
     },
 };
 use aptos_consensus_types::{
@@ -121,7 +122,7 @@ proptest! {
             |key| Author::from_bytes(&key.public_key().to_bytes()[0..32]).unwrap()
         ).collect();
         let runtime = consensus_runtime();
-        let block_store = build_empty_tree();
+        let block_store = build_default_empty_tree();
         for block in blocks {
             if block.round() > 0 && authors.contains(&block.author().unwrap()) {
                 let known_parent = block_store.block_exists(block.parent_id());
@@ -154,6 +155,9 @@ proptest! {
 
 #[tokio::test]
 async fn test_block_store_prune() {
+    //       ╭--> A1--> A2--> A3
+    // Genesis--> B1--> B2
+    //             ╰--> C1
     let (blocks, block_store) = build_simple_tree().await;
     // Attempt to prune genesis block (should be no-op)
     assert_eq!(block_store.prune_tree(blocks[0].id()).len(), 0);
@@ -348,7 +352,7 @@ async fn test_insert_vote() {
 #[tokio::test]
 async fn test_illegal_timestamp() {
     let signer = ValidatorSigner::random(None);
-    let block_store = build_empty_tree();
+    let block_store = build_default_empty_tree();
     let genesis = block_store.ordered_root();
     let block_with_illegal_timestamp = Block::new_proposal(
         Payload::empty(false, true),
@@ -436,17 +440,17 @@ async fn test_need_sync_for_ledger_info() {
     let block_store = inserter.block_store();
 
     let mut prev = block_store.ordered_root();
-    for i in 1..=30 {
+    for i in 1..=100 {
         prev = inserter.insert_block(&prev, i, None).await;
     }
     inserter
         .insert_block(
             &prev,
-            31,
+            101,
             Some(prev.block().gen_block_info(HashValue::zero(), 1, None)),
         )
         .await;
-    assert_eq!(block_store.ordered_root().round(), 30);
+    assert_eq!(block_store.ordered_root().round(), 100);
     assert_eq!(block_store.commit_root().round(), 0);
 
     let create_ledger_info = |round: u64| {
@@ -472,7 +476,7 @@ async fn test_need_sync_for_ledger_info() {
     assert!(block_store.need_sync_for_ledger_info(&ordered_too_far));
 
     let committed_round_too_far =
-        block_store.commit_root().round() + 30.max(block_store.vote_back_pressure_limit * 2) + 1;
+        block_store.commit_root().round() + 100.max(block_store.vote_back_pressure_limit * 2) + 1;
     let committed_too_far = create_ledger_info(committed_round_too_far);
     assert!(block_store.need_sync_for_ledger_info(&committed_too_far));
 

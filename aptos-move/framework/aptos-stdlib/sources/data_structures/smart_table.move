@@ -4,6 +4,9 @@
 /// when expanding to avoid unexpected gas cost.
 /// SmartTable uses faster hash function SipHash instead of cryptographically secure hash functions like sha3-256 since
 /// it tolerates collisions.
+///
+/// DEPRECATED: since it's implementation is inneficient, it
+/// has been deprecated in favor of `big_ordered_map.move`.
 module aptos_std::smart_table {
     use std::error;
     use std::vector;

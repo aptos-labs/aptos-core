@@ -22,16 +22,20 @@ fun ReachingDefTest::basic($t0|a: u64, $t1|b: u64): u64 {
 
 [variant baseline]
 fun ReachingDefTest::create_resource($t0|sender: &signer) {
-     var $t1: &signer
+     var $t1|r: 0x42::ReachingDefTest::R
      var $t2: u64
      var $t3: bool
      var $t4: 0x42::ReachingDefTest::R
-  0: $t1 := move($t0)
-  1: $t2 := 1
-  2: $t3 := false
-  3: $t4 := pack 0x42::ReachingDefTest::R($t2, $t3)
-  4: move_to<0x42::ReachingDefTest::R>($t4, $t1)
-  5: return ()
+     var $t5: &signer
+     var $t6: 0x42::ReachingDefTest::R
+  0: $t2 := 1
+  1: $t3 := false
+  2: $t4 := pack 0x42::ReachingDefTest::R($t2, $t3)
+  3: $t1 := $t4
+  4: $t5 := move($t0)
+  5: $t6 := move($t1)
+  6: move_to<0x42::ReachingDefTest::R>($t6, $t5)
+  7: return ()
 }
 
 ============ after pipeline `reaching_def` ================
@@ -58,14 +62,18 @@ fun ReachingDefTest::basic($t0|a: u64, $t1|b: u64): u64 {
 
 [variant baseline]
 fun ReachingDefTest::create_resource($t0|sender: &signer) {
-     var $t1: &signer
+     var $t1|r: 0x42::ReachingDefTest::R
      var $t2: u64
      var $t3: bool
      var $t4: 0x42::ReachingDefTest::R
-  0: $t1 := move($t0)
-  1: $t2 := 1
-  2: $t3 := false
-  3: $t4 := pack 0x42::ReachingDefTest::R($t2, $t3)
-  4: move_to<0x42::ReachingDefTest::R>($t4, $t0)
-  5: return ()
+     var $t5: &signer
+     var $t6: 0x42::ReachingDefTest::R
+  0: $t2 := 1
+  1: $t3 := false
+  2: $t4 := pack 0x42::ReachingDefTest::R($t2, $t3)
+  3: $t1 := $t4
+  4: $t5 := move($t0)
+  5: $t6 := move($t4)
+  6: move_to<0x42::ReachingDefTest::R>($t4, $t0)
+  7: return ()
 }

@@ -5,12 +5,9 @@
 use crate::{
     types::TxnIndex, versioned_data::VersionedData,
     versioned_delayed_fields::VersionedDelayedFields, versioned_group_data::VersionedGroupData,
-    versioned_modules::VersionedModules,
 };
 use aptos_types::{
-    executable::{ExecutableTestType, ModulePath},
-    vm::modules::AptosModuleExtension,
-    write_set::TransactionWrite,
+    executable::ModulePath, vm::modules::AptosModuleExtension, write_set::TransactionWrite,
 };
 use move_binary_format::{file_format::CompiledScript, CompiledModule};
 use move_core_types::language_storage::ModuleId;
@@ -24,7 +21,6 @@ pub mod unsync_map;
 pub mod versioned_data;
 pub mod versioned_delayed_fields;
 pub mod versioned_group_data;
-pub mod versioned_modules;
 
 #[cfg(test)]
 mod unit_tests;
@@ -42,9 +38,6 @@ pub struct MVHashMap<K, T, V: TransactionWrite, I: Clone> {
     data: VersionedData<K, V>,
     group_data: VersionedGroupData<K, T, V>,
     delayed_fields: VersionedDelayedFields<I>,
-
-    #[deprecated]
-    deprecated_modules: VersionedModules<K, V, ExecutableTestType>,
 
     module_cache:
         SyncModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>,
@@ -65,7 +58,6 @@ where
             data: VersionedData::empty(),
             group_data: VersionedGroupData::empty(),
             delayed_fields: VersionedDelayedFields::empty(),
-            deprecated_modules: VersionedModules::empty(),
 
             module_cache: SyncModuleCache::empty(),
             script_cache: SyncScriptCache::empty(),
@@ -73,13 +65,11 @@ where
     }
 
     pub fn stats(&self) -> BlockStateStats {
-        #[allow(deprecated)]
-        let num_modules = self.deprecated_modules.num_keys() + self.module_cache.num_modules();
         BlockStateStats {
             num_resources: self.data.num_keys(),
             num_resource_groups: self.group_data.num_keys(),
             num_delayed_fields: self.delayed_fields.num_keys(),
-            num_modules,
+            num_modules: self.module_cache.num_modules(),
             base_resources_size: self.data.total_base_value_size(),
             base_delayed_fields_size: self.delayed_fields.total_base_value_size(),
         }
@@ -98,12 +88,6 @@ where
 
     pub fn delayed_fields(&self) -> &VersionedDelayedFields<I> {
         &self.delayed_fields
-    }
-
-    #[deprecated]
-    pub fn deprecated_modules(&self) -> &VersionedModules<K, V, ExecutableTestType> {
-        #[allow(deprecated)]
-        &self.deprecated_modules
     }
 
     /// Returns the module cache. While modules in it are associated with versions, at any point

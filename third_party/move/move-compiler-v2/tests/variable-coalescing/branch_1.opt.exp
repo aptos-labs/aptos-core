@@ -138,17 +138,17 @@ fun m::foo($t0: bool, $t1: u64): u64 {
 module c0ffee.m {
 
 
-foo(Arg0: bool, Arg1: u64): u64 /* def_idx: 0 */ {
+foo(b: bool, p: u64): u64 /* def_idx: 0 */ {
 B0:
-	0: MoveLoc[0](Arg0: bool)
+	0: MoveLoc[0](b: bool)
 	1: BrTrue(3)
 B1:
 	2: Branch(5)
 B2:
 	3: LdU64(0)
-	4: StLoc[1](Arg1: u64)
+	4: StLoc[1](p: u64)
 B3:
-	5: MoveLoc[1](Arg1: u64)
+	5: MoveLoc[1](p: u64)
 	6: LdU64(1)
 	7: Add
 	8: Ret

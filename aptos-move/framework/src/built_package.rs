@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    docgen::{get_docgen_output_dir, DocgenOptions},
+    docgen::DocgenOptions,
     extended_checks,
     natives::code::{ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy},
     zip_metadata, zip_metadata_str, RuntimeModuleMetadataV1, APTOS_METADATA_KEY,
@@ -16,12 +16,12 @@ use codespan_reporting::{
     term::termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor},
 };
 use itertools::Itertools;
-use move_binary_format::{file_format_common::VERSION_7, CompiledModule};
-use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
-use move_compiler::{
+use legacy_move_compiler::{
     compiled_unit::{CompiledUnit, NamedCompiledModule},
     shared::NumericalAddress,
 };
+use move_binary_format::{file_format_common, file_format_common::VERSION_7, CompiledModule};
+use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_compiler_v2::{external_checks::ExternalChecks, options::Options, Experiment};
 use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_model::{
@@ -30,6 +30,7 @@ use move_model::{
 };
 use move_package::{
     compilation::{compiled_package::CompiledPackage, package_layout::CompiledPackageLayout},
+    resolution::resolution_graph::ResolvedGraph,
     source_package::{
         manifest_parser::{parse_move_manifest_string, parse_source_manifest},
         std_lib::StdVersion,
@@ -126,7 +127,7 @@ impl Default for BuildOptions {
             compiler_version: None,
             language_version: None,
             skip_attribute_checks: false,
-            check_test_code: false,
+            check_test_code: true,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             experiments: vec![],
         }
@@ -152,6 +153,14 @@ impl BuildOptions {
     pub fn with_experiment(mut self, exp: &str) -> Self {
         self.experiments.push(exp.to_string());
         self
+    }
+
+    pub fn set_latest_language(self) -> Self {
+        BuildOptions {
+            language_version: Some(LanguageVersion::latest()),
+            bytecode_version: Some(file_format_common::VERSION_MAX),
+            ..self
+        }
     }
 }
 
@@ -183,7 +192,6 @@ pub fn build_model(
     let build_config = BuildConfig {
         dev_mode,
         additional_named_addresses,
-        architecture: None,
         generate_abis: false,
         generate_docs: false,
         generate_move_model: false,
@@ -220,49 +228,63 @@ impl BuiltPackage {
     /// This function currently reports all Move compilation errors and warnings to stdout,
     /// and is not `Ok` if there was an error among those.
     pub fn build(package_path: PathBuf, options: BuildOptions) -> anyhow::Result<Self> {
-        BuiltPackage::build_with_external_checks(package_path, options, vec![])
+        let build_config = Self::create_build_config(&options)?;
+        let resolved_graph = Self::prepare_resolution_graph(package_path, build_config.clone())?;
+        BuiltPackage::build_with_external_checks(resolved_graph, options, build_config, vec![])
+    }
+
+    pub fn create_build_config(options: &BuildOptions) -> anyhow::Result<BuildConfig> {
+        let bytecode_version = Some(options.inferred_bytecode_version());
+        let compiler_version = options.compiler_version;
+        let language_version = options.language_version;
+        Self::check_versions(&compiler_version, &language_version)?;
+        let skip_attribute_checks = options.skip_attribute_checks;
+        Ok(BuildConfig {
+            dev_mode: options.dev,
+            additional_named_addresses: options.named_addresses.clone(),
+            generate_abis: options.with_abis,
+            generate_docs: false,
+            generate_move_model: true,
+            full_model_generation: options.check_test_code,
+            install_dir: options.install_dir.clone(),
+            test_mode: false,
+            override_std: options.override_std.clone(),
+            force_recompilation: false,
+            fetch_deps_only: false,
+            skip_fetch_latest_git_deps: options.skip_fetch_latest_git_deps,
+            compiler_config: CompilerConfig {
+                bytecode_version,
+                compiler_version,
+                language_version,
+                skip_attribute_checks,
+                known_attributes: options.known_attributes.clone(),
+                experiments: options.experiments.clone(),
+            },
+        })
+    }
+
+    pub fn prepare_resolution_graph(
+        package_path: PathBuf,
+        build_config: BuildConfig,
+    ) -> anyhow::Result<ResolvedGraph> {
+        eprintln!("Compiling, may take a little while to download git dependencies...");
+        build_config.resolution_graph_for_package(&package_path, &mut stderr())
     }
 
     /// Same as `build` but allows to provide external checks to be made on Move code.
     /// The `external_checks` are only run when compiler v2 is used.
     pub fn build_with_external_checks(
-        package_path: PathBuf,
+        resolved_graph: ResolvedGraph,
         options: BuildOptions,
+        build_config: BuildConfig,
         external_checks: Vec<Arc<dyn ExternalChecks>>,
     ) -> anyhow::Result<Self> {
         {
-            let bytecode_version = Some(options.inferred_bytecode_version());
-            let compiler_version = options.compiler_version;
-            let language_version = options.language_version;
-            Self::check_versions(&compiler_version, &language_version)?;
-            let skip_attribute_checks = options.skip_attribute_checks;
-            let build_config = BuildConfig {
-                dev_mode: options.dev,
-                additional_named_addresses: options.named_addresses.clone(),
-                architecture: None,
-                generate_abis: options.with_abis,
-                generate_docs: false,
-                generate_move_model: true,
-                full_model_generation: options.check_test_code,
-                install_dir: options.install_dir.clone(),
-                test_mode: false,
-                override_std: options.override_std.clone(),
-                force_recompilation: false,
-                fetch_deps_only: false,
-                skip_fetch_latest_git_deps: options.skip_fetch_latest_git_deps,
-                compiler_config: CompilerConfig {
-                    bytecode_version,
-                    compiler_version,
-                    language_version,
-                    skip_attribute_checks,
-                    known_attributes: options.known_attributes.clone(),
-                    experiments: options.experiments.clone(),
-                },
-            };
+            let package_path = resolved_graph.root_package_path.clone();
+            let bytecode_version = build_config.compiler_config.bytecode_version;
 
-            eprintln!("Compiling, may take a little while to download git dependencies...");
             let (mut package, model_opt) = build_config.compile_package_no_exit(
-                &package_path,
+                resolved_graph,
                 external_checks,
                 &mut stderr(),
             )?;
@@ -286,7 +308,10 @@ impl BuiltPackage {
             }
 
             if let Some(model_options) = model.get_extension::<Options>() {
-                if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
+                if model_options.experiment_on(Experiment::FAIL_ON_WARNING) && model.has_warnings()
+                {
+                    bail!("found warning(s), and `--fail-on-warning` is set")
+                } else if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
                     std::process::exit(if model.has_warnings() { 1 } else { 0 })
                 }
             }
@@ -322,7 +347,7 @@ impl BuiltPackage {
                             .unwrap()
                             .parent()
                             .unwrap()
-                            .join(get_docgen_output_dir())
+                            .join("doc")
                             .display()
                             .to_string()
                     })

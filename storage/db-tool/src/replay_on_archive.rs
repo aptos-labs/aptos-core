@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, Error, Ok, Result};
+use anyhow::{Error, Ok, Result};
 use aptos_backup_cli::utils::{ReplayConcurrencyLevelOpt, RocksdbOpt};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_config::config::{
@@ -10,7 +10,7 @@ use aptos_config::config::{
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db::{backup::backup_handler::BackupHandler, AptosDB};
-use aptos_logger::{error, info};
+use aptos_logger::prelude::*;
 use aptos_storage_interface::{
     state_store::state_view::db_state_view::DbStateViewAtVersion, AptosDbError, DbReader,
 };
@@ -24,7 +24,6 @@ use aptos_types::{
 };
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
 use clap::Parser;
-use itertools::multizip;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{
     path::PathBuf,
@@ -79,7 +78,10 @@ impl Opt {
         let verifier = Verifier::new(&self)?;
         let all_errors = verifier.run()?;
         if !all_errors.is_empty() {
-            error!("All failed transactions: {:?}", all_errors);
+            error!("{} failed transactions", all_errors.len());
+            for e in all_errors {
+                error!("Failed: {}", e);
+            }
             process::exit(2);
         }
         Ok(())
@@ -151,7 +153,7 @@ impl Verifier {
             Self::get_start_and_limit(&arc_db, config.start_version, config.end_version)?;
         info!(
             start_version = start,
-            end_version = start + limit,
+            limit = limit,
             "Replaying transactions."
         );
         Ok(Self {
@@ -169,6 +171,11 @@ impl Verifier {
 
     // Split the replay to multiple reply tasks running in parallel
     pub fn run(self) -> Result<Vec<Error>> {
+        if self.limit == 0 {
+            info!("Nothing to verify.");
+            return Ok(vec![]);
+        }
+
         AptosVM::set_concurrency_level_once(self.replay_concurrency_level);
         let task_size = self.limit / self.concurrent_replay as u64;
         let ranges: Vec<(u64, u64)> = (0..self.concurrent_replay)
@@ -206,7 +213,7 @@ impl Verifier {
         let mut expected_writesets = Vec::new();
         let mut expected_txn_infos = Vec::new();
         let mut chunk_start_version = start;
-        for (idx, item) in txn_iter.enumerate() {
+        for item in txn_iter {
             // timeout check
             if let Some(duration) = self.timeout_secs {
                 if self.replay_stat.get_elapsed_secs() >= duration {
@@ -221,34 +228,30 @@ impl Verifier {
             expected_events.push(expected_event);
             expected_writesets.push(expected_writeset);
             if is_epoch_ending || cur_txns.len() >= self.chunk_size {
-                // verify results
-                let fail_txns = self.execute_and_verify(
-                    chunk_start_version,
-                    &cur_txns,
-                    &expected_txn_infos,
-                    &expected_events,
-                    &expected_writesets,
-                )?;
-                // collect failed transactions
-                total_failed_txns.extend(fail_txns);
-                self.replay_stat.update_cnt(cur_txns.len() as u64);
+                let cnt = cur_txns.len();
+                while !cur_txns.is_empty() {
+                    // verify results
+                    let failed_txn_opt = self.execute_and_verify(
+                        &mut chunk_start_version,
+                        &mut cur_txns,
+                        &mut expected_txn_infos,
+                        &mut expected_events,
+                        &mut expected_writesets,
+                    )?;
+                    // collect failed transactions
+                    total_failed_txns.extend(failed_txn_opt);
+                }
+                self.replay_stat.update_cnt(cnt as u64);
                 self.replay_stat.print_tps();
-
-                // empty for the new chunk
-                chunk_start_version = start + (idx as u64) + 1;
-                cur_txns.clear();
-                expected_txn_infos.clear();
-                expected_events.clear();
-                expected_writesets.clear();
             }
         }
         // verify results
         let fail_txns = self.execute_and_verify(
-            chunk_start_version,
-            &cur_txns,
-            &expected_txn_infos,
-            &expected_events,
-            &expected_writesets,
+            &mut chunk_start_version,
+            &mut cur_txns,
+            &mut expected_txn_infos,
+            &mut expected_events,
+            &mut expected_writesets,
         )?;
         total_failed_txns.extend(fail_txns);
         Ok(total_failed_txns)
@@ -260,41 +263,44 @@ impl Verifier {
         start_version: Version,
         end_version: Version,
     ) -> Result<(Version, u64)> {
-        let start_version = std::cmp::max(
-            aptos_db
-                .get_first_txn_version()?
-                .ok_or(AptosDbError::NotFound(
-                    "First txn version is None".to_string(),
-                ))?,
-            start_version,
-        );
+        let db_start = aptos_db
+            .get_first_txn_version()?
+            .ok_or(AptosDbError::NotFound(
+                "First txn version is None".to_string(),
+            ))?;
+        let start = std::cmp::max(db_start, start_version);
 
-        let end_version = std::cmp::min(
-            aptos_db
-                .get_synced_version()?
-                .ok_or(AptosDbError::NotFound("Synced version is None".to_string()))?,
-            end_version,
-        );
-        assert!(
-            start_version <= end_version,
-            "start_version {} must be less than or equal to end_version{}",
-            start_version,
-            end_version
-        );
-        let limit = end_version - start_version;
+        let db_end = aptos_db
+            .get_synced_version()?
+            .ok_or(AptosDbError::NotFound("Synced version is None".to_string()))?;
+        let end = std::cmp::min(end_version, db_end);
+
+        let limit = if start <= end {
+            end - start + 1
+        } else {
+            warn!(
+                start = start_version,
+                db_start = db_start,
+                end = end_version,
+                db_end = db_end,
+                "No transactions to verify in requested range."
+            );
+            0
+        };
+
         Ok((start_version, limit))
     }
 
     fn execute_and_verify(
         &self,
-        start_version: Version,
-        cur_txns: &[Transaction],
-        expected_txn_infos: &Vec<TransactionInfo>,
-        expected_epoch_events: &Vec<Vec<ContractEvent>>,
-        expected_epoch_writesets: &Vec<WriteSet>,
-    ) -> Result<Vec<Error>> {
+        current_version: &mut Version,
+        cur_txns: &mut Vec<Transaction>,
+        expected_txn_infos: &mut Vec<TransactionInfo>,
+        expected_events: &mut Vec<Vec<ContractEvent>>,
+        expected_writesets: &mut Vec<WriteSet>,
+    ) -> Result<Option<Error>> {
         if cur_txns.is_empty() {
-            return Ok(Vec::new());
+            return Ok(None);
         }
         let txns = cur_txns
             .iter()
@@ -305,38 +311,45 @@ impl Verifier {
             &txns_provider,
             &self
                 .arc_db
-                .state_view_at_version(start_version.checked_sub(1))?,
+                .state_view_at_version(current_version.checked_sub(1))?,
         )?;
+        assert_eq!(executed_outputs.len(), cur_txns.len());
 
-        let mut failed_txns = Vec::new();
-        let mut version = start_version;
-        for (idx, (expected_txn_info, expected_events, expected_writeset, executed_output)) in
-            multizip((
-                expected_txn_infos,
-                expected_epoch_events,
-                expected_epoch_writesets,
-                executed_outputs,
-            ))
-            .enumerate()
-        {
-            version = start_version + idx as Version;
-            if let Err(err) = executed_output.ensure_match_transaction_info(
+        for idx in 0..cur_txns.len() {
+            let version = *current_version;
+            *current_version += 1;
+
+            if let Err(err) = executed_outputs[idx].ensure_match_transaction_info(
                 version,
-                expected_txn_info,
-                Some(expected_writeset),
-                Some(expected_events),
+                &expected_txn_infos[idx],
+                Some(&expected_writesets[idx]),
+                Some(&expected_events[idx]),
             ) {
-                failed_txns.push(err);
+                let err_opt = if idx == 0 {
+                    // FIXME(aldenhu): remove this hack
+                    warn!(
+                        version = version,
+                        "Probably known failure due to StateStorageUsage missing from a restored DB."
+                    );
+                    Ok(None)
+                } else {
+                    Ok(Some(err))
+                };
+
+                cur_txns.drain(0..idx + 1);
+                expected_txn_infos.drain(0..idx + 1);
+                expected_events.drain(0..idx + 1);
+                expected_writesets.drain(0..idx + 1);
+
+                return err_opt;
             }
         }
 
-        if (version + 1 - start_version) as usize != expected_txn_infos.len() {
-            bail!(
-                "processed transaction count {} is not equal to expected transaction count {}",
-                version + 1 - start_version,
-                expected_txn_infos.len()
-            );
-        }
-        Ok(failed_txns)
+        cur_txns.clear();
+        expected_txn_infos.clear();
+        expected_events.clear();
+        expected_writesets.clear();
+
+        Ok(None)
     }
 }

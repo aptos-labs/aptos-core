@@ -41,7 +41,7 @@ impl BlockPreparer {
         &self,
         block: &Block,
         block_qc_fut: Shared<impl Future<Output = Option<Arc<QuorumCert>>>>,
-    ) -> ExecutorResult<Vec<SignedTransaction>> {
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
         fail_point!("consensus::prepare_block", |_| {
             use aptos_executor_types::ExecutorError;
             use std::{thread, time::Duration};
@@ -50,13 +50,16 @@ impl BlockPreparer {
         });
         let start_time = Instant::now();
 
-        let block_voters = block_qc_fut
-            .await
-            .map(|qc| qc.ledger_info().get_voters_bitvec().clone());
-        let (txns, max_txns_from_block_to_execute) = self
-            .payload_manager
-            .get_transactions(block, block_voters)
-            .await?;
+        let (txns, max_txns_from_block_to_execute, block_gas_limit) = tokio::select! {
+                // Poll the block qc future until a QC is received. Ignore None outcomes.
+                Some(qc) = block_qc_fut => {
+                    let block_voters = Some(qc.ledger_info().get_voters_bitvec().clone());
+                    self.payload_manager.get_transactions(block, block_voters).await
+                },
+                result = self.payload_manager.get_transactions(block, None) => {
+                   result
+                }
+        }?;
         let txn_filter = self.txn_filter.clone();
         let txn_deduper = self.txn_deduper.clone();
         let txn_shuffler = self.txn_shuffler.clone();
@@ -81,6 +84,6 @@ impl BlockPreparer {
         .await
         .expect("Failed to spawn blocking task for transaction generation");
         counters::BLOCK_PREPARER_LATENCY.observe_duration(start_time.elapsed());
-        result
+        result.map(|result| (result, block_gas_limit))
     }
 }

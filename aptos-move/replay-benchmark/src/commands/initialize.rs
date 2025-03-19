@@ -7,8 +7,7 @@ use crate::{
     overrides::OverrideConfig,
     workload::TransactionBlock,
 };
-use anyhow::{anyhow, bail};
-use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
+use anyhow::anyhow;
 use aptos_logger::Level;
 use aptos_types::on_chain_config::FeatureFlag;
 use clap::Parser;
@@ -55,25 +54,19 @@ pub struct InitializeCommand {
         help = "If set, overrides the gas feature version used by the gas schedule"
     )]
     gas_feature_version: Option<u64>,
+
+    #[clap(
+        long,
+        num_args = 1..,
+        value_delimiter = ' ',
+        help = "List of space-separated paths to compiled / built packages with Move code"
+    )]
+    override_packages: Vec<String>,
 }
 
 impl InitializeCommand {
     pub async fn initialize_inputs(self) -> anyhow::Result<()> {
         init_logger_and_metrics(self.log_level);
-
-        if !self
-            .enable_features
-            .iter()
-            .all(|f| !self.disable_features.contains(f))
-        {
-            bail!("Enabled and disabled feature flags cannot overlap")
-        }
-        if matches!(self.gas_feature_version, Some(v) if v > LATEST_GAS_FEATURE_VERSION) {
-            bail!(
-                "Gas feature version must be at most the latest one: {}",
-                LATEST_GAS_FEATURE_VERSION
-            );
-        }
 
         let bytes = fs::read(PathBuf::from(&self.transactions_file)).await?;
         let txn_blocks: Vec<TransactionBlock> = bcs::from_bytes(&bytes).map_err(|err| {
@@ -84,16 +77,16 @@ impl InitializeCommand {
         })?;
 
         // TODO:
-        //  Right now, only features can be overridden. In the future, we may want to support:
-        //      1. Framework code, e.g., to test performance of new natives or compiler,
-        //      2. Gas schedule, to track the costs of charging gas or tracking limits.
-        //      3. BlockExecutorConfigFromOnchain to experiment with different block cutting based
-        //         on gas limits.
+        //   1. Override gas schedule, to track the costs of charging gas or tracking limits.
+        //   2. BlockExecutorConfigFromOnchain to experiment with different block cutting based
+        //      on gas limits?.
+        //   3. Build options for package overrides.
         let override_config = OverrideConfig::new(
             self.enable_features,
             self.disable_features,
             self.gas_feature_version,
-        );
+            self.override_packages,
+        )?;
 
         let debugger = build_debugger(self.rest_api.rest_endpoint, self.rest_api.api_key)?;
         let inputs =

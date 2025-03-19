@@ -18,7 +18,7 @@ use move_core_types::{
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    values::{Reference, Struct, Value, Vector, VectorRef},
+    values::{Closure, Reference, Struct, Value, Vector, VectorRef},
 };
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, fmt::Write, ops::Deref};
@@ -212,6 +212,13 @@ fn native_format_impl(
         MoveTypeLayout::Vector(ty) => {
             if let MoveTypeLayout::U8 = ty.as_ref() {
                 let bytes = val.value_as::<Vec<u8>>()?;
+                if context.context.timed_feature_enabled(
+                    aptos_types::on_chain_config::TimedFeatureFlag::ChargeBytesForPrints,
+                ) {
+                    context
+                        .context
+                        .charge(STRING_UTILS_PER_BYTE * NumBytes::new(bytes.len() as u64))?;
+                }
                 write!(out, "0x{}", hex::encode(bytes)).unwrap();
                 return Ok(());
             }
@@ -350,9 +357,28 @@ fn native_format_impl(
             )?;
             out.push('}');
         },
+        MoveTypeLayout::Function(_) => {
+            // Notice that we print the undecorated value representation,
+            // avoiding potential loading of the function to get full
+            // decorated type information.
+            let (fun, args) = val.value_as::<Closure>()?.unpack();
+            let data = context
+                .context
+                .function_value_extension()
+                .get_serialization_data(fun.as_ref())?;
+            out.push_str(&fun.to_stable_string());
+            format_vector(
+                context,
+                data.captured_layouts.iter(),
+                args.collect(),
+                depth,
+                !context.single_line,
+                out,
+            )?;
+            out.push(')');
+        },
 
-        // This is unreachable because we check layout at the start. Still, return
-        // an error to be safe.
+        // Return error for native types
         MoveTypeLayout::Native(..) => {
             return Err(SafeNativeError::Abort {
                 abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,

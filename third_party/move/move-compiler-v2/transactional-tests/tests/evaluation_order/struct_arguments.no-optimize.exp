@@ -1,0 +1,55 @@
+processed 7 tasks
+
+task 1 'run'. lines 57-64:
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x42::M,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(2), 2)],
+}
+
+task 2 'run'. lines 66-73:
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x42::M,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(3), 2)],
+}
+
+task 3 'run'. lines 75-82:
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x42::M,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 2)],
+}
+
+task 4 'run'. lines 84-91:
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x42::M,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(5), 2)],
+}
+
+task 5 'run'. lines 93-110:
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x42::M,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(6), 2)],
+}
+
+task 6 'run'. lines 112-119:
+Error: Script execution failed with VMError: {
+    major_status: RESOURCE_ALREADY_EXISTS,
+    sub_status: None,
+    location: 0x42::M,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 9)],
+}

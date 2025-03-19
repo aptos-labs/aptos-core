@@ -453,9 +453,18 @@ impl BackupCompactor {
         let (to_move, compaction_meta) =
             self.update_compaction_timestamps(&mut metaview, files, new_files)?;
         for file in to_move {
-            // directly return if any of the backup task fails
             info!(file = file, "Backup metadata file.");
-            self.storage.backup_metadata_file(&file).await?
+            self.storage
+                .backup_metadata_file(&file)
+                .await
+                .map_err(|err| {
+                    error!(
+                        file = file,
+                        error = %err,
+                        "Backup metadata file failed, ignoring.",
+                    )
+                })
+                .ok();
         }
         // save the metadata compaction timestamps
         let metadata = Metadata::new_compaction_timestamps(compaction_meta);
