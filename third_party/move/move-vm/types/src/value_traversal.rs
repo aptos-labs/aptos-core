@@ -3,7 +3,7 @@
 
 use crate::{
     delayed_values::error::code_invariant_error,
-    values::{Container, Value, ValueImpl},
+    values::{Closure, Container, Value, ValueImpl},
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
@@ -56,6 +56,12 @@ fn find_identifiers_in_value_impl(
             },
         },
 
+        ValueImpl::ClosureValue(Closure(_, captured)) => {
+            for val in captured.iter() {
+                find_identifiers_in_value_impl(val, identifiers)?;
+            }
+        },
+
         ValueImpl::Invalid | ValueImpl::ContainerRef(_) | ValueImpl::IndexedRef(_) => {
             return Err(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -82,7 +88,7 @@ mod test {
 
     #[test]
     fn test_traversal_in_invalid_value() {
-        let a = Value::signer_reference(AccountAddress::random());
+        let a = Value::master_signer_reference(AccountAddress::random());
         assert_err!(find_identifiers_in_value(&a, &mut HashSet::new()));
     }
 

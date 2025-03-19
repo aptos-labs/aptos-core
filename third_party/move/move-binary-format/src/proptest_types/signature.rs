@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::file_format::{
-    Ability, AbilitySet, Signature, SignatureToken, StructHandle, StructHandleIndex, TableIndex,
-    TypeParameterIndex,
+    Signature, SignatureToken, StructHandle, StructHandleIndex, TableIndex, TypeParameterIndex,
 };
+use move_core_types::ability::{Ability, AbilitySet};
 use proptest::{
     collection::{vec, SizeRange},
     prelude::*,

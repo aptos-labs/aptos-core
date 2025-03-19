@@ -80,7 +80,6 @@ def main():
         | github.workflow.head_branch = "{branch}"
         | "grep_json_aptos_move_vm_perf"
         | parseJson(message)
-        | code_perf_version = "v1"
         """.format(
                 branch=args.branch
             )
@@ -118,7 +117,7 @@ def main():
             line = line.strip()
             if "}" in line:
                 parts = line.split("}")
-                res = [parts[0] + "}"] + parts[1].split(", ")[1:]
+                res = ["}".join(parts[:-1]) + "}"] + parts[-1].split(", ")[1:]
                 return res
             else:
                 return line.split(", ")
@@ -133,7 +132,6 @@ def main():
         | "grep_json_single_node_perf"
         | parseJson(message)
         | source = "ADHOC"
-        | code_perf_version = "v8"
         """.format(
                 branch=args.branch
             )

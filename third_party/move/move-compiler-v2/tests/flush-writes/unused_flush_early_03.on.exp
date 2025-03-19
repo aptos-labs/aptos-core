@@ -29,69 +29,78 @@ public fun m::test1() {
      var $t1: u64
      var $t2: u64
      var $t3: bool
-     var $t4: u64
-     var $t5: bool [unused]
-     var $t6: u64 [unused]
-     var $t7: bool [unused]
+     var $t4: u64 [unused]
+     var $t5: u64
+     var $t6: bool [unused]
+     var $t7: u64 [unused]
      var $t8: u64 [unused]
+     var $t9: bool [unused]
+     var $t10: u64 [unused]
+     var $t11: u64 [unused]
      # flush: $t1, $t2
      # live vars:
   0: ($t0, $t1, $t2) := m::foo()
      # live vars: $t0, $t1, $t2
-  1: $t4 := 0
-     # live vars: $t0, $t1, $t2, $t4
-  2: $t3 := ==($t0, $t4)
-     # live vars: $t1, $t2, $t3
-  3: if ($t3) goto 6 else goto 4
-     # live vars: $t1, $t2
-  4: label L9
-     # live vars: $t1, $t2
-  5: goto 8
-     # live vars: $t1, $t2
-  6: label L0
-     # live vars: $t1, $t2
-  7: m::bar()
-     # live vars: $t1, $t2
-  8: label L2
-     # live vars: $t1, $t2
-  9: $t0 := 0
+  1: $t0 := move($t0)
      # live vars: $t0, $t1, $t2
- 10: $t3 := ==($t1, $t0)
+  2: $t5 := 0
+     # live vars: $t0, $t1, $t2, $t5
+  3: $t3 := ==($t0, $t5)
+     # live vars: $t1, $t2, $t3
+  4: if ($t3) goto 7 else goto 5
+     # live vars: $t1, $t2
+  5: label L9
+     # live vars: $t1, $t2
+  6: goto 9
+     # live vars: $t1, $t2
+  7: label L0
+     # live vars: $t1, $t2
+  8: m::bar()
+     # live vars: $t1, $t2
+  9: label L2
+     # live vars: $t1, $t2
+ 10: $t1 := move($t1)
+     # live vars: $t1, $t2
+ 11: $t0 := 0
+     # live vars: $t0, $t1, $t2
+ 12: $t3 := ==($t1, $t0)
      # live vars: $t2, $t3
- 11: if ($t3) goto 14 else goto 12
+ 13: if ($t3) goto 16 else goto 14
      # live vars: $t2
- 12: label L10
+ 14: label L10
      # live vars: $t2
- 13: goto 16
+ 15: goto 18
      # live vars: $t2
- 14: label L3
+ 16: label L3
      # live vars: $t2
- 15: m::bar()
+ 17: m::bar()
      # live vars: $t2
- 16: label L5
+ 18: label L5
      # live vars: $t2
- 17: $t0 := 0
+ 19: $t2 := move($t2)
+     # live vars: $t2
+ 20: $t0 := 0
      # live vars: $t0, $t2
- 18: $t3 := ==($t2, $t0)
+ 21: $t3 := ==($t2, $t0)
      # live vars: $t3
- 19: if ($t3) goto 22 else goto 20
+ 22: if ($t3) goto 25 else goto 23
      # live vars:
- 20: label L11
+ 23: label L11
      # live vars:
- 21: goto 24
+ 24: goto 27
      # live vars:
- 22: label L6
+ 25: label L6
      # live vars:
- 23: m::bar()
+ 26: m::bar()
      # live vars:
- 24: label L8
+ 27: label L8
      # live vars:
- 25: return ()
+ 28: return ()
 }
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 
 
@@ -107,13 +116,12 @@ B0:
 	3: Ret
 }
 public test1() /* def_idx: 2 */ {
-L0:	loc0: u64
-L1:	loc1: u64
-L2:	loc2: u64
+L0:	z: u64
+L1:	y: u64
 B0:
 	0: Call foo(): u64 * u64 * u64
-	1: StLoc[0](loc0: u64)
-	2: StLoc[1](loc1: u64)
+	1: StLoc[0](z: u64)
+	2: StLoc[1](y: u64)
 	3: LdU64(0)
 	4: Eq
 	5: BrTrue(7)
@@ -122,7 +130,7 @@ B1:
 B2:
 	7: Call bar()
 B3:
-	8: MoveLoc[1](loc1: u64)
+	8: MoveLoc[1](y: u64)
 	9: LdU64(0)
 	10: Eq
 	11: BrTrue(13)
@@ -131,7 +139,7 @@ B4:
 B5:
 	13: Call bar()
 B6:
-	14: MoveLoc[0](loc0: u64)
+	14: MoveLoc[0](z: u64)
 	15: LdU64(0)
 	16: Eq
 	17: BrTrue(19)

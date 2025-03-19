@@ -8,7 +8,7 @@ use crate::{
 use anyhow::Context;
 use aptos::{
     account::fund::FundWithFaucet,
-    common::types::{CliCommand, MovePackageDir, ScriptFunctionArguments, TransactionOptions},
+    common::types::{CliCommand, MovePackageOptions, ScriptFunctionArguments, TransactionOptions},
     governance::CompileScriptFunction,
     move_tool::{CompileScript, RunScript},
 };
@@ -35,21 +35,14 @@ impl ScriptTransactions {
         account_manager: &mut AccountManager,
     ) -> anyhow::Result<()> {
         // Get all accounts that'll be used in this run.
-        // TODO: improve this to support account address as argument.
-        let mut account_symbols: HashMap<String, Account> = HashMap::new();
-        for transaction in &self.transactions {
-            account_symbols.insert(
-                transaction.sender_address.clone(),
-                account_manager.allocate_account()?,
-            );
-        }
         let mut versions_to_capture = vec![];
         for transaction in &self.transactions {
-            let sender_account = account_symbols
-                .get(transaction.sender_address.as_str())
+            let sender_account = account_manager
+                .get_account(&transaction.sender_address)
                 .unwrap();
+
             let version = self
-                .execute_script_transaction(move_folder_path, transaction, sender_account)
+                .execute_script_transaction(move_folder_path, transaction, &sender_account)
                 .await?;
             if let Some(output_name) = &transaction.output_name {
                 versions_to_capture.push((version, output_name.clone()));
@@ -125,7 +118,7 @@ impl ScriptTransactions {
             .join("build")
             .join(package_name)
             .join("bytecode_scripts")
-            .join("main.mv");
+            .join("main_0.mv");
 
         let cmd = create_run_script_cmd(compiled_build_path);
         let transaction_summary = cmd.execute().await.context(format!(
@@ -220,7 +213,7 @@ impl ScriptTransactions {
 }
 
 fn create_compile_script_cmd(package_dir: PathBuf) -> CompileScript {
-    let mut move_package_dir = MovePackageDir::default();
+    let mut move_package_dir = MovePackageOptions::default();
     move_package_dir.package_dir = Some(package_dir);
 
     CompileScript {

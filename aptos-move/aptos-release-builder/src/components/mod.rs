@@ -26,7 +26,7 @@ use aptos_types::{
 };
 use futures::executor::block_on;
 use handlebars::Handlebars;
-use move_binary_format::file_format_common::VERSION_6;
+use move_binary_format::file_format_common::VERSION_DEFAULT_LANG_V2;
 use once_cell::sync::Lazy;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -599,21 +599,41 @@ impl ReleaseConfig {
 
         source_dir.push("sources");
 
-        std::fs::create_dir(source_dir.as_path())
-            .map_err(|err| anyhow!("Fail to create folder for source: {:?}", err))?;
+        std::fs::create_dir(source_dir.as_path()).map_err(|err| {
+            anyhow!(
+                "Fail to create folder for source {}: {:?}",
+                source_dir.display(),
+                err
+            )
+        })?;
 
         source_dir.push(&self.name);
-        std::fs::create_dir(source_dir.as_path())
-            .map_err(|err| anyhow!("Fail to create folder for source: {:?}", err))?;
+        std::fs::create_dir(source_dir.as_path()).map_err(|err| {
+            anyhow!(
+                "Fail to create folder for source {}: {:?}",
+                source_dir.display(),
+                err
+            )
+        })?;
 
         let mut metadata_dir = base_path.to_path_buf();
         metadata_dir.push("metadata");
 
-        std::fs::create_dir(metadata_dir.as_path())
-            .map_err(|err| anyhow!("Fail to create folder for metadata: {:?}", err))?;
+        std::fs::create_dir(metadata_dir.as_path()).map_err(|err| {
+            anyhow!(
+                "Fail to create folder for metadata {}: {:?}",
+                metadata_dir.display(),
+                err
+            )
+        })?;
         metadata_dir.push(&self.name);
-        std::fs::create_dir(metadata_dir.as_path())
-            .map_err(|err| anyhow!("Fail to create folder for metadata: {:?}", err))?;
+        std::fs::create_dir(metadata_dir.as_path()).map_err(|err| {
+            anyhow!(
+                "Fail to create folder for metadata {}: {:?}",
+                metadata_dir.display(),
+                err
+            )
+        })?;
 
         // If we are generating multi-step proposal files, we generate the files in reverse order,
         // since we need to pass in the hash of the next file to the previous file.
@@ -623,8 +643,13 @@ impl ReleaseConfig {
             proposal_dir.push(&self.name);
             proposal_dir.push(proposal.name.as_str());
 
-            std::fs::create_dir(proposal_dir.as_path())
-                .map_err(|err| anyhow!("Fail to create folder for proposal: {:?}", err))?;
+            std::fs::create_dir(proposal_dir.as_path()).map_err(|err| {
+                anyhow!(
+                    "Fail to create folder for proposal {}: {:?}",
+                    proposal_dir.display(),
+                    err
+                )
+            })?;
 
             let mut result: Vec<(String, String)> = vec![];
             if let ExecutionMode::MultiStep = &proposal.execution_mode {
@@ -657,7 +682,13 @@ impl ReleaseConfig {
                 script_path.set_extension("move");
 
                 std::fs::write(script_path.as_path(), append_script_hash(script).as_bytes())
-                    .map_err(|err| anyhow!("Failed to write to file: {:?}", err))?;
+                    .map_err(|err| {
+                        anyhow!(
+                            "Failed to write to file {}: {:?}",
+                            script_path.display(),
+                            err
+                        )
+                    })?;
             }
 
             let mut metadata_path = base_path.to_path_buf();
@@ -669,7 +700,13 @@ impl ReleaseConfig {
                 metadata_path.as_path(),
                 serde_json::to_string_pretty(&proposal.metadata)?,
             )
-            .map_err(|err| anyhow!("Failed to write to file: {:?}", err))?;
+            .map_err(|err| {
+                anyhow!(
+                    "Failed to write to file {}: {:?}",
+                    metadata_path.display(),
+                    err
+                )
+            })?;
         }
 
         Ok(())
@@ -733,7 +770,7 @@ impl Default for ReleaseConfig {
                     metadata: ProposalMetadata::default(),
                     name: "framework".to_string(),
                     update_sequence: vec![ReleaseEntry::Framework(FrameworkReleaseConfig {
-                        bytecode_version: VERSION_6,
+                        bytecode_version: VERSION_DEFAULT_LANG_V2,
                         git_hash: None,
                     })],
                 },

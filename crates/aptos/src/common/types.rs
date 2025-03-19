@@ -50,6 +50,8 @@ use aptos_vm_types::output::VMOutput;
 use async_trait::async_trait;
 use clap::{Parser, ValueEnum};
 use hex::FromHexError;
+use indoc::indoc;
+use move_compiler_v2::Experiment;
 use move_core_types::{
     account_address::AccountAddress, language_storage::TypeTag, vm_status::VMStatus,
 };
@@ -78,6 +80,18 @@ const ACCEPTED_CLOCK_SKEW_US: u64 = 5 * US_IN_SECS;
 pub const DEFAULT_EXPIRATION_SECS: u64 = 30;
 pub const DEFAULT_PROFILE: &str = "default";
 pub const GIT_IGNORE: &str = ".gitignore";
+
+pub const APTOS_FOLDER_GIT_IGNORE: &str = indoc! {"
+    *
+    testnet/
+    config.yaml
+"};
+pub const MOVE_FOLDER_GIT_IGNORE: &str = indoc! {"
+  .aptos/
+  build/
+  .coverage_map.mvcov
+  .trace"
+};
 
 // Custom header value to identify the client
 const X_APTOS_CLIENT_VALUE: &str = concat!("aptos-cli/", env!("CARGO_PKG_VERSION"));
@@ -250,8 +264,11 @@ pub struct ProfileConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub network: Option<Network>,
     /// Private key for commands.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(deserialize_with = "deserialize_private_key_with_prefix")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "deserialize_private_key_with_prefix"
+    )]
     pub private_key: Option<Ed25519PrivateKey>,
     /// Public key for commands
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -389,7 +406,7 @@ impl CliConfig {
             write_to_user_only_file(
                 aptos_folder.join(GIT_IGNORE).as_path(),
                 GIT_IGNORE,
-                "*\ntestnet/\nconfig.yaml".as_bytes(),
+                APTOS_FOLDER_GIT_IGNORE.as_bytes(),
             )?;
         }
 
@@ -1092,9 +1109,9 @@ impl FromStr for OptimizationLevel {
     }
 }
 
-/// Options for compiling a move package dir
+/// Options for compiling a move package.
 #[derive(Debug, Clone, Parser)]
-pub struct MovePackageDir {
+pub struct MovePackageOptions {
     /// Path to a move package (the folder with a Move.toml file).  Defaults to current directory.
     #[clap(long, value_parser)]
     pub package_dir: Option<PathBuf>,
@@ -1138,11 +1155,9 @@ pub struct MovePackageDir {
     #[clap(long)]
     pub dev: bool,
 
-    /// Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code.
-    /// NOTE: this behavior will become the default in the future.
-    /// See <https://github.com/aptos-labs/aptos-core/issues/10335>
-    #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
-    pub check_test_code: bool,
+    /// Skip extended checks (such as checks for the #[view] attribute) on test code.
+    #[clap(long, default_value = "false")]
+    pub skip_checks_on_test_code: bool,
 
     /// Select optimization level.  Choices are "none", "default", or "extra".
     /// Level "extra" may spend more time on expensive optimizations in the future.
@@ -1157,40 +1172,40 @@ pub struct MovePackageDir {
 
     /// ...or --bytecode BYTECODE_VERSION
     /// Specify the version of the bytecode the compiler is going to emit.
-    /// Defaults to `7`.
+    /// If not provided, it is inferred from the language version.
     #[clap(long, alias = "bytecode", verbatim_doc_comment)]
     pub bytecode_version: Option<u32>,
 
     /// ...or --compiler COMPILER_VERSION
-    /// Specify the version of the compiler.
-    /// Defaults to `1`, unless `--move-2` is selected.
+    /// Specify the version of the compiler (must be at least 2).
+    /// Defaults to the latest stable compiler version.
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
            alias = "compiler",
-           default_value_if("move_2", "true", LATEST_STABLE_COMPILER_VERSION),
+           default_value = LATEST_STABLE_COMPILER_VERSION,
            verbatim_doc_comment)]
     pub compiler_version: Option<CompilerVersion>,
 
     /// ...or --language LANGUAGE_VERSION
     /// Specify the language version to be supported.
-    /// Defaults to `1`, unless `--move-2` is selected.
+    /// Defaults to the latest stable language version.
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
            alias = "language",
-           default_value_if("move_2", "true", LATEST_STABLE_LANGUAGE_VERSION),
+           default_value = LATEST_STABLE_LANGUAGE_VERSION,
            verbatim_doc_comment)]
     pub language_version: Option<LanguageVersion>,
 
-    /// Select bytecode, language, and compiler versions to support the latest Move 2.
-    #[clap(long, verbatim_doc_comment)]
-    pub move_2: bool,
+    /// Fail the compilation if there are any warnings.
+    #[clap(long)]
+    pub fail_on_warning: bool,
 }
 
-impl Default for MovePackageDir {
+impl Default for MovePackageOptions {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl MovePackageDir {
+impl MovePackageOptions {
     pub fn new() -> Self {
         Self {
             dev: false,
@@ -1200,12 +1215,12 @@ impl MovePackageDir {
             override_std: None,
             skip_fetch_latest_git_deps: true,
             bytecode_version: None,
-            compiler_version: None,
-            language_version: None,
+            compiler_version: Some(CompilerVersion::latest_stable()),
+            language_version: Some(LanguageVersion::latest_stable()),
             skip_attribute_checks: false,
-            check_test_code: false,
-            move_2: false,
+            skip_checks_on_test_code: false,
             optimize: None,
+            fail_on_warning: false,
             experiments: vec![],
         }
     }
@@ -1226,6 +1241,30 @@ impl MovePackageDir {
     pub fn add_named_address(&mut self, key: String, value: String) {
         self.named_addresses
             .insert(key, AccountAddressWrapper::from_str(&value).unwrap());
+    }
+
+    /// Compute the experiments to be used for the compiler.
+    pub fn compute_experiments(&self) -> Vec<String> {
+        let mut experiments = self.experiments.clone();
+        let mut set = |k: &str, v: bool| {
+            experiments.push(format!("{}={}", k, if v { "on" } else { "off" }));
+        };
+        match self.optimize {
+            None | Some(OptimizationLevel::Default) => {
+                set(Experiment::OPTIMIZE, true);
+            },
+            Some(OptimizationLevel::None) => {
+                set(Experiment::OPTIMIZE, false);
+            },
+            Some(OptimizationLevel::Extra) => {
+                set(Experiment::OPTIMIZE_EXTRA, true);
+                set(Experiment::OPTIMIZE, true);
+            },
+        }
+        if self.fail_on_warning {
+            set(Experiment::FAIL_ON_WARNING, true);
+        }
+        experiments
     }
 }
 
@@ -1511,12 +1550,12 @@ pub struct ChangeSummary {
 pub struct FaucetOptions {
     /// URL for the faucet endpoint e.g. `https://faucet.devnet.aptoslabs.com`
     #[clap(long)]
-    faucet_url: Option<reqwest::Url>,
+    pub faucet_url: Option<reqwest::Url>,
 
     /// Auth token to bypass faucet ratelimits. You can also set this as an environment
     /// variable with FAUCET_AUTH_TOKEN.
     #[clap(long, env)]
-    faucet_auth_token: Option<String>,
+    pub faucet_auth_token: Option<String>,
 }
 
 impl FaucetOptions {
@@ -1527,19 +1566,38 @@ impl FaucetOptions {
         }
     }
 
-    fn faucet_url(&self, profile: &ProfileOptions) -> CliTypedResult<reqwest::Url> {
+    fn faucet_url(&self, profile_options: &ProfileOptions) -> CliTypedResult<reqwest::Url> {
         if let Some(ref faucet_url) = self.faucet_url {
-            Ok(faucet_url.clone())
-        } else if let Some(Some(url)) = CliConfig::load_profile(
-            profile.profile_name(),
+            return Ok(faucet_url.clone());
+        }
+        let profile = CliConfig::load_profile(
+            profile_options.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
-        )?
-        .map(|profile| profile.faucet_url)
-        {
-            reqwest::Url::parse(&url)
-                .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string()))
-        } else {
-            Err(CliError::CommandArgumentError("No faucet given. Please add --faucet-url or add a faucet URL to the .aptos/config.yaml for the current profile".to_string()))
+        )?;
+        let profile = match profile {
+            Some(profile) => profile,
+            None => {
+                return Err(CliError::CommandArgumentError(format!(
+                    "Profile \"{}\" not found.",
+                    profile_options.profile_name().unwrap_or(DEFAULT_PROFILE)
+                )))
+            },
+        };
+
+        match profile.faucet_url {
+            Some(url) => reqwest::Url::parse(&url)
+                .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string())),
+            None => match profile.network {
+                Some(Network::Mainnet) => {
+                    Err(CliError::CommandArgumentError("There is no faucet for mainnet. Please create and fund the account by transferring funds from another account. If you are confident you want to use a faucet, set --faucet-url or add a faucet URL to .aptos/config.yaml for the current profile".to_string()))
+                },
+                Some(Network::Testnet) => {
+                    Err(CliError::CommandArgumentError(format!("To get testnet APT you must visit {}. If you are confident you want to use a faucet programmatically, set --faucet-url or add a faucet URL to .aptos/config.yaml for the current profile", get_mint_site_url(None))))
+                },
+                _ => {
+                    Err(CliError::CommandArgumentError("No faucet given. Please set --faucet-url or add a faucet URL to .aptos/config.yaml for the current profile".to_string()))
+                },
+            },
         }
     }
 
@@ -1563,7 +1621,7 @@ impl FaucetOptions {
 }
 
 /// Gas price options for manipulating how to prioritize transactions
-#[derive(Debug, Eq, Parser, PartialEq)]
+#[derive(Debug, Clone, Eq, Parser, PartialEq)]
 pub struct GasOptions {
     /// Gas multiplier per unit of gas
     ///
@@ -2094,7 +2152,7 @@ impl TryInto<Vec<TypeTag>> for TypeArgVec {
 
     fn try_into(self) -> Result<Vec<TypeTag>, Self::Error> {
         let mut type_tags: Vec<TypeTag> = vec![];
-        for type_arg in self.type_args {
+        for type_arg in self.type_args.iter() {
             type_tags.push(
                 TypeTag::try_from(type_arg)
                     .map_err(|err| CliError::UnableToParse("type argument", err.to_string()))?,
@@ -2382,4 +2440,13 @@ pub struct ChunkedPublishOption {
     /// transaction to fail due to exceeding the execution gas limit.
     #[clap(long, default_value_t = CHUNK_SIZE_IN_BYTES)]
     pub(crate) chunk_size: usize,
+}
+
+/// For minting testnet APT.
+pub fn get_mint_site_url(address: Option<AccountAddress>) -> String {
+    let params = match address {
+        Some(address) => format!("?address={}", address.to_standard_string()),
+        None => "".to_string(),
+    };
+    format!("https://aptos.dev/network/faucet{}", params)
 }

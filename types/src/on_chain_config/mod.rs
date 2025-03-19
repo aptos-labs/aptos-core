@@ -46,7 +46,7 @@ pub use self::{
     consensus_config::{
         AnchorElectionMode, ConsensusAlgorithmConfig, ConsensusConfigV1, DagConsensusConfigV1,
         LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig, ProposerElectionType,
-        ValidatorTxnConfig,
+        ValidatorTxnConfig, DEFAULT_ENABLED_WINDOW_SIZE, DEFAULT_WINDOW_SIZE,
     },
     execution_config::{
         BlockGasLimitType, ExecutionConfigV1, ExecutionConfigV2, ExecutionConfigV4,
@@ -269,6 +269,11 @@ impl ConfigurationResource {
             last_reconfiguration_time,
             events,
         }
+    }
+
+    #[cfg(feature = "fuzzing")]
+    pub fn set_last_reconfiguration_time_for_test(&mut self, last_reconfiguration_time: u64) {
+        self.last_reconfiguration_time = last_reconfiguration_time;
     }
 }
 

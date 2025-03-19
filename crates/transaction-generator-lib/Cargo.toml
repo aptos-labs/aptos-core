@@ -23,5 +23,4 @@ clap = { workspace = true }
 move-binary-format = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
-rand_core = { workspace = true }
 serde = { workspace = true }

@@ -8,7 +8,10 @@ use crate::{
     monitor,
     network::{IncomingBatchRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
-    payload_manager::{DirectMempoolPayloadManager, QuorumStorePayloadManager, TPayloadManager},
+    payload_manager::{
+        DirectMempoolPayloadManager, QuorumStoreCommitNotifier, QuorumStorePayloadManager,
+        TPayloadManager,
+    },
     quorum_store::{
         batch_coordinator::{BatchCoordinator, BatchCoordinatorCommand},
         batch_generator::{BackPressure, BatchGenerator, BatchGeneratorCommand},
@@ -25,7 +28,7 @@ use crate::{
     round_manager::VerifiedEvent,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::{QuorumStoreConfig, SecureBackend};
+use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
     common::Author, proof_of_store::ProofCache, request_response::GetPayloadCommand,
 };
@@ -129,7 +132,6 @@ pub struct InnerBuilder {
     network_sender: NetworkSender,
     verifier: Arc<ValidatorVerifier>,
     proof_cache: ProofCache,
-    backend: SecureBackend,
     coordinator_tx: Sender<CoordinatorCommand>,
     coordinator_rx: Option<Receiver<CoordinatorCommand>>,
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
@@ -165,7 +167,6 @@ impl InnerBuilder {
         network_sender: NetworkSender,
         verifier: Arc<ValidatorVerifier>,
         proof_cache: ProofCache,
-        backend: SecureBackend,
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         broadcast_proofs: bool,
         consensus_key: Arc<PrivateKey>,
@@ -205,7 +206,6 @@ impl InnerBuilder {
             network_sender,
             verifier,
             proof_cache,
-            backend,
             coordinator_tx,
             coordinator_rx: Some(coordinator_rx),
             batch_generator_cmd_tx,
@@ -365,6 +365,7 @@ impl InnerBuilder {
                 * self.num_validators,
             self.batch_store.clone().unwrap(),
             self.config.allow_batches_without_pos_in_proposal,
+            self.config.enable_payload_v2,
             self.config.batch_expiry_gap_when_init_usecs,
         );
         spawn_named!(
@@ -443,10 +444,11 @@ impl InnerBuilder {
             Arc::from(QuorumStorePayloadManager::new(
                 batch_reader,
                 // TODO: remove after splitting out clean requests
-                self.coordinator_tx.clone(),
+                Box::new(QuorumStoreCommitNotifier::new(self.coordinator_tx.clone())),
                 consensus_publisher,
                 self.verifier.get_ordered_account_addresses(),
                 self.verifier.address_to_validator_index().clone(),
+                self.config.enable_payload_v2,
             )),
             Some(self.quorum_store_msg_tx.clone()),
         )

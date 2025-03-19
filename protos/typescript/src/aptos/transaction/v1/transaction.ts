@@ -1106,6 +1106,11 @@ export interface MultiKeySignature {
   signaturesRequired?: number | undefined;
 }
 
+export interface AbstractionSignature {
+  functionInfo?: string | undefined;
+  signature?: Uint8Array | undefined;
+}
+
 export interface SingleSender {
   sender?: AccountSignature | undefined;
 }
@@ -1119,6 +1124,7 @@ export interface AccountSignature {
   /** 4 is reserved. */
   singleKeySignature?: SingleKeySignature | undefined;
   multiKeySignature?: MultiKeySignature | undefined;
+  abstraction?: AbstractionSignature | undefined;
 }
 
 export enum AccountSignature_Type {
@@ -1127,6 +1133,7 @@ export enum AccountSignature_Type {
   TYPE_MULTI_ED25519 = 2,
   TYPE_SINGLE_KEY = 4,
   TYPE_MULTI_KEY = 5,
+  TYPE_ABSTRACTION = 6,
   UNRECOGNIZED = -1,
 }
 
@@ -1147,6 +1154,9 @@ export function accountSignature_TypeFromJSON(object: any): AccountSignature_Typ
     case 5:
     case "TYPE_MULTI_KEY":
       return AccountSignature_Type.TYPE_MULTI_KEY;
+    case 6:
+    case "TYPE_ABSTRACTION":
+      return AccountSignature_Type.TYPE_ABSTRACTION;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -1166,6 +1176,8 @@ export function accountSignature_TypeToJSON(object: AccountSignature_Type): stri
       return "TYPE_SINGLE_KEY";
     case AccountSignature_Type.TYPE_MULTI_KEY:
       return "TYPE_MULTI_KEY";
+    case AccountSignature_Type.TYPE_ABSTRACTION:
+      return "TYPE_ABSTRACTION";
     case AccountSignature_Type.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -10255,6 +10267,114 @@ export const MultiKeySignature = {
   },
 };
 
+function createBaseAbstractionSignature(): AbstractionSignature {
+  return { functionInfo: "", signature: new Uint8Array(0) };
+}
+
+export const AbstractionSignature = {
+  encode(message: AbstractionSignature, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.functionInfo !== undefined && message.functionInfo !== "") {
+      writer.uint32(10).string(message.functionInfo);
+    }
+    if (message.signature !== undefined && message.signature.length !== 0) {
+      writer.uint32(18).bytes(message.signature);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): AbstractionSignature {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseAbstractionSignature();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.functionInfo = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.signature = reader.bytes();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<AbstractionSignature, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<AbstractionSignature | AbstractionSignature[]>
+      | Iterable<AbstractionSignature | AbstractionSignature[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [AbstractionSignature.encode(p).finish()];
+        }
+      } else {
+        yield* [AbstractionSignature.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, AbstractionSignature>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<AbstractionSignature> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [AbstractionSignature.decode(p)];
+        }
+      } else {
+        yield* [AbstractionSignature.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): AbstractionSignature {
+    return {
+      functionInfo: isSet(object.functionInfo) ? globalThis.String(object.functionInfo) : "",
+      signature: isSet(object.signature) ? bytesFromBase64(object.signature) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: AbstractionSignature): unknown {
+    const obj: any = {};
+    if (message.functionInfo !== undefined && message.functionInfo !== "") {
+      obj.functionInfo = message.functionInfo;
+    }
+    if (message.signature !== undefined && message.signature.length !== 0) {
+      obj.signature = base64FromBytes(message.signature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<AbstractionSignature>): AbstractionSignature {
+    return AbstractionSignature.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<AbstractionSignature>): AbstractionSignature {
+    const message = createBaseAbstractionSignature();
+    message.functionInfo = object.functionInfo ?? "";
+    message.signature = object.signature ?? new Uint8Array(0);
+    return message;
+  },
+};
+
 function createBaseSingleSender(): SingleSender {
   return { sender: undefined };
 }
@@ -10353,6 +10473,7 @@ function createBaseAccountSignature(): AccountSignature {
     multiEd25519: undefined,
     singleKeySignature: undefined,
     multiKeySignature: undefined,
+    abstraction: undefined,
   };
 }
 
@@ -10372,6 +10493,9 @@ export const AccountSignature = {
     }
     if (message.multiKeySignature !== undefined) {
       MultiKeySignature.encode(message.multiKeySignature, writer.uint32(50).fork()).ldelim();
+    }
+    if (message.abstraction !== undefined) {
+      AbstractionSignature.encode(message.abstraction, writer.uint32(58).fork()).ldelim();
     }
     return writer;
   },
@@ -10417,6 +10541,13 @@ export const AccountSignature = {
           }
 
           message.multiKeySignature = MultiKeySignature.decode(reader, reader.uint32());
+          continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.abstraction = AbstractionSignature.decode(reader, reader.uint32());
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -10470,6 +10601,7 @@ export const AccountSignature = {
       multiKeySignature: isSet(object.multiKeySignature)
         ? MultiKeySignature.fromJSON(object.multiKeySignature)
         : undefined,
+      abstraction: isSet(object.abstraction) ? AbstractionSignature.fromJSON(object.abstraction) : undefined,
     };
   },
 
@@ -10489,6 +10621,9 @@ export const AccountSignature = {
     }
     if (message.multiKeySignature !== undefined) {
       obj.multiKeySignature = MultiKeySignature.toJSON(message.multiKeySignature);
+    }
+    if (message.abstraction !== undefined) {
+      obj.abstraction = AbstractionSignature.toJSON(message.abstraction);
     }
     return obj;
   },
@@ -10510,6 +10645,9 @@ export const AccountSignature = {
       : undefined;
     message.multiKeySignature = (object.multiKeySignature !== undefined && object.multiKeySignature !== null)
       ? MultiKeySignature.fromPartial(object.multiKeySignature)
+      : undefined;
+    message.abstraction = (object.abstraction !== undefined && object.abstraction !== null)
+      ? AbstractionSignature.fromPartial(object.abstraction)
       : undefined;
     return message;
   },

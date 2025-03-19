@@ -19,7 +19,7 @@ use aptos_crypto::{ed25519::Ed25519PrivateKey, hash::HashValue, SigningKey};
 use aptos_db::AptosDB;
 use aptos_executor::{block_executor::BlockExecutor, db_bootstrapper};
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_framework::BuiltPackage;
+use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_indexer_grpc_table_info::internal_indexer_db_service::MockInternalIndexerDBService;
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_mempool_notifications::MempoolNotificationSender;
@@ -42,6 +42,7 @@ use aptos_types::{
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
+    function_info::FunctionInfo,
     indexer::indexer_db_reader::IndexerReader,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{
@@ -55,7 +56,13 @@ use bytes::Bytes;
 use hyper::{HeaderMap, Response};
 use rand::SeedableRng;
 use serde_json::{json, Value};
-use std::{boxed::Box, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    boxed::Box,
+    net::SocketAddr,
+    path::PathBuf,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::watch::channel;
 use warp::{http::header::CONTENT_TYPE, Filter, Rejection, Reply};
 use warp_reverse_proxy::reverse_proxy_filter;
@@ -131,7 +138,7 @@ pub fn new_test_context_inner(
     let (root_key, genesis, genesis_waypoint, validators) = builder.build(&mut rng).unwrap();
     let (validator_identity, _, _, _) = validators[0].get_key_objects(None).unwrap();
     let validator_owner = validator_identity.account_address.unwrap();
-    let (sender, recver) = channel::<Version>(0);
+    let (sender, recver) = channel::<(Instant, Version)>((Instant::now(), 0 as Version));
     let (db, db_rw) = if use_db_with_indexer {
         let mut aptos_db = AptosDB::new_for_test_with_indexer(
             &tmp_dir,
@@ -506,6 +513,19 @@ impl TestContext {
         )
     }
 
+    pub async fn add_dispatchable_authentication_function(
+        &self,
+        account: &LocalAccount,
+        func: FunctionInfo,
+    ) -> SignedTransaction {
+        let factory = self.transaction_factory();
+        account.sign_with_transaction_builder(
+            factory
+                .add_dispatchable_authentication_function(func)
+                .expiration_timestamp_secs(u64::MAX),
+        )
+    }
+
     pub async fn execute_multisig_transaction(
         &mut self,
         owner: &mut LocalAccount,
@@ -736,11 +756,28 @@ impl TestContext {
         path: PathBuf,
         named_addresses: Vec<(String, AccountAddress)>,
     ) -> TransactionPayload {
-        let mut build_options = aptos_framework::BuildOptions::default();
+        Self::build_package_with_options(path, named_addresses, BuildOptions::default())
+    }
+
+    pub fn build_package_with_latest_language(
+        path: PathBuf,
+        named_addresses: Vec<(String, AccountAddress)>,
+    ) -> TransactionPayload {
+        Self::build_package_with_options(
+            path,
+            named_addresses,
+            BuildOptions::default().set_latest_language(),
+        )
+    }
+
+    fn build_package_with_options(
+        path: PathBuf,
+        named_addresses: Vec<(String, AccountAddress)>,
+        mut build_options: BuildOptions,
+    ) -> TransactionPayload {
         named_addresses.into_iter().for_each(|(name, address)| {
             build_options.named_addresses.insert(name, address);
         });
-
         let package = BuiltPackage::build(path, build_options).unwrap();
         let code = package.extract_code();
         let metadata = package.extract_metadata().unwrap();
@@ -771,7 +808,10 @@ impl TestContext {
         }
     }
 
-    pub async fn commit_block(&mut self, signed_txns: &[SignedTransaction]) {
+    pub async fn try_commit_block(
+        &mut self,
+        signed_txns: &[SignedTransaction],
+    ) -> Vec<TransactionStatus> {
         let metadata = self.new_block_metadata();
         let timestamp = metadata.timestamp_usecs();
         let txns: Vec<Transaction> = std::iter::once(Transaction::BlockMetadata(metadata.clone()))
@@ -795,28 +835,36 @@ impl TestContext {
             .unwrap();
         let compute_status = result.compute_status_for_input_txns().clone();
         assert_eq!(compute_status.len(), txns.len(), "{:?}", result);
-        // But the rest of the txns must be Kept.
-        for st in compute_status {
+        if !compute_status
+            .iter()
+            .any(|s| !matches!(&s, TransactionStatus::Keep(_)))
+        {
+            self.executor
+                .commit_blocks(
+                    vec![metadata.id()],
+                    // StateCheckpoint/BlockEpilogue is added on top of the input transactions.
+                    self.new_ledger_info(&metadata, result.root_hash(), txns.len() + 1),
+                )
+                .unwrap();
+
+            self.mempool
+                .mempool_notifier
+                .notify_new_commit(txns, timestamp)
+                .await
+                .unwrap();
+        }
+        compute_status
+    }
+
+    pub async fn commit_block(&mut self, signed_txns: &[SignedTransaction]) {
+        // The txns must be kept.
+        for st in self.try_commit_block(signed_txns).await {
             match st {
                 TransactionStatus::Discard(st) => panic!("transaction is discarded: {:?}", st),
                 TransactionStatus::Retry => panic!("should not retry"),
                 TransactionStatus::Keep(_) => (),
             }
         }
-
-        self.executor
-            .commit_blocks(
-                vec![metadata.id()],
-                // StateCheckpoint/BlockEpilogue is added on top of the input transactions.
-                self.new_ledger_info(&metadata, result.root_hash(), txns.len() + 1),
-            )
-            .unwrap();
-
-        self.mempool
-            .mempool_notifier
-            .notify_new_commit(txns, timestamp)
-            .await
-            .unwrap();
     }
 
     pub async fn get_sequence_number(&self, account: AccountAddress) -> u64 {

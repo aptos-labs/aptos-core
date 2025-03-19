@@ -30,14 +30,14 @@ module 0x1::vector {
         range_with_step(start, end, 1)
     }
     public fun range_with_step(start: u64, end: u64, step: u64): vector<u64> {
-        let _t4;
+        let _t3;
         if (!(step > 0)) abort 131075;
-        _t4 = empty<u64>();
+        _t3 = empty<u64>();
         while (start < end) {
-            push_back<u64>(&mut _t4, start);
+            push_back<u64>(&mut _t3, start);
             start = start + step
         };
-        _t4
+        _t3
     }
     public fun append<Element>(self: &mut vector<Element>, other: vector<Element>) {
         reverse<Element>(&mut other);
@@ -121,16 +121,16 @@ module 0x1::vector {
         _t1
     }
     public fun slice<Element: copy>(self: &vector<Element>, start: u64, end: u64): vector<Element> {
-        let _t6;
-        let _t5;
-        if (start <= end) _t5 = end <= length<Element>(self) else _t5 = false;
-        if (!_t5) abort 131076;
-        _t6 = empty<Element>();
+        let _t4;
+        let _t3;
+        if (start <= end) _t3 = end <= length<Element>(self) else _t3 = false;
+        if (!_t3) abort 131076;
+        _t4 = empty<Element>();
         while (start < end) {
-            push_back<Element>(&mut _t6, *borrow<Element>(self, start));
+            push_back<Element>(&mut _t4, *borrow<Element>(self, start));
             start = start + 1
         };
-        _t6
+        _t4
     }
     public fun swap_remove<Element>(self: &mut vector<Element>, i: u64): Element {
         if (is_empty<Element>(/*freeze*/self)) abort 131072;

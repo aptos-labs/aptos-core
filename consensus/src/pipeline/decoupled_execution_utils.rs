@@ -45,6 +45,7 @@ pub fn prepare_phases_and_buffer_manager(
     consensus_observer_config: ConsensusObserverConfig,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
     max_pending_rounds_in_commit_vote_cache: u64,
+    new_pipeline_enabled: bool,
 ) -> (
     PipelinePhase<ExecutionSchedulePhase>,
     PipelinePhase<ExecutionWaitPhase>,
@@ -98,8 +99,9 @@ pub fn prepare_phases_and_buffer_manager(
     let (persisting_phase_request_tx, persisting_phase_request_rx) =
         create_channel::<CountedRequest<PersistingRequest>>();
     let (persisting_phase_response_tx, persisting_phase_response_rx) = create_channel();
+    let commit_msg_tx = Arc::new(commit_msg_tx);
 
-    let persisting_phase_processor = PersistingPhase::new(persisting_proxy);
+    let persisting_phase_processor = PersistingPhase::new(persisting_proxy, commit_msg_tx.clone());
     let persisting_phase = PipelinePhase::new(
         persisting_phase_request_rx,
         Some(persisting_phase_response_tx),
@@ -120,7 +122,7 @@ pub fn prepare_phases_and_buffer_manager(
             execution_wait_phase_response_rx,
             signing_phase_request_tx,
             signing_phase_response_rx,
-            Arc::new(commit_msg_tx),
+            commit_msg_tx,
             commit_msg_rx,
             persisting_phase_request_tx,
             persisting_phase_response_rx,
@@ -136,6 +138,7 @@ pub fn prepare_phases_and_buffer_manager(
             consensus_observer_config,
             consensus_publisher,
             max_pending_rounds_in_commit_vote_cache,
+            new_pipeline_enabled,
         ),
     )
 }

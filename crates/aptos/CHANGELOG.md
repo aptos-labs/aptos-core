@@ -3,6 +3,50 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
+- Compiler v1 is now deprecated. It is now removed from the Aptos CLI.
+- Added a new option `aptos move compile --fail-on-warning` which fails the compilation if any warnings are found.
+- We now default to running extended checks when compiling test code (this was previously only done with the option `--check-test-code`, but this is no longer available). However, these checks can be now be skipped with `--skip-checks-on-test-code`.
+
+## [6.2.0]
+- Several compiler parsing bugs fixed, including in specifications for receiver style functions
+- Remove support for OpenSSL 1.x.x and Ubuntu 20.04, add warning appropriately
+
+## [6.1.1]
+- Added a new feature to `aptos workspace run`: The workspace server now listens for a "stop" command from
+stdin, which triggers a graceful shutdown when received.
+
+## [6.1.0]
+- Remove FFI support from Aptos CLI.
+- Various compiler bug fixes.
+- Fix for coverage tool crash in the presence of inline functions.
+
+## [6.0.3] - 2025/01/27
+- Update the processors used by localnet to 1.26.
+
+## [6.0.2] - 2025/01/24
+- Fix `aptos workspace run` so it does not panic when writing to closed stdout/stderr, allowing it to finish its graceful shutdown sequence when used as a child process.
+
+## [6.0.1] - 2025/01/17
+- Update Hasura metadata to include `entry_function_contract_address`, `entry_function_module_name`, and `entry_function_function_name` in `user_transactions` table.
+
+## [6.0.0] - 2025/01/14
+- Set Compiler v2 as the default compiler and Move 2 as the default language version.
+- Add new `--move-1` flag to use Compiler v1 and Move 1.
+- Add flag `--benchmark` to `aptos move prove`, which allows to benchmark verification times of individual functions in a package.
+- Add flag `--only <name>` to `aptos move prove`, which allows to scope verification to a function.
+- Fix `aptos init` to show the explorer link for accounts when account is already created on chain instead of prompting to fund the account.
+- Set Compiler v2 as the default compiler and Move 2 as the default language version.
+- Add new `--move-1` flag to use Compiler v1 and Move 1.
+- Upgrade indexer processors for localnet from 51a34901b40d7f75767ac907b4d2478104d6a515 to 3064a075e1abc06c60363f3f2551cc41f5c091de. Upgrade Hasura metadata accordingly.
+
+## [5.1.0] - 2024/12/13
+- More optimizations are now default for compiler v2.
+- Downgrade bytecode version to v6 before calling the Revela decompiler, if possible, i.e. no enum types are used. This allows to continue to use Revela until the new decompiler is ready.
+
+## [5.0.0] - 2024/12/11
+- [**Breaking Change**] `aptos init` and `aptos account fund-with-faucet` no longer work directly with testnet, you must now use the minting page at the [Aptos dev docs](https://aptos.dev/network/faucet).
+## [4.7.0] - 2024/12/10
+- [`Fix`] CLI config should not always require a private key field to be present.
 
 ## [4.6.0] - 2024/11/29
 - Add `--node-api-key` flag to `aptos move replay` to allow for querying the fullnode with an API key.
@@ -56,7 +100,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## [4.1.0] - 2024/08/30
 - Marks Move 2 and compiler v2 as stable.
-- Adds new `--move-2` flag to work with Move 2 without need for multiple other flags. 
+- Adds new `--move-2` flag to work with Move 2 without need for multiple other flags.
 - Adds `aptos move lint` to produce lint warnings for the current package. Only a few lint rules are implemented for now,
   but more are coming.
 - Adds `aptos move fmt`, which runs the Move formatter, `movefmt`, on the current package. Also adds

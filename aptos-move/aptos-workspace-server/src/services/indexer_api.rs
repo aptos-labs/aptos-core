@@ -5,16 +5,19 @@ use super::{
     docker_common::create_start_and_inspect_container,
     postgres::get_postgres_connection_string_within_docker_network,
 };
-use crate::common::{make_shared, IP_LOCAL_HOST};
+use crate::{
+    common::{make_shared, ArcError, IP_LOCAL_HOST},
+    no_panic_println,
+};
 use anyhow::{anyhow, Context, Result};
-use aptos::node::local_testnet::{
-    docker,
+use aptos_localnet::{
+    health_checker::HealthChecker,
     indexer_api::{post_metadata, HASURA_IMAGE, HASURA_METADATA},
-    HealthChecker,
 };
 use bollard::{
     container::{CreateContainerOptions, WaitContainerOptions},
     secret::{ContainerInspectResponse, HostConfig, PortBinding},
+    Docker,
 };
 use futures::TryStreamExt;
 use maplit::hashmap;
@@ -124,15 +127,10 @@ fn create_container_options_and_config(
 pub fn start_indexer_api(
     instance_id: Uuid,
     shutdown: CancellationToken,
-    fut_docker_network: impl Future<Output = Result<String, Arc<anyhow::Error>>>
-        + Clone
-        + Send
-        + 'static,
-    fut_postgres: impl Future<Output = Result<u16, Arc<anyhow::Error>>> + Clone + Send + 'static,
-    fut_all_processors_ready: impl Future<Output = Result<(), Arc<anyhow::Error>>>
-        + Clone
-        + Send
-        + 'static,
+    fut_docker: impl Future<Output = Result<Docker, ArcError>> + Clone + Send + 'static,
+    fut_docker_network: impl Future<Output = Result<String, ArcError>> + Clone + Send + 'static,
+    fut_postgres: impl Future<Output = Result<u16, ArcError>> + Clone + Send + 'static,
+    fut_all_processors_ready: impl Future<Output = Result<(), ArcError>> + Clone + Send + 'static,
 ) -> (
     impl Future<Output = Result<u16>>,
     impl Future<Output = Result<()>>,
@@ -141,30 +139,25 @@ pub fn start_indexer_api(
     let fut_container_clean_up = Arc::new(Mutex::new(None));
 
     let fut_create_indexer_api = make_shared({
+        let fut_docker = fut_docker.clone();
         let fut_container_clean_up = fut_container_clean_up.clone();
 
         async move {
-            let (docker_network_name, _postgres_port, _) = try_join!(
-                fut_docker_network,
-                fut_postgres,
-                fut_all_processors_ready
-            )
-            .map_err(anyhow::Error::msg)
-            .context(
-                "failed to start indexer api server: one or more dependencies failed to start",
-            )?;
+            let (docker_network_name, _postgres_port, _) =
+                try_join!(fut_docker_network, fut_postgres, fut_all_processors_ready).context(
+                    "failed to start indexer api server: one or more dependencies failed to start",
+                )?;
 
-            println!("Starting indexer API..");
+            no_panic_println!("Starting indexer API..");
 
             let (options, config) =
                 create_container_options_and_config(instance_id, docker_network_name);
             let (fut_container, fut_container_cleanup) =
-                create_start_and_inspect_container(shutdown.clone(), options, config);
+                create_start_and_inspect_container(shutdown.clone(), fut_docker, options, config);
             *fut_container_clean_up.lock().await = Some(fut_container_cleanup);
 
             let container_info = fut_container
                 .await
-                .map_err(anyhow::Error::msg)
                 .context("failed to start indexer api server")?;
 
             let indexer_api_port = get_hasura_assigned_port(&container_info)
@@ -178,7 +171,7 @@ pub fn start_indexer_api(
         let fut_create_indexer_api = fut_create_indexer_api.clone();
 
         async move {
-            let indexer_api_port = fut_create_indexer_api.await.map_err(anyhow::Error::msg)?;
+            let indexer_api_port = fut_create_indexer_api.await?;
 
             let url =
                 Url::parse(&format!("http://{}:{}", IP_LOCAL_HOST, indexer_api_port)).unwrap();
@@ -190,7 +183,7 @@ pub fn start_indexer_api(
                 .await
                 .context("failed to wait for indexer API to be ready")?;
 
-            println!("Indexer API is up, applying hasura metadata..");
+            no_panic_println!("Indexer API is up, applying hasura metadata..");
 
             // Apply the hasura metadata, with the second health checker waiting for it to succeed.
             post_metadata(url.clone(), HASURA_METADATA)
@@ -203,9 +196,10 @@ pub fn start_indexer_api(
                 .await
                 .context("failed to wait for indexer API to be ready")?;
 
-            println!(
+            no_panic_println!(
                 "Indexer API is ready. Endpoint: http://{}:{}/",
-                IP_LOCAL_HOST, indexer_api_port
+                IP_LOCAL_HOST,
+                indexer_api_port
             );
 
             anyhow::Ok(indexer_api_port)
@@ -213,7 +207,7 @@ pub fn start_indexer_api(
     };
 
     let fut_indexer_api_finish = async move {
-        let docker = docker::get_docker()
+        let docker = fut_docker
             .await
             .context("failed to wait on indexer api container")?;
 

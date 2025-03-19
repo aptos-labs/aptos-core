@@ -57,6 +57,7 @@ use crate::{
     contract_event::TransactionEvent,
     executable::ModulePath,
     fee_statement::FeeStatement,
+    function_info::FunctionInfo,
     keyless::FederatedKeylessPublicKey,
     proof::accumulator::InMemoryEventAccumulator,
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -68,9 +69,6 @@ pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 pub use move_core_types::transaction_argument::TransactionArgument;
 use move_core_types::vm_status::AbortLocation;
-use move_vm_types::delayed_values::delayed_field_id::{
-    ExtractUniqueIndex, ExtractWidth, TryFromMoveValue, TryIntoMoveValue,
-};
 pub use multisig::{ExecutionError, Multisig, MultisigTransactionPayload};
 use once_cell::sync::OnceCell;
 pub use script::{
@@ -78,10 +76,26 @@ pub use script::{
     TypeArgumentABI,
 };
 use serde::de::DeserializeOwned;
-use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
+use std::{
+    collections::BTreeSet,
+    hash::Hash,
+    ops::Deref,
+    sync::{atomic::AtomicU64, Arc},
+};
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
+
+#[derive(Clone)]
+pub enum Auth<'a> {
+    Ed25519(&'a Ed25519PrivateKey),
+    Abstraction(FunctionInfo, Arc<dyn Fn(&[u8]) -> Vec<u8>>),
+    DomainAbstraction {
+        function_info: FunctionInfo,
+        account_identity: Vec<u8>,
+        sign_function: Arc<dyn Fn(&[u8]) -> Vec<u8>>,
+    },
+}
 
 /// RawTransaction is the portion of a transaction that a client signs.
 #[derive(
@@ -321,6 +335,64 @@ impl RawTransaction {
         ))
     }
 
+    pub fn sign_aa_transaction(
+        self,
+        sender_auth: Auth,
+        secondary_signers: Vec<AccountAddress>,
+        secondary_auths: Vec<Auth>,
+        fee_payer: Option<(AccountAddress, Auth)>,
+    ) -> Result<SignatureCheckedTransaction> {
+        let user_signed_message = if fee_payer.is_some() {
+            RawTransactionWithData::new_fee_payer(
+                self.clone(),
+                secondary_signers.clone(),
+                AccountAddress::ZERO,
+            )
+        } else {
+            RawTransactionWithData::new_multi_agent(self.clone(), secondary_signers.clone())
+        };
+        let sender_authenticator = gen_auth(sender_auth, &user_signed_message)?;
+
+        if secondary_auths.len() != secondary_signers.len() {
+            return Err(format_err!(
+                "number of secondary private keys and number of secondary signers don't match"
+            ));
+        }
+        let mut secondary_authenticators = vec![];
+        for auth in secondary_auths {
+            let secondary_authenticator = gen_auth(auth, &user_signed_message)?;
+            secondary_authenticators.push(secondary_authenticator);
+        }
+
+        if let Some((fee_payer_address, fee_payer_auth)) = fee_payer {
+            let user_signed_message = RawTransactionWithData::new_fee_payer(
+                self.clone(),
+                secondary_signers.clone(),
+                fee_payer_address,
+            );
+            let fee_payer_authenticator = gen_auth(fee_payer_auth, &user_signed_message)?;
+            Ok(SignatureCheckedTransaction(
+                SignedTransaction::new_fee_payer(
+                    self,
+                    sender_authenticator,
+                    secondary_signers,
+                    secondary_authenticators,
+                    fee_payer_address,
+                    fee_payer_authenticator,
+                ),
+            ))
+        } else {
+            Ok(SignatureCheckedTransaction(
+                SignedTransaction::new_multi_agent(
+                    self,
+                    sender_authenticator,
+                    secondary_signers,
+                    secondary_authenticators,
+                ),
+            ))
+        }
+    }
+
     /// Signs the given `RawTransaction`. Note that this consumes the `RawTransaction` and turns it
     /// into a `SignatureCheckedTransaction`.
     ///
@@ -361,6 +433,41 @@ impl RawTransaction {
     pub fn signing_message(&self) -> Result<Vec<u8>, CryptoMaterialError> {
         signing_message(self)
     }
+}
+
+fn gen_auth(
+    auth: Auth,
+    user_signed_message: &RawTransactionWithData,
+) -> Result<AccountAuthenticator> {
+    Ok(match auth {
+        Auth::Ed25519(private_key) => {
+            let sender_signature = private_key.sign(user_signed_message)?;
+            AccountAuthenticator::ed25519(Ed25519PublicKey::from(private_key), sender_signature)
+        },
+        Auth::Abstraction(function_info, sign_function) => {
+            let digest =
+                HashValue::sha3_256_of(signing_message(user_signed_message)?.as_slice()).to_vec();
+            AccountAuthenticator::abstraction(
+                function_info.clone(),
+                digest.clone(),
+                sign_function(digest.as_ref()),
+            )
+        },
+        Auth::DomainAbstraction {
+            function_info,
+            account_identity,
+            sign_function,
+        } => {
+            let digest =
+                HashValue::sha3_256_of(signing_message(user_signed_message)?.as_slice()).to_vec();
+            AccountAuthenticator::domain_abstraction(
+                function_info.clone(),
+                digest.clone(),
+                sign_function(digest.as_ref()),
+                account_identity.clone(),
+            )
+        },
+    })
 }
 
 #[derive(
@@ -1020,7 +1127,8 @@ impl VMValidatorResult {
                 Some(status) =>
                     status.status_type() == StatusType::Unknown
                         || status.status_type() == StatusType::Validation
-                        || status.status_type() == StatusType::InvariantViolation,
+                        || status.status_type() == StatusType::InvariantViolation
+                        || status.status_type() == StatusType::Execution,
             },
             "Unexpected discarded status: {:?}",
             vm_status
@@ -2063,22 +2171,6 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + Debug
         + DeserializeOwned
         + Serialize;
-    /// Delayed field identifier type.
-    type Identifier: PartialOrd
-        + Ord
-        + Send
-        + Sync
-        + Clone
-        + Hash
-        + Eq
-        + Debug
-        + Copy
-        + From<u64>
-        + From<(u32, u32)>
-        + ExtractUniqueIndex
-        + ExtractWidth
-        + TryIntoMoveValue
-        + TryFromMoveValue<Hint = ()>;
     type Value: Send + Sync + Debug + Clone + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + TransactionEvent;
 

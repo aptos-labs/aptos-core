@@ -18,9 +18,12 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{
     module_and_script_storage::code_storage::AptosCodeStorage,
     module_write_set::ModuleWrite,
-    resolver::{ResourceGroupSize, TExecutorView, TResourceGroupView},
+    resolver::{
+        BlockSynchronizationKillSwitch, ResourceGroupSize, TExecutorView, TResourceGroupView,
+    },
 };
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
@@ -66,7 +69,7 @@ pub trait ExecutorTask: Sync {
 
     /// Create an instance of the transaction executor.
     fn init(
-        environment: AptosEnvironment,
+        environment: &AptosEnvironment,
         state_view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
     ) -> Self;
 
@@ -77,13 +80,13 @@ pub trait ExecutorTask: Sync {
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Tag,
             MoveTypeLayout,
-            <Self::Txn as Transaction>::Identifier,
             <Self::Txn as Transaction>::Value,
         > + TResourceGroupView<
             GroupKey = <Self::Txn as Transaction>::Key,
             ResourceTag = <Self::Txn as Transaction>::Tag,
             Layout = MoveTypeLayout,
-        > + AptosCodeStorage),
+        > + AptosCodeStorage
+              + BlockSynchronizationKillSwitch),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
@@ -118,12 +121,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
     fn aggregator_v1_delta_set(&self) -> Vec<(<Self::Txn as Transaction>::Key, DeltaOp)>;
 
     /// Get the delayed field changes of a transaction from its output.
-    fn delayed_field_change_set(
-        &self,
-    ) -> BTreeMap<
-        <Self::Txn as Transaction>::Identifier,
-        DelayedChange<<Self::Txn as Transaction>::Identifier>,
-    >;
+    fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>;
 
     fn reads_needing_delayed_field_exchange(
         &self,
@@ -204,11 +202,5 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     fn get_write_summary(
         &self,
-    ) -> HashSet<
-        InputOutputKey<
-            <Self::Txn as Transaction>::Key,
-            <Self::Txn as Transaction>::Tag,
-            <Self::Txn as Transaction>::Identifier,
-        >,
-    >;
+    ) -> HashSet<InputOutputKey<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Tag>>;
 }

@@ -19,7 +19,7 @@ use aptos_types::{
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::alert;
-use aptos_vm_types::module_and_script_storage::{AptosCodeStorageAdapter, AsAptosCodeStorage};
+use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
 use move_binary_format::{
     errors::{Location, VMError},
     CompiledModule,
@@ -122,7 +122,7 @@ where
         // If the environment caches too many struct names, flush type caches. Also flush module
         // caches because they contain indices for struct names.
         if struct_name_index_map_size > config.max_struct_name_index_map_num_entries {
-            runtime_environment.flush_struct_name_and_info_caches();
+            runtime_environment.flush_struct_name_and_tag_caches();
             self.module_cache.flush();
         }
 
@@ -198,13 +198,8 @@ impl AptosModuleCacheManager {
         // To avoid cold starts, fetch the framework code. This ensures the state with 0 modules
         // cached is not possible for block execution (as long as the config enables the framework
         // prefetch).
-        let environment = guard.environment();
-        if environment.features().is_loader_v2_enabled()
-            && guard.module_cache().num_modules() == 0
-            && config.prefetch_framework_code
-        {
-            let code_storage = state_view.as_aptos_code_storage(environment.clone());
-            prefetch_aptos_framework(code_storage, guard.module_cache_mut()).map_err(|err| {
+        if guard.module_cache().num_modules() == 0 && config.prefetch_framework_code {
+            prefetch_aptos_framework(state_view, &mut guard).map_err(|err| {
                 alert_or_println!("Failed to load Aptos framework to module cache: {:?}", err);
                 VMError::from(err).into_vm_status()
             })?;
@@ -271,8 +266,15 @@ impl<'a> AptosModuleCacheManagerGuard<'a> {
     #[cfg(test)]
     pub(crate) fn none() -> Self {
         use aptos_types::state_store::MockStateView;
+        Self::none_for_state_view(&MockStateView::empty())
+    }
+
+    /// A guard in [AptosModuleCacheManagerGuard::None] state with empty module cache and the
+    /// environment initialized based on the provided state. Use for testing only.
+    #[cfg(test)]
+    pub(crate) fn none_for_state_view(state_view: &impl StateView) -> Self {
         AptosModuleCacheManagerGuard::None {
-            environment: AptosEnvironment::new(&MockStateView::empty()),
+            environment: AptosEnvironment::new(state_view),
             module_cache: GlobalModuleCache::empty(),
         }
     }
@@ -281,10 +283,12 @@ impl<'a> AptosModuleCacheManagerGuard<'a> {
 /// If Aptos framework exists, loads "transaction_validation.move" and all its transitive
 /// dependencies from storage into provided module cache. If loading fails for any reason, a panic
 /// error is returned.
-fn prefetch_aptos_framework<S: StateView>(
-    code_storage: AptosCodeStorageAdapter<S, AptosEnvironment>,
-    module_cache: &mut GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+fn prefetch_aptos_framework(
+    state_view: &impl StateView,
+    guard: &mut AptosModuleCacheManagerGuard,
 ) -> Result<(), PanicError> {
+    let code_storage = state_view.as_aptos_code_storage(guard.environment());
+
     // If framework code exists in storage, the transitive closure will be verified and cached.
     let maybe_loaded = code_storage
         .fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"))
@@ -298,7 +302,9 @@ fn prefetch_aptos_framework<S: StateView>(
         // Framework must have been loaded. Drain verified modules from local cache into
         // global cache.
         let verified_module_code_iter = code_storage.into_verified_module_code_iter()?;
-        module_cache.insert_verified(verified_module_code_iter)?;
+        guard
+            .module_cache_mut()
+            .insert_verified(verified_module_code_iter)?;
     }
     Ok(())
 }
@@ -306,59 +312,89 @@ fn prefetch_aptos_framework<S: StateView>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_language_e2e_tests::{data_store::FakeDataStore, executor::FakeExecutor};
+    use aptos_language_e2e_tests::executor::FakeExecutor;
     use aptos_types::{
         on_chain_config::{FeatureFlag, Features, OnChainConfig},
         state_store::{state_key::StateKey, state_value::StateValue, MockStateView},
     };
     use claims::assert_ok;
-    use std::collections::HashMap;
+    use move_core_types::identifier::Identifier;
+    use move_vm_types::{
+        code::{mock_verified_code, MockExtension},
+        loaded_data::runtime_types::StructIdentifier,
+    };
+    use std::{
+        collections::HashMap,
+        sync::atomic::{AtomicU64, Ordering},
+    };
 
     #[test]
     fn test_prefetch_existing_aptos_framework() {
         let executor = FakeExecutor::from_head_genesis();
         let state_view = executor.get_state_view();
 
-        let environment = AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view);
-        let code_storage = state_view.as_aptos_code_storage(environment);
+        let mut guard = AptosModuleCacheManagerGuard::none_for_state_view(state_view);
+        assert_eq!(guard.module_cache().num_modules(), 0);
 
-        let mut module_cache = GlobalModuleCache::empty();
-        assert_eq!(module_cache.num_modules(), 0);
-
-        let result = prefetch_aptos_framework(code_storage, &mut module_cache);
+        let result = prefetch_aptos_framework(state_view, &mut guard);
         assert!(result.is_ok());
-        assert!(module_cache.num_modules() > 0);
+        assert!(guard.module_cache().num_modules() > 0);
     }
 
     #[test]
     fn test_prefetch_non_existing_aptos_framework() {
-        let state_view = FakeDataStore::default();
+        let state_view = MockStateView::empty();
 
-        let environment =
-            AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view);
-        let code_storage = state_view.as_aptos_code_storage(environment);
+        let mut guard = AptosModuleCacheManagerGuard::none_for_state_view(&state_view);
+        assert_eq!(guard.module_cache().num_modules(), 0);
 
-        let mut module_cache = GlobalModuleCache::empty();
-        assert_eq!(module_cache.num_modules(), 0);
-
-        let result = prefetch_aptos_framework(code_storage, &mut module_cache);
+        let result = prefetch_aptos_framework(&state_view, &mut guard);
         assert!(result.is_ok());
-        assert_eq!(module_cache.num_modules(), 0);
+        assert_eq!(guard.module_cache().num_modules(), 0);
     }
 
-    #[allow(dead_code)]
-    fn state_view_with_changed_feature_flag(
-        feature_flag: Option<FeatureFlag>,
-    ) -> MockStateView<StateKey> {
+    fn add_struct_identifier<K, D, V, E>(manager: &mut ModuleCacheManager<K, D, V, E>, name: &str)
+    where
+        K: Hash + Eq + Clone,
+        V: Deref<Target = Arc<D>>,
+        E: WithSize,
+    {
+        assert_ok!(manager
+            .environment
+            .as_mut()
+            .unwrap()
+            .runtime_environment()
+            .struct_name_to_idx_for_test(StructIdentifier {
+                module: ModuleId::new(AccountAddress::ZERO, Identifier::new("m").unwrap()),
+                name: Identifier::new(name).unwrap()
+            }));
+    }
+
+    fn assert_struct_name_index_map_size_eq<K, D, V, E>(
+        manager: &ModuleCacheManager<K, D, V, E>,
+        expected: usize,
+    ) where
+        K: Hash + Eq + Clone,
+        V: Deref<Target = Arc<D>>,
+        E: WithSize,
+    {
+        let actual = assert_ok!(manager
+            .environment
+            .as_ref()
+            .unwrap()
+            .runtime_environment()
+            .struct_name_index_map_size());
+        assert_eq!(actual, expected);
+    }
+
+    fn state_view_with_changed_feature_flag(feature_flag: FeatureFlag) -> MockStateView<StateKey> {
         // Tweak feature flags to force a different config.
         let mut features = Features::default();
 
-        if let Some(feature_flag) = feature_flag {
-            if features.is_enabled(feature_flag) {
-                features.disable(feature_flag);
-            } else {
-                features.enable(feature_flag);
-            }
+        if features.is_enabled(feature_flag) {
+            features.disable(feature_flag);
+        } else {
+            features.enable(feature_flag);
         }
 
         MockStateView::new(HashMap::from([(
@@ -368,28 +404,197 @@ mod test {
     }
 
     #[test]
-    fn test_check_ready_sets_transaction_slice_metadata() {
+    fn test_check_ready() {
+        let mut manager = ModuleCacheManager::new();
+        assert_eq!(
+            manager.transaction_slice_metadata,
+            TransactionSliceMetadata::Unknown
+        );
+        assert_eq!(manager.module_cache.num_modules(), 0);
+
         let state_view = MockStateView::empty();
         let config = BlockExecutorModuleCacheLocalConfig {
             prefetch_framework_code: false,
-            max_module_cache_size_in_bytes: 8,
+            max_module_cache_size_in_bytes: 32,
             max_struct_name_index_map_num_entries: 2,
         };
 
-        let manager = AptosModuleCacheManager::new();
-        assert_eq!(
-            manager.inner.lock().transaction_slice_metadata,
-            TransactionSliceMetadata::Unknown
-        );
+        // Populate the cache for testing.
+        manager
+            .module_cache
+            .insert(0, mock_verified_code(0, MockExtension::new(8)));
+        manager
+            .module_cache
+            .insert(1, mock_verified_code(1, MockExtension::new(8)));
+        manager
+            .module_cache
+            .insert(2, mock_verified_code(2, MockExtension::new(8)));
 
+        // Case 1: Initial set-up, modules should not be cached. Metadata and environment are set.
         let metadata_1 = TransactionSliceMetadata::block_from_u64(0, 1);
-        assert_ok!(manager.try_lock(&state_view, &config, metadata_1));
-        assert_eq!(manager.inner.lock().transaction_slice_metadata, metadata_1);
+        assert_ok!(manager.check_ready(AptosEnvironment::new(&state_view), &config, metadata_1));
+        assert_eq!(manager.transaction_slice_metadata, metadata_1);
+        assert!(manager.environment.is_some());
+        assert_eq!(manager.module_cache.num_modules(), 0);
 
-        let metadata_2 = TransactionSliceMetadata::block_from_u64(1, 2);
-        assert_ok!(manager.try_lock(&state_view, &config, metadata_2));
-        assert_eq!(manager.inner.lock().transaction_slice_metadata, metadata_2);
+        add_struct_identifier(&mut manager, "foo");
+        assert_struct_name_index_map_size_eq(&manager, 1);
+        manager
+            .module_cache
+            .insert(0, mock_verified_code(0, MockExtension::new(8)));
+        manager
+            .module_cache
+            .insert(1, mock_verified_code(1, MockExtension::new(8)));
+        assert_eq!(manager.module_cache.num_modules(), 2);
+
+        // Case 2: Different metadata => cache is flushed. Here we pass a deep copy of environment.
+        let metadata_2 = TransactionSliceMetadata::block_from_u64(2, 3);
+        assert_ok!(manager.check_ready(AptosEnvironment::new(&state_view), &config, metadata_2));
+        assert_eq!(manager.transaction_slice_metadata, metadata_2);
+        assert!(manager.environment.is_some());
+        assert_eq!(manager.module_cache.num_modules(), 0);
+        assert_struct_name_index_map_size_eq(&manager, 0);
+
+        add_struct_identifier(&mut manager, "foo");
+        add_struct_identifier(&mut manager, "bar");
+        assert_struct_name_index_map_size_eq(&manager, 2);
+        manager
+            .module_cache
+            .insert(0, mock_verified_code(0, MockExtension::new(8)));
+        manager
+            .module_cache
+            .insert(1, mock_verified_code(1, MockExtension::new(8)));
+        manager
+            .module_cache
+            .insert(2, mock_verified_code(2, MockExtension::new(8)));
+        manager
+            .module_cache
+            .insert(3, mock_verified_code(3, MockExtension::new(8)));
+        assert_eq!(manager.module_cache.num_modules(), 4);
+
+        // Case 3: Metadata follows immediately after and environment is the same. Cache is not
+        //         flushed.
+        let metadata_3 = TransactionSliceMetadata::block_from_u64(3, 4);
+        assert!(metadata_3.is_immediately_after(&metadata_2));
+
+        assert_ok!(manager.check_ready(AptosEnvironment::new(&state_view), &config, metadata_3));
+        assert_eq!(manager.transaction_slice_metadata, metadata_3);
+        assert!(manager.environment.is_some());
+        assert_eq!(manager.module_cache.num_modules(), 4);
+        assert_eq!(manager.module_cache.size_in_bytes(), 32);
+        assert_struct_name_index_map_size_eq(&manager, 2);
+
+        manager
+            .module_cache
+            .insert(4, mock_verified_code(4, MockExtension::new(8)));
+        assert_eq!(manager.module_cache.num_modules(), 5);
+        assert_eq!(manager.module_cache.size_in_bytes(), 40);
+
+        // Case 4: Too many modules cached.
+        let metadata_4 = TransactionSliceMetadata::block_from_u64(4, 5);
+        assert!(metadata_4.is_immediately_after(&metadata_3));
+
+        assert_ok!(manager.check_ready(AptosEnvironment::new(&state_view), &config, metadata_4));
+        assert_eq!(manager.transaction_slice_metadata, metadata_4);
+        assert!(manager.environment.is_some());
+        assert_eq!(manager.module_cache.num_modules(), 0);
+        assert_struct_name_index_map_size_eq(&manager, 2);
+
+        manager
+            .module_cache
+            .insert(0, mock_verified_code(0, MockExtension::new(8)));
+        manager
+            .module_cache
+            .insert(1, mock_verified_code(1, MockExtension::new(8)));
+        assert_eq!(manager.module_cache.num_modules(), 2);
+
+        // Case 5: Environment changes.
+        let metadata_5 = TransactionSliceMetadata::block_from_u64(5, 6);
+        assert!(metadata_5.is_immediately_after(&metadata_4));
+
+        let state_view = state_view_with_changed_feature_flag(FeatureFlag::EMIT_FEE_STATEMENT);
+
+        assert_ok!(manager.check_ready(AptosEnvironment::new(&state_view), &config, metadata_5));
+        assert_eq!(manager.transaction_slice_metadata, metadata_5);
+        assert!(manager.environment.is_some());
+        assert_eq!(manager.module_cache.num_modules(), 0);
+        assert_struct_name_index_map_size_eq(&manager, 0);
+
+        add_struct_identifier(&mut manager, "foo");
+        add_struct_identifier(&mut manager, "bar");
+        add_struct_identifier(&mut manager, "baz");
+        assert_struct_name_index_map_size_eq(&manager, 3);
+        manager
+            .module_cache
+            .insert(0, mock_verified_code(0, MockExtension::new(8)));
+        manager
+            .module_cache
+            .insert(1, mock_verified_code(1, MockExtension::new(8)));
+        assert_eq!(manager.module_cache.num_modules(), 2);
+        assert_eq!(manager.module_cache.size_in_bytes(), 16);
+
+        // Case 6: Type cache is too large.
+        let metadata_6 = TransactionSliceMetadata::block_from_u64(6, 5);
+        assert!(metadata_6.is_immediately_after(&metadata_5));
+
+        assert_ok!(manager.check_ready(AptosEnvironment::new(&state_view), &config, metadata_6));
+        assert_eq!(manager.transaction_slice_metadata, metadata_6);
+        assert!(manager.environment.is_some());
+        assert_eq!(manager.module_cache.num_modules(), 0);
+        assert_struct_name_index_map_size_eq(&manager, 0);
     }
 
-    // TODO(loader_v2): Add more unit tests like with previous commits.
+    #[test]
+    fn test_try_lock_inner_single_thread() {
+        let manager = AptosModuleCacheManager::new();
+
+        let state_view = MockStateView::empty();
+        let config = BlockExecutorModuleCacheLocalConfig::default();
+        let metadata = TransactionSliceMetadata::block_from_u64(0, 1);
+
+        let guard = assert_ok!(manager.try_lock(&state_view, &config, metadata));
+        assert!(matches!(guard, AptosModuleCacheManagerGuard::Guard { .. }));
+    }
+
+    #[test]
+    fn test_try_lock_inner_multiple_threads() {
+        let manager = Arc::new(AptosModuleCacheManager::new());
+
+        let state_view = Arc::new(MockStateView::empty());
+        let config = Arc::new(BlockExecutorModuleCacheLocalConfig::default());
+        let metadata = TransactionSliceMetadata::block_from_u64(0, 1);
+
+        let counter = Arc::new(AtomicU64::new(0));
+        let num_threads = 8;
+        let mut handles = Vec::with_capacity(num_threads);
+
+        for _ in 0..num_threads {
+            let handle = std::thread::spawn({
+                let manager = manager.clone();
+                let state_view = state_view.clone();
+                let config = config.clone();
+                let counter = counter.clone();
+
+                move || {
+                    let guard = assert_ok!(manager.try_lock_inner(&state_view, &config, metadata));
+
+                    // Wait for all threads to complete.
+                    counter.fetch_add(1, Ordering::SeqCst);
+                    loop {
+                        if counter.load(Ordering::SeqCst) == num_threads as u64 {
+                            break;
+                        }
+                    }
+                    if matches!(guard, AptosModuleCacheManagerGuard::Guard { .. }) {
+                        1
+                    } else {
+                        0
+                    }
+                }
+            });
+            handles.push(handle);
+        }
+        let sum = handles.into_iter().map(|h| h.join().unwrap()).sum::<i32>();
+        assert_eq!(sum, 1);
+    }
 }

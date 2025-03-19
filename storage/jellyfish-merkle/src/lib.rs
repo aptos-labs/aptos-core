@@ -419,7 +419,7 @@ where
         shard_root_nodes: Vec<Node<K>>,
         persisted_version: Option<Version>,
         version: Version,
-    ) -> Result<(HashValue, TreeUpdateBatch<K>)> {
+    ) -> Result<(HashValue, usize, TreeUpdateBatch<K>)> {
         ensure!(
             shard_root_nodes.len() == 16,
             "sharded root nodes {} must be 16",
@@ -446,6 +446,7 @@ where
         APTOS_JELLYFISH_LEAF_COUNT.set(root_node.leaf_count() as i64);
 
         let root_hash = root_node.hash();
+        let leaf_count = root_node.leaf_count();
 
         let mut tree_update_batch = TreeUpdateBatch::new();
         if let Some(persisted_version) = persisted_version {
@@ -453,7 +454,7 @@ where
         }
         tree_update_batch.put_node(NodeKey::new_empty_path(version), root_node);
 
-        Ok((root_hash, tree_update_batch))
+        Ok((root_hash, leaf_count, tree_update_batch))
     }
 
     /// Returns the node versions of the root of each shard, or None if the shard is empty.
@@ -696,7 +697,7 @@ where
             shard_root_nodes.push(shard_root_node);
         }
 
-        let (root_hash, top_levels_batch) =
+        let (root_hash, _leaf_count, top_levels_batch) =
             self.put_top_levels_nodes(shard_root_nodes, version.checked_sub(1), version)?;
         tree_update_batch.combine(top_levels_batch);
 
@@ -709,13 +710,13 @@ where
         key: HashValue,
         version: Version,
     ) -> Result<(Option<(HashValue, (K, Version))>, SparseMerkleProof)> {
-        self.get_with_proof_ext(key, version, 0)
+        self.get_with_proof_ext(&key, version, 0)
             .map(|(value, proof_ext)| (value, proof_ext.into()))
     }
 
     pub fn get_with_proof_ext(
         &self,
-        key: HashValue,
+        key: &HashValue,
         version: Version,
         target_root_depth: usize,
     ) -> Result<(Option<(HashValue, (K, Version))>, SparseMerkleProofExt)> {
@@ -975,7 +976,7 @@ where
 {
     let existing_leaf_key = existing_leaf_node.account_key();
 
-    if kvs.len() == 1 && kvs[0].0 == existing_leaf_key {
+    if kvs.len() == 1 && &kvs[0].0 == existing_leaf_key {
         if let (key, Some((value_hash, state_key))) = kvs[0] {
             let new_leaf_node = Node::new_leaf(key, *value_hash, (state_key.clone(), version));
             Ok(Some(new_leaf_node))

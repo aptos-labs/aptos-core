@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state_store::{
-    sharded_state_update_refs::ShardedStateUpdateRefs, sharded_state_updates::ShardedStateUpdates,
-    state_delta::StateDelta, state_view::cached_state_view::ShardedStateCache,
+    state::LedgerState,
+    state_summary::LedgerStateSummary,
+    state_update_refs::StateUpdateRefs,
+    state_view::cached_state_view::ShardedStateCache,
+    state_with_summary::{LedgerStateWithSummary, StateWithSummary},
 };
 use aptos_types::transaction::{Transaction, TransactionInfo, TransactionOutput, Version};
 
@@ -13,11 +16,10 @@ pub struct ChunkToCommit<'a> {
     pub transactions: &'a [Transaction],
     pub transaction_outputs: &'a [TransactionOutput],
     pub transaction_infos: &'a [TransactionInfo],
-    pub base_state_version: Option<Version>,
-    pub latest_in_memory_state: &'a StateDelta,
-    pub state_update_refs: &'a ShardedStateUpdateRefs<'a>,
-    pub state_updates_until_last_checkpoint: Option<&'a ShardedStateUpdates>,
-    pub sharded_state_cache: Option<&'a ShardedStateCache>,
+    pub state: &'a LedgerState,
+    pub state_summary: &'a LedgerStateSummary,
+    pub state_update_refs: &'a StateUpdateRefs<'a>,
+    pub state_reads: &'a ShardedStateCache,
     pub is_reconfig: bool,
 }
 
@@ -36,5 +38,32 @@ impl<'a> ChunkToCommit<'a> {
 
     pub fn expect_last_version(&self) -> Version {
         self.next_version() - 1
+    }
+
+    pub fn result_ledger_state_with_summary(&self) -> LedgerStateWithSummary {
+        let latest = StateWithSummary::new(
+            self.state.latest().clone(),
+            self.state_summary.latest().clone(),
+        );
+        let last_checkpoint = StateWithSummary::new(
+            self.state.last_checkpoint().clone(),
+            self.state_summary.last_checkpoint().clone(),
+        );
+        LedgerStateWithSummary::from_latest_and_last_checkpoint(latest, last_checkpoint)
+    }
+
+    pub fn estimated_total_state_updates(&self) -> usize {
+        let for_last_checkpoint = self
+            .state_update_refs
+            .for_last_checkpoint
+            .as_ref()
+            .map_or(0, |x| x.len());
+        let for_latest = self
+            .state_update_refs
+            .for_latest
+            .as_ref()
+            .map_or(0, |x| x.len());
+
+        for_latest + for_last_checkpoint
     }
 }

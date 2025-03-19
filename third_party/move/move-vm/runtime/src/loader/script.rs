@@ -1,8 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{intern_type, BinaryCache, Function, FunctionHandle, FunctionInstantiation};
-use crate::{loader::ScriptHash, storage::struct_name_index_map::StructNameIndexMap};
+use super::{intern_type, Function, FunctionHandle, FunctionInstantiation};
 use move_binary_format::{
     access::ScriptAccess,
     binary_views::BinaryIndexedView,
@@ -13,6 +12,7 @@ use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_sta
 use move_vm_types::loaded_data::{
     runtime_access_specifier::AccessSpecifier,
     runtime_types::{StructIdentifier, Type},
+    struct_name_indexing::StructNameIndexMap,
 };
 use std::{collections::BTreeMap, ops::Deref, sync::Arc};
 
@@ -47,10 +47,11 @@ impl Script {
             let struct_name = script.identifier_at(struct_handle.name);
             let module_handle = script.module_handle_at(struct_handle.module);
             let module_id = script.module_id_for_handle(module_handle);
-            struct_names.push(struct_name_index_map.struct_name_to_idx(StructIdentifier {
+            let struct_name = StructIdentifier {
                 module: module_id,
                 name: struct_name.to_owned(),
-            })?);
+            };
+            struct_names.push(struct_name_index_map.struct_name_to_idx(&struct_name)?);
         }
 
         let mut function_refs = vec![];
@@ -124,6 +125,8 @@ impl Script {
             local_tys,
             param_tys,
             access_specifier: AccessSpecifier::Any,
+            is_persistent: false,
+            has_module_reentrancy_lock: false,
         });
 
         let mut single_signature_token_map = BTreeMap::new();
@@ -196,32 +199,5 @@ impl Deref for Script {
 
     fn deref(&self) -> &Self::Target {
         &self.script
-    }
-}
-
-// A script cache is a map from the hash value of a script and the `Script` itself.
-// Script are added in the cache once verified and so getting a script out the cache
-// does not require further verification (except for parameters and type parameters)
-#[derive(Clone)]
-pub(crate) struct ScriptCache {
-    pub(crate) scripts: BinaryCache<ScriptHash, Arc<Script>>,
-}
-
-impl ScriptCache {
-    pub(crate) fn new() -> Self {
-        Self {
-            scripts: BinaryCache::new(),
-        }
-    }
-
-    pub(crate) fn get(&self, hash: &ScriptHash) -> Option<Arc<Script>> {
-        self.scripts.get(hash).cloned()
-    }
-
-    pub(crate) fn insert(&mut self, hash: ScriptHash, script: Script) -> Arc<Script> {
-        match self.get(&hash) {
-            Some(cached) => cached,
-            None => self.scripts.insert(hash, Arc::new(script)).clone(),
-        }
     }
 }

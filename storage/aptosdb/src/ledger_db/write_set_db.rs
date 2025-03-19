@@ -9,10 +9,16 @@ use crate::{
     },
     utils::iterators::ExpectContinuousVersions,
 };
-use aptos_experimental_runtimes::thread_manager::optimal_min_len;
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_metrics_core::TimerHelper;
+use aptos_schemadb::{
+    batch::{SchemaBatch, WriteBatch},
+    DB,
+};
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
-use aptos_types::{transaction::Version, write_set::WriteSet};
+use aptos_types::{
+    transaction::{TransactionOutput, Version},
+    write_set::WriteSet,
+};
 use rayon::prelude::*;
 use std::{path::Path, sync::Arc};
 
@@ -104,42 +110,52 @@ impl WriteSetDb {
     }
 
     /// Commits write sets starting from `first_version` to the database.
-    pub(crate) fn commit_write_sets<'a>(
+    pub(crate) fn commit_write_sets(
         &self,
         first_version: Version,
-        write_sets: impl IndexedParallelIterator<Item = &'a WriteSet>,
+        transaction_outputs: &[TransactionOutput],
     ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_write_sets"])
-            .start_timer();
-        let batch = SchemaBatch::new();
-        let num_txns = write_sets.len();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_write_sets"]);
 
-        write_sets
-            .with_min_len(optimal_min_len(num_txns, 128))
+        let chunk_size = transaction_outputs.len() / 4 + 1;
+        let batches = transaction_outputs
+            .par_chunks(chunk_size)
             .enumerate()
-            .try_for_each(|(i, write_set)| -> Result<()> {
-                Self::put_write_set(first_version + i as Version, write_set, &batch)?;
+            .map(|(chunk_idx, chunk)| {
+                let mut batch = self.db().new_native_batch();
+                let chunk_first_version = first_version + (chunk_idx * chunk_size) as Version;
 
-                Ok(())
-            })?;
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_write_sets___commit"])
-            .start_timer();
-        self.write_schemas(batch)
+                chunk.iter().enumerate().try_for_each(|(i, txn_out)| {
+                    Self::put_write_set(
+                        chunk_first_version + i as Version,
+                        txn_out.write_set(),
+                        &mut batch,
+                    )
+                })?;
+                Ok(batch)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        {
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_write_sets___commit"]);
+            for batch in batches {
+                self.db().write_schemas(batch)?
+            }
+            Ok(())
+        }
     }
 
     /// Saves executed transaction vm output given the `version`.
     pub(crate) fn put_write_set(
         version: Version,
         write_set: &WriteSet,
-        batch: &SchemaBatch,
+        batch: &mut impl WriteBatch,
     ) -> Result<()> {
         batch.put::<WriteSetSchema>(&version, write_set)
     }
 
     /// Deletes the write sets between a range of version in [begin, end).
-    pub(crate) fn prune(begin: Version, end: Version, db_batch: &SchemaBatch) -> Result<()> {
+    pub(crate) fn prune(begin: Version, end: Version, db_batch: &mut SchemaBatch) -> Result<()> {
         for version in begin..end {
             db_batch.delete::<WriteSetSchema>(&version)?;
         }

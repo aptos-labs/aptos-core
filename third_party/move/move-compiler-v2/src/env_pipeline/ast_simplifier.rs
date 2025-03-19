@@ -50,7 +50,7 @@
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use log::{debug, log_enabled, trace, Level};
-use move_binary_format::file_format::Ability;
+use move_core_types::ability::Ability;
 use move_model::{
     ast::{Exp, ExpData, Operation, Pattern, Value, VisitorPosition},
     constant_folder::ConstantFolder,
@@ -65,6 +65,8 @@ use std::{
     iter::{IntoIterator, Iterator},
     vec::Vec,
 };
+
+const DEBUG: bool = false;
 
 /// Run the AST simplification pass on all target functions in the `env`.
 /// Optionally do some aggressive simplifications that may eliminate code.
@@ -91,10 +93,12 @@ pub fn run_simplifier(env: &mut GlobalEnv, eliminate_code: bool) {
     // Actually do the writing of new definitions.
     for (qfid, def) in new_definitions.into_iter() {
         env.set_function_def(qfid, def);
-        debug!(
-            "After simplifier, function is `{}`",
-            env.dump_fun(&env.get_function(qfid))
-        );
+        if DEBUG {
+            debug!(
+                "After simplifier, function is `{}`",
+                env.dump_fun(&env.get_function(qfid))
+            );
+        }
     }
 }
 
@@ -359,7 +363,7 @@ fn find_possibly_modified_vars(
                     _ => {},
                 }
             },
-            Lambda(node_id, pat, _, _, _) => {
+            Lambda(node_id, pat, _, _) => {
                 // Define a new scope for bound vars, and turn off `modifying` within.
                 match pos {
                     VisitorPosition::Pre => {

@@ -17,7 +17,7 @@ use aptos_executor_types::{
     state_compute_result::StateComputeResult, ExecutorError, ExecutorResult,
 };
 use aptos_infallible::Mutex;
-use aptos_logger::{error, warn};
+use aptos_logger::{error, info, warn};
 use aptos_types::{
     block_info::BlockInfo,
     contract_event::ContractEvent,
@@ -30,12 +30,12 @@ use aptos_types::{
     validator_txn::ValidatorTransaction,
 };
 use derivative::Derivative;
-use futures::future::{join4, BoxFuture, Shared};
+use futures::future::{join5, BoxFuture, Shared};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     fmt::{Debug, Display, Formatter},
-    sync::Arc,
+    sync::{Arc, Weak},
     time::{Duration, Instant},
 };
 use tokio::{
@@ -68,13 +68,13 @@ impl From<Error> for TaskError {
 pub type TaskResult<T> = Result<T, TaskError>;
 pub type TaskFuture<T> = Shared<BoxFuture<'static, TaskResult<T>>>;
 
-pub type PrepareResult = Arc<Vec<SignatureVerifiedTransaction>>;
+pub type PrepareResult = (Arc<Vec<SignatureVerifiedTransaction>>, Option<u64>);
 pub type ExecuteResult = Duration;
 pub type LedgerUpdateResult = (StateComputeResult, Duration, Option<u64>);
 pub type PostLedgerUpdateResult = ();
 pub type CommitVoteResult = CommitVote;
 pub type PreCommitResult = StateComputeResult;
-pub type PostPreCommitResult = ();
+pub type NotifyStateSyncResult = ();
 pub type CommitLedgerResult = Option<LedgerInfoWithSignatures>;
 pub type PostCommitResult = ();
 
@@ -86,25 +86,27 @@ pub struct PipelineFutures {
     pub post_ledger_update_fut: TaskFuture<PostLedgerUpdateResult>,
     pub commit_vote_fut: TaskFuture<CommitVoteResult>,
     pub pre_commit_fut: TaskFuture<PreCommitResult>,
-    pub post_pre_commit_fut: TaskFuture<PostPreCommitResult>,
+    pub notify_state_sync_fut: TaskFuture<NotifyStateSyncResult>,
     pub commit_ledger_fut: TaskFuture<CommitLedgerResult>,
     pub post_commit_fut: TaskFuture<PostCommitResult>,
 }
 
 impl PipelineFutures {
-    // Wait for futures involved executor to complete
-    pub async fn wait_until_executor_finishes(self) {
-        let _ = join4(
+    // Wait for futures involved executor/state sync to complete
+    pub async fn wait_until_finishes(self) {
+        let _ = join5(
             self.execute_fut,
             self.ledger_update_fut,
             self.pre_commit_fut,
             self.commit_ledger_fut,
+            self.notify_state_sync_fut,
         )
         .await;
     }
 }
 
 pub struct PipelineInputTx {
+    pub qc_tx: Option<oneshot::Sender<Arc<QuorumCert>>>,
     pub rand_tx: Option<oneshot::Sender<Option<Randomness>>>,
     pub order_vote_tx: Option<oneshot::Sender<()>>,
     pub order_proof_tx: Option<oneshot::Sender<()>>,
@@ -112,10 +114,70 @@ pub struct PipelineInputTx {
 }
 
 pub struct PipelineInputRx {
+    pub qc_rx: oneshot::Receiver<Arc<QuorumCert>>,
     pub rand_rx: oneshot::Receiver<Option<Randomness>>,
     pub order_vote_rx: oneshot::Receiver<()>,
     pub order_proof_fut: TaskFuture<()>,
     pub commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
+}
+
+/// A window of blocks that are needed for execution with the execution pool, EXCLUDING the current block
+#[derive(Clone)]
+pub struct OrderedBlockWindow {
+    /// `block_id` (HashValue) helps with logging in the unlikely case there are issues upgrading
+    /// the `Weak` pointer (we can use `block_id`)
+    blocks: Vec<(HashValue, Weak<PipelinedBlock>)>,
+}
+
+impl OrderedBlockWindow {
+    pub fn new(blocks: Vec<Arc<PipelinedBlock>>) -> Self {
+        Self {
+            blocks: blocks
+                .iter()
+                .map(|x| (x.id(), Arc::downgrade(x)))
+                .collect::<Vec<(HashValue, Weak<PipelinedBlock>)>>(),
+        }
+    }
+
+    pub fn empty() -> Self {
+        Self { blocks: vec![] }
+    }
+
+    /// The blocks stored in `OrderedBlockWindow` use [`Weak`](Weak) pointers
+    ///
+    /// if the `PipelinedBlock` still exists
+    ///      `upgraded_block` will be `Some(PipelinedBlock)`, and included in `blocks`
+    /// else it will panic
+    pub fn blocks(&self) -> Vec<Block> {
+        let mut blocks: Vec<Block> = vec![];
+        for (block_id, block) in self.blocks.iter() {
+            let upgraded_block = block.upgrade();
+            if let Some(block) = upgraded_block {
+                blocks.push(block.block().clone())
+            } else {
+                panic!(
+                    "Block with id: {} not found during upgrade in OrderedBlockWindow::blocks()",
+                    block_id
+                )
+            }
+        }
+        blocks
+    }
+
+    pub fn pipelined_blocks(&self) -> Vec<Arc<PipelinedBlock>> {
+        let mut blocks: Vec<Arc<PipelinedBlock>> = Vec::new();
+        for (block_id, block) in self.blocks.iter() {
+            if let Some(block) = block.upgrade() {
+                blocks.push(block);
+            } else {
+                panic!(
+                    "Block with id: {} not found during upgrade in OrderedBlockWindow::pipelined_blocks()",
+                    block_id
+                )
+            }
+        }
+        blocks
+    }
 }
 
 /// A representation of a block that has been added to the execution pipeline. It might either be in ordered
@@ -126,6 +188,9 @@ pub struct PipelineInputRx {
 pub struct PipelinedBlock {
     /// Block data that cannot be regenerated.
     block: Block,
+    /// A window of blocks that are needed for execution with the execution pool, EXCLUDING the current block
+    #[derivative(PartialEq = "ignore")]
+    block_window: OrderedBlockWindow,
     /// Input transactions in the order of execution
     input_transactions: Vec<SignedTransaction>,
     /// The state_compute_result is calculated for all the pending blocks prior to insertion to
@@ -145,6 +210,8 @@ pub struct PipelinedBlock {
     pipeline_tx: Arc<Mutex<Option<PipelineInputTx>>>,
     #[derivative(PartialEq = "ignore")]
     pipeline_abort_handle: Arc<Mutex<Option<Vec<AbortHandle>>>>,
+    #[derivative(PartialEq = "ignore")]
+    block_qc: Arc<Mutex<Option<Arc<QuorumCert>>>>,
 }
 
 impl Serialize for PipelinedBlock {
@@ -187,7 +254,6 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
             input_transactions,
             randomness,
         } = SerializedBlock::deserialize(deserializer)?;
-
         let block = PipelinedBlock::new(block, input_transactions, StateComputeResult::new_dummy());
         if let Some(r) = randomness {
             block.set_randomness(r);
@@ -223,6 +289,12 @@ impl PipelinedBlock {
             to_retry,
             execution_time,
             root_hash: self.state_compute_result.root_hash(),
+            gas_used: self
+                .state_compute_result
+                .execution_output
+                .block_end_info
+                .as_ref()
+                .map(|info| info.block_effective_gas_units()),
         };
 
         // We might be retrying execution, so it might have already been set.
@@ -286,6 +358,13 @@ impl PipelinedBlock {
             .take()
             .expect("pre_commit_result_rx missing.")
     }
+
+    pub fn set_qc(&self, qc: Arc<QuorumCert>) {
+        *self.block_qc.lock() = Some(qc.clone());
+        if let Some(tx) = self.pipeline_tx().lock().as_mut() {
+            tx.qc_tx.take().map(|tx| tx.send(qc));
+        }
+    }
 }
 
 impl Debug for PipelinedBlock {
@@ -308,6 +387,7 @@ impl PipelinedBlock {
     ) -> Self {
         Self {
             block,
+            block_window: OrderedBlockWindow::empty(),
             input_transactions,
             state_compute_result,
             randomness: OnceCell::new(),
@@ -317,15 +397,25 @@ impl PipelinedBlock {
             pipeline_futs: Arc::new(Mutex::new(None)),
             pipeline_tx: Arc::new(Mutex::new(None)),
             pipeline_abort_handle: Arc::new(Mutex::new(None)),
+            block_qc: Arc::new(Mutex::new(None)),
         }
     }
 
-    pub fn new_ordered(block: Block) -> Self {
-        Self::new(block, vec![], StateComputeResult::new_dummy())
+    pub fn new_ordered(block: Block, window: OrderedBlockWindow) -> Self {
+        let input_transactions = Vec::new();
+        let state_compute_result = StateComputeResult::new_dummy();
+        Self {
+            block_window: window,
+            ..Self::new(block, input_transactions, state_compute_result)
+        }
     }
 
     pub fn block(&self) -> &Block {
         &self.block
+    }
+
+    pub fn block_window(&self) -> &OrderedBlockWindow {
+        &self.block_window
     }
 
     pub fn id(&self) -> HashValue {
@@ -422,12 +512,18 @@ impl PipelinedBlock {
     pub fn get_execution_summary(&self) -> Option<ExecutionSummary> {
         self.execution_summary.get().cloned()
     }
+
+    pub fn qc(&self) -> Option<Arc<QuorumCert>> {
+        self.block_qc.lock().clone()
+    }
 }
 
 /// Pipeline related functions
 impl PipelinedBlock {
     pub fn pipeline_enabled(&self) -> bool {
-        self.pipeline_futs.lock().is_some()
+        // if the pipeline_tx is set, the pipeline is enabled,
+        // we don't use pipeline fut here because it can't be taken when abort
+        self.pipeline_tx.lock().is_some()
     }
 
     pub fn pipeline_futs(&self) -> Option<PipelineFutures> {
@@ -452,8 +548,20 @@ impl PipelinedBlock {
 
     pub fn abort_pipeline(&self) -> Option<PipelineFutures> {
         if let Some(abort_handles) = self.pipeline_abort_handle.lock().take() {
+            let mut aborted = false;
             for handle in abort_handles {
-                handle.abort();
+                if !handle.is_finished() {
+                    handle.abort();
+                    aborted = true;
+                }
+            }
+            if aborted {
+                info!(
+                    "[Pipeline] Aborting pipeline for block {} {} {}",
+                    self.id(),
+                    self.epoch(),
+                    self.round()
+                );
             }
         }
         self.pipeline_futs.lock().take()
@@ -461,7 +569,9 @@ impl PipelinedBlock {
 
     pub async fn wait_for_compute_result(&self) -> ExecutorResult<(StateComputeResult, Duration)> {
         self.pipeline_futs()
-            .expect("Pipeline needs to be enabled")
+            .ok_or(ExecutorError::InternalError {
+                error: "Pipeline aborted".to_string(),
+            })?
             .ledger_update_fut
             .await
             .map(|(compute_result, execution_time, _)| (compute_result, execution_time))
@@ -471,11 +581,11 @@ impl PipelinedBlock {
     }
 
     pub async fn wait_for_commit_ledger(&self) {
-        self.pipeline_futs()
-            .expect("Pipeline needs to be enabled")
-            .commit_ledger_fut
-            .await
-            .expect("Commit ledger should succeed");
+        // may be aborted (e.g. by reset)
+        if let Some(fut) = self.pipeline_futs() {
+            // this may be cancelled
+            let _ = fut.commit_ledger_fut.await;
+        }
     }
 }
 
@@ -486,4 +596,5 @@ pub struct ExecutionSummary {
     pub to_retry: u64,
     pub execution_time: Duration,
     pub root_hash: HashValue,
+    pub gas_used: Option<u64>,
 }

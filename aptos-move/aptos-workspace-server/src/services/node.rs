@@ -1,10 +1,10 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::IP_LOCAL_HOST;
+use crate::{common::IP_LOCAL_HOST, no_panic_println};
 use anyhow::{bail, Result};
-use aptos::node::local_testnet::HealthChecker;
 use aptos_config::config::{NodeConfig, TableInfoServiceMode};
+use aptos_localnet::health_checker::HealthChecker;
 use aptos_node::{load_node_config, start_and_report_ports};
 use aptos_types::network_address::{NetworkAddress, Protocol};
 use futures::channel::oneshot;
@@ -87,7 +87,7 @@ pub fn start_node(
     let (indexer_grpc_port_tx, indexer_grpc_port_rx) = oneshot::channel();
 
     let run_node = {
-        println!("Starting node..");
+        no_panic_println!("Starting node..");
 
         let test_dir = test_dir.to_owned();
         let node_config = node_config.clone();
@@ -123,9 +123,10 @@ pub fn start_node(
         );
         api_health_checker.wait(None).await?;
 
-        println!(
+        no_panic_println!(
             "Node API is ready. Endpoint: http://{}:{}/",
-            IP_LOCAL_HOST, api_port
+            IP_LOCAL_HOST,
+            api_port
         );
 
         Ok(api_port)
@@ -138,9 +139,10 @@ pub fn start_node(
             HealthChecker::DataServiceGrpc(get_data_service_url(indexer_grpc_port));
 
         indexer_grpc_health_checker.wait(None).await?;
-        println!(
+        no_panic_println!(
             "Transaction stream is ready. Endpoint: http://{}:{}/",
-            IP_LOCAL_HOST, indexer_grpc_port
+            IP_LOCAL_HOST,
+            indexer_grpc_port
         );
 
         Ok(indexer_grpc_port)

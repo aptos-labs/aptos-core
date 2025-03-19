@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::chain_id::{ChainId, NamedChain};
+use chrono::{DateTime, TimeZone, Utc};
+use chrono_tz::America::Los_Angeles;
 use serde::Serialize;
 use strum::{EnumCount, IntoEnumIterator};
 use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
@@ -12,6 +14,10 @@ pub enum TimedFeatureFlag {
     LimitTypeTagSize,
     ModuleComplexityCheck,
     EntryCompatibility,
+    ChargeBytesForPrints,
+
+    // Fixes the bug of table natives not tracking the memory usage of the global values they create.
+    FixMemoryUsageTracking,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -52,26 +58,65 @@ impl TimedFeatureOverride {
     }
 }
 
+const BEGINNING_OF_TIME: DateTime<Utc> = DateTime::UNIX_EPOCH;
+
 impl TimedFeatureFlag {
     /// Returns the activation time of the feature on the given chain.
-    /// The time is specified as a Unix Epoch timestamp in microseconds.
-    pub const fn activation_time_micros_on(&self, chain_id: &NamedChain) -> u64 {
+    pub fn activation_time_on(&self, chain_id: &NamedChain) -> DateTime<Utc> {
         use NamedChain::*;
         use TimedFeatureFlag::*;
 
         match (self, chain_id) {
             // Enabled from the beginning of time.
-            (DisableInvariantViolationCheckInSwapLoc, TESTNET) => 0,
-            (DisableInvariantViolationCheckInSwapLoc, MAINNET) => 0,
+            (DisableInvariantViolationCheckInSwapLoc, TESTNET) => BEGINNING_OF_TIME,
+            (DisableInvariantViolationCheckInSwapLoc, MAINNET) => BEGINNING_OF_TIME,
 
-            (ModuleComplexityCheck, TESTNET) => 1_719_356_400_000_000, /* Tuesday, June 21, 2024 16:00:00 AM GMT-07:00 */
-            (ModuleComplexityCheck, MAINNET) => 1_720_033_200_000_000, /* Wednesday, July 3, 2024 12:00:00 AM GMT-07:00 */
+            // Note: These have been enabled since the start due to a bug.
+            (LimitTypeTagSize, TESTNET) => BEGINNING_OF_TIME,
+            (LimitTypeTagSize, MAINNET) => BEGINNING_OF_TIME,
 
-            (EntryCompatibility, TESTNET) => 1_730_923_200_000_000, /* Wednesday, Nov 6, 2024 12:00:00 AM GMT-07:00 */
-            (EntryCompatibility, MAINNET) => 1_731_441_600_000_000, /* Tuesday, Nov 12, 2024 12:00:00 AM GMT-07:00 */
+            (ModuleComplexityCheck, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2024, 6, 25, 16, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (ModuleComplexityCheck, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2024, 7, 3, 12, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
 
-            // If unspecified, a timed feature is considered enabled from the very beginning of time.
-            _ => 0,
+            (EntryCompatibility, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2024, 11, 6, 12, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (EntryCompatibility, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2024, 11, 12, 12, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            // Note: Activation time set to 1 hour after the beginning of time
+            //       so we can test the old and new behaviors in tests.
+            (FixMemoryUsageTracking, TESTING) => Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap(),
+            (FixMemoryUsageTracking, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2025, 3, 7, 12, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (FixMemoryUsageTracking, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2025, 3, 11, 17, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            (ChargeBytesForPrints, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2025, 3, 7, 12, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (ChargeBytesForPrints, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2025, 3, 11, 17, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            // For chains other than testnet and mainnet, a timed feature is considered enabled from
+            // the very beginning, if left unspecified.
+            (_, TESTING | DEVNET | PREMAINNET) => BEGINNING_OF_TIME,
         }
     }
 }
@@ -126,7 +171,9 @@ impl TimedFeaturesBuilder {
             OnNamedChain {
                 named_chain,
                 timestamp_micros,
-            } => *timestamp_micros >= flag.activation_time_micros_on(named_chain),
+            } => {
+                *timestamp_micros >= flag.activation_time_on(named_chain).timestamp_micros() as u64
+            },
             EnableAll => true,
         }
     }
@@ -163,12 +210,61 @@ mod test {
     }
 
     #[test]
+    fn test_micros_conversion() {
+        use NamedChain::*;
+
+        assert_eq!(
+            Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0)
+                .unwrap()
+                .timestamp_micros(),
+            1_704_067_200_000_000
+        );
+
+        assert_eq!(
+            Utc.with_ymd_and_hms(2024, 11, 15, 0, 0, 0)
+                .unwrap()
+                .timestamp_micros(),
+            1_731_628_800_000_000
+        );
+
+        assert_eq!(
+            TimedFeatureFlag::ModuleComplexityCheck
+                .activation_time_on(&TESTNET)
+                .timestamp_micros(),
+            1_719_356_400_000_000
+        );
+        assert_eq!(
+            TimedFeatureFlag::ModuleComplexityCheck
+                .activation_time_on(&MAINNET)
+                .timestamp_micros(),
+            1_720_033_200_000_000
+        );
+
+        assert_eq!(
+            TimedFeatureFlag::EntryCompatibility
+                .activation_time_on(&TESTNET)
+                .timestamp_micros(),
+            1_730_923_200_000_000
+        );
+        assert_eq!(
+            TimedFeatureFlag::EntryCompatibility
+                .activation_time_on(&MAINNET)
+                .timestamp_micros(),
+            1_731_441_600_000_000
+        );
+    }
+
+    #[test]
     fn test_timed_features_activation() {
         use TimedFeatureFlag::*;
-        // Monday, Jan 01, 2024 12:00:00.000 AM GMT
-        let jan_1_2024_micros: u64 = 1_704_067_200_000_000;
-        // Friday, November 15, 2024 12:00:00 AM GMT
-        let nov_15_2024_micros: u64 = 1_731_628_800_000_000;
+        let jan_1_2024_micros = Utc
+            .with_ymd_and_hms(2024, 1, 1, 0, 0, 0)
+            .unwrap()
+            .timestamp_micros() as u64;
+        let nov_15_2024_micros = Utc
+            .with_ymd_and_hms(2024, 11, 15, 0, 0, 0)
+            .unwrap()
+            .timestamp_micros() as u64;
 
         // Check testnet on Jan 1, 2024.
         let testnet_jan_1_2024 = TimedFeaturesBuilder::new(ChainId::testnet(), jan_1_2024_micros);

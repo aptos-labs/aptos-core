@@ -9,6 +9,25 @@ NIGHTLY_VERSION="nightly-2024-04-06"
 # GDRIVE format https://docs.google.com/uc?export=download&id=DOCID
 CORPUS_ZIPS=("https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip" "https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_seed_corpus.zip")
 
+# This save time excluding some features needed only for specific targets
+# Downside: fuzzers which require  specific features need to recompile all dependencies
+function get_features_for_target() {
+    local target=$1
+    local toml_file="fuzz/Cargo.toml"
+
+    # Find the section containing our target and extract required-features if present
+    features=$(sed -n "/name = \"$target\"/,/\[\[bin]]/p" "$toml_file" | \
+              grep "required-features" | \
+              sed -E 's/.*required-features *= *\[(.*)\].*/\1/' | \
+              tr -d '", ')
+
+    if [ -n "$features" ]; then
+        echo "--features $features"
+    else
+        echo ""
+    fi
+}
+
 function info() {
     echo "[info] $1"
 }
@@ -53,6 +72,9 @@ function usage() {
         "build-oss-fuzz")
             echo "Usage: $0 build-oss-fuzz <target_dir>"
             ;;
+        "cmin")
+            echo "Usage: $0 cmin <fuzz_target> [corpus_dir]"
+            ;;
         "coverage")
             echo "Usage: $0 coverage <fuzz_target>"
             ;;
@@ -80,6 +102,7 @@ function usage() {
             echo "    block-builder     runs rust tool to hel build fuzzers"
             echo "    build             builds fuzz targets"
             echo "    build-oss-fuzz    builds fuzz targets for oss-fuzz"
+            echo "    cmin              minimizes a corpus for a target"
             echo "    coverage          generates coverage for a fuzz target"
             echo "    clean-coverage    clean coverage for a fuzz target"
             echo "    debug             debugs a fuzz target with a testcase"
@@ -114,7 +137,8 @@ function build() {
     info "Target directory: $target_dir"
     mkdir -p $target_dir
     info "Building $fuzz_target"
-    cargo_fuzz build --sanitizer none --verbose -O --target-dir $target_dir $fuzz_target
+    features=$(get_features_for_target $fuzz_target)
+    cargo_fuzz build --sanitizer none --verbose -O --target-dir $target_dir $features $fuzz_target
 }
 
 function build-oss-fuzz() {
@@ -166,11 +190,31 @@ function build-oss-fuzz() {
     done
 }
 
+function cmin() {
+    if [ -z "$1" ]; then
+        usage cmin
+    fi
+    fuzz_target=$1
+    corpus_dir=${2:-./fuzz/corpus/$fuzz_target}
+    cargo_fuzz cmin $fuzz_target $corpus_dir
+}
+
+function install-coverage-tools() {
+     cargo +$NIGHTLY_VERSION install cargo-binutils
+     cargo +$NIGHTLY_VERSION install rustfilt
+}
+
 function coverage() {
     if [ -z "$1" ]; then
         usage coverage
     fi
     fuzz_target=$1
+
+    if ! cargo +$NIGHTLY_VERSION cov -V &> /dev/null; then
+        install-coverage-tools
+    fi
+
+    clean-coverage $fuzz_target
     local corpus_dir="fuzz/corpus/$fuzz_target"
     local coverage_dir="./fuzz/coverage/$fuzz_target/report"
     mkdir -p $coverage_dir
@@ -181,10 +225,15 @@ function coverage() {
     
     info "Generating coverage for $fuzz_target"
 
-    fuzz_target_bin=$(find ./target/*/coverage -name $fuzz_target -type f -perm /111) #$(find target/*/coverage -name $fuzz_target -type f)
+    PERM="/111"
+    if [[ $OSTYPE == 'darwin'* ]]; then
+        PERM="+111"
+    fi
+
+    fuzz_target_bin=$(find ./target/*/coverage -name $fuzz_target -type f -perm $PERM)
     echo "Found fuzz target binary: $fuzz_target_bin"
     # Generate the coverage report
-    cargo +nightly cov -- show $fuzz_target_bin \
+    cargo +$NIGHTLY_VERSION cov -- show $fuzz_target_bin \
         --format=html \
         --instr-profile=fuzz/coverage/$fuzz_target/coverage.profdata \
         --show-directory-coverage \
@@ -200,12 +249,11 @@ function clean-coverage() {
     fi
 
     local fuzz_target="$1"
-    local coverage_dir="./fuzz/coverage/$fuzz_target/"
-
     if [ "$fuzz_target" == "all" ]; then
-        rm -rf coverage
+        rm -rf ./fuzz/coverage
     else
-        rm -rf $target_dir
+        local coverage_dir="./fuzz/coverage/$fuzz_target/"
+        rm -rf $coverage_dir
     fi
 }
 
@@ -261,13 +309,15 @@ function run() {
         fi
     fi
     info "Running $fuzz_target"
-    cargo_fuzz run --sanitizer none -O $fuzz_target $testcase -- -fork=10
+    features=$(get_features_for_target $fuzz_target)
+    cargo_fuzz run $features --sanitizer address -O $fuzz_target $testcase -- -fork=15 #-ignore_crashes=1
 }
 
 function test() {
     for fuzz_target in $(list); do
         info "Testing $fuzz_target"
-        cargo_fuzz run $fuzz_target -- -max_len=1024 -jobs=4 -workers=4 -runs=1000
+        features=$(get_features_for_target $fuzz_target)
+        cargo_fuzz run $features $fuzz_target -- -max_len=1024 -jobs=4 -workers=4 -runs=1000
         if [ $? -ne 0 ]; then
             error "Failed to run $fuzz_target"
         fi
@@ -329,6 +379,10 @@ case "$1" in
   "build-oss-fuzz")
     shift
     build-oss-fuzz "$@"
+    ;;
+  "cmin")
+    shift
+    cmin "$@"
     ;;
   "coverage")
     shift

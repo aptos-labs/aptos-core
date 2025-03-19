@@ -26,23 +26,20 @@ use crate::{
     state_merkle_db::StateMerkleDb,
     state_store::StateStore,
     transaction_store::TransactionStore,
-    utils::new_sharded_kv_schema_batch,
 };
 use aptos_config::config::{
     PrunerConfig, RocksdbConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::HashValue;
 use aptos_db_indexer::{db_indexer::InternalIndexerDB, Indexer};
-use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
 use aptos_resource_viewer::AptosValueAnnotator;
-use aptos_schemadb::SchemaBatch;
-use aptos_scratchpad::SparseMerkleTree;
+use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::{
-    db_ensure as ensure, db_other_bail as bail,
-    state_store::sharded_state_updates::ShardedStateUpdates, AptosDbError, DbReader, DbWriter,
-    LedgerSummary, Order, Result, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
+    db_ensure as ensure, db_other_bail as bail, AptosDbError, DbReader, DbWriter, LedgerSummary,
+    Order, Result, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -103,7 +100,7 @@ pub struct AptosDB {
     commit_lock: std::sync::Mutex<()>,
     indexer: Option<Indexer>,
     skip_index_and_usage: bool,
-    update_subscriber: Option<Sender<Version>>,
+    update_subscriber: Option<Sender<(Instant, Version)>>,
 }
 
 // DbReader implementations and private functions used by them.
@@ -189,7 +186,10 @@ impl AptosDB {
         Ok((ledger_db, state_merkle_db, state_kv_db))
     }
 
-    pub fn add_version_update_subscriber(&mut self, sender: Sender<Version>) -> Result<()> {
+    pub fn add_version_update_subscriber(
+        &mut self,
+        sender: Sender<(Instant, Version)>,
+    ) -> Result<()> {
         self.update_subscriber = Some(sender);
         Ok(())
     }
@@ -233,8 +233,8 @@ impl AptosDB {
             genesis_li.ledger_info().epoch() == current_epoch && current_epoch == 0,
             "Genesis ledger info epoch is not 0"
         );
-        let ledger_batch = SchemaBatch::new();
-        ledger_metadata_db.put_ledger_info(genesis_li, &ledger_batch)?;
+        let mut ledger_batch = SchemaBatch::new();
+        ledger_metadata_db.put_ledger_info(genesis_li, &mut ledger_batch)?;
         ledger_metadata_db.write_schemas(ledger_batch)
     }
 }

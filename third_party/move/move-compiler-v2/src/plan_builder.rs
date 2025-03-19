@@ -5,8 +5,7 @@
 
 //! Build a vector of module test plans for a Move program compiled with V2.
 //!
-//! This reimplements move-compiler/src/unit_test/plan_builder.rs in terms
-//! of data structures available in V2's `GlobalEnv` structure after AST processing.
+//! This reimplements the legacy move compiler functionality.
 //!
 //! Each module containing any labeled `#[test]` functions gets an item in the output list, which
 //! includes info about each '#[test]' function: name, arguments to provide, and expected failure or
@@ -14,11 +13,11 @@
 
 use crate::options::Options;
 use codespan_reporting::diagnostic::Severity;
-use move_command_line_common::{address::NumericalAddress, parser::NumberFormat};
-use move_compiler::{
+use legacy_move_compiler::{
     shared::known_attributes::{AttributeKind, TestingAttribute},
     unit_test::{ExpectedFailure, ExpectedMoveError, ModuleTestPlan, TestCase},
 };
+use move_command_line_common::{address::NumericalAddress, parser::NumberFormat};
 use move_core_types::{
     identifier::Identifier, language_storage::ModuleId, value::MoveValue, vm_status::StatusCode,
 };
@@ -162,9 +161,29 @@ fn build_test_info(
 
     let mut arguments = Vec::new();
     for param in function.get_parameters_ref() {
-        let Parameter(var, _ty, var_loc) = &param;
+        let Parameter(var, ty, var_loc) = &param;
 
         match test_annotation_params.get(var) {
+            Some(MoveValue::Address(addr)) => match ty {
+                Type::Primitive(PrimitiveType::Signer) => arguments.push(MoveValue::Signer(*addr)),
+                Type::Reference(_, inner) if **inner == Type::Primitive(PrimitiveType::Signer) => {
+                    arguments.push(MoveValue::Signer(*addr));
+                },
+                Type::Primitive(PrimitiveType::Address) => {
+                    arguments.push(MoveValue::Address(*addr))
+                },
+                _ => {
+                    let err_msg = "Unexpected argument type: expect an address or a signer";
+                    let invalid_test = "unable to generate test";
+                    env.error_with_labels(&fn_id_loc, invalid_test, vec![
+                        (test_attribute_loc.clone(), err_msg.to_string()),
+                        (
+                            var_loc.clone(),
+                            "Corresponding to this parameter".to_string(),
+                        ),
+                    ]);
+                },
+            },
             Some(value) => arguments.push(value.clone()),
             None => {
                 let missing_param_msg = "Missing test parameter assignment in test. Expected a \

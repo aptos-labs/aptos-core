@@ -5,6 +5,7 @@ syntax = "proto3";
 
 package aptos.indexer.v1;
 
+import "aptos/indexer/v1/filter.proto";
 import "aptos/transaction/v1/transaction.proto";
 
 // This is for storage only.
@@ -26,6 +27,14 @@ message GetTransactionsRequest {
   // Optional; number of transactions in each `TransactionsResponse` for current stream.
   // If not present, default to 1000. If larger than 1000, request will be rejected.
   optional uint64 batch_size = 3;
+
+  // If provided, only transactions that match the filter will be included.
+  optional BooleanTransactionFilter transaction_filter = 4;
+}
+
+message ProcessedRange {
+    uint64 first_version = 1;
+    uint64 last_version = 2;
 }
 
 // TransactionsResponse is a batch of transactions.
@@ -35,6 +44,8 @@ message TransactionsResponse {
 
   // Required; chain id.
   optional uint64 chain_id = 2 [jstype = JS_STRING];
+
+  optional ProcessedRange processed_range = 3;
 }
 
 service RawData {

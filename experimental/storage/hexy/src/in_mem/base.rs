@@ -6,9 +6,13 @@ use anyhow::{ensure, Result};
 use aptos_crypto::{hash::HOT_STATE_PLACE_HOLDER_HASH, HashValue};
 use aptos_experimental_layered_map::LayeredMap;
 use aptos_metrics_core::TimerHelper;
+use std::{
+    cell::UnsafeCell,
+    sync::{atomic, atomic::Ordering},
+};
 
 struct BigVector<T> {
-    chunks: Vec<Vec<T>>,
+    chunks: Vec<Vec<UnsafeCell<T>>>,
 }
 
 impl<T> BigVector<T>
@@ -22,7 +26,11 @@ where
         let mut remainder = size;
         while remainder > 0 {
             let chunk_size = Self::CHUNK_SIZE.min(remainder);
-            chunks.push(vec![template.clone(); chunk_size]);
+
+            let mut chunk = Vec::with_capacity(chunk_size);
+            chunk.resize_with(chunk_size, || UnsafeCell::new(template.clone()));
+            chunks.push(chunk);
+
             remainder -= chunk_size;
         }
         Self { chunks }
@@ -36,22 +44,33 @@ where
         }
     }
 
-    pub fn expect(&self, index: usize) -> &T {
+    pub fn expect_raw(&self, index: usize) -> *mut T {
         let chunk = index / Self::CHUNK_SIZE;
         let offset = index % Self::CHUNK_SIZE;
-        &self.chunks[chunk][offset]
+        self.chunks[chunk][offset].get()
     }
 
-    pub fn expect_mut(&mut self, index: usize) -> &mut T {
-        let chunk = index / Self::CHUNK_SIZE;
-        let offset = index % Self::CHUNK_SIZE;
-        &mut self.chunks[chunk][offset]
+    // Another thread is possibly modifying the cell, explicit synchronization is needed through,
+    // e.g. atomic::fence
+    pub unsafe fn unsafe_expect(&self, index: usize) -> &T {
+        &*self.expect_raw(index)
+    }
+
+    // The caller must guarantee the cell pointed by the index is not accessed while
+    // it's mutated.
+    #[allow(clippy::mut_from_ref)]
+    pub unsafe fn unsafe_expect_mut(&self, index: usize) -> &mut T {
+        &mut *self.expect_raw(index)
     }
 }
 
 pub struct HexyBase {
     levels_by_height: Vec<BigVector<HashValue>>,
 }
+
+/// N.B. Considerations have been taken with regard to reading and writing happening from different
+/// threads.
+unsafe impl Sync for HexyBase {}
 
 impl HexyBase {
     pub fn allocate(num_leaves: u32) -> Self {
@@ -77,17 +96,17 @@ impl HexyBase {
         self.levels_by_height[0].len()
     }
 
-    pub fn height(&self) -> usize {
+    pub fn num_levels(&self) -> usize {
         self.levels_by_height.len()
     }
 
-    pub fn height_u8(&self) -> u8 {
-        self.height() as u8
+    pub fn num_levels_u8(&self) -> u8 {
+        self.num_levels() as u8
     }
 
-    pub fn get_hash(&self, position: NodePosition) -> Result<HashValue> {
+    pub(crate) unsafe fn unsafe_get_hash(&self, position: NodePosition) -> Result<HashValue> {
         ensure!(
-            position.level_height < self.height_u8(),
+            position.level_height < self.num_levels_u8(),
             "level_height out of bound. num_of_leaves: {:?}, requested position: {:?}",
             self.num_leaves(),
             position,
@@ -95,16 +114,15 @@ impl HexyBase {
 
         let level = self.expect_level(position);
         if position.index_in_level < level.len() as u32 {
-            Ok(*level.expect(position.index_in_level as usize))
+            Ok(*level.unsafe_expect(position.index_in_level as usize))
         } else {
+            let parent_position = position.parent();
             ensure!(
-                position.level_height < self.height_u8(),
-                "index_in_level out of bound. num_of_leaves: {:?}, requested position: {:?}",
+                parent_position.level_height < self.num_levels_u8(),
+                "index_in_level out of bound for root level. num_of_leaves: {:?}, requested position: {:?}",
                 self.num_leaves(),
                 position,
             );
-
-            let parent_position = position.parent();
             let parent_level = self.expect_level(parent_position);
 
             ensure!(
@@ -118,15 +136,15 @@ impl HexyBase {
         }
     }
 
-    pub fn get_hash_mut(&mut self, position: NodePosition) -> Result<&mut HashValue> {
+    unsafe fn unsafe_get_hash_mut(&self, position: NodePosition) -> Result<&mut HashValue> {
         let num_leaves = self.num_leaves();
         ensure!(
-            position.level_height < self.height_u8(),
+            position.level_height < self.num_levels_u8(),
             "level_height out of bound. num_of_leaves: {:?}, requested position: {:?}",
             num_leaves,
             position,
         );
-        let level = self.expect_level_mut(position);
+        let level = self.expect_level(position);
         ensure!(
             position.index_in_level < level.len() as u32,
             "index_in_level out of bound. num_of_leaves: {:?}, requested position: {:?}",
@@ -134,44 +152,52 @@ impl HexyBase {
             position,
         );
 
-        Ok(level.expect_mut(position.index_in_level as usize))
+        Ok(level.unsafe_expect_mut(position.index_in_level as usize))
     }
 
     fn expect_level(&self, position: NodePosition) -> &BigVector<HashValue> {
         &self.levels_by_height[position.level_height as usize]
     }
 
-    fn expect_level_mut(&mut self, position: NodePosition) -> &mut BigVector<HashValue> {
-        &mut self.levels_by_height[position.level_height as usize]
-    }
-
-    pub fn expect_hash(&self, position: NodePosition) -> HashValue {
-        self.get_hash(position).expect("Failed to get hash.")
+    pub(crate) unsafe fn unsafe_expect_hash(&self, position: NodePosition) -> HashValue {
+        self.unsafe_get_hash(position).expect("Failed to get hash.")
     }
 
     pub fn root_position(&self) -> NodePosition {
         NodePosition {
-            level_height: self.height_u8() - 1,
+            level_height: self.num_levels_u8() - 1,
             index_in_level: 0,
         }
     }
 
-    pub fn root_hash(&self) -> HashValue {
+    pub(crate) fn root_hash(&self) -> HashValue {
+        atomic::fence(Ordering::Acquire);
+
         self.levels_by_height
             .last()
-            .map_or(*HOT_STATE_PLACE_HOLDER_HASH, |level| *level.expect(0))
+            .map_or(*HOT_STATE_PLACE_HOLDER_HASH, |level| unsafe {
+                *level.unsafe_expect(0)
+            })
     }
 
+    // N.B. Any view that's older than the overlay being committed can return wrong hashes, since
+    // the cells touched between `committed` and `to commit` will be mutated on the base.
     pub fn merge(&self, overlay: LayeredMap<NodePosition, HashValue>) -> Result<()> {
         let _timer = TIMER.timer_with(&["merge"]);
 
+        // N.B. Assuming any valid view has all the cells being updated in a LayeredMap, we can
+        // update those cells without locking.
         for (position, hash) in overlay.iter() {
-            unsafe {
-                let raw_self = self as *const Self as *mut Self;
-                let mut_self = raw_self.as_mut().expect("self is null.");
-                *(mut_self.get_hash_mut(position)?) = hash;
-            }
+            unsafe { *self.unsafe_get_hash_mut(position)? = hash }
         }
+
+        // N.B. when a new view is constructed, an Acquire fence will be in place to make sure
+        // updates before the committed overlay are synced over.
+        // TODO(aldenhu): it's NOT necessary for a Release fence because we know the root
+        //                overlay must be updated under a lock after the merge; but it'll be
+        //                better the code is restructured so it's more obvious.
+        // atomic::fence(Ordering::Release);
+
         Ok(())
     }
 }

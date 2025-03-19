@@ -7,7 +7,7 @@ use itertools::Itertools;
 #[allow(unused_imports)]
 use log::debug;
 use move_model::metadata::LanguageVersion;
-use move_prover::{cli::Options, run_move_prover, run_move_prover_v2};
+use move_prover::{cli::Options, run_move_prover_v2};
 use move_prover_test_utils::baseline_test::verify_or_update_baseline;
 use std::{
     fs::File,
@@ -90,17 +90,11 @@ fn test_docgen(path: &Path, mut options: Options, suffix: &str) -> anyhow::Resul
     temp_path.push(&base_name);
 
     if path.to_str().is_some_and(|s| s.contains(V2_TEST_DIR)) {
-        options.compiler_v2 = true;
         options.language_version = Some(LanguageVersion::latest_stable());
     }
 
     let mut error_writer = Buffer::no_color();
-    let prover_runner = if path.to_str().is_some_and(|s| s.contains(V2_TEST_DIR)) {
-        run_move_prover_v2
-    } else {
-        run_move_prover
-    };
-    let mut output = match prover_runner(&mut error_writer, options) {
+    let mut output = match run_move_prover_v2(&mut error_writer, options) {
         Ok(()) => {
             let mut contents = String::new();
             debug!("writing to {}", temp_path.display());

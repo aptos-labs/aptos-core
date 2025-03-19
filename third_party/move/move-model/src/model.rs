@@ -17,9 +17,10 @@
 
 use crate::{
     ast::{
-        AccessSpecifier, Address, AddressSpecifier, Attribute, ConditionKind, Exp, ExpData,
-        FriendDecl, GlobalInvariant, ModuleName, PropertyBag, PropertyValue, ResourceSpecifier,
-        Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl, Value,
+        AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Attribute, ConditionKind,
+        Exp, ExpData, FriendDecl, GlobalInvariant, ModuleName, PropertyBag, PropertyValue,
+        ResourceSpecifier, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl,
+        Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -31,9 +32,9 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{
-        AbilityInference, AbilityInferer, NoUnificationContext, Type, TypeDisplayContext,
-        TypeUnificationAdapter, Variance,
+        AbilityInference, AbilityInferer, NoUnificationContext, Type, TypeDisplayContext, Variance,
     },
+    ty_invariant_analysis::TypeUnificationAdapter,
     well_known,
 };
 use anyhow::bail;
@@ -43,18 +44,19 @@ use codespan_reporting::{
     term::{emit, termcolor::WriteColor, Config},
 };
 use itertools::Itertools;
+use legacy_move_compiler::command_line as cli;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
-pub use move_binary_format::file_format::{AbilitySet, Visibility};
+pub use move_binary_format::file_format::Visibility;
 #[allow(deprecated)]
 use move_binary_format::normalized::Type as MType;
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     file_format::{
-        AccessKind, Bytecode, CodeOffset, Constant as VMConstant, ConstantPoolIndex,
-        FunctionDefinitionIndex, FunctionHandleIndex, MemberCount, SignatureIndex, SignatureToken,
-        StructDefinitionIndex, VariantIndex,
+        Bytecode, CodeOffset, Constant as VMConstant, ConstantPoolIndex, FunctionDefinitionIndex,
+        FunctionHandleIndex, MemberCount, SignatureIndex, SignatureToken, StructDefinitionIndex,
+        VariantIndex,
     },
     views::{FunctionDefinitionView, FunctionHandleView, StructHandleView},
     CompiledModule,
@@ -63,7 +65,7 @@ use move_bytecode_source_map::{mapping::SourceMapping, source_map::SourceMap};
 use move_command_line_common::{
     address::NumericalAddress, env::read_bool_env_var, files::FileHash,
 };
-use move_compiler::command_line as cli;
+pub use move_core_types::ability::AbilitySet;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
@@ -700,6 +702,11 @@ impl GlobalEnv {
         self.address_alias_map = map
     }
 
+    /// Gets the global address alias map
+    pub fn get_address_alias_map(&self) -> &BTreeMap<Symbol, AccountAddress> {
+        &self.address_alias_map
+    }
+
     /// Indicates that all modules in the environment should be treated as
     /// target modules, i.e. `module.is_target()` returns true. This can be
     /// used to temporarily override the default which distinguishes
@@ -879,6 +886,17 @@ impl GlobalEnv {
         let mut target_modules: Vec<ModuleEnv> = vec![];
         for module_env in self.get_modules() {
             if module_env.is_target() {
+                target_modules.push(module_env);
+            }
+        }
+        target_modules
+    }
+
+    /// Find all primary target modules and return in a vector
+    pub fn get_primary_target_modules(&self) -> Vec<ModuleEnv> {
+        let mut target_modules: Vec<ModuleEnv> = vec![];
+        for module_env in self.get_modules() {
+            if module_env.is_primary_target() {
                 target_modules.push(module_env);
             }
         }
@@ -1202,7 +1220,12 @@ impl GlobalEnv {
 
     /// Writes accumulated diagnostics of given or higher severity.
     pub fn report_diag<W: WriteColor>(&self, writer: &mut W, severity: Severity) {
-        self.report_diag_with_filter(writer, |d| d.severity >= severity)
+        self.report_diag_with_filter(
+            |files, diag| {
+                emit(writer, &Config::default(), files, diag).expect("emit must not fail")
+            },
+            |d| d.severity >= severity,
+        );
     }
 
     /// Helper function to report diagnostics, check for errors, and fail with a message on
@@ -1301,11 +1324,11 @@ impl GlobalEnv {
     }
 
     /// Writes accumulated diagnostics that pass through `filter`
-    pub fn report_diag_with_filter<W: WriteColor, F: FnMut(&Diagnostic<FileId>) -> bool>(
-        &self,
-        writer: &mut W,
-        mut filter: F,
-    ) {
+    pub fn report_diag_with_filter<E, F>(&self, mut emitter: E, mut filter: F)
+    where
+        E: FnMut(&Files<String>, &Diagnostic<FileId>),
+        F: FnMut(&Diagnostic<FileId>) -> bool,
+    {
         let mut shown = BTreeSet::new();
         self.diags.borrow_mut().sort_by(|a, b| {
             let reported_ordering = a.1.cmp(&b.1);
@@ -1327,8 +1350,7 @@ impl GlobalEnv {
                 // Avoid showing the same message twice. This can happen e.g. because of
                 // duplication of expressions via schema inclusion.
                 if shown.insert(format!("{:?}", diag)) {
-                    emit(writer, &Config::default(), &self.source_files, diag)
-                        .expect("emit must not fail");
+                    emitter(&self.source_files, diag);
                 }
                 *reported = true;
             }
@@ -1687,8 +1709,29 @@ impl GlobalEnv {
         module: &CompiledModule,
         def_idx: FunctionDefinitionIndex,
     ) -> BTreeSet<QualifiedId<FunId>> {
-        // TODO(LAMBDA) -- fix when we extend bytecode with function values
-        self.get_called_funs_from_bytecode(module, def_idx)
+        let function_definition = module.function_def_at(def_idx);
+        let function_definition_view = FunctionDefinitionView::new(module, function_definition);
+        let used_funs: BTreeSet<QualifiedId<FunId>> = match function_definition_view.code() {
+            Some(unit) => unit
+                .code
+                .iter()
+                .filter_map(|c| {
+                    let handle_idx = match c {
+                        Bytecode::Call(i) | Bytecode::PackClosure(i, ..) => Some(*i),
+                        Bytecode::CallGeneric(i) | Bytecode::PackClosureGeneric(i, ..) => {
+                            Some(module.function_instantiation_at(*i).handle)
+                        },
+                        _ => None,
+                    };
+                    handle_idx.map(|idx| {
+                        ModuleEnv::get_used_function_from_compiled_module(self, idx, module)
+                            .get_qualified_id()
+                    })
+                })
+                .collect(),
+            None => BTreeSet::default(),
+        };
+        used_funs
     }
 
     fn get_called_funs_from_bytecode(
@@ -1915,6 +1958,18 @@ impl GlobalEnv {
         data.def = Some(def);
     }
 
+    /// Sets the inferred acquired structs of this function.
+    pub fn set_acquired_structs(&mut self, fun: QualifiedId<FunId>, acquires: BTreeSet<StructId>) {
+        let data = self
+            .module_data
+            .get_mut(fun.module_id.to_usize())
+            .unwrap()
+            .function_data
+            .get_mut(&fun.id)
+            .unwrap();
+        data.acquired_structs = Some(acquires)
+    }
+
     /// Adds a new function definition.
     pub fn add_function_def(
         &mut self,
@@ -1948,6 +2003,7 @@ impl GlobalEnv {
             params,
             result_type,
             access_specifiers: None,
+            acquired_structs: None,
             spec: RefCell::new(Default::default()),
             def: Some(def),
             called_funs: Some(called_funs),
@@ -2614,9 +2670,9 @@ impl GlobalEnv {
                     emit!(writer, "!")
                 }
                 match &spec.kind {
-                    AccessKind::Reads => emit!(writer, "reads "),
-                    AccessKind::Writes => emit!(writer, "writes "),
-                    AccessKind::Acquires => emit!(writer, "acquires "),
+                    AccessSpecifierKind::Reads => emit!(writer, "reads "),
+                    AccessSpecifierKind::Writes => emit!(writer, "writes "),
+                    AccessSpecifierKind::LegacyAcquires => emit!(writer, "acquires "),
                 }
                 match &spec.resource.1 {
                     ResourceSpecifier::Any => emit!(writer, "*"),
@@ -2977,9 +3033,7 @@ impl<'env> ModuleEnv<'env> {
 
     /// Returns the set of modules in the current package,
     /// whose public(package) functions are called or referenced in the current module.
-    /// Requires: `self` is a primary target.
     pub fn need_to_be_friended_by(&self) -> BTreeSet<ModuleId> {
-        debug_assert!(self.is_primary_target());
         let mut deps = BTreeSet::new();
         if self.is_script_module() {
             return deps;
@@ -3004,12 +3058,12 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Returns true if functions in the current module can call a public(package) function in the given module.
-    /// Requires: `self` is a primary target.
     fn can_call_package_fun_in(&self, other: &Self) -> bool {
-        debug_assert!(self.is_primary_target());
         !self.is_script_module()
             && !other.is_script_module()
-            && other.is_primary_target()
+            // TODO(#13745): fix this when we have a way to check if
+            // two non-primary targets are in the same package
+            && (!self.is_primary_target() || other.is_primary_target())
             && self.self_address() == other.self_address()
     }
 
@@ -3535,6 +3589,11 @@ pub struct StructEnv<'env> {
 }
 
 impl<'env> StructEnv<'env> {
+    /// Shortcut to access the env
+    pub fn env(&self) -> &GlobalEnv {
+        self.module_env.env
+    }
+
     /// Returns the name of this struct.
     pub fn get_name(&self) -> Symbol {
         self.data.name
@@ -3847,6 +3906,19 @@ impl<'env> StructEnv<'env> {
             type_param_names: Some(type_param_names),
             ..self.module_env.get_type_display_ctx()
         }
+    }
+
+    /// If this is a function type wrapper (`struct W(|T|R)`), get the underlying
+    /// function type, instantiated.
+    pub fn get_function_wrapper_type(&self, inst: &[Type]) -> Option<Type> {
+        if self.get_field_count() == 1 {
+            let field = self.get_fields().next().unwrap();
+            let ty = field.get_type();
+            if field.is_positional() && ty.is_function() {
+                return Some(ty.instantiate(inst));
+            }
+        }
+        None
     }
 }
 
@@ -4202,11 +4274,14 @@ pub struct FunctionData {
     /// Access specifiers.
     pub(crate) access_specifiers: Option<Vec<AccessSpecifier>>,
 
+    /// Acquires information, if available. This is either inferred or annotated by the
+    /// user via a legacy acquires declaration.
+    pub(crate) acquired_structs: Option<BTreeSet<StructId>>,
+
     /// Specification associated with this function.
     pub(crate) spec: RefCell<Spec>,
 
-    /// Optional definition associated with this function. The definition is available if
-    /// the model is build with option `ModelBuilderOptions::compile_via_model`.
+    /// Optional definition associated with this function.
     pub(crate) def: Option<Exp>,
 
     /// A cache for the called functions.
@@ -4244,6 +4319,7 @@ impl FunctionData {
             params: vec![],
             result_type: Type::unit(),
             access_specifiers: None,
+            acquired_structs: None,
             spec: RefCell::new(Default::default()),
             def: None,
             called_funs: None,
@@ -4274,6 +4350,11 @@ pub struct FunctionEnv<'env> {
 }
 
 impl<'env> FunctionEnv<'env> {
+    /// Shortcut to access the env
+    pub fn env(&self) -> &GlobalEnv {
+        self.module_env.env
+    }
+
     /// Returns the name of this function.
     pub fn get_name(&self) -> Symbol {
         self.data.name
@@ -4716,6 +4797,12 @@ impl<'env> FunctionEnv<'env> {
         self.data.access_specifiers.as_deref()
     }
 
+    /// Returns the inferred acquired structs of this function. This is checked
+    /// against declared acquires from `get_access_specifiers`.
+    pub fn get_acquired_structs(&self) -> Option<&BTreeSet<StructId>> {
+        self.data.acquired_structs.as_ref()
+    }
+
     /// Get the name to be used for a local by index, if available.
     /// Otherwise generate a unique name.
     pub fn get_local_name(&self, idx: usize) -> Symbol {
@@ -4794,8 +4881,7 @@ impl<'env> FunctionEnv<'env> {
         self.data.spec.borrow_mut()
     }
 
-    /// Returns associated definition. The definition of the function, in Exp form, is available
-    /// if the model is build with `ModelBuilderOptions::compile_via_model`
+    /// Returns associated definition if available.
     pub fn get_def(&self) -> Option<&Exp> {
         self.data.def.as_ref()
     }

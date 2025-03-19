@@ -21,7 +21,7 @@ use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     natives::function::{PartialVMError, PartialVMResult},
-    value_serde::serialized_size_allowing_delayed_values,
+    value_serde::ValueSerDeContext,
     values::{values_impl::Reference, Struct, Value},
 };
 use smallvec::{smallvec, SmallVec};
@@ -69,7 +69,11 @@ fn native_to_bytes(
     //               implement it in a more efficient way.
     let val = ref_to_val.read_ref()?;
 
-    let serialized_value = match val.simple_serialize(&layout) {
+    let serialized_value = match ValueSerDeContext::new()
+        .with_legacy_signer()
+        .with_func_args_deserialization(context.function_value_extension())
+        .serialize(&val, &layout)?
+    {
         Some(serialized_value) => serialized_value,
         None => {
             context.charge(BCS_TO_BYTES_FAILURE)?;
@@ -131,7 +135,12 @@ fn serialized_size_impl(
     //               implement it in a more efficient way.
     let value = reference.read_ref()?;
     let ty_layout = context.type_to_type_layout(ty)?;
-    serialized_size_allowing_delayed_values(&value, &ty_layout)
+
+    ValueSerDeContext::new()
+        .with_legacy_signer()
+        .with_func_args_deserialization(context.function_value_extension())
+        .with_delayed_fields_serde()
+        .serialized_size(&value, &ty_layout)
 }
 
 fn native_constant_serialized_size(
@@ -184,10 +193,11 @@ fn constant_serialized_size(ty_layout: &MoveTypeLayout) -> (u64, PartialVMResult
         MoveTypeLayout::Signer => Ok(None),
         // vectors have no constant size
         MoveTypeLayout::Vector(_) => Ok(None),
-        // enums have no constant size
+        // enums and functions have no constant size
         MoveTypeLayout::Struct(
             MoveStructLayout::RuntimeVariants(_) | MoveStructLayout::WithVariants(_),
-        ) => Ok(None),
+        )
+        | MoveTypeLayout::Function(..) => Ok(None),
         MoveTypeLayout::Struct(MoveStructLayout::Runtime(fields)) => {
             let mut total = Some(0);
             for field in fields {

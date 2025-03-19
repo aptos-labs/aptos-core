@@ -3,11 +3,12 @@
 
 //! Do a few checks of functions and function calls.
 
-use crate::{experiments::Experiment, Options};
+use crate::Options;
 use codespan_reporting::diagnostic::Severity;
 use move_binary_format::file_format::Visibility;
 use move_model::{
     ast::{ExpData, Operation, Pattern},
+    metadata::LanguageVersion,
     model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, NodeId, Parameter, QualifiedId},
     ty::Type,
 };
@@ -56,22 +57,22 @@ fn identify_function_typed_params_with_functions_in_rets(
 }
 
 /// check that function parameters/results do not have function type unless allowed.
-/// (1) is there a function type arg at the top level?  This is allowed for inline or LAMBDA_IN_PARAMS
-/// (2) is there a function type result at the top level?  This is allowed only for LAMBDA_IN_RETURNS
-/// (3) is there *any* function type with function type in an arg? This is allowed only for LAMBDA_IN_PARAMS
-/// (4) is there *any* function type with function type in a result? This is allowed only for LAMBDA_IN_RETURNS
 pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
     let options = env
         .get_extension::<Options>()
         .expect("Options is available");
-    let lambda_params_ok = options.experiment_on(Experiment::LAMBDA_IN_PARAMS);
-    let lambda_return_ok = options.experiment_on(Experiment::LAMBDA_IN_RETURNS);
+
+    let lambda_params_ok = options
+        .language_version
+        .unwrap_or_default()
+        .is_at_least(LanguageVersion::V2_2);
+    let lambda_return_ok = lambda_params_ok;
     if lambda_params_ok && lambda_return_ok {
         return;
     }
 
     for caller_module in env.get_modules() {
-        if caller_module.is_primary_target() {
+        if caller_module.is_target() {
             for caller_func in caller_module.get_functions() {
                 if !lambda_params_ok || !lambda_return_ok {
                     let caller_name = caller_func.get_full_name_str();
@@ -270,7 +271,7 @@ fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv
                 },
                 ExpData::Assign(_, pat, _)
                 | ExpData::Block(_, pat, _, _)
-                | ExpData::Lambda(_, pat, _, _, _) => {
+                | ExpData::Lambda(_, pat, _, _) => {
                     pat.visit_pre_post(&mut |_, pat| {
                         if let Pattern::Struct(id, str, _, _) = pat {
                             let module_id = str.module_id;
@@ -316,6 +317,7 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
     let mut private_funcs: BTreeSet<QualifiedFunId> = BTreeSet::new();
 
     for caller_module in env.get_modules() {
+        // TODO(#13745): fix when we can tell in general if two modules are in the same package
         if caller_module.is_primary_target() {
             let caller_module_id = caller_module.get_id();
             let caller_module_has_friends = !caller_module.has_no_friends();
@@ -383,6 +385,7 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                                             == caller_func.module_env.self_address()
                                         {
                                             // if callee is also a primary target, then they are in the same package
+                                            // TODO(#13745): fix when we can tell in general if two modules are in the same package
                                             if callee_func.module_env.is_primary_target() {
                                                 // we should've inferred the friend declaration
                                                 panic!(

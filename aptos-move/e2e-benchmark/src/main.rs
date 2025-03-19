@@ -6,13 +6,12 @@ use aptos_language_e2e_tests::{
     executor::{ExecFuncTimerDynamicArgs, FakeExecutor, GasMeterType, Measurement},
 };
 use aptos_transaction_generator_lib::{
-    publishing::{
-        module_simple::{AutomaticArgs, LoopType, MultiSigConfig},
-        publish_util::{Package, PackageHandler},
-    },
-    EntryPoints,
+    entry_point_trait::{AutomaticArgs, EntryPointTrait, MultiSigConfig},
+    publishing::publish_util::{Package, PackageHandler},
 };
+use aptos_transaction_workloads_lib::{EntryPoints, LoopType, MapType};
 use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
+use clap::Parser;
 use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;
 use std::{collections::HashMap, fs, process::exit};
@@ -88,6 +87,8 @@ const ABSOLUTE_BUFFER_US: f64 = 2.0;
 struct CalibrationInfo {
     // count: usize,
     expected_time_micros: f64,
+    min_ratio: f64,
+    max_ratio: f64,
 }
 
 fn get_parsed_calibration_values() -> HashMap<String, CalibrationInfo> {
@@ -101,13 +102,26 @@ fn get_parsed_calibration_values() -> HashMap<String, CalibrationInfo> {
             let parts = line.split('\t').collect::<Vec<_>>();
             (parts[0].to_string(), CalibrationInfo {
                 // count: parts[1].parse().unwrap(),
-                expected_time_micros: parts[parts.len() - 1].parse().unwrap(),
+                expected_time_micros: parts[parts.len() - 1].parse().expect(line),
+                min_ratio: parts[2].parse().expect(line),
+                max_ratio: parts[3].parse().expect(line),
             })
         })
         .collect()
 }
 
+#[derive(Parser, Debug)]
+struct Args {
+    #[clap(long, default_value = "false")]
+    pub only_landblocking: bool,
+}
+
+// making constants to allow for easier change of type and addition of othe options
+const LANDBLOCKING_AND_CONTINUOUS: bool = true;
+const ONLY_CONTINUOUS: bool = false;
+
 fn main() {
+    let args = Args::parse();
     let executor = FakeExecutor::from_head_genesis();
     let mut executor = executor.set_not_parallel();
 
@@ -120,122 +134,208 @@ fn main() {
         //     data_length: Some(32),
         // }),
         // (, EntryPoints::IncGlobal),
-        EntryPoints::Loop {
+        (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::Loop {
             loop_count: Some(100000),
             loop_type: LoopType::NoOp,
-        },
-        EntryPoints::Loop {
+        }),
+        (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::Loop {
             loop_count: Some(10000),
             loop_type: LoopType::Arithmetic,
-        },
+        }),
         // This is a cheap bcs (serializing vec<u8>), so not representative of what BCS native call should cost.
         // (, EntryPoints::Loop { loop_count: Some(1000), loop_type: LoopType::BcsToBytes { len: 1024 }}),
-        EntryPoints::CreateObjects {
+        (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::CreateObjects {
             num_objects: 10,
             object_payload_size: 0,
-        },
-        EntryPoints::CreateObjects {
+        }),
+        (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::CreateObjects {
             num_objects: 10,
             object_payload_size: 10 * 1024,
-        },
-        EntryPoints::CreateObjects {
+        }),
+        (ONLY_CONTINUOUS, EntryPoints::CreateObjects {
             num_objects: 100,
             object_payload_size: 0,
-        },
-        EntryPoints::CreateObjects {
+        }),
+        (ONLY_CONTINUOUS, EntryPoints::CreateObjects {
             num_objects: 100,
             object_payload_size: 10 * 1024,
-        },
-        EntryPoints::InitializeVectorPicture { length: 128 },
-        EntryPoints::VectorPicture { length: 128 },
-        EntryPoints::VectorPictureRead { length: 128 },
-        EntryPoints::InitializeVectorPicture { length: 30 * 1024 },
-        EntryPoints::VectorPicture { length: 30 * 1024 },
-        EntryPoints::VectorPictureRead { length: 30 * 1024 },
-        EntryPoints::SmartTablePicture {
+        }),
+        (
+            LANDBLOCKING_AND_CONTINUOUS,
+            EntryPoints::InitializeVectorPicture { length: 128 },
+        ),
+        (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::VectorPicture {
+            length: 128,
+        }),
+        (
+            LANDBLOCKING_AND_CONTINUOUS,
+            EntryPoints::VectorPictureRead { length: 128 },
+        ),
+        (ONLY_CONTINUOUS, EntryPoints::InitializeVectorPicture {
             length: 30 * 1024,
-            num_points_per_txn: 200,
-        },
-        EntryPoints::SmartTablePicture {
+        }),
+        (ONLY_CONTINUOUS, EntryPoints::VectorPicture {
+            length: 30 * 1024,
+        }),
+        (ONLY_CONTINUOUS, EntryPoints::VectorPictureRead {
+            length: 30 * 1024,
+        }),
+        (
+            LANDBLOCKING_AND_CONTINUOUS,
+            EntryPoints::SmartTablePicture {
+                length: 30 * 1024,
+                num_points_per_txn: 200,
+            },
+        ),
+        (ONLY_CONTINUOUS, EntryPoints::SmartTablePicture {
             length: 1024 * 1024,
             num_points_per_txn: 300,
-        },
-        EntryPoints::ResourceGroupsSenderWriteTag {
-            string_length: 1024,
-        },
-        EntryPoints::ResourceGroupsSenderMultiChange {
-            string_length: 1024,
-        },
-        EntryPoints::TokenV1MintAndTransferFT,
-        EntryPoints::TokenV1MintAndTransferNFTSequential,
-        EntryPoints::TokenV2AmbassadorMint { numbered: true },
-        EntryPoints::LiquidityPoolSwap { is_stable: true },
-        EntryPoints::LiquidityPoolSwap { is_stable: false },
-        EntryPoints::CoinInitAndMint,
-        EntryPoints::FungibleAssetMint,
-        EntryPoints::IncGlobalMilestoneAggV2 { milestone_every: 1 },
-        EntryPoints::IncGlobalMilestoneAggV2 { milestone_every: 2 },
-        EntryPoints::EmitEvents { count: 1000 },
+        }),
+        (
+            LANDBLOCKING_AND_CONTINUOUS,
+            EntryPoints::ResourceGroupsSenderWriteTag {
+                string_length: 1024,
+            },
+        ),
+        (
+            LANDBLOCKING_AND_CONTINUOUS,
+            EntryPoints::ResourceGroupsSenderMultiChange {
+                string_length: 1024,
+            },
+        ),
+        (
+            LANDBLOCKING_AND_CONTINUOUS,
+            EntryPoints::TokenV1MintAndTransferFT,
+        ),
+        (
+            LANDBLOCKING_AND_CONTINUOUS,
+            EntryPoints::TokenV1MintAndTransferNFTSequential,
+        ),
+        (
+            LANDBLOCKING_AND_CONTINUOUS,
+            EntryPoints::TokenV2AmbassadorMint { numbered: true },
+        ),
+        (ONLY_CONTINUOUS, EntryPoints::LiquidityPoolSwap {
+            is_stable: true,
+        }),
+        (
+            LANDBLOCKING_AND_CONTINUOUS,
+            EntryPoints::LiquidityPoolSwap { is_stable: false },
+        ),
+        (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::CoinInitAndMint),
+        (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::FungibleAssetMint),
+        (
+            LANDBLOCKING_AND_CONTINUOUS,
+            EntryPoints::IncGlobalMilestoneAggV2 { milestone_every: 1 },
+        ),
+        (ONLY_CONTINUOUS, EntryPoints::IncGlobalMilestoneAggV2 {
+            milestone_every: 2,
+        }),
+        (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::EmitEvents {
+            count: 1000,
+        }),
+        (
+            LANDBLOCKING_AND_CONTINUOUS,
+            EntryPoints::APTTransferWithPermissionedSigner,
+        ),
+        (
+            LANDBLOCKING_AND_CONTINUOUS,
+            EntryPoints::APTTransferWithMasterSigner,
+        ),
         // long vectors with small elements
-        EntryPoints::VectorTrimAppend {
+        (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::VectorTrimAppend {
             // baseline, only vector creation
             vec_len: 3000,
             element_len: 1,
             index: 0,
             repeats: 0,
-        },
-        EntryPoints::VectorTrimAppend {
+        }),
+        (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::VectorTrimAppend {
             vec_len: 3000,
             element_len: 1,
             index: 100,
             repeats: 1000,
-        },
-        EntryPoints::VectorTrimAppend {
+        }),
+        (ONLY_CONTINUOUS, EntryPoints::VectorTrimAppend {
             vec_len: 3000,
             element_len: 1,
             index: 2990,
             repeats: 1000,
-        },
-        EntryPoints::VectorRemoveInsert {
-            vec_len: 3000,
-            element_len: 1,
-            index: 100,
-            repeats: 1000,
-        },
-        EntryPoints::VectorRemoveInsert {
+        }),
+        (
+            LANDBLOCKING_AND_CONTINUOUS,
+            EntryPoints::VectorRemoveInsert {
+                vec_len: 3000,
+                element_len: 1,
+                index: 100,
+                repeats: 1000,
+            },
+        ),
+        (ONLY_CONTINUOUS, EntryPoints::VectorRemoveInsert {
             vec_len: 3000,
             element_len: 1,
             index: 2998,
             repeats: 1000,
-        },
-        // EntryPoints::VectorRangeMove {
-        //     vec_len: 3000,
-        //     element_len: 1,
-        //     index: 1000,
-        //     move_len: 500,
-        //     repeats: 1000,
-        // },
+        }),
+        (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::VectorRangeMove {
+            vec_len: 3000,
+            element_len: 1,
+            index: 1000,
+            move_len: 500,
+            repeats: 1000,
+        }),
         // vectors with large elements
-        EntryPoints::VectorTrimAppend {
+        (ONLY_CONTINUOUS, EntryPoints::VectorTrimAppend {
             // baseline, only vector creation
             vec_len: 100,
             element_len: 100,
             index: 0,
             repeats: 0,
-        },
-        EntryPoints::VectorTrimAppend {
+        }),
+        (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::VectorTrimAppend {
             vec_len: 100,
             element_len: 100,
             index: 10,
             repeats: 1000,
-        },
-        // EntryPoints::VectorRangeMove {
-        //     vec_len: 100,
-        //     element_len: 100,
-        //     index: 50,
-        //     move_len: 10,
-        //     repeats: 1000,
-        // },
+        }),
+        (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::VectorRangeMove {
+            vec_len: 100,
+            element_len: 100,
+            index: 50,
+            move_len: 10,
+            repeats: 1000,
+        }),
+        (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::MapInsertRemove {
+            len: 100,
+            repeats: 100,
+            map_type: MapType::OrderedMap,
+        }),
+        (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::MapInsertRemove {
+            len: 100,
+            repeats: 100,
+            map_type: MapType::SimpleMap,
+        }),
+        (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::MapInsertRemove {
+            len: 100,
+            repeats: 100,
+            map_type: MapType::BigOrderedMap {
+                inner_max_degree: 4,
+                leaf_max_degree: 4,
+            },
+        }),
+        (ONLY_CONTINUOUS, EntryPoints::MapInsertRemove {
+            len: 100,
+            repeats: 100,
+            map_type: MapType::BigOrderedMap {
+                inner_max_degree: 1024,
+                leaf_max_degree: 1024,
+            },
+        }),
+        (ONLY_CONTINUOUS, EntryPoints::MapInsertRemove {
+            len: 1000,
+            repeats: 100,
+            map_type: MapType::OrderedMap,
+        }),
     ];
 
     let mut failures = Vec::new();
@@ -246,15 +346,19 @@ fn main() {
         "walltime(us)", "expected(us)", "dif(- is impr)", "gas/s", "exe gas", "io gas",
     );
 
-    for (index, entry_point) in entry_points.into_iter().enumerate() {
+    for (index, (flow, entry_point)) in entry_points.into_iter().enumerate() {
+        if args.only_landblocking && (flow == ONLY_CONTINUOUS) {
+            continue;
+        }
         let entry_point_name = format!("{:?}", entry_point);
-        let expected_time_micros = calibration_values
+        let cur_calibration = calibration_values
             .get(&entry_point_name)
-            .expect(&entry_point_name)
-            .expected_time_micros;
+            .expect(&entry_point_name);
+        let expected_time_micros = cur_calibration.expected_time_micros;
         let publisher = executor.new_account_at(AccountAddress::random());
 
-        let mut package_handler = PackageHandler::new(entry_point.package_name());
+        let mut package_handler =
+            PackageHandler::new(entry_point.pre_built_packages(), entry_point.package_name());
         let mut rng = StdRng::seed_from_u64(14);
         let package = package_handler.pick_package(&mut rng, *publisher.address());
         execute_txn(
@@ -306,6 +410,15 @@ fn main() {
             entry_point
         );
 
+        let max_regression = f64::max(
+            expected_time_micros * (1.0 + ALLOWED_REGRESSION) + ABSOLUTE_BUFFER_US,
+            expected_time_micros * cur_calibration.max_ratio,
+        );
+        let max_improvement = f64::min(
+            expected_time_micros * (1.0 - ALLOWED_IMPROVEMENT) - ABSOLUTE_BUFFER_US,
+            expected_time_micros * cur_calibration.min_ratio,
+        );
+
         json_lines.push(json!({
             "grep": "grep_json_aptos_move_vm_perf",
             "transaction_type": entry_point_name,
@@ -314,21 +427,22 @@ fn main() {
             "execution_gas_units": execution_gas_units,
             "io_gas_units": io_gas_units,
             "expected_wall_time_us": expected_time_micros,
+            "expected_max_wall_time_us": max_regression,
+            "expected_min_wall_time_us": max_improvement,
             "code_perf_version": CODE_PERF_VERSION,
             "test_index": index,
+            "flow": if args.only_landblocking { "LAND_BLOCKING" } else { "CONTINUOUS" },
         }));
 
-        if elapsed_micros > expected_time_micros * (1.0 + ALLOWED_REGRESSION) + ABSOLUTE_BUFFER_US {
+        if elapsed_micros > max_regression {
             failures.push(format!(
-                "Performance regression detected: {:.1}us, expected: {:.1}us, diff: {}%, for {:?}",
-                elapsed_micros, expected_time_micros, diff, entry_point
+                "Performance regression detected: {:.1}us, expected: {:.1}us, limit: {:.1}us, diff: {}%, for {:?}",
+                elapsed_micros, expected_time_micros, max_regression, diff, entry_point
             ));
-        } else if elapsed_micros + ABSOLUTE_BUFFER_US
-            < expected_time_micros * (1.0 - ALLOWED_IMPROVEMENT)
-        {
+        } else if elapsed_micros < max_improvement {
             failures.push(format!(
-                "Performance improvement detected: {:.1}us, expected {:.1}us, diff: {}%, for {:?}. You need to adjust expected time!",
-                elapsed_micros, expected_time_micros, diff, entry_point
+                "Performance improvement detected: {:.1}us, expected {:.1}us, limit {:.1}us, diff: {}%, for {:?}. You need to adjust expected time!",
+                elapsed_micros, expected_time_micros, max_improvement, diff, entry_point
             ));
         }
     }

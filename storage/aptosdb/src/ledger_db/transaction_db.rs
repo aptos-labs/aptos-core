@@ -12,7 +12,11 @@ use crate::{
 };
 use aptos_crypto::hash::{CryptoHash, HashValue};
 use aptos_db_indexer_schemas::schema::transaction_by_account::TransactionByAccountSchema;
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_metrics_core::TimerHelper;
+use aptos_schemadb::{
+    batch::{NativeBatch, SchemaBatch, WriteBatch},
+    DB,
+};
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::transaction::{Transaction, Version};
 use rayon::prelude::*;
@@ -83,15 +87,13 @@ impl TransactionDb {
         transactions: &[Transaction],
         skip_index: bool,
     ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_transactions"])
-            .start_timer();
-        let chunk_size = 512;
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transactions"]);
+        let chunk_size = transactions.len() / 4 + 1;
         let batches = transactions
             .par_chunks(chunk_size)
             .enumerate()
-            .map(|(chunk_index, txns_in_chunk)| -> Result<SchemaBatch> {
-                let batch = SchemaBatch::new();
+            .map(|(chunk_index, txns_in_chunk)| -> Result<NativeBatch> {
+                let mut batch = self.db().new_native_batch();
                 let chunk_first_version = first_version + (chunk_size * chunk_index) as u64;
                 txns_in_chunk
                     .iter()
@@ -101,7 +103,7 @@ impl TransactionDb {
                             chunk_first_version + i as u64,
                             txn,
                             skip_index,
-                            &batch,
+                            &mut batch,
                         )?;
 
                         Ok(())
@@ -114,13 +116,11 @@ impl TransactionDb {
         // it might be acceptable because we are writing the progress, we want to play on the safer
         // side unless this really becomes the bottleneck on production.
         {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["commit_transactions___commit"])
-                .start_timer();
-
-            batches
-                .into_iter()
-                .try_for_each(|batch| self.write_schemas(batch))
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transactions___commit"]);
+            for batch in batches {
+                self.db().write_schemas(batch)?
+            }
+            Ok(())
         }
     }
 
@@ -131,7 +131,7 @@ impl TransactionDb {
         version: Version,
         transaction: &Transaction,
         skip_index: bool,
-        batch: &SchemaBatch,
+        batch: &mut impl WriteBatch,
     ) -> Result<()> {
         if !skip_index {
             if let Some(txn) = transaction.try_as_signed_user_txn() {
@@ -152,7 +152,7 @@ impl TransactionDb {
         &self,
         begin: Version,
         end: Version,
-        db_batch: &SchemaBatch,
+        db_batch: &mut SchemaBatch,
     ) -> Result<()> {
         for version in begin..end {
             db_batch.delete::<TransactionSchema>(&version)?;
@@ -164,7 +164,7 @@ impl TransactionDb {
     pub(crate) fn prune_transaction_by_hash_indices(
         &self,
         transactions: &[Transaction],
-        db_batch: &SchemaBatch,
+        db_batch: &mut SchemaBatch,
     ) -> Result<()> {
         for transaction in transactions {
             db_batch.delete::<TransactionByHashSchema>(&transaction.hash())?;

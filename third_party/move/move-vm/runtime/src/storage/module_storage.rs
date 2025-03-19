@@ -1,19 +1,36 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{loader::Module, WithRuntimeEnvironment};
+use crate::{
+    loader::{Function, LazyLoadedFunction, LazyLoadedFunctionState, LoadedFunctionOwner, Module},
+    logging::expect_no_verification_errors,
+    LayoutConverter, LoadedFunction, StorageLayoutConverter, WithRuntimeEnvironment,
+};
 use ambassador::delegatable_trait;
 use bytes::Bytes;
 use hashbrown::HashSet;
-use move_binary_format::{errors::VMResult, CompiledModule};
+use move_binary_format::{
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    CompiledModule,
+};
 use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
+    account_address::AccountAddress,
+    function::FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
+    identifier::IdentStr,
+    language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
+    vm_status::StatusCode,
 };
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
+    loaded_data::{
+        runtime_types::{StructType, Type},
+        struct_name_indexing::StructNameIndex,
+    },
     module_cyclic_dependency_error, module_linker_error,
+    value_serde::FunctionValueExtension,
+    values::{AbstractFunction, SerializedFunctionData},
 };
 use std::sync::Arc;
 
@@ -21,13 +38,6 @@ use std::sync::Arc;
 /// implement their own module storage to pass to the VM to resolve code.
 #[delegatable_trait]
 pub trait ModuleStorage: WithRuntimeEnvironment {
-    /// Returns true if loader V2 implementation is enabled. Will be removed in the future, for now
-    /// it is simply a convenient way to check the feature flag if module storage is available.
-    // TODO(loader_v2): Remove this when loader V2 is enabled.
-    fn is_enabled(&self) -> bool {
-        self.runtime_environment().vm_config().use_loader_v2
-    }
-
     /// Returns true if the module exists, and false otherwise. An error is returned if there is a
     /// storage error.
     fn check_module_exists(
@@ -101,6 +111,137 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<Module>>>;
+
+    /// Returns the verified module. If it does not exist, a linker error is returned. All other
+    /// errors are mapped using [expect_no_verification_errors] - since on-chain code should not
+    /// fail bytecode verification.
+    fn fetch_existing_verified_module(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Arc<Module>> {
+        self.fetch_verified_module(address, module_name)
+            .map_err(expect_no_verification_errors)?
+            .ok_or_else(|| module_linker_error!(address, module_name))
+    }
+
+    /// Returns a struct type corresponding to the specified name. The module containing the struct
+    /// will be fetched and cached beforehand.
+    fn fetch_struct_ty(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+        struct_name: &IdentStr,
+    ) -> PartialVMResult<Arc<StructType>> {
+        let module = self
+            .fetch_existing_verified_module(address, module_name)
+            .map_err(|err| err.to_partial())?;
+        Ok(module
+            .struct_map
+            .get(struct_name)
+            .and_then(|idx| module.structs.get(*idx))
+            .ok_or_else(|| {
+                PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(format!(
+                    "Struct {}::{}::{} does not exist",
+                    address, module_name, struct_name
+                ))
+            })?
+            .definition_struct_type
+            .clone())
+    }
+
+    fn fetch_struct_ty_by_idx(&self, idx: &StructNameIndex) -> PartialVMResult<Arc<StructType>> {
+        let struct_name = self
+            .runtime_environment()
+            .struct_name_index_map()
+            .idx_to_struct_name_ref(*idx)?;
+
+        self.fetch_struct_ty(
+            struct_name.module.address(),
+            struct_name.module.name(),
+            struct_name.name.as_ident_str(),
+        )
+    }
+
+    /// Returns a runtime type corresponding to the specified type tag (file format type
+    /// representation). If a struct type is constructed, the module containing the struct
+    /// definition is fetched and cached.
+    fn fetch_ty(&self, ty_tag: &TypeTag) -> PartialVMResult<Type> {
+        // TODO(loader_v2): Loader V1 uses VMResults everywhere, but partial VM errors
+        //                  seem better fit. Here we map error to VMError to reuse existing
+        //                  type builder implementation, and then strip the location info.
+        self.runtime_environment()
+            .vm_config()
+            .ty_builder
+            .create_ty(ty_tag, |st| {
+                self.fetch_struct_ty(
+                    &st.address,
+                    st.module.as_ident_str(),
+                    st.name.as_ident_str(),
+                )
+                .map_err(|err| err.finish(Location::Undefined))
+            })
+            .map_err(|err| err.to_partial())
+    }
+
+    /// Returns the function definition corresponding to the specified name, as well as the module
+    /// where this function is defined. The returned function can contain uninstantiated generic
+    /// types and its signature. The returned module is verified.
+    fn fetch_function_definition(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+        function_name: &IdentStr,
+    ) -> VMResult<(Arc<Module>, Arc<Function>)> {
+        let module = self.fetch_existing_verified_module(address, module_name)?;
+        let function = module
+            .function_map
+            .get(function_name)
+            .and_then(|idx| module.function_defs.get(*idx))
+            .ok_or_else(|| {
+                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                    .with_message(format!(
+                        "Function {}::{}::{} does not exist",
+                        address, module_name, function_name
+                    ))
+                    .finish(Location::Undefined)
+            })?
+            .clone();
+        Ok((module, function))
+    }
+
+    fn load_function(
+        &self,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
+        ty_args: &[TypeTag],
+    ) -> VMResult<LoadedFunction> {
+        let _timer = VM_TIMER.timer_with_label("Loader::load_function");
+
+        let (module, function) =
+            self.fetch_function_definition(module_id.address(), module_id.name(), function_name)?;
+
+        let ty_args = ty_args
+            .iter()
+            .map(|ty_arg| self.fetch_ty(ty_arg).map_err(|e| e.finish(Location::Undefined)))
+            .collect::<VMResult<Vec<_>>>()
+            .map_err(|mut err| {
+                // User provided type argument failed to load. Set extra sub status to distinguish from internal type loading error.
+                if StatusCode::TYPE_RESOLUTION_FAILURE == err.major_status() {
+                    err.set_sub_status(move_core_types::vm_status::sub_status::type_resolution_failure::EUSER_TYPE_LOADING_FAILURE);
+                }
+                err
+            })?;
+
+        Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
+            .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
+
+        Ok(LoadedFunction {
+            owner: LoadedFunctionOwner::Module(module),
+            ty_args,
+            function,
+        })
+    }
 }
 
 impl<T, E, V> ModuleStorage for T
@@ -301,4 +442,105 @@ where
         version,
     )?;
     Ok(module.code().verified().clone())
+}
+
+/// Avoids the orphan rule to implement external [FunctionValueExtension] for any generic type that
+/// implements [ModuleStorage].
+pub struct FunctionValueExtensionAdapter<'a> {
+    pub(crate) module_storage: &'a dyn ModuleStorage,
+}
+
+pub trait AsFunctionValueExtension {
+    fn as_function_value_extension(&self) -> FunctionValueExtensionAdapter;
+}
+
+impl<T: ModuleStorage> AsFunctionValueExtension for T {
+    fn as_function_value_extension(&self) -> FunctionValueExtensionAdapter {
+        FunctionValueExtensionAdapter {
+            module_storage: self,
+        }
+    }
+}
+
+impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
+    fn get_function_arg_tys(
+        &self,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
+        substitution_ty_arg_tags: Vec<TypeTag>,
+    ) -> PartialVMResult<Vec<Type>> {
+        let substitution_ty_args = substitution_ty_arg_tags
+            .into_iter()
+            .map(|tag| self.module_storage.fetch_ty(&tag))
+            .collect::<PartialVMResult<Vec<_>>>()?;
+
+        let (_, function) = self
+            .module_storage
+            .fetch_function_definition(module_id.address(), module_id.name(), function_name)
+            .map_err(|err| err.to_partial())?;
+
+        let ty_builder = &self
+            .module_storage
+            .runtime_environment()
+            .vm_config()
+            .ty_builder;
+        function
+            .param_tys()
+            .iter()
+            .map(|ty_to_substitute| {
+                ty_builder.create_ty_with_subst(ty_to_substitute, &substitution_ty_args)
+            })
+            .collect::<PartialVMResult<Vec<_>>>()
+    }
+
+    fn create_from_serialization_data(
+        &self,
+        data: SerializedFunctionData,
+    ) -> PartialVMResult<Box<dyn AbstractFunction>> {
+        Ok(Box::new(LazyLoadedFunction::new_unresolved(data)))
+    }
+
+    fn get_serialization_data(
+        &self,
+        fun: &dyn AbstractFunction,
+    ) -> PartialVMResult<SerializedFunctionData> {
+        match &*LazyLoadedFunction::expect_this_impl(fun)?.0.borrow() {
+            LazyLoadedFunctionState::Unresolved { data, .. } => Ok(data.clone()),
+            LazyLoadedFunctionState::Resolved { fun, mask, ty_args } => {
+                let ty_converter = StorageLayoutConverter::new(self.module_storage);
+                let ty_builder = &self
+                    .module_storage
+                    .runtime_environment()
+                    .vm_config()
+                    .ty_builder;
+                let instantiate = |ty: &Type| -> PartialVMResult<Type> {
+                    if fun.ty_args.is_empty() {
+                        Ok(ty.clone())
+                    } else {
+                        ty_builder.create_ty_with_subst(ty, &fun.ty_args)
+                    }
+                };
+                let captured_layouts = mask
+                    .extract(fun.param_tys(), true)
+                    .into_iter()
+                    .map(|t| ty_converter.type_to_type_layout(&instantiate(t)?))
+                    .collect::<PartialVMResult<Vec<_>>>()?;
+                Ok(SerializedFunctionData {
+                    format_version: FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
+                    module_id: fun
+                        .module_id()
+                        .ok_or_else(|| {
+                            PartialVMError::new_invariant_violation(
+                                "attempt to serialize a script function",
+                            )
+                        })?
+                        .clone(),
+                    fun_id: fun.function.name.clone(),
+                    ty_args: ty_args.clone(),
+                    mask: *mask,
+                    captured_layouts,
+                })
+            },
+        }
+    }
 }

@@ -5,6 +5,7 @@ use super::{CheckerData, CheckerTrait};
 use crate::{
     common::{ListManager, ListManagerConfig},
     endpoints::{AptosTapError, RejectionReason, RejectionReasonCode},
+    firebase_jwt::X_IS_JWT_HEADER,
 };
 use anyhow::Result;
 use aptos_logger::info;
@@ -33,6 +34,11 @@ impl CheckerTrait for AuthTokenChecker {
         data: CheckerData,
         _dry_run: bool,
     ) -> Result<Vec<RejectionReason>, AptosTapError> {
+        // Don't check if the request has X_IS_JWT_HEADER set.
+        if data.headers.contains_key(X_IS_JWT_HEADER) {
+            return Ok(vec![]);
+        }
+
         let auth_token = match data
             .headers
             .get(AUTHORIZATION)

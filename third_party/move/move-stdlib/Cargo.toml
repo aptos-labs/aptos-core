@@ -16,7 +16,7 @@ hex = { workspace = true }
 log = { workspace = true }
 move-binary-format = { workspace = true }
 move-command-line-common = { workspace = true }
-move-compiler ={ workspace = true }
+legacy-move-compiler ={ workspace = true }
 move-core-types = { workspace = true }
 move-docgen = { workspace = true }
 move-errmapgen = { workspace = true }

@@ -2,7 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use crate::state_store::state_view::hot_state_view::HotStateView;
+use aptos_crypto::HashValue;
 pub use aptos_types::indexer::indexer_db_reader::Order;
 use aptos_types::{
     account_address::AccountAddress,
@@ -31,7 +32,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 use thiserror::Error;
 
 pub mod block_info;
@@ -43,8 +44,10 @@ mod metrics;
 pub mod mock;
 pub mod state_store;
 
-use crate::chunk_to_commit::ChunkToCommit;
-use aptos_scratchpad::SparseMerkleTree;
+use crate::{
+    chunk_to_commit::ChunkToCommit,
+    state_store::{state::State, state_summary::StateSummary},
+};
 pub use aptos_types::block_info::BlockHeight;
 use aptos_types::state_store::state_key::prefix::StateKeyPrefix;
 pub use errors::AptosDbError;
@@ -354,7 +357,7 @@ pub trait DbReader: Send + Sync {
         /// Returns the proof of the given state key and version.
         fn get_state_proof_by_version_ext(
             &self,
-            state_key: &StateKey,
+            key_hash: &HashValue,
             version: Version,
             root_depth: usize,
         ) -> Result<SparseMerkleProofExt>;
@@ -369,7 +372,7 @@ pub trait DbReader: Send + Sync {
         /// This is used by aptos core (executor) internally.
         fn get_state_value_with_proof_by_version_ext(
             &self,
-            state_key: &StateKey,
+            key_hash: &HashValue,
             version: Version,
             root_depth: usize,
         ) -> Result<(Option<StateValue>, SparseMerkleProofExt)>;
@@ -378,8 +381,9 @@ pub trait DbReader: Send + Sync {
         /// Used by the Db-bootstrapper.
         fn get_pre_committed_ledger_summary(&self) -> Result<LedgerSummary>;
 
-        /// Get the oldest in memory state tree.
-        fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>>;
+        fn get_persisted_state(&self) -> Result<(Arc<dyn HotStateView>, State)>;
+
+        fn get_persisted_state_summary(&self) -> Result<StateSummary>;
 
         /// Get the ledger info of the epoch that `known_version` belongs to.
         fn get_epoch_ending_ledger_info(
@@ -485,7 +489,7 @@ pub trait DbReader: Send + Sync {
         state_key: &StateKey,
         version: Version,
     ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
-        self.get_state_value_with_proof_by_version_ext(state_key, version, 0)
+        self.get_state_value_with_proof_by_version_ext(state_key.crypto_hash_ref(), version, 0)
             .map(|(value, proof_ext)| (value, proof_ext.into()))
     }
 
@@ -656,15 +660,6 @@ impl SaveTransactionsRequest {
             ledger_info_with_signatures,
         }
     }
-}
-
-pub fn jmt_updates(
-    state_updates: &HashMap<&StateKey, Option<&StateValue>>,
-) -> Vec<(HashValue, Option<(HashValue, StateKey)>)> {
-    state_updates
-        .iter()
-        .map(|(k, v_opt)| (k.hash(), v_opt.as_ref().map(|v| (v.hash(), (*k).clone()))))
-        .collect()
 }
 
 pub fn jmt_update_refs<K>(

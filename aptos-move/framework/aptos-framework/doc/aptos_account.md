@@ -25,7 +25,7 @@
 -  [Function `register_apt`](#0x1_aptos_account_register_apt)
 -  [Function `fungible_transfer_only`](#0x1_aptos_account_fungible_transfer_only)
 -  [Function `is_fungible_balance_at_least`](#0x1_aptos_account_is_fungible_balance_at_least)
--  [Function `burn_from_fungible_store`](#0x1_aptos_account_burn_from_fungible_store)
+-  [Function `burn_from_fungible_store_for_gas`](#0x1_aptos_account_burn_from_fungible_store_for_gas)
 -  [Function `ensure_primary_fungible_store_exists`](#0x1_aptos_account_ensure_primary_fungible_store_exists)
 -  [Function `primary_fungible_store_address`](#0x1_aptos_account_primary_fungible_store_address)
 -  [Specification](#@Specification_1)
@@ -47,7 +47,7 @@
     -  [Function `register_apt`](#@Specification_1_register_apt)
     -  [Function `fungible_transfer_only`](#@Specification_1_fungible_transfer_only)
     -  [Function `is_fungible_balance_at_least`](#@Specification_1_is_fungible_balance_at_least)
-    -  [Function `burn_from_fungible_store`](#@Specification_1_burn_from_fungible_store)
+    -  [Function `burn_from_fungible_store_for_gas`](#@Specification_1_burn_from_fungible_store_for_gas)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -59,6 +59,7 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
 <b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
+<b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store">0x1::primary_fungible_store</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 </code></pre>
@@ -579,6 +580,7 @@ Set whether <code><a href="account.md#0x1_account">account</a></code> can receiv
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_set_allow_direct_coin_transfers">set_allow_direct_coin_transfers</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, allow: bool) <b>acquires</b> <a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a> {
+    // TODO: [<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>] Is permissioned <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> allowed?
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>if</b> (<b>exists</b>&lt;<a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(addr)) {
         <b>let</b> direct_transfer_config = <b>borrow_global_mut</b>&lt;<a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(addr);
@@ -664,7 +666,7 @@ By default, this returns true if an account has not explicitly set whether the c
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_register_apt">register_apt</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_new_accounts_default_to_fa_apt_store_enabled">features::new_accounts_default_to_fa_apt_store_enabled</a>()) {
-        <a href="aptos_account.md#0x1_aptos_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(account_signer));
+        <a href="aptos_account.md#0x1_aptos_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(account_signer));
     } <b>else</b> {
         <a href="coin.md#0x1_coin_register">coin::register</a>&lt;AptosCoin&gt;(account_signer);
     }
@@ -699,7 +701,7 @@ to transfer APT) - if we want to allow APT PFS without account itself
 <pre><code><b>public</b>(<b>friend</b>) entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_fungible_transfer_only">fungible_transfer_only</a>(
     source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64
 ) {
-    <b>let</b> sender_store = <a href="aptos_account.md#0x1_aptos_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source));
+    <b>let</b> sender_store = <a href="aptos_account.md#0x1_aptos_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(source));
     <b>let</b> recipient_store = <a href="aptos_account.md#0x1_aptos_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<b>to</b>);
 
     // <b>use</b> <b>internal</b> APIs, <b>as</b> they skip:
@@ -707,7 +709,8 @@ to transfer APT) - if we want to allow APT PFS without account itself
     // <b>as</b> APT cannot be frozen or have dispatch, and PFS cannot be transfered
     // (PFS could potentially be burned. regular transfer would permanently unburn the store.
     // Ignoring the check here <b>has</b> the equivalent of unburning, transfers, and then burning again)
-    <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">fungible_asset::deposit_internal</a>(recipient_store, <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">fungible_asset::withdraw_internal</a>(sender_store, amount));
+    <a href="fungible_asset.md#0x1_fungible_asset_withdraw_permission_check_by_address">fungible_asset::withdraw_permission_check_by_address</a>(source, sender_store, amount);
+    <a href="fungible_asset.md#0x1_fungible_asset_unchecked_deposit">fungible_asset::unchecked_deposit</a>(recipient_store, <a href="fungible_asset.md#0x1_fungible_asset_unchecked_withdraw">fungible_asset::unchecked_withdraw</a>(sender_store, amount));
 }
 </code></pre>
 
@@ -741,14 +744,14 @@ Is balance from APT Primary FungibleStore at least the given amount
 
 </details>
 
-<a id="0x1_aptos_account_burn_from_fungible_store"></a>
+<a id="0x1_aptos_account_burn_from_fungible_store_for_gas"></a>
 
-## Function `burn_from_fungible_store`
+## Function `burn_from_fungible_store_for_gas`
 
-Burn from APT Primary FungibleStore
+Burn from APT Primary FungibleStore for gas charge
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store">burn_from_fungible_store</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store_for_gas">burn_from_fungible_store_for_gas</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -757,7 +760,7 @@ Burn from APT Primary FungibleStore
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store">burn_from_fungible_store</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store_for_gas">burn_from_fungible_store_for_gas</a>(
     ref: &BurnRef,
     <a href="account.md#0x1_account">account</a>: <b>address</b>,
     amount: u64,
@@ -765,7 +768,7 @@ Burn from APT Primary FungibleStore
     // Skip burning <b>if</b> amount is zero. This shouldn't <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> out <b>as</b> it's called <b>as</b> part of transaction fee burning.
     <b>if</b> (amount != 0) {
         <b>let</b> store_addr = <a href="aptos_account.md#0x1_aptos_account_primary_fungible_store_address">primary_fungible_store_address</a>(<a href="account.md#0x1_account">account</a>);
-        <a href="fungible_asset.md#0x1_fungible_asset_address_burn_from">fungible_asset::address_burn_from</a>(ref, store_addr, amount);
+        <a href="fungible_asset.md#0x1_fungible_asset_address_burn_from_for_gas">fungible_asset::address_burn_from_for_gas</a>(ref, store_addr, amount);
     };
 }
 </code></pre>
@@ -1294,12 +1297,12 @@ Check if the AptosCoin under the address existed.
 
 
 
-<a id="@Specification_1_burn_from_fungible_store"></a>
+<a id="@Specification_1_burn_from_fungible_store_for_gas"></a>
 
-### Function `burn_from_fungible_store`
+### Function `burn_from_fungible_store_for_gas`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store">burn_from_fungible_store</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store_for_gas">burn_from_fungible_store_for_gas</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
 </code></pre>
 
 

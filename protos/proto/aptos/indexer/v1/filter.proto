@@ -1,0 +1,65 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package aptos.indexer.v1;
+
+import "aptos/transaction/v1/transaction.proto";
+
+message LogicalAndFilters {
+  repeated BooleanTransactionFilter filters = 1;
+}
+
+message LogicalOrFilters {
+  repeated BooleanTransactionFilter filters = 1;
+}
+
+message TransactionRootFilter {
+  optional bool success = 1;
+  optional aptos.transaction.v1.Transaction.TransactionType transaction_type = 2;
+}
+
+message EntryFunctionFilter {
+  optional string address = 1;
+  optional string module_name  = 2;
+  optional string function = 3;
+}
+
+message UserTransactionPayloadFilter {
+  optional EntryFunctionFilter entry_function_filter = 1;
+}
+
+message UserTransactionFilter {
+  optional string sender = 1;
+  optional UserTransactionPayloadFilter payload_filter = 2;
+}
+
+
+message MoveStructTagFilter {
+  optional string address = 1;
+  optional string module = 2;
+  optional string name = 3;
+}
+
+message EventFilter {
+  optional MoveStructTagFilter struct_type = 1;
+  optional string data_substring_filter = 2;
+}
+
+message APIFilter {
+  oneof filter {
+    TransactionRootFilter transaction_root_filter = 1;
+    UserTransactionFilter user_transaction_filter = 2;
+    EventFilter event_filter = 3;
+  }
+}
+
+message BooleanTransactionFilter {
+  oneof filter {
+      APIFilter api_filter = 1;
+      LogicalAndFilters logical_and = 2;
+      LogicalOrFilters logical_or = 3;
+      BooleanTransactionFilter logical_not = 4;
+  }
+}

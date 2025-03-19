@@ -153,7 +153,7 @@ Destroy a table. The table must be empty to succeed.
 <pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_destroy_empty">destroy_empty</a>&lt;K: <b>copy</b> + drop, V&gt;(self: <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;) {
     <b>assert</b>!(self.length == 0, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="table_with_length.md#0x1_table_with_length_ENOT_EMPTY">ENOT_EMPTY</a>));
     <b>let</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a> { inner, length: _ } = self;
-    <a href="table.md#0x1_table_destroy">table::destroy</a>(inner)
+    <a href="table.md#0x1_table_destroy_known_empty_unsafe">table::destroy_known_empty_unsafe</a>(inner)
 }
 </code></pre>
 

@@ -11,7 +11,7 @@ use aptos_db_indexer_schemas::{
 };
 use aptos_logger::info;
 use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::{
     db_other_bail as bail, state_store::state_view::db_state_view::DbStateViewAtVersion,
     AptosDbError, DbReader, Result,
@@ -321,6 +321,16 @@ impl<'a, R: StateView> TableInfoParser<'a, R> {
                     for (_identifier, field) in &struct_value.value {
                         self.parse_move_value(field)?;
                     }
+                }
+            },
+            AnnotatedMoveValue::RawStruct(struct_value) => {
+                for val in &struct_value.field_values {
+                    self.parse_move_value(val)?
+                }
+            },
+            AnnotatedMoveValue::Closure(closure_value) => {
+                for capture in &closure_value.captured {
+                    self.parse_move_value(capture)?
                 }
             },
 

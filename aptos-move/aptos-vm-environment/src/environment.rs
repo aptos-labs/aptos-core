@@ -59,7 +59,7 @@ impl AptosEnvironment {
     /// block executor where this optimization is needed. Note: whether the optimization will be
     /// enabled or not depends on the feature flag.
     pub fn new_with_delayed_field_optimization_enabled(state_view: &impl StateView) -> Self {
-        let env = Environment::new(state_view, true, None).try_enable_delayed_field_optimization();
+        let env = Environment::new(state_view, false, None).try_enable_delayed_field_optimization();
         Self(Arc::new(env))
     }
 
@@ -270,9 +270,14 @@ fn fetch_config_and_update_hash<T: OnChainConfig>(
 }
 
 #[cfg(test)]
-pub mod test {
+pub mod tests {
     use super::*;
-    use aptos_types::state_store::MockStateView;
+    use aptos_types::{
+        on_chain_config::{FeatureFlag, GasScheduleV2},
+        state_store::{state_key::StateKey, state_value::StateValue, MockStateView},
+    };
+    use serde::Serialize;
+    use std::collections::HashMap;
 
     #[test]
     fn test_new_environment() {
@@ -297,5 +302,95 @@ pub mod test {
         );
     }
 
-    // TODO(loader_v2): Add equality tests.
+    fn state_view_with_non_default_config<T: OnChainConfig + Serialize>(
+        config: T,
+    ) -> MockStateView<StateKey> {
+        MockStateView::new(HashMap::from([(
+            StateKey::resource(T::address(), &T::struct_tag()).unwrap(),
+            StateValue::new_legacy(bcs::to_bytes(&config).unwrap().into()),
+        )]))
+    }
+
+    #[test]
+    fn test_environment_eq() {
+        let state_view = MockStateView::empty();
+        let environment_1 = AptosEnvironment::new(&state_view);
+        let environment_2 = AptosEnvironment::new(&state_view);
+        assert!(environment_1 == environment_2);
+    }
+
+    #[test]
+    fn test_environment_ne() {
+        let mut non_default_configuration = ConfigurationResource::default();
+        assert_eq!(
+            non_default_configuration.last_reconfiguration_time_micros(),
+            0
+        );
+        non_default_configuration.set_last_reconfiguration_time_for_test(1);
+
+        let mut non_default_features = Features::default();
+        assert!(non_default_features.is_enabled(FeatureFlag::LIMIT_VM_TYPE_SIZE));
+        non_default_features.disable(FeatureFlag::LIMIT_VM_TYPE_SIZE);
+
+        let state_views = [
+            MockStateView::empty(),
+            // Change configuration resource (epoch change).
+            state_view_with_non_default_config(non_default_configuration),
+            // Change features set.
+            state_view_with_non_default_config(non_default_features),
+            // Different chain ID.
+            state_view_with_non_default_config(ChainId::mainnet()),
+            // Different gas schedules:
+            //  - different feature version,
+            //  - same feature version, but an extra parameter,
+            //  - completely different gas schedule.
+            state_view_with_non_default_config(GasScheduleV2 {
+                feature_version: 12,
+                entries: vec![],
+            }),
+            state_view_with_non_default_config(GasScheduleV2 {
+                feature_version: 13,
+                entries: vec![],
+            }),
+            state_view_with_non_default_config(GasScheduleV2 {
+                feature_version: 12,
+                entries: vec![(String::from("gas.param.base"), 12)],
+            }),
+            state_view_with_non_default_config(GasScheduleV2 {
+                feature_version: 0,
+                entries: vec![],
+            }),
+        ];
+        for i in 0..state_views.len() {
+            for j in 0..state_views.len() {
+                if i != j {
+                    let environment_1 = AptosEnvironment::new(&state_views[i]);
+                    let environment_2 = AptosEnvironment::new(&state_views[j]);
+                    assert!(environment_1 != environment_2);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_environment_with_injected_create_signer_for_gov_sim() {
+        let state_view = MockStateView::empty();
+
+        let not_injected_envs = [
+            AptosEnvironment::new(&state_view),
+            AptosEnvironment::new_with_gas_hook(&state_view, Arc::new(|_| {})),
+            AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view),
+        ];
+        for env in not_injected_envs {
+            #[allow(deprecated)]
+            let not_enabled = !env.inject_create_signer_for_gov_sim();
+            assert!(not_enabled);
+        }
+
+        // Injected.
+        let env = AptosEnvironment::new_with_injected_create_signer_for_gov_sim(&state_view);
+        #[allow(deprecated)]
+        let enabled = env.inject_create_signer_for_gov_sim();
+        assert!(enabled);
+    }
 }

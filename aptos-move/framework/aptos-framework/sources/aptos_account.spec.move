@@ -282,7 +282,7 @@ spec aptos_framework::aptos_account {
         pragma verify = false;
     }
 
-    spec burn_from_fungible_store(
+    spec burn_from_fungible_store_for_gas(
         ref: &BurnRef,
         account: address,
         amount: u64,

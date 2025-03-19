@@ -18,9 +18,7 @@ const APTOS_CLI_PACKAGE_NAME: &str = "aptos";
 // Relevant file paths to monitor when deciding to run the targeted tests.
 // Note: these paths should be relative to the root of the `aptos-core` repository,
 // and will be transformed into UTF-8 paths for cross-platform compatibility.
-const RELEVANT_FILE_PATHS_FOR_COMPILER_V2: [&str; 7] = [
-    ".github/actions/move-tests-compiler-v2",
-    ".github/workflows/move-test-compiler-v2.yaml",
+const RELEVANT_FILE_PATHS_FOR_COMPILER_V2: [&str; 5] = [
     "aptos-move/aptos-transactional-test-harness",
     "aptos-move/e2e-move-tests",
     "aptos-move/framework",
@@ -258,6 +256,7 @@ impl AptosCargoCommand {
                     self.get_args_and_affected_packages(package_args)?;
 
                 // Determine if any relevant files or packages were changed
+                #[allow(unused_assignments)]
                 let relevant_changes_detected = detect_relevant_changes(
                     RELEVANT_FILE_PATHS_FOR_FRAMEWORK_UPGRADE_TESTS.to_vec(),
                     RELEVANT_PACKAGES_FOR_FRAMEWORK_UPGRADE_TESTS.to_vec(),
@@ -472,6 +471,7 @@ fn run_targeted_unit_tests(
     // Create the command to run the unit tests
     let mut command = Cargo::command("nextest");
     command.args(["run"]);
+    command.args(["--no-tests=warn"]); // Don't fail if no tests are run!
     command.args(direct_args).pass_through(push_through_args);
 
     // Run the unit tests

@@ -29,7 +29,11 @@ pub fn read_env_var(v: &str) -> String {
     std::env::var(v).unwrap_or_else(|_| String::new())
 }
 
-pub fn run_prover_for_pkg(path_to_pkg: impl Into<String>) {
+pub fn run_prover_for_pkg(
+    path_to_pkg: impl Into<String>,
+    shards: usize,
+    only_shard: Option<usize>,
+) {
     let pkg_path = path_in_crate(path_to_pkg);
     let mut options = ProverOptions::default_for_test();
     let no_tools = read_env_var("BOOGIE_EXE").is_empty()
@@ -47,12 +51,15 @@ pub fn run_prover_for_pkg(path_to_pkg: impl Into<String>) {
         let unconditional_abort_inconsistency_flag =
             read_env_var(ENV_TEST_UNCONDITIONAL_ABORT_AS_INCONSISTENCY) == "1";
         let disallow_timeout_overwrite = read_env_var(ENV_TEST_DISALLOW_TIMEOUT_OVERWRITE) == "1";
+        options.shards = Some(shards);
+        options.only_shard = only_shard;
         options.check_inconsistency = inconsistency_flag;
         options.unconditional_abort_as_inconsistency = unconditional_abort_inconsistency_flag;
         options.disallow_global_timeout_to_be_overwritten = disallow_timeout_overwrite;
         options.vc_timeout = read_env_var(ENV_TEST_VC_TIMEOUT)
             .parse::<usize>()
-            .unwrap_or(options.vc_timeout);
+            .ok()
+            .or(options.vc_timeout);
         let skip_attribute_checks = false;
         options
             .prove(
@@ -71,21 +78,41 @@ pub fn run_prover_for_pkg(path_to_pkg: impl Into<String>) {
 }
 
 #[test]
-fn move_framework_prover_tests() {
-    run_prover_for_pkg("aptos-framework");
+fn move_framework_prover_tests_shard1() {
+    run_prover_for_pkg("aptos-framework", 5, Some(1));
+}
+
+#[test]
+fn move_framework_prover_tests_shard2() {
+    run_prover_for_pkg("aptos-framework", 5, Some(2));
+}
+
+#[test]
+fn move_framework_prover_tests_shard3() {
+    run_prover_for_pkg("aptos-framework", 5, Some(3));
+}
+
+#[test]
+fn move_framework_prover_tests_shard4() {
+    run_prover_for_pkg("aptos-framework", 5, Some(4));
+}
+
+#[test]
+fn move_framework_prover_tests_shard5() {
+    run_prover_for_pkg("aptos-framework", 5, Some(5));
 }
 
 #[test]
 fn move_token_prover_tests() {
-    run_prover_for_pkg("aptos-token");
+    run_prover_for_pkg("aptos-token", 1, None);
 }
 
 #[test]
 fn move_aptos_stdlib_prover_tests() {
-    run_prover_for_pkg("aptos-stdlib");
+    run_prover_for_pkg("aptos-stdlib", 1, None);
 }
 
 #[test]
 fn move_stdlib_prover_tests() {
-    run_prover_for_pkg("move-stdlib");
+    run_prover_for_pkg("move-stdlib", 1, None);
 }

@@ -28,11 +28,8 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    block_executor::config::BlockExecutorConfig,
-    contract_event::TransactionEvent,
-    executable::{ExecutableTestType, ModulePath},
-    state_store::state_value::StateValueMetadata,
-    write_set::WriteOpKind,
+    block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
+    executable::ModulePath, state_store::state_value::StateValueMetadata, write_set::WriteOpKind,
 };
 use claims::{assert_matches, assert_ok};
 use fail::FailScenario;
@@ -84,7 +81,6 @@ fn test_resource_group_deletion() {
         MockTask<KeyType<u32>, MockEvent>,
         NonEmptyGroupDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        ExecutableTestType,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
@@ -154,7 +150,6 @@ fn resource_group_bcs_fallback() {
         MockTask<KeyType<u32>, MockEvent>,
         NonEmptyGroupDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        ExecutableTestType,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
@@ -233,6 +228,38 @@ fn resource_group_bcs_fallback() {
 }
 
 #[test]
+fn interrupt_requested() {
+    let transactions = Vec::from([MockTransaction::Abort, MockTransaction::InterruptRequested]);
+    let txn_provider = DefaultTxnProvider::new(transactions);
+    let mut guard = AptosModuleCacheManagerGuard::none();
+
+    let data_view = DeltaDataView::<KeyType<u32>> {
+        phantom: PhantomData,
+    };
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+    let block_executor = BlockExecutor::<
+        MockTransaction<KeyType<u32>, MockEvent>,
+        MockTask<KeyType<u32>, MockEvent>,
+        DeltaDataView<KeyType<u32>>,
+        NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
+        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
+    >::new(
+        BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+        executor_thread_pool,
+        None,
+    );
+
+    // MockTransaction::InterruptRequested will only return if interrupt is requested (here, due
+    // to abort from the first transaction). O.w. the test will hang.
+    let _ = block_executor.execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+}
+
+#[test]
 fn block_output_err_precedence() {
     let incarnation: MockIncarnation<KeyType<u32>, MockEvent> = MockIncarnation::new(
         vec![KeyType::<u32>(1, false)],
@@ -262,7 +289,6 @@ fn block_output_err_precedence() {
         MockTask<KeyType<u32>, MockEvent>,
         DeltaDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        ExecutableTestType,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
@@ -304,7 +330,6 @@ fn skip_rest_gas_limit() {
         MockTask<KeyType<u32>, MockEvent>,
         DeltaDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        ExecutableTestType,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), Some(5)),
@@ -341,7 +366,6 @@ where
         MockTask<K, E>,
         DeltaDataView<K>,
         NoOpTransactionCommitHook<MockOutput<K, E>, usize>,
-        ExecutableTestType,
         _,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),

@@ -15,14 +15,18 @@ use crate::{
     versioned_node_cache::VersionedNodeCache,
 };
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs, StorageDirPaths};
-use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
+use aptos_crypto::HashValue;
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_jellyfish_merkle::{
     node_type::NodeKey, JellyfishMerkleTree, TreeReader, TreeUpdateBatch, TreeWriter,
 };
 use aptos_logger::prelude::*;
+use aptos_metrics_core::TimerHelper;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::{
+    batch::{IntoRawBatch, RawBatch, SchemaBatch, WriteBatch},
+    DB,
+};
 #[cfg(test)]
 use aptos_scratchpad::get_state_shard_id;
 use aptos_storage_interface::{
@@ -114,24 +118,24 @@ impl StateMerkleDb {
     pub(crate) fn commit(
         &self,
         version: Version,
-        top_levels_batch: SchemaBatch,
-        batches_for_shards: Vec<SchemaBatch>,
+        top_levels_batch: impl IntoRawBatch,
+        batches_for_shards: Vec<impl IntoRawBatch + Send>,
     ) -> Result<()> {
         ensure!(
             batches_for_shards.len() == NUM_STATE_SHARDS,
             "Shard count mismatch."
         );
-        THREAD_MANAGER.get_io_pool().scope(|s| {
-            let mut batches = batches_for_shards.into_iter();
-            for shard_id in 0..NUM_STATE_SHARDS {
-                let state_merkle_batch = batches.next().unwrap();
-                s.spawn(move |_| {
-                    self.commit_single_shard(version, shard_id as u8, state_merkle_batch)
+        THREAD_MANAGER.get_io_pool().install(|| {
+            batches_for_shards
+                .into_par_iter()
+                .enumerate()
+                .for_each(|(shard_id, batch)| {
+                    self.db_shard(shard_id as u8)
+                        .write_schemas(batch)
                         .unwrap_or_else(|err| {
                             panic!("Failed to commit state merkle shard {shard_id}: {err}")
                         });
-                });
-            }
+                })
         });
 
         self.commit_top_levels(version, top_levels_batch)
@@ -215,32 +219,26 @@ impl StateMerkleDb {
         Arc::clone(&self.state_merkle_db_shards[shard_id as usize])
     }
 
-    pub(crate) fn commit_top_levels(&self, version: Version, batch: SchemaBatch) -> Result<()> {
-        batch.put::<DbMetadataSchema>(
-            &DbMetadataKey::StateMerkleCommitProgress,
-            &DbMetadataValue::Version(version),
-        )?;
+    pub(crate) fn db(&self, shard_id: Option<u8>) -> &DB {
+        if let Some(shard_id) = shard_id {
+            self.db_shard(shard_id)
+        } else {
+            self.metadata_db()
+        }
+    }
 
+    pub(crate) fn commit_top_levels(
+        &self,
+        version: Version,
+        batch: impl IntoRawBatch,
+    ) -> Result<()> {
         info!(version = version, "Committing StateMerkleDb.");
         self.state_merkle_metadata_db.write_schemas(batch)
     }
 
-    pub(crate) fn commit_single_shard(
-        &self,
-        version: Version,
-        shard_id: u8,
-        batch: SchemaBatch,
-    ) -> Result<()> {
-        batch.put::<DbMetadataSchema>(
-            &DbMetadataKey::StateMerkleShardCommitProgress(shard_id as usize),
-            &DbMetadataValue::Version(version),
-        )?;
-        self.state_merkle_db_shards[shard_id as usize].write_schemas(batch)
-    }
-
     pub fn get_with_proof_ext(
         &self,
-        state_key: &StateKey,
+        key: &HashValue,
         version: Version,
         root_depth: usize,
     ) -> Result<(
@@ -248,7 +246,7 @@ impl StateMerkleDb {
         SparseMerkleProofExt,
     )> {
         JellyfishMerkleTree::new(self)
-            .get_with_proof_ext(state_key.hash(), version, root_depth)
+            .get_with_proof_ext(key, version, root_depth)
             .map_err(Into::into)
     }
 
@@ -322,52 +320,63 @@ impl StateMerkleDb {
 
     fn create_jmt_commit_batch_for_shard(
         &self,
+        version: Version,
         shard_id: Option<u8>,
         tree_update_batch: &TreeUpdateBatch<StateKey>,
         previous_epoch_ending_version: Option<Version>,
-    ) -> Result<SchemaBatch> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["create_jmt_commit_batch_for_shard"])
-            .start_timer();
+    ) -> Result<RawBatch> {
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["create_jmt_commit_batch_for_shard"]);
 
-        let batch = SchemaBatch::new();
+        let mut batch = self.db(shard_id).new_native_batch();
 
         let node_batch = tree_update_batch
             .node_batch
             .iter()
             .flatten()
             .collect::<Vec<_>>();
-        let num_nodes = node_batch.len();
-        node_batch
-            .par_iter()
-            .with_min_len(optimal_min_len(num_nodes, 128))
-            .try_for_each(|(node_key, node)| {
-                ensure!(node_key.get_shard_id() == shard_id, "shard_id mismatch");
-                batch.put::<JellyfishMerkleNodeSchema>(node_key, node)
-            })?;
+        node_batch.iter().try_for_each(|(node_key, node)| {
+            ensure!(node_key.get_shard_id() == shard_id, "shard_id mismatch");
+            batch.put::<JellyfishMerkleNodeSchema>(node_key, node)
+        })?;
 
         let stale_node_index_batch = tree_update_batch
             .stale_node_index_batch
             .iter()
             .flatten()
             .collect::<Vec<_>>();
-        let num_stale_nodes = stale_node_index_batch.len();
-        stale_node_index_batch
-            .par_iter()
-            .with_min_len(optimal_min_len(num_stale_nodes, 128))
-            .try_for_each(|row| {
-                ensure!(row.node_key.get_shard_id() == shard_id, "shard_id mismatch");
-                if previous_epoch_ending_version.is_some()
-                    && row.node_key.version() <= previous_epoch_ending_version.unwrap()
-                {
-                    batch.put::<StaleNodeIndexCrossEpochSchema>(row, &())
-                } else {
-                    // These are processed by the state merkle pruner.
-                    batch.put::<StaleNodeIndexSchema>(row, &())
-                }
-            })?;
+        stale_node_index_batch.iter().try_for_each(|row| {
+            ensure!(row.node_key.get_shard_id() == shard_id, "shard_id mismatch");
+            if previous_epoch_ending_version.is_some()
+                && row.node_key.version() <= previous_epoch_ending_version.unwrap()
+            {
+                batch.put::<StaleNodeIndexCrossEpochSchema>(row, &())
+            } else {
+                // These are processed by the state merkle pruner.
+                batch.put::<StaleNodeIndexSchema>(row, &())
+            }
+        })?;
 
-        Ok(batch)
+        Self::put_progress(Some(version), shard_id, &mut batch)?;
+
+        batch.into_raw_batch(self.db(shard_id))
+    }
+
+    pub(crate) fn put_progress(
+        version: Option<Version>,
+        shard_id: Option<u8>,
+        batch: &mut impl WriteBatch,
+    ) -> Result<()> {
+        let key = if let Some(shard_id) = shard_id {
+            DbMetadataKey::StateMerkleShardCommitProgress(shard_id as usize)
+        } else {
+            DbMetadataKey::StateMerkleCommitProgress
+        };
+
+        if let Some(version) = version {
+            batch.put::<DbMetadataSchema>(&key, &DbMetadataValue::Version(version))
+        } else {
+            batch.delete::<DbMetadataSchema>(&key)
+        }
     }
 
     // A non-sharded helper function accepting KV updates from all shards.
@@ -378,12 +387,12 @@ impl StateMerkleDb {
         version: Version,
         base_version: Option<Version>,
         previous_epoch_ending_version: Option<Version>,
-    ) -> Result<(SchemaBatch, Vec<SchemaBatch>, HashValue)> {
+    ) -> Result<(RawBatch, Vec<RawBatch>, HashValue)> {
         let mut sharded_value_set: Vec<Vec<(HashValue, Option<&(HashValue, StateKey)>)>> =
             Vec::new();
         sharded_value_set.resize(NUM_STATE_SHARDS, Default::default());
         value_set.into_iter().for_each(|(k, v)| {
-            sharded_value_set[get_state_shard_id(k) as usize].push((k, v));
+            sharded_value_set[get_state_shard_id(&k) as usize].push((k, v));
         });
 
         let (shard_root_nodes, sharded_batches) = (0..16)
@@ -403,7 +412,7 @@ impl StateMerkleDb {
             .into_iter()
             .unzip();
 
-        let (root_hash, top_levels_batch) = self.calculate_top_levels(
+        let (root_hash, _leaf_count, top_levels_batch) = self.calculate_top_levels(
             shard_root_nodes,
             version,
             base_version,
@@ -425,7 +434,7 @@ impl StateMerkleDb {
         base_version: Option<Version>,
         shard_persisted_version: Option<Version>,
         previous_epoch_ending_version: Option<Version>,
-    ) -> Result<(Node, SchemaBatch)> {
+    ) -> Result<(Node, RawBatch)> {
         if let Some(shard_persisted_version) = shard_persisted_version {
             assert!(shard_persisted_version <= base_version.expect("Must have base version."));
         }
@@ -460,6 +469,7 @@ impl StateMerkleDb {
         }
 
         let batch = self.create_jmt_commit_batch_for_shard(
+            version,
             Some(shard_id),
             &tree_update_batch,
             previous_epoch_ending_version,
@@ -477,13 +487,11 @@ impl StateMerkleDb {
         version: Version,
         base_version: Option<Version>,
         previous_epoch_ending_version: Option<Version>,
-    ) -> Result<(HashValue, SchemaBatch)> {
+    ) -> Result<(HashValue, usize, RawBatch)> {
         assert!(shard_root_nodes.len() == 16);
-        let (root_hash, tree_update_batch) = JellyfishMerkleTree::new(self).put_top_levels_nodes(
-            shard_root_nodes,
-            base_version,
-            version,
-        )?;
+
+        let (root_hash, leaf_count, tree_update_batch) = JellyfishMerkleTree::new(self)
+            .put_top_levels_nodes(shard_root_nodes, base_version, version)?;
 
         if self.cache_enabled() {
             self.version_caches.get(&None).unwrap().add_version(
@@ -498,12 +506,13 @@ impl StateMerkleDb {
         }
 
         let batch = self.create_jmt_commit_batch_for_shard(
+            version,
             None,
             &tree_update_batch,
             previous_epoch_ending_version,
         )?;
 
-        Ok((root_hash, batch))
+        Ok((root_hash, leaf_count, batch.into_raw_batch(self.db(None))?))
     }
 
     pub(crate) fn get_shard_persisted_versions(
@@ -843,7 +852,7 @@ impl TreeWriter<StateKey> for StateMerkleDb {
             .with_label_values(&["tree_writer_write_batch"])
             .start_timer();
         // Get the top level batch and sharded batch from raw NodeBatch
-        let top_level_batch = SchemaBatch::new();
+        let mut top_level_batch = SchemaBatch::new();
         let mut jmt_shard_batches: Vec<SchemaBatch> = Vec::with_capacity(NUM_STATE_SHARDS);
         jmt_shard_batches.resize_with(NUM_STATE_SHARDS, SchemaBatch::new);
         node_batch.iter().try_for_each(|(node_key, node)| {

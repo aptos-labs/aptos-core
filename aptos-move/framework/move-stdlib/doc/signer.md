@@ -5,12 +5,47 @@
 
 
 
+-  [Constants](#@Constants_0)
 -  [Function `borrow_address`](#0x1_signer_borrow_address)
 -  [Function `address_of`](#0x1_signer_address_of)
--  [Specification](#@Specification_0)
+-  [Specification](#@Specification_1)
 
 
 <pre><code></code></pre>
+
+
+
+<a id="@Constants_0"></a>
+
+## Constants
+
+
+<a id="0x1_signer_EADDRESS_OF_PERMISSIONED"></a>
+
+signer is a builtin move type that represents an address that has been verfied by the VM.
+
+VM Runtime representation is equivalent to following:
+```
+enum signer has drop {
+Master { account: address },
+Permissioned { account: address, permissions_address: address },
+}
+```
+
+for bcs serialization:
+
+```
+struct signer has drop {
+account: address,
+}
+```
+^ The discrepency is needed to maintain backwards compatibility of signer serialization
+semantics.
+Calling address_of on a permissioned signer.
+
+
+<pre><code><b>const</b> <a href="signer.md#0x1_signer_EADDRESS_OF_PERMISSIONED">EADDRESS_OF_PERMISSIONED</a>: u64 = 0;
+</code></pre>
 
 
 
@@ -18,12 +53,6 @@
 
 ## Function `borrow_address`
 
-Borrows the address of the signer
-Conceptually, you can think of the <code><a href="signer.md#0x1_signer">signer</a></code> as being a struct wrapper around an
-address
-```
-struct signer has drop { addr: address }
-```
 <code>borrow_address</code> borrows this inner field
 
 
@@ -67,7 +96,7 @@ struct signer has drop { addr: address }
 
 </details>
 
-<a id="@Specification_0"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 

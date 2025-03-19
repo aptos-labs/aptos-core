@@ -2,18 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{node::get_data_service_url, postgres::get_postgres_connection_string};
-use crate::common::make_shared;
+use crate::{
+    common::{make_shared, ArcError},
+    no_panic_println,
+};
 use anyhow::{anyhow, Context, Result};
-use aptos::node::local_testnet::{processors::get_processor_config, HealthChecker};
+use aptos_localnet::{health_checker::HealthChecker, processors::get_processor_config};
 use diesel::Connection;
 use diesel_async::{async_connection_wrapper::AsyncConnectionWrapper, pg::AsyncPgConnection};
-use futures::{future::try_join_all, stream::FuturesUnordered, StreamExt};
+use futures::{future::try_join_all, stream::FuturesUnordered, StreamExt, TryFutureExt};
 use processor::{
     gap_detectors::DEFAULT_GAP_DETECTION_BATCH_SIZE, processors::ProcessorName,
     utils::database::run_pending_migrations, IndexerGrpcProcessorConfig,
 };
 use server_framework::RunnableConfig;
-use std::{future::Future, sync::Arc};
+use std::future::Future;
 use tokio::try_join;
 
 /// Names of the processors to enable in the local network.
@@ -42,10 +45,7 @@ const PROCESSOR_NAMES: &[ProcessorName] = {
 /// - One that resolves when the processor is up.
 /// - One that resolves when the processor stops (which it should not under normal operation).
 fn start_processor(
-    fut_prerequisites: &(impl Future<Output = Result<(u16, u16), Arc<anyhow::Error>>>
-          + Clone
-          + Send
-          + 'static),
+    fut_prerequisites: &(impl Future<Output = Result<(u16, u16), ArcError>> + Clone + Send + 'static),
     processor_name: &ProcessorName,
 ) -> (
     impl Future<Output = Result<()>>,
@@ -54,10 +54,9 @@ fn start_processor(
     let fut_prerequisites_ = fut_prerequisites.clone();
     let processor_name_ = processor_name.to_owned();
     let handle_processor = tokio::spawn(async move {
-        let (postgres_port, indexer_grpc_port) =
-            fut_prerequisites_.await.map_err(anyhow::Error::msg)?;
+        let (postgres_port, indexer_grpc_port) = fut_prerequisites_.await?;
 
-        println!("Starting processor {}..", processor_name_);
+        no_panic_println!("Starting processor {}..", processor_name_);
 
         let config = IndexerGrpcProcessorConfig {
             processor_config: get_processor_config(&processor_name_)?,
@@ -94,8 +93,7 @@ fn start_processor(
     let fut_prerequisites_ = fut_prerequisites.clone();
     let processor_name_ = processor_name.to_owned();
     let fut_processor_ready = async move {
-        let (postgres_port, _indexer_grpc_port) =
-            fut_prerequisites_.await.map_err(anyhow::Error::msg)?;
+        let (postgres_port, _indexer_grpc_port) = fut_prerequisites_.await?;
 
         let processor_health_checker = HealthChecker::Processor(
             get_postgres_connection_string(postgres_port),
@@ -104,7 +102,7 @@ fn start_processor(
 
         processor_health_checker.wait(None).await?;
 
-        println!("Processor {} is ready.", processor_name_);
+        no_panic_println!("Processor {} is ready.", processor_name_);
 
         Ok(())
     };
@@ -123,9 +121,9 @@ fn start_processor(
 /// - One that resolves when all processors are up.
 /// - One that resolves when any of the processors stops (which it should not under normal operation).
 pub fn start_all_processors(
-    fut_node_api: impl Future<Output = Result<u16, Arc<anyhow::Error>>> + Clone + Send + 'static,
-    fut_indexer_grpc: impl Future<Output = Result<u16, Arc<anyhow::Error>>> + Clone + Send + 'static,
-    fut_postgres: impl Future<Output = Result<u16, Arc<anyhow::Error>>> + Clone + Send + 'static,
+    fut_node_api: impl Future<Output = Result<u16, ArcError>> + Clone + Send + 'static,
+    fut_indexer_grpc: impl Future<Output = Result<u16, ArcError>> + Clone + Send + 'static,
+    fut_postgres: impl Future<Output = Result<u16, ArcError>> + Clone + Send + 'static,
 ) -> (
     impl Future<Output = Result<()>>,
     impl Future<Output = Result<()>>,
@@ -133,10 +131,9 @@ pub fn start_all_processors(
     let fut_migration = async move {
         let postgres_port = fut_postgres
             .await
-            .map_err(anyhow::Error::msg)
             .context("failed to run migration: postgres did not start successfully")?;
 
-        println!("Starting migration..");
+        no_panic_println!("Starting migration..");
 
         let connection_string = get_postgres_connection_string(postgres_port);
 
@@ -153,18 +150,17 @@ pub fn start_all_processors(
         .await
         .map_err(|err| anyhow!("failed to join task handle: {}", err))??;
 
-        println!("Migration done.");
+        no_panic_println!("Migration done.");
 
         Ok(postgres_port)
     };
 
-    let fut_prerequisites = make_shared::<_, _, anyhow::Error>(async move {
+    let fut_prerequisites = make_shared(async move {
         let (_node_api_port, indexer_grpc_port, postgres_port) = try_join!(
-            fut_node_api,
-            fut_indexer_grpc,
+            fut_node_api.map_err(|err| anyhow!(err)),
+            fut_indexer_grpc.map_err(|err| anyhow!(err)),
             fut_migration
         )
-        .map_err(anyhow::Error::msg)
         .context(
             "failed to start processors: one or more prerequisites did not start successfully",
         )?;
