@@ -274,13 +274,13 @@ module aptos_framework::primary_fungible_store {
         fungible_asset::withdraw_with_ref(transfer_ref, from_primary_store, amount)
     }
 
-    /// Deposit from the primary store of `owner` ignoring frozen flag.
+    /// Deposit to the primary store of `owner` ignoring frozen flag.
     public fun deposit_with_ref(transfer_ref: &TransferRef, owner: address, fa: FungibleAsset) acquires DeriveRefPod {
-        let from_primary_store = ensure_primary_store_exists(
+        let to_primary_store = ensure_primary_store_exists(
             owner,
             fungible_asset::transfer_ref_metadata(transfer_ref)
         );
-        fungible_asset::deposit_with_ref(transfer_ref, from_primary_store, fa);
+        fungible_asset::deposit_with_ref(transfer_ref, to_primary_store, fa);
     }
 
     /// Transfer `amount` of FA from the primary store of `from` to that of `to` ignoring frozen flag.
