@@ -17,9 +17,10 @@
 
 use crate::{
     ast::{
-        AccessSpecifier, Address, AddressSpecifier, Attribute, ConditionKind, Exp, ExpData,
-        FriendDecl, GlobalInvariant, ModuleName, PropertyBag, PropertyValue, ResourceSpecifier,
-        Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl, Value,
+        AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Attribute, ConditionKind,
+        Exp, ExpData, FriendDecl, GlobalInvariant, ModuleName, PropertyBag, PropertyValue,
+        ResourceSpecifier, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl,
+        Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -31,9 +32,9 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{
-        AbilityInference, AbilityInferer, NoUnificationContext, Type, TypeDisplayContext,
-        TypeUnificationAdapter, Variance,
+        AbilityInference, AbilityInferer, NoUnificationContext, Type, TypeDisplayContext, Variance,
     },
+    ty_invariant_analysis::TypeUnificationAdapter,
     well_known,
 };
 use anyhow::bail;
@@ -43,6 +44,7 @@ use codespan_reporting::{
     term::{emit, termcolor::WriteColor, Config},
 };
 use itertools::Itertools;
+use legacy_move_compiler::command_line as cli;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 pub use move_binary_format::file_format::Visibility;
@@ -52,9 +54,9 @@ use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     file_format::{
-        AccessKind, Bytecode, CodeOffset, Constant as VMConstant, ConstantPoolIndex,
-        FunctionDefinitionIndex, FunctionHandleIndex, MemberCount, SignatureIndex, SignatureToken,
-        StructDefinitionIndex, VariantIndex,
+        Bytecode, CodeOffset, Constant as VMConstant, ConstantPoolIndex, FunctionDefinitionIndex,
+        FunctionHandleIndex, MemberCount, SignatureIndex, SignatureToken, StructDefinitionIndex,
+        VariantIndex,
     },
     views::{FunctionDefinitionView, FunctionHandleView, StructHandleView},
     CompiledModule,
@@ -63,7 +65,6 @@ use move_bytecode_source_map::{mapping::SourceMapping, source_map::SourceMap};
 use move_command_line_common::{
     address::NumericalAddress, env::read_bool_env_var, files::FileHash,
 };
-use move_compiler::command_line as cli;
 pub use move_core_types::ability::AbilitySet;
 use move_core_types::{
     account_address::AccountAddress,
@@ -1957,6 +1958,18 @@ impl GlobalEnv {
         data.def = Some(def);
     }
 
+    /// Sets the inferred acquired structs of this function.
+    pub fn set_acquired_structs(&mut self, fun: QualifiedId<FunId>, acquires: BTreeSet<StructId>) {
+        let data = self
+            .module_data
+            .get_mut(fun.module_id.to_usize())
+            .unwrap()
+            .function_data
+            .get_mut(&fun.id)
+            .unwrap();
+        data.acquired_structs = Some(acquires)
+    }
+
     /// Adds a new function definition.
     pub fn add_function_def(
         &mut self,
@@ -1990,6 +2003,7 @@ impl GlobalEnv {
             params,
             result_type,
             access_specifiers: None,
+            acquired_structs: None,
             spec: RefCell::new(Default::default()),
             def: Some(def),
             called_funs: Some(called_funs),
@@ -2656,9 +2670,9 @@ impl GlobalEnv {
                     emit!(writer, "!")
                 }
                 match &spec.kind {
-                    AccessKind::Reads => emit!(writer, "reads "),
-                    AccessKind::Writes => emit!(writer, "writes "),
-                    AccessKind::Acquires => emit!(writer, "acquires "),
+                    AccessSpecifierKind::Reads => emit!(writer, "reads "),
+                    AccessSpecifierKind::Writes => emit!(writer, "writes "),
+                    AccessSpecifierKind::LegacyAcquires => emit!(writer, "acquires "),
                 }
                 match &spec.resource.1 {
                     ResourceSpecifier::Any => emit!(writer, "*"),
@@ -4260,11 +4274,14 @@ pub struct FunctionData {
     /// Access specifiers.
     pub(crate) access_specifiers: Option<Vec<AccessSpecifier>>,
 
+    /// Acquires information, if available. This is either inferred or annotated by the
+    /// user via a legacy acquires declaration.
+    pub(crate) acquired_structs: Option<BTreeSet<StructId>>,
+
     /// Specification associated with this function.
     pub(crate) spec: RefCell<Spec>,
 
-    /// Optional definition associated with this function. The definition is available if
-    /// the model is build with option `ModelBuilderOptions::compile_via_model`.
+    /// Optional definition associated with this function.
     pub(crate) def: Option<Exp>,
 
     /// A cache for the called functions.
@@ -4302,6 +4319,7 @@ impl FunctionData {
             params: vec![],
             result_type: Type::unit(),
             access_specifiers: None,
+            acquired_structs: None,
             spec: RefCell::new(Default::default()),
             def: None,
             called_funs: None,
@@ -4779,6 +4797,12 @@ impl<'env> FunctionEnv<'env> {
         self.data.access_specifiers.as_deref()
     }
 
+    /// Returns the inferred acquired structs of this function. This is checked
+    /// against declared acquires from `get_access_specifiers`.
+    pub fn get_acquired_structs(&self) -> Option<&BTreeSet<StructId>> {
+        self.data.acquired_structs.as_ref()
+    }
+
     /// Get the name to be used for a local by index, if available.
     /// Otherwise generate a unique name.
     pub fn get_local_name(&self, idx: usize) -> Symbol {
@@ -4857,8 +4881,7 @@ impl<'env> FunctionEnv<'env> {
         self.data.spec.borrow_mut()
     }
 
-    /// Returns associated definition. The definition of the function, in Exp form, is available
-    /// if the model is build with `ModelBuilderOptions::compile_via_model`
+    /// Returns associated definition if available.
     pub fn get_def(&self) -> Option<&Exp> {
         self.data.def.as_ref()
     }

@@ -6,10 +6,6 @@
 #![deny(deprecated)]
 
 //! The core Move VM logic.
-//!
-//! It is a design goal for the Move VM to be independent of the Diem blockchain, so that
-//! other blockchains can use it as well. The VM isn't there yet, but hopefully will be there
-//! soon.
 
 pub mod data_cache;
 mod interpreter;
@@ -18,7 +14,6 @@ pub mod logging;
 pub mod move_vm;
 pub mod native_extensions;
 pub mod native_functions;
-mod runtime;
 pub mod session;
 #[macro_use]
 pub mod tracing;
@@ -35,11 +30,13 @@ mod reentrancy_checker;
 mod runtime_type_checks;
 mod storage;
 
-pub use loader::{Function, LoadedFunction, Module, Script};
-#[cfg(any(test, feature = "testing"))]
-pub use storage::implementations::unreachable_code_storage;
+pub use loader::{Function, LoadedFunction, LoadedFunctionOwner, Module, Script};
 pub use storage::{
     code_storage::{ambassador_impl_CodeStorage, CodeStorage},
+    dependencies_gas_charging::{
+        check_dependencies_and_charge_gas, check_script_dependencies_and_check_gas,
+        check_type_tag_dependencies_and_charge_gas,
+    },
     environment::{
         ambassador_impl_WithRuntimeEnvironment, RuntimeEnvironment, WithRuntimeEnvironment,
     },

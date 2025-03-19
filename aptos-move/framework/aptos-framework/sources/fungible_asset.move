@@ -236,6 +236,14 @@ module aptos_framework::fungible_asset {
         frozen: bool,
     }
 
+    #[event]
+    /// Module event emitted when a fungible store is deleted.
+    struct FungibleStoreDeletion has drop, store {
+        store: address,
+        owner: address,
+        metadata: address,
+    }
+
     inline fun default_to_concurrent_fungible_supply(): bool {
         features::concurrent_fungible_assets_enabled()
     }
@@ -836,9 +844,9 @@ module aptos_framework::fungible_asset {
 
     /// Used to delete a store.  Requires the store to be completely empty prior to removing it
     public fun remove_store(delete_ref: &DeleteRef) acquires FungibleStore, FungibleAssetEvents, ConcurrentFungibleBalance {
-        let store = &object::object_from_delete_ref<FungibleStore>(delete_ref);
-        let addr = object::object_address(store);
-        let FungibleStore { metadata: _, balance, frozen: _ }
+        let store = object::object_from_delete_ref<FungibleStore>(delete_ref);
+        let addr = object::object_address(&store);
+        let FungibleStore { metadata, balance, frozen: _}
             = move_from<FungibleStore>(addr);
         assert!(balance == 0, error::permission_denied(EBALANCE_IS_NOT_ZERO));
 
@@ -858,6 +866,11 @@ module aptos_framework::fungible_asset {
             event::destroy_handle(withdraw_events);
             event::destroy_handle(frozen_events);
         };
+        event::emit(FungibleStoreDeletion {
+            store: addr,
+            owner: object::owner(store),
+            metadata: object::object_address(&metadata),
+        });
     }
 
     /// Withdraw `amount` of the fungible asset from `store` by the owner.
@@ -903,7 +916,7 @@ module aptos_framework::fungible_asset {
         abort_on_dispatch: bool,
     ) acquires FungibleStore, DispatchFunctionStore {
         withdraw_sanity_check_impl(
-            signer::address_of(owner),
+            permissioned_signer::address_of(owner),
             store,
             abort_on_dispatch,
         )
@@ -1346,6 +1359,7 @@ module aptos_framework::fungible_asset {
         owner: &signer,
         store: Object<T>,
     ) acquires FungibleStore {
+        // TODO: Can permissioned signer invoked from here?
         assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
         assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));
         assert!(allow_upgrade_to_concurrent_fungible_balance(), error::invalid_argument(ECONCURRENT_BALANCE_NOT_ENABLED));

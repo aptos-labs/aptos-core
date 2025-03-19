@@ -155,7 +155,6 @@ pub enum IncomingRpcRequest {
     DAGRequest(IncomingDAGRequest),
     CommitRequest(IncomingCommitRequest),
     RandGenRequest(IncomingRandGenRequest),
-    #[allow(dead_code)]
     BlockRetrieval(IncomingBlockRetrievalRequest),
 }
 
@@ -245,7 +244,7 @@ impl NetworkSender {
     /// returns a future that is fulfilled with BlockRetrievalResponse.
     pub async fn request_block(
         &self,
-        retrieval_request: BlockRetrievalRequestV1,
+        retrieval_request: BlockRetrievalRequest,
         from: Author,
         timeout: Duration,
     ) -> anyhow::Result<BlockRetrievalResponse> {
@@ -257,8 +256,18 @@ impl NetworkSender {
         });
 
         ensure!(from != self.author, "Retrieve block from self");
-        let msg =
-            ConsensusMsg::DeprecatedBlockRetrievalRequest(Box::new(retrieval_request.clone()));
+        // TODO @bchcho @hariria the sending of new ConsensusMsg::BlockRetrievalRequest must be
+        // phased over multiple releases to avoid `warn!(remote_peer = peer_id, "Unexpected msg: {:?}", msg);`
+        // Uncomment and replace after release
+        // let msg = ConsensusMsg::BlockRetrievalRequest(Box::new(retrieval_request.clone()));
+        let msg = match &retrieval_request {
+            BlockRetrievalRequest::V1(v1) => {
+                ConsensusMsg::DeprecatedBlockRetrievalRequest(Box::new(v1.clone()))
+            },
+            BlockRetrievalRequest::V2(_) => {
+                panic!("Unexpected BlockRetrievalRequest::V2, should be using ConsensusMsg::DeprecatedBlockRetrievalRequest with BlockRetrievalRequestV1")
+            },
+        };
         counters::CONSENSUS_SENT_MSGS
             .with_label_values(&[msg.name()])
             .inc();
@@ -267,6 +276,8 @@ impl NetworkSender {
             ConsensusMsg::BlockRetrievalResponse(resp) => *resp,
             _ => return Err(anyhow!("Invalid response to request")),
         };
+
+        // Verify response against retrieval request
         response
             .verify(retrieval_request, &self.validators)
             .map_err(|e| {
@@ -828,6 +839,7 @@ impl NetworkTask {
                         .with_label_values(&[msg.name()])
                         .inc();
                     let req = match msg {
+                        // TODO @bchocho @hariria revisit deprecation later once BlockRetrievalRequest enum is released
                         ConsensusMsg::DeprecatedBlockRetrievalRequest(request) => {
                             debug!(
                                 remote_peer = peer_id,
@@ -842,6 +854,19 @@ impl NetworkTask {
                                     response_sender: callback,
                                 },
                             )
+                        },
+                        ConsensusMsg::BlockRetrievalRequest(request) => {
+                            debug!(
+                                remote_peer = peer_id,
+                                event = LogEvent::ReceiveBlockRetrieval,
+                                "{:?}",
+                                request
+                            );
+                            IncomingRpcRequest::BlockRetrieval(IncomingBlockRetrievalRequest {
+                                req: *request,
+                                protocol,
+                                response_sender: callback,
+                            })
                         },
                         ConsensusMsg::BatchRequestMsg(request) => {
                             debug!(

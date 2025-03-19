@@ -5,7 +5,7 @@ use crate::values::{DeserializationSeed, SerializationReadyValue, VMValueCast, V
 use better_any::Tid;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    function::{ClosureMask, MoveFunctionLayout},
+    function::{ClosureMask, MoveFunctionLayout, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
@@ -39,9 +39,6 @@ pub struct Closure(
     pub(crate) Box<dyn AbstractFunction>,
     pub(crate) Vec<ValueImpl>,
 );
-
-/// Version number for the serialization format of function data.
-pub const FUNCTION_DATA_SERIALIZATION_FORMAT_V1: u16 = 1;
 
 /// The representation of a function in storage.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]

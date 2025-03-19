@@ -99,7 +99,9 @@ pub enum FeatureFlag {
     /// covers mem::swap and vector::move_range
     /// AIP-105 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-105.md)
     NATIVE_MEMORY_OPERATIONS = 80,
-    ENABLE_LOADER_V2 = 81,
+    /// The feature was used to gate the rollout of new loader used by Move VM. It was enabled on
+    /// mainnet and can no longer be disabled.
+    _ENABLE_LOADER_V2 = 81,
     /// Prior to this feature flag, it was possible to attempt 'init_module' to publish modules
     /// that results in a new package created but without any code. With this feature, it is no
     /// longer possible and an explicit error is returned if publishing is attempted. The feature
@@ -205,7 +207,6 @@ impl FeatureFlag {
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
             FeatureFlag::NATIVE_MEMORY_OPERATIONS,
             FeatureFlag::COLLECTION_OWNER,
-            FeatureFlag::ENABLE_LOADER_V2,
             FeatureFlag::PERMISSIONED_SIGNER,
             FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
             FeatureFlag::ACCOUNT_ABSTRACTION,
@@ -363,10 +364,6 @@ impl Features {
 
     pub fn is_native_memory_operations_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::NATIVE_MEMORY_OPERATIONS)
-    }
-
-    pub fn is_loader_v2_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::ENABLE_LOADER_V2)
     }
 
     pub fn is_call_tree_and_instruction_vm_cache_enabled(&self) -> bool {

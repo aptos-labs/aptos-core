@@ -699,6 +699,7 @@ fn get_transactions_responses_builder(
         .map(|chunk| TransactionsResponse {
             chain_id: Some(chain_id as u64),
             transactions: chunk,
+            processed_range: None,
         })
         .collect();
     (responses, num_stripped)
