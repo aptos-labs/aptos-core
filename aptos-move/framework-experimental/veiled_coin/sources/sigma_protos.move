@@ -94,7 +94,7 @@
 /// $C'$ -> $\bar{C}$, $Y$ -> $y$, $Y'$ -> $\bar{y}$, $v$ -> $b^*$). Note that their relation does not include the
 /// ElGamal-to-Pedersen conversion parts, as they can do ZK range proofs directly over ElGamal ciphertexts using their
 /// $\Sigma$-bullets modification of Bulletproofs.
-module veiled_coin::sigma_protos {
+module framework_experimental::sigma_protos {
     use std::error;
     use std::option::Option;
     use std::vector;
@@ -103,10 +103,10 @@ module veiled_coin::sigma_protos {
     use aptos_std::ristretto255_pedersen as pedersen;
     use aptos_std::ristretto255::{Self, RistrettoPoint, Scalar};
 
-    use veiled_coin::helpers::cut_vector;
+    use framework_experimental::helpers::cut_vector;
 
     #[test_only]
-    use veiled_coin::helpers::generate_elgamal_keypair;
+    use framework_experimental::helpers::generate_elgamal_keypair;
 
     //
     // Errors
