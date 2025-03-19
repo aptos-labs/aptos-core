@@ -313,53 +313,6 @@ fn dynamic_read_writes_contended_with_block_gas_limit(
     );
 }
 
-fn module_publishing_fallback_with_block_gas_limit(
-    num_txns: usize,
-    maybe_block_gas_limit: Option<u64>,
-) {
-    let mut runner = TestRunner::default();
-
-    let universe = vec(any::<[u8; 32]>(), 100)
-        .new_tree(&mut runner)
-        .expect("creating a new value should succeed")
-        .current();
-    let transaction_gen = vec(
-        any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
-        num_txns,
-    )
-    .new_tree(&mut runner)
-    .expect("creating a new value should succeed")
-    .current();
-
-    run_transactions::<[u8; 32], [u8; 32], MockEvent>(
-        &universe,
-        transaction_gen.clone(),
-        vec![],
-        vec![],
-        2,
-        (false, true),
-        maybe_block_gas_limit,
-    );
-    run_transactions::<[u8; 32], [u8; 32], MockEvent>(
-        &universe,
-        transaction_gen.clone(),
-        vec![],
-        vec![],
-        2,
-        (true, false),
-        maybe_block_gas_limit,
-    );
-    run_transactions::<[u8; 32], [u8; 32], MockEvent>(
-        &universe,
-        transaction_gen,
-        vec![],
-        vec![],
-        2,
-        (true, true),
-        maybe_block_gas_limit,
-    );
-}
-
 fn publishing_fixed_params_with_block_gas_limit(
     num_txns: usize,
     maybe_block_gas_limit: Option<u64>,
@@ -620,13 +573,6 @@ fn dynamic_read_writes_contended() {
 // TODO(loader_v2): Fix this test.
 #[test]
 #[ignore]
-fn module_publishing_fallback() {
-    module_publishing_fallback_with_block_gas_limit(3000, None);
-}
-
-// TODO(loader_v2): Fix this test.
-#[test]
-#[ignore]
 // Test a single transaction intersection interleaves with a lot of dependencies and
 // not overlapping module r/w keys.
 fn module_publishing_races() {
@@ -724,17 +670,6 @@ fn dynamic_read_writes_contended_with_block_gas_limit_test() {
         Some(rand::thread_rng().gen_range(0, 1000) as u64),
     );
     dynamic_read_writes_contended_with_block_gas_limit(1000, Some(0));
-}
-
-// TODO(loader_v2): Fix this test.
-#[test]
-#[ignore]
-fn module_publishing_fallback_with_block_gas_limit_test() {
-    module_publishing_fallback_with_block_gas_limit(
-        3000,
-        // Need to execute at least 2 txns to trigger module publishing fallback
-        Some(rand::thread_rng().gen_range(1, 3000 * MAX_GAS_PER_TXN / 2)),
-    );
 }
 
 // TODO(loader_v2): Fix this test.

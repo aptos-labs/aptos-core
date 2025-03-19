@@ -5,7 +5,7 @@ use crate::errors::{SafeNativeError, SafeNativeResult};
 use aptos_gas_algebra::{
     AbstractValueSize, DynamicExpression, GasExpression, GasQuantity, InternalGasUnit,
 };
-use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
+use aptos_gas_schedule::{AbstractValueSizeGasParameters, MiscGasParameters, NativeGasParameters};
 use aptos_types::on_chain_config::{Features, TimedFeatureFlag, TimedFeatures};
 use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::native_functions::NativeContext;
@@ -101,6 +101,11 @@ impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
             .abstract_value_size_dereferenced(val, self.gas_feature_version)
     }
 
+    /// Returns the gas parameters that are used to define abstract value sizes.
+    pub fn abs_val_gas_params(&self) -> &AbstractValueSizeGasParameters {
+        &self.misc_gas_params.abs_val
+    }
+
     /// Returns the current gas feature version.
     pub fn gas_feature_version(&self) -> u64 {
         self.gas_feature_version
@@ -114,6 +119,14 @@ impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
     /// Checks if the timed feature corresponding to the given flag is enabled.
     pub fn timed_feature_enabled(&self, flag: TimedFeatureFlag) -> bool {
         self.timed_features.is_enabled(flag)
+    }
+
+    /// Signals to the VM (and by extension, the gas meter) that the native function has
+    /// incurred additional heap memory usage that should be tracked.
+    pub fn use_heap_memory(&mut self, amount: u64) {
+        if self.timed_feature_enabled(TimedFeatureFlag::FixMemoryUsageTracking) {
+            self.inner.use_heap_memory(amount);
+        }
     }
 
     /// Configures the behavior of [`Self::charge()`].

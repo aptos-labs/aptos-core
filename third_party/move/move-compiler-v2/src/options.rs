@@ -9,14 +9,14 @@ use crate::{
 use clap::Parser;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_command_line_common::env::{bool_to_str, read_env_var};
-use move_compiler::{
+use legacy_move_compiler::{
     command_line as cli,
     shared::{
         move_compiler_warn_of_deprecation_use_env_var,
         warn_of_deprecation_use_in_aptos_libs_env_var,
     },
 };
+use move_command_line_common::env::{bool_to_str, read_env_var};
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use once_cell::sync::Lazy;
 use std::{

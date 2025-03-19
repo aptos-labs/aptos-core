@@ -24,7 +24,6 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage, AsUnsyncModuleStorage,
-    WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -258,14 +257,13 @@ fn call_script_with_args_ty_args_signers(
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
     let storage = InMemoryStorage::new();
-    let move_vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
     let code_storage = storage.as_unsync_code_storage();
-    let mut session = move_vm.new_session(&storage);
+    let mut session = MoveVM::new_session(&storage);
 
     let traversal_storage = TraversalStorage::new();
 
     session
-        .execute_script(
+        .load_and_execute_script(
             script,
             ty_args,
             combine_signers_and_args(signers, non_signer_args),
@@ -288,7 +286,6 @@ fn call_function_with_args_ty_args_signers(
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
     let mut storage = InMemoryStorage::new();
-    let move_vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
 
     let module_id = module.self_id();
     let mut module_blob = vec![];
@@ -296,7 +293,7 @@ fn call_function_with_args_ty_args_signers(
 
     storage.add_module_bytes(module_id.address(), module_id.name(), module_blob.into());
     let module_storage = storage.as_unsync_module_storage();
-    let mut session = move_vm.new_session(&storage);
+    let mut session = MoveVM::new_session(&storage);
 
     let traversal_storage = TraversalStorage::new();
     session.execute_function_bypass_visibility(
@@ -782,9 +779,8 @@ fn call_missing_item() {
     let function_name = ident_str!("foo");
 
     let mut storage = InMemoryStorage::new();
-    let move_vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
     let module_storage = storage.as_unsync_module_storage();
-    let mut session = move_vm.new_session(&storage);
+    let mut session = MoveVM::new_session(&storage);
 
     let traversal_storage = TraversalStorage::new();
     let error = session
@@ -812,7 +808,7 @@ fn call_missing_item() {
 
     storage.add_module_bytes(module_id.address(), module_id.name(), module_blob.into());
     let module_storage = storage.as_unsync_module_storage();
-    let mut session = move_vm.new_session(&storage);
+    let mut session = MoveVM::new_session(&storage);
 
     let traversal_storage = TraversalStorage::new();
     let error = session

@@ -347,12 +347,12 @@ dependencies = [
  "indoc",
  "itertools 0.13.0",
  "jemallocator",
+ "legacy-move-compiler",
  "maplit",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-cli",
  "move-command-line-common",
- "move-compiler",
  "move-compiler-v2",
  "move-core-types",
  "move-coverage",
@@ -712,7 +712,6 @@ dependencies = [
  "concurrent-queue",
  "criterion",
  "crossbeam",
- "dashmap",
  "derivative",
  "fail",
  "hashbrown 0.14.3",
@@ -842,8 +841,8 @@ dependencies = [
  "clap 4.5.21",
  "futures",
  "itertools 0.13.0",
+ "legacy-move-compiler",
  "move-binary-format",
- "move-compiler",
  "move-core-types",
  "move-model",
  "move-package",
@@ -1218,6 +1217,7 @@ dependencies = [
  "lru 0.7.8",
  "move-core-types",
  "once_cell",
+ "ouroboros",
  "owo-colors",
  "proptest",
  "proptest-derive",
@@ -1908,6 +1908,7 @@ dependencies = [
  "flate2",
  "hex",
  "itertools 0.13.0",
+ "legacy-move-compiler",
  "libsecp256k1",
  "log",
  "lru 0.7.8",
@@ -1915,7 +1916,6 @@ dependencies = [
  "move-binary-format",
  "move-cli",
  "move-command-line-common",
- "move-compiler",
  "move-compiler-v2",
  "move-core-types",
  "move-docgen",
@@ -2977,7 +2977,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-aggregator",
- "aptos-crypto",
  "aptos-types",
  "aptos-vm-types",
  "bytes",
@@ -3792,6 +3791,7 @@ dependencies = [
  "aptos-vm",
  "bitvec 1.0.1",
  "criterion",
+ "dashmap",
  "itertools 0.13.0",
  "jemallocator",
  "once_cell",
@@ -4401,7 +4401,6 @@ dependencies = [
  "move-binary-format",
  "move-bytecode-verifier",
  "move-command-line-common",
- "move-compiler",
  "move-compiler-v2",
  "move-core-types",
  "move-model",
@@ -4437,6 +4436,8 @@ dependencies = [
  "base64 0.13.1",
  "bcs 0.1.4",
  "bytes",
+ "chrono",
+ "chrono-tz 0.10.1",
  "ciborium",
  "claims",
  "coset",
@@ -6155,12 +6156,13 @@ checksum = "a2698f953def977c68f935bb0dfa959375ad4638570e969e2f1e9f433cbf1af6"
 
 [[package]]
 name = "cc"
-version = "1.0.83"
+version = "1.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1174fb0b6ec23863f8b971027804a42614e347eafb0a95bf0b12cdae21fc4d0"
+checksum = "be714c154be609ec7f5dad223a33bf1482fff90472de28f7362806e6d4832b8c"
 dependencies = [
  "jobserver",
  "libc",
+ "shlex",
 ]
 
 [[package]]
@@ -6216,7 +6218,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91d7b79e99bfaa0d47da0687c43aa3b7381938a62ad3a6498599039321f660b7"
 dependencies = [
  "chrono",
- "chrono-tz-build",
+ "chrono-tz-build 0.2.1",
+ "phf",
+]
+
+[[package]]
+name = "chrono-tz"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c6ac4f2c0bf0f44e9161aec9675e1050aa4a530663c4a9e37e108fa948bca9f"
+dependencies = [
+ "chrono",
+ "chrono-tz-build 0.4.0",
  "phf",
 ]
 
@@ -6228,6 +6241,16 @@ checksum = "433e39f13c9a060046954e0592a8d0a4bcb1040125cbf91cb8ee58964cfb350f"
 dependencies = [
  "parse-zoneinfo",
  "phf",
+ "phf_codegen",
+]
+
+[[package]]
+name = "chrono-tz-build"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e94fea34d77a245229e7746bd2beb786cd2a896f306ff491fb8cecb3074b10a7"
+dependencies = [
+ "parse-zoneinfo",
  "phf_codegen",
 ]
 
@@ -9930,9 +9953,9 @@ dependencies = [
 
 [[package]]
 name = "jobserver"
-version = "0.1.27"
+version = "0.1.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c37f63953c4c63420ed5fd3d6d398c719489b9f872b9fa683262f8edd363c7d"
+checksum = "48d1dbcbbeb6a7fec7e059840aa538bd62aaccf972c7346c4d9d2059312853d0"
 dependencies = [
  "libc",
 ]
@@ -10266,6 +10289,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "legacy-move-compiler"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "bcs 0.1.4",
+ "clap 4.5.21",
+ "codespan-reporting",
+ "hex",
+ "move-binary-format",
+ "move-bytecode-source-map",
+ "move-bytecode-verifier",
+ "move-command-line-common",
+ "move-core-types",
+ "move-ir-types",
+ "move-symbol-pool",
+ "once_cell",
+ "petgraph 0.6.5",
+ "regex",
+ "tempfile",
+]
+
+[[package]]
 name = "levenshtein"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10517,19 +10562,18 @@ dependencies = [
 
 [[package]]
 name = "lz4"
-version = "1.25.0"
+version = "1.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6eab492fe7f8651add23237ea56dbf11b3c4ff762ab83d40a47f11433421f91"
+checksum = "a20b523e860d03443e98350ceaac5e71c6ba89aea7d960769ec3ce37f4de5af4"
 dependencies = [
- "libc",
  "lz4-sys",
 ]
 
 [[package]]
 name = "lz4-sys"
-version = "1.9.5"
+version = "1.11.1+lz4-1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9764018d143cc854c9f17f0b907de70f14393b1f502da6375dce70f00514eb3"
+checksum = "6bd8c0d6c6ed0cd30b3652886bb8711dc4bb01d637a68105a3d5158039b418e6"
 dependencies = [
  "cc",
  "libc",
@@ -10913,10 +10957,10 @@ dependencies = [
  "colored",
  "datatest-stable",
  "httpmock",
+ "legacy-move-compiler",
  "move-binary-format",
  "move-bytecode-viewer",
  "move-command-line-common",
- "move-compiler",
  "move-compiler-v2",
  "move-core-types",
  "move-coverage",
@@ -10951,41 +10995,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-compiler"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "bcs 0.1.4",
- "clap 4.5.21",
- "codespan-reporting",
- "datatest-stable",
- "hex",
- "move-binary-format",
- "move-borrow-graph",
- "move-bytecode-source-map",
- "move-bytecode-verifier",
- "move-command-line-common",
- "move-core-types",
- "move-ir-to-bytecode",
- "move-ir-types",
- "move-stdlib",
- "move-symbol-pool",
- "once_cell",
- "pathdiff",
- "petgraph 0.6.5",
- "regex",
- "tempfile",
-]
-
-[[package]]
-name = "move-compiler-transactional-tests"
-version = "0.1.0"
-dependencies = [
- "datatest-stable",
- "move-transactional-test-runner",
-]
-
-[[package]]
 name = "move-compiler-v2"
 version = "0.1.0"
 dependencies = [
@@ -10995,18 +11004,18 @@ dependencies = [
  "clap 4.5.21",
  "codespan",
  "codespan-reporting",
- "datatest-stable",
  "ethnum",
  "flexi_logger",
  "im",
  "itertools 0.13.0",
+ "legacy-move-compiler",
+ "libtest-mimic",
  "log",
  "move-binary-format",
  "move-borrow-graph",
  "move-bytecode-source-map",
  "move-bytecode-verifier",
  "move-command-line-common",
- "move-compiler",
  "move-core-types",
  "move-disassembler",
  "move-ir-types",
@@ -11028,6 +11037,7 @@ version = "0.1.0"
 dependencies = [
  "datatest-stable",
  "itertools 0.13.0",
+ "libtest-mimic",
  "move-compiler-v2",
  "move-model",
  "move-transactional-test-runner",
@@ -11106,10 +11116,10 @@ dependencies = [
  "anyhow",
  "clap 4.5.21",
  "colored",
+ "legacy-move-compiler",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-command-line-common",
- "move-compiler",
  "move-core-types",
  "move-coverage",
  "move-ir-types",
@@ -11125,8 +11135,8 @@ dependencies = [
  "codespan-reporting",
  "datatest-stable",
  "itertools 0.13.0",
+ "legacy-move-compiler",
  "log",
- "move-compiler",
  "move-core-types",
  "move-model",
  "move-prover",
@@ -11229,8 +11239,8 @@ version = "0.1.0"
 dependencies = [
  "codespan-reporting",
  "datatest-stable",
+ "legacy-move-compiler",
  "move-binary-format",
- "move-compiler",
  "move-compiler-v2",
  "move-model",
  "move-prover-test-utils",
@@ -11249,11 +11259,11 @@ dependencies = [
  "either",
  "internment",
  "itertools 0.13.0",
+ "legacy-move-compiler",
  "log",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-command-line-common",
- "move-compiler",
  "move-core-types",
  "move-disassembler",
  "move-ir-types",
@@ -11275,12 +11285,12 @@ dependencies = [
  "colored",
  "datatest-stable",
  "itertools 0.13.0",
+ "legacy-move-compiler",
  "move-abigen",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-bytecode-utils",
  "move-command-line-common",
- "move-compiler",
  "move-compiler-v2",
  "move-core-types",
  "move-docgen",
@@ -11309,12 +11319,12 @@ dependencies = [
  "atty",
  "clap 4.5.21",
  "codespan-reporting",
- "datatest-stable",
  "itertools 0.13.0",
+ "legacy-move-compiler",
+ "libtest-mimic",
  "log",
  "move-abigen",
  "move-command-line-common",
- "move-compiler",
  "move-compiler-v2",
  "move-docgen",
  "move-errmapgen",
@@ -11342,10 +11352,10 @@ dependencies = [
  "codespan-reporting",
  "futures",
  "itertools 0.13.0",
+ "legacy-move-compiler",
  "log",
  "move-binary-format",
  "move-command-line-common",
- "move-compiler",
  "move-core-types",
  "move-model",
  "move-prover-bytecode-pipeline",
@@ -11448,8 +11458,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "codespan-reporting",
+ "legacy-move-compiler",
  "move-command-line-common",
- "move-compiler",
  "move-compiler-v2",
  "move-model",
  "move-prover-test-utils",
@@ -11465,11 +11475,11 @@ dependencies = [
  "dir-diff",
  "file_diff",
  "hex",
+ "legacy-move-compiler",
  "log",
  "move-binary-format",
  "move-cli",
  "move-command-line-common",
- "move-compiler",
  "move-core-types",
  "move-docgen",
  "move-errmapgen",
@@ -11521,11 +11531,11 @@ dependencies = [
  "clap 4.5.21",
  "datatest-stable",
  "difference",
+ "legacy-move-compiler",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-bytecode-verifier",
  "move-command-line-common",
- "move-compiler",
  "move-compiler-v2",
  "move-core-types",
  "move-disassembler",
@@ -11556,11 +11566,11 @@ dependencies = [
  "datatest-stable",
  "difference",
  "itertools 0.13.0",
+ "legacy-move-compiler",
  "move-binary-format",
  "move-bytecode-utils",
  "move-cli",
  "move-command-line-common",
- "move-compiler",
  "move-compiler-v2",
  "move-core-types",
  "move-ir-types",
@@ -11587,10 +11597,10 @@ dependencies = [
  "bytes",
  "claims",
  "codespan-reporting",
+ "legacy-move-compiler",
  "memory-stats",
  "move-binary-format",
  "move-bytecode-verifier",
- "move-compiler",
  "move-compiler-v2",
  "move-core-types",
  "move-model",
@@ -11632,10 +11642,10 @@ dependencies = [
  "hashbrown 0.14.3",
  "hex",
  "lazy_static",
+ "legacy-move-compiler",
  "lru 0.7.8",
  "move-binary-format",
  "move-bytecode-verifier",
- "move-compiler",
  "move-core-types",
  "move-ir-compiler",
  "move-vm-metrics",
@@ -11645,7 +11655,6 @@ dependencies = [
  "parking_lot 0.12.1",
  "proptest",
  "serde",
- "sha3 0.9.1",
  "smallbitvec",
  "triomphe",
  "typed-arena",
@@ -15949,7 +15958,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "970dff17c11e884a4a09bc76e3a17ef71e01bb13447a11e85226e254fe6d10b8"
 dependencies = [
  "chrono",
- "chrono-tz",
+ "chrono-tz 0.8.5",
  "globwalk",
  "humansize",
  "lazy_static",
@@ -16031,17 +16040,6 @@ dependencies = [
  "quote",
  "syn 2.0.87",
  "test-case-core",
-]
-
-[[package]]
-name = "testdiff"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap 4.5.21",
- "once_cell",
- "regex",
- "walkdir",
 ]
 
 [[package]]

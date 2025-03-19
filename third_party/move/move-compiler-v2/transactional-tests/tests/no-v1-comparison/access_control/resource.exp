@@ -1,0 +1,68 @@
+processed 11 tasks
+
+task 2 'run'. lines 57-57:
+return values: true
+
+task 3 'run'. lines 59-59:
+return values: true
+
+task 4 'run'. lines 61-61:
+return values: true
+
+task 5 'run'. lines 63-63:
+return values: true
+
+task 6 'run'. lines 65-65:
+Error: Function execution failed with VMError: {
+    message: not allowed to perform `reads 0x42::test::R(@0x1)`,
+    major_status: ACCESS_DENIED,
+    sub_status: None,
+    location: 0x42::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+
+task 7 'run'. lines 67-67:
+Error: Function execution failed with VMError: {
+    message: not allowed to perform `reads 0x42::test::R(@0x1)`,
+    major_status: ACCESS_DENIED,
+    sub_status: None,
+    location: 0x42::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(2), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+
+task 8 'run'. lines 69-69:
+Error: Function execution failed with VMError: {
+    message: not allowed to perform `writes 0x42::test::R(@0x1)`,
+    major_status: ACCESS_DENIED,
+    sub_status: None,
+    location: 0x42::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(3), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+
+task 9 'run'. lines 71-71:
+Error: Function execution failed with VMError: {
+    message: not allowed to perform `writes 0x42::test::R(@0x1)`,
+    major_status: ACCESS_DENIED,
+    sub_status: None,
+    location: 0x42::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+
+task 10 'run'. lines 73-73:
+Error: Function execution failed with VMError: {
+    message: not allowed to perform `reads 0x42::test::R(@0x1)`,
+    major_status: ACCESS_DENIED,
+    sub_status: None,
+    location: 0x42::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(6), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000042, name: Identifier("test") }), FunctionDefinitionIndex(5), 0)] }),
+}
