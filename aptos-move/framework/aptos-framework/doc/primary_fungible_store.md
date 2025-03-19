@@ -800,7 +800,7 @@ Withdraw from the primary store of <code>owner</code> ignoring frozen flag.
 
 ## Function `deposit_with_ref`
 
-Deposit from the primary store of <code>owner</code> ignoring frozen flag.
+Deposit to the primary store of <code>owner</code> ignoring frozen flag.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_deposit_with_ref">deposit_with_ref</a>(transfer_ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>, owner: <b>address</b>, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)
@@ -813,11 +813,11 @@ Deposit from the primary store of <code>owner</code> ignoring frozen flag.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_deposit_with_ref">deposit_with_ref</a>(transfer_ref: &TransferRef, owner: <b>address</b>, fa: FungibleAsset) <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> {
-    <b>let</b> from_primary_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(
+    <b>let</b> to_primary_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(
         owner,
         <a href="fungible_asset.md#0x1_fungible_asset_transfer_ref_metadata">fungible_asset::transfer_ref_metadata</a>(transfer_ref)
     );
-    <a href="fungible_asset.md#0x1_fungible_asset_deposit_with_ref">fungible_asset::deposit_with_ref</a>(transfer_ref, from_primary_store, fa);
+    <a href="fungible_asset.md#0x1_fungible_asset_deposit_with_ref">fungible_asset::deposit_with_ref</a>(transfer_ref, to_primary_store, fa);
 }
 </code></pre>
 
