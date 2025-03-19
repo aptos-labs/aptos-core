@@ -996,7 +996,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                     ),
                 ],
             )
-            print_table(results, by_levels=False, only_fields=None)
+            print_table(results, by_levels=False, only_fields=[])
 
         if single_node_result.tps < criteria.min_tps:
             text = f"regression detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.min_tps}), {test.key} didn't meet TPS requirements"
@@ -1024,7 +1024,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             warnings.append(text)
 
 if HIDE_OUTPUT:
-    print_table(results, by_levels=False, single_field=None)
+    print_table(results, by_levels=False, only_fields=[])
 
 if warnings:
     print("Warnings: ")

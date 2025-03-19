@@ -373,9 +373,7 @@ class ReplayScheduler:
         return f"{self.id}-{self.network}"
 
     def humio_hash_mismatch_url(self, start_time: float, end_time: float) -> str:
-        query = (
-            f'k8s.labels.run = "{self.get_label()}" | "TransactionOutput does not match"'
-        )
+        query = f'k8s.labels.run = "{self.get_label()}" | "TransactionOutput does not match"'
 
         params = {
             "live": "false",
@@ -713,7 +711,9 @@ if __name__ == "__main__":
             print_logs(failed_logs, txn_mismatch_logs)
             if txn_mismatch_logs:
                 url = scheduler.humio_hash_mismatch_url(start_time, time.time())
-                logger.error(f"Transaction mismatch logs found. All mismatch logs: {url}")
+                logger.error(
+                    f"Transaction mismatch logs found. All mismatch logs: {url}"
+                )
                 exit(2)
             if len(failed_logs) > 0:
                 logger.error("Failed tasks found.")

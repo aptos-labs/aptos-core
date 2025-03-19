@@ -200,6 +200,7 @@ class RunHelper:
         private_key = None
         public_key = None
         account_address = None
+        network = None
         for line in content:
             if "private_key: " in line:
                 private_key = line.split("private_key: ")[1].replace('"', "")
@@ -207,9 +208,12 @@ class RunHelper:
                 public_key = line.split("public_key: ")[1].replace('"', "")
             if "account: " in line:
                 account_address = line.split("account: ")[1].replace('"', "")
+            if "network: " in line:
+                network = line.split("network: ")[1].replace('"', "")
         if not private_key or not public_key or not account_address:
             raise RuntimeError(f"Failed to parse {path} to get account info")
         return AccountInfo(
+            network=network,
             private_key=private_key,
             public_key=public_key,
             account_address=account_address,

@@ -181,7 +181,7 @@ module aptos_framework::resource_account {
         };
 
         if (empty_container) {
-            let container = move_from(source_addr);
+            let container = move_from<Container>(source_addr);
             let Container { store } = container;
             simple_map::destroy_empty(store);
         };
