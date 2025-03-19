@@ -52,7 +52,7 @@ impl DataStateView {
     pub fn new_with_data_reads_and_code(
         db: Arc<dyn AptosValidatorInterface + Send>,
         version: Version,
-        code_data: FakeDataStore,
+        code_data: InMemoryStateStore,
         features_to_enable: Vec<FeatureFlag>,
         features_to_disable: Vec<FeatureFlag>,
     ) -> Self {

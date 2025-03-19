@@ -844,12 +844,8 @@ dependencies = [
  "itertools 0.13.0",
  "legacy-move-compiler",
  "move-binary-format",
-<<<<<<< HEAD
-=======
  "move-command-line-common",
- "move-compiler",
  "move-compiler-v2",
->>>>>>> 1a7ab25af7 (fix)
  "move-core-types",
  "move-model",
  "move-package",

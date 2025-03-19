@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    add_aptos_packages_to_data_store, check_aptos_packages_availability, compile_aptos_packages,
+    add_aptos_packages_to_state_store, check_aptos_packages_availability, compile_aptos_packages,
     data_state_view::DataStateView, dump_and_compile_from_package_metadata, is_aptos_package,
     CompilationCache, DataManager, IndexWriter, PackageInfo, TxnIndex, APTOS_COMMONS, SAMPLING_RATE
 };
 use anyhow::{format_err, Result};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_framework::natives::code::PackageMetadata;
-use aptos_language_e2e_tests::data_store::FakeDataStore;
+use aptos_transaction_simulation::{InMemoryStateStore, SimulationStateStore};
+
 use aptos_rest_client::Client;
 use aptos_types::{
     on_chain_config::{Features, FeatureFlag}, state_store::{state_key::StateKey, state_value::StateValue, TStateView}, transaction::{
@@ -219,7 +220,7 @@ impl DataCollection {
                     let data_manager= data_manager.clone();
                     let index = index_writer.clone();
 
-                    let mut data_state = FakeDataStore::default();
+                    let mut data_state = InMemoryStateStore::default();
                     let mut features_to_enable = vec![FeatureFlag::VM_BINARY_FORMAT_V7, FeatureFlag::NATIVE_MEMORY_OPERATIONS];
 
                     let cache_v1 = compilation_cache
@@ -227,7 +228,7 @@ impl DataCollection {
                         .unwrap()
                         .compiled_package_cache_v1
                         .clone();
-                    add_aptos_packages_to_data_store(&mut data_state, &cache_v1);
+                    add_aptos_packages_to_state_store(&mut data_state, &cache_v1);
                     let state_view = DataStateView::new_with_data_reads_and_code(
                         self.debugger.clone(),
                         version,

@@ -16,8 +16,8 @@ use legacy_move_compiler::{
         warn_of_deprecation_use_in_aptos_libs_env_var,
     },
 };
-use move_command_line_common::env::{bool_to_str, read_env_var};
 use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_command_line_common::env::{bool_to_str, read_env_var};
 use once_cell::sync::Lazy;
 use std::{
     cell::RefCell,
@@ -177,16 +177,19 @@ impl Options {
                 visited.iter().clone().join(",")
             )
         }
-        let experiments_to_override = read_env_var(OVERRIDE_EXP_CACHE);
-        let experiments = experiments_to_override
-            .split(',')
-            .map(|s| s.to_string())
-            .collect_vec();
-        if !experiments.contains(&name.to_string()) {
-            if let Some(on) = self.experiment_cache.borrow().get(name).cloned() {
-                return on;
-            }
+        if let Some(on) = self.experiment_cache.borrow().get(name).cloned() {
+            return on;
         }
+        // let experiments_to_override = read_env_var(OVERRIDE_EXP_CACHE);
+        // let experiments = experiments_to_override
+        //     .split(',')
+        //     .map(|s| s.to_string())
+        //     .collect_vec();
+        // if !experiments.contains(&name.to_string()) {
+        //     if let Some(on) = self.experiment_cache.borrow().get(name).cloned() {
+        //         return on;
+        //     }
+        // }
         if let Some(exp) = EXPERIMENTS.get(&name.to_string()) {
             // First we look at experiments provided via the command line, second
             // via the env var, and last we take the configured default.
@@ -309,14 +312,14 @@ fn compiler_exp_var() -> Vec<String> {
         }
         vec![]
     });
-    if !read_env_var(OVERRIDE_EXP_CACHE).is_empty() {
-        for s in ["MOVE_COMPILER_EXP", "MVC_EXP"] {
-            let s = read_env_var(s);
-            if !s.is_empty() {
-                return s.split(',').map(|s| s.to_string()).collect();
-            }
-        }
-    }
+    // if !read_env_var(OVERRIDE_EXP_CACHE).is_empty() {
+    //     for s in ["MOVE_COMPILER_EXP", "MVC_EXP"] {
+    //         let s = read_env_var(s);
+    //         if !s.is_empty() {
+    //             return s.split(',').map(|s| s.to_string()).collect();
+    //         }
+    //     }
+    // }
     (*EXP_VAR).clone()
 }
 

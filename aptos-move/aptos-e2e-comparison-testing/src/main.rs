@@ -7,7 +7,7 @@ use aptos_comparison_testing::{
 };
 use aptos_rest_client::Client;
 use clap::{Parser, Subcommand};
-use move_command_line_common::env::OVERRIDE_EXP_CACHE;
+// use move_command_line_common::env::OVERRIDE_EXP_CACHE;
 use move_compiler_v2::Experiment;
 use move_core_types::account_address::AccountAddress;
 use std::{env, path::PathBuf};

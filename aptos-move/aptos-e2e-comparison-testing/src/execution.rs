@@ -36,7 +36,7 @@ use std::collections::BTreeMap;
 const GAS_DIFF_PERCENTAGE: u64 = 3;
 const TXNS_NUMBER: u64 = 1000;
 
-fn add_packages_to_state_store(
+pub fn add_packages_to_state_store(
     state_store: &impl SimulationStateStore,
     package_info: &PackageInfo,
     compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
@@ -52,7 +52,7 @@ fn add_packages_to_state_store(
     }
 }
 
-fn add_aptos_packages_to_state_store(
+pub fn add_aptos_packages_to_state_store(
     state_store: &impl SimulationStateStore,
     compiled_package_map: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
 ) {
@@ -876,7 +876,7 @@ impl Execution {
     fn execute_code(
         &self,
         version: Version,
-        mut state: FakeDataStore,
+        mut state: InMemoryStateStore,
         package_info: &PackageInfo,
         txn: &mut Transaction,
         compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
@@ -884,11 +884,11 @@ impl Execution {
         v2_flag: bool
     ) -> Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus> {
         // Always add Aptos (0x1) packages.
-        add_aptos_packages_to_data_store(&mut state, compiled_package_cache);
+        add_aptos_packages_to_state_store(&mut state, compiled_package_cache);
 
         // Add other modules.
         if package_info.is_compilable() {
-            add_packages_to_data_store(&mut state, package_info, compiled_package_cache);
+            add_packages_to_state_store(&mut state, package_info, compiled_package_cache);
         }
 
         // Update features if needed to the correct binary format used by V2 compiler.
