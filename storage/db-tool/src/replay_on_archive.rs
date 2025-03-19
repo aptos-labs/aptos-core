@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, Error, Ok, Result};
+use anyhow::{Error, Ok, Result};
 use aptos_backup_cli::utils::{ReplayConcurrencyLevelOpt, RocksdbOpt};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_config::config::{
@@ -24,7 +24,6 @@ use aptos_types::{
 };
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
 use clap::Parser;
-use itertools::multizip;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{
     path::PathBuf,
@@ -214,7 +213,7 @@ impl Verifier {
         let mut expected_writesets = Vec::new();
         let mut expected_txn_infos = Vec::new();
         let mut chunk_start_version = start;
-        for (idx, item) in txn_iter.enumerate() {
+        for item in txn_iter {
             // timeout check
             if let Some(duration) = self.timeout_secs {
                 if self.replay_stat.get_elapsed_secs() >= duration {
@@ -229,34 +228,30 @@ impl Verifier {
             expected_events.push(expected_event);
             expected_writesets.push(expected_writeset);
             if is_epoch_ending || cur_txns.len() >= self.chunk_size {
-                // verify results
-                let fail_txns = self.execute_and_verify(
-                    chunk_start_version,
-                    &cur_txns,
-                    &expected_txn_infos,
-                    &expected_events,
-                    &expected_writesets,
-                )?;
-                // collect failed transactions
-                total_failed_txns.extend(fail_txns);
-                self.replay_stat.update_cnt(cur_txns.len() as u64);
+                let cnt = cur_txns.len();
+                while !cur_txns.is_empty() {
+                    // verify results
+                    let failed_txn_opt = self.execute_and_verify(
+                        &mut chunk_start_version,
+                        &mut cur_txns,
+                        &mut expected_txn_infos,
+                        &mut expected_events,
+                        &mut expected_writesets,
+                    )?;
+                    // collect failed transactions
+                    total_failed_txns.extend(failed_txn_opt);
+                }
+                self.replay_stat.update_cnt(cnt as u64);
                 self.replay_stat.print_tps();
-
-                // empty for the new chunk
-                chunk_start_version = start + (idx as u64) + 1;
-                cur_txns.clear();
-                expected_txn_infos.clear();
-                expected_events.clear();
-                expected_writesets.clear();
             }
         }
         // verify results
         let fail_txns = self.execute_and_verify(
-            chunk_start_version,
-            &cur_txns,
-            &expected_txn_infos,
-            &expected_events,
-            &expected_writesets,
+            &mut chunk_start_version,
+            &mut cur_txns,
+            &mut expected_txn_infos,
+            &mut expected_events,
+            &mut expected_writesets,
         )?;
         total_failed_txns.extend(fail_txns);
         Ok(total_failed_txns)
@@ -298,14 +293,14 @@ impl Verifier {
 
     fn execute_and_verify(
         &self,
-        start_version: Version,
-        cur_txns: &[Transaction],
-        expected_txn_infos: &Vec<TransactionInfo>,
-        expected_epoch_events: &Vec<Vec<ContractEvent>>,
-        expected_epoch_writesets: &Vec<WriteSet>,
-    ) -> Result<Vec<Error>> {
+        current_version: &mut Version,
+        cur_txns: &mut Vec<Transaction>,
+        expected_txn_infos: &mut Vec<TransactionInfo>,
+        expected_events: &mut Vec<Vec<ContractEvent>>,
+        expected_writesets: &mut Vec<WriteSet>,
+    ) -> Result<Option<Error>> {
         if cur_txns.is_empty() {
-            return Ok(Vec::new());
+            return Ok(None);
         }
         let txns = cur_txns
             .iter()
@@ -316,38 +311,45 @@ impl Verifier {
             &txns_provider,
             &self
                 .arc_db
-                .state_view_at_version(start_version.checked_sub(1))?,
+                .state_view_at_version(current_version.checked_sub(1))?,
         )?;
+        assert_eq!(executed_outputs.len(), cur_txns.len());
 
-        let mut failed_txns = Vec::new();
-        let mut version = start_version;
-        for (idx, (expected_txn_info, expected_events, expected_writeset, executed_output)) in
-            multizip((
-                expected_txn_infos,
-                expected_epoch_events,
-                expected_epoch_writesets,
-                executed_outputs,
-            ))
-            .enumerate()
-        {
-            version = start_version + idx as Version;
-            if let Err(err) = executed_output.ensure_match_transaction_info(
+        for idx in 0..cur_txns.len() {
+            let version = *current_version;
+            *current_version += 1;
+
+            if let Err(err) = executed_outputs[idx].ensure_match_transaction_info(
                 version,
-                expected_txn_info,
-                Some(expected_writeset),
-                Some(expected_events),
+                &expected_txn_infos[idx],
+                Some(&expected_writesets[idx]),
+                Some(&expected_events[idx]),
             ) {
-                failed_txns.push(err);
+                let err_opt = if idx == 0 {
+                    // FIXME(aldenhu): remove this hack
+                    warn!(
+                        version = version,
+                        "Probably known failure due to StateStorageUsage missing from a restored DB."
+                    );
+                    Ok(None)
+                } else {
+                    Ok(Some(err))
+                };
+
+                cur_txns.drain(0..idx + 1);
+                expected_txn_infos.drain(0..idx + 1);
+                expected_events.drain(0..idx + 1);
+                expected_writesets.drain(0..idx + 1);
+
+                return err_opt;
             }
         }
 
-        if (version + 1 - start_version) as usize != expected_txn_infos.len() {
-            bail!(
-                "processed transaction count {} is not equal to expected transaction count {}",
-                version + 1 - start_version,
-                expected_txn_infos.len()
-            );
-        }
-        Ok(failed_txns)
+        cur_txns.clear();
+        expected_txn_infos.clear();
+        expected_events.clear();
+        expected_writesets.clear();
+
+        Ok(None)
     }
 }

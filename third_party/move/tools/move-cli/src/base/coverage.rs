@@ -3,7 +3,7 @@
 
 use super::reroot_path;
 use clap::*;
-use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
+use legacy_move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_coverage::{
     coverage_map::CoverageMap,
     format_csv_summary, format_human_summary,

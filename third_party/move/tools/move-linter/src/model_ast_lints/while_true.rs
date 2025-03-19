@@ -4,7 +4,7 @@
 //! This module implements an expression linter that checks code of the form:
 //! `while (true) { ... }` and suggests to use `loop { ... }` instead.
 
-use move_compiler::parser::syntax::FOR_LOOP_UPDATE_ITER_FLAG;
+use legacy_move_compiler::parser::syntax::FOR_LOOP_UPDATE_ITER_FLAG;
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
     ast::{Exp, ExpData, Value},

@@ -1,12 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    config::VMConfig,
-    loader::{LegacyModuleStorageAdapter, Loader, PseudoGasContext, VALUE_DEPTH_MAX},
-    storage::ty_tag_converter::TypeTagConverter,
-    ModuleStorage,
-};
+use crate::{config::VMConfig, storage::ty_tag_converter::TypeTagConverter, ModuleStorage};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     function::MoveFunctionLayout,
@@ -24,6 +19,9 @@ use std::sync::Arc;
 /// Maximal nodes which are allowed when converting to layout. This includes the types of
 /// fields for struct types.
 const MAX_TYPE_TO_LAYOUT_NODES: u64 = 256;
+
+/// Maximal depth of a value in terms of type depth.
+const VALUE_DEPTH_MAX: u64 = 128;
 
 /// A trait allowing to convert runtime types into other types used throughout the stack.
 #[allow(private_bounds)]
@@ -440,76 +438,3 @@ impl<'a> LayoutConverterBase for StorageLayoutConverter<'a> {
 }
 
 impl<'a> LayoutConverter for StorageLayoutConverter<'a> {}
-
-// --------------------------------------------------------------------------------------------
-// Layout converter based on `Loader`
-
-// This should go away once we eliminated loader v1.
-
-pub(crate) struct LoaderLayoutConverter<'a> {
-    loader: &'a Loader,
-    module_store: &'a LegacyModuleStorageAdapter,
-    module_storage: &'a dyn ModuleStorage,
-}
-
-impl<'a> LoaderLayoutConverter<'a> {
-    pub fn new(
-        loader: &'a Loader,
-        module_store: &'a LegacyModuleStorageAdapter,
-        module_storage: &'a dyn ModuleStorage,
-    ) -> Self {
-        Self {
-            loader,
-            module_store,
-            module_storage,
-        }
-    }
-}
-
-impl<'a> LayoutConverterBase for LoaderLayoutConverter<'a> {
-    fn vm_config(&self) -> &VMConfig {
-        self.loader.vm_config()
-    }
-
-    fn fetch_struct_ty_by_idx(&self, idx: StructNameIndex) -> PartialVMResult<Arc<StructType>> {
-        match self.loader {
-            Loader::V1(..) => {
-                self.loader
-                    .fetch_struct_ty_by_idx(idx, self.module_store, self.module_storage)
-            },
-            Loader::V2(..) => {
-                let struct_name = self.struct_name_index_map().idx_to_struct_name_ref(idx)?;
-                self.module_storage.fetch_struct_ty(
-                    struct_name.module.address(),
-                    struct_name.module.name(),
-                    struct_name.name.as_ident_str(),
-                )
-            },
-        }
-    }
-
-    fn struct_name_index_map(&self) -> &StructNameIndexMap {
-        self.loader.struct_name_index_map(self.module_storage)
-    }
-
-    fn struct_name_idx_to_struct_tag(
-        &self,
-        idx: StructNameIndex,
-        ty_args: &[Type],
-    ) -> PartialVMResult<StructTag> {
-        match self.loader {
-            Loader::V1(loader) => {
-                let mut gas_context = PseudoGasContext::new(self.vm_config());
-                let arg_tags = ty_args
-                    .iter()
-                    .map(|t| loader.type_to_type_tag_impl(t, &mut gas_context))
-                    .collect::<PartialVMResult<Vec<_>>>()?;
-                loader.name_cache.idx_to_struct_tag(idx, arg_tags)
-            },
-            Loader::V2(..) => TypeTagConverter::new(self.module_storage.runtime_environment())
-                .struct_name_idx_to_struct_tag(&idx, ty_args),
-        }
-    }
-}
-
-impl<'a> LayoutConverter for LoaderLayoutConverter<'a> {}

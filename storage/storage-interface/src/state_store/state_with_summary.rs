@@ -81,7 +81,7 @@ impl LedgerStateWithSummary {
         Self::from_latest_and_last_checkpoint(checkpoint.clone(), checkpoint)
     }
 
-    pub fn new_dummy() -> Self {
+    pub fn new_empty() -> Self {
         let empty = StateWithSummary::new_empty();
         Self::from_latest_and_last_checkpoint(empty.clone(), empty)
     }
