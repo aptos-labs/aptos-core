@@ -14,7 +14,6 @@ use crate::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_core_types::ability::AbilitySet;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Rewriter for expressions, allowing to substitute locals by expressions as well as instantiate
@@ -205,7 +204,6 @@ pub trait ExpRewriterFunctions {
         pat: &Pattern,
         body: &Exp,
         capture_kind: LambdaCaptureKind,
-        abilities: AbilitySet,
     ) -> Option<Exp> {
         None
     }
@@ -363,18 +361,18 @@ pub trait ExpRewriterFunctions {
                     exp
                 }
             },
-            Lambda(id, pat, body, capture_kind, abilities) => {
+            Lambda(id, pat, body, capture_kind) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat, true);
                 self.rewrite_enter_scope(new_id, new_pat.vars().iter());
                 let (body_changed, new_body) = self.internal_rewrite_exp(body);
                 self.rewrite_exit_scope(new_id);
                 if let Some(new_exp) =
-                    self.rewrite_lambda(new_id, &new_pat, &new_body, *capture_kind, *abilities)
+                    self.rewrite_lambda(new_id, &new_pat, &new_body, *capture_kind)
                 {
                     new_exp
                 } else if id_changed || pat_changed || body_changed {
-                    Lambda(new_id, new_pat, new_body, *capture_kind, *abilities).into_exp()
+                    Lambda(new_id, new_pat, new_body, *capture_kind).into_exp()
                 } else {
                     exp
                 }

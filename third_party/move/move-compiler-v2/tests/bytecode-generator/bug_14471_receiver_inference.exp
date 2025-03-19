@@ -112,52 +112,52 @@ module 815.m {
 struct MyMap has key {
 	table: Table<address, ValueWrap>
 }
-struct Table<Ty0, Ty1> has store {
-	x: Ty0,
-	y: Ty1
+struct Table<T1, T2> has store {
+	x: T1,
+	y: T2
 }
 struct ValueWrap has drop, store {
 	val: u64
 }
 
-contains<Ty0: drop, Ty1: drop>(Arg0: &Table<Ty0, Ty1>, Arg1: Ty0): bool /* def_idx: 0 */ {
+contains<T1: drop, T2: drop>(self: &Table<T1, T2>, _key: T1): bool /* def_idx: 0 */ {
 B0:
 	0: LdTrue
-	1: MoveLoc[0](Arg0: &Table<Ty0, Ty1>)
+	1: MoveLoc[0](self: &Table<T1, T2>)
 	2: Pop
 	3: Ret
 }
-add<Ty0: drop, Ty1: drop>(Arg0: &mut Table<Ty0, Ty1>, Arg1: Ty0, Arg2: Ty1) /* def_idx: 1 */ {
+add<T1: drop, T2: drop>(self: &mut Table<T1, T2>, _key: T1, _val: T2) /* def_idx: 1 */ {
 B0:
-	0: MoveLoc[0](Arg0: &mut Table<Ty0, Ty1>)
+	0: MoveLoc[0](self: &mut Table<T1, T2>)
 	1: Pop
 	2: Ret
 }
-public add_when_missing(Arg0: address, Arg1: u64) /* def_idx: 2 */ {
-L2:	loc0: &mut MyMap
-L3:	loc1: ValueWrap
+public add_when_missing(key: address, val: u64) /* def_idx: 2 */ {
+L2:	my_map: &mut MyMap
+L3:	wrap: ValueWrap
 B0:
 	0: LdConst[0](Address: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 21])
 	1: MutBorrowGlobal[0](MyMap)
-	2: StLoc[2](loc0: &mut MyMap)
-	3: CopyLoc[2](loc0: &mut MyMap)
+	2: StLoc[2](my_map: &mut MyMap)
+	3: CopyLoc[2](my_map: &mut MyMap)
 	4: ImmBorrowField[0](MyMap.table: Table<address, ValueWrap>)
-	5: CopyLoc[0](Arg0: address)
+	5: CopyLoc[0](key: address)
 	6: Call contains<address, ValueWrap>(&Table<address, ValueWrap>, address): bool
 	7: BrTrue(17)
 B1:
-	8: MoveLoc[1](Arg1: u64)
+	8: MoveLoc[1](val: u64)
 	9: Pack[2](ValueWrap)
-	10: StLoc[3](loc1: ValueWrap)
-	11: MoveLoc[2](loc0: &mut MyMap)
+	10: StLoc[3](wrap: ValueWrap)
+	11: MoveLoc[2](my_map: &mut MyMap)
 	12: MutBorrowField[0](MyMap.table: Table<address, ValueWrap>)
-	13: MoveLoc[0](Arg0: address)
-	14: MoveLoc[3](loc1: ValueWrap)
+	13: MoveLoc[0](key: address)
+	14: MoveLoc[3](wrap: ValueWrap)
 	15: Call add<address, ValueWrap>(&mut Table<address, ValueWrap>, address, ValueWrap)
 B2:
 	16: Ret
 B3:
-	17: MoveLoc[2](loc0: &mut MyMap)
+	17: MoveLoc[2](my_map: &mut MyMap)
 	18: Pop
 	19: Branch(16)
 }

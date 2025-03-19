@@ -8,7 +8,8 @@ use crate::{
     },
 };
 use anyhow::Result;
-use aptos_protos::transaction::v1::Transaction;
+use aptos_protos::{transaction::v1::Transaction, util::timestamp::Timestamp};
+use aptos_transaction_filter::{BooleanTransactionFilter, Filterable};
 use prost::Message;
 use std::{
     path::PathBuf,
@@ -74,7 +75,9 @@ impl FileStoreReader {
         version: u64,
         retries: u8,
         max_files: Option<usize>,
-        tx: Sender<(Vec<Transaction>, usize)>,
+        filter: Option<BooleanTransactionFilter>,
+        ending_version: Option<u64>,
+        tx: Sender<(Vec<Transaction>, usize, Timestamp, (u64, u64))>,
     ) {
         trace!(
             "Getting transactions from file store, version: {version}, max_files: {max_files:?}."
@@ -107,23 +110,39 @@ impl FileStoreReader {
 
         for i in file_index..end_file_index {
             let current_version = batch_metadata.files[i].first_version;
-            let mut size_bytes = batch_metadata.files[i].size_bytes;
+            if let Some(ending_version) = ending_version {
+                if current_version >= ending_version {
+                    break;
+                }
+            }
             let transactions = self
                 .get_transaction_file_at_version(current_version, retries)
                 .await;
             if let Ok(mut transactions) = transactions {
+                let timestamp = transactions.last().unwrap().timestamp.unwrap();
                 let num_to_skip = version.saturating_sub(current_version) as usize;
-                let result = if num_to_skip > 0 {
-                    let transactions_to_return = transactions.split_off(num_to_skip);
-                    for transaction in transactions {
-                        size_bytes -= transaction.encoded_len();
-                    }
-                    (transactions_to_return, size_bytes)
-                } else {
-                    (transactions, size_bytes)
-                };
-                trace!("Got {} transactions from file store to send, size: {size_bytes}, first_version: {:?}", result.0.len(), result.0.first().map(|t| t.version));
-                if tx.send(result).await.is_err() {
+                if num_to_skip > 0 {
+                    transactions = transactions.split_off(num_to_skip);
+                }
+                let mut processed_range = (
+                    transactions.first().unwrap().version,
+                    transactions.last().unwrap().version,
+                );
+                if let Some(ending_version) = ending_version {
+                    transactions
+                        .truncate(transactions.partition_point(|t| t.version < ending_version));
+                    processed_range.1 = processed_range.1.min(ending_version - 1);
+                }
+                if let Some(ref filter) = filter {
+                    transactions.retain(|t| filter.matches(t));
+                }
+                let size_bytes = transactions.iter().map(|t| t.encoded_len()).sum();
+                trace!("Got {} transactions from file store to send, size: {size_bytes}, processed_range: [{}, {}]", transactions.len(), processed_range.0, processed_range.1);
+                if tx
+                    .send((transactions, size_bytes, timestamp, processed_range))
+                    .await
+                    .is_err()
+                {
                     break;
                 }
             } else {

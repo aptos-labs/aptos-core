@@ -3,7 +3,7 @@
 
 use crate::{
     cli_build_information,
-    common::types::{CliCommand, CliError, CliTypedResult},
+    common::types::{CliCommand, CliError, CliTypedResult, PromptOptions},
     update::{
         get_additional_binaries_dir, prover_dependency_installer::DependencyInstaller,
         update_binary,
@@ -14,9 +14,10 @@ use aptos_build_info::BUILD_OS;
 use async_trait::async_trait;
 use clap::Parser;
 use move_prover_boogie_backend::options::{
-    BoogieOptions, MAX_BOOGIE_VERSION, MAX_CVC5_VERSION, MAX_Z3_VERSION, MIN_BOOGIE_VERSION,
-    MIN_CVC5_VERSION, MIN_Z3_VERSION,
+    BoogieOptions, MAX_BOOGIE_VERSION, MAX_Z3_VERSION, MIN_BOOGIE_VERSION, MIN_Z3_VERSION,
 };
+#[cfg(unix)]
+use move_prover_boogie_backend::options::{MAX_CVC5_VERSION, MIN_CVC5_VERSION};
 use std::{
     env,
     path::{Path, PathBuf},
@@ -50,8 +51,6 @@ const TARGET_CVC5_VERSION: &str = "0.0.3";
 
 #[cfg(not(target_os = "windows"))]
 const CVC5_EXE_ENV: &str = "CVC5_EXE";
-#[cfg(target_os = "windows")]
-const CVC5_EXE: &str = "cvc5.exe";
 #[cfg(not(target_os = "windows"))]
 const CVC5_EXE: &str = "cvc5";
 
@@ -62,6 +61,9 @@ pub struct ProverDependencyInstaller {
     /// given we will put it in a standard location for your OS.
     #[clap(long)]
     install_dir: Option<PathBuf>,
+
+    #[clap(flatten)]
+    pub prompt_options: PromptOptions,
 }
 
 impl ProverDependencyInstaller {
@@ -193,6 +195,7 @@ impl ProverDependencyInstaller {
             target_version: version.to_string(),
             install_dir: Some(install_dir.clone()),
             check: false,
+            assume_yes: self.prompt_options.assume_yes,
         };
         let result = update_binary(installer).await?;
 

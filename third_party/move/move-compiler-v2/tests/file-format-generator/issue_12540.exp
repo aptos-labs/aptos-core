@@ -1,0 +1,31 @@
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+
+
+public point_add_assign(a: &mut u64, b: &u64): &mut u64 /* def_idx: 0 */ {
+L2:	return: &mut u64
+B0:
+	0: CopyLoc[0](a: &mut u64)
+	1: FreezeRef
+	2: MoveLoc[1](b: &u64)
+	3: LdTrue
+	4: Call point_add_internal(&u64, &u64, bool): u64
+	5: MoveLoc[0](a: &mut u64)
+	6: StLoc[2](return: &mut u64)
+	7: Pop
+	8: MoveLoc[2](return: &mut u64)
+	9: Ret
+}
+point_add_internal(a: &u64, b: &u64, _in_place: bool): u64 /* def_idx: 1 */ {
+B0:
+	0: MoveLoc[0](a: &u64)
+	1: ReadRef
+	2: MoveLoc[1](b: &u64)
+	3: ReadRef
+	4: Add
+	5: Ret
+}
+}
+============ bytecode verification succeeded ========

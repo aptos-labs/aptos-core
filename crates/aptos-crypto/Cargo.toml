@@ -101,6 +101,10 @@ name = "bulletproofs"
 harness = false
 
 [[bench]]
+name = "bulletproofs_batch_verify"
+harness = false
+
+[[bench]]
 name = "ed25519"
 harness = false
 

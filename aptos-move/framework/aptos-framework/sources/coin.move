@@ -19,7 +19,7 @@ module aptos_framework::coin {
     use aptos_framework::fungible_asset::{Self, FungibleAsset, Metadata, MintRef, TransferRef, BurnRef};
     use aptos_framework::object::{Self, Object, object_address};
     use aptos_framework::primary_fungible_store;
-    use aptos_std::type_info::{Self, TypeInfo, type_name};
+    use aptos_std::type_info::{Self, TypeInfo};
     use aptos_framework::create_signer;
 
     friend aptos_framework::aptos_coin;
@@ -113,7 +113,7 @@ module aptos_framework::coin {
     //
 
     const MAX_COIN_NAME_LENGTH: u64 = 32;
-    const MAX_COIN_SYMBOL_LENGTH: u64 = 10;
+    const MAX_COIN_SYMBOL_LENGTH: u64 = 32;
 
     /// Core data structures
 
@@ -622,7 +622,7 @@ module aptos_framework::coin {
             fungible_asset::withdraw_permission_check_by_address(
                 account,
                 primary_fungible_store::primary_store_address(
-                    signer::address_of(account),
+                    permissioned_signer::address_of(account),
                     ensure_paired_metadata<CoinType>()
                 ),
                 0
@@ -634,7 +634,7 @@ module aptos_framework::coin {
     public entry fun migrate_to_fungible_store<CoinType>(
         account: &signer
     ) acquires CoinStore, CoinConversionMap, CoinInfo {
-        let account_addr = signer::address_of(account);
+        let account_addr = permissioned_signer::address_of(account);
         assert_signer_has_permission<CoinType>(account);
         maybe_convert_to_fungible_store<CoinType>(account_addr);
     }
@@ -862,16 +862,10 @@ module aptos_framework::coin {
                 !coin_store.frozen,
                 error::permission_denied(EFROZEN),
             );
-            if (std::features::module_event_migration_enabled()) {
-                event::emit(
-                    CoinDeposit { coin_type: type_name<CoinType>(), account: account_addr, amount: coin.value }
-                );
-            } else {
                 event::emit_event<DepositEvent>(
                     &mut coin_store.deposit_events,
                     DepositEvent { amount: coin.value },
                 );
-            };
             merge(&mut coin_store.coin, coin);
         } else {
             let metadata = paired_metadata<CoinType>();
@@ -891,7 +885,7 @@ module aptos_framework::coin {
         coin: Coin<CoinType>
     ) acquires CoinStore, CoinConversionMap, CoinInfo {
         let metadata = ensure_paired_metadata<CoinType>();
-        let account_address = signer::address_of(account);
+        let account_address = permissioned_signer::address_of(account);
         fungible_asset::refill_permission(
             account,
             coin.value,
@@ -1035,7 +1029,7 @@ module aptos_framework::coin {
         monitor_supply: bool,
         parallelizable: bool,
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) acquires CoinInfo, CoinConversionMap {
-        let account_addr = signer::address_of(account);
+        let account_addr = permissioned_signer::address_of(account);
         assert_signer_has_permission<CoinType>(account);
 
         assert!(
@@ -1093,7 +1087,7 @@ module aptos_framework::coin {
     }
 
     public fun register<CoinType>(account: &signer) acquires CoinInfo, CoinConversionMap {
-        let account_addr = signer::address_of(account);
+        let account_addr = permissioned_signer::address_of(account);
         assert_signer_has_permission<CoinType>(account);
         // Short-circuit and do nothing if account is already registered for CoinType.
         if (is_account_registered<CoinType>(account_addr)) {
@@ -1130,7 +1124,7 @@ module aptos_framework::coin {
         account: &signer,
         amount: u64,
     ): Coin<CoinType> acquires CoinStore, CoinConversionMap, CoinInfo, PairedCoinType {
-        let account_addr = signer::address_of(account);
+        let account_addr = permissioned_signer::address_of(account);
 
         let (coin_amount_to_withdraw, fa_amount_to_withdraw) = calculate_amount_to_withdraw<CoinType>(
             account_addr,
@@ -1153,18 +1147,10 @@ module aptos_framework::coin {
                 !coin_store.frozen,
                 error::permission_denied(EFROZEN),
             );
-            if (std::features::module_event_migration_enabled()) {
-                event::emit(
-                    CoinWithdraw {
-                        coin_type: type_name<CoinType>(), account: account_addr, amount: coin_amount_to_withdraw
-                    }
-                );
-            } else {
-                event::emit_event<WithdrawEvent>(
-                    &mut coin_store.withdraw_events,
-                    WithdrawEvent { amount: coin_amount_to_withdraw },
-                );
-            };
+            event::emit_event<WithdrawEvent>(
+                &mut coin_store.withdraw_events,
+                WithdrawEvent { amount: coin_amount_to_withdraw },
+            );
             extract(&mut coin_store.coin, coin_amount_to_withdraw)
         } else {
             zero()
@@ -1792,7 +1778,6 @@ module aptos_framework::coin {
             !coin_store.frozen,
             error::permission_denied(EFROZEN),
         );
-
         event::emit_event<DepositEvent>(
             &mut coin_store.deposit_events,
             DepositEvent { amount: coin.value },

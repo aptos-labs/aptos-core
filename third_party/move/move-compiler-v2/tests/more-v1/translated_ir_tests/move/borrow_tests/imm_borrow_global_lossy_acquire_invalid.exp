@@ -10,4 +10,4 @@ error: function acquires global `Tester::Pair` which is currently borrowed
    │         ^^^^^^^^^^^^^^^^^^^^ function called here
    ·
 35 │     fun eq_helper(p1: &Pair, addr2: address): bool acquires Pair {
-   │                                                             ----- access declared here
+   │                                                             ----- `acquires` declared here

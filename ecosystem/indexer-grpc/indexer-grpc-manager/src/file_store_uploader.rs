@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::data_manager::DataManager;
+use crate::{
+    data_manager::DataManager,
+    metrics::{FILE_STORE_UPLOADED_BYTES, FILE_STORE_VERSION, TIMER},
+};
 use anyhow::Result;
 use aptos_indexer_grpc_utils::{
     compression_util::{FileEntry, StorageFormat},
@@ -18,8 +21,9 @@ use tokio::{sync::mpsc::channel, time::Instant};
 use tracing::info;
 
 const NUM_TXNS_PER_FOLDER: u64 = 100000;
-const MAX_SIZE_PER_FILE: usize = 20 * (1 << 20);
+const MAX_SIZE_PER_FILE: usize = 50 * (1 << 20);
 const MAX_NUM_FOLDERS_TO_CHECK_FOR_RECOVERY: usize = 5;
+const MIN_UPDATE_FREQUENCY: Duration = Duration::from_secs(10);
 
 pub(crate) struct FileStoreUploader {
     chain_id: u64,
@@ -78,6 +82,8 @@ impl FileStoreUploader {
 
     /// Recovers the batch metadata in memory buffer for the unfinished batch from file store.
     async fn recover(&self) -> Result<(u64, BatchMetadata)> {
+        let _timer = TIMER.with_label_values(&["recover"]).start_timer();
+
         let mut version = self
             .reader
             .get_latest_version()
@@ -116,23 +122,33 @@ impl FileStoreUploader {
         )
         .await;
         tokio_scoped::scope(|s| {
-            let (tx, mut rx) = channel(5);
+            let (tx, mut rx) = channel::<(_, BatchMetadata, _)>(5);
             s.spawn(async move {
                 while let Some((transactions, batch_metadata, end_batch)) = rx.recv().await {
+                    let bytes_to_upload = batch_metadata.files.last().unwrap().size_bytes as u64;
                     self.do_upload(transactions, batch_metadata, end_batch)
                         .await
                         .unwrap();
+                    FILE_STORE_UPLOADED_BYTES.inc_by(bytes_to_upload);
                 }
             });
             s.spawn(async move {
                 loop {
-                    let transactions = data_manager
-                        .get_transactions_from_cache(
-                            file_store_operator.version(),
-                            MAX_SIZE_PER_FILE,
-                            /*update_file_store_version=*/ true,
-                        )
-                        .await;
+                    let _timer = TIMER
+                        .with_label_values(&["file_store_uploader_main_loop"])
+                        .start_timer();
+                    let transactions = {
+                        let _timer = TIMER
+                            .with_label_values(&["get_transactions_from_cache"])
+                            .start_timer();
+                        data_manager
+                            .get_transactions_from_cache(
+                                file_store_operator.version(),
+                                MAX_SIZE_PER_FILE,
+                                /*update_file_store_version=*/ true,
+                            )
+                            .await
+                    };
                     let len = transactions.len();
                     for transaction in transactions {
                         file_store_operator
@@ -156,23 +172,34 @@ impl FileStoreUploader {
         batch_metadata: BatchMetadata,
         end_batch: bool,
     ) -> Result<()> {
+        let _timer = TIMER.with_label_values(&["do_upload"]).start_timer();
+
         let first_version = transactions.first().unwrap().version;
         let last_version = transactions.last().unwrap().version;
-        let data_file =
-            FileEntry::from_transactions(transactions, StorageFormat::Lz4CompressedProto);
+        let data_file = {
+            let _timer = TIMER
+                .with_label_values(&["do_upload__prepare_file"])
+                .start_timer();
+            FileEntry::from_transactions(transactions, StorageFormat::Lz4CompressedProto)
+        };
         let path = self.reader.get_path_for_version(first_version);
 
         info!("Dumping transactions [{first_version}, {last_version}] to file {path:?}.");
 
-        self.writer
-            .save_raw_file(path, data_file.into_inner())
-            .await?;
+        {
+            let _timer = TIMER
+                .with_label_values(&["do_upload__save_file"])
+                .start_timer();
+            self.writer
+                .save_raw_file(path, data_file.into_inner())
+                .await?;
+        }
 
         let mut update_batch_metadata = false;
         let max_update_frequency = self.writer.max_update_frequency();
         if self.last_batch_metadata_update_time.is_none()
             || Instant::now() - self.last_batch_metadata_update_time.unwrap()
-                >= max_update_frequency
+                >= MIN_UPDATE_FREQUENCY
         {
             update_batch_metadata = true;
         } else if end_batch {
@@ -188,12 +215,17 @@ impl FileStoreUploader {
         }
 
         let batch_metadata_path = self.reader.get_path_for_batch_metadata(first_version);
-        self.writer
-            .save_raw_file(
-                batch_metadata_path,
-                serde_json::to_vec(&batch_metadata).map_err(anyhow::Error::msg)?,
-            )
-            .await?;
+        {
+            let _timer = TIMER
+                .with_label_values(&["do_upload__update_batch_metadata"])
+                .start_timer();
+            self.writer
+                .save_raw_file(
+                    batch_metadata_path,
+                    serde_json::to_vec(&batch_metadata).map_err(anyhow::Error::msg)?,
+                )
+                .await?;
+        }
 
         if end_batch {
             self.last_batch_metadata_update_time = None;
@@ -202,6 +234,9 @@ impl FileStoreUploader {
         }
 
         if Instant::now() - self.last_metadata_update_time >= max_update_frequency {
+            let _timer = TIMER
+                .with_label_values(&["do_upload__update_metadata"])
+                .start_timer();
             self.update_file_store_metadata(last_version + 1).await?;
             self.last_metadata_update_time = Instant::now();
         }
@@ -211,6 +246,7 @@ impl FileStoreUploader {
 
     /// Updates the file store metadata.
     async fn update_file_store_metadata(&self, version: u64) -> Result<()> {
+        FILE_STORE_VERSION.set(version as i64);
         let metadata = FileStoreMetadata {
             chain_id: self.chain_id,
             num_transactions_per_folder: NUM_TXNS_PER_FOLDER,

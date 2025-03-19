@@ -50,7 +50,6 @@ runs:
         INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
         RUST_MIN_STACK: "4297152"
         MVP_TEST_ON_CI: "true"
-        SOLC_EXE: /home/runner/bin/solc
         Z3_EXE: /home/runner/bin/z3
         CVC5_EXE: /home/runner/bin/cvc5
         DOTNET_ROOT: /home/runner/.dotnet

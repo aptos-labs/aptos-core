@@ -150,55 +150,55 @@ struct S {
 	y: u64
 }
 
-bar(Arg0: &mut u64, Arg1: u64): &mut u64 /* def_idx: 0 */ {
+bar(r: &mut u64, i: u64): &mut u64 /* def_idx: 0 */ {
 B0:
-	0: MoveLoc[1](Arg1: u64)
-	1: CopyLoc[0](Arg0: &mut u64)
+	0: MoveLoc[1](i: u64)
+	1: CopyLoc[0](r: &mut u64)
 	2: WriteRef
-	3: MoveLoc[0](Arg0: &mut u64)
+	3: MoveLoc[0](r: &mut u64)
 	4: Ret
 }
-baz(Arg0: &mut u64, Arg1: u64) /* def_idx: 1 */ {
+baz(r: &mut u64, i: u64) /* def_idx: 1 */ {
 B0:
-	0: MoveLoc[1](Arg1: u64)
-	1: MoveLoc[0](Arg0: &mut u64)
+	0: MoveLoc[1](i: u64)
+	1: MoveLoc[0](r: &mut u64)
 	2: WriteRef
 	3: Ret
 }
-foo(Arg0: &u64): u64 /* def_idx: 2 */ {
+foo(l: &u64): u64 /* def_idx: 2 */ {
 B0:
-	0: MoveLoc[0](Arg0: &u64)
+	0: MoveLoc[0](l: &u64)
 	1: ReadRef
 	2: Ret
 }
-public test(Arg0: &mut S, Arg1: u64) /* def_idx: 3 */ {
-L2:	loc0: u64
+public test(s: &mut S, v: u64) /* def_idx: 3 */ {
+L2:	n: u64
 B0:
-	0: CopyLoc[0](Arg0: &mut S)
+	0: CopyLoc[0](s: &mut S)
 	1: ImmBorrowField[0](S.x: u64)
 	2: Call foo(&u64): u64
-	3: StLoc[2](loc0: u64)
-	4: CopyLoc[0](Arg0: &mut S)
+	3: StLoc[2](n: u64)
+	4: CopyLoc[0](s: &mut S)
 	5: ImmBorrowField[0](S.x: u64)
 	6: ReadRef
-	7: CopyLoc[2](loc0: u64)
-	8: CopyLoc[0](Arg0: &mut S)
+	7: CopyLoc[2](n: u64)
+	8: CopyLoc[0](s: &mut S)
 	9: ImmBorrowField[1](S.y: u64)
 	10: ReadRef
 	11: Mul
 	12: Eq
 	13: BrFalse(21)
 B1:
-	14: MoveLoc[0](Arg0: &mut S)
+	14: MoveLoc[0](s: &mut S)
 	15: MutBorrowField[0](S.x: u64)
-	16: MoveLoc[2](loc0: u64)
+	16: MoveLoc[2](n: u64)
 	17: Call bar(&mut u64, u64): &mut u64
-	18: MoveLoc[1](Arg1: u64)
+	18: MoveLoc[1](v: u64)
 	19: Call baz(&mut u64, u64)
 B2:
 	20: Ret
 B3:
-	21: MoveLoc[0](Arg0: &mut S)
+	21: MoveLoc[0](s: &mut S)
 	22: Pop
 	23: Branch(20)
 }

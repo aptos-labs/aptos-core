@@ -398,6 +398,7 @@ impl From<TypeTag> for Type {
                 name: s.name,
                 type_arguments: s.type_args.into_iter().map(|ty| ty.into()).collect(),
             },
+            TypeTag::Function(_) => panic!("function types not supported in normalized types"),
         }
     }
 }

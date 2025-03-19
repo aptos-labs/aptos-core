@@ -23,8 +23,8 @@ use aptos_vm_types::{
     abstract_write_op::{AbstractResourceWriteOp, WriteWithDelayedFieldsOp},
     change_set::{randomly_check_layout_matches, VMChangeSet},
     resolver::{
-        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TModuleView,
-        TResourceGroupView, TResourceView,
+        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TResourceGroupView,
+        TResourceView,
     },
 };
 use bytes::Bytes;
@@ -309,14 +309,6 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
     }
 }
 
-impl<'r> TModuleView for ExecutorViewWithChangeSet<'r> {
-    type Key = StateKey;
-
-    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
-        self.base_executor_view.get_module_state_value(state_key)
-    }
-}
-
 impl<'r> StateStorageView for ExecutorViewWithChangeSet<'r> {
     type Key = StateKey;
 
@@ -361,10 +353,6 @@ mod test {
 
     fn read_resource(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {
         bcs::from_bytes(&view.get_resource_bytes(&key(s), None).unwrap().unwrap()).unwrap()
-    }
-
-    fn read_module(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {
-        bcs::from_bytes(&view.get_module_bytes(&key(s)).unwrap().unwrap()).unwrap()
     }
 
     fn read_aggregator(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {
@@ -415,7 +403,6 @@ mod test {
     #[test]
     fn test_change_set_state_view() {
         let mut state_view = FakeDataStore::default();
-        state_view.set_legacy(key("module_base"), serialize(&10));
 
         state_view.set_legacy(key("resource_base"), serialize(&30));
         state_view.set_legacy(key("resource_both"), serialize(&40));
@@ -496,8 +483,6 @@ mod test {
             resolver.as_resource_group_view(),
             change_set,
         );
-
-        assert_eq!(read_module(&view, "module_base"), 10);
 
         assert_eq!(read_resource(&view, "resource_base"), 30);
         assert_eq!(read_resource(&view, "resource_both"), 80);

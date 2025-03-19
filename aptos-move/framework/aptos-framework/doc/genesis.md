@@ -29,6 +29,7 @@
     -  [Function `create_initialize_validators_with_commission`](#@Specification_1_create_initialize_validators_with_commission)
     -  [Function `create_initialize_validators`](#@Specification_1_create_initialize_validators)
     -  [Function `create_initialize_validator`](#@Specification_1_create_initialize_validator)
+    -  [Function `initialize_validator`](#@Specification_1_initialize_validator)
     -  [Function `set_genesis_end`](#@Specification_1_set_genesis_end)
 
 
@@ -1024,6 +1025,22 @@ The last step of genesis.
 
 
 <pre><code><b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">stake::ResourceRequirement</a>;
+</code></pre>
+
+
+
+<a id="@Specification_1_initialize_validator"></a>
+
+### Function `initialize_validator`
+
+
+<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_validator">initialize_validator</a>(pool_address: <b>address</b>, validator: &<a href="genesis.md#0x1_genesis_ValidatorConfiguration">genesis::ValidatorConfiguration</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
 </code></pre>
 
 

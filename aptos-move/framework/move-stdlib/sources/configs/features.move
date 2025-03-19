@@ -634,6 +634,38 @@ module std::features {
         is_enabled(ACCOUNT_ABSTRACTION)
     }
 
+    /// Whether bytecode version v8 is enabled.
+    /// Lifetime: transient
+    ///
+    /// We do not expect use from Move, so for now only for documentation purposes here
+    const VM_BINARY_FORMAT_V8: u64 = 86;
+
+    /// Whether the batch Bulletproofs native functions are available. This is needed because of the introduction of a new native function.
+    /// Lifetime: transient
+    const BULLETPROOFS_BATCH_NATIVES: u64 = 87;
+
+    public fun get_bulletproofs_batch_feature(): u64 { BULLETPROOFS_BATCH_NATIVES }
+
+    public fun bulletproofs_batch_enabled(): bool acquires Features {
+        is_enabled(BULLETPROOFS_BATCH_NATIVES)
+    }
+
+    /// Whether the account abstraction is enabled.
+    ///
+    /// Lifetime: transient
+    const DOMAIN_ACCOUNT_ABSTRACTION: u64 = 88;
+
+    public fun is_domain_account_abstraction_enabled(): bool acquires Features {
+        is_enabled(DOMAIN_ACCOUNT_ABSTRACTION)
+    }
+
+    /// Whether function values are enabled.
+    /// Lifetime: transient
+    ///
+    /// We do not expect use from Move, so for now only for documentation purposes here
+    const ENABLE_FUNCTION_VALUES: u64 = 89;
+
+
     // ============================================================================================
     // Feature Flag Implementation
 
@@ -666,11 +698,11 @@ module std::features {
         if (!exists<Features>(@std)) {
             move_to<Features>(framework, Features { features: vector[] })
         };
-        let features = &mut borrow_global_mut<Features>(@std).features;
-        vector::for_each_ref(&enable, |feature| {
+        let features = &mut Features[@std].features;
+        enable.for_each_ref(|feature| {
             set(features, *feature, true);
         });
-        vector::for_each_ref(&disable, |feature| {
+        disable.for_each_ref(|feature| {
             set(features, *feature, false);
         });
     }
@@ -690,7 +722,7 @@ module std::features {
             features
         } else if (exists<Features>(@std)) {
             // Otherwise, use the currently effective feature flag vec as the baseline, if it exists.
-            borrow_global<Features>(@std).features
+            Features[@std].features
         } else {
             // Otherwise, use an empty feature vec.
             vector[]
@@ -710,7 +742,7 @@ module std::features {
         if (exists<PendingFeatures>(@std)) {
             let PendingFeatures { features } = move_from<PendingFeatures>(@std);
             if (exists<Features>(@std)) {
-                borrow_global_mut<Features>(@std).features = features;
+                Features[@std].features = features;
             } else {
                 move_to(framework, Features { features })
             }
@@ -721,35 +753,35 @@ module std::features {
     /// Check whether the feature is enabled.
     public fun is_enabled(feature: u64): bool acquires Features {
         exists<Features>(@std) &&
-            contains(&borrow_global<Features>(@std).features, feature)
+            contains(&Features[@std].features, feature)
     }
 
     /// Helper to include or exclude a feature flag.
     fun set(features: &mut vector<u8>, feature: u64, include: bool) {
         let byte_index = feature / 8;
         let bit_mask = 1 << ((feature % 8) as u8);
-        while (vector::length(features) <= byte_index) {
-            vector::push_back(features, 0)
+        while (features.length() <= byte_index) {
+            features.push_back(0)
         };
-        let entry = vector::borrow_mut(features, byte_index);
+
         if (include)
-            *entry = *entry | bit_mask
+            features[byte_index] |= bit_mask
         else
-            *entry = *entry & (0xff ^ bit_mask)
+            features[byte_index] &= (0xff ^ bit_mask)
     }
 
     /// Helper to check whether a feature flag is enabled.
     fun contains(features: &vector<u8>, feature: u64): bool {
         let byte_index = feature / 8;
         let bit_mask = 1 << ((feature % 8) as u8);
-        byte_index < vector::length(features) && (*vector::borrow(features, byte_index) & bit_mask) != 0
+        byte_index < features.length() && (features[byte_index] & bit_mask) != 0
     }
 
     fun apply_diff(features: &mut vector<u8>, enable: vector<u64>, disable: vector<u64>) {
-        vector::for_each(enable, |feature| {
+        enable.for_each(|feature| {
             set(features, feature, true);
         });
-        vector::for_each(disable, |feature| {
+        disable.for_each(|feature| {
             set(features, feature, false);
         });
     }

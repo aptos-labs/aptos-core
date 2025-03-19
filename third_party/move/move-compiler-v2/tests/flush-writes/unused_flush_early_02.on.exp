@@ -75,14 +75,14 @@ B0:
 	1: Ret
 }
 public test(): u64 * u64 /* def_idx: 2 */ {
-L0:	loc0: u64
-L1:	loc1: u64
+L0:	x: u64
+L1:	z: u64
 B0:
 	0: Call one(): u64
-	1: StLoc[0](loc0: u64)
+	1: StLoc[0](x: u64)
 	2: Call one(): u64
 	3: Call one(): u64
-	4: StLoc[1](loc1: u64)
+	4: StLoc[1](z: u64)
 	5: LdU64(0)
 	6: Eq
 	7: BrTrue(9)
@@ -91,8 +91,8 @@ B1:
 B2:
 	9: Call bar()
 B3:
-	10: MoveLoc[0](loc0: u64)
-	11: MoveLoc[1](loc1: u64)
+	10: MoveLoc[0](x: u64)
+	11: MoveLoc[1](z: u64)
 	12: Ret
 }
 }

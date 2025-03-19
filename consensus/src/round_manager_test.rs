@@ -14,9 +14,7 @@ use crate::{
         round_state::{ExponentialTimeInterval, RoundState},
     },
     metrics_safety_rules::MetricsSafetyRules,
-    network::{
-        DeprecatedIncomingBlockRetrievalRequest, IncomingBlockRetrievalRequest, NetworkSender,
-    },
+    network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::{CommitMessage, ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::DirectMempoolPayloadManager,
@@ -74,6 +72,7 @@ use aptos_types::{
     on_chain_config::{
         ConsensusAlgorithmConfig, ConsensusConfigV1, OnChainConsensusConfig,
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorTxnConfig,
+        DEFAULT_WINDOW_SIZE,
     },
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
@@ -153,7 +152,7 @@ impl NodeSetup {
         let mut onchain_consensus_config = onchain_consensus_config.unwrap_or_default();
         // With order votes feature, the validators additionally send order votes.
         // next_proposal and next_vote functions could potentially break because of it.
-        if let OnChainConsensusConfig::V3 {
+        if let OnChainConsensusConfig::V4 {
             alg:
                 ConsensusAlgorithmConfig::JolteonV2 {
                     main: _,
@@ -161,6 +160,7 @@ impl NodeSetup {
                     order_vote_enabled,
                 },
             vtxn: _,
+            window_size: _,
         } = &mut onchain_consensus_config
         {
             *order_vote_enabled = false;
@@ -285,6 +285,7 @@ impl NodeSetup {
         ));
         let time_service = Arc::new(ClockTimeService::new(executor));
 
+        let window_size = onchain_consensus_config.window_size();
         let block_store = Arc::new(BlockStore::new(
             storage.clone(),
             initial_data,
@@ -294,6 +295,7 @@ impl NodeSetup {
             10,
             Arc::from(DirectMempoolPayloadManager::new()),
             false,
+            window_size,
             Arc::new(Mutex::new(PendingBlocks::new())),
             None,
         ));
@@ -310,6 +312,7 @@ impl NodeSetup {
             PayloadTxnsSize::new(5, 500),
             10,
             1,
+            Some(30_000),
             PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
             false,
@@ -373,7 +376,10 @@ impl NodeSetup {
     pub fn restart(self, playground: &mut NetworkPlayground, executor: Handle) -> Self {
         let recover_data = self
             .storage
-            .try_start(self.onchain_consensus_config.order_vote_enabled())
+            .try_start(
+                self.onchain_consensus_config.order_vote_enabled(),
+                self.onchain_consensus_config.window_size(),
+            )
             .unwrap_or_else(|e| panic!("fail to restart due to: {}", e));
         Self::new(
             playground,
@@ -506,37 +512,7 @@ impl NodeSetup {
         self.commit_decision_queue.pop_front().unwrap()
     }
 
-    /// SOON TO BE DEPRECATED: Please use [`poll_block_retrieval_v2`](NodeSetup::poll_block_retrieval_v2) going forward
-    /// NOTE: [`IncomingBlockRetrievalRequest`](DeprecatedIncomingBlockRetrievalRequest) is being phased out over two releases
-    /// After the first release, this can be deleted
-    pub async fn poll_block_retrieval(
-        &mut self,
-    ) -> Option<DeprecatedIncomingBlockRetrievalRequest> {
-        match self.poll_next_network_event() {
-            Some(Event::RpcRequest(_, msg, protocol, response_sender)) => match msg {
-                ConsensusMsg::DeprecatedBlockRetrievalRequest(v) => {
-                    Some(DeprecatedIncomingBlockRetrievalRequest {
-                        req: *v,
-                        protocol,
-                        response_sender,
-                    })
-                },
-                msg => panic!(
-                    "Unexpected Consensus Message: {:?} on node {}",
-                    msg,
-                    self.identity_desc()
-                ),
-            },
-            Some(Event::Message(_, msg)) => panic!(
-                "Unexpected Consensus Message: {:?} on node {}",
-                msg,
-                self.identity_desc()
-            ),
-            None => None,
-        }
-    }
-
-    pub async fn poll_block_retrieval_v2(&mut self) -> Option<IncomingBlockRetrievalRequest> {
+    pub async fn poll_block_retrieval(&mut self) -> Option<IncomingBlockRetrievalRequest> {
         match self.poll_next_network_event() {
             Some(Event::RpcRequest(_, msg, protocol, response_sender)) => match msg {
                 ConsensusMsg::DeprecatedBlockRetrievalRequest(v) => {
@@ -615,8 +591,13 @@ fn start_replying_to_block_retreival(nodes: Vec<NodeSetup>) -> ReplyingRPCHandle
                         request,
                         node.identity_desc()
                     );
+                    let wrapped_request = IncomingBlockRetrievalRequest {
+                        req: request.req,
+                        protocol: request.protocol,
+                        response_sender: request.response_sender,
+                    };
                     node.block_store
-                        .process_block_retrieval(request)
+                        .process_block_retrieval(wrapped_request)
                         .await
                         .unwrap();
                 } else {
@@ -1376,8 +1357,8 @@ fn response_on_block_retrieval() {
 
         // first verify that we can retrieve the block if it's in the tree
         let (tx1, rx1) = oneshot::channel();
-        let single_block_request = DeprecatedIncomingBlockRetrievalRequest {
-            req: BlockRetrievalRequestV1::new(block_id, 1),
+        let single_block_request = IncomingBlockRetrievalRequest {
+            req: BlockRetrievalRequest::V1(BlockRetrievalRequestV1::new(block_id, 1)),
             protocol: ProtocolId::ConsensusRpcBcs,
             response_sender: tx1,
         };
@@ -1399,8 +1380,8 @@ fn response_on_block_retrieval() {
 
         // verify that if a block is not there, return ID_NOT_FOUND
         let (tx2, rx2) = oneshot::channel();
-        let missing_block_request = DeprecatedIncomingBlockRetrievalRequest {
-            req: BlockRetrievalRequestV1::new(HashValue::random(), 1),
+        let missing_block_request = IncomingBlockRetrievalRequest {
+            req: BlockRetrievalRequest::V1(BlockRetrievalRequestV1::new(HashValue::random(), 1)),
             protocol: ProtocolId::ConsensusRpcBcs,
             response_sender: tx2,
         };
@@ -1423,8 +1404,8 @@ fn response_on_block_retrieval() {
 
         // if asked for many blocks, return NOT_ENOUGH_BLOCKS
         let (tx3, rx3) = oneshot::channel();
-        let many_block_request = DeprecatedIncomingBlockRetrievalRequest {
-            req: BlockRetrievalRequestV1::new(block_id, 3),
+        let many_block_request = IncomingBlockRetrievalRequest {
+            req: BlockRetrievalRequest::V1(BlockRetrievalRequestV1::new(block_id, 3)),
             protocol: ProtocolId::ConsensusRpcBcs,
             response_sender: tx3,
         };
@@ -2557,9 +2538,10 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
         runtime.handle().clone(),
         1,
         None,
-        Some(OnChainConsensusConfig::V3 {
+        Some(OnChainConsensusConfig::V4 {
             alg: alg_config,
             vtxn: vtxn_config,
+            window_size: DEFAULT_WINDOW_SIZE,
         }),
         Some(local_config),
         Some(randomness_config),

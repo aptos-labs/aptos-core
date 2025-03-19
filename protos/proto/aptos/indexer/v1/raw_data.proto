@@ -32,6 +32,11 @@ message GetTransactionsRequest {
   optional BooleanTransactionFilter transaction_filter = 4;
 }
 
+message ProcessedRange {
+    uint64 first_version = 1;
+    uint64 last_version = 2;
+}
+
 // TransactionsResponse is a batch of transactions.
 message TransactionsResponse {
   // Required; transactions data.
@@ -39,6 +44,8 @@ message TransactionsResponse {
 
   // Required; chain id.
   optional uint64 chain_id = 2 [jstype = JS_STRING];
+
+  optional ProcessedRange processed_range = 3;
 }
 
 service RawData {

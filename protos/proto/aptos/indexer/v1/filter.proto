@@ -48,9 +48,11 @@ message EventFilter {
 }
 
 message APIFilter {
-  optional TransactionRootFilter transaction_root_filter = 1;
-  optional UserTransactionFilter user_transaction_filter = 2;
-  optional EventFilter event_filter = 3;
+  oneof filter {
+    TransactionRootFilter transaction_root_filter = 1;
+    UserTransactionFilter user_transaction_filter = 2;
+    EventFilter event_filter = 3;
+  }
 }
 
 message BooleanTransactionFilter {
