@@ -29,7 +29,9 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{
     module_and_script_storage::code_storage::AptosCodeStorage,
     module_write_set::ModuleWrite,
-    resolver::{ResourceGroupSize, TExecutorView, TResourceGroupView},
+    resolver::{
+        BlockSynchronizationKillSwitch, ResourceGroupSize, TExecutorView, TResourceGroupView,
+    },
     resource_group_adapter::{
         decrement_size_for_remove_tag, group_tagged_resource_size, increment_size_for_add_tag,
     },
@@ -392,6 +394,7 @@ impl<K, E> MockIncarnation<K, E> {
 /// value determines the index for choosing the read & write sets of the particular execution.
 #[derive(Clone, Debug)]
 pub(crate) enum MockTransaction<K, E> {
+    InterruptRequested,
     Write {
         /// Incarnation counter, increased during each mock (re-)execution. Allows tracking the final
         /// incarnation for each mock transaction, whose behavior should be reproduced for baseline.
@@ -430,6 +433,9 @@ impl<K, E> MockTransaction<K, E> {
             } => incarnation_behaviors,
             Self::SkipRest(_) => unreachable!("SkipRest does not contain incarnation behaviors"),
             Self::Abort => unreachable!("Abort does not contain incarnation behaviors"),
+            Self::InterruptRequested => {
+                unreachable!("InterruptRequested does not contain incarnation behaviors")
+            },
         }
     }
 }
@@ -841,7 +847,7 @@ where
     type Output = MockOutput<K, E>;
     type Txn = MockTransaction<K, E>;
 
-    fn init(_environment: AptosEnvironment, _state_view: &impl TStateView<Key = K>) -> Self {
+    fn init(_environment: &AptosEnvironment, _state_view: &impl TStateView<Key = K>) -> Self {
         Self::new()
     }
 
@@ -849,7 +855,8 @@ where
         &self,
         view: &(impl TExecutorView<K, u32, MoveTypeLayout, ValueType>
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>
-              + AptosCodeStorage),
+              + AptosCodeStorage
+              + BlockSynchronizationKillSwitch),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
@@ -871,12 +878,8 @@ where
                 for k in behavior.reads.iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
                     // TODO: test aggregator reads.
-                    if k.is_module_path() {
-                        match view.get_module_bytes(k) {
-                            Ok(v) => read_results.push(v.map(Into::into)),
-                            Err(_) => read_results.push(None),
-                        }
-                    } else {
+                    if !k.is_module_path() {
+                        // TODO: also prop test modules
                         match view.get_resource_bytes(k, None) {
                             Ok(v) => read_results.push(v.map(Into::into)),
                             Err(_) => read_results.push(None),
@@ -1038,6 +1041,10 @@ where
                 ExecutionStatus::SkipRest(mock_output)
             },
             MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
+            MockTransaction::InterruptRequested => {
+                while !view.interrupt_requested() {}
+                ExecutionStatus::SkipRest(MockOutput::skip_output())
+            },
         }
     }
 

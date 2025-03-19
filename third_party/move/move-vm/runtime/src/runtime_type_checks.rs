@@ -1,13 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{frame_type_cache::FrameTypeCache, interpreter::Stack, loader::Resolver};
+use crate::{
+    frame_type_cache::FrameTypeCache, interpreter::Stack, loader::Resolver, LoadedFunction,
+};
 use move_binary_format::{errors::*, file_format::Bytecode};
 use move_core_types::{
     ability::{Ability, AbilitySet},
+    function::ClosureMask,
     vm_status::StatusCode,
 };
-use move_vm_types::{loaded_data::runtime_types::Type, values::Locals};
+use move_vm_types::{gas::UnmeteredGasMeter, loaded_data::runtime_types::Type, values::Locals};
 
 pub(crate) trait RuntimeTypeCheck {
     /// Paranoid type checks to perform before instruction execution.
@@ -17,6 +20,7 @@ pub(crate) trait RuntimeTypeCheck {
         ty_args: &[Type],
         resolver: &Resolver,
         operand_stack: &mut Stack,
+        ty_cache: &mut FrameTypeCache,
         instruction: &Bytecode,
     ) -> PartialVMResult<()>;
 
@@ -66,10 +70,92 @@ fn verify_pack<'a>(
         // copy capability where its field is a struct that has copy
         // capability but not vice versa.
         ty.paranoid_check_abilities(field_expected_abilities)?;
-        ty.paranoid_check_eq(expected_ty)?;
+        // Similar, we use assignability for the value moved in the field
+        ty.paranoid_check_assignable(expected_ty)?;
     }
 
     operand_stack.push_ty(output_ty)
+}
+
+pub fn verify_pack_closure(
+    resolver: &Resolver,
+    operand_stack: &mut Stack,
+    func: &LoadedFunction,
+    mask: ClosureMask,
+) -> PartialVMResult<()> {
+    // Accumulated abilities
+    let mut abilities = if func.function.is_persistent() {
+        AbilitySet::PUBLIC_FUNCTIONS
+    } else {
+        AbilitySet::PRIVATE_FUNCTIONS
+    };
+    // Verify that captured arguments are assignable against types in the function
+    // signature.
+    let expected_capture_tys = mask.extract(func.param_tys(), true);
+
+    let given_capture_tys = operand_stack.popn_tys(expected_capture_tys.len() as u16)?;
+    for (expected, given) in expected_capture_tys
+        .into_iter()
+        .zip(given_capture_tys.into_iter())
+    {
+        with_instantiation(resolver, func, expected, |expected| {
+            // Intersect the captured type with the accumulated abilities
+            abilities = abilities.intersect(given.abilities()?);
+            given.paranoid_check_assignable(expected)
+        })?
+    }
+    // Push result type onto stack
+    let args = mask
+        .extract(func.param_tys(), false)
+        .into_iter()
+        .map(|curried| with_owned_instantiation(resolver, func, curried, Ok))
+        .collect::<PartialVMResult<Vec<_>>>()?;
+    let results = func
+        .return_tys()
+        .iter()
+        .map(|ret| with_owned_instantiation(resolver, func, ret, Ok))
+        .collect::<PartialVMResult<Vec<_>>>()?;
+    operand_stack.push_ty(Type::Function {
+        args,
+        results,
+        abilities,
+    })?;
+
+    Ok(())
+}
+
+fn with_instantiation<R>(
+    resolver: &Resolver,
+    func: &LoadedFunction,
+    ty: &Type,
+    action: impl FnOnce(&Type) -> PartialVMResult<R>,
+) -> PartialVMResult<R> {
+    if func.ty_args().is_empty() {
+        action(ty)
+    } else {
+        action(
+            &resolver
+                .ty_builder()
+                .create_ty_with_subst(ty, func.ty_args())?,
+        )
+    }
+}
+
+fn with_owned_instantiation<R>(
+    resolver: &Resolver,
+    func: &LoadedFunction,
+    ty: &Type,
+    action: impl FnOnce(Type) -> PartialVMResult<R>,
+) -> PartialVMResult<R> {
+    if func.ty_args().is_empty() {
+        action(ty.clone())
+    } else {
+        action(
+            resolver
+                .ty_builder()
+                .create_ty_with_subst(ty, func.ty_args())?,
+        )
+    }
 }
 
 pub(crate) struct NoRuntimeTypeCheck;
@@ -82,6 +168,7 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
         _ty_args: &[Type],
         _resolver: &Resolver,
         _operand_stack: &mut Stack,
+        _ty_cache: &mut FrameTypeCache,
         _instruction: &Bytecode,
     ) -> PartialVMResult<()> {
         Ok(())
@@ -114,23 +201,27 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     fn pre_execution_type_stack_transition(
         local_tys: &[Type],
         locals: &Locals,
-        _ty_args: &[Type],
-        _resolver: &Resolver,
+        ty_args: &[Type],
+        resolver: &Resolver,
         operand_stack: &mut Stack,
+        ty_cache: &mut FrameTypeCache,
         instruction: &Bytecode,
     ) -> PartialVMResult<()> {
         match instruction {
-            // TODO(#15664): implement closures
-            Bytecode::PackClosure(..)
-            | Bytecode::PackClosureGeneric(..)
-            | Bytecode::CallClosure(..) => {
-                return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FUNCTIONALITY)
-                    .with_message("closure opcodes in interpreter".to_owned()))
-            },
             // Call instruction will be checked at execute_main.
             Bytecode::Call(_) | Bytecode::CallGeneric(_) => (),
             Bytecode::BrFalse(_) | Bytecode::BrTrue(_) => {
                 operand_stack.pop_ty()?;
+            },
+            Bytecode::CallClosure(sig_idx) => {
+                // For closure, we need to check the type of the closure on
+                // top of the stack. The argument types are checked when the frame
+                // is constructed in the interpreter, using the same code as for regular
+                // calls.
+                let (expected_ty, _) =
+                    ty_cache.get_signature_index_type(*sig_idx, resolver, ty_args)?;
+                let given_ty = operand_stack.pop_ty()?;
+                given_ty.paranoid_check_assignable(expected_ty)?;
             },
             Bytecode::Branch(_) => (),
             Bytecode::Ret => {
@@ -145,11 +236,12 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             // StLoc needs to check before execution as we need to check the drop ability of values.
             Bytecode::StLoc(idx) => {
-                let ty = local_tys[*idx as usize].clone();
+                let expected_ty = &local_tys[*idx as usize];
                 let val_ty = operand_stack.pop_ty()?;
-                ty.paranoid_check_eq(&val_ty)?;
+                // For store, use assignability
+                val_ty.paranoid_check_assignable(expected_ty)?;
                 if !locals.is_invalid(*idx as usize)? {
-                    ty.paranoid_check_has_ability(Ability::Drop)?;
+                    expected_ty.paranoid_check_has_ability(Ability::Drop)?;
                 }
             },
             // We will check the rest of the instructions after execution phase.
@@ -171,6 +263,8 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             | Bytecode::MutBorrowField(_)
             | Bytecode::ImmBorrowFieldGeneric(_)
             | Bytecode::MutBorrowFieldGeneric(_)
+            | Bytecode::PackClosure(..)
+            | Bytecode::PackClosureGeneric(..)
             | Bytecode::Pack(_)
             | Bytecode::PackGeneric(_)
             | Bytecode::Unpack(_)
@@ -251,22 +345,15 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         ty_cache: &mut FrameTypeCache,
         instruction: &Bytecode,
     ) -> PartialVMResult<()> {
-        let ty_builder = resolver.loader().ty_builder();
+        let ty_builder = resolver.ty_builder();
 
         match instruction {
-            // TODO(#15664): implement closures
-            Bytecode::PackClosure(..)
-            | Bytecode::PackClosureGeneric(..)
-            | Bytecode::CallClosure(..) => {
-                return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FUNCTIONALITY)
-                    .with_message("closure opcodes in interpreter".to_owned()))
-            },
-
             Bytecode::BrTrue(_) | Bytecode::BrFalse(_) => (),
             Bytecode::Branch(_)
             | Bytecode::Ret
             | Bytecode::Call(_)
             | Bytecode::CallGeneric(_)
+            | Bytecode::CallClosure(_)
             | Bytecode::Abort => {
                 // Invariants hold because all of the instructions
                 // above will force VM to break from the interpreter
@@ -386,6 +473,22 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let field_ref_ty = ty_builder.create_ref_ty(field_ty, is_mut)?;
                 operand_stack.push_ty(field_ref_ty)?;
             },
+            Bytecode::PackClosure(fh_idx, mask) => {
+                let function =
+                    resolver.build_loaded_function_from_handle_and_ty_args(*fh_idx, vec![])?;
+                verify_pack_closure(resolver, operand_stack, &function, *mask)?;
+            },
+            Bytecode::PackClosureGeneric(fh_idx, mask) => {
+                let ty_args = resolver.instantiate_generic_function(
+                    Option::<&mut UnmeteredGasMeter>::None, // don't charge for paranoid mode
+                    *fh_idx,
+                    ty_args,
+                )?;
+                let function = resolver
+                    .build_loaded_function_from_instantiation_and_ty_args(*fh_idx, ty_args)?;
+                verify_pack_closure(resolver, operand_stack, &function, *mask)?;
+            },
+
             Bytecode::Pack(idx) => {
                 let field_count = resolver.field_count(*idx);
                 let args_ty = resolver.get_struct(*idx)?;
@@ -655,7 +758,8 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
                 let elem_tys = operand_stack.popn_tys(*num as u16)?;
                 for elem_ty in elem_tys.iter() {
-                    elem_ty.paranoid_check_eq(ty)?;
+                    // For vector element types, use assignability
+                    elem_ty.paranoid_check_assignable(ty)?;
                 }
 
                 let vec_ty = ty_builder.create_vec_ty(ty)?;
@@ -689,7 +793,8 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Bytecode::VecPushBack(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
-                operand_stack.pop_ty()?.paranoid_check_eq(ty)?;
+                // For pushing an element to a vector, use assignability
+                operand_stack.pop_ty()?.paranoid_check_assignable(ty)?;
                 operand_stack
                     .pop_ty()?
                     .paranoid_check_is_vec_ref_ty::<true>(ty)?;

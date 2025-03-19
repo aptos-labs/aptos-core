@@ -366,37 +366,37 @@ fun freeze_mut_ref::t8($t0: bool, $t1: &mut 0x42::freeze_mut_ref::S, $t2: &0x42:
 
 
 Diagnostics:
-warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
    ┌─ tests/bytecode-generator/freeze_mut_ref.move:58:9
    │
 58 │         (x, y) = (&mut 0, &mut 0);
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
+warning: Unused assignment/binding to `y`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_y`), or binding to `_`
    ┌─ tests/bytecode-generator/freeze_mut_ref.move:58:9
    │
 58 │         (x, y) = (&mut 0, &mut 0);
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
    ┌─ tests/bytecode-generator/freeze_mut_ref.move:66:24
    │
 66 │         let g = &mut ({x = x + 1; s}).f;
    │                        ^^^^^^^^^
 
-warning: Unused assignment to `z`. Consider removing or prefixing with an underscore: `_z`
+warning: Unused assignment/binding to `z`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_z`), or binding to `_`
    ┌─ tests/bytecode-generator/freeze_mut_ref.move:69:20
    │
 69 │         *({*f = 0; z = y; g}) = 2;
    │                    ^^^^^
 
-warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
    ┌─ tests/bytecode-generator/freeze_mut_ref.move:74:19
    │
 74 │         if (cond) x = copy s else x = other;
    │                   ^^^^^^^^^^
 
-warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
    ┌─ tests/bytecode-generator/freeze_mut_ref.move:74:35
    │
 74 │         if (cond) x = copy s else x = other;
@@ -413,186 +413,186 @@ struct S has drop {
 	dummy_field: bool
 }
 
-public borrow_mut<Ty0>(Arg0: &mut vector<Ty0>): &Ty0 /* def_idx: 0 */ {
+public borrow_mut<Element>(map: &mut vector<Element>): &Element /* def_idx: 0 */ {
 B0:
-	0: MoveLoc[0](Arg0: &mut vector<Ty0>)
+	0: MoveLoc[0](map: &mut vector<Element>)
 	1: LdU64(0)
 	2: VecMutBorrow(2)
 	3: FreezeRef
 	4: Ret
 }
-public borrow_mut2<Ty0>(Arg0: &mut Ty0): &Ty0 /* def_idx: 1 */ {
+public borrow_mut2<Element>(v: &mut Element): &Element /* def_idx: 1 */ {
 B0:
-	0: MoveLoc[0](Arg0: &mut Ty0)
+	0: MoveLoc[0](v: &mut Element)
 	1: FreezeRef
 	2: Ret
 }
-public borrow_mut3<Ty0>(Arg0: &mut Ty0, Arg1: &Ty0): &Ty0 /* def_idx: 2 */ {
-L2:	loc0: &Ty0
+public borrow_mut3<Element>(v1: &mut Element, v2: &Element): &Element /* def_idx: 2 */ {
+L2:	return: &Element
 B0:
-	0: MoveLoc[1](Arg1: &Ty0)
+	0: MoveLoc[1](v2: &Element)
 	1: Pop
-	2: MoveLoc[0](Arg0: &mut Ty0)
+	2: MoveLoc[0](v1: &mut Element)
 	3: FreezeRef
-	4: StLoc[2](loc0: &Ty0)
+	4: StLoc[2](return: &Element)
 B1:
-	5: MoveLoc[2](loc0: &Ty0)
+	5: MoveLoc[2](return: &Element)
 	6: Ret
 B2:
-	7: MoveLoc[0](Arg0: &mut Ty0)
+	7: MoveLoc[0](v1: &mut Element)
 	8: Pop
-	9: MoveLoc[1](Arg1: &Ty0)
-	10: StLoc[2](loc0: &Ty0)
+	9: MoveLoc[1](v2: &Element)
+	10: StLoc[2](return: &Element)
 	11: Branch(5)
 }
-public borrow_mut4<Ty0>(Arg0: &mut Ty0): &Ty0 /* def_idx: 3 */ {
+public borrow_mut4<Element>(v: &mut Element): &Element /* def_idx: 3 */ {
 B0:
-	0: MoveLoc[0](Arg0: &mut Ty0)
+	0: MoveLoc[0](v: &mut Element)
 	1: FreezeRef
 	2: Ret
 }
 t0() /* def_idx: 4 */ {
-L0:	loc0: u64
-L1:	loc1: &u64
+L0:	$t2: u64
+L1:	x: &u64
 B0:
 	0: LdU64(0)
-	1: StLoc[0](loc0: u64)
-	2: MutBorrowLoc[0](loc0: u64)
+	1: StLoc[0]($t2: u64)
+	2: MutBorrowLoc[0]($t2: u64)
 	3: FreezeRef
 	4: Pop
 	5: Ret
 }
-t1(Arg0: &mut S): &S /* def_idx: 5 */ {
+t1(s: &mut S): &S /* def_idx: 5 */ {
 B0:
-	0: MoveLoc[0](Arg0: &mut S)
+	0: MoveLoc[0](s: &mut S)
 	1: FreezeRef
 	2: Ret
 }
-t2(Arg0: &mut u64, Arg1: &mut u64): &u64 * &mut u64 /* def_idx: 6 */ {
-L2:	loc0: &u64
+t2(u1: &mut u64, u2: &mut u64): &u64 * &mut u64 /* def_idx: 6 */ {
+L2:	return[0]: &u64
 B0:
-	0: MoveLoc[0](Arg0: &mut u64)
+	0: MoveLoc[0](u1: &mut u64)
 	1: FreezeRef
-	2: MoveLoc[1](Arg1: &mut u64)
+	2: MoveLoc[1](u2: &mut u64)
 	3: Ret
 }
 public t4() /* def_idx: 7 */ {
-L0:	loc0: u64
-L1:	loc1: &u64
-L2:	loc2: u64
+L0:	$t4: u64
+L1:	$t2: &u64
+L2:	$t7: u64
 B0:
 	0: LdU64(0)
-	1: StLoc[0](loc0: u64)
-	2: MutBorrowLoc[0](loc0: u64)
+	1: StLoc[0]($t4: u64)
+	2: MutBorrowLoc[0]($t4: u64)
 	3: FreezeRef
 	4: Pop
 	5: LdU64(0)
-	6: StLoc[2](loc2: u64)
-	7: MutBorrowLoc[2](loc2: u64)
+	6: StLoc[2]($t7: u64)
+	7: MutBorrowLoc[2]($t7: u64)
 	8: FreezeRef
 	9: Pop
 	10: Ret
 }
-public t5(Arg0: &mut G) /* def_idx: 8 */ {
-L1:	loc0: &mut u64
-L2:	loc1: u64
-L3:	loc2: u64
-L4:	loc3: &mut u64
-L5:	loc4: &u64
-L6:	loc5: u64
-L7:	loc6: &mut u64
+public t5(s: &mut G) /* def_idx: 8 */ {
+L1:	f: &mut u64
+L2:	x: u64
+L3:	$t13: u64
+L4:	y: &mut u64
+L5:	$t18: &u64
+L6:	$t5: u64
+L7:	g: &mut u64
 B0:
 	0: LdU64(0)
 	1: LdU64(1)
 	2: Add
-	3: CopyLoc[0](Arg0: &mut G)
+	3: CopyLoc[0](s: &mut G)
 	4: MutBorrowField[0](G.f: u64)
-	5: StLoc[1](loc0: &mut u64)
+	5: StLoc[1](f: &mut u64)
 	6: LdU64(1)
 	7: Add
 	8: Pop
-	9: MoveLoc[0](Arg0: &mut G)
+	9: MoveLoc[0](s: &mut G)
 	10: MutBorrowField[0](G.f: u64)
 	11: LdU64(2)
-	12: StLoc[3](loc2: u64)
-	13: MutBorrowLoc[3](loc2: u64)
-	14: StLoc[4](loc3: &mut u64)
+	12: StLoc[3]($t13: u64)
+	13: MutBorrowLoc[3]($t13: u64)
+	14: StLoc[4](y: &mut u64)
 	15: LdU64(2)
 	16: LdU64(0)
-	17: MoveLoc[1](loc0: &mut u64)
+	17: MoveLoc[1](f: &mut u64)
 	18: WriteRef
-	19: MoveLoc[4](loc3: &mut u64)
+	19: MoveLoc[4](y: &mut u64)
 	20: FreezeRef
 	21: Pop
-	22: StLoc[6](loc5: u64)
-	23: StLoc[7](loc6: &mut u64)
-	24: MoveLoc[6](loc5: u64)
-	25: MoveLoc[7](loc6: &mut u64)
+	22: StLoc[6]($t5: u64)
+	23: StLoc[7](g: &mut u64)
+	24: MoveLoc[6]($t5: u64)
+	25: MoveLoc[7](g: &mut u64)
 	26: WriteRef
 	27: Ret
 }
-t6(Arg0: bool, Arg1: &mut S, Arg2: &S) /* def_idx: 9 */ {
-L3:	loc0: &S
+t6(cond: bool, s: &mut S, other: &S) /* def_idx: 9 */ {
+L3:	$t4: &S
 B0:
-	0: MoveLoc[0](Arg0: bool)
+	0: MoveLoc[0](cond: bool)
 	1: BrFalse(10)
 B1:
-	2: MoveLoc[2](Arg2: &S)
+	2: MoveLoc[2](other: &S)
 	3: Pop
-	4: CopyLoc[1](Arg1: &mut S)
-	5: MoveLoc[1](Arg1: &mut S)
+	4: CopyLoc[1](s: &mut S)
+	5: MoveLoc[1](s: &mut S)
 	6: Pop
 	7: FreezeRef
 	8: Pop
 B2:
 	9: Ret
 B3:
-	10: MoveLoc[1](Arg1: &mut S)
+	10: MoveLoc[1](s: &mut S)
 	11: Pop
-	12: MoveLoc[2](Arg2: &S)
+	12: MoveLoc[2](other: &S)
 	13: Pop
 	14: Branch(9)
 }
-t7(Arg0: bool, Arg1: &mut S, Arg2: &S) /* def_idx: 10 */ {
-L3:	loc0: &S
-L4:	loc1: &S
+t7(cond: bool, s: &mut S, other: &S) /* def_idx: 10 */ {
+L3:	$t4: &S
+L4:	_x: &S
 B0:
-	0: MoveLoc[0](Arg0: bool)
+	0: MoveLoc[0](cond: bool)
 	1: BrFalse(10)
 B1:
-	2: MoveLoc[2](Arg2: &S)
+	2: MoveLoc[2](other: &S)
 	3: Pop
-	4: MoveLoc[1](Arg1: &mut S)
+	4: MoveLoc[1](s: &mut S)
 	5: FreezeRef
-	6: StLoc[3](loc0: &S)
+	6: StLoc[3]($t4: &S)
 B2:
-	7: MoveLoc[3](loc0: &S)
+	7: MoveLoc[3]($t4: &S)
 	8: Pop
 	9: Ret
 B3:
-	10: MoveLoc[1](Arg1: &mut S)
+	10: MoveLoc[1](s: &mut S)
 	11: Pop
-	12: MoveLoc[2](Arg2: &S)
-	13: StLoc[3](loc0: &S)
+	12: MoveLoc[2](other: &S)
+	13: StLoc[3]($t4: &S)
 	14: Branch(7)
 }
-t8(Arg0: bool, Arg1: &mut S, Arg2: &S) /* def_idx: 11 */ {
-L3:	loc0: &S
+t8(cond: bool, s: &mut S, other: &S) /* def_idx: 11 */ {
+L3:	_x: &S
 B0:
-	0: MoveLoc[0](Arg0: bool)
+	0: MoveLoc[0](cond: bool)
 	1: BrFalse(8)
 B1:
-	2: MoveLoc[2](Arg2: &S)
+	2: MoveLoc[2](other: &S)
 	3: Pop
-	4: MoveLoc[1](Arg1: &mut S)
+	4: MoveLoc[1](s: &mut S)
 	5: FreezeRef
 	6: Pop
 B2:
 	7: Ret
 B3:
-	8: MoveLoc[1](Arg1: &mut S)
+	8: MoveLoc[1](s: &mut S)
 	9: Pop
-	10: MoveLoc[2](Arg2: &S)
+	10: MoveLoc[2](other: &S)
 	11: Pop
 	12: Branch(7)
 }

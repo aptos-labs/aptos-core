@@ -6,7 +6,9 @@ use crate::{
     filters::{EventFilter, TransactionRootFilter, UserTransactionFilter},
     traits::Filterable,
 };
+use anyhow::{anyhow, ensure, Result};
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
+use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -44,7 +46,86 @@ impl From<EventFilter> for BooleanTransactionFilter {
     }
 }
 
+impl From<BooleanTransactionFilter> for aptos_protos::indexer::v1::BooleanTransactionFilter {
+    fn from(boolean_transaction_filter: BooleanTransactionFilter) -> Self {
+        match boolean_transaction_filter {
+            BooleanTransactionFilter::And(logical_and) => {
+                aptos_protos::indexer::v1::BooleanTransactionFilter {
+                    filter: Some(
+                        aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalAnd(
+                            logical_and.into(),
+                        ),
+                    ),
+                }
+            },
+            BooleanTransactionFilter::Or(logical_or) => {
+                aptos_protos::indexer::v1::BooleanTransactionFilter {
+                    filter: Some(
+                        aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalOr(
+                            logical_or.into(),
+                        ),
+                    ),
+                }
+            },
+            BooleanTransactionFilter::Not(logical_not) => {
+                aptos_protos::indexer::v1::BooleanTransactionFilter {
+                    filter: Some(
+                        aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalNot(
+                            // We do not `impl From` for `LogicalNot` because it is a recursive type that only contains a `Box<BooleanTransactionFilter>`
+                            Box::new((*logical_not.not).into()),
+                        ),
+                    ),
+                }
+            },
+            BooleanTransactionFilter::Filter(api_filter) => {
+                aptos_protos::indexer::v1::BooleanTransactionFilter {
+                    filter: Some(
+                        aptos_protos::indexer::v1::boolean_transaction_filter::Filter::ApiFilter(
+                            api_filter.into(),
+                        ),
+                    ),
+                }
+            },
+        }
+    }
+}
+
 impl BooleanTransactionFilter {
+    pub fn new_from_proto(
+        proto_filter: aptos_protos::indexer::v1::BooleanTransactionFilter,
+        max_filter_size: Option<usize>,
+    ) -> Result<Self> {
+        if let Some(max_filter_size) = max_filter_size {
+            ensure!(
+                proto_filter.encoded_len() <= max_filter_size,
+                "Filter is too complicated."
+            );
+        }
+        Ok(
+            match proto_filter
+                .filter
+                .ok_or(anyhow!("Oneof is not set in BooleanTransactionFilter."))?
+            {
+                aptos_protos::indexer::v1::boolean_transaction_filter::Filter::ApiFilter(
+                    api_filter,
+                ) => TryInto::<APIFilter>::try_into(api_filter)?.into(),
+                aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalAnd(
+                    logical_and,
+                ) => BooleanTransactionFilter::And(logical_and.try_into()?),
+                aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalOr(
+                    logical_or,
+                ) => BooleanTransactionFilter::Or(logical_or.try_into()?),
+                aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalNot(
+                    logical_not,
+                ) => BooleanTransactionFilter::Not(logical_not.try_into()?),
+            },
+        )
+    }
+
+    pub fn into_proto(self) -> aptos_protos::indexer::v1::BooleanTransactionFilter {
+        self.into()
+    }
+
     /// Combines the current filter with another filter using a logical AND.
     /// Returns a new `BooleanTransactionFilter` representing the conjunction.
     ///
@@ -162,12 +243,12 @@ impl Filterable<Transaction> for BooleanTransactionFilter {
         }
     }
 
-    fn is_allowed(&self, item: &Transaction) -> bool {
+    fn matches(&self, item: &Transaction) -> bool {
         match self {
-            BooleanTransactionFilter::And(and) => and.is_allowed(item),
-            BooleanTransactionFilter::Or(or) => or.is_allowed(item),
-            BooleanTransactionFilter::Not(not) => not.is_allowed(item),
-            BooleanTransactionFilter::Filter(filter) => filter.is_allowed(item),
+            BooleanTransactionFilter::And(and) => and.matches(item),
+            BooleanTransactionFilter::Or(or) => or.matches(item),
+            BooleanTransactionFilter::Not(not) => not.matches(item),
+            BooleanTransactionFilter::Filter(filter) => filter.matches(item),
         }
     }
 }
@@ -175,6 +256,28 @@ impl Filterable<Transaction> for BooleanTransactionFilter {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LogicalAnd {
     and: Vec<BooleanTransactionFilter>,
+}
+
+impl TryFrom<aptos_protos::indexer::v1::LogicalAndFilters> for LogicalAnd {
+    type Error = anyhow::Error;
+
+    fn try_from(proto_filter: aptos_protos::indexer::v1::LogicalAndFilters) -> Result<Self> {
+        Ok(Self {
+            and: proto_filter
+                .filters
+                .into_iter()
+                .map(|f| BooleanTransactionFilter::new_from_proto(f, None))
+                .collect::<Result<_>>()?,
+        })
+    }
+}
+
+impl From<LogicalAnd> for aptos_protos::indexer::v1::LogicalAndFilters {
+    fn from(logical_and: LogicalAnd) -> Self {
+        aptos_protos::indexer::v1::LogicalAndFilters {
+            filters: logical_and.and.into_iter().map(Into::into).collect(),
+        }
+    }
 }
 
 impl Filterable<Transaction> for LogicalAnd {
@@ -185,14 +288,36 @@ impl Filterable<Transaction> for LogicalAnd {
         Ok(())
     }
 
-    fn is_allowed(&self, item: &Transaction) -> bool {
-        self.and.iter().all(|filter| filter.is_allowed(item))
+    fn matches(&self, item: &Transaction) -> bool {
+        self.and.iter().all(|filter| filter.matches(item))
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LogicalOr {
     or: Vec<BooleanTransactionFilter>,
+}
+
+impl TryFrom<aptos_protos::indexer::v1::LogicalOrFilters> for LogicalOr {
+    type Error = anyhow::Error;
+
+    fn try_from(proto_filter: aptos_protos::indexer::v1::LogicalOrFilters) -> Result<Self> {
+        Ok(Self {
+            or: proto_filter
+                .filters
+                .into_iter()
+                .map(|f| BooleanTransactionFilter::new_from_proto(f, None))
+                .collect::<Result<_>>()?,
+        })
+    }
+}
+
+impl From<LogicalOr> for aptos_protos::indexer::v1::LogicalOrFilters {
+    fn from(logical_or: LogicalOr) -> Self {
+        aptos_protos::indexer::v1::LogicalOrFilters {
+            filters: logical_or.or.into_iter().map(Into::into).collect(),
+        }
+    }
 }
 
 impl Filterable<Transaction> for LogicalOr {
@@ -203,8 +328,8 @@ impl Filterable<Transaction> for LogicalOr {
         Ok(())
     }
 
-    fn is_allowed(&self, item: &Transaction) -> bool {
-        self.or.iter().any(|filter| filter.is_allowed(item))
+    fn matches(&self, item: &Transaction) -> bool {
+        self.or.iter().any(|filter| filter.matches(item))
     }
 }
 
@@ -213,13 +338,28 @@ pub struct LogicalNot {
     not: Box<BooleanTransactionFilter>,
 }
 
+impl TryFrom<Box<aptos_protos::indexer::v1::BooleanTransactionFilter>> for LogicalNot {
+    type Error = anyhow::Error;
+
+    fn try_from(
+        proto_filter: Box<aptos_protos::indexer::v1::BooleanTransactionFilter>,
+    ) -> Result<Self> {
+        Ok(Self {
+            not: Box::new(BooleanTransactionFilter::new_from_proto(
+                *proto_filter,
+                None,
+            )?),
+        })
+    }
+}
+
 impl Filterable<Transaction> for LogicalNot {
     fn validate_state(&self) -> Result<(), FilterError> {
         self.not.is_valid()
     }
 
-    fn is_allowed(&self, item: &Transaction) -> bool {
-        !self.not.is_allowed(item)
+    fn matches(&self, item: &Transaction) -> bool {
+        !self.not.matches(item)
     }
 }
 
@@ -231,6 +371,29 @@ pub enum APIFilter {
     TransactionRootFilter(TransactionRootFilter),
     UserTransactionFilter(UserTransactionFilter),
     EventFilter(EventFilter),
+}
+
+impl TryFrom<aptos_protos::indexer::v1::ApiFilter> for APIFilter {
+    type Error = anyhow::Error;
+
+    fn try_from(proto_filter: aptos_protos::indexer::v1::ApiFilter) -> Result<Self> {
+        Ok(
+            match proto_filter
+                .filter
+                .ok_or(anyhow!("Oneof is not set in ApiFilter."))?
+            {
+                aptos_protos::indexer::v1::api_filter::Filter::TransactionRootFilter(
+                    transaction_root_filter,
+                ) => Into::<TransactionRootFilter>::into(transaction_root_filter).into(),
+                aptos_protos::indexer::v1::api_filter::Filter::UserTransactionFilter(
+                    user_transaction_filter,
+                ) => Into::<UserTransactionFilter>::into(user_transaction_filter).into(),
+                aptos_protos::indexer::v1::api_filter::Filter::EventFilter(event_filter) => {
+                    Into::<EventFilter>::into(event_filter).into()
+                },
+            },
+        )
+    }
 }
 
 impl From<TransactionRootFilter> for APIFilter {
@@ -251,6 +414,39 @@ impl From<EventFilter> for APIFilter {
     }
 }
 
+impl From<APIFilter> for aptos_protos::indexer::v1::ApiFilter {
+    fn from(api_filter: APIFilter) -> Self {
+        match api_filter {
+            APIFilter::TransactionRootFilter(transaction_root_filter) => {
+                aptos_protos::indexer::v1::ApiFilter {
+                    filter: Some(
+                        aptos_protos::indexer::v1::api_filter::Filter::TransactionRootFilter(
+                            transaction_root_filter.into(),
+                        ),
+                    ),
+                }
+            },
+            APIFilter::UserTransactionFilter(user_transaction_filter) => {
+                aptos_protos::indexer::v1::ApiFilter {
+                    filter: Some(
+                        aptos_protos::indexer::v1::api_filter::Filter::UserTransactionFilter(
+                            user_transaction_filter.into(),
+                        ),
+                    ),
+                }
+            },
+            APIFilter::EventFilter(event_filter) => aptos_protos::indexer::v1::ApiFilter {
+                filter: Some(aptos_protos::indexer::v1::api_filter::Filter::EventFilter(
+                    aptos_protos::indexer::v1::EventFilter {
+                        struct_type: event_filter.struct_type.map(Into::into),
+                        data_substring_filter: event_filter.data_substring_filter,
+                    },
+                )),
+            },
+        }
+    }
+}
+
 impl Filterable<Transaction> for APIFilter {
     fn validate_state(&self) -> Result<(), FilterError> {
         match self {
@@ -260,10 +456,10 @@ impl Filterable<Transaction> for APIFilter {
         }
     }
 
-    fn is_allowed(&self, txn: &Transaction) -> bool {
+    fn matches(&self, txn: &Transaction) -> bool {
         match self {
-            APIFilter::TransactionRootFilter(filter) => filter.is_allowed(txn),
-            APIFilter::UserTransactionFilter(ut_filter) => ut_filter.is_allowed(txn),
+            APIFilter::TransactionRootFilter(filter) => filter.matches(txn),
+            APIFilter::UserTransactionFilter(ut_filter) => ut_filter.matches(txn),
             APIFilter::EventFilter(events_filter) => {
                 if let Some(txn_data) = &txn.txn_data {
                     let events = match txn_data {
@@ -274,7 +470,7 @@ impl Filterable<Transaction> for APIFilter {
                         TxnData::Validator(_) => return false,
                         TxnData::BlockEpilogue(_) => return false,
                     };
-                    events_filter.is_allowed_vec(events)
+                    events_filter.matches_vec(events)
                 } else {
                     false
                 }
@@ -346,7 +542,7 @@ mod test {
         const LOOPS: i32 = 1000;
         for _ in 0..LOOPS {
             for txn in &txns.transactions {
-                query.is_allowed(txn);
+                query.matches(txn);
             }
         }
         let elapsed = start.elapsed();
@@ -418,5 +614,161 @@ mod test {
 
         let yaml = serde_yaml::to_string(&query).unwrap();
         println!("YAML: \n{}", yaml);
+    }
+
+    #[test]
+    fn test_into_proto() {
+        let filter = BooleanTransactionFilter::new_and(vec![
+            BooleanTransactionFilter::new_or(vec![
+                BooleanTransactionFilter::new_filter(APIFilter::TransactionRootFilter(
+                    TransactionRootFilterBuilder::default()
+                        .success(true)
+                        .build()
+                        .unwrap(),
+                )),
+                BooleanTransactionFilter::new_filter(APIFilter::UserTransactionFilter(
+                    UserTransactionFilterBuilder::default()
+                        .sender("0x0011")
+                        .build()
+                        .unwrap(),
+                )),
+            ]),
+            BooleanTransactionFilter::new_filter(APIFilter::EventFilter(
+                EventFilterBuilder::default()
+                    .struct_type(
+                        MoveStructTagFilterBuilder::default()
+                            .address("0x0077")
+                            .module("roulette")
+                            .name("spin")
+                            .build()
+                            .unwrap(),
+                    )
+                    .build()
+                    .unwrap(),
+            )),
+            BooleanTransactionFilter::new_not(BooleanTransactionFilter::new_filter(
+                APIFilter::EventFilter(
+                    EventFilterBuilder::default()
+                        .struct_type(
+                            MoveStructTagFilterBuilder::default()
+                                .address("0x0088")
+                                .build()
+                                .unwrap(),
+                        )
+                        .build()
+                        .unwrap(),
+                ),
+            )),
+        ]);
+
+        let expected_proto = aptos_protos::indexer::v1::BooleanTransactionFilter {
+            filter: Some(
+                aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalAnd(
+                    aptos_protos::indexer::v1::LogicalAndFilters {
+                        filters: vec![
+                            aptos_protos::indexer::v1::BooleanTransactionFilter {
+                                filter: Some(
+                                    aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalOr(
+                                        aptos_protos::indexer::v1::LogicalOrFilters {
+                                            filters: vec![
+                                                aptos_protos::indexer::v1::BooleanTransactionFilter {
+                                                    filter: Some(
+                                                        aptos_protos::indexer::v1::boolean_transaction_filter::Filter::ApiFilter(
+                                                            aptos_protos::indexer::v1::ApiFilter {
+                                                                filter: Some(
+                                                                    aptos_protos::indexer::v1::api_filter::Filter::TransactionRootFilter(
+                                                                        aptos_protos::indexer::v1::TransactionRootFilter {
+                                                                            success: Some(true),
+                                                                            transaction_type: None,
+                                                                        },
+                                                                    ),
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ),
+                                                },
+                                                aptos_protos::indexer::v1::BooleanTransactionFilter {
+                                                    filter: Some(
+                                                        aptos_protos::indexer::v1::boolean_transaction_filter::Filter::ApiFilter(
+                                                            aptos_protos::indexer::v1::ApiFilter {
+                                                                filter: Some(
+                                                                    aptos_protos::indexer::v1::api_filter::Filter::UserTransactionFilter(
+                                                                        aptos_protos::indexer::v1::UserTransactionFilter {
+                                                                            sender: Some(
+                                                                                "0x0011".to_string()
+                                                                            ),
+                                                                            payload_filter: None,
+                                                                        },
+                                                                    ),
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ),
+                                                },
+                                            ],
+                                        },
+                                    ),
+                                ),
+                            },
+                            aptos_protos::indexer::v1::BooleanTransactionFilter {
+                                filter: Some(
+                                    aptos_protos::indexer::v1::boolean_transaction_filter::Filter::ApiFilter(
+                                        aptos_protos::indexer::v1::ApiFilter {
+                                            filter: Some(
+                                                aptos_protos::indexer::v1::api_filter::Filter::EventFilter(
+                                                    aptos_protos::indexer::v1::EventFilter {
+                                                        struct_type: Some(
+                                                            aptos_protos::indexer::v1::MoveStructTagFilter {
+                                                                address: Some("0x0077".to_string()),
+                                                                module: Some("roulette".to_string()),
+                                                                name: Some("spin".to_string()),
+                                                            },
+                                                        ),
+                                                        data_substring_filter: None,
+                                                    },
+                                                ),
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            },
+                            aptos_protos::indexer::v1::BooleanTransactionFilter {
+                                filter: Some(
+                                    aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalNot(
+                                        Box::new(
+                                            aptos_protos::indexer::v1::BooleanTransactionFilter {
+                                                filter: Some(
+                                                    aptos_protos::indexer::v1::boolean_transaction_filter::Filter::ApiFilter(
+                                                        aptos_protos::indexer::v1::ApiFilter {
+                                                            filter: Some(
+                                                                aptos_protos::indexer::v1::api_filter::Filter::EventFilter(
+                                                                    aptos_protos::indexer::v1::EventFilter {
+                                                                        struct_type: Some(
+                                                                            aptos_protos::indexer::v1::MoveStructTagFilter {
+                                                                                address: Some("0x0088".to_string()),
+                                                                                module: None,
+                                                                                name: None,
+                                                                            },
+                                                                        ),
+                                                                        data_substring_filter: None,
+                                                                    },
+                                                                ),
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                ),
+                            },
+                        ],
+                    },
+                ),
+            ),
+        };
+
+        let actual_proto = filter.into_proto();
+        assert_eq!(expected_proto, actual_proto);
     }
 }

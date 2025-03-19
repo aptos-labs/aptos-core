@@ -298,6 +298,7 @@ impl CompiledScriptBuilder {
                     return_,
                     type_parameters: handle.type_parameters.clone(),
                     access_specifiers: handle.access_specifiers.clone(),
+                    attributes: handle.attributes.clone(),
                 });
                 self.function_pool.insert((module_id, name), idx);
                 Ok(idx)

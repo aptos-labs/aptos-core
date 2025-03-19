@@ -20,6 +20,7 @@ aptos-metrics-core = { workspace = true }
 cfg-if = { workspace = true }
 once_cell = { workspace = true }
 prometheus = { workspace = true }
+rlimit = { workspace = true }
 sysinfo = { workspace = true }
 
 [target.'cfg(target_os="linux")'.dependencies]

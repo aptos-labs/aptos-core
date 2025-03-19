@@ -75,19 +75,19 @@ struct S has drop {
 	b: u64
 }
 
-foo(Arg0: &signer, Arg1: u64, Arg2: u64) /* def_idx: 0 */ {
+foo(_x: &signer, _y: u64, _z: u64) /* def_idx: 0 */ {
 B0:
-	0: MoveLoc[0](Arg0: &signer)
+	0: MoveLoc[0](_x: &signer)
 	1: Pop
 	2: Ret
 }
-public test(Arg0: &signer, Arg1: S) /* def_idx: 1 */ {
+public test(x: &signer, y: S) /* def_idx: 1 */ {
 B0:
-	0: MoveLoc[0](Arg0: &signer)
-	1: ImmBorrowLoc[1](Arg1: S)
+	0: MoveLoc[0](x: &signer)
+	1: ImmBorrowLoc[1](y: S)
 	2: ImmBorrowField[0](S.a: u64)
 	3: ReadRef
-	4: ImmBorrowLoc[1](Arg1: S)
+	4: ImmBorrowLoc[1](y: S)
 	5: ImmBorrowField[1](S.b: u64)
 	6: ReadRef
 	7: Call foo(&signer, u64, u64)

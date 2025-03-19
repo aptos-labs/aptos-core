@@ -15,11 +15,9 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues, AsUnsyncModuleStorage,
-    RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
-use std::convert::TryInto;
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 const TEST_MODULE_ID: &str = "M";
@@ -95,12 +93,14 @@ fn run(
 ) -> VMResult<(ChangeSet, SerializedReturnValues)> {
     let module_id = &module.0;
     let modules = vec![module.clone()];
-    let (runtime_environment, vm, storage) = setup_vm(&modules);
-    let mut session = vm.new_session(&storage);
+    let mut storage = InMemoryStorage::new();
+    compile_modules(&mut storage, &modules);
+
+    let mut session = MoveVM::new_session(&storage);
 
     let fun_name = Identifier::new(fun_name).unwrap();
     let traversal_storage = TraversalStorage::new();
-    let module_storage = storage.as_unsync_module_storage(runtime_environment);
+    let module_storage = storage.as_unsync_module_storage();
 
     session
         .execute_function_bypass_visibility(
@@ -119,15 +119,6 @@ fn run(
 }
 
 type ModuleCode = (ModuleId, String);
-
-// TODO - move some utility functions to where test infra lives, see about unifying with similar code
-fn setup_vm(modules: &[ModuleCode]) -> (RuntimeEnvironment, MoveVM, InMemoryStorage) {
-    let mut storage = InMemoryStorage::new();
-    compile_modules(&mut storage, modules);
-    let runtime_environment = RuntimeEnvironment::new(vec![]);
-    let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
-    (runtime_environment, vm, storage)
-}
 
 fn compile_modules(storage: &mut InMemoryStorage, modules: &[ModuleCode]) {
     modules.iter().for_each(|(id, code)| {

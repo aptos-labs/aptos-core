@@ -9,6 +9,7 @@ use crate::{
     monitor,
     pipeline::pipeline_phase::CountedRequest,
     state_computer::StateComputeResultFut,
+    transaction_shuffler::TransactionShuffler,
 };
 use aptos_consensus_types::{
     block::Block, pipeline_execution_result::PipelineExecutionResult, quorum_cert::QuorumCert,
@@ -99,6 +100,7 @@ impl ExecutionPipeline {
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         pre_commit_hook: PreCommitHook,
         lifetime_guard: CountedRequest<()>,
+        shuffler: Arc<dyn TransactionShuffler>,
     ) -> StateComputeResultFut {
         let (result_tx, result_rx) = oneshot::channel();
         let block_id = block.id();
@@ -114,6 +116,7 @@ impl ExecutionPipeline {
                 pre_commit_hook,
                 lifetime_guard,
                 block_qc,
+                shuffler,
             })
             .expect("Failed to send block to execution pipeline.");
 
@@ -144,20 +147,24 @@ impl ExecutionPipeline {
             command_creation_time,
             lifetime_guard,
             block_qc,
+            shuffler,
         } = command;
         counters::PREPARE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
         debug!("prepare_block received block {}.", block.id());
-        let input_txns = block_preparer
+        let prepare_block_result = block_preparer
             .prepare_block(&block, async { block_qc }.shared())
             .await;
-        if let Err(e) = input_txns {
+        if let Err(e) = prepare_block_result {
             result_tx
                 .send(Err(e))
                 .unwrap_or_else(log_failed_to_send_result("prepare_block", block.id()));
             return;
         }
         let validator_txns = block.validator_txns().cloned().unwrap_or_default();
-        let input_txns = input_txns.expect("input_txns must be Some.");
+        let (input_txns, block_gas_limit) =
+            prepare_block_result.expect("prepare_block must return Ok");
+        let block_executor_onchain_config =
+            block_executor_onchain_config.with_block_gas_limit_override(block_gas_limit);
         tokio::task::spawn_blocking(move || {
             let txns_to_execute =
                 Block::combine_to_input_transactions(validator_txns, input_txns.clone(), metadata);
@@ -183,6 +190,7 @@ impl ExecutionPipeline {
                     result_tx,
                     command_creation_time: Instant::now(),
                     lifetime_guard,
+                    shuffler,
                 })
                 .expect("Failed to send block to execution pipeline.");
         })
@@ -217,6 +225,7 @@ impl ExecutionPipeline {
             result_tx,
             command_creation_time,
             lifetime_guard,
+            shuffler: _,
         }) = block_rx.recv().await
         {
             counters::EXECUTE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
@@ -383,6 +392,7 @@ struct PrepareBlockCommand {
     command_creation_time: Instant,
     lifetime_guard: CountedRequest<()>,
     block_qc: Option<Arc<QuorumCert>>,
+    shuffler: Arc<dyn TransactionShuffler>,
 }
 
 struct ExecuteBlockCommand {
@@ -394,6 +404,8 @@ struct ExecuteBlockCommand {
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
     command_creation_time: Instant,
     lifetime_guard: CountedRequest<()>,
+    #[allow(dead_code)]
+    shuffler: Arc<dyn TransactionShuffler>,
 }
 
 struct LedgerApplyCommand {
@@ -431,6 +443,7 @@ fn log_failed_to_send_result<T>(
                 e,
                 &counters::PIPELINE_DISCARDED_EXECUTOR_ERROR_COUNT,
                 block_id,
+                false,
             );
         }
     }

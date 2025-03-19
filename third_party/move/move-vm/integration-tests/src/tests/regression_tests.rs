@@ -107,14 +107,13 @@ fn script_large_ty() {
     println!("Serialized len: {}", script.len());
     CompiledModule::deserialize(&module).unwrap();
 
-    let mut storage = InMemoryStorage::new();
     let vm_config = VMConfig {
         verifier_config,
         paranoid_type_checks: true,
         ..Default::default()
     };
     let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
-    let move_vm = MoveVM::new_with_runtime_environment(&runtime_environment);
+    let mut storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
 
     let module_address = AccountAddress::from_hex_literal("0x42").unwrap();
     let module_identifier = Identifier::new("pwn").unwrap();
@@ -136,11 +135,11 @@ fn script_large_ty() {
         struct_name,
     );
 
-    let mut session = move_vm.new_session(&storage);
-    let code_storage = storage.as_unsync_code_storage(runtime_environment);
+    let mut session = MoveVM::new_session(&storage);
+    let code_storage = storage.as_unsync_code_storage();
     let traversal_storage = TraversalStorage::new();
     let res = session
-        .execute_script(
+        .load_and_execute_script(
             script.as_ref(),
             vec![input_type],
             Vec::<Vec<u8>>::new(),

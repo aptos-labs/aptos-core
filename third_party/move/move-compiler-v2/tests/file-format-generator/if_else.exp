@@ -4,64 +4,64 @@
 module 42.if_else {
 
 
-if_else(Arg0: bool, Arg1: u64): u64 /* def_idx: 0 */ {
-L2:	loc0: u64
+if_else(cond: bool, x: u64): u64 /* def_idx: 0 */ {
+L2:	return: u64
 B0:
-	0: MoveLoc[0](Arg0: bool)
+	0: MoveLoc[0](cond: bool)
 	1: BrFalse(7)
 B1:
-	2: MoveLoc[1](Arg1: u64)
+	2: MoveLoc[1](x: u64)
 	3: LdU64(1)
 	4: Add
-	5: StLoc[2](loc0: u64)
+	5: StLoc[2](return: u64)
 	6: Branch(11)
 B2:
-	7: MoveLoc[1](Arg1: u64)
+	7: MoveLoc[1](x: u64)
 	8: LdU64(1)
 	9: Sub
-	10: StLoc[2](loc0: u64)
+	10: StLoc[2](return: u64)
 B3:
-	11: MoveLoc[2](loc0: u64)
+	11: MoveLoc[2](return: u64)
 	12: Ret
 }
-if_else_nested(Arg0: bool, Arg1: u64): u64 /* def_idx: 1 */ {
-L2:	loc0: u64
-L3:	loc1: u64
-L4:	loc2: u64
+if_else_nested(cond: bool, x: u64): u64 /* def_idx: 1 */ {
+L2:	$t4: u64
+L3:	$t9: u64
+L4:	return: u64
 B0:
-	0: MoveLoc[0](Arg0: bool)
+	0: MoveLoc[0](cond: bool)
 	1: BrFalse(7)
 B1:
-	2: CopyLoc[1](Arg1: u64)
+	2: CopyLoc[1](x: u64)
 	3: LdU64(1)
 	4: Add
-	5: StLoc[2](loc0: u64)
+	5: StLoc[2]($t4: u64)
 	6: Branch(11)
 B2:
-	7: CopyLoc[1](Arg1: u64)
+	7: CopyLoc[1](x: u64)
 	8: LdU64(1)
 	9: Sub
-	10: StLoc[2](loc0: u64)
+	10: StLoc[2]($t4: u64)
 B3:
 	11: LdU64(10)
-	12: StLoc[3](loc1: u64)
-	13: MoveLoc[2](loc0: u64)
-	14: MoveLoc[3](loc1: u64)
+	12: StLoc[3]($t9: u64)
+	13: MoveLoc[2]($t4: u64)
+	14: MoveLoc[3]($t9: u64)
 	15: Gt
 	16: BrFalse(22)
 B4:
-	17: MoveLoc[1](Arg1: u64)
+	17: MoveLoc[1](x: u64)
 	18: LdU64(2)
 	19: Mul
-	20: StLoc[4](loc2: u64)
+	20: StLoc[4](return: u64)
 	21: Branch(26)
 B5:
-	22: MoveLoc[1](Arg1: u64)
+	22: MoveLoc[1](x: u64)
 	23: LdU64(2)
 	24: Div
-	25: StLoc[4](loc2: u64)
+	25: StLoc[4](return: u64)
 B6:
-	26: MoveLoc[4](loc2: u64)
+	26: MoveLoc[4](return: u64)
 	27: Ret
 }
 }

@@ -146,23 +146,23 @@ struct S has copy, drop {
 	b: u64
 }
 
-test(Arg0: S): u64 /* def_idx: 0 */ {
-L1:	loc0: S
-L2:	loc1: S
-L3:	loc2: u64
-L4:	loc3: &mut u64
+test(s: S): u64 /* def_idx: 0 */ {
+L1:	p: S
+L2:	q: S
+L3:	$t6: u64
+L4:	ref: &mut u64
 B0:
-	0: MoveLoc[0](Arg0: S)
-	1: StLoc[1](loc0: S)
-	2: CopyLoc[1](loc0: S)
-	3: StLoc[2](loc1: S)
-	4: MutBorrowLoc[1](loc0: S)
+	0: MoveLoc[0](s: S)
+	1: StLoc[1](p: S)
+	2: CopyLoc[1](p: S)
+	3: StLoc[2](q: S)
+	4: MutBorrowLoc[1](p: S)
 	5: MutBorrowField[0](S.a: u64)
-	6: StLoc[4](loc3: &mut u64)
+	6: StLoc[4](ref: &mut u64)
 	7: LdU64(0)
-	8: MoveLoc[4](loc3: &mut u64)
+	8: MoveLoc[4](ref: &mut u64)
 	9: WriteRef
-	10: ImmBorrowLoc[2](loc1: S)
+	10: ImmBorrowLoc[2](q: S)
 	11: ImmBorrowField[0](S.a: u64)
 	12: ReadRef
 	13: Ret

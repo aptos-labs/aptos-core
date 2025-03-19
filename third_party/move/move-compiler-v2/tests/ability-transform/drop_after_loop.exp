@@ -833,30 +833,30 @@ module 42.m {
 
 
 drop_after_loop() /* def_idx: 0 */ {
-L0:	loc0: u64
-L1:	loc1: &mut u64
-L2:	loc2: bool
+L0:	l: u64
+L1:	r: &mut u64
+L2:	c: bool
 B0:
 	0: LdU64(1)
-	1: StLoc[0](loc0: u64)
-	2: MutBorrowLoc[0](loc0: u64)
-	3: StLoc[1](loc1: &mut u64)
+	1: StLoc[0](l: u64)
+	2: MutBorrowLoc[0](l: u64)
+	3: StLoc[1](r: &mut u64)
 	4: LdTrue
-	5: StLoc[2](loc2: bool)
+	5: StLoc[2](c: bool)
 B1:
-	6: MoveLoc[2](loc2: bool)
+	6: MoveLoc[2](c: bool)
 	7: BrFalse(14)
 B2:
 	8: LdU64(2)
-	9: CopyLoc[1](loc1: &mut u64)
+	9: CopyLoc[1](r: &mut u64)
 	10: WriteRef
 	11: LdFalse
-	12: StLoc[2](loc2: bool)
+	12: StLoc[2](c: bool)
 	13: Branch(6)
 B3:
-	14: MoveLoc[1](loc1: &mut u64)
+	14: MoveLoc[1](r: &mut u64)
 	15: Pop
-	16: MoveLoc[0](loc0: u64)
+	16: MoveLoc[0](l: u64)
 	17: LdU64(2)
 	18: Eq
 	19: BrFalse(21)

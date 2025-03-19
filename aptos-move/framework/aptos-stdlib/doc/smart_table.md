@@ -10,6 +10,9 @@ when expanding to avoid unexpected gas cost.
 SmartTable uses faster hash function SipHash instead of cryptographically secure hash functions like sha3-256 since
 it tolerates collisions.
 
+DEPRECATED: since it's implementation is inneficient, it
+has been deprecated in favor of <code>big_ordered_map.<b>move</b></code>.
+
 
 -  [Struct `Entry`](#0x1_smart_table_Entry)
 -  [Struct `SmartTable`](#0x1_smart_table_SmartTable)

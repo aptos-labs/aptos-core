@@ -159,51 +159,51 @@ struct S {
 	z: u64
 }
 
-bar(Arg0: &mut u64, Arg1: u64) /* def_idx: 0 */ {
+bar(r: &mut u64, i: u64) /* def_idx: 0 */ {
 B0:
-	0: MoveLoc[1](Arg1: u64)
-	1: MoveLoc[0](Arg0: &mut u64)
+	0: MoveLoc[1](i: u64)
+	1: MoveLoc[0](r: &mut u64)
 	2: WriteRef
 	3: Ret
 }
-foo(Arg0: &u64): u64 /* def_idx: 1 */ {
+foo(l: &u64): u64 /* def_idx: 1 */ {
 B0:
-	0: MoveLoc[0](Arg0: &u64)
+	0: MoveLoc[0](l: &u64)
 	1: ReadRef
 	2: Ret
 }
-public test(Arg0: &mut S, Arg1: u64) /* def_idx: 2 */ {
-L2:	loc0: u64
+public test(s: &mut S, i: u64) /* def_idx: 2 */ {
+L2:	$t4: u64
 B0:
-	0: MoveLoc[1](Arg1: u64)
-	1: CopyLoc[0](Arg0: &mut S)
+	0: MoveLoc[1](i: u64)
+	1: CopyLoc[0](s: &mut S)
 	2: ImmBorrowField[0](S.x: u64)
 	3: ReadRef
 	4: Div
-	5: StLoc[1](Arg1: u64)
-	6: CopyLoc[0](Arg0: &mut S)
+	5: StLoc[1](i: u64)
+	6: CopyLoc[0](s: &mut S)
 	7: ImmBorrowField[1](S.y: u64)
 	8: Call foo(&u64): u64
-	9: StLoc[2](loc0: u64)
+	9: StLoc[2]($t4: u64)
 B1:
-	10: CopyLoc[1](Arg1: u64)
-	11: CopyLoc[2](loc0: u64)
+	10: CopyLoc[1](i: u64)
+	11: CopyLoc[2]($t4: u64)
 	12: Lt
 	13: BrFalse(25)
 B2:
-	14: CopyLoc[0](Arg0: &mut S)
+	14: CopyLoc[0](s: &mut S)
 	15: MutBorrowField[2](S.z: u64)
-	16: CopyLoc[1](Arg1: u64)
+	16: CopyLoc[1](i: u64)
 	17: LdU64(1)
 	18: Sub
 	19: Call bar(&mut u64, u64)
-	20: MoveLoc[1](Arg1: u64)
+	20: MoveLoc[1](i: u64)
 	21: LdU64(1)
 	22: Add
-	23: StLoc[1](Arg1: u64)
+	23: StLoc[1](i: u64)
 	24: Branch(10)
 B3:
-	25: MoveLoc[0](Arg0: &mut S)
+	25: MoveLoc[0](s: &mut S)
 	26: Pop
 	27: Ret
 }

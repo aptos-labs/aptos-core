@@ -2,7 +2,9 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::fat_type::{FatStructLayout, FatStructType, FatType, WrappedAbilitySet};
+use crate::fat_type::{
+    FatFunctionType, FatStructLayout, FatStructType, FatType, WrappedAbilitySet,
+};
 use anyhow::{anyhow, bail};
 pub use limit::Limiter;
 use move_binary_format::{
@@ -20,6 +22,7 @@ use move_bytecode_utils::{compiled_module_viewer::CompiledModuleView, layout::Ty
 use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
+    function::{ClosureMask, MoveClosure},
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
     transaction_argument::{convert_txn_args, TransactionArgument},
@@ -45,6 +48,25 @@ pub struct AnnotatedMoveStruct {
     pub value: Vec<(Identifier, AnnotatedMoveValue)>,
 }
 
+/// Used to represent raw struct data, with struct name and field names. This stems
+/// from closure capture values for which only the serialization layout is known.
+#[derive(Clone, Debug)]
+pub struct RawMoveStruct {
+    pub variant_info: Option<u16>,
+    pub field_values: Vec<AnnotatedMoveValue>,
+}
+
+/// Used to represent an annotated closure. The `captured` values will have only
+/// `RawMoveStruct` information and are not fully decorated.
+#[derive(Clone, Debug)]
+pub struct AnnotatedMoveClosure {
+    pub module_id: ModuleId,
+    pub fun_id: Identifier,
+    pub ty_args: Vec<TypeTag>,
+    pub mask: ClosureMask,
+    pub captured: Vec<AnnotatedMoveValue>,
+}
+
 /// AnnotatedMoveValue is a fully expanded version of on chain Move data. This should only be used
 /// for debugging/client purpose right now and just for a better visualization of on chain data. In
 /// the long run, we would like to transform this struct to a Json value so that we can have a cross
@@ -63,25 +85,9 @@ pub enum AnnotatedMoveValue {
     U16(u16),
     U32(u32),
     U256(u256::U256),
-}
-
-impl AnnotatedMoveValue {
-    pub fn ty_tag(&self) -> TypeTag {
-        use AnnotatedMoveValue::*;
-        match self {
-            U8(_) => TypeTag::U8,
-            U16(_) => TypeTag::U16,
-            U32(_) => TypeTag::U32,
-            U64(_) => TypeTag::U64,
-            U128(_) => TypeTag::U128,
-            U256(_) => TypeTag::U256,
-            Bool(_) => TypeTag::Bool,
-            Address(_) => TypeTag::Address,
-            Vector(t, _) => t.clone(),
-            Bytes(_) => TypeTag::Vector(Box::new(TypeTag::U8)),
-            Struct(s) => TypeTag::Struct(Box::new(s.ty_tag.clone())),
-        }
-    }
+    // NOTE: Added in v8
+    Closure(AnnotatedMoveClosure),
+    RawStruct(RawMoveStruct),
 }
 
 pub struct MoveValueAnnotator<V> {
@@ -162,7 +168,10 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         let types: Vec<&FatType> = param_tys
             .iter()
             .filter(|t| match t {
-                FatType::Signer => false,
+                FatType::Signer
+                | FatType::Function(_)
+                | FatType::Runtime(_)
+                | FatType::RuntimeVariants(_) => false,
                 FatType::Reference(inner) => !matches!(&**inner, FatType::Signer),
                 FatType::Bool
                 | FatType::U8
@@ -363,6 +372,11 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         sig: &SignatureToken,
         limit: &mut Limiter,
     ) -> anyhow::Result<FatType> {
+        let resolve_slice = |toks: &[SignatureToken], limit: &mut Limiter| {
+            toks.iter()
+                .map(|tok| self.resolve_signature(module, tok, limit))
+                .collect::<anyhow::Result<Vec<_>>>()
+        };
         Ok(match sig {
             SignatureToken::Bool => FatType::Bool,
             SignatureToken::U8 => FatType::U8,
@@ -376,19 +390,19 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             SignatureToken::Vector(ty) => {
                 FatType::Vector(Box::new(self.resolve_signature(module, ty, limit)?))
             },
-            SignatureToken::Function(..) => {
-                // TODO(#15664): implement
-                bail!("function types NYI by fat types")
+            SignatureToken::Function(args, results, abilities) => {
+                FatType::Function(Box::new(FatFunctionType {
+                    args: resolve_slice(args, limit)?,
+                    results: resolve_slice(results, limit)?,
+                    abilities: *abilities,
+                }))
             },
             SignatureToken::Struct(idx) => {
                 FatType::Struct(Box::new(self.resolve_struct_handle(module, *idx, limit)?))
             },
             SignatureToken::StructInstantiation(idx, toks) => {
                 let struct_ty = self.resolve_struct_handle(module, *idx, limit)?;
-                let args = toks
-                    .iter()
-                    .map(|tok| self.resolve_signature(module, tok, limit))
-                    .collect::<anyhow::Result<Vec<_>>>()?;
+                let args = resolve_slice(toks, limit)?;
                 FatType::Struct(Box::new(
                     struct_ty
                         .subst(&args, limit)
@@ -442,6 +456,10 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             TypeTag::U256 => FatType::U256,
             TypeTag::U128 => FatType::U128,
             TypeTag::Vector(ty) => FatType::Vector(Box::new(self.resolve_type_impl(ty, limit)?)),
+            TypeTag::Function(..) => {
+                // TODO(#15664) implement functions for fat types"
+                todo!("functions for fat types")
+            },
         })
     }
 
@@ -549,6 +567,68 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         }
     }
 
+    fn annotate_raw_struct(
+        &self,
+        move_struct: &MoveStruct,
+        ty: &FatType,
+        limit: &mut Limiter,
+    ) -> anyhow::Result<RawMoveStruct> {
+        let annotate_values = |values: &[MoveValue], tys: &[FatType], limit: &mut Limiter| {
+            values
+                .iter()
+                .zip(tys)
+                .map(|(v, ty)| self.annotate_value(v, ty, limit))
+                .collect::<anyhow::Result<Vec<_>>>()
+        };
+        match (move_struct, ty) {
+            (MoveStruct::Runtime(values), FatType::Runtime(tys)) if values.len() == tys.len() => {
+                Ok(RawMoveStruct {
+                    variant_info: None,
+                    field_values: annotate_values(values, tys, limit)?,
+                })
+            },
+            (MoveStruct::RuntimeVariant(tag, values), FatType::RuntimeVariants(vars))
+                if (*tag as usize) < vars.len() && values.len() == vars[*tag as usize].len() =>
+            {
+                Ok(RawMoveStruct {
+                    variant_info: Some(*tag),
+                    field_values: annotate_values(values, &vars[*tag as usize], limit)?,
+                })
+            },
+            _ => bail!("type and value mismatch: inconsistent raw struct information"),
+        }
+    }
+
+    fn annotate_closure(
+        &self,
+        move_closure: &MoveClosure,
+        _ty: &FatFunctionType,
+        limit: &mut Limiter,
+    ) -> anyhow::Result<AnnotatedMoveClosure> {
+        let MoveClosure {
+            module_id,
+            fun_id,
+            ty_args,
+            mask,
+            captured,
+        } = move_closure;
+        let captured = captured
+            .iter()
+            .map(|(layout, value)| {
+                let fat_type = FatType::from_runtime_layout(layout, limit)
+                    .map_err(|e| anyhow!("failed to annotate captured value: {}", e))?;
+                self.annotate_value(value, &fat_type, limit)
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        Ok(AnnotatedMoveClosure {
+            module_id: module_id.clone(),
+            fun_id: fun_id.clone(),
+            ty_args: ty_args.to_vec(),
+            mask: *mask,
+            captured,
+        })
+    }
+
     fn annotate_value(
         &self,
         value: &MoveValue,
@@ -583,6 +663,12 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             (MoveValue::Struct(s), FatType::Struct(ty)) => {
                 AnnotatedMoveValue::Struct(self.annotate_struct(s, ty.as_ref(), limit)?)
             },
+            (MoveValue::Struct(s), FatType::Runtime(_) | FatType::RuntimeVariants(_)) => {
+                AnnotatedMoveValue::RawStruct(self.annotate_raw_struct(s, ty, limit)?)
+            },
+            (MoveValue::Closure(c), FatType::Function(ty)) => {
+                AnnotatedMoveValue::Closure(self.annotate_closure(c, ty, limit)?)
+            },
             (MoveValue::U8(_), _)
             | (MoveValue::U64(_), _)
             | (MoveValue::U128(_), _)
@@ -590,6 +676,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             | (MoveValue::Address(_), _)
             | (MoveValue::Vector(_), _)
             | (MoveValue::Struct(_), _)
+            | (MoveValue::Closure(_), _)
             | (MoveValue::Signer(_), _)
             | (MoveValue::U16(_), _)
             | (MoveValue::U32(_), _)
@@ -658,6 +745,8 @@ fn pretty_print_value(
         },
         AnnotatedMoveValue::Bytes(v) => write!(f, "{}", hex::encode(v)),
         AnnotatedMoveValue::Struct(s) => pretty_print_struct(f, s, indent),
+        AnnotatedMoveValue::RawStruct(s) => pretty_print_raw_struct(f, s, indent),
+        AnnotatedMoveValue::Closure(c) => pretty_print_closure(f, c, indent),
     }
 }
 
@@ -680,6 +769,78 @@ fn pretty_print_struct(
     }
     write_indent(f, indent)?;
     write!(f, "}}")
+}
+
+fn pretty_print_raw_struct(
+    f: &mut Formatter,
+    value: &RawMoveStruct,
+    indent: u64,
+) -> std::fmt::Result {
+    let RawMoveStruct {
+        variant_info,
+        field_values: value,
+    } = value;
+    if let Some(var) = variant_info {
+        write!(f, "#{}", var)?
+    }
+    writeln!(f, "{{")?;
+    for elem in value {
+        write_indent(f, indent + 4)?;
+        pretty_print_value(f, elem, indent + 4)?;
+        writeln!(f)?
+    }
+    write!(f, "}}")
+}
+
+fn pretty_print_closure(
+    f: &mut Formatter,
+    value: &AnnotatedMoveClosure,
+    indent: u64,
+) -> std::fmt::Result {
+    let AnnotatedMoveClosure {
+        module_id,
+        fun_id,
+        ty_args,
+        mask,
+        captured,
+        ..
+    } = value;
+    write!(
+        f,
+        "0x{}::{}::{}",
+        module_id.address.short_str_lossless(),
+        module_id.name,
+        fun_id
+    )?;
+    if !ty_args.is_empty() {
+        let mut last_sep = "<";
+        for ty in ty_args {
+            f.write_str(last_sep)?;
+            last_sep = ", ";
+            write!(f, "{}", ty)?
+        }
+        write!(f, ">")?
+    }
+    write!(f, "(")?;
+    let mut iter_captured = captured.iter();
+    let mut first = true;
+    for i in 0..mask.max_captured().unwrap_or_default() {
+        if first {
+            first = false
+        } else {
+            write!(f, ", ")?
+        }
+        if mask.is_captured(i) {
+            if let Some(val) = iter_captured.next() {
+                pretty_print_value(f, val, indent)?
+            } else {
+                write!(f, "<invalid closure mask>")?
+            }
+        } else {
+            write!(f, "_")?
+        }
+    }
+    write!(f, ")")
 }
 
 fn pretty_print_ability_modifiers(f: &mut Formatter, abilities: AbilitySet) -> std::fmt::Result {
@@ -705,6 +866,60 @@ impl serde::Serialize for AnnotatedMoveStruct {
         }
         for (f, v) in &self.value {
             s.serialize_entry(f, v)?
+        }
+        s.end()
+    }
+}
+
+impl serde::Serialize for RawMoveStruct {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut s;
+        if let Some(tag) = &self.variant_info {
+            s = serializer.serialize_map(Some(self.field_values.len() + 1))?;
+            s.serialize_entry("$variant_tag", tag)?;
+        } else {
+            s = serializer.serialize_map(Some(self.field_values.len()))?;
+        }
+        for (i, v) in self.field_values.iter().enumerate() {
+            s.serialize_entry(&i, v)?
+        }
+        s.end()
+    }
+}
+
+impl serde::Serialize for AnnotatedMoveClosure {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let AnnotatedMoveClosure {
+            module_id,
+            fun_id,
+            ty_args,
+            mask,
+            captured,
+            ..
+        } = self;
+        let mut count = 2;
+        if !ty_args.is_empty() {
+            count += 1
+        }
+        if !captured.is_empty() {
+            count += 1
+        }
+        let mut s = serializer.serialize_map(Some(count))?;
+        s.serialize_entry(
+            "$fun_name",
+            &format!(
+                "0x{}::{}::{}",
+                module_id.address.short_str_lossless(),
+                module_id.name,
+                fun_id
+            ),
+        )?;
+        if !ty_args.is_empty() {
+            s.serialize_entry("$ty_args", ty_args)?;
+        }
+        s.serialize_entry("$mask", &mask.to_string())?;
+        if !captured.is_empty() {
+            s.serialize_entry("$captured", captured)?
         }
         s.end()
     }
@@ -761,6 +976,8 @@ impl serde::Serialize for AnnotatedMoveValue {
                 }
             },
             Struct(s) => s.serialize(serializer),
+            RawStruct(s) => s.serialize(serializer),
+            Closure(c) => c.serialize(serializer),
         }
     }
 }

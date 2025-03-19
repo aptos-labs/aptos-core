@@ -23,11 +23,18 @@ itertools = { workspace = true }
 once_cell = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
+aptos-schemadb = { workspace = true }
+aptos-temppath = { workspace = true }
 criterion = { workspace = true }
 itertools = { workspace = true }
 jemallocator = { workspace = true }
 proptest = { workspace = true }
 rand = { workspace = true }
+rocksdb = { workspace = true }
+
+[lib]
+bench = false
 
 [[bench]]
 name = "sorting"

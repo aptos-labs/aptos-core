@@ -18,7 +18,9 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{
     module_and_script_storage::code_storage::AptosCodeStorage,
     module_write_set::ModuleWrite,
-    resolver::{ResourceGroupSize, TExecutorView, TResourceGroupView},
+    resolver::{
+        BlockSynchronizationKillSwitch, ResourceGroupSize, TExecutorView, TResourceGroupView,
+    },
 };
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
@@ -67,7 +69,7 @@ pub trait ExecutorTask: Sync {
 
     /// Create an instance of the transaction executor.
     fn init(
-        environment: AptosEnvironment,
+        environment: &AptosEnvironment,
         state_view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
     ) -> Self;
 
@@ -83,7 +85,8 @@ pub trait ExecutorTask: Sync {
             GroupKey = <Self::Txn as Transaction>::Key,
             ResourceTag = <Self::Txn as Transaction>::Tag,
             Layout = MoveTypeLayout,
-        > + AptosCodeStorage),
+        > + AptosCodeStorage
+              + BlockSynchronizationKillSwitch),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error>;

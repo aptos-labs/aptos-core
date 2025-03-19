@@ -1,16 +1,66 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{loader::PseudoGasContext, RuntimeEnvironment};
+use crate::{config::VMConfig, RuntimeEnvironment};
 use hashbrown::{hash_map::Entry, HashMap};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    language_storage::{StructTag, TypeTag},
+    language_storage::{FunctionTag, StructTag, TypeTag},
     vm_status::StatusCode,
 };
 use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex};
 use parking_lot::RwLock;
 use std::hash::{Hash, Hasher};
+
+struct PseudoGasContext {
+    // Parameters for metering type tag construction:
+    //   - maximum allowed cost,
+    //   - base cost for any type to tag conversion,
+    //   - cost for size of a struct tag.
+    max_cost: u64,
+    cost: u64,
+    cost_base: u64,
+    cost_per_byte: u64,
+}
+
+impl PseudoGasContext {
+    fn new(vm_config: &VMConfig) -> Self {
+        Self {
+            max_cost: vm_config.type_max_cost,
+            cost: 0,
+            cost_base: vm_config.type_base_cost,
+            cost_per_byte: vm_config.type_byte_cost,
+        }
+    }
+
+    fn current_cost(&mut self) -> u64 {
+        self.cost
+    }
+
+    fn charge_base(&mut self) -> PartialVMResult<()> {
+        self.charge(self.cost_base)
+    }
+
+    fn charge_struct_tag(&mut self, struct_tag: &StructTag) -> PartialVMResult<()> {
+        let size =
+            (struct_tag.address.len() + struct_tag.module.len() + struct_tag.name.len()) as u64;
+        self.charge(size * self.cost_per_byte)
+    }
+
+    fn charge(&mut self, amount: u64) -> PartialVMResult<()> {
+        self.cost += amount;
+        if self.cost > self.max_cost {
+            Err(
+                PartialVMError::new(StatusCode::TYPE_TAG_LIMIT_EXCEEDED).with_message(format!(
+                    "Exceeded maximum type tag limit of {} when charging {}",
+                    self.max_cost, amount
+                )),
+            )
+        } else {
+            Ok(())
+        }
+    }
+}
 
 /// Key type for [TypeTagCache] that corresponds to a fully-instantiated struct.
 #[derive(Clone, Eq, PartialEq)]
@@ -161,14 +211,6 @@ impl TypeTagCache {
     }
 }
 
-impl Clone for TypeTagCache {
-    fn clone(&self) -> Self {
-        Self {
-            cache: RwLock::new(self.cache.read().clone()),
-        }
-    }
-}
-
 /// Responsible for building type tags, while also doing the metering in order to bound space and
 /// time complexity.
 pub(crate) struct TypeTagConverter<'a> {
@@ -238,6 +280,26 @@ impl<'a> TypeTagConverter<'a> {
                 let struct_tag =
                     self.struct_name_idx_to_struct_tag_impl(idx, ty_args, gas_context)?;
                 TypeTag::Struct(Box::new(struct_tag))
+            },
+
+            // Functions: recurse
+            Type::Function {
+                args,
+                results,
+                abilities,
+            } => {
+                let to_vec = |ts: &[Type],
+                              gas_ctx: &mut PseudoGasContext|
+                 -> PartialVMResult<Vec<TypeTag>> {
+                    ts.iter()
+                        .map(|t| self.ty_to_ty_tag_impl(t, gas_ctx))
+                        .collect()
+                };
+                TypeTag::Function(Box::new(FunctionTag {
+                    args: to_vec(args, gas_context)?,
+                    results: to_vec(results, gas_context)?,
+                    abilities: *abilities,
+                }))
             },
 
             // References and type parameters cannot be converted to tags.

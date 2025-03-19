@@ -40,13 +40,15 @@ impl UnusedAssignmentChecker {
             let live_after = &live_var_info.after;
             let dst_name = dst_name.display(target.func_env.symbol_pool()).to_string();
             if !dst_name.starts_with('_') && live_after.get(&dst).is_none() {
-                target
-                    .global_env()
-                    .diag(
-                        Severity::Warning,
-                        &loc,
-                        &format!("Unused assignment to `{}`. Consider removing or prefixing with an underscore: `_{}`", dst_name, dst_name)
-                    );
+                target.global_env().diag(
+                    Severity::Warning,
+                    &loc,
+                    &format!(
+                        "Unused assignment/binding to `{}`. Consider removing the assignment/binding, \
+                        or prefixing with an underscore (e.g., `_{}`), or binding to `_`",
+                        dst_name, dst_name
+                    ),
+                );
             }
         }
     }

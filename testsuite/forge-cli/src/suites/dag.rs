@@ -12,7 +12,7 @@ use aptos_forge::{
 };
 use aptos_sdk::types::on_chain_config::{
     BlockGasLimitType, ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig,
-    OnChainExecutionConfig, TransactionShufflerType, ValidatorTxnConfig,
+    OnChainExecutionConfig, TransactionShufflerType, ValidatorTxnConfig, DEFAULT_WINDOW_SIZE,
 };
 use aptos_testcases::{
     consensus_reliability_tests::ChangingWorkingQuorumTest,
@@ -93,9 +93,10 @@ fn dag_realistic_env_max_load_test(
             helm_values["chain"]["epoch_duration_secs"] =
                 (if long_running { 600 } else { 300 }).into();
 
-            let onchain_consensus_config = OnChainConsensusConfig::V3 {
+            let onchain_consensus_config = OnChainConsensusConfig::V4 {
                 alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
                 vtxn: ValidatorTxnConfig::default_for_genesis(),
+                window_size: DEFAULT_WINDOW_SIZE
             };
 
             helm_values["chain"]["on_chain_consensus_config"] =
@@ -113,6 +114,10 @@ fn dag_realistic_env_max_load_test(
                 OnChainExecutionConfig::V4(config_v4) => {
                     config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
                     config_v4.transaction_shuffler_type = TransactionShufflerType::default_for_genesis();
+                }
+                OnChainExecutionConfig::V5(config_v5) => {
+                    config_v5.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                    config_v5.transaction_shuffler_type = TransactionShufflerType::default_for_genesis();
                 }
             }
             helm_values["chain"]["on_chain_execution_config"] =
@@ -177,9 +182,10 @@ fn dag_changing_working_quorum_test() -> ForgeConfig {
             helm_values["genesis"]["validator"]["num_validators_with_larger_stake"] =
                 num_large_validators.into();
 
-            let onchain_consensus_config = OnChainConsensusConfig::V3 {
+            let onchain_consensus_config = OnChainConsensusConfig::V4 {
                 alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
                 vtxn: ValidatorTxnConfig::default_for_genesis(),
+                window_size: DEFAULT_WINDOW_SIZE,
             };
 
             helm_values["chain"]["on_chain_consensus_config"] =
@@ -213,6 +219,9 @@ fn dag_reconfig_enable_test() -> ForgeConfig {
                     }
                     OnChainExecutionConfig::V4(config_v4) => {
                         config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                    }
+                    OnChainExecutionConfig::V5(config_v5) => {
+                        config_v5.block_gas_limit_type = BlockGasLimitType::NoLimit;
                     }
             }
             helm_values["chain"]["on_chain_execution_config"] =

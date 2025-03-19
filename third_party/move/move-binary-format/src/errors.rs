@@ -121,18 +121,7 @@ impl VMError {
                         };
                     },
                 };
-                // Errors for OUT_OF_GAS do not always have index set: if it does not, it should already return above.
-                debug_assert!(
-                    offsets.len() == 1,
-                    "Unexpected offsets. major_status: {:?}\
-                    sub_status: {:?}\
-                    location: {:?}\
-                    offsets: {:#?}",
-                    major_status,
-                    sub_status,
-                    location,
-                    offsets
-                );
+                // offset can be None if it comes from `check_dependencies_and_charge_gas` for example
                 let (function, code_offset) = match offsets.pop() {
                     None => {
                         return VMStatus::Error {
@@ -256,7 +245,7 @@ impl VMError {
         }))
     }
 
-    pub fn format_test_output(&self, verbose: bool, comparison_mode: bool) -> String {
+    pub fn format_test_output(&self, verbose: bool) -> String {
         let location_string = match &self.location() {
             Location::Undefined => "undefined".to_owned(),
             Location::Script => "script".to_owned(),
@@ -264,18 +253,8 @@ impl VMError {
                 format!("0x{}::{}", id.address().short_str_lossless(), id.name())
             },
         };
-        let indices = if comparison_mode {
-            // During comparison testing, abstract this data.
-            "redacted".to_string()
-        } else {
-            format!("{:?}", self.indices())
-        };
-        let offsets = if comparison_mode {
-            // During comparison testing, abstract this data.
-            "redacted".to_string()
-        } else {
-            format!("{:?}", self.offsets())
-        };
+        let indices = format!("{:?}", self.indices());
+        let offsets = format!("{:?}", self.offsets());
 
         if verbose {
             let message_str = match &self.message() {
@@ -467,6 +446,10 @@ impl PartialVMError {
             indices: vec![],
             offsets: vec![],
         }))
+    }
+
+    pub fn new_invariant_violation(msg: impl ToString) -> PartialVMError {
+        Self::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(msg.to_string())
     }
 
     pub fn major_status(&self) -> StatusCode {

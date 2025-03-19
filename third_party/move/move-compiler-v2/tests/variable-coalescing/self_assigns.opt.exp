@@ -85,7 +85,7 @@ public fun m::test4($t0: u64): u64 {
 
 
 Diagnostics:
-warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
   ┌─ tests/variable-coalescing/self_assigns.move:3:9
   │
 3 │         x = x;
@@ -448,56 +448,56 @@ public fun m::test4($t0: u64): u64 {
 module c0ffee.m {
 
 
-public test1(Arg0: u64) /* def_idx: 0 */ {
+public test1(x: u64) /* def_idx: 0 */ {
 B0:
 	0: Ret
 }
-public test2(Arg0: u64): u64 /* def_idx: 1 */ {
+public test2(x: u64): u64 /* def_idx: 1 */ {
 B0:
-	0: MoveLoc[0](Arg0: u64)
+	0: MoveLoc[0](x: u64)
 	1: Ret
 }
 public test3(): u64 /* def_idx: 2 */ {
-L0:	loc0: u64
-L1:	loc1: u64
+L0:	i: u64
+L1:	x: u64
 B0:
 	0: LdU64(0)
-	1: StLoc[0](loc0: u64)
+	1: StLoc[0](i: u64)
 	2: LdU64(1)
-	3: StLoc[1](loc1: u64)
+	3: StLoc[1](x: u64)
 B1:
-	4: CopyLoc[0](loc0: u64)
+	4: CopyLoc[0](i: u64)
 	5: LdU64(42)
 	6: Lt
 	7: BrFalse(13)
 B2:
-	8: MoveLoc[0](loc0: u64)
+	8: MoveLoc[0](i: u64)
 	9: LdU64(1)
 	10: Add
-	11: StLoc[0](loc0: u64)
+	11: StLoc[0](i: u64)
 	12: Branch(4)
 B3:
-	13: MoveLoc[1](loc1: u64)
+	13: MoveLoc[1](x: u64)
 	14: Ret
 }
-public test4(Arg0: u64): u64 /* def_idx: 3 */ {
-L1:	loc0: u64
+public test4(x: u64): u64 /* def_idx: 3 */ {
+L1:	i: u64
 B0:
 	0: LdU64(0)
-	1: StLoc[1](loc0: u64)
+	1: StLoc[1](i: u64)
 B1:
-	2: CopyLoc[1](loc0: u64)
+	2: CopyLoc[1](i: u64)
 	3: LdU64(42)
 	4: Lt
 	5: BrFalse(11)
 B2:
-	6: MoveLoc[1](loc0: u64)
+	6: MoveLoc[1](i: u64)
 	7: LdU64(1)
 	8: Add
-	9: StLoc[1](loc0: u64)
+	9: StLoc[1](i: u64)
 	10: Branch(2)
 B3:
-	11: MoveLoc[0](Arg0: u64)
+	11: MoveLoc[0](x: u64)
 	12: Ret
 }
 }
