@@ -372,7 +372,7 @@ Return the current dispatchable authenticator move function info. <code>None</co
     <b>let</b> resource_addr = <a href="account_abstraction.md#0x1_account_abstraction_resource_addr">resource_addr</a>(addr);
     <b>if</b> (<b>exists</b>&lt;<a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr)) {
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(
-            <a href="ordered_map.md#0x1_ordered_map_keys">ordered_map::keys</a>(&<b>borrow_global</b>&lt;<a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr).auth_functions)
+            <a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a>[resource_addr].auth_functions.keys()
         )
     } <b>else</b> { <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>() }
 }
@@ -593,7 +593,7 @@ only be obtained as a part of the governance script.
 ) <b>acquires</b> <a href="account_abstraction.md#0x1_account_abstraction_DomainDispatchableAuthenticator">DomainDispatchableAuthenticator</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
 
-    <b>borrow_global_mut</b>&lt;<a href="account_abstraction.md#0x1_account_abstraction_DomainDispatchableAuthenticator">DomainDispatchableAuthenticator</a>&gt;(@aptos_framework).auth_functions.add(
+    <a href="account_abstraction.md#0x1_account_abstraction_DomainDispatchableAuthenticator">DomainDispatchableAuthenticator</a>[@aptos_framework].auth_functions.add(
         <a href="function_info.md#0x1_function_info_new_function_info_from_address">function_info::new_function_info_from_address</a>(module_address, module_name, function_name),
         DomainRegisterValue::Empty,
     );
@@ -687,37 +687,45 @@ only be obtained as a part of the governance script.
         <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility">function_info::check_dispatch_type_compatibility</a>(&dispatcher_auth_function_info, &auth_function),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account_abstraction.md#0x1_account_abstraction_EAUTH_FUNCTION_SIGNATURE_MISMATCH">EAUTH_FUNCTION_SIGNATURE_MISMATCH</a>)
     );
-    <b>if</b> (is_add && !<b>exists</b>&lt;<a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr)) {
-        <b>move_to</b>(
-            &<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(resource_addr),
-            DispatchableAuthenticator::V1 { auth_functions: <a href="ordered_map.md#0x1_ordered_map_new">ordered_map::new</a>() }
-        );
-    };
-    <b>assert</b>!(<b>exists</b>&lt;<a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account_abstraction.md#0x1_account_abstraction_EFUNCTION_INFO_EXISTENCE">EFUNCTION_INFO_EXISTENCE</a>));
-    <b>let</b> current_map = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr).auth_functions;
     <b>if</b> (is_add) {
+        <b>if</b> (!<b>exists</b>&lt;<a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr)) {
+            <b>move_to</b>(
+                &<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(resource_addr),
+                DispatchableAuthenticator::V1 { auth_functions: <a href="ordered_map.md#0x1_ordered_map_new">ordered_map::new</a>() }
+            );
+        };
+        <b>let</b> current_map = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr).auth_functions;
         <b>assert</b>!(
-            !<a href="ordered_map.md#0x1_ordered_map_contains">ordered_map::contains</a>(current_map, &auth_function),
+            !current_map.contains(&auth_function),
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="account_abstraction.md#0x1_account_abstraction_EFUNCTION_INFO_EXISTENCE">EFUNCTION_INFO_EXISTENCE</a>)
         );
-        <a href="ordered_map.md#0x1_ordered_map_add">ordered_map::add</a>(current_map, auth_function, <b>true</b>);
+        current_map.add(auth_function, <b>true</b>);
+        <a href="event.md#0x1_event_emit">event::emit</a>(
+            <a href="account_abstraction.md#0x1_account_abstraction_UpdateDispatchableAuthenticator">UpdateDispatchableAuthenticator</a> {
+                <a href="account.md#0x1_account">account</a>: addr,
+                <b>update</b>: b"add",
+                auth_function,
+            }
+        );
     } <b>else</b> {
+        <b>assert</b>!(<b>exists</b>&lt;<a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account_abstraction.md#0x1_account_abstraction_EFUNCTION_INFO_EXISTENCE">EFUNCTION_INFO_EXISTENCE</a>));
+        <b>let</b> current_map = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr).auth_functions;
         <b>assert</b>!(
-            <a href="ordered_map.md#0x1_ordered_map_contains">ordered_map::contains</a>(current_map, &auth_function),
+            current_map.contains(&auth_function),
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account_abstraction.md#0x1_account_abstraction_EFUNCTION_INFO_EXISTENCE">EFUNCTION_INFO_EXISTENCE</a>)
         );
-        <a href="ordered_map.md#0x1_ordered_map_remove">ordered_map::remove</a>(current_map, &auth_function);
-    };
-    <a href="event.md#0x1_event_emit">event::emit</a>(
-        <a href="account_abstraction.md#0x1_account_abstraction_UpdateDispatchableAuthenticator">UpdateDispatchableAuthenticator</a> {
-            <a href="account.md#0x1_account">account</a>: addr,
-            <b>update</b>: <b>if</b> (is_add) { b"add" } <b>else</b> { b"remove" },
-            auth_function,
-        }
-    );
-    <b>if</b> (<a href="ordered_map.md#0x1_ordered_map_length">ordered_map::length</a>(current_map) == 0) {
+        current_map.remove(&auth_function);
+        <a href="event.md#0x1_event_emit">event::emit</a>(
+            <a href="account_abstraction.md#0x1_account_abstraction_UpdateDispatchableAuthenticator">UpdateDispatchableAuthenticator</a> {
+                <a href="account.md#0x1_account">account</a>: addr,
+                <b>update</b>: b"remove",
+                auth_function,
+            }
+        );
+        <b>if</b> (current_map.length() == 0) {
             <a href="account_abstraction.md#0x1_account_abstraction_remove_authenticator">remove_authenticator</a>(<a href="account.md#0x1_account">account</a>);
-    }
+        }
+    };
 }
 </code></pre>
 
@@ -742,7 +750,7 @@ only be obtained as a part of the governance script.
 
 <pre><code>inline <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_dispatchable_authenticator_internal">dispatchable_authenticator_internal</a>(addr: <b>address</b>): &OrderedMap&lt;FunctionInfo, bool&gt; {
     <b>assert</b>!(<a href="account_abstraction.md#0x1_account_abstraction_using_dispatchable_authenticator">using_dispatchable_authenticator</a>(addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account_abstraction.md#0x1_account_abstraction_EDISPATCHABLE_AUTHENTICATOR_IS_NOT_USED">EDISPATCHABLE_AUTHENTICATOR_IS_NOT_USED</a>));
-    &<b>borrow_global</b>&lt;<a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(<a href="account_abstraction.md#0x1_account_abstraction_resource_addr">resource_addr</a>(addr)).auth_functions
+    &<a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a>[<a href="account_abstraction.md#0x1_account_abstraction_resource_addr">resource_addr</a>(addr)].auth_functions
 }
 </code></pre>
 
@@ -767,7 +775,7 @@ only be obtained as a part of the governance script.
 
 <pre><code>inline <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_dispatchable_domain_authenticator_internal">dispatchable_domain_authenticator_internal</a>(): &BigOrderedMap&lt;FunctionInfo, <a href="account_abstraction.md#0x1_account_abstraction_DomainRegisterValue">DomainRegisterValue</a>&gt; {
     <b>assert</b>!(<b>exists</b>&lt;<a href="account_abstraction.md#0x1_account_abstraction_DomainDispatchableAuthenticator">DomainDispatchableAuthenticator</a>&gt;(@aptos_framework), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account_abstraction.md#0x1_account_abstraction_EDOMAIN_AA_NOT_INITIALIZED">EDOMAIN_AA_NOT_INITIALIZED</a>));
-    &<b>borrow_global</b>&lt;<a href="account_abstraction.md#0x1_account_abstraction_DomainDispatchableAuthenticator">DomainDispatchableAuthenticator</a>&gt;(@aptos_framework).auth_functions
+    &<a href="account_abstraction.md#0x1_account_abstraction_DomainDispatchableAuthenticator">DomainDispatchableAuthenticator</a>[@aptos_framework].auth_functions
 }
 </code></pre>
 
@@ -804,14 +812,14 @@ only be obtained as a part of the governance script.
         <b>assert</b>!(func_infos.contains(&func_info), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account_abstraction.md#0x1_account_abstraction_EFUNCTION_INFO_EXISTENCE">EFUNCTION_INFO_EXISTENCE</a>));
     } <b>else</b> {
         <b>let</b> func_infos = <a href="account_abstraction.md#0x1_account_abstraction_dispatchable_authenticator_internal">dispatchable_authenticator_internal</a>(master_signer_addr);
-        <b>assert</b>!(<a href="ordered_map.md#0x1_ordered_map_contains">ordered_map::contains</a>(func_infos, &func_info), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account_abstraction.md#0x1_account_abstraction_EFUNCTION_INFO_EXISTENCE">EFUNCTION_INFO_EXISTENCE</a>));
+        <b>assert</b>!(func_infos.contains(&func_info), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account_abstraction.md#0x1_account_abstraction_EFUNCTION_INFO_EXISTENCE">EFUNCTION_INFO_EXISTENCE</a>));
     };
 
     <a href="function_info.md#0x1_function_info_load_module_from_function">function_info::load_module_from_function</a>(&func_info);
     <b>let</b> returned_signer = <a href="account_abstraction.md#0x1_account_abstraction_dispatchable_authenticate">dispatchable_authenticate</a>(<a href="account.md#0x1_account">account</a>, signing_data, &func_info);
     // Returned <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> MUST represent the same <a href="account.md#0x1_account">account</a> <b>address</b>. Otherwise, it may <b>break</b> the <b>invariant</b> of Aptos blockchain!
     <b>assert</b>!(
-        master_signer_addr == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&returned_signer),
+        master_signer_addr == <a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(&returned_signer),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account_abstraction.md#0x1_account_abstraction_EINCONSISTENT_SIGNER_ADDRESS">EINCONSISTENT_SIGNER_ADDRESS</a>)
     );
     returned_signer

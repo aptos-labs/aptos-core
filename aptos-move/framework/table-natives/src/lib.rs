@@ -380,6 +380,13 @@ fn native_add_box(
 
     let (gv, loaded) =
         table.get_or_create_global_value(function_value_extension, table_context, key_bytes)?;
+    let mem_usage = gv.view().map(|val| {
+        u64::from(
+            context
+                .abs_val_gas_params()
+                .abstract_heap_size(&val, context.gas_feature_version()),
+        )
+    });
 
     let res = match gv.move_to(val) {
         Ok(_) => Ok(smallvec![]),
@@ -392,6 +399,9 @@ fn native_add_box(
 
     // TODO(Gas): Figure out a way to charge this earlier.
     context.charge(key_cost)?;
+    if let Some(amount) = mem_usage {
+        context.use_heap_memory(amount);
+    }
     charge_load_cost(context, loaded)?;
 
     res
@@ -421,6 +431,13 @@ fn native_borrow_box(
 
     let (gv, loaded) =
         table.get_or_create_global_value(function_value_extension, table_context, key_bytes)?;
+    let mem_usage = gv.view().map(|val| {
+        u64::from(
+            context
+                .abs_val_gas_params()
+                .abstract_heap_size(&val, context.gas_feature_version()),
+        )
+    });
 
     let res = match gv.borrow_global() {
         Ok(ref_val) => Ok(smallvec![ref_val]),
@@ -433,6 +450,9 @@ fn native_borrow_box(
 
     // TODO(Gas): Figure out a way to charge this earlier.
     context.charge(key_cost)?;
+    if let Some(amount) = mem_usage {
+        context.use_heap_memory(amount);
+    }
     charge_load_cost(context, loaded)?;
 
     res
@@ -462,12 +482,22 @@ fn native_contains_box(
 
     let (gv, loaded) =
         table.get_or_create_global_value(function_value_extension, table_context, key_bytes)?;
+    let mem_usage = gv.view().map(|val| {
+        u64::from(
+            context
+                .abs_val_gas_params()
+                .abstract_heap_size(&val, context.gas_feature_version()),
+        )
+    });
     let exists = Value::bool(gv.exists()?);
 
     drop(table_data);
 
     // TODO(Gas): Figure out a way to charge this earlier.
     context.charge(key_cost)?;
+    if let Some(amount) = mem_usage {
+        context.use_heap_memory(amount);
+    }
     charge_load_cost(context, loaded)?;
 
     Ok(smallvec![exists])
@@ -497,6 +527,14 @@ fn native_remove_box(
 
     let (gv, loaded) =
         table.get_or_create_global_value(function_value_extension, table_context, key_bytes)?;
+    let mem_usage = gv.view().map(|val| {
+        u64::from(
+            context
+                .abs_val_gas_params()
+                .abstract_heap_size(&val, context.gas_feature_version()),
+        )
+    });
+
     let res = match gv.move_from() {
         Ok(val) => Ok(smallvec![val]),
         Err(_) => Err(SafeNativeError::Abort {
@@ -508,6 +546,9 @@ fn native_remove_box(
 
     // TODO(Gas): Figure out a way to charge this earlier.
     context.charge(key_cost)?;
+    if let Some(amount) = mem_usage {
+        context.use_heap_memory(amount);
+    }
     charge_load_cost(context, loaded)?;
 
     res

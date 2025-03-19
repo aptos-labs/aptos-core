@@ -6,7 +6,7 @@ use move_bytecode_verifier::VerifierConfig;
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::{
     config::VMConfig, module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage,
-    AsUnsyncModuleStorage, RuntimeEnvironment, StagingModuleStorage, WithRuntimeEnvironment,
+    AsUnsyncModuleStorage, RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -47,20 +47,11 @@ fn test_publish_module_with_nested_loops() {
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
-        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
 
-        let mut sess = vm.new_session(&storage);
-        if vm.vm_config().use_loader_v2 {
-            let module_storage = storage.as_unsync_module_storage();
-            let result = StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob
-                .clone()
-                .into()]);
-            assert!(result.is_ok());
-        } else {
-            #[allow(deprecated)]
-            sess.publish_module(m_blob.clone(), TEST_ADDR, &mut UnmeteredGasMeter)
-                .unwrap();
-        }
+        let module_storage = storage.as_unsync_module_storage();
+        let result =
+            StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob.clone().into()]);
+        assert!(result.is_ok());
     }
 
     // Should fail with max_loop_depth = 1
@@ -74,20 +65,11 @@ fn test_publish_module_with_nested_loops() {
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
-        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
 
-        let mut sess = vm.new_session(&storage);
-        if vm.vm_config().use_loader_v2 {
-            let module_storage = storage.as_unsync_module_storage();
-            let result = StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob
-                .clone()
-                .into()]);
-            assert!(result.is_err());
-        } else {
-            #[allow(deprecated)]
-            sess.publish_module(m_blob.clone(), TEST_ADDR, &mut UnmeteredGasMeter)
-                .unwrap_err();
-        }
+        let module_storage = storage.as_unsync_module_storage();
+        let result =
+            StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob.clone().into()]);
+        assert!(result.is_err());
     }
 }
 
@@ -126,12 +108,11 @@ fn test_run_script_with_nested_loops() {
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
-        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
         let code_storage = storage.as_unsync_code_storage();
 
-        let mut sess = vm.new_session(&storage);
+        let mut sess = MoveVM::new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];
-        sess.execute_script(
+        sess.load_and_execute_script(
             s_blob.clone(),
             vec![],
             args,
@@ -153,12 +134,11 @@ fn test_run_script_with_nested_loops() {
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
-        let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
         let code_storage = storage.as_unsync_code_storage();
 
-        let mut sess = vm.new_session(&storage);
+        let mut sess = MoveVM::new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];
-        sess.execute_script(
+        sess.load_and_execute_script(
             s_blob,
             vec![],
             args,

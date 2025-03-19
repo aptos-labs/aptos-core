@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    loader::{Function, LazyLoadedFunction, LazyLoadedFunctionState, Module},
+    loader::{Function, LazyLoadedFunction, LazyLoadedFunctionState, LoadedFunctionOwner, Module},
     logging::expect_no_verification_errors,
-    LayoutConverter, StorageLayoutConverter, WithRuntimeEnvironment,
+    LayoutConverter, LoadedFunction, StorageLayoutConverter, WithRuntimeEnvironment,
 };
 use ambassador::delegatable_trait;
 use bytes::Bytes;
@@ -38,13 +38,6 @@ use std::sync::Arc;
 /// implement their own module storage to pass to the VM to resolve code.
 #[delegatable_trait]
 pub trait ModuleStorage: WithRuntimeEnvironment {
-    /// Returns true if loader V2 implementation is enabled. Will be removed in the future, for now
-    /// it is simply a convenient way to check the feature flag if module storage is available.
-    // TODO(loader_v2): Remove this when loader V2 is enabled.
-    fn is_enabled(&self) -> bool {
-        self.runtime_environment().vm_config().use_loader_v2
-    }
-
     /// Returns true if the module exists, and false otherwise. An error is returned if there is a
     /// storage error.
     fn check_module_exists(
@@ -215,6 +208,39 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
             })?
             .clone();
         Ok((module, function))
+    }
+
+    fn load_function(
+        &self,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
+        ty_args: &[TypeTag],
+    ) -> VMResult<LoadedFunction> {
+        let _timer = VM_TIMER.timer_with_label("Loader::load_function");
+
+        let (module, function) =
+            self.fetch_function_definition(module_id.address(), module_id.name(), function_name)?;
+
+        let ty_args = ty_args
+            .iter()
+            .map(|ty_arg| self.fetch_ty(ty_arg).map_err(|e| e.finish(Location::Undefined)))
+            .collect::<VMResult<Vec<_>>>()
+            .map_err(|mut err| {
+                // User provided type argument failed to load. Set extra sub status to distinguish from internal type loading error.
+                if StatusCode::TYPE_RESOLUTION_FAILURE == err.major_status() {
+                    err.set_sub_status(move_core_types::vm_status::sub_status::type_resolution_failure::EUSER_TYPE_LOADING_FAILURE);
+                }
+                err
+            })?;
+
+        Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
+            .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
+
+        Ok(LoadedFunction {
+            owner: LoadedFunctionOwner::Module(module),
+            ty_args,
+            function,
+        })
     }
 }
 

@@ -1,5 +1,5 @@
 Loop { loop_count: Some(100000), loop_type: NoOp }	55	0.965	1.066	41062.1
-Loop { loop_count: Some(10000), loop_type: Arithmetic }	55	0.951	1.155	25685.1
+Loop { loop_count: Some(10000), loop_type: Arithmetic }	55	0.951	1.155	28685.1
 CreateObjects { num_objects: 10, object_payload_size: 0 }	55	0.931	1.050	164.5
 CreateObjects { num_objects: 10, object_payload_size: 10240 }	55	0.962	1.059	9426.9
 CreateObjects { num_objects: 100, object_payload_size: 0 }	55	0.945	1.047	1447.9

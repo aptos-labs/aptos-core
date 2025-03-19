@@ -4,9 +4,9 @@
 
 use crate::{
     ast::{
-        AccessSpecifier, Address, AddressSpecifier, Exp, ExpData, LambdaCaptureKind, MatchArm,
-        ModuleName, Operation, Pattern, QualifiedSymbol, QuantKind, ResourceSpecifier,
-        RewriteResult, Spec, TempIndex, Value,
+        AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Exp, ExpData,
+        LambdaCaptureKind, MatchArm, ModuleName, Operation, Pattern, QualifiedSymbol, QuantKind,
+        ResourceSpecifier, RewriteResult, Spec, TempIndex, Value,
     },
     builder::{
         model_builder::{
@@ -30,11 +30,8 @@ use crate::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_binary_format::file_format::{self};
-use move_compiler::{
+use legacy_move_compiler::{
     expansion::ast::{self as EA},
-    hlir::ast as HA,
-    naming::ast as NA,
     parser::ast::{self as PA, CallKind, Field},
     shared::{unique_map::UniqueMap, Identifier, Name},
 };
@@ -42,7 +39,6 @@ use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
     function::ClosureMask,
-    value::MoveValue,
 };
 use move_ir_types::{
     location::{sp, Spanned},
@@ -400,21 +396,23 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             .update_node_instantiation(node_id, instantiation);
     }
 
-    /// Finalizes types in this translator, producing errors if some could not be inferred
+    /// Finalizes types in this translator, producing errors if post_process is true and
+    /// some could not be inferred
     /// and remained incomplete.
-    pub fn finalize_types(&mut self) {
+    /// TODO: refactor `finalize_types` to avoid running it two times before and after post processing
+    pub fn finalize_types(&mut self, post_process: bool) {
         if !*self.had_errors.borrow() {
             let mut reported_vars = BTreeSet::new();
             for i in self.node_counter_start..self.env().next_free_node_number() {
                 let node_id = NodeId::new(i);
                 if let Some(ty) = self.get_node_type_opt(node_id) {
-                    let ty = self.finalize_type(node_id, &ty, &mut reported_vars);
+                    let ty = self.finalize_type(node_id, &ty, &mut reported_vars, post_process);
                     self.update_node_type(node_id, ty);
                 }
                 if let Some(inst) = self.get_node_instantiation_opt(node_id) {
                     let inst = inst
                         .iter()
-                        .map(|ty| self.finalize_type(node_id, ty, &mut reported_vars))
+                        .map(|ty| self.finalize_type(node_id, ty, &mut reported_vars, post_process))
                         .collect_vec();
                     self.update_node_instantiation(node_id, inst);
                 }
@@ -430,6 +428,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         node_id: NodeId,
         ty: &Type,
         reported_vars: &mut BTreeSet<u32>,
+        post_process: bool,
     ) -> Type {
         let ty = self.subs.specialize_with_defaults(ty);
         let mut incomplete = false;
@@ -443,7 +442,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             }
         };
         ty.visit(&mut visitor);
-        if incomplete {
+        if incomplete && post_process {
             let displayed_ty = format!("{}", ty.display(&self.type_display_context()));
             // Skip displaying the error message if there is already an error in the type;
             // we must have another message about it already.
@@ -876,95 +875,6 @@ impl<'env, 'builder, 'module_builder> AbilityContext
 /// # Type Translation
 
 impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'module_translator> {
-    /// Translates an hlir type into a target AST type.
-    pub fn translate_hlir_single_type(&mut self, ty: &HA::SingleType) -> Type {
-        use HA::SingleType_::*;
-        match &ty.value {
-            Ref(is_mut, ty) => {
-                let ty = self.translate_hlir_base_type(ty);
-                if ty == Type::Error {
-                    Type::Error
-                } else {
-                    Type::Reference(ReferenceKind::from_is_mut(*is_mut), Box::new(ty))
-                }
-            },
-            Base(ty) => self.translate_hlir_base_type(ty),
-        }
-    }
-
-    fn translate_hlir_base_type(&mut self, ty: &HA::BaseType) -> Type {
-        use HA::{BaseType_::*, TypeName_::*};
-        use NA::{BuiltinTypeName_::*, TParam};
-        match &ty.value {
-            Param(TParam {
-                user_specified_name,
-                ..
-            }) => {
-                let sym = self.symbol_pool().make(user_specified_name.value.as_str());
-                self.type_params_table[&sym].clone()
-            },
-            Apply(_, type_name, args) => {
-                let loc = self.to_loc(&type_name.loc);
-                match &type_name.value {
-                    Builtin(builtin_type_name) => match &builtin_type_name.value {
-                        Address => Type::new_prim(PrimitiveType::Address),
-                        Signer => Type::new_prim(PrimitiveType::Signer),
-                        U8 => Type::new_prim(PrimitiveType::U8),
-                        U16 => Type::new_prim(PrimitiveType::U16),
-                        U32 => Type::new_prim(PrimitiveType::U32),
-                        U64 => Type::new_prim(PrimitiveType::U64),
-                        U128 => Type::new_prim(PrimitiveType::U128),
-                        U256 => Type::new_prim(PrimitiveType::U256),
-                        Vector => Type::Vector(Box::new(self.translate_hlir_base_type(&args[0]))),
-                        Bool => Type::new_prim(PrimitiveType::Bool),
-                        Fun => Type::Fun(
-                            Box::new(Type::tuple(
-                                self.translate_hlir_base_types(&args[0..args.len() - 1]),
-                            )),
-                            Box::new(self.translate_hlir_base_type(&args[args.len() - 1])),
-                            AbilitySet::FUNCTIONS,
-                        ),
-                    },
-                    ModuleType(m, n) => {
-                        let addr_bytes = self.parent.parent.resolve_address(&loc, &m.value.address);
-                        let module_name = ModuleName::from_address_bytes_and_name(
-                            addr_bytes,
-                            self.symbol_pool().make(m.value.module.0.value.as_str()),
-                        );
-                        let symbol = self.symbol_pool().make(n.0.value.as_str());
-                        let qsym = QualifiedSymbol {
-                            module_name,
-                            symbol,
-                        };
-                        let rty = self.parent.parent.lookup_type(&loc, &qsym);
-                        if !args.is_empty() {
-                            // Replace type instantiation.
-                            if let Type::Struct(mid, sid, _) = &rty {
-                                let arg_types = self.translate_hlir_base_types(args);
-                                if arg_types.iter().any(|x| *x == Type::Error) {
-                                    Type::Error
-                                } else {
-                                    Type::Struct(*mid, *sid, arg_types)
-                                }
-                            } else {
-                                Type::Error
-                            }
-                        } else {
-                            rty
-                        }
-                    },
-                }
-            },
-            _ => unreachable!(),
-        }
-    }
-
-    fn translate_hlir_base_types(&mut self, tys: &[HA::BaseType]) -> Vec<Type> {
-        tys.iter()
-            .map(|t| self.translate_hlir_base_type(t))
-            .collect()
-    }
-
     /// Translates a source AST type into a target AST type.
     pub fn translate_type(&mut self, ty: &EA::Type) -> Type {
         use EA::Type_::*;
@@ -1175,21 +1085,25 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             type_args,
             address,
         } = &specifier.value;
-        if *kind != file_format::AccessKind::Acquires {
-            self.check_language_version(
-                &loc,
-                "read/write access specifiers. Try `acquires` instead.",
-                LanguageVersion::V2_0,
-            )?;
-        } else if *negated {
-            self.check_language_version(&loc, "access specifier negation", LanguageVersion::V2_0)?;
-        } else if type_args.is_some() && !type_args.as_ref().unwrap().is_empty() {
-            self.check_language_version(
-                &loc,
-                "access specifier type instantiation. Try removing the type instantiation.",
-                LanguageVersion::V2_0,
-            )?;
-        };
+        match kind {
+            EA::AccessSpecifierKind::LegacyAcquires => {
+                if *negated || type_args.is_some() || address.value != EA::AddressSpecifier_::Empty
+                {
+                    self.error(
+                        &loc,
+                        "only simple resource names can be used with `acquires`",
+                    )
+                }
+            },
+            EA::AccessSpecifierKind::Reads | EA::AccessSpecifierKind::Writes => {
+                self.check_language_version(
+                    &loc,
+                    "read/write access specifiers.",
+                    // TODO: should we move this into 2.3?
+                    LanguageVersion::V2_2,
+                )?;
+            },
+        }
         let resource = match (module_address, module_name, resource_name) {
             (None, None, None) => {
                 // This stems from a  specifier of the form `acquires *(0x1)`
@@ -1284,9 +1198,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             )?;
         };
         let address = self.translate_address_specifier(address)?;
+        let kind = match kind {
+            EA::AccessSpecifierKind::Reads => AccessSpecifierKind::Reads,
+            EA::AccessSpecifierKind::Writes => AccessSpecifierKind::Writes,
+            EA::AccessSpecifierKind::LegacyAcquires => AccessSpecifierKind::LegacyAcquires,
+        };
         Some(AccessSpecifier {
             loc: loc.clone(),
-            kind: *kind,
+            kind,
             negated: *negated,
             resource: (loc, resource),
             address,
@@ -2231,12 +2150,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             if ok {
                 receiver_param_type = subs.specialize(&receiver_param_type);
                 self.subs = subs;
-                let inst = inst
-                    .type_inst
-                    .iter()
-                    .map(|t| self.finalize_type(id, t, &mut BTreeSet::new()))
-                    .collect();
-                self.env().set_node_instantiation(id, inst)
+                self.env()
+                    .set_node_instantiation(id, inst.type_inst.clone())
             }
         }
         // Inject borrow operation if required.
@@ -5463,65 +5378,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let loc = err.specific_loc().unwrap_or_else(|| loc.clone());
         let (msg, hints, labels) = err.message_with_hints_and_labels(self, context);
         self.error_with_notes_and_labels(&loc, &msg, hints, labels)
-    }
-
-    pub fn translate_from_move_value(&mut self, loc: &Loc, ty: &Type, value: &MoveValue) -> Value {
-        match (ty, value) {
-            (_, MoveValue::U8(n)) => Value::Number(BigInt::from_u8(*n).unwrap()),
-            (_, MoveValue::U16(n)) => Value::Number(BigInt::from_u16(*n).unwrap()),
-            (_, MoveValue::U32(n)) => Value::Number(BigInt::from_u32(*n).unwrap()),
-            (_, MoveValue::U64(n)) => Value::Number(BigInt::from_u64(*n).unwrap()),
-            (_, MoveValue::U128(n)) => Value::Number(BigInt::from_u128(*n).unwrap()),
-            (_, MoveValue::U256(n)) => Value::Number(BigInt::from(n)),
-            (_, MoveValue::Bool(b)) => Value::Bool(*b),
-            (_, MoveValue::Address(a)) => Value::Address(Address::Numerical(*a)),
-            (_, MoveValue::Signer(a)) => Value::Address(Address::Numerical(*a)),
-            (Type::Vector(inner), MoveValue::Vector(vs)) => match **inner {
-                Type::Primitive(PrimitiveType::U8) => {
-                    let b = vs
-                        .iter()
-                        .filter_map(|v| match v {
-                            MoveValue::U8(n) => Some(*n),
-                            _ => {
-                                self.error(loc, &format!("Expected u8 type, buf found: {:?}", v));
-                                None
-                            },
-                        })
-                        .collect::<Vec<u8>>();
-                    Value::ByteArray(b)
-                },
-                Type::Primitive(PrimitiveType::Address) => {
-                    let b = vs
-                        .iter()
-                        .filter_map(|v| match v {
-                            MoveValue::Address(a) => Some(Address::Numerical(*a)),
-                            _ => {
-                                self.error(
-                                    loc,
-                                    &format!("Expected address type, but found: {:?}", v),
-                                );
-                                None
-                            },
-                        })
-                        .collect::<Vec<Address>>();
-                    Value::AddressArray(b)
-                },
-                _ => {
-                    let b = vs
-                        .iter()
-                        .map(|v| self.translate_from_move_value(loc, inner, v))
-                        .collect::<Vec<Value>>();
-                    Value::Vector(b)
-                },
-            },
-            _ => {
-                self.error(
-                    loc,
-                    &format!("Not supported constant value/type combination: {}", value),
-                );
-                Value::Bool(false)
-            },
-        }
     }
 
     fn translate_macro_call(

@@ -3,8 +3,8 @@
 
 use crate::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, loader::Function,
-    AsUnsyncModuleStorage, Module, ModuleStorage, RuntimeEnvironment, UnsyncModuleStorage,
-    WithRuntimeEnvironment,
+    AsUnsyncModuleStorage, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment,
+    UnsyncModuleStorage, WithRuntimeEnvironment,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
