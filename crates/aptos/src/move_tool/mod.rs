@@ -517,6 +517,9 @@ pub struct TestPackage {
     #[clap(long, short)]
     pub filter: Option<String>,
 
+    #[clap(long)]
+    pub gas_limit: Option<u64>,
+
     /// A boolean value to skip warnings.
     #[clap(long)]
     pub ignore_compile_warnings: bool,
@@ -622,7 +625,7 @@ impl CliCommand<&'static str> for TestPackage {
                 MiscGasParameters::zeros(),
             ),
             aptos_test_feature_flags_genesis(),
-            None,
+            self.gas_limit,
             None,
             self.compute_coverage,
             &mut std::io::stdout(),

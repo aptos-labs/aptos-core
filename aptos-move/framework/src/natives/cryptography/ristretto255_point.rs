@@ -62,7 +62,7 @@ pub struct NativeRistrettoPointContext {
 //
 
 /// This limit ensures that no more than 1.6MB will be allocated for Ristretto points (160 bytes for each) per VM session.
-const NUM_POINTS_LIMIT: usize = 10000;
+const NUM_POINTS_LIMIT: usize = 1000000;
 
 /// Equivalent to `std::error::resource_exhausted(4)` in Move.
 const E_TOO_MANY_POINTS_CREATED: u64 = 0x09_0004;
