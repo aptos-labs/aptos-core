@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: expected function of type `|integer|_` but found `u64`
+   ┌─ tests/checking-lang-v2.2/lambda/storable/return_func.move:85:37
+   │
+85 │         vector::push_back(&mut sum, f(5));
+   │                                     ^^^^
+
+error: expected function of type `|integer|_` but found `u64`
+   ┌─ tests/checking-lang-v2.2/lambda/storable/return_func.move:86:37
+   │
+86 │         vector::push_back(&mut sum, g(7));
+   │                                     ^^^^
+
+error: expected function of type `|integer|_` but found `u64`
+   ┌─ tests/checking-lang-v2.2/lambda/storable/return_func.move:87:37
+   │
+87 │         vector::push_back(&mut sum, h(6));
+   │                                     ^^^^

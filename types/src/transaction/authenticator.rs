@@ -482,6 +482,7 @@ pub enum Scheme {
     SingleKey = 2,
     MultiKey = 3,
     Abstraction = 4,
+    DeriveDomainAbstraction = 5,
     NoScheme = 250,
     /// Scheme identifier used to derive addresses (not the authentication key) of objects and
     /// resources accounts. This application serves to domain separate hashes. Without such
@@ -504,6 +505,7 @@ impl fmt::Display for Scheme {
             Scheme::MultiKey => "MultiKey",
             Scheme::NoScheme => "NoScheme",
             Scheme::Abstraction => "Abstraction",
+            Scheme::DeriveDomainAbstraction => "DeriveDomainAbstraction",
             Scheme::DeriveAuid => "DeriveAuid",
             Scheme::DeriveObjectAddressFromObject => "DeriveObjectAddressFromObject",
             Scheme::DeriveObjectAddressFromGuid => "DeriveObjectAddressFromGuid",
@@ -546,6 +548,14 @@ pub enum AccountAuthenticator {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+pub enum DomainAccount {
+    V1 {
+        #[serde(with = "serde_bytes")]
+        account_identity: Vec<u8>,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub enum AbstractionAuthData {
     V1 {
         #[serde(with = "serde_bytes")]
@@ -553,12 +563,23 @@ pub enum AbstractionAuthData {
         #[serde(with = "serde_bytes")]
         authenticator: Vec<u8>,
     },
+    DomainV1 {
+        #[serde(with = "serde_bytes")]
+        signing_message_digest: Vec<u8>,
+        #[serde(with = "serde_bytes")]
+        authenticator: Vec<u8>,
+        account: DomainAccount,
+    },
 }
 
 impl AbstractionAuthData {
     pub fn signing_message_digest(&self) -> &Vec<u8> {
         match self {
             Self::V1 {
+                signing_message_digest,
+                ..
+            }
+            | Self::DomainV1 {
                 signing_message_digest,
                 ..
             } => signing_message_digest,
@@ -619,6 +640,23 @@ impl AccountAuthenticator {
             auth_data: AbstractionAuthData::V1 {
                 signing_message_digest,
                 authenticator,
+            },
+        }
+    }
+
+    /// Create a domain abstracted authenticator
+    pub fn domain_abstraction(
+        function_info: FunctionInfo,
+        signing_message_digest: Vec<u8>,
+        authenticator: Vec<u8>,
+        account_identity: Vec<u8>,
+    ) -> Self {
+        Self::Abstraction {
+            function_info,
+            auth_data: AbstractionAuthData::DomainV1 {
+                signing_message_digest,
+                authenticator,
+                account: DomainAccount::V1 { account_identity },
             },
         }
     }
@@ -758,6 +796,15 @@ impl AuthenticationKey {
         let mut bytes = source.to_vec();
         bytes.append(&mut derive_from.to_vec());
         Self::from_preimage(bytes, Scheme::DeriveObjectAddressFromObject)
+    }
+
+    pub fn domain_abstraction_address(
+        func_info_bcs_bytes: Vec<u8>,
+        account_identity: &[u8],
+    ) -> AuthenticationKey {
+        let mut bytes = func_info_bcs_bytes;
+        bytes.append(&mut bcs::to_bytes(account_identity).expect("must serialize byte array"));
+        Self::from_preimage(bytes, Scheme::DeriveDomainAbstraction)
     }
 
     /// Create an authentication key from an Ed25519 public key

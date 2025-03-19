@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    loader::{
-        access_specifier_loader::load_access_specifier, LegacyModuleStorageAdapter, Loader, Module,
-        Resolver, Script,
-    },
+    loader::{access_specifier_loader::load_access_specifier, Module, Resolver, Script},
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
     storage::ty_tag_converter::TypeTagConverter,
     LayoutConverter, ModuleStorage, StorageLayoutConverter,
@@ -16,12 +13,15 @@ use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     errors::{PartialVMError, PartialVMResult},
-    file_format::{Bytecode, CompiledModule, FunctionDefinitionIndex, Visibility},
+    file_format::{
+        Bytecode, CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility,
+    },
 };
 use move_core_types::{
     ability::{Ability, AbilitySet},
     function::ClosureMask,
     identifier::{IdentStr, Identifier},
+    language_storage,
     language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
     vm_status::StatusCode,
@@ -52,11 +52,13 @@ pub struct Function {
     pub(crate) local_tys: Vec<Type>,
     pub(crate) param_tys: Vec<Type>,
     pub(crate) access_specifier: AccessSpecifier,
+    pub(crate) is_persistent: bool,
+    pub(crate) has_module_reentrancy_lock: bool,
 }
 
 /// For loaded function representation, specifies the owner: a script or a module.
 #[derive(Clone)]
-pub(crate) enum LoadedFunctionOwner {
+pub enum LoadedFunctionOwner {
     Script(Arc<Script>),
     Module(Arc<Module>),
 }
@@ -64,12 +66,12 @@ pub(crate) enum LoadedFunctionOwner {
 /// A loaded runtime function representation along with type arguments used to instantiate it.
 #[derive(Clone)]
 pub struct LoadedFunction {
-    pub(crate) owner: LoadedFunctionOwner,
+    pub owner: LoadedFunctionOwner,
     // A set of verified type arguments provided for this definition. If
     // function is not generic, an empty vector.
-    pub(crate) ty_args: Vec<Type>,
+    pub ty_args: Vec<Type>,
     // Definition of the loaded function.
-    pub(crate) function: Arc<Function>,
+    pub function: Arc<Function>,
 }
 
 /// A lazy loaded function, which can either be unresolved (as resulting
@@ -166,6 +168,7 @@ impl LazyLoadedFunction {
             LazyLoadedFunctionState::Unresolved {
                 data:
                     SerializedFunctionData {
+                        format_version: _,
                         module_id,
                         fun_id,
                         ty_args,
@@ -315,6 +318,14 @@ impl LoadedFunction {
         }
     }
 
+    /// Returns the module id or, if it is a script, the pseudo module id for scripts.
+    pub fn module_or_script_id(&self) -> &ModuleId {
+        match &self.owner {
+            LoadedFunctionOwner::Module(m) => Module::self_id(m),
+            LoadedFunctionOwner::Script(_) => language_storage::pseudo_script_module_id(),
+        }
+    }
+
     /// Returns the name of this function.
     pub fn name(&self) -> &str {
         self.function.name()
@@ -399,18 +410,13 @@ impl LoadedFunction {
         }
     }
 
-    pub(crate) fn get_resolver<'a>(
-        &self,
-        loader: &'a Loader,
-        module_store: &'a LegacyModuleStorageAdapter,
-        module_storage: &'a impl ModuleStorage,
-    ) -> Resolver<'a> {
+    pub(crate) fn get_resolver<'a>(&self, module_storage: &'a impl ModuleStorage) -> Resolver<'a> {
         match &self.owner {
             LoadedFunctionOwner::Module(module) => {
-                Resolver::for_module(loader, module_store, module_storage, module.clone())
+                Resolver::for_module(module_storage, module.clone())
             },
             LoadedFunctionOwner::Script(script) => {
-                Resolver::for_script(loader, module_store, module_storage, script.clone())
+                Resolver::for_script(module_storage, script.clone())
             },
         }
     }
@@ -490,6 +496,8 @@ impl Function {
             return_tys,
             param_tys,
             access_specifier,
+            is_persistent: handle.attributes.contains(&FunctionAttribute::Persistent),
+            has_module_reentrancy_lock: handle.attributes.contains(&FunctionAttribute::ModuleLock),
         })
     }
 
@@ -524,6 +532,14 @@ impl Function {
 
     pub fn param_tys(&self) -> &[Type] {
         &self.param_tys
+    }
+
+    pub fn is_persistent(&self) -> bool {
+        self.is_persistent || !self.is_friend_or_private()
+    }
+
+    pub fn has_module_lock(&self) -> bool {
+        self.has_module_reentrancy_lock
     }
 
     /// Creates the function type instance for this function. This requires cloning

@@ -7,7 +7,8 @@
 
 use aptos_gas_schedule::gas_params::natives::move_stdlib::*;
 use aptos_native_interface::{
-    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
+    SafeNativeResult,
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
@@ -16,6 +17,8 @@ use move_vm_types::{
 };
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
+
+const EADDRESS_OF_PERMISSIONED: u64 = 0;
 
 /***************************************************************************************************
  * native fun borrow_address
@@ -33,6 +36,16 @@ fn native_borrow_address(
     debug_assert!(arguments.len() == 1);
 
     let signer_reference = safely_pop_arg!(arguments, SignerRef);
+
+    if context
+        .get_feature_flags()
+        .is_enabled(aptos_types::on_chain_config::FeatureFlag::PERMISSIONED_SIGNER)
+        && signer_reference.is_permissioned()?
+    {
+        return SafeNativeResult::Err(SafeNativeError::Abort {
+            abort_code: EADDRESS_OF_PERMISSIONED,
+        });
+    }
 
     context.charge(SIGNER_BORROW_ADDRESS_BASE)?;
 

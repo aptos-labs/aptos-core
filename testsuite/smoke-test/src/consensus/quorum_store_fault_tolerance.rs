@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aptos_cli::validator::generate_blob, smoke_test_environment::SwarmBuilder,
-    txn_emitter::generate_traffic,
+    smoke_test_environment::SwarmBuilder, txn_emitter::generate_traffic,
+    utils::update_consensus_config,
 };
-use aptos::test::CliTestFramework;
 use aptos_consensus::QUORUM_STORE_DB_NAME;
 use aptos_forge::{
     args::TransactionTypeArg, reconfig, wait_for_all_nodes_to_catchup, NodeExt, Swarm, SwarmExt,
@@ -60,31 +59,6 @@ async fn generate_traffic_and_assert_committed(
     // assert some much smaller number than expected, so it doesn't fail under contention
     assert!(txn_stat.submitted > 30);
     assert!(txn_stat.committed > 30);
-}
-
-async fn update_consensus_config(
-    cli: &CliTestFramework,
-    root_cli_index: usize,
-    new_consensus_config: OnChainConsensusConfig,
-) {
-    let update_consensus_config_script = format!(
-        r#"
-    script {{
-        use aptos_framework::aptos_governance;
-        use aptos_framework::consensus_config;
-        fun main(core_resources: &signer) {{
-            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-            let config_bytes = {};
-            consensus_config::set_for_next_epoch(&framework_signer, config_bytes);
-            aptos_governance::force_end_epoch(&framework_signer);
-        }}
-    }}
-    "#,
-        generate_blob(&bcs::to_bytes(&new_consensus_config).unwrap())
-    );
-    cli.run_script(root_cli_index, &update_consensus_config_script)
-        .await
-        .unwrap();
 }
 
 // TODO: remove when quorum store becomes the in-code default

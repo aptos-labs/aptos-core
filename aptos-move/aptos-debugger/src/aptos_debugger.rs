@@ -74,7 +74,10 @@ impl AptosDebugger {
         print_transaction_stats(txn_provider.get_txns(), version);
 
         let mut result = None;
-
+        assert!(
+            !concurrency_levels.is_empty(),
+            "concurrency_levels cannot be empty"
+        );
         for concurrency_level in concurrency_levels {
             for i in 0..repeat_execution_times {
                 let start_time = Instant::now();
@@ -129,9 +132,9 @@ impl AptosDebugger {
         }
 
         let env = AptosEnvironment::new(&state_view);
-        let vm = AptosVM::new(env.clone(), &state_view);
+        let vm = AptosVM::new(&env, &state_view);
         let resolver = state_view.as_move_resolver();
-        let code_storage = state_view.as_aptos_code_storage(env);
+        let code_storage = state_view.as_aptos_code_storage(&env);
 
         let (status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,

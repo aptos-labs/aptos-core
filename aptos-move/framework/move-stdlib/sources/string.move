@@ -1,6 +1,5 @@
 /// The `string` module defines the `String` type which represents UTF8 encoded strings.
 module std::string {
-    use std::vector;
     use std::option::{Self, Option};
 
     /// An invalid UTF8 encoding.
@@ -36,34 +35,34 @@ module std::string {
 
     /// Checks whether this string is empty.
     public fun is_empty(self: &String): bool {
-        vector::is_empty(&self.bytes)
+        self.bytes.is_empty()
     }
 
     /// Returns the length of this string, in bytes.
     public fun length(self: &String): u64 {
-        vector::length(&self.bytes)
+        self.bytes.length()
     }
 
     /// Appends a string.
     public fun append(self: &mut String, r: String) {
-        vector::append(&mut self.bytes, r.bytes)
+        self.bytes.append(r.bytes)
     }
 
     /// Appends bytes which must be in valid utf8 format.
     public fun append_utf8(self: &mut String, bytes: vector<u8>) {
-        append(self, utf8(bytes))
+        self.append(utf8(bytes))
     }
 
     /// Insert the other string at the byte index in given string. The index must be at a valid utf8 char
     /// boundary.
     public fun insert(self: &mut String, at: u64, o: String) {
         let bytes = &self.bytes;
-        assert!(at <= vector::length(bytes) && internal_is_char_boundary(bytes, at), EINVALID_INDEX);
-        let l = length(self);
-        let front = sub_string(self, 0, at);
-        let end = sub_string(self, at, l);
-        append(&mut front, o);
-        append(&mut front, end);
+        assert!(at <= bytes.length() && internal_is_char_boundary(bytes, at), EINVALID_INDEX);
+        let l = self.length();
+        let front = self.sub_string(0, at);
+        let end = self.sub_string(at, l);
+        front.append(o);
+        front.append(end);
         *self = front;
     }
 
@@ -72,7 +71,7 @@ module std::string {
     /// guaranteeing that the result is valid utf8.
     public fun sub_string(self: &String, i: u64, j: u64): String {
         let bytes = &self.bytes;
-        let l = vector::length(bytes);
+        let l = bytes.length();
         assert!(
             j <= l && i <= j && internal_is_char_boundary(bytes, i) && internal_is_char_boundary(bytes, j),
             EINVALID_INDEX

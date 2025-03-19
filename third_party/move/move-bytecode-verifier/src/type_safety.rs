@@ -11,18 +11,15 @@ use move_binary_format::{
     control_flow_graph::ControlFlowGraph,
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle, FunctionHandleIndex,
-        LocalIndex, Signature, SignatureToken, SignatureToken as ST, StructDefinition,
-        StructDefinitionIndex, StructFieldInformation, StructHandleIndex, VariantIndex, Visibility,
+        Bytecode, CodeOffset, FunctionAttribute, FunctionDefinitionIndex, FunctionHandle,
+        FunctionHandleIndex, LocalIndex, Signature, SignatureToken, SignatureToken as ST,
+        StructDefinition, StructDefinitionIndex, StructFieldInformation, StructHandleIndex,
+        VariantIndex,
     },
     safe_assert, safe_unwrap,
     views::FieldOrVariantIndex,
 };
-use move_core_types::{
-    ability::{Ability, AbilitySet},
-    function::ClosureMask,
-    vm_status::StatusCode,
-};
+use move_core_types::{ability::AbilitySet, function::ClosureMask, vm_status::StatusCode};
 
 struct Locals<'a> {
     param_count: usize,
@@ -350,13 +347,24 @@ fn clos_pack(
     mask: ClosureMask,
 ) -> PartialVMResult<()> {
     let func_handle = verifier.resolver.function_handle_at(func_handle_idx);
+    // In order to determine whether this closure is storable, we need to figure whether
+    // this function is marked as Persistent. This is case for
+    // functions which are defined as public or which have this attribute explicit in the
+    // source.
+    let mut abilities = if func_handle
+        .attributes
+        .contains(&FunctionAttribute::Persistent)
+    {
+        AbilitySet::PUBLIC_FUNCTIONS
+    } else {
+        AbilitySet::PRIVATE_FUNCTIONS
+    };
     // Check the captured arguments on the stack
     let param_sgn = verifier.resolver.signature_at(func_handle.parameters);
     let captured_param_tys = mask.extract(&param_sgn.0, true);
-    let mut abilities = AbilitySet::ALL;
     for ty in captured_param_tys.into_iter().rev() {
-        abilities = abilities.intersect(verifier.abilities(ty)?);
         let arg = safe_unwrap!(verifier.stack.pop());
+        abilities = abilities.intersect(verifier.abilities(&arg)?);
         // For captured param type to argument, use assignability
         if (type_actuals.is_empty() && !ty.is_assignable_from(&arg))
             || (!type_actuals.is_empty() && !instantiate(ty, type_actuals).is_assignable_from(&arg))
@@ -372,28 +380,6 @@ fn clos_pack(
                 .with_message("captured argument must not be a reference".to_owned()));
         }
     }
-
-    // In order to determine whether this closure can be storable, we need to figure whether
-    // this function is public.
-    // TODO(#15664): We currently cannot determine for an imported function if it is public or
-    //   friend. A standalone CompiledModule does not give this information. This means that we
-    //   cannot construct storable closures from imported functions for now, which is an
-    //   undesired restriction, so this should be fixed by extending the FunctionHandle data,
-    //   and adding visibility there.
-    let mut is_storable = false;
-    for fun_def in verifier.resolver.function_defs().unwrap_or(&[]) {
-        if fun_def.function == func_handle_idx {
-            // Function defined in this module, so we can check visibility.
-            if fun_def.visibility == Visibility::Public {
-                is_storable = true;
-            }
-            break;
-        }
-    }
-    if !is_storable {
-        abilities.remove(Ability::Store);
-    }
-    abilities.remove(Ability::Key);
 
     // Construct the resulting function type
     let not_captured_param_tys = mask
