@@ -12,24 +12,24 @@ atty = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 codespan-reporting = { workspace = true }
 itertools = { workspace = true }
+legacy-move-compiler = { workspace = true }
 log = { workspace = true, features = ["serde"] }
 move-abigen = { workspace = true }
 move-command-line-common = { workspace = true }
-move-compiler = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-docgen = { workspace = true }
 move-errmapgen = { workspace = true }
 move-model = { workspace = true }
 move-prover-boogie-backend = { workspace = true }
 move-prover-bytecode-pipeline = { workspace = true }
-move-stackless-bytecode  = { workspace = true }
+move-stackless-bytecode = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 simplelog = { workspace = true }
 toml = { workspace = true }
 
 [dev-dependencies]
-datatest-stable = { workspace = true }
+libtest-mimic = { workspace = true }
 move-prover-test-utils = { workspace = true }
 shell-words = { workspace = true }
 tempfile = { workspace = true }

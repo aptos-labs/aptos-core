@@ -54,8 +54,6 @@ macro_rules! convert_impl {
 }
 
 impl<'r> WriteOpConverter<'r> {
-    convert_impl!(convert_module, get_module_state_value_metadata);
-
     convert_impl!(convert_aggregator, get_aggregator_v1_state_value_metadata);
 
     pub(crate) fn new(
@@ -397,7 +395,7 @@ mod tests {
         ]));
         let resolver = state_view.as_move_resolver();
         let env = AptosEnvironment::new(&state_view);
-        let code_storage = state_view.as_aptos_code_storage(env);
+        let code_storage = state_view.as_aptos_code_storage(&env);
         // Storage slot metadata is enabled on the mainnet.
         let woc = WriteOpConverter::new(&resolver, true);
 

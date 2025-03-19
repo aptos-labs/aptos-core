@@ -23,8 +23,8 @@ bcs = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }
+legacy-move-compiler = { workspace = true }
 move-binary-format = { workspace = true }
-move-compiler = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
 move-package = { workspace = true }

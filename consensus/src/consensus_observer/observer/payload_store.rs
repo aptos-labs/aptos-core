@@ -283,6 +283,7 @@ mod test {
         block::Block,
         block_data::{BlockData, BlockType},
         common::{Author, Payload, ProofWithData},
+        pipelined_block::OrderedBlockWindow,
         proof_of_store::{BatchId, BatchInfo, ProofOfStore},
         quorum_cert::QuorumCert,
     };
@@ -1101,7 +1102,9 @@ mod test {
                 vec![],
                 proofs_of_store.clone(),
                 None,
+                None,
                 vec![],
+                true,
             );
 
             // Insert the block payload into the store
@@ -1129,7 +1132,10 @@ mod test {
                 block_type,
             );
             let block = Block::new_for_testing(block_info.id(), block_data, None);
-            let pipelined_block = Arc::new(PipelinedBlock::new_ordered(block));
+            let pipelined_block = Arc::new(PipelinedBlock::new_ordered(
+                block,
+                OrderedBlockWindow::empty(),
+            ));
 
             // Add the pipelined block to the list
             pipelined_blocks.push(pipelined_block.clone());

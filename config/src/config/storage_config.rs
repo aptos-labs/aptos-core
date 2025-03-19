@@ -203,6 +203,8 @@ pub struct StorageConfig {
     pub db_path_overrides: Option<DbPathConfig>,
     /// ensure `ulimit -n`, set to 0 to not ensure.
     pub ensure_rlimit_nofile: u64,
+    /// panic if failed to ensure `ulimit -n`
+    pub assert_rlimit_nofile: bool,
 }
 
 pub const NO_OP_STORAGE_PRUNER_CONFIG: PrunerConfig = PrunerConfig {
@@ -353,6 +355,7 @@ impl Default for StorageConfig {
             buffered_state_target_items: BUFFERED_STATE_TARGET_ITEMS,
             max_num_nodes_per_lru_cache_shard: DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             ensure_rlimit_nofile: 0,
+            assert_rlimit_nofile: false,
         }
     }
 }
@@ -404,6 +407,7 @@ impl StorageConfig {
     }
 }
 
+#[derive(Debug)]
 pub struct StorageDirPaths {
     default_path: PathBuf,
     ledger_db_path: Option<PathBuf>,
@@ -472,7 +476,7 @@ impl StorageDirPaths {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct ShardedDbPaths {
     metadata_path: Option<PathBuf>,
     shard_paths: [Option<PathBuf>; 16],
@@ -516,6 +520,10 @@ impl ConfigOptimizer for StorageConfig {
                 && config_yaml["ensure_rlimit_nofile"].is_null()
             {
                 config.ensure_rlimit_nofile = 999_999;
+                modified_config = true;
+            }
+            if chain_id.is_testnet() && config_yaml["assert_rlimit_nofile"].is_null() {
+                config.assert_rlimit_nofile = true;
                 modified_config = true;
             }
         }
@@ -714,6 +722,7 @@ mod test {
     fn test_optimize_ensure_rlimit_nofile() {
         let mut node_config = NodeConfig::default();
         assert_eq!(node_config.storage.ensure_rlimit_nofile, 0);
+        assert!(!node_config.storage.assert_rlimit_nofile);
 
         let modified_config = StorageConfig::optimize(
             &mut node_config,
@@ -725,5 +734,18 @@ mod test {
         assert!(modified_config);
 
         assert_eq!(node_config.storage.ensure_rlimit_nofile, 999_999);
+        assert!(!node_config.storage.assert_rlimit_nofile);
+
+        let modified_config = StorageConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config,
+            NodeType::Validator,
+            Some(ChainId::testnet()),
+        )
+        .unwrap();
+        assert!(modified_config);
+
+        assert_eq!(node_config.storage.ensure_rlimit_nofile, 999_999);
+        assert!(node_config.storage.assert_rlimit_nofile);
     }
 }

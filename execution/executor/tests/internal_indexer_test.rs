@@ -175,7 +175,7 @@ fn test_db_indexer_data() {
 
     let x = internal_indexer_db.get_event_by_key_iter().unwrap();
     let res: Vec<_> = x.collect();
-    assert_eq!(res.len(), 4);
+    assert_eq!(res.len(), 16);
 
     let core_kv_iter = db_indexer
         .get_prefixed_state_value_iterator(
@@ -376,6 +376,10 @@ fn test_db_indexer_data() {
         (
             false,
             "0x1::randomness_config_seqnum::RandomnessConfigSeqNum",
+        ),
+        (
+            false,
+            "0x1::account_abstraction::DomainDispatchableAuthenticator",
         ),
         (false, "0x1::coin::CoinInfo<0x1::aptos_coin::AptosCoin>"),
         (

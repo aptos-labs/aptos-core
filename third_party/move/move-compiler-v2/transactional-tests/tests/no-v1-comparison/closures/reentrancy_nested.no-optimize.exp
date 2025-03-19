@@ -1,0 +1,31 @@
+processed 8 tasks
+
+task 4 'run'. lines 74-76:
+Error: Function execution failed with VMError: {
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x42::tests,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(5), 2)],
+}
+
+task 5 'run'. lines 77-79:
+Error: Function execution failed with VMError: {
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x42::worker1,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 1)],
+}
+
+task 6 'run'. lines 80-82:
+Error: Function execution failed with VMError: {
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x42::worker2,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 1)],
+}
+
+task 7 'run'. lines 83-83:
+return values: true

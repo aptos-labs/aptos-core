@@ -18,9 +18,9 @@ aptos-metrics-core = { workspace = true }
 async-trait = { workspace = true }
 backtrace = { workspace = true }
 clap = { workspace = true }
+figment = { workspace = true }
 prometheus = { workspace = true }
 serde = { workspace = true }
-serde_yaml = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
