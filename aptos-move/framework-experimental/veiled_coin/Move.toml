@@ -9,4 +9,4 @@ AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", su
 std = "0x1"
 aptos_std = "0x1"
 aptos_framework = "0x1"
-veiled_coin = "_"
+framework_experimental = "0x7"
