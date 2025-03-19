@@ -110,8 +110,8 @@ This section is dedicated to the finer details of the API change, but we include
 - Epoch is returned as a U64 (the string wrapper), not a u64. The v0 API received this change too, as the previous behavior was inconsistent and potentially incorrect.
 - `/transactions/simulate` returns a `UserTransaction` now, not just a `Transaction`. The user can only ever submit a user transaction to this endpoint, so it can only ever return a user transaction.
 - All docs in the spec that incorrectly used a 16 byte address have been updated.
-- MoveTypes are now returned as structured structs instead of strings. To deal with some types that we don't have proper parsing for, e.g. generic type params, a new “unparseable” variant has been added. This ensures the response from the API can actually be deserialized.
-    - MoveValue has received the same treatment, minus the unparseable stuff.
+- MoveTypes are now returned as structured structs instead of strings. To deal with some types that we don't have proper parsing for, e.g. generic type params, a new “unparsable” variant has been added. This ensures the response from the API can actually be deserialized.
+    - MoveValue has received the same treatment, minus the unparsable stuff.
 - Some snake casing is different, e.g. ed25519 became ed_25519 (proper snake casing).
 - U64 and U128 have been used throughout every endpoint. There were a couple of places in v0 where we should've been using it but weren't, e.g. paging params.
 - The `v1` API runs on a separate port (where the OS selects a free port) behind a reverse proxy running within the node. This works fine with our source and docker based deployments. This is only temporary while we host both APIs.
