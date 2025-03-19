@@ -1,9 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::resolver::{ExecutorView, ResourceGroupSize};
+use crate::resolver::ExecutorView;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
+    vm::resource_groups::ResourceGroupSize,
     write_set::{TransactionWrite, WriteOp, WriteOpSize},
 };
 use move_binary_format::errors::PartialVMResult;

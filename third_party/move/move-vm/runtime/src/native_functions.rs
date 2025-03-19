@@ -99,7 +99,7 @@ impl NativeFunctions {
 
 pub struct NativeContext<'a, 'b> {
     interpreter: &'a mut dyn InterpreterDebugInterface,
-    data_store: &'a mut TransactionDataCache,
+    data_cache: &'a mut dyn TransactionDataCache,
     resolver: &'a Resolver<'a>,
     extensions: &'a mut NativeContextExtensions<'b>,
     gas_balance: InternalGas,
@@ -116,7 +116,7 @@ pub struct NativeContext<'a, 'b> {
 impl<'a, 'b> NativeContext<'a, 'b> {
     pub(crate) fn new(
         interpreter: &'a mut dyn InterpreterDebugInterface,
-        data_store: &'a mut TransactionDataCache,
+        data_cache: &'a mut dyn TransactionDataCache,
         resolver: &'a Resolver<'a>,
         extensions: &'a mut NativeContextExtensions<'b>,
         gas_balance: InternalGas,
@@ -124,7 +124,7 @@ impl<'a, 'b> NativeContext<'a, 'b> {
     ) -> Self {
         Self {
             interpreter,
-            data_store,
+            data_cache,
             resolver,
             extensions,
             gas_balance,
@@ -149,12 +149,13 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         //                     can implement the check more efficiently, without the
         //                     need to actually load bytes.
         let (value, num_bytes) = self
-            .data_store
+            .data_cache
             .load_resource(
                 self.resolver.module_storage(),
                 self.resolver.resource_resolver(),
                 address,
                 ty,
+                false,
             )
             .map_err(|err| err.finish(Location::Undefined))?;
         let exists = value

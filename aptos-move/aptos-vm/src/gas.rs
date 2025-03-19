@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{move_vm_ext::AptosMoveResolver, transaction_metadata::TransactionMetadata};
+use crate::{
+    aptos_vm::is_account_init_for_sponsored_transaction, transaction_metadata::TransactionMetadata,
+};
 use aptos_gas_algebra::{Gas, GasExpression, InternalGas};
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{
@@ -13,11 +15,10 @@ use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_types::on_chain_config::Features;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_log, speculative_warn};
 use aptos_vm_types::{
-    resolver::BlockSynchronizationKillSwitch,
+    resolver::{BlockSynchronizationKillSwitch, ExecutorView},
     storage::{space_pricing::DiskSpacePricing, StorageGasParameters},
 };
 use move_core_types::vm_status::{StatusCode, VMStatus};
-use move_vm_runtime::ModuleStorage;
 
 /// This is used until gas version 18, which introduces a configurable entry for this.
 const MAXIMUM_APPROVED_TRANSACTION_SIZE_LEGACY: u64 = 1024 * 1024;
@@ -49,8 +50,7 @@ pub fn make_prod_gas_meter<T: BlockSynchronizationKillSwitch>(
 pub(crate) fn check_gas(
     gas_params: &AptosGasParameters,
     gas_feature_version: u64,
-    resolver: &impl AptosMoveResolver,
-    module_storage: &impl ModuleStorage,
+    executor_view: &impl ExecutorView,
     txn_metadata: &TransactionMetadata,
     features: &Features,
     is_approved_gov_script: bool,
@@ -185,12 +185,7 @@ pub(crate) fn check_gas(
     // gas to cover storage, execution, and IO costs.
     // TODO: This isn't the cleaning code, thus we localize it just here and will remove it
     // once accountv2 is available and we no longer need to create accounts.
-    if crate::aptos_vm::is_account_init_for_sponsored_transaction(
-        txn_metadata,
-        features,
-        resolver,
-        module_storage,
-    )? {
+    if is_account_init_for_sponsored_transaction(txn_metadata, features, executor_view)? {
         let gas_unit_price: u64 = txn_metadata.gas_unit_price().into();
         let max_gas_amount: u64 = txn_metadata.max_gas_amount().into();
         let pricing = DiskSpacePricing::new(gas_feature_version, features);

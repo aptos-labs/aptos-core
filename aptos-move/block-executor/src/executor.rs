@@ -42,15 +42,12 @@ use aptos_types::{
     transaction::{
         block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction, BlockOutput,
     },
-    vm::modules::AptosModuleExtension,
+    vm::{modules::AptosModuleExtension, resource_groups::ResourceGroupSize},
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
-use aptos_vm_types::{
-    change_set::randomly_check_layout_matches, module_write_set::ModuleWrite,
-    resolver::ResourceGroupSize,
-};
+use aptos_vm_types::{change_set::randomly_check_layout_matches, module_write_set::ModuleWrite};
 use bytes::Bytes;
 use claims::assert_none;
 use core::panic;

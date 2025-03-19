@@ -3,16 +3,10 @@
 
 //! MoveVM and Session wrapped, to make sure Aptos natives and extensions are always installed and
 //! taken care of after session finish.
-mod resolver;
 pub mod session;
-mod vm;
 pub(crate) mod write_op_converter;
 
-pub use crate::move_vm_ext::{
-    resolver::{AptosMoveResolver, AsExecutorView, AsResourceGroupView, ResourceGroupResolver},
-    session::{convert_modules_into_write_ops, SessionExt},
-    vm::{GenesisMoveVm, GenesisRuntimeBuilder, MoveVmExt},
-};
+pub use crate::move_vm_ext::session::convert_modules_into_write_ops;
 use aptos_types::state_store::state_key::StateKey;
 pub use aptos_types::transaction::user_transaction_context::UserTransactionContext;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};

@@ -7,15 +7,16 @@ use aptos_move_stdlib::natives::all_natives;
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::NativeTableContext;
 use aptos_types::on_chain_config::{Features, TimedFeaturesBuilder};
+use aptos_vm::data_cache_v2::AptosTransactionDataCache;
 use move_binary_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress, ident_str, identifier::Identifier, language_storage::ModuleId,
 };
 use move_ir_compiler::Compiler;
 use move_vm_runtime::{
-    data_cache::TransactionDataCache, module_traversal::*, move_vm::MoveVM,
-    native_extensions::NativeContextExtensions, native_functions::NativeFunction,
-    AsUnsyncCodeStorage, CodeStorage, ModuleStorage, RuntimeEnvironment,
+    module_traversal::*, move_vm::MoveVM, native_extensions::NativeContextExtensions,
+    native_functions::NativeFunction, AsUnsyncCodeStorage, CodeStorage, ModuleStorage,
+    RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
@@ -200,7 +201,7 @@ fn main() -> Result<()> {
     let return_values = MoveVM::execute_loaded_function(
         func,
         args,
-        &mut TransactionDataCache::empty(),
+        &mut AptosTransactionDataCache::empty(),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
         &mut extensions,

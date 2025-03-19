@@ -9,10 +9,10 @@ use aptos_types::{
     error::{code_invariant_error, PanicError},
     state_store::TStateView,
     transaction::BlockExecutableTransaction as Transaction,
+    vm::resource_groups::ResourceGroupSize,
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{alert, prelude::*};
-use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;

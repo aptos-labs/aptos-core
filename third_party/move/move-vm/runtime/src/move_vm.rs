@@ -51,7 +51,7 @@ impl MoveVM {
     pub fn execute_loaded_function(
         function: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,

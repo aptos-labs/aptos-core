@@ -5,8 +5,7 @@
 use bytes::Bytes;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
-    account_address::AccountAddress, language_storage::StructTag, metadata::Metadata,
-    value::MoveTypeLayout,
+    account_address::AccountAddress, language_storage::StructTag, value::MoveTypeLayout,
 };
 
 pub fn resource_size(resource: &Option<Bytes>) -> usize {
@@ -27,7 +26,6 @@ pub trait ResourceResolver {
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-        metadata: &[Metadata],
         layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<(Option<Bytes>, usize)>;
 }

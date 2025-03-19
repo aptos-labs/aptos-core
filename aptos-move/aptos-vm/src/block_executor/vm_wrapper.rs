@@ -11,6 +11,7 @@ use aptos_types::{
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
     },
+    vm::resource_groups::{GroupSizeKind, GroupSizeKind::AsSum},
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
@@ -52,13 +53,35 @@ impl ExecutorTask for AptosExecutorTask {
         fail_point!("aptos_vm::vm_wrapper::execute_transaction", |_| {
             ExecutionStatus::DelayedFieldsCodeInvariantError("fail points error".into())
         });
-
         let log_context = AdapterLogSchema::new(self.id, txn_idx as usize);
-        let resolver = self.vm.as_move_resolver_with_group_view(view);
-        match self
-            .vm
-            .execute_single_transaction(txn, &resolver, view, &log_context)
-        {
+
+        let group_size_kind = GroupSizeKind::from_gas_feature_version(
+            self.vm.gas_feature_version(),
+            // Even if flag is enabled, if we are in non-capable context, we cannot use AsSum,
+            // and split resource groups in the VMChangeSet.
+            // We are not capable if:
+            // - Block contains single PayloadWriteSet::Direct transaction
+            // - we are not executing blocks for a live network in a gas charging context
+            //     (outside of BlockExecutor) i.e. unit tests, view functions, etc.
+            //     In this case, disabled will lead to a different gas behavior,
+            //     but gas is not relevant for those contexts.
+            self.vm
+                .features()
+                .is_resource_groups_split_in_vm_change_set_enabled()
+                && view.is_resource_groups_split_in_change_set_capable(),
+        );
+        let result = if group_size_kind == AsSum {
+            // Use executor view.
+            self.vm
+                .execute_single_transaction(txn, view, view, &log_context)
+        } else {
+            // This branch will only be used for backwards compatibility and non-capable context.
+            // For testing MVP, this is irrelevant!
+            // TODO: implement stashed executor view.
+            unimplemented!()
+        };
+
+        match result {
             Ok((vm_status, vm_output)) => {
                 if vm_output.status().is_discarded() {
                     speculative_trace!(

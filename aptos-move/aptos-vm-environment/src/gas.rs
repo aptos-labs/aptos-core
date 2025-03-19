@@ -10,14 +10,6 @@ use aptos_vm_types::storage::{io_pricing::IoPricing, StorageGasParameters};
 use move_core_types::gas_algebra::NumArgs;
 use sha3::{digest::Update, Sha3_256};
 
-/// Returns the gas feature version stored in [GasScheduleV2]. If the gas schedule does not exist,
-/// returns 0 gas feature version.
-pub fn get_gas_feature_version(state_view: &impl StateView) -> u64 {
-    GasScheduleV2::fetch_config(state_view)
-        .map(|gas_schedule| gas_schedule.feature_version)
-        .unwrap_or(0)
-}
-
 /// Returns the gas parameters and the gas feature version from the state. If no gas parameters are
 /// found, returns an error. Also updates the provided sha3 with config bytes.
 fn get_gas_config_from_storage(

@@ -13,6 +13,7 @@ use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{state_key::StateKey, StateView},
     transaction::TransactionOutput,
+    vm::state_view_adapter::ExecutorViewAdapter,
     write_set::TransactionWrite,
 };
 use aptos_vm_types::output::VMOutput;
@@ -119,9 +120,13 @@ impl<'view> Worker<'view> {
 
     fn finalize_one(&mut self) {
         let vm_output = self.buffer.pop_front().unwrap().unwrap();
-        let txn_out = vm_output
-            .try_materialize_into_transaction_output(&self.state_view)
-            .unwrap();
+
+        let txn_out = {
+            let executor_view = ExecutorViewAdapter::borrowed(&self.state_view);
+            vm_output
+                .try_materialize_into_transaction_output(&executor_view)
+                .unwrap()
+        };
         for (key, op) in txn_out.write_set() {
             // TODO(ptx): hack: deal only with the total supply
             if key == Lazy::force(&TOTAL_SUPPLY_STATE_KEY) {

@@ -256,11 +256,9 @@ impl RuntimeEnvironment {
 
     /// Returns the type tag for the given type. Construction of the tag can fail if it is too
     /// "complex": i.e., too deeply nested, or has large struct identifiers.
-    pub fn ty_to_ty_tag(&self, ty: &Type) -> VMResult<TypeTag> {
+    pub fn ty_to_ty_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
         let ty_tag_builder = TypeTagConverter::new(self);
-        ty_tag_builder
-            .ty_to_ty_tag(ty)
-            .map_err(|e| e.finish(Location::Undefined))
+        ty_tag_builder.ty_to_ty_tag(ty)
     }
 
     /// If type is a (generic or non-generic) struct or enum, returns its name. Otherwise, returns

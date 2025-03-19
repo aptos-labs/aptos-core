@@ -4,9 +4,9 @@
 use aptos_aggregator::{delta_change_set::DeltaOp, types::DelayedFieldsSpeculativeError};
 use aptos_types::{
     error::PanicOr,
+    vm::resource_groups::ResourceGroupSize,
     write_set::{TransactionWrite, WriteOpKind},
 };
-use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use move_core_types::value::MoveTypeLayout;
 use std::sync::{atomic::AtomicU32, Arc};
@@ -220,9 +220,10 @@ pub enum UnknownOrLayout<'a> {
 pub(crate) mod test {
     use super::*;
     use aptos_aggregator::delta_change_set::serialize;
+    use aptos_table_natives::TableHandle;
     use aptos_types::{
         executable::ModulePath,
-        state_store::state_value::StateValue,
+        state_store::{state_key::StateKey, state_value::StateValue},
         write_set::{TransactionWrite, WriteOpKind},
     };
     use bytes::Bytes;
@@ -245,6 +246,14 @@ pub(crate) mod test {
             _address: &AccountAddress,
             _module_name: &IdentStr,
         ) -> Self {
+            unreachable!("Irrelevant for test")
+        }
+
+        fn from_table_handle_and_key(_handle: &TableHandle, _key: &[u8]) -> Self {
+            unreachable!("Irrelevant for test")
+        }
+
+        fn from_state_key(_key: &StateKey) -> &Self {
             unreachable!("Irrelevant for test")
         }
     }

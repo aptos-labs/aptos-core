@@ -15,7 +15,6 @@ use move_core_types::{
     effects::{AccountChangeSet, ChangeSet, Op},
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
-    metadata::Metadata,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
@@ -56,7 +55,6 @@ impl ResourceResolver for BlankStorage {
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
-        _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<(Option<Bytes>, usize)> {
         Ok((None, 0))
@@ -294,7 +292,6 @@ impl ResourceResolver for InMemoryStorage {
         &self,
         address: &AccountAddress,
         tag: &StructTag,
-        _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<(Option<Bytes>, usize)> {
         if let Some(account_storage) = self.accounts.get(address) {

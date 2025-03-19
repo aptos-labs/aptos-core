@@ -24,7 +24,18 @@ use move_vm_types::{
 };
 use std::collections::btree_map::BTreeMap;
 
-pub struct AccountDataCache {
+pub trait TransactionDataCache {
+    fn load_resource(
+        &mut self,
+        module_storage: &dyn ModuleStorage,
+        resource_resolver: &dyn ResourceResolver,
+        addr: AccountAddress,
+        ty: &Type,
+        is_mut: bool,
+    ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)>;
+}
+
+struct AccountDataCache {
     // The bool flag in the `data_map` indicates whether the resource contains
     // an aggregator or snapshot.
     data_map: BTreeMap<Type, (MoveTypeLayout, GlobalValue, bool)>,
@@ -51,15 +62,15 @@ impl AccountDataCache {
 /// The Move VM takes a `DataStore` in input and this is the default and correct implementation
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
-pub struct TransactionDataCache {
+pub struct LegacyTransactionDataCache {
     account_map: BTreeMap<AccountAddress, AccountDataCache>,
 }
 
-impl TransactionDataCache {
+impl LegacyTransactionDataCache {
     /// Create a `TransactionDataCache` with a `RemoteCache` that provides access to data
     /// not updated in the transaction.
     pub fn empty() -> Self {
-        TransactionDataCache {
+        LegacyTransactionDataCache {
             account_map: BTreeMap::new(),
         }
     }
@@ -131,16 +142,16 @@ impl TransactionDataCache {
         }
         map.get_mut(k).unwrap()
     }
+}
 
-    // Retrieves data from the local cache or loads it from the remote cache into the local cache.
-    // All operations on the global data are based on this API and they all load the data
-    // into the cache.
-    pub(crate) fn load_resource(
+impl TransactionDataCache for LegacyTransactionDataCache {
+    fn load_resource(
         &mut self,
         module_storage: &dyn ModuleStorage,
         resource_resolver: &dyn ResourceResolver,
         addr: AccountAddress,
         ty: &Type,
+        _is_mut: bool,
     ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
         let account_cache = Self::get_mut_or_insert_with(&mut self.account_map, &addr, || {
             (addr, AccountDataCache::new())
@@ -163,9 +174,12 @@ impl TransactionDataCache {
                     .type_to_type_layout_with_identifier_mappings(ty)?;
 
             let (data, bytes_loaded) = {
-                let metadata = module_storage
-                    .fetch_existing_module_metadata(&ty_tag.address, ty_tag.module.as_ident_str())
-                    .map_err(|e| e.to_partial())?;
+                // TODO:
+                //   We should not use this data cache in unit tests for Aptos! We should use the
+                //   one that supports groups. Pass it from the above.
+                // let metadata = module_storage
+                //     .fetch_existing_module_metadata(&ty_tag.address, ty_tag.module.as_ident_str())
+                //     .map_err(|e| e.to_partial())?;
 
                 // If we need to process aggregator lifting, we pass type layout to remote.
                 // Remote, in turn ensures that all aggregator values are lifted if the resolved
@@ -173,7 +187,6 @@ impl TransactionDataCache {
                 resource_resolver.get_resource_bytes_with_metadata_and_layout(
                     &addr,
                     &ty_tag,
-                    &metadata,
                     if has_aggregator_lifting {
                         Some(&ty_layout)
                     } else {

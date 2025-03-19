@@ -29,6 +29,7 @@ serde = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
+aptos-table-natives = { workspace = true }
 move-vm-runtime = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }

@@ -10,9 +10,9 @@ use crate::types::ValueWithLayout;
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp};
 use aptos_types::{
     state_store::state_value::StateValue,
+    vm::resource_groups::ResourceGroupSize,
     write_set::{TransactionWrite, WriteOpKind},
 };
-use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use claims::assert_none;
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};

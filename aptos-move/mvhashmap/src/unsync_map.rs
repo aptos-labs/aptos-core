@@ -10,10 +10,10 @@ use aptos_aggregator::types::DelayedFieldValue;
 use aptos_types::{
     error::{code_invariant_error, PanicError},
     executable::ModulePath,
-    vm::modules::AptosModuleExtension,
+    vm::{modules::AptosModuleExtension, resource_groups::ResourceGroupSize},
     write_set::TransactionWrite,
 };
-use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
+use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use move_binary_format::{file_format::CompiledScript, CompiledModule};
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
 use move_vm_runtime::{Module, Script};

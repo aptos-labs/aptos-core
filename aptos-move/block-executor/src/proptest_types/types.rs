@@ -9,29 +9,30 @@ use aptos_aggregator::{
     resolver::TAggregatorV1View,
 };
 use aptos_mvhashmap::types::TxnIndex;
+use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::TransactionEvent,
     error::PanicError,
     executable::ModulePath,
     fee_statement::FeeStatement,
-    on_chain_config::CurrentTimeMicroseconds,
+    on_chain_config::{ConfigStorage, CurrentTimeMicroseconds},
     state_store::{
         errors::StateViewError,
+        state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
         StateViewId, TStateView,
     },
     transaction::BlockExecutableTransaction as Transaction,
+    vm::resource_groups::ResourceGroupSize,
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{
     module_and_script_storage::code_storage::AptosCodeStorage,
     module_write_set::ModuleWrite,
-    resolver::{
-        BlockSynchronizationKillSwitch, ResourceGroupSize, TExecutorView, TResourceGroupView,
-    },
+    resolver::{BlockSynchronizationKillSwitch, TExecutorView},
     resource_group_adapter::{
         decrement_size_for_remove_tag, group_tagged_resource_size, increment_size_for_add_tag,
     },
@@ -146,6 +147,14 @@ impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> ModulePath for KeyType<K> 
 
     fn from_address_and_module_name(_address: &AccountAddress, _module_name: &IdentStr) -> Self {
         unimplemented!()
+    }
+
+    fn from_table_handle_and_key(_handle: &TableHandle, _key: &[u8]) -> Self {
+        unreachable!("Irrelevant for tests")
+    }
+
+    fn from_state_key(_key: &StateKey) -> &Self {
+        unreachable!("Irrelevant for tests")
     }
 }
 
@@ -854,7 +863,8 @@ where
     fn execute_transaction(
         &self,
         view: &(impl TExecutorView<K, u32, MoveTypeLayout, ValueType>
-              + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>
+              + TableResolver
+              + ConfigStorage
               + AptosCodeStorage
               + BlockSynchronizationKillSwitch),
         txn: &Self::Txn,

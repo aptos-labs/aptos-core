@@ -116,7 +116,7 @@ impl Interpreter {
     pub(crate) fn entrypoint(
         function: LoadedFunction,
         args: Vec<Value>,
-        data_store: &mut TransactionDataCache,
+        data_store: &mut impl TransactionDataCache,
         module_storage: &impl ModuleStorage,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
@@ -142,7 +142,7 @@ impl InterpreterImpl<'_> {
     pub(crate) fn entrypoint(
         function: LoadedFunction,
         args: Vec<Value>,
-        data_store: &mut TransactionDataCache,
+        data_store: &mut impl TransactionDataCache,
         module_storage: &impl ModuleStorage,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
@@ -225,7 +225,7 @@ impl InterpreterImpl<'_> {
 
     fn dispatch_execute_main<RTTCheck: RuntimeTypeCheck>(
         self,
-        data_store: &mut TransactionDataCache,
+        data_store: &mut impl TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -267,7 +267,7 @@ impl InterpreterImpl<'_> {
     /// at the top of the stack (return). If the call stack is empty execution is completed.
     fn execute_main<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         mut self,
-        data_store: &mut TransactionDataCache,
+        data_store: &mut impl TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -792,7 +792,7 @@ impl InterpreterImpl<'_> {
         &mut self,
         current_frame: &mut Frame,
         resolver: &Resolver,
-        data_store: &mut TransactionDataCache,
+        data_store: &mut impl TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -834,7 +834,7 @@ impl InterpreterImpl<'_> {
         &mut self,
         current_frame: &mut Frame,
         resolver: &Resolver,
-        data_store: &mut TransactionDataCache,
+        data_store: &mut impl TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -1118,16 +1118,18 @@ impl InterpreterImpl<'_> {
     /// Loads a resource from the data store and return the number of bytes read from the storage.
     fn load_resource<'c>(
         resolver: &Resolver,
-        data_store: &'c mut TransactionDataCache,
+        data_store: &'c mut impl TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
+        is_mut: bool,
     ) -> PartialVMResult<&'c mut GlobalValue> {
         match data_store.load_resource(
             resolver.module_storage(),
             resolver.resource_resolver(),
             addr,
             ty,
+            is_mut,
         ) {
             Ok((gv, load_res)) => {
                 if let Some(bytes_loaded) = load_res {
@@ -1150,12 +1152,13 @@ impl InterpreterImpl<'_> {
         is_mut: bool,
         is_generic: bool,
         resolver: &Resolver,
-        data_store: &mut TransactionDataCache,
+        data_store: &mut impl TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
-        let res = Self::load_resource(resolver, data_store, gas_meter, addr, ty)?.borrow_global();
+        let res =
+            Self::load_resource(resolver, data_store, gas_meter, addr, ty, is_mut)?.borrow_global();
         gas_meter.charge_borrow_global(
             is_mut,
             is_generic,
@@ -1217,12 +1220,12 @@ impl InterpreterImpl<'_> {
         &mut self,
         is_generic: bool,
         resolver: &Resolver,
-        data_store: &mut TransactionDataCache,
+        data_store: &mut impl TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
-        let gv = Self::load_resource(resolver, data_store, gas_meter, addr, ty)?;
+        let gv = Self::load_resource(resolver, data_store, gas_meter, addr, ty, false)?;
         let exists = gv.exists()?;
         gas_meter.charge_exists(is_generic, TypeWithLoader { ty, resolver }, exists)?;
         self.check_access(resolver, AccessKind::Reads, ty, addr)?;
@@ -1235,12 +1238,12 @@ impl InterpreterImpl<'_> {
         &mut self,
         is_generic: bool,
         resolver: &Resolver,
-        data_store: &mut TransactionDataCache,
+        data_store: &mut impl TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
-        let resource = match Self::load_resource(resolver, data_store, gas_meter, addr, ty)?
+        let resource = match Self::load_resource(resolver, data_store, gas_meter, addr, ty, true)?
             .move_from()
         {
             Ok(resource) => {
@@ -1267,13 +1270,13 @@ impl InterpreterImpl<'_> {
         &mut self,
         is_generic: bool,
         resolver: &Resolver,
-        data_store: &mut TransactionDataCache,
+        data_store: &mut impl TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
         resource: Value,
     ) -> PartialVMResult<()> {
-        let gv = Self::load_resource(resolver, data_store, gas_meter, addr, ty)?;
+        let gv = Self::load_resource(resolver, data_store, gas_meter, addr, ty, true)?;
         // NOTE(Gas): To maintain backward compatibility, we need to charge gas after attempting
         //            the move_to operation.
         match gv.move_to(resource) {
@@ -1782,7 +1785,7 @@ impl Frame {
         &mut self,
         resolver: &Resolver,
         interpreter: &mut InterpreterImpl,
-        data_store: &mut TransactionDataCache,
+        data_store: &mut impl TransactionDataCache,
         gas_meter: &mut impl GasMeter,
     ) -> VMResult<ExitCode> {
         self.execute_code_impl::<RTTCheck, RTCaches>(resolver, interpreter, data_store, gas_meter)
@@ -1800,7 +1803,7 @@ impl Frame {
         &mut self,
         resolver: &Resolver,
         interpreter: &mut InterpreterImpl,
-        data_store: &mut TransactionDataCache,
+        data_store: &mut impl TransactionDataCache,
         gas_meter: &mut impl GasMeter,
     ) -> PartialVMResult<ExitCode> {
         use SimpleInstruction as S;

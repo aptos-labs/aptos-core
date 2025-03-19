@@ -73,6 +73,10 @@ impl<'a> NativeAggregatorContext<'a> {
         }
     }
 
+    pub fn reset_txn_hash(&mut self, txn_hash: [u8; 32]) {
+        self.txn_hash = txn_hash;
+    }
+
     /// Returns the hash of transaction associated with this context.
     pub fn txn_hash(&self) -> [u8; 32] {
         self.txn_hash

@@ -2,14 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::resolver::{TAggregatorV1View, TDelayedFieldView};
+use aptos_table_natives::TableResolver;
 use aptos_types::{
-    serde_helper::bcs_utils::size_u32_as_uleb128,
+    on_chain_config::ConfigStorage,
     state_store::{
         errors::StateViewError,
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
         StateView, StateViewId,
+    },
+    vm::{
+        resource_groups::{GroupSizeKind, ResourceGroupSize},
+        state_view_adapter::ExecutorViewAdapter,
     },
     write_set::WriteOp,
 };
@@ -188,6 +193,7 @@ pub trait TExecutorView<K, T, L, V>:
     TResourceView<Key = K, Layout = L>
     + TAggregatorV1View<Identifier = K>
     + TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = K, ResourceGroupTag = T>
+    + TResourceGroupView<GroupKey = K, ResourceTag = T, Layout = L>
     + StateStorageView<Key = K>
 {
 }
@@ -196,13 +202,20 @@ impl<A, K, T, L, V> TExecutorView<K, T, L, V> for A where
     A: TResourceView<Key = K, Layout = L>
         + TAggregatorV1View<Identifier = K>
         + TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = K, ResourceGroupTag = T>
+        + TResourceGroupView<GroupKey = K, ResourceTag = T, Layout = L>
         + StateStorageView<Key = K>
 {
 }
 
-pub trait ExecutorView: TExecutorView<StateKey, StructTag, MoveTypeLayout, WriteOp> {}
+pub trait ExecutorView:
+    TExecutorView<StateKey, StructTag, MoveTypeLayout, WriteOp> + TableResolver + ConfigStorage
+{
+}
 
-impl<T> ExecutorView for T where T: TExecutorView<StateKey, StructTag, MoveTypeLayout, WriteOp> {}
+impl<T> ExecutorView for T where
+    T: TExecutorView<StateKey, StructTag, MoveTypeLayout, WriteOp> + TableResolver + ConfigStorage
+{
+}
 
 pub trait ResourceGroupView:
     TResourceGroupView<GroupKey = StateKey, ResourceTag = StructTag, Layout = MoveTypeLayout>
@@ -214,8 +227,7 @@ impl<T> ResourceGroupView for T where
 {
 }
 
-/// Direct implementations for StateView.
-impl<S> TResourceView for S
+impl<'s, S> TResourceView for ExecutorViewAdapter<'s, S>
 where
     S: StateView,
 {
@@ -227,7 +239,7 @@ where
         state_key: &Self::Key,
         _maybe_layout: Option<&Self::Layout>,
     ) -> PartialVMResult<Option<StateValue>> {
-        self.get_state_value(state_key).map_err(|e| {
+        self.state_view().get_state_value(state_key).map_err(|e| {
             PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
                 "Unexpected storage error for resource at {:?}: {:?}",
                 state_key, e
@@ -236,77 +248,88 @@ where
     }
 }
 
-impl<S> StateStorageView for S
+impl<'s, S> TResourceGroupView for ExecutorViewAdapter<'s, S>
+where
+    S: StateView,
+{
+    type GroupKey = StateKey;
+    type Layout = MoveTypeLayout;
+    type ResourceTag = StructTag;
+
+    fn resource_group_size(
+        &self,
+        group_key: &Self::GroupKey,
+    ) -> PartialVMResult<ResourceGroupSize> {
+        if self.group_size_kind() == GroupSizeKind::None {
+            return Ok(ResourceGroupSize::zero_concrete());
+        }
+
+        self.load_group_to_cache(group_key)?;
+        Ok(self
+            .group_cache()
+            .borrow()
+            .get(group_key)
+            .expect("Must be cached")
+            .1)
+    }
+
+    fn get_resource_from_group(
+        &self,
+        group_key: &Self::GroupKey,
+        resource_tag: &Self::ResourceTag,
+        _maybe_layout: Option<&Self::Layout>,
+    ) -> PartialVMResult<Option<Bytes>> {
+        self.load_group_to_cache(group_key)?;
+        Ok(self
+            .group_cache()
+            .borrow()
+            .get(group_key)
+            .expect("Must be cached")
+            .0
+            .get(resource_tag)
+            .cloned())
+    }
+
+    fn release_group_cache(
+        &self,
+    ) -> Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>> {
+        // Returning the contents to the caller leads to preparing the change set in the backwards
+        // compatible way (containing the whole group update).
+        Some(
+            self.group_cache()
+                .borrow_mut()
+                .drain()
+                .map(|(k, v)| (k, v.0))
+                .collect(),
+        )
+    }
+}
+
+impl<'s, S> StateStorageView for ExecutorViewAdapter<'s, S>
 where
     S: StateView,
 {
     type Key = StateKey;
 
     fn id(&self) -> StateViewId {
-        self.id()
+        self.state_view().id()
     }
 
     fn read_state_value(&self, state_key: &Self::Key) -> Result<(), StateViewError> {
-        self.get_state_value(state_key)?;
+        self.state_view().get_state_value(state_key)?;
         Ok(())
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
-        self.get_usage().map_err(Into::into)
+        self.state_view().get_usage().map_err(Into::into)
     }
 }
 
-impl<S> BlockSynchronizationKillSwitch for S
+impl<'s, S> BlockSynchronizationKillSwitch for ExecutorViewAdapter<'s, S>
 where
     S: StateView,
 {
     fn interrupt_requested(&self) -> bool {
         false
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ResourceGroupSize {
-    Concrete(u64),
-    /// Combined represents what would the size be if we know individual
-    /// parts that contribute to it. This is useful when individual parts
-    /// are changing, and we want to know what the size of the group would be.
-    ///
-    /// Formula is based on how bcs serializes the BTreeMap:
-    ///   varint encoding len(num_tagged_resources) + all_tagged_resources_size
-    /// Also, if num_tagged_resources is 0, then the size is 0, because we will not store
-    /// empty resource group in storage.
-    Combined {
-        num_tagged_resources: usize,
-        all_tagged_resources_size: u64,
-    },
-}
-
-impl ResourceGroupSize {
-    pub fn zero_combined() -> Self {
-        Self::Combined {
-            num_tagged_resources: 0,
-            all_tagged_resources_size: 0,
-        }
-    }
-
-    pub fn zero_concrete() -> Self {
-        Self::Concrete(0)
-    }
-
-    pub fn get(&self) -> u64 {
-        match self {
-            Self::Concrete(size) => *size,
-            Self::Combined {
-                num_tagged_resources,
-                all_tagged_resources_size,
-            } => {
-                if *num_tagged_resources == 0 {
-                    0
-                } else {
-                    size_u32_as_uleb128(*num_tagged_resources) as u64 + *all_tagged_resources_size
-                }
-            },
-        }
     }
 }

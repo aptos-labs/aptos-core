@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(any(test, feature = "testing"))]
-use crate::aptos_vm::{serialized_signer, SerializedSigners};
-use crate::AptosVM;
-#[cfg(any(test, feature = "testing"))]
 use crate::{
-    data_cache::AsMoveResolver,
-    move_vm_ext::session::user_transaction_sessions::session_change_sets::SystemSessionChangeSet,
+    aptos_vm::{serialized_signer, SerializedSigners},
     transaction_metadata::TransactionMetadata,
 };
+use crate::{data_cache_v2::Session, move_vm_ext::SessionId, AptosVM};
 #[cfg(any(test, feature = "testing"))]
-use aptos_types::{state_store::StateView, transaction::SignedTransaction};
+use aptos_types::{
+    state_store::StateView, transaction::SignedTransaction,
+    vm::state_view_adapter::ExecutorViewAdapter,
+};
 #[cfg(any(test, feature = "testing"))]
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 #[cfg(any(test, feature = "testing"))]
@@ -102,28 +102,34 @@ impl AptosVM {
             &NoopBlockSynchronizationKillSwitch {},
         );
 
-        let change_set_configs = &self
+        let change_set_configs = self
             .storage_gas_params(&log_context)
             .expect("Storage gas parameters should exist for tests")
-            .change_set_configs;
+            .change_set_configs
+            .clone();
 
-        let resolver = state_view.as_move_resolver();
+        let executor_view = ExecutorViewAdapter::borrowed(state_view);
         let module_storage = state_view.as_aptos_code_storage(self.runtime_environment());
+        let session = Session::new(
+            &executor_view,
+            &module_storage,
+            self.environment(),
+            SessionId::prologue_meta(&txn_data),
+            Some(txn_data.as_user_transaction_context()),
+            change_set_configs,
+        );
 
         let traversal_storage = TraversalStorage::new();
         self.failed_transaction_cleanup(
-            SystemSessionChangeSet::empty(),
+            session,
             error_vm_status,
             &mut gas_meter,
             &txn_data,
-            &resolver,
-            &module_storage,
             &SerializedSigners::new(
                 vec![serialized_signer(&txn_data.sender)],
                 txn_data.fee_payer().as_ref().map(serialized_signer),
             ),
             &log_context,
-            change_set_configs,
             &mut TraversalContext::new(&traversal_storage),
         )
     }

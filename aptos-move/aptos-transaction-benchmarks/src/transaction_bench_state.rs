@@ -31,7 +31,6 @@ use aptos_types::{
 };
 use aptos_vm::{
     aptos_vm::AptosVMBlockExecutor,
-    data_cache::AsMoveResolver,
     sharded_block_executor::{
         local_executor_shard::{LocalExecutorClient, LocalExecutorService},
         ShardedBlockExecutor,
@@ -116,12 +115,9 @@ where
             )
         };
 
-        let validator_set = ValidatorSet::fetch_config(
-            &FakeExecutor::from_head_genesis()
-                .get_state_view()
-                .as_move_resolver(),
-        )
-        .expect("Unable to retrieve the validator set from storage");
+        let validator_set =
+            ValidatorSet::fetch_config(FakeExecutor::from_head_genesis().get_state_view())
+                .expect("Unable to retrieve the validator set from storage");
 
         Self {
             num_transactions,

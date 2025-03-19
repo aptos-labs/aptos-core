@@ -21,9 +21,9 @@ use aptos_types::{
     executable::ModulePath,
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
+    vm::resource_groups::ResourceGroupSize,
     write_set::TransactionWrite,
 };
-use aptos_vm_types::resolver::ResourceGroupSize;
 use derivative::Derivative;
 use move_core_types::value::MoveTypeLayout;
 use move_vm_types::{

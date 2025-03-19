@@ -10,7 +10,9 @@ use crate::{
     },
 };
 use aptos_gas_algebra::DynamicExpression;
-use aptos_gas_schedule::{AptosGasParameters, MiscGasParameters, NativeGasParameters};
+use aptos_gas_schedule::{
+    AptosGasParameters, MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION,
+};
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{
     chain_id::ChainId,
@@ -19,7 +21,7 @@ use aptos_types::{
     },
     state_store::StateView,
 };
-use aptos_vm_types::storage::StorageGasParameters;
+use aptos_vm_types::storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters};
 use move_vm_runtime::{config::VMConfig, RuntimeEnvironment, WithRuntimeEnvironment};
 use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
@@ -31,6 +33,50 @@ use std::sync::Arc;
 pub struct AptosEnvironment(Arc<Environment>);
 
 impl AptosEnvironment {
+    pub fn genesis(chain_id: ChainId) -> Self {
+        let features = Features::default();
+        let timed_features = TimedFeaturesBuilder::enable_all().build();
+
+        let vm_config =
+            aptos_prod_vm_config(&features, &timed_features, aptos_default_ty_builder());
+
+        // All genesis sessions run with unmetered gas meter, and here we set the gas parameters
+        // for natives as zeros (they do not matter, but we still need them to make natives).
+        let mut native_builder = SafeNativeBuilder::new(
+            LATEST_GAS_FEATURE_VERSION,
+            NativeGasParameters::zeros(),
+            MiscGasParameters::zeros(),
+            timed_features.clone(),
+            features.clone(),
+            None,
+        );
+        let natives = aptos_natives_with_builder(&mut native_builder, false);
+        let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
+
+        #[allow(deprecated)]
+        let environment = Environment {
+            chain_id,
+            features,
+            timed_features,
+            gas_feature_version: LATEST_GAS_FEATURE_VERSION,
+            // Not using zeroes to avoid weird cases where max bound is set to zero. We should not
+            // be using these in genesis in any case as these are used for Aptos virtual machine
+            // only.
+            gas_params: Err("should not be called in genesis".to_string()),
+            storage_gas_params: Err("should not be called in genesis".to_string()),
+            runtime_environment,
+            inject_create_signer_for_gov_sim: false,
+            // Genesis never compares environments (there is only one), so the hash value is not
+            // relevant here.
+            hash: [0; 32],
+        };
+        Self(Arc::new(environment))
+    }
+
+    pub fn genesis_change_set_configs() -> ChangeSetConfigs {
+        ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION)
+    }
+
     /// Returns new execution environment based on the current state.
     pub fn new(state_view: &impl StateView) -> Self {
         Self(Arc::new(Environment::new(state_view, false, None)))

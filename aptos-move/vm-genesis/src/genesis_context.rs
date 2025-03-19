@@ -15,7 +15,6 @@ use aptos_types::{
 use aptos_vm_types::module_write_set::ModuleWrite;
 use bytes::Bytes;
 use claims::assert_some;
-use move_core_types::language_storage::ModuleId;
 use std::collections::{BTreeMap, HashMap};
 
 type Result<T, E = StateViewError> = std::result::Result<T, E>;
@@ -30,11 +29,6 @@ impl GenesisStateView {
         Self {
             state_data: HashMap::new(),
         }
-    }
-
-    pub(crate) fn add_module(&mut self, module_id: &ModuleId, blob: &[u8]) {
-        self.state_data
-            .insert(StateKey::module_id(module_id), blob.to_vec());
     }
 
     pub(crate) fn add_module_write_ops(

@@ -18,6 +18,7 @@ anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-gas-algebra = { workspace = true }
 aptos-gas-schedule = { workspace = true }
+aptos-table-natives = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
@@ -33,6 +34,6 @@ serde = { workspace = true }
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
 aptos-gas-schedule = { workspace = true, features = ["testing"] }
-aptos-language-e2e-tests = { workspace = true }
+aptos-types = { workspace = true, features = ["testing"] }
 aptos-vm = { workspace = true }
 test-case = { workspace = true }

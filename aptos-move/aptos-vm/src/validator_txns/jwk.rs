@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aptos_vm::get_system_transaction_output,
+    data_cache_v2::Session,
     errors::expect_only_successful_execution,
-    move_vm_ext::{AptosMoveResolver, SessionId},
+    move_vm_ext::SessionId,
     system_module_names::{JWKS_MODULE, UPSERT_INTO_OBSERVED_JWKS},
     validator_txns::jwk::{
         ExecutionFailure::{Expected, Unexpected},
@@ -17,16 +17,18 @@ use crate::{
 };
 use aptos_logger::debug;
 use aptos_types::{
+    fee_statement::FeeStatement,
     jwks,
     jwks::{Issuer, ObservedJWKs, ProviderJWKs, QuorumCertifiedUpdate},
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{OnChainConfig, ValidatorSet},
-    transaction::TransactionStatus,
+    transaction::{ExecutionStatus, TransactionStatus},
     validator_verifier::ValidatorVerifier,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
-    module_and_script_storage::module_storage::AptosModuleStorage, output::VMOutput,
+    module_and_script_storage::code_storage::AptosCodeStorage, module_write_set::ModuleWriteSet,
+    output::VMOutput, resolver::ExecutorView,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -57,15 +59,15 @@ enum ExecutionFailure {
 impl AptosVM {
     pub(crate) fn process_jwk_update(
         &self,
-        resolver: &impl AptosMoveResolver,
-        module_storage: &impl AptosModuleStorage,
+        executor_view: &impl ExecutorView,
+        module_storage: &impl AptosCodeStorage,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
         update: jwks::QuorumCertifiedUpdate,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         debug!("Processing jwk transaction");
         match self.process_jwk_update_inner(
-            resolver,
+            executor_view,
             module_storage,
             log_context,
             session_id,
@@ -95,16 +97,16 @@ impl AptosVM {
 
     fn process_jwk_update_inner(
         &self,
-        resolver: &impl AptosMoveResolver,
-        module_storage: &impl AptosModuleStorage,
+        executor_view: &impl ExecutorView,
+        module_storage: &impl AptosCodeStorage,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
         update: jwks::QuorumCertifiedUpdate,
     ) -> Result<(VMStatus, VMOutput), ExecutionFailure> {
         // Load resources.
-        let validator_set = ValidatorSet::fetch_config(resolver)
+        let validator_set = ValidatorSet::fetch_config(executor_view)
             .ok_or_else(|| Expected(MissingResourceValidatorSet))?;
-        let observed_jwks = ObservedJWKs::fetch_config(resolver)
+        let observed_jwks = ObservedJWKs::fetch_config(executor_view)
             .ok_or_else(|| Expected(MissingResourceObservedJWKs))?;
 
         let mut jwks_by_issuer: HashMap<Issuer, ProviderJWKs> =
@@ -138,8 +140,19 @@ impl AptosVM {
             .map_err(|_| Expected(MultiSigVerificationFailed))?;
 
         // All verification passed. Apply the `observed`.
-        let mut gas_meter = UnmeteredGasMeter;
-        let mut session = self.new_session(resolver, session_id, None);
+
+        let mut session = Session::new(
+            executor_view,
+            module_storage,
+            self.environment(),
+            session_id,
+            None,
+            self.storage_gas_params(log_context)
+                .map_err(Unexpected)?
+                .change_set_configs
+                .clone(),
+        );
+
         let args = vec![
             MoveValue::Signer(AccountAddress::ONE),
             vec![observed].as_move_value(),
@@ -152,24 +165,23 @@ impl AptosVM {
                 UPSERT_INTO_OBSERVED_JWKS,
                 vec![],
                 serialize_values(&args),
-                &mut gas_meter,
+                &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                module_storage,
             )
             .map_err(|e| {
                 expect_only_successful_execution(e, UPSERT_INTO_OBSERVED_JWKS.as_str(), log_context)
             })
             .map_err(|r| Unexpected(r.unwrap_err()))?;
 
-        let output = get_system_transaction_output(
-            session,
-            module_storage,
-            &self
-                .storage_gas_params(log_context)
-                .map_err(Unexpected)?
-                .change_set_configs,
-        )
-        .map_err(Unexpected)?;
+        let change_set = session
+            .finish()
+            .map_err(|err| Unexpected(err.into_vm_status()))?;
+        let output = VMOutput::new(
+            change_set,
+            ModuleWriteSet::empty(),
+            FeeStatement::zero(),
+            TransactionStatus::Keep(ExecutionStatus::Success),
+        );
 
         Ok((VMStatus::Executed, output))
     }

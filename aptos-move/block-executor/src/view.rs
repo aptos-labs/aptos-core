@@ -30,23 +30,25 @@ use aptos_mvhashmap::{
     versioned_delayed_fields::TVersionedDelayedFieldView,
     MVHashMap,
 };
+use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     error::{code_invariant_error, expect_ok, PanicError, PanicOr},
     executable::ModulePath,
+    on_chain_config::ConfigStorage,
     state_store::{
         errors::StateViewError,
+        state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
         StateViewId, TStateView,
     },
     transaction::BlockExecutableTransaction as Transaction,
-    vm::modules::AptosModuleExtension,
+    vm::{modules::AptosModuleExtension, resource_groups::ResourceGroupSize},
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{
-    BlockSynchronizationKillSwitch, ResourceGroupSize, StateStorageView, TResourceGroupView,
-    TResourceView,
+    BlockSynchronizationKillSwitch, StateStorageView, TResourceGroupView, TResourceView,
 };
 use bytes::Bytes;
 use claims::assert_ok;
@@ -980,6 +982,25 @@ pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>> {
     pub(crate) runtime_environment: &'a RuntimeEnvironment,
     pub(crate) latest_view: ViewState<'a, T>,
     pub(crate) txn_idx: TxnIndex,
+}
+
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TableResolver for LatestView<'a, T, S> {
+    fn resolve_table_entry_bytes_with_layout(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+        maybe_layout: Option<&MoveTypeLayout>,
+    ) -> Result<Option<Bytes>, PartialVMError> {
+        let key = T::Key::from_table_handle_and_key(handle, key);
+        self.get_resource_bytes(&key, maybe_layout)
+    }
+}
+
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ConfigStorage for LatestView<'a, T, S> {
+    fn fetch_config_bytes(&self, state_key: &StateKey) -> Option<Bytes> {
+        let state_key = T::Key::from_state_key(state_key);
+        self.get_resource_bytes(state_key, None).ok()?
+    }
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
