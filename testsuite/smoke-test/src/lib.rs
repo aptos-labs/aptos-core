@@ -69,4 +69,6 @@ mod utils;
 mod validator_txns;
 
 #[cfg(test)]
+mod execution_pool;
+#[cfg(test)]
 mod workspace_builder;

@@ -25,10 +25,6 @@ const RELEVANT_FILE_PATHS_FOR_COMPILER_V2: [&str; 5] = [
     "aptos-move/move-examples",
     "third_party/move",
 ];
-const NO_MVC_BLOCK_V1_PACKAGES: [&str; 2] = [
-    "e2e-move-tests", // no block v1 because the meta data test requires using v1
-    "move-compiler",
-];
 const RELEVANT_FILE_PATHS_FOR_EXECUTION_PERFORMANCE_TESTS: [&str; 5] = [
     ".github/workflows/execution-performance.yaml",
     ".github/workflows/workflow-run-execution-performance.yaml",
@@ -86,7 +82,6 @@ pub enum AptosCargoCommand {
     TargetedExecutionPerformanceTests(CommonArgs),
     TargetedFrameworkUpgradeTests(CommonArgs),
     TargetedUnitTests(CommonArgs),
-    TargetedCompilerUnitTests(CommonArgs),
     Test(CommonArgs),
 }
 
@@ -116,7 +111,6 @@ impl AptosCargoCommand {
             AptosCargoCommand::TargetedExecutionPerformanceTests(args) => args,
             AptosCargoCommand::TargetedFrameworkUpgradeTests(args) => args,
             AptosCargoCommand::TargetedUnitTests(args) => args,
-            AptosCargoCommand::TargetedCompilerUnitTests(args) => args,
             AptosCargoCommand::Test(args) => args,
         }
     }
@@ -292,46 +286,12 @@ impl AptosCargoCommand {
                     let package_name = get_package_name_from_path(&package_path);
 
                     // Only add the package if it is not in the ignore list
-                    if TARGETED_UNIT_TEST_PACKAGES_TO_IGNORE.contains(&package_name.as_str())
-                        || NO_MVC_BLOCK_V1_PACKAGES.contains(&package_name.as_str())
-                    {
+                    if TARGETED_UNIT_TEST_PACKAGES_TO_IGNORE.contains(&package_name.as_str()) {
                         debug!(
                             "Ignoring package when running targeted-unit-tests: {:?}",
                             package_name
                         );
                     } else {
-                        packages_to_test.push(package_path); // Add the package to the list
-                    }
-                }
-
-                // Create and run the command if we found packages to test
-                if !packages_to_test.is_empty() {
-                    println!("Running the targeted unit tests...");
-                    return run_targeted_unit_tests(
-                        packages_to_test,
-                        direct_args,
-                        push_through_args,
-                    );
-                }
-
-                // Otherwise, skip the targeted unit tests
-                println!("Skipping targeted unit tests because no test packages were affected!");
-                Ok(())
-            },
-            AptosCargoCommand::TargetedCompilerUnitTests(_) => {
-                // Run the targeted unit tests (if necessary).
-                // Start by calculating the affected packages.
-                let (direct_args, push_through_args, affected_package_paths) =
-                    self.get_args_and_affected_packages(package_args)?;
-
-                // Filter out the ignored packages
-                let mut packages_to_test = vec![];
-                for package_path in affected_package_paths {
-                    // Extract the package name from the full path
-                    let package_name = get_package_name_from_path(&package_path);
-
-                    // Only add the packages for v1 tests
-                    if NO_MVC_BLOCK_V1_PACKAGES.contains(&package_name.as_str()) {
                         packages_to_test.push(package_path); // Add the package to the list
                     }
                 }

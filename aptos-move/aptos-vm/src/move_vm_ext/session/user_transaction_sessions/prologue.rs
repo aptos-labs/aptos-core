@@ -22,15 +22,15 @@ use derive_more::{Deref, DerefMut};
 use move_core_types::vm_status::VMStatus;
 
 #[derive(Deref, DerefMut)]
-pub struct PrologueSession<'r, 'l> {
+pub struct PrologueSession<'r> {
     #[deref]
     #[deref_mut]
-    session: RespawnedSession<'r, 'l>,
+    session: RespawnedSession<'r>,
 }
 
-impl<'r, 'l> PrologueSession<'r, 'l> {
+impl<'r> PrologueSession<'r> {
     pub fn new<'m>(
-        vm: &'l AptosVM,
+        vm: &AptosVM,
         txn_meta: &'m TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
     ) -> Self {
@@ -48,13 +48,13 @@ impl<'r, 'l> PrologueSession<'r, 'l> {
 
     pub fn into_user_session(
         self,
-        vm: &'l AptosVM,
-        txn_meta: &'l TransactionMetadata,
+        vm: &AptosVM,
+        txn_meta: &TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
         gas_feature_version: u64,
         change_set_configs: &ChangeSetConfigs,
         module_storage: &impl AptosModuleStorage,
-    ) -> Result<(SystemSessionChangeSet, UserSession<'r, 'l>), VMStatus> {
+    ) -> Result<(SystemSessionChangeSet, UserSession<'r>), VMStatus> {
         let Self { session } = self;
 
         if gas_feature_version >= 1 {

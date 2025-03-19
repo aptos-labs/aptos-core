@@ -15,7 +15,7 @@ module aptos_framework::account_abstraction {
     use aptos_framework::object;
     use aptos_framework::auth_data::AbstractionAuthData;
     use aptos_framework::system_addresses;
-    use aptos_framework::permissioned_signer::is_permissioned_signer;
+    use aptos_framework::permissioned_signer::{Self, is_permissioned_signer};
     #[test_only]
     use aptos_framework::account::create_account_for_test;
     #[test_only]
@@ -79,7 +79,7 @@ module aptos_framework::account_abstraction {
         let resource_addr = resource_addr(addr);
         if (exists<DispatchableAuthenticator>(resource_addr)) {
             option::some(
-                ordered_map::keys(&borrow_global<DispatchableAuthenticator>(resource_addr).auth_functions)
+                DispatchableAuthenticator[resource_addr].auth_functions.keys()
             )
         } else { option::none() }
     }
@@ -180,7 +180,7 @@ module aptos_framework::account_abstraction {
     ) acquires DomainDispatchableAuthenticator {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        borrow_global_mut<DomainDispatchableAuthenticator>(@aptos_framework).auth_functions.add(
+        DomainDispatchableAuthenticator[@aptos_framework].auth_functions.add(
             function_info::new_function_info_from_address(module_address, module_name, function_name),
             DomainRegisterValue::Empty,
         );
@@ -257,12 +257,12 @@ module aptos_framework::account_abstraction {
 
     inline fun dispatchable_authenticator_internal(addr: address): &OrderedMap<FunctionInfo, bool> {
         assert!(using_dispatchable_authenticator(addr), error::not_found(EDISPATCHABLE_AUTHENTICATOR_IS_NOT_USED));
-        &borrow_global<DispatchableAuthenticator>(resource_addr(addr)).auth_functions
+        &DispatchableAuthenticator[resource_addr(addr)].auth_functions
     }
 
     inline fun dispatchable_domain_authenticator_internal(): &BigOrderedMap<FunctionInfo, DomainRegisterValue> {
         assert!(exists<DomainDispatchableAuthenticator>(@aptos_framework), error::not_found(EDOMAIN_AA_NOT_INITIALIZED));
-        &borrow_global<DomainDispatchableAuthenticator>(@aptos_framework).auth_functions
+        &DomainDispatchableAuthenticator[@aptos_framework].auth_functions
     }
 
     fun authenticate(
@@ -279,14 +279,14 @@ module aptos_framework::account_abstraction {
             assert!(func_infos.contains(&func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
         } else {
             let func_infos = dispatchable_authenticator_internal(master_signer_addr);
-            assert!(ordered_map::contains(func_infos, &func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
+            assert!(func_infos.contains(&func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
         };
 
         function_info::load_module_from_function(&func_info);
         let returned_signer = dispatchable_authenticate(account, signing_data, &func_info);
         // Returned signer MUST represent the same account address. Otherwise, it may break the invariant of Aptos blockchain!
         assert!(
-            master_signer_addr == signer::address_of(&returned_signer),
+            master_signer_addr == permissioned_signer::address_of(&returned_signer),
             error::invalid_state(EINCONSISTENT_SIGNER_ADDRESS)
         );
         returned_signer
@@ -305,16 +305,16 @@ module aptos_framework::account_abstraction {
     ) acquires DispatchableAuthenticator {
         let bob_addr = signer::address_of(bob);
         create_account_for_test(bob_addr);
-        assert!(!using_dispatchable_authenticator(bob_addr), 0);
+        assert!(!using_dispatchable_authenticator(bob_addr));
         add_authentication_function(
             bob,
             @aptos_framework,
             string::utf8(b"account_abstraction_tests"),
             string::utf8(b"test_auth")
         );
-        assert!(using_dispatchable_authenticator(bob_addr), 0);
+        assert!(using_dispatchable_authenticator(bob_addr));
         remove_authenticator(bob);
-        assert!(!using_dispatchable_authenticator(bob_addr), 0);
+        assert!(!using_dispatchable_authenticator(bob_addr));
     }
 
     #[test(bob = @0xb0b)]

@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{DEFAULT_BUILD_DIR, DEFAULT_STORAGE_DIR};
+use legacy_move_compiler::{
+    command_line::COLOR_MODE_ENV_VAR,
+    compiled_unit::{CompiledUnit, NamedCompiledModule},
+};
 use move_binary_format::CompiledModule;
 use move_command_line_common::{
     env::{read_bool_env_var, NO_COLOR_MODE_ENV_VAR},
@@ -9,10 +13,6 @@ use move_command_line_common::{
     testing::{
         add_update_baseline_fix, format_diff, get_compiler_exp_extension, read_env_update_baseline,
     },
-};
-use move_compiler::{
-    command_line::COLOR_MODE_ENV_VAR,
-    compiled_unit::{CompiledUnit, NamedCompiledModule},
 };
 use move_coverage::coverage_map::{CoverageMap, ExecCoverageMapWithModules};
 use move_package::{

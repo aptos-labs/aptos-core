@@ -74,7 +74,10 @@ impl AptosDebugger {
         print_transaction_stats(txn_provider.get_txns(), version);
 
         let mut result = None;
-
+        assert!(
+            !concurrency_levels.is_empty(),
+            "concurrency_levels cannot be empty"
+        );
         for concurrency_level in concurrency_levels {
             for i in 0..repeat_execution_times {
                 let start_time = Instant::now();

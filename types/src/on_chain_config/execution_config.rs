@@ -432,7 +432,11 @@ mod test {
     #[test]
     fn test_config_onchain_payload() {
         let execution_config = OnChainExecutionConfig::V1(ExecutionConfigV1 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
+            transaction_shuffler_type: TransactionShufflerType::UseCaseAware {
+                sender_spread_factor: 32,
+                platform_use_case_spread_factor: 0,
+                user_use_case_spread_factor: 0,
+            },
         });
 
         let mut configs = HashMap::new();
@@ -447,13 +451,20 @@ mod test {
         let result: OnChainExecutionConfig = payload.get().unwrap();
         assert!(matches!(
             result.transaction_shuffler_type(),
-            TransactionShufflerType::SenderAwareV2(32)
+            TransactionShufflerType::UseCaseAware {
+                sender_spread_factor: 32,
+                ..
+            }
         ));
 
         // V2 test with random per-block gas limit
         let rand_gas_limit = rand::thread_rng().gen_range(0, 1000000) as u64;
         let execution_config = OnChainExecutionConfig::V2(ExecutionConfigV2 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
+            transaction_shuffler_type: TransactionShufflerType::UseCaseAware {
+                sender_spread_factor: 32,
+                platform_use_case_spread_factor: 0,
+                user_use_case_spread_factor: 0,
+            },
             block_gas_limit: Some(rand_gas_limit),
         });
 
@@ -469,7 +480,10 @@ mod test {
         let result: OnChainExecutionConfig = payload.get().unwrap();
         assert!(matches!(
             result.transaction_shuffler_type(),
-            TransactionShufflerType::SenderAwareV2(32)
+            TransactionShufflerType::UseCaseAware {
+                sender_spread_factor: 32,
+                ..
+            }
         ));
         assert_eq!(
             result.block_gas_limit_type(),
@@ -478,7 +492,11 @@ mod test {
 
         // V2 test with no per-block gas limit
         let execution_config = OnChainExecutionConfig::V2(ExecutionConfigV2 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
+            transaction_shuffler_type: TransactionShufflerType::UseCaseAware {
+                sender_spread_factor: 32,
+                platform_use_case_spread_factor: 0,
+                user_use_case_spread_factor: 0,
+            },
             block_gas_limit: None,
         });
 
@@ -494,7 +512,10 @@ mod test {
         let result: OnChainExecutionConfig = payload.get().unwrap();
         assert!(matches!(
             result.transaction_shuffler_type(),
-            TransactionShufflerType::SenderAwareV2(32)
+            TransactionShufflerType::UseCaseAware {
+                sender_spread_factor: 32,
+                ..
+            }
         ));
         assert_eq!(result.block_gas_limit_type(), BlockGasLimitType::NoLimit);
     }
