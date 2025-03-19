@@ -11,6 +11,8 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 - Add network to show profiles.
 - The new subcommand `aptos update move-mutation-test` will install/update the external binary `move-mutation-test`, which performs mutation testing on a Move project to find blind spots in Move unit tests.
 
+- Add beta simulate command to simulate any transaction from anyone
+
 ## [6.2.0]
 - Several compiler parsing bugs fixed, including in specifications for receiver style functions
 - Remove support for OpenSSL 1.x.x and Ubuntu 20.04, add warning appropriately
