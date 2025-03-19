@@ -9,7 +9,7 @@ use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher, Deref};
 use bytes::Bytes;
 #[cfg(any(test, feature = "fuzzing"))]
-use proptest::{arbitrary::Arbitrary, prelude::*};
+use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*};
 use ref_cast::RefCast;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::ops::Deref;
@@ -189,7 +189,7 @@ pub struct ExistingStateValue {
 
 /// Shared memory layout between StateValue and DbStateValue. Avoids unnecessary memory movement
 /// when converting between the two.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum Store {
     Existing(ExistingStateValue),
     /// Non-existent, cached in the hot tier.
@@ -234,7 +234,7 @@ impl Store {
 ///
 /// 1. It's guaranteed by constructors that it's not `HotNonExistent`.
 /// 2. Access time is just placeholder, must be set when converting to DbStateValue.
-#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, PartialEq, RefCast)]
+#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, RefCast)]
 #[repr(transparent)]
 pub struct StateValue(Store);
 
@@ -261,13 +261,25 @@ impl Deref for StateValue {
     }
 }
 
+impl PartialEq for StateValue {
+    fn eq(&self, other: &Self) -> bool {
+        // Ignoring access_time_secs for equality check for now.
+        // TODO: change after access time is actual part of the metadata.
+        self.data == other.data && self.metadata == other.metadata
+    }
+}
+
+impl Eq for StateValue {}
+
+pub const ARB_STATE_VALUE_MAX_SIZE: usize = 100;
+
 #[cfg(any(test, feature = "fuzzing"))]
 impl Arbitrary for StateValue {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        any::<Vec<u8>>()
+        vec(any::<u8>(), 0..=ARB_STATE_VALUE_MAX_SIZE)
             .prop_map(|bytes| StateValue::new_legacy(bytes.into()))
             .boxed()
     }
@@ -445,6 +457,11 @@ impl DbStateValue {
             Store::Existing(existing) => existing.access_time_secs,
             Store::HotNonExistent { access_time_secs } => *access_time_secs,
         }
+    }
+
+    pub fn with_access_time_secs(mut self, access_time_secs: u32) -> Self {
+        self.0.set_access_time_secs(access_time_secs);
+        self
     }
 }
 

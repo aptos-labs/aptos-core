@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, register_histogram_vec, register_int_counter_vec, register_int_gauge,
-    register_int_gauge_vec, HistogramVec, IntCounterVec, IntGauge, IntGaugeVec,
+    exponential_buckets, register_histogram_vec, register_int_counter, register_int_counter_vec,
+    register_int_gauge, register_int_gauge_vec, HistogramVec, IntCounter, IntCounterVec, IntGauge,
+    IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -11,6 +12,14 @@ pub static FILE_STORE_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_indexer_grpc_v2_file_store_version",
         "File store version (next_version)."
+    )
+    .unwrap()
+});
+
+pub static FILE_STORE_UPLOADED_BYTES: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_indexer_grpc_v2_file_store_uploaded_bytes",
+        "# of bytes uploaded to file store."
     )
     .unwrap()
 });

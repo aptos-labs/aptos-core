@@ -20,17 +20,16 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     module_traversal::*, move_vm::MoveVM, AsUnsyncModuleStorage, ModuleStorage,
-    StagingModuleStorage, WithRuntimeEnvironment,
+    StagingModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 const WORKING_ACCOUNT: AccountAddress = AccountAddress::TWO;
 
 struct Adapter {
     store: InMemoryStorage,
-    vm: Arc<MoveVM>,
     functions: Vec<(ModuleId, Identifier)>,
 }
 
@@ -59,15 +58,7 @@ impl Adapter {
             ),
         ];
 
-        let vm = Arc::new(MoveVM::new_with_runtime_environment(
-            store.runtime_environment(),
-        ));
-
-        Self {
-            store,
-            vm,
-            functions,
-        }
+        Self { store, functions }
     }
 
     fn publish_modules_using_loader_v2<'a, M: ModuleStorage>(
@@ -101,7 +92,7 @@ impl Adapter {
         name: &IdentStr,
         module_storage: &impl ModuleStorage,
     ) {
-        let mut session = self.vm.new_session(&self.store);
+        let mut session = MoveVM::new_session(&self.store);
         let traversal_storage = TraversalStorage::new();
         session
             .execute_function_bypass_visibility(
@@ -187,9 +178,8 @@ fn load_phantom_module() {
     let module_storage = InMemoryStorage::new().into_unsync_module_storage();
     let new_module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
 
-    let mut session = adapter.vm.new_session(&adapter.store);
-    let _ = session
-        .load_function(&new_module_storage, &module_id, ident_str!("foo"), &[])
+    let _ = new_module_storage
+        .load_function(&module_id, ident_str!("foo"), &[])
         .unwrap();
 }
 
@@ -248,9 +238,8 @@ fn load_with_extra_ability() {
     let module_storage = InMemoryStorage::new().into_unsync_module_storage();
     let new_module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
 
-    let mut session = adapter.vm.new_session(&adapter.store);
-    let _ = session
-        .load_function(&new_module_storage, &module_id, ident_str!("foo"), &[])
+    let _ = new_module_storage
+        .load_function(&module_id, ident_str!("foo"), &[])
         .unwrap();
 }
 

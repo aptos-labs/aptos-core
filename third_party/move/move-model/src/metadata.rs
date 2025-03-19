@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::bail;
+use legacy_move_compiler::shared::LanguageVersion as CompilerLanguageVersion;
 use move_binary_format::file_format_common::{
     VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2, VERSION_MAX,
 };
 use move_command_line_common::env;
-use move_compiler::shared::LanguageVersion as CompilerLanguageVersion;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt,
@@ -194,11 +194,6 @@ pub enum LanguageVersion {
     V2_1,
     /// The currently unstable 2.2 version of Move
     V2_2,
-}
-
-impl LanguageVersion {
-    /// Leave this symbolic for now in case of more versions.
-    pub const V2_LAMBDA: Self = Self::V2_2;
 }
 
 impl Default for LanguageVersion {

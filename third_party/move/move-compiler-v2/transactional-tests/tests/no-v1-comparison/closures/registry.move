@@ -42,8 +42,8 @@ module 0x66::delayed_work {
 
 //# run 0x66::delayed_work::initialize --signers 0x66
 
-//# run 0x66::delayed_work::add --verbose --signers 0x66 --args 5
+//# run 0x66::delayed_work::add --signers 0x66 --args 5
 
-//# run 0x66::delayed_work::add --verbose --signers 0x66 --args 7
+//# run 0x66::delayed_work::add --signers 0x66 --args 7
 
 //# run 0x66::delayed_work::eval --signers 0x66 --args 3 15

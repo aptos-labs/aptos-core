@@ -206,6 +206,8 @@ class WorkerPod:
         pod_manifest["metadata"]["name"] = self.name  # Unique name for each pod
         pod_manifest["metadata"]["labels"]["run"] = self.label
         pod_manifest["spec"]["containers"][0]["image"] = self.image
+        pod_ttl = self.config.timeout_secs + 30 * 60 # 30 minutes slack to allow for pod setup and teardown
+        pod_manifest["metadata"]["annotations"]["k8s-ttl-controller.twin.sh/ttl"] = f"{pod_ttl}s"
         pod_manifest["spec"]["volumes"][0]["persistentVolumeClaim"][
             "claimName"
         ] = self.get_claim_name()

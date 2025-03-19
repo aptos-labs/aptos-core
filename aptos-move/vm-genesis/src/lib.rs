@@ -43,7 +43,7 @@ use aptos_types::{
 use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{
-        convert_modules_into_write_ops, GenesisMoveVM, GenesisRuntimeBuilder, SessionExt,
+        convert_modules_into_write_ops, GenesisMoveVm, GenesisRuntimeBuilder, SessionExt,
     },
 };
 use aptos_vm_types::{
@@ -187,12 +187,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     emit_new_block_and_epoch_event(&mut session, &module_storage);
 
     // Create a change set with all initialized resources.
-    let (mut change_set, module_write_set) =
-        assert_ok!(session.finish(&genesis_change_set_configs, &module_storage));
-    assert!(
-        module_write_set.is_empty(),
-        "Modules cannot be published in the first genesis session"
-    );
+    let mut change_set = assert_ok!(session.finish(&genesis_change_set_configs, &module_storage));
 
     // Publish the framework, using a different session id, in case both sessions create tables.
     let mut new_id = [0u8; 32];
@@ -320,12 +315,7 @@ pub fn encode_genesis_change_set(
     // Reconfiguration should happen after all on-chain invocations.
     emit_new_block_and_epoch_event(&mut session, &module_storage);
 
-    let (mut change_set, module_write_set) =
-        assert_ok!(session.finish(&genesis_change_set_configs, &module_storage));
-    assert!(
-        module_write_set.is_empty(),
-        "Modules cannot be published in the first genesis session"
-    );
+    let mut change_set = assert_ok!(session.finish(&genesis_change_set_configs, &module_storage));
 
     // Publish the framework, using a different id, in case both sessions create tables.
     let mut new_id = [0u8; 32];
@@ -909,13 +899,11 @@ fn code_to_writes_for_publishing(
 ///  1. Resources containing package information.
 ///  2. Module write set with published code.
 fn publish_framework(
-    genesis_vm: &GenesisMoveVM,
+    genesis_vm: &GenesisMoveVm,
     genesis_runtime_environment: &RuntimeEnvironment,
     hash_value: HashValue,
     framework: &ReleaseBundle,
 ) -> (VMChangeSet, ModuleWriteSet) {
-    assert!(genesis_runtime_environment.vm_config().use_loader_v2);
-
     // Reset state view to be empty, to make sure all module write ops are creations.
     let mut state_view = GenesisStateView::new();
 
@@ -950,7 +938,7 @@ fn publish_framework(
         writes.extend(package_writes.clone());
         state_view.add_module_write_ops(package_writes);
     }
-    let module_write_set = ModuleWriteSet::new(true, writes);
+    let module_write_set = ModuleWriteSet::new(writes);
 
     // At this point we processed all packages, and the state view contains all the code. We can
     // run package initialization.
@@ -972,12 +960,8 @@ fn publish_framework(
         initialize_package(&mut session, &module_storage, addr, pack);
     }
 
-    let (change_set, empty_module_write_set) =
+    let change_set =
         assert_ok!(session.finish(&genesis_vm.genesis_change_set_configs(), &module_storage));
-
-    // We use loader V2, so modules are published outside the session and so the module write set
-    // returned when finishing the session should be empty.
-    assert!(empty_module_write_set.is_empty());
     (change_set, module_write_set)
 }
 

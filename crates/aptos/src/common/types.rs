@@ -51,6 +51,7 @@ use async_trait::async_trait;
 use clap::{Parser, ValueEnum};
 use hex::FromHexError;
 use indoc::indoc;
+use move_compiler_v2::Experiment;
 use move_core_types::{
     account_address::AccountAddress, language_storage::TypeTag, vm_status::VMStatus,
 };
@@ -289,6 +290,8 @@ pub struct ProfileConfig {
 /// ProfileConfig but without the private parts
 #[derive(Debug, Serialize)]
 pub struct ProfileSummary {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network: Option<Network>,
     pub has_private_key: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key: Option<Ed25519PublicKey>,
@@ -303,6 +306,7 @@ pub struct ProfileSummary {
 impl From<&ProfileConfig> for ProfileSummary {
     fn from(config: &ProfileConfig) -> Self {
         ProfileSummary {
+            network: config.network,
             has_private_key: config.private_key.is_some(),
             public_key: config.public_key.clone(),
             account: config.account,
@@ -1108,9 +1112,9 @@ impl FromStr for OptimizationLevel {
     }
 }
 
-/// Options for compiling a move package dir
+/// Options for compiling a move package.
 #[derive(Debug, Clone, Parser)]
-pub struct MovePackageDir {
+pub struct MovePackageOptions {
     /// Path to a move package (the folder with a Move.toml file).  Defaults to current directory.
     #[clap(long, value_parser)]
     pub package_dir: Option<PathBuf>,
@@ -1154,11 +1158,9 @@ pub struct MovePackageDir {
     #[clap(long)]
     pub dev: bool,
 
-    /// Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code.
-    /// NOTE: this behavior will become the default in the future.
-    /// See <https://github.com/aptos-labs/aptos-core/issues/10335>
-    #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
-    pub check_test_code: bool,
+    /// Skip extended checks (such as checks for the #[view] attribute) on test code.
+    #[clap(long, default_value = "false")]
+    pub skip_checks_on_test_code: bool,
 
     /// Select optimization level.  Choices are "none", "default", or "extra".
     /// Level "extra" may spend more time on expensive optimizations in the future.
@@ -1194,15 +1196,19 @@ pub struct MovePackageDir {
            default_value = LATEST_STABLE_LANGUAGE_VERSION,
            verbatim_doc_comment)]
     pub language_version: Option<LanguageVersion>,
+
+    /// Fail the compilation if there are any warnings.
+    #[clap(long)]
+    pub fail_on_warning: bool,
 }
 
-impl Default for MovePackageDir {
+impl Default for MovePackageOptions {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl MovePackageDir {
+impl MovePackageOptions {
     pub fn new() -> Self {
         Self {
             dev: false,
@@ -1215,8 +1221,9 @@ impl MovePackageDir {
             compiler_version: Some(CompilerVersion::latest_stable()),
             language_version: Some(LanguageVersion::latest_stable()),
             skip_attribute_checks: false,
-            check_test_code: false,
+            skip_checks_on_test_code: false,
             optimize: None,
+            fail_on_warning: false,
             experiments: vec![],
         }
     }
@@ -1237,6 +1244,30 @@ impl MovePackageDir {
     pub fn add_named_address(&mut self, key: String, value: String) {
         self.named_addresses
             .insert(key, AccountAddressWrapper::from_str(&value).unwrap());
+    }
+
+    /// Compute the experiments to be used for the compiler.
+    pub fn compute_experiments(&self) -> Vec<String> {
+        let mut experiments = self.experiments.clone();
+        let mut set = |k: &str, v: bool| {
+            experiments.push(format!("{}={}", k, if v { "on" } else { "off" }));
+        };
+        match self.optimize {
+            None | Some(OptimizationLevel::Default) => {
+                set(Experiment::OPTIMIZE, true);
+            },
+            Some(OptimizationLevel::None) => {
+                set(Experiment::OPTIMIZE, false);
+            },
+            Some(OptimizationLevel::Extra) => {
+                set(Experiment::OPTIMIZE_EXTRA, true);
+                set(Experiment::OPTIMIZE, true);
+            },
+        }
+        if self.fail_on_warning {
+            set(Experiment::FAIL_ON_WARNING, true);
+        }
+        experiments
     }
 }
 

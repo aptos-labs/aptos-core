@@ -6,9 +6,7 @@ use move_binary_format::file_format::{
     SignatureToken::*,
 };
 use move_core_types::vm_status::StatusCode;
-use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage, WithRuntimeEnvironment,
-};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -74,9 +72,8 @@ fn merge_borrow_states_infinite_loop() {
 
     move_bytecode_verifier::verify_script(&cs).expect("verify failed");
     let storage = InMemoryStorage::new();
-    let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
 
-    let mut session = vm.new_session(&storage);
+    let mut session = MoveVM::new_session(&storage);
     let mut script_bytes = vec![];
     cs.serialize(&mut script_bytes).unwrap();
 
@@ -84,7 +81,7 @@ fn merge_borrow_states_infinite_loop() {
     let code_storage = storage.as_unsync_code_storage();
 
     let err = session
-        .execute_script(
+        .load_and_execute_script(
             script_bytes.as_slice(),
             vec![],
             Vec::<Vec<u8>>::new(),
