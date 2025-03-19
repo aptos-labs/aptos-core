@@ -3045,7 +3045,7 @@ Mutate the token_properties of one token.
     <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(all_token_data, token_id.token_data_id), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="token.md#0x3_token_ETOKEN_DATA_NOT_PUBLISHED">ETOKEN_DATA_NOT_PUBLISHED</a>));
     <b>let</b> token_data = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(all_token_data, token_id.token_data_id);
 
-    // <b>if</b> default property is mutatable, <a href="token.md#0x3_token">token</a> property is alwasy mutable
+    // <b>if</b> default property is mutatable, <a href="token.md#0x3_token">token</a> property is always mutable
     // we only need <b>to</b> check <a href="token.md#0x3_token_TOKEN_PROPERTY_MUTABLE">TOKEN_PROPERTY_MUTABLE</a> when default property is immutable
     <b>if</b> (!token_data.mutability_config.properties) {
         <b>assert</b>!(

@@ -75,8 +75,8 @@ use std::{
 use thiserror::Error;
 
 pub const USER_AGENT: &str = concat!("aptos-cli/", env!("CARGO_PKG_VERSION"));
-const US_IN_SECS: u64 = 1_000_000;
-const ACCEPTED_CLOCK_SKEW_US: u64 = 5 * US_IN_SECS;
+pub const US_IN_SECS: u64 = 1_000_000;
+pub const ACCEPTED_CLOCK_SKEW_US: u64 = 5 * US_IN_SECS;
 pub const DEFAULT_EXPIRATION_SECS: u64 = 30;
 pub const DEFAULT_PROFILE: &str = "default";
 pub const GIT_IGNORE: &str = ".gitignore";
@@ -290,6 +290,8 @@ pub struct ProfileConfig {
 /// ProfileConfig but without the private parts
 #[derive(Debug, Serialize)]
 pub struct ProfileSummary {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network: Option<Network>,
     pub has_private_key: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key: Option<Ed25519PublicKey>,
@@ -304,6 +306,7 @@ pub struct ProfileSummary {
 impl From<&ProfileConfig> for ProfileSummary {
     fn from(config: &ProfileConfig) -> Self {
         ProfileSummary {
+            network: config.network,
             has_private_key: config.private_key.is_some(),
             public_key: config.public_key.clone(),
             account: config.account,
@@ -798,6 +801,10 @@ impl PrivateKeyInputOptions {
         }
     }
 
+    pub fn has_key_or_file(&self) -> bool {
+        self.private_key.is_some() || self.private_key_file.is_some()
+    }
+
     /// Extract public key from CLI args with fallback to config
     /// This will first try to extract public key from private_key from CLI args
     /// With fallback to profile
@@ -834,6 +841,44 @@ impl PrivateKeyInputOptions {
                     let address = account_address_from_public_key(&public_key);
                     Ok((public_key, address))
                 },
+            }
+        } else {
+            Err(CliError::CommandArgumentError(
+                "One of ['--private-key', '--private-key-file'], or ['public_key'] must present in profile".to_string(),
+            ))
+        }
+    }
+
+    /// Extract address
+    pub fn extract_address(
+        &self,
+        encoding: EncodingType,
+        profile: &ProfileOptions,
+        maybe_address: Option<AccountAddress>,
+    ) -> CliTypedResult<AccountAddress> {
+        // Order of operations
+        // 1. CLI inputs
+        // 2. Profile
+        // 3. Derived
+        if let Some(address) = maybe_address {
+            return Ok(address);
+        }
+
+        if let Some(private_key) = self.extract_private_key_cli(encoding)? {
+            // If we use the CLI inputs, then we should derive or use the address from the input
+            let address = account_address_from_public_key(&private_key.public_key());
+            Ok(address)
+        } else if let Some((Some(public_key), maybe_config_address)) = CliConfig::load_profile(
+            profile.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| (p.public_key, p.account))
+        {
+            if let Some(address) = maybe_config_address {
+                Ok(address)
+            } else {
+                let address = account_address_from_public_key(&public_key);
+                Ok(address)
             }
         } else {
             Err(CliError::CommandArgumentError(

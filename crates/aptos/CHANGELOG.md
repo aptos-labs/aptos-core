@@ -6,6 +6,10 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 - Compiler v1 is now deprecated. It is now removed from the Aptos CLI.
 - Added a new option `aptos move compile --fail-on-warning` which fails the compilation if any warnings are found.
 - We now default to running extended checks when compiling test code (this was previously only done with the option `--check-test-code`, but this is no longer available). However, these checks can be now be skipped with `--skip-checks-on-test-code`.
+- Add network to show profiles.
+- The new subcommand `aptos update move-mutation-test` will install/update the external binary `move-mutation-test`, which performs mutation testing on a Move project to find blind spots in Move unit tests.
+
+- Add beta simulate command to simulate any transaction from anyone
 
 ## [6.2.0]
 - Several compiler parsing bugs fixed, including in specifications for receiver style functions
