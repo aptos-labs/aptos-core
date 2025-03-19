@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{data_manager::DataManager, metadata_manager::MetadataManager};
+use crate::{data_manager::DataManager, metadata_manager::MetadataManager, metrics::COUNTER};
 use aptos_protos::indexer::v1::{
     grpc_manager_server::GrpcManager, service_info::Info, GetDataServiceForRequestRequest,
     GetDataServiceForRequestResponse, GetTransactionsRequest, HeartbeatRequest, HeartbeatResponse,
@@ -79,8 +79,6 @@ impl GrpcManagerService {
                 {
                     continue;
                 }
-                // TODO(grao): Validate the data at the metadata manager side to make sure
-                // stream_info is always available.
                 let num_active_streams = info.stream_info.as_ref().unwrap().active_streams.len();
                 candidates.push((candidate.0, num_active_streams));
             }
@@ -98,8 +96,6 @@ impl GrpcManagerService {
         let mut candidates = vec![];
         for candidate in self.metadata_manager.get_historical_data_services_info() {
             if let Some(info) = candidate.1.back().as_ref() {
-                // TODO(grao): Validate the data at the metadata manager side to make sure
-                // stream_info is always available.
                 let num_active_streams = info.stream_info.as_ref().unwrap().active_streams.len();
                 candidates.push((candidate.0, num_active_streams));
             }
@@ -144,6 +140,8 @@ impl GrpcManager for GrpcManagerService {
         Ok(Response::new(TransactionsResponse {
             transactions,
             chain_id: Some(self.chain_id),
+            // Not used.
+            processed_range: None,
         }))
     }
 
@@ -153,25 +151,40 @@ impl GrpcManager for GrpcManagerService {
     ) -> Result<Response<GetDataServiceForRequestResponse>, Status> {
         let request = request.into_inner();
 
-        if request.user_request.is_none() {
-            return Err(Status::invalid_argument("Bad request."));
+        if request.user_request.is_none()
+            || request
+                .user_request
+                .as_ref()
+                .unwrap()
+                .starting_version
+                .is_none()
+        {
+            let candidates = self.metadata_manager.get_live_data_services_info();
+            if let Some(candidate) = candidates.iter().next() {
+                let data_service_address = candidate.0.clone();
+                return Ok(Response::new(GetDataServiceForRequestResponse {
+                    data_service_address,
+                }));
+            } else {
+                return Err(Status::internal(
+                    "Cannot find a data service instance to serve the provided request.",
+                ));
+            }
         }
 
-        let user_request = request.user_request.unwrap();
-        if user_request.starting_version.is_none() {
-            return Err(Status::invalid_argument("Bad request."));
-        }
-
-        let starting_version = user_request.starting_version();
+        let starting_version = request.user_request.unwrap().starting_version();
 
         let data_service_address =
             // TODO(grao): Use a simple strategy for now. Consider to make it smarter in the
             // future.
             if let Some(address) = self.pick_live_data_service(starting_version) {
+                COUNTER.with_label_values(&["live_data_service_picked"]).inc();
                 address
             } else if let Some(address) = self.pick_historical_data_service(starting_version).await {
+                COUNTER.with_label_values(&["historical_data_service_picked"]).inc();
                 address
             } else {
+                COUNTER.with_label_values(&["failed_to_pick_data_service"]).inc();
                 return Err(Status::internal(
                     "Cannot find a data service instance to serve the provided request.",
                 ));

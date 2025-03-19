@@ -38,11 +38,6 @@ fn test_publish_module_with_nested_loops() {
 
     // Should succeed with max_loop_depth = 2
     {
-        let storage = InMemoryStorage::new();
-        let natives = move_stdlib::natives::all_natives(
-            AccountAddress::from_hex_literal("0x1").unwrap(),
-            move_stdlib::natives::GasParameters::zeros(),
-        );
         let vm_config = VMConfig {
             verifier_config: VerifierConfig {
                 max_loop_depth: Some(2),
@@ -50,30 +45,17 @@ fn test_publish_module_with_nested_loops() {
             },
             ..Default::default()
         };
-        let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
-        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
+        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
+        let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
 
-        let mut sess = vm.new_session(&storage);
-        if vm.vm_config().use_loader_v2 {
-            let module_storage = storage.as_unsync_module_storage(runtime_environment);
-            let result = StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob
-                .clone()
-                .into()]);
-            assert!(result.is_ok());
-        } else {
-            #[allow(deprecated)]
-            sess.publish_module(m_blob.clone(), TEST_ADDR, &mut UnmeteredGasMeter)
-                .unwrap();
-        }
+        let module_storage = storage.as_unsync_module_storage();
+        let result =
+            StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob.clone().into()]);
+        assert!(result.is_ok());
     }
 
     // Should fail with max_loop_depth = 1
     {
-        let storage = InMemoryStorage::new();
-        let natives = move_stdlib::natives::all_natives(
-            AccountAddress::from_hex_literal("0x1").unwrap(),
-            move_stdlib::natives::GasParameters::zeros(),
-        );
         let vm_config = VMConfig {
             verifier_config: VerifierConfig {
                 max_loop_depth: Some(1),
@@ -81,21 +63,13 @@ fn test_publish_module_with_nested_loops() {
             },
             ..Default::default()
         };
-        let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
-        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
+        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
+        let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
 
-        let mut sess = vm.new_session(&storage);
-        if vm.vm_config().use_loader_v2 {
-            let module_storage = storage.as_unsync_module_storage(runtime_environment);
-            let result = StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob
-                .clone()
-                .into()]);
-            assert!(result.is_err());
-        } else {
-            #[allow(deprecated)]
-            sess.publish_module(m_blob.clone(), TEST_ADDR, &mut UnmeteredGasMeter)
-                .unwrap_err();
-        }
+        let module_storage = storage.as_unsync_module_storage();
+        let result =
+            StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob.clone().into()]);
+        assert!(result.is_err());
     }
 }
 
@@ -125,11 +99,6 @@ fn test_run_script_with_nested_loops() {
 
     // Should succeed with max_loop_depth = 2
     {
-        let storage = InMemoryStorage::new();
-        let natives = move_stdlib::natives::all_natives(
-            AccountAddress::from_hex_literal("0x1").unwrap(),
-            move_stdlib::natives::GasParameters::zeros(),
-        );
         let vm_config = VMConfig {
             verifier_config: VerifierConfig {
                 max_loop_depth: Some(2),
@@ -137,13 +106,13 @@ fn test_run_script_with_nested_loops() {
             },
             ..Default::default()
         };
-        let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
-        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
-        let code_storage = storage.as_unsync_code_storage(runtime_environment);
+        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
+        let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
+        let code_storage = storage.as_unsync_code_storage();
 
-        let mut sess = vm.new_session(&storage);
+        let mut sess = MoveVM::new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];
-        sess.execute_script(
+        sess.load_and_execute_script(
             s_blob.clone(),
             vec![],
             args,
@@ -156,11 +125,6 @@ fn test_run_script_with_nested_loops() {
 
     // Should fail with max_loop_depth = 1
     {
-        let storage = InMemoryStorage::new();
-        let natives = move_stdlib::natives::all_natives(
-            AccountAddress::from_hex_literal("0x1").unwrap(),
-            move_stdlib::natives::GasParameters::zeros(),
-        );
         let vm_config = VMConfig {
             verifier_config: VerifierConfig {
                 max_loop_depth: Some(1),
@@ -168,13 +132,13 @@ fn test_run_script_with_nested_loops() {
             },
             ..Default::default()
         };
-        let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
-        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
-        let code_storage = storage.as_unsync_code_storage(runtime_environment);
+        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
+        let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
+        let code_storage = storage.as_unsync_code_storage();
 
-        let mut sess = vm.new_session(&storage);
+        let mut sess = MoveVM::new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];
-        sess.execute_script(
+        sess.load_and_execute_script(
             s_blob,
             vec![],
             args,

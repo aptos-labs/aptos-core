@@ -35,28 +35,24 @@ public fun A::read_at($t0|addr: address): u64 {
 
 [variant baseline]
 public fun B::move_from_test_incorrect($t0|addr1: address, $t1|addr2: address): 0x0::B::T {
-     var $t2|v: 0x0::B::T
-     var $t3|x0: u64
-     var $t4|x1: u64
-     var $t5: address
-     var $t6: u64
-     var $t7: address
-     var $t8: 0x0::B::T
-     var $t9: address
-     var $t10: u64
-     var $t11: 0x0::B::T
-  0: $t5 := copy($t1)
-  1: $t6 := A::read_at($t5)
-  2: $t3 := $t6
-  3: $t7 := move($t0)
-  4: $t8 := move_from<0x0::B::T>($t7)
-  5: $t2 := $t8
-  6: $t9 := move($t1)
-  7: $t10 := A::read_at($t9)
-  8: $t4 := $t10
-  9: assert Eq<u64>($t3, $t4)
- 10: $t11 := move($t2)
- 11: return $t11
+     var $t2|x0: u64
+     var $t3|x1: u64
+     var $t4: address
+     var $t5: u64
+     var $t6: address
+     var $t7: 0x0::B::T
+     var $t8: address
+     var $t9: u64
+  0: $t4 := copy($t1)
+  1: $t5 := A::read_at($t4)
+  2: $t2 := $t5
+  3: $t6 := move($t0)
+  4: $t7 := move_from<0x0::B::T>($t6)
+  5: $t8 := move($t1)
+  6: $t9 := A::read_at($t8)
+  7: $t3 := $t9
+  8: assert Eq<u64>($t2, $t3)
+  9: return $t7
 }
 
 
@@ -132,8 +128,8 @@ public fun B::mutate_S_test2_incorrect($t0|addr: address) {
 
 [variant baseline]
 public fun B::mutate_at_test_incorrect($t0|addr1: address, $t1|addr2: address) {
-     var $t2|t: &mut 0x0::B::T
-     var $t3|x0: u64
+     var $t2|x0: u64
+     var $t3|t: &mut 0x0::B::T
      var $t4|x1: u64
      var $t5: address
      var $t6: u64
@@ -146,18 +142,18 @@ public fun B::mutate_at_test_incorrect($t0|addr1: address, $t1|addr2: address) {
      var $t13: u64
   0: $t5 := copy($t1)
   1: $t6 := A::read_at($t5)
-  2: $t3 := $t6
+  2: $t2 := $t6
   3: $t7 := move($t0)
   4: $t8 := borrow_global<0x0::B::T>($t7)
-  5: $t2 := $t8
+  5: $t3 := $t8
   6: $t9 := 2
-  7: $t10 := move($t2)
+  7: $t10 := move($t3)
   8: $t11 := borrow_field<0x0::B::T>.x($t10)
   9: write_ref($t11, $t9)
  10: $t12 := move($t1)
  11: $t13 := A::read_at($t12)
  12: $t4 := $t13
- 13: assert Eq<u64>($t3, $t4)
+ 13: assert Eq<u64>($t2, $t4)
  14: return ()
 }
 
@@ -172,7 +168,7 @@ public fun A::mutate_at($t0|addr: address) {
      var $t5: &mut u64
   0: assume CanModify<0x0::A::S>($t0)
   1: @0 := save_mem(A::S)
-     # VC: caller does not have permission to modify `A::S` at given address at tests/spec_instrumentation/modifies.move:18:17+17
+     # VC: caller does not have permission to modify `A::S` at given address at tests/spec_instrumentation/modifies.move:18:17+26
   2: assert CanModify<0x0::A::S>($t0)
   3: $t2 := borrow_global<0x0::A::S>($t0) on_abort goto 13 with $t3
   4: $t4 := 2
@@ -216,44 +212,43 @@ public fun A::read_at($t0|addr: address): u64 {
 
 [variant verification]
 public fun B::move_from_test_incorrect($t0|addr1: address, $t1|addr2: address): 0x0::B::T {
-     var $t2|v: 0x0::B::T
-     var $t3|x0: u64
-     var $t4|x1: u64
-     var $t5: u64
-     var $t6: bool
-     var $t7: num
-     var $t8: 0x0::B::T
-     var $t9: u64
-     var $t10: bool
+     var $t2|x0: u64
+     var $t3|x1: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: num
+     var $t7: 0x0::B::T
+     var $t8: u64
+     var $t9: bool
   0: assume CanModify<0x0::B::T>($t1)
-  1: $t5 := opaque begin: A::read_at($t1)
-  2: assume Identical($t6, Not(exists<0x0::A::S>($t1)))
-  3: if ($t6) goto 4 else goto 7
+  1: $t4 := opaque begin: A::read_at($t1)
+  2: assume Identical($t5, Not(exists<0x0::A::S>($t1)))
+  3: if ($t5) goto 4 else goto 7
   4: label L4
-  5: trace_abort($t7)
+  5: trace_abort($t6)
   6: goto 26
   7: label L3
-  8: assume WellFormed($t5)
-  9: assume Eq<u64>($t5, select A::S.x<0x0::A::S>(global<0x0::A::S>($t1)))
- 10: $t5 := opaque end: A::read_at($t1)
-     # VC: caller does not have permission to modify `B::T` at given address at tests/spec_instrumentation/modifies.move:65:17+9
+  8: assume WellFormed($t4)
+  9: assume Eq<u64>($t4, select A::S.x<0x0::A::S>(global<0x0::A::S>($t1)))
+ 10: $t4 := opaque end: A::read_at($t1)
+     # VC: caller does not have permission to modify `B::T` at given address at tests/spec_instrumentation/modifies.move:65:17+19
  11: assert CanModify<0x0::B::T>($t0)
- 12: $t8 := move_from<0x0::B::T>($t0) on_abort goto 26 with $t7
- 13: $t9 := opaque begin: A::read_at($t1)
- 14: assume Identical($t10, Not(exists<0x0::A::S>($t1)))
- 15: if ($t10) goto 16 else goto 19
+ 12: $t7 := move_from<0x0::B::T>($t0) on_abort goto 26 with $t6
+ 13: $t8 := opaque begin: A::read_at($t1)
+ 14: assume Identical($t9, Not(exists<0x0::A::S>($t1)))
+ 15: if ($t9) goto 16 else goto 19
  16: label L6
- 17: trace_abort($t7)
+ 17: trace_abort($t6)
  18: goto 26
  19: label L5
- 20: assume WellFormed($t9)
- 21: assume Eq<u64>($t9, select A::S.x<0x0::A::S>(global<0x0::A::S>($t1)))
- 22: $t9 := opaque end: A::read_at($t1)
- 23: assert Eq<u64>($t5, $t9)
+ 20: assume WellFormed($t8)
+ 21: assume Eq<u64>($t8, select A::S.x<0x0::A::S>(global<0x0::A::S>($t1)))
+ 22: $t8 := opaque end: A::read_at($t1)
+ 23: assert Eq<u64>($t4, $t8)
  24: label L1
- 25: return $t8
+ 25: return $t7
  26: label L2
- 27: abort($t7)
+ 27: abort($t6)
 }
 
 
@@ -281,7 +276,7 @@ public fun B::move_to_test_incorrect($t0|account: signer, $t1|addr2: address) {
  10: $t4 := opaque end: A::read_at($t1)
  11: $t7 := 2
  12: $t8 := pack 0x0::B::T($t7)
-     # VC: caller does not have permission to modify `B::T` at given address at tests/spec_instrumentation/modifies.move:52:9+7
+     # VC: caller does not have permission to modify `B::T` at given address at tests/spec_instrumentation/modifies.move:52:9+28
  13: assert CanModify<0x0::B::T>($t0)
  14: move_to<0x0::B::T>($t8, $t0) on_abort goto 28 with $t6
  15: $t9 := opaque begin: A::read_at($t1)
@@ -407,8 +402,8 @@ public fun B::mutate_S_test2_incorrect($t0|addr: address) {
 
 [variant verification]
 public fun B::mutate_at_test_incorrect($t0|addr1: address, $t1|addr2: address) {
-     var $t2|t: &mut 0x0::B::T
-     var $t3|x0: u64
+     var $t2|x0: u64
+     var $t3|t: &mut 0x0::B::T
      var $t4|x1: u64
      var $t5: u64
      var $t6: bool
@@ -429,7 +424,7 @@ public fun B::mutate_at_test_incorrect($t0|addr1: address, $t1|addr2: address) {
   8: assume WellFormed($t5)
   9: assume Eq<u64>($t5, select A::S.x<0x0::A::S>(global<0x0::A::S>($t1)))
  10: $t5 := opaque end: A::read_at($t1)
-     # VC: caller does not have permission to modify `B::T` at given address at tests/spec_instrumentation/modifies.move:38:17+17
+     # VC: caller does not have permission to modify `B::T` at given address at tests/spec_instrumentation/modifies.move:38:17+27
  11: assert CanModify<0x0::B::T>($t0)
  12: $t8 := borrow_global<0x0::B::T>($t0) on_abort goto 31 with $t7
  13: $t9 := 2
@@ -488,8 +483,8 @@ fun B::move_from_test_incorrect[baseline]
 spec {
   modifies global<0x0::B::T>($t1);
 }
-9 -> spec {
-  assert Eq<u64>($t3, $t4);
+8 -> spec {
+  assert Eq<u64>($t2, $t3);
 }
 
 
@@ -497,8 +492,8 @@ fun B::move_from_test_incorrect[verification]
 spec {
   modifies global<0x0::B::T>($t1);
 }
-9 -> spec {
-  assert Eq<u64>($t3, $t4);
+8 -> spec {
+  assert Eq<u64>($t2, $t3);
 }
 
 
@@ -563,7 +558,7 @@ spec {
   modifies global<0x0::B::T>($t1);
 }
 13 -> spec {
-  assert Eq<u64>($t3, $t4);
+  assert Eq<u64>($t2, $t4);
 }
 
 
@@ -572,5 +567,5 @@ spec {
   modifies global<0x0::B::T>($t1);
 }
 13 -> spec {
-  assert Eq<u64>($t3, $t4);
+  assert Eq<u64>($t2, $t4);
 }

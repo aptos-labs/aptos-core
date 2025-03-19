@@ -144,16 +144,16 @@ module c0ffee.m {
 
 
 test() /* def_idx: 0 */ {
-L0:	loc0: u64
+L0:	i: u64
 B0:
 	0: LdU64(0)
-	1: StLoc[0](loc0: u64)
+	1: StLoc[0](i: u64)
 B1:
-	2: MoveLoc[0](loc0: u64)
+	2: MoveLoc[0](i: u64)
 	3: LdU64(1)
 	4: Add
-	5: StLoc[0](loc0: u64)
-	6: CopyLoc[0](loc0: u64)
+	5: StLoc[0](i: u64)
+	6: CopyLoc[0](i: u64)
 	7: LdU64(10)
 	8: Eq
 	9: BrTrue(11)

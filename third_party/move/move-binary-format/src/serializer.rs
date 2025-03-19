@@ -541,17 +541,18 @@ fn serialize_function_handle(
     serialize_signature_index(binary, &function_handle.return_)?;
     serialize_ability_sets(binary, &function_handle.type_parameters)?;
     if major_version >= VERSION_7 {
-        serialize_access_specifiers(binary, &function_handle.access_specifiers)
-    } else if function_handle.access_specifiers.is_some()
-        && function_handle
-            .access_specifiers
-            .as_ref()
-            .unwrap()
-            .iter()
-            .any(|sp| !sp.is_old_style_acquires())
-    {
-        Err(anyhow!(
+        serialize_access_specifiers(binary, &function_handle.access_specifiers)?
+    } else if function_handle.access_specifiers.is_some() {
+        return Err(anyhow!(
             "Access specifiers not supported in bytecode version {}",
+            major_version
+        ));
+    }
+    if major_version >= VERSION_8 {
+        serialize_function_attributes(binary, &function_handle.attributes)
+    } else if !function_handle.attributes.is_empty() {
+        Err(anyhow!(
+            "Function attributes not supported in bytecode version {}",
             major_version
         ))
     } else {
@@ -857,6 +858,28 @@ fn serialize_ability_sets(binary: &mut BinaryData, sets: &[AbilitySet]) -> Resul
     Ok(())
 }
 
+fn serialize_function_attributes(
+    binary: &mut BinaryData,
+    attributes: &[FunctionAttribute],
+) -> Result<()> {
+    write_as_uleb128(binary, attributes.len() as u64, ATTRIBUTE_COUNT_MAX)?;
+    for attr in attributes {
+        serialize_function_attribute(binary, attr)?;
+    }
+    Ok(())
+}
+
+fn serialize_function_attribute(
+    binary: &mut BinaryData,
+    attribute: &FunctionAttribute,
+) -> Result<()> {
+    use FunctionAttribute::*;
+    match attribute {
+        Persistent => binary.push(SerializedFunctionAttribute::PERSISTENT as u8),
+        ModuleLock => binary.push(SerializedFunctionAttribute::MODULE_LOCK as u8),
+    }
+}
+
 fn serialize_access_specifiers(
     binary: &mut BinaryData,
     accesses: &Option<Vec<AccessSpecifier>>,
@@ -874,7 +897,6 @@ fn serialize_access_specifier(binary: &mut BinaryData, acc: &AccessSpecifier) ->
     binary.push(match acc.kind {
         AccessKind::Reads => SerializedAccessKind::READ,
         AccessKind::Writes => SerializedAccessKind::WRITE,
-        AccessKind::Acquires => SerializedAccessKind::ACQUIRES,
     } as u8)?;
     binary.push(
         if acc.negated {
@@ -1607,7 +1629,6 @@ impl ModuleSerializer {
         function_definition: &FunctionDefinition,
     ) -> Result<()> {
         serialize_function_handle_index(binary, &function_definition.function)?;
-
         let mut flags = 0;
         if self.common.major_version < VERSION_5 {
             let visibility = if function_definition.visibility == Visibility::Public
@@ -1630,6 +1651,7 @@ impl ModuleSerializer {
         binary.push(flags)?;
 
         serialize_acquires(binary, &function_definition.acquires_global_resources)?;
+
         if let Some(code) = &function_definition.code {
             serialize_code_unit(self.common.major_version(), binary, code)?;
         }

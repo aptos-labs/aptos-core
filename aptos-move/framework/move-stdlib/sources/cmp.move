@@ -67,18 +67,18 @@ module std::cmp {
 
     #[test]
     fun test_compare_numbers() {
-        assert!(is_ne(&compare(&1, &5)), 0);
-        assert!(!is_eq(&compare(&1, &5)), 0);
-        assert!(is_lt(&compare(&1, &5)), 1);
-        assert!(is_le(&compare(&1, &5)), 2);
-        assert!(is_eq(&compare(&5, &5)), 3);
-        assert!(!is_ne(&compare(&5, &5)), 3);
-        assert!(!is_lt(&compare(&5, &5)), 4);
-        assert!(is_le(&compare(&5, &5)), 5);
-        assert!(!is_eq(&compare(&7, &5)), 6);
-        assert!(is_ne(&compare(&7, &5)), 6);
-        assert!(!is_lt(&compare(&7, &5)), 7);
-        assert!(!is_le(&compare(&7, &5)), 8);
+        assert!(compare(&1, &5).is_ne(), 0);
+        assert!(!compare(&1, &5).is_eq(), 0);
+        assert!(compare(&1, &5).is_lt(), 1);
+        assert!(compare(&1, &5).is_le(), 2);
+        assert!(compare(&5, &5).is_eq(), 3);
+        assert!(!compare(&5, &5).is_ne(), 3);
+        assert!(!compare(&5, &5).is_lt(), 4);
+        assert!(compare(&5, &5).is_le(), 5);
+        assert!(!compare(&7, &5).is_eq(), 6);
+        assert!(compare(&7, &5).is_ne(), 6);
+        assert!(!compare(&7, &5).is_lt(), 7);
+        assert!(!compare(&7, &5).is_le(), 8);
 
         assert!(!compare(&1, &5).is_eq(), 0);
         assert!(compare(&1, &5).is_ne(), 0);

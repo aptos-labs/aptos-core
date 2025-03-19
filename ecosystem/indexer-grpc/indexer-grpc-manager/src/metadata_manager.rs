@@ -1,7 +1,10 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::GrpcAddress;
+use crate::{
+    config::{GrpcAddress, MAX_MESSAGE_SIZE},
+    metrics::{CONNECTED_INSTANCES, COUNTER, KNOWN_LATEST_VERSION, TIMER},
+};
 use anyhow::{bail, Result};
 use aptos_indexer_grpc_utils::timestamp_now_proto;
 use aptos_protos::{
@@ -9,19 +12,26 @@ use aptos_protos::{
         data_service_client::DataServiceClient, grpc_manager_client::GrpcManagerClient,
         service_info::Info, FullnodeInfo, GrpcManagerInfo, HeartbeatRequest,
         HistoricalDataServiceInfo, LiveDataServiceInfo, PingDataServiceRequest, ServiceInfo,
+        StreamInfo,
     },
-    internal::fullnode::v1::{fullnode_data_client::FullnodeDataClient, PingFullnodeRequest},
+    internal::fullnode::v1::{
+        fullnode_data_client::FullnodeDataClient, GetTransactionsFromNodeRequest,
+        PingFullnodeRequest,
+    },
     util::timestamp::Timestamp,
 };
 use dashmap::DashMap;
 use rand::{prelude::*, thread_rng};
 use std::{
     collections::{HashMap, VecDeque},
-    sync::atomic::{AtomicU64, Ordering},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Mutex,
+    },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tonic::transport::channel::Channel;
-use tracing::trace;
+use tonic::{codec::CompressionEncoding, transport::channel::Channel};
+use tracing::{trace, warn};
 
 // The maximum # of states for each service we keep.
 const MAX_NUM_OF_STATES_TO_KEEP: usize = 100;
@@ -36,7 +46,11 @@ impl Peer {
         let channel = Channel::from_shared(address)
             .expect("Bad address.")
             .connect_lazy();
-        let client = GrpcManagerClient::new(channel);
+        let client = GrpcManagerClient::new(channel)
+            .send_compressed(CompressionEncoding::Zstd)
+            .accept_compressed(CompressionEncoding::Zstd)
+            .max_encoding_message_size(MAX_MESSAGE_SIZE)
+            .max_decoding_message_size(MAX_MESSAGE_SIZE);
         Self {
             client,
             recent_states: VecDeque::new(),
@@ -54,7 +68,11 @@ impl Fullnode {
         let channel = Channel::from_shared(address)
             .expect("Bad address.")
             .connect_lazy();
-        let client = FullnodeDataClient::new(channel);
+        let client = FullnodeDataClient::new(channel)
+            .send_compressed(CompressionEncoding::Zstd)
+            .accept_compressed(CompressionEncoding::Zstd)
+            .max_encoding_message_size(MAX_MESSAGE_SIZE)
+            .max_decoding_message_size(MAX_MESSAGE_SIZE);
         Self {
             client,
             recent_states: VecDeque::new(),
@@ -72,7 +90,11 @@ impl LiveDataService {
         let channel = Channel::from_shared(address)
             .expect("Bad address.")
             .connect_lazy();
-        let client = DataServiceClient::new(channel);
+        let client = DataServiceClient::new(channel)
+            .send_compressed(CompressionEncoding::Zstd)
+            .accept_compressed(CompressionEncoding::Zstd)
+            .max_encoding_message_size(MAX_MESSAGE_SIZE)
+            .max_decoding_message_size(MAX_MESSAGE_SIZE);
         Self {
             client,
             recent_states: VecDeque::new(),
@@ -90,7 +112,11 @@ impl HistoricalDataService {
         let channel = Channel::from_shared(address)
             .expect("Bad address.")
             .connect_lazy();
-        let client = DataServiceClient::new(channel);
+        let client = DataServiceClient::new(channel)
+            .send_compressed(CompressionEncoding::Zstd)
+            .accept_compressed(CompressionEncoding::Zstd)
+            .max_encoding_message_size(MAX_MESSAGE_SIZE)
+            .max_decoding_message_size(MAX_MESSAGE_SIZE);
         Self {
             client,
             recent_states: VecDeque::new(),
@@ -106,6 +132,8 @@ pub(crate) struct MetadataManager {
     live_data_services: DashMap<GrpcAddress, LiveDataService>,
     historical_data_services: DashMap<GrpcAddress, HistoricalDataService>,
     known_latest_version: AtomicU64,
+    // NOTE: We assume the master is statically configured for now.
+    master_address: Mutex<Option<GrpcAddress>>,
 }
 
 impl MetadataManager {
@@ -114,6 +142,7 @@ impl MetadataManager {
         self_advertised_address: GrpcAddress,
         grpc_manager_addresses: Vec<GrpcAddress>,
         fullnode_addresses: Vec<GrpcAddress>,
+        master_address: Option<GrpcAddress>,
     ) -> Self {
         let grpc_managers = DashMap::new();
         for address in grpc_manager_addresses {
@@ -131,67 +160,109 @@ impl MetadataManager {
             live_data_services: DashMap::new(),
             historical_data_services: DashMap::new(),
             known_latest_version: AtomicU64::new(0),
+            master_address: Mutex::new(master_address),
         }
     }
 
-    fn need_ping(latest_state_timestamp: Timestamp, threshold: Duration) -> bool {
-        let latest_state_timestamp_since_epoch = Duration::new(
-            latest_state_timestamp.seconds as u64,
-            latest_state_timestamp.nanos as u32,
-        );
+    fn is_stale_timestamp(timestamp: Timestamp, threshold: Duration) -> bool {
+        let timestamp_since_epoch = Duration::new(timestamp.seconds as u64, timestamp.nanos as u32);
         let now_since_epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-        let staleness = now_since_epoch.saturating_sub(latest_state_timestamp_since_epoch);
+        let staleness = now_since_epoch.saturating_sub(timestamp_since_epoch);
 
         staleness >= threshold
     }
 
     pub(crate) async fn start(&self) -> Result<()> {
         loop {
+            let _timer = TIMER
+                .with_label_values(&["metadata_manager_main_loop"])
+                .start_timer();
+            let mut unreachable_live_data_services = vec![];
+            let mut unreachable_historical_data_services = vec![];
             tokio_scoped::scope(|s| {
                 for kv in &self.grpc_managers {
+                    let address = kv.key().clone();
                     let grpc_manager = kv.value();
                     let client = grpc_manager.client.clone();
                     s.spawn(async move {
-                        let _ = self.heartbeat(client).await;
+                        if let Err(e) = self.heartbeat(client).await {
+                            warn!("Failed to send heartbeat to other grpc manager ({address}): {e:?}.");
+                        }
                     });
                 }
 
                 for kv in &self.fullnodes {
                     let (address, fullnode) = kv.pair();
                     let need_ping = fullnode.recent_states.back().map_or(true, |s| {
-                        Self::need_ping(s.timestamp.unwrap_or_default(), Duration::from_secs(1))
+                        Self::is_stale_timestamp(
+                            s.timestamp.unwrap_or_default(),
+                            Duration::from_secs(1),
+                        )
                     });
                     if need_ping {
                         let address = address.clone();
                         let client = fullnode.client.clone();
                         s.spawn(async move {
-                            let _ = self.ping_fullnode(address, client).await;
+                            if let Err(e) = self.ping_fullnode(address.clone(), client).await {
+                                warn!("Failed to ping FN ({address}): {e:?}.");
+                            }
                         });
                     }
                 }
 
                 for kv in &self.live_data_services {
                     let (address, live_data_service) = kv.pair();
+                    let unreachable = live_data_service.recent_states.back().map_or(false, |s| {
+                        Self::is_stale_timestamp(
+                            s.timestamp.unwrap_or_default(),
+                            Duration::from_secs(60),
+                        )
+                    });
+                    if unreachable {
+                        unreachable_live_data_services.push(address.clone());
+                        continue;
+                    }
                     let need_ping = live_data_service.recent_states.back().map_or(true, |s| {
-                        Self::need_ping(s.timestamp.unwrap_or_default(), Duration::from_secs(5))
+                        Self::is_stale_timestamp(
+                            s.timestamp.unwrap_or_default(),
+                            Duration::from_secs(5),
+                        )
                     });
                     if need_ping {
                         let address = address.clone();
                         let client = live_data_service.client.clone();
                         s.spawn(async move {
-                            let _ = self.ping_live_data_service(address, client).await;
+                            if let Err(e) =
+                                self.ping_live_data_service(address.clone(), client).await
+                            {
+                                warn!("Failed to ping live data service ({address}): {e:?}.");
+                            }
                         });
                     }
                 }
 
                 for kv in &self.historical_data_services {
                     let (address, historical_data_service) = kv.pair();
+                    let unreachable =
+                        historical_data_service
+                            .recent_states
+                            .back()
+                            .map_or(false, |s| {
+                                Self::is_stale_timestamp(
+                                    s.timestamp.unwrap_or_default(),
+                                    Duration::from_secs(60),
+                                )
+                            });
+                    if unreachable {
+                        unreachable_historical_data_services.push(address.clone());
+                        continue;
+                    }
                     let need_ping =
                         historical_data_service
                             .recent_states
                             .back()
                             .map_or(true, |s| {
-                                Self::need_ping(
+                                Self::is_stale_timestamp(
                                     s.timestamp.unwrap_or_default(),
                                     Duration::from_secs(5),
                                 )
@@ -200,13 +271,48 @@ impl MetadataManager {
                         let address = address.clone();
                         let client = historical_data_service.client.clone();
                         s.spawn(async move {
-                            let _ = self.ping_historical_data_service(address, client).await;
+                            if let Err(e) = self
+                                .ping_historical_data_service(address.clone(), client)
+                                .await
+                            {
+                                warn!("Failed to ping historical data service ({address}): {e:?}.");
+                            }
                         });
                     }
                 }
             });
 
-            // TODO(grao): Remove unreachable services from the map.
+            for address in unreachable_live_data_services {
+                COUNTER
+                    .with_label_values(&["unreachable_live_data_service"])
+                    .inc();
+                self.live_data_services.remove(&address);
+            }
+
+            for address in unreachable_historical_data_services {
+                COUNTER
+                    .with_label_values(&["unreachable_historical_data_service"])
+                    .inc();
+                self.historical_data_services.remove(&address);
+            }
+
+            // NOTE: We don't remove FNs and GrpcManagers here intentionally.
+
+            CONNECTED_INSTANCES
+                .with_label_values(&["fullnode"])
+                .set(self.fullnodes.len() as i64);
+
+            CONNECTED_INSTANCES
+                .with_label_values(&["live_data_service"])
+                .set(self.live_data_services.len() as i64);
+
+            CONNECTED_INSTANCES
+                .with_label_values(&["historical_data_service"])
+                .set(self.historical_data_services.len() as i64);
+
+            CONNECTED_INSTANCES
+                .with_label_values(&["grpc_manager"])
+                .set(self.grpc_managers.len() as i64);
 
             // TODO(grao): Double check if we should change this value, and/or we should separate
             // ping for different services to different loops.
@@ -225,14 +331,45 @@ impl MetadataManager {
         }
     }
 
-    pub(crate) fn get_fullnode_for_request(&self) -> FullnodeDataClient<Channel> {
+    pub(crate) fn get_fullnode_for_request(
+        &self,
+        request: &GetTransactionsFromNodeRequest,
+    ) -> (GrpcAddress, FullnodeDataClient<Channel>) {
+        // TODO(grao): Double check the counters to see if we need a different way or additional
+        // information.
         let mut rng = thread_rng();
-        // TODO(grao): Filter out bad FNs.
+        if let Some(fullnode) = self
+            .fullnodes
+            .iter()
+            .filter(|fullnode| {
+                fullnode.recent_states.back().map_or(false, |s| {
+                    s.known_latest_version >= request.starting_version
+                })
+            })
+            .choose(&mut rng)
+            .map(|kv| (kv.key().clone(), kv.value().client.clone()))
+        {
+            COUNTER
+                .with_label_values(&["get_fullnode_for_request__happy"])
+                .inc();
+            return fullnode;
+        }
+
+        COUNTER
+            .with_label_values(&["get_fullnode_for_request__fallback"])
+            .inc();
         self.fullnodes
             .iter()
             .choose(&mut rng)
-            .map(|kv| kv.value().client.clone())
+            .map(|kv| (kv.key().clone(), kv.value().client.clone()))
             .unwrap()
+    }
+
+    pub(crate) fn get_fullnodes_info(&self) -> HashMap<String, VecDeque<FullnodeInfo>> {
+        self.fullnodes
+            .iter()
+            .map(|entry| (entry.key().clone(), entry.value().recent_states.clone()))
+            .collect()
     }
 
     pub(crate) fn get_live_data_services_info(
@@ -260,6 +397,7 @@ impl MetadataManager {
     fn update_known_latest_version(&self, version: u64) {
         self.known_latest_version
             .fetch_max(version, Ordering::SeqCst);
+        KNOWN_LATEST_VERSION.set(version as i64);
     }
 
     async fn heartbeat(&self, mut client: GrpcManagerClient<Channel>) -> Result<()> {
@@ -267,8 +405,7 @@ impl MetadataManager {
             chain_id: self.chain_id,
             timestamp: Some(timestamp_now_proto()),
             known_latest_version: Some(self.get_known_latest_version()),
-            // TODO(grao): Store and broadcast master address if known.
-            master_address: None,
+            master_address: self.master_address.lock().unwrap().clone(),
         };
         let service_info = ServiceInfo {
             address: Some(self.self_advertised_address.clone()),
@@ -344,12 +481,17 @@ impl MetadataManager {
     fn handle_live_data_service_info(
         &self,
         address: GrpcAddress,
-        info: LiveDataServiceInfo,
+        mut info: LiveDataServiceInfo,
     ) -> Result<()> {
         let mut entry = self
             .live_data_services
             .entry(address.clone())
             .or_insert(LiveDataService::new(address));
+        if info.stream_info.is_none() {
+            info.stream_info = Some(StreamInfo {
+                active_streams: vec![],
+            });
+        }
         entry.value_mut().recent_states.push_back(info);
         if entry.value().recent_states.len() > MAX_NUM_OF_STATES_TO_KEEP {
             entry.value_mut().recent_states.pop_front();
@@ -361,12 +503,17 @@ impl MetadataManager {
     fn handle_historical_data_service_info(
         &self,
         address: GrpcAddress,
-        info: HistoricalDataServiceInfo,
+        mut info: HistoricalDataServiceInfo,
     ) -> Result<()> {
         let mut entry = self
             .historical_data_services
             .entry(address.clone())
             .or_insert(HistoricalDataService::new(address));
+        if info.stream_info.is_none() {
+            info.stream_info = Some(StreamInfo {
+                active_streams: vec![],
+            });
+        }
         entry.value_mut().recent_states.push_back(info);
         if entry.value().recent_states.len() > MAX_NUM_OF_STATES_TO_KEEP {
             entry.value_mut().recent_states.pop_front();
@@ -395,6 +542,11 @@ impl MetadataManager {
     }
 
     fn handle_grpc_manager_info(&self, address: GrpcAddress, info: GrpcManagerInfo) -> Result<()> {
+        self.master_address
+            .lock()
+            .unwrap()
+            .clone_from(&info.master_address);
+
         let mut entry = self
             .grpc_managers
             .entry(address.clone())

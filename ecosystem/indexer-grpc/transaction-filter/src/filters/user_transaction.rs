@@ -31,6 +31,24 @@ pub struct UserTransactionFilter {
     pub payload: Option<UserTransactionPayloadFilter>,
 }
 
+impl From<aptos_protos::indexer::v1::UserTransactionFilter> for UserTransactionFilter {
+    fn from(proto_filter: aptos_protos::indexer::v1::UserTransactionFilter) -> Self {
+        Self {
+            sender: proto_filter.sender,
+            payload: proto_filter.payload_filter.map(|f| f.into()),
+        }
+    }
+}
+
+impl From<UserTransactionFilter> for aptos_protos::indexer::v1::UserTransactionFilter {
+    fn from(user_transaction_filter: UserTransactionFilter) -> Self {
+        Self {
+            sender: user_transaction_filter.sender,
+            payload_filter: user_transaction_filter.payload.map(Into::into),
+        }
+    }
+}
+
 impl Filterable<Transaction> for UserTransactionFilter {
     #[inline]
     fn validate_state(&self) -> Result<(), FilterError> {
@@ -42,7 +60,7 @@ impl Filterable<Transaction> for UserTransactionFilter {
     }
 
     #[inline]
-    fn is_allowed(&self, txn: &Transaction) -> bool {
+    fn matches(&self, txn: &Transaction) -> bool {
         let user_request = if let Some(TxnData::User(u)) = txn.txn_data.as_ref() {
             if let Some(user_request) = u.request.as_ref() {
                 user_request
@@ -67,7 +85,7 @@ impl Filterable<Transaction> for UserTransactionFilter {
                 .and_then(get_entry_function_payload_from_transaction_payload);
             if let Some(payload) = entry_function_payload {
                 // Here we have an actual EntryFunctionPayload
-                if !payload_filter.is_allowed(payload) {
+                if !payload_filter.matches(payload) {
                     return false;
                 }
             }
@@ -101,6 +119,26 @@ pub struct EntryFunctionFilter {
     pub function: Option<String>,
 }
 
+impl From<aptos_protos::indexer::v1::EntryFunctionFilter> for EntryFunctionFilter {
+    fn from(proto_filter: aptos_protos::indexer::v1::EntryFunctionFilter) -> Self {
+        Self {
+            address: proto_filter.address,
+            module: proto_filter.module_name,
+            function: proto_filter.function,
+        }
+    }
+}
+
+impl From<EntryFunctionFilter> for aptos_protos::indexer::v1::EntryFunctionFilter {
+    fn from(entry_function_filter: EntryFunctionFilter) -> Self {
+        Self {
+            address: entry_function_filter.address,
+            module_name: entry_function_filter.module,
+            function: entry_function_filter.function,
+        }
+    }
+}
+
 impl Filterable<EntryFunctionId> for EntryFunctionFilter {
     #[inline]
     fn validate_state(&self) -> Result<(), FilterError> {
@@ -111,16 +149,14 @@ impl Filterable<EntryFunctionId> for EntryFunctionFilter {
     }
 
     #[inline]
-    fn is_allowed(&self, module_id: &EntryFunctionId) -> bool {
-        if !self.function.is_allowed(&module_id.name) {
+    fn matches(&self, module_id: &EntryFunctionId) -> bool {
+        if !self.function.matches(&module_id.name) {
             return false;
         }
 
         if self.address.is_some() || self.function.is_some() {
             if let Some(module) = &module_id.module.as_ref() {
-                if !(self.address.is_allowed(&module.address)
-                    && self.module.is_allowed(&module.name))
-                {
+                if !(self.address.matches(&module.address) && self.module.matches(&module.name)) {
                     return false;
                 }
             } else {
@@ -156,6 +192,26 @@ pub struct UserTransactionPayloadFilter {
     pub function: Option<EntryFunctionFilter>,
 }
 
+impl From<aptos_protos::indexer::v1::UserTransactionPayloadFilter>
+    for UserTransactionPayloadFilter
+{
+    fn from(proto_filter: aptos_protos::indexer::v1::UserTransactionPayloadFilter) -> Self {
+        Self {
+            function: proto_filter.entry_function_filter.map(|f| f.into()),
+        }
+    }
+}
+
+impl From<UserTransactionPayloadFilter>
+    for aptos_protos::indexer::v1::UserTransactionPayloadFilter
+{
+    fn from(user_transaction_payload_filter: UserTransactionPayloadFilter) -> Self {
+        Self {
+            entry_function_filter: user_transaction_payload_filter.function.map(Into::into),
+        }
+    }
+}
+
 impl Filterable<EntryFunctionPayload> for UserTransactionPayloadFilter {
     #[inline]
     fn validate_state(&self) -> Result<(), FilterError> {
@@ -167,8 +223,8 @@ impl Filterable<EntryFunctionPayload> for UserTransactionPayloadFilter {
     }
 
     #[inline]
-    fn is_allowed(&self, payload: &EntryFunctionPayload) -> bool {
-        self.function.is_allowed_opt(&payload.function)
+    fn matches(&self, payload: &EntryFunctionPayload) -> bool {
+        self.function.matches_opt(&payload.function)
     }
 }
 

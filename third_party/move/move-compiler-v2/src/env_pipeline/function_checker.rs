@@ -3,11 +3,12 @@
 
 //! Do a few checks of functions and function calls.
 
-use crate::{experiments::Experiment, Options};
+use crate::Options;
 use codespan_reporting::diagnostic::Severity;
 use move_binary_format::file_format::Visibility;
 use move_model::{
     ast::{ExpData, Operation, Pattern},
+    metadata::LanguageVersion,
     model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, NodeId, Parameter, QualifiedId},
     ty::Type,
 };
@@ -56,16 +57,16 @@ fn identify_function_typed_params_with_functions_in_rets(
 }
 
 /// check that function parameters/results do not have function type unless allowed.
-/// (1) is there a function type arg at the top level?  This is allowed for inline or LAMBDA_IN_PARAMS
-/// (2) is there a function type result at the top level?  This is allowed only for LAMBDA_IN_RETURNS
-/// (3) is there *any* function type with function type in an arg? This is allowed only for LAMBDA_IN_PARAMS
-/// (4) is there *any* function type with function type in a result? This is allowed only for LAMBDA_IN_RETURNS
 pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
     let options = env
         .get_extension::<Options>()
         .expect("Options is available");
-    let lambda_params_ok = options.experiment_on(Experiment::LAMBDA_IN_PARAMS);
-    let lambda_return_ok = options.experiment_on(Experiment::LAMBDA_IN_RETURNS);
+
+    let lambda_params_ok = options
+        .language_version
+        .unwrap_or_default()
+        .is_at_least(LanguageVersion::V2_2);
+    let lambda_return_ok = lambda_params_ok;
     if lambda_params_ok && lambda_return_ok {
         return;
     }
@@ -270,7 +271,7 @@ fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv
                 },
                 ExpData::Assign(_, pat, _)
                 | ExpData::Block(_, pat, _, _)
-                | ExpData::Lambda(_, pat, _, _, _) => {
+                | ExpData::Lambda(_, pat, _, _) => {
                     pat.visit_pre_post(&mut |_, pat| {
                         if let Pattern::Struct(id, str, _, _) = pat {
                             let module_id = str.module_id;

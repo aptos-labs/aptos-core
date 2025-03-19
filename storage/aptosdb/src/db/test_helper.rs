@@ -49,7 +49,7 @@ pub fn kv_store_genesis() -> Vec<(StateKey, Option<StateValue>)> {
         .collect()
 }
 
-fn arb_key_universe(size: usize) -> impl Strategy<Value = Vec<StateKey>> {
+pub fn arb_key_universe(size: usize) -> impl Strategy<Value = Vec<StateKey>> {
     let genesis_keys = kv_genesis_keys();
     hash_set(
         any::<StateKey>().prop_filter(
@@ -63,11 +63,10 @@ fn arb_key_universe(size: usize) -> impl Strategy<Value = Vec<StateKey>> {
 
 prop_compose! {
     pub fn arb_state_kv_sets(
-        key_universe_size: usize,
+        keys: Vec<StateKey>,
         max_update_set_size: usize,
         max_versions: usize,
     )(
-        keys in arb_key_universe(key_universe_size),
         input in vec(
             vec(
                 any::<(Index, Option<StateValue>)>(),
@@ -94,7 +93,10 @@ prop_compose! {
         max_update_set_size: usize,
         max_versions: usize,
     )(
-        sets in arb_state_kv_sets(key_universe_size, max_update_set_size, max_versions - 1),
+        sets in arb_key_universe(key_universe_size)
+            .prop_flat_map(move |keys| {
+                arb_state_kv_sets(keys, max_update_set_size, max_versions - 1)
+            }),
     ) -> Vec<Vec<(StateKey, Option<StateValue>)>> {
         std::iter::once(kv_store_genesis())
         .chain(sets.into_iter())
@@ -112,19 +114,19 @@ pub(crate) fn update_store(
 }
 
 pub fn update_in_memory_state(
-    smt: &SparseMerkleTree<StateValue>,
-    root_smt: &SparseMerkleTree<StateValue>,
+    smt: &SparseMerkleTree,
+    root_smt: &SparseMerkleTree,
     txns_to_commit: &[TransactionToCommit],
-) -> SparseMerkleTree<StateValue> {
+) -> SparseMerkleTree {
     let updates = txns_to_commit
         .iter()
         .flat_map(|txn_to_commit| txn_to_commit.write_set().state_update_refs())
         .collect::<HashMap<_, _>>()
         .into_iter()
-        .map(|(k, u)| (k.hash(), u))
-        .collect();
+        .map(|(k, u)| (k.hash(), u.map(CryptoHash::hash)))
+        .collect_vec();
     smt.freeze(root_smt)
-        .batch_update(updates, &())
+        .batch_update(updates.iter(), &())
         .unwrap()
         .unfreeze()
 }

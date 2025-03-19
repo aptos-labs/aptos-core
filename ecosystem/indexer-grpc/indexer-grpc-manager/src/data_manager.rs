@@ -1,7 +1,14 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{config::CacheConfig, metadata_manager::MetadataManager};
+use crate::{
+    config::CacheConfig,
+    metadata_manager::MetadataManager,
+    metrics::{
+        CACHE_END_VERSION, CACHE_SIZE, CACHE_START_VERSION, IS_FILE_STORE_LAGGING, MAX_CACHE_SIZE,
+        TARGET_CACHE_SIZE,
+    },
+};
 use anyhow::{bail, ensure, Result};
 use aptos_indexer_grpc_utils::{
     config::IndexerGrpcFileStoreConfig, file_store_operator_v2::file_store_reader::FileStoreReader,
@@ -22,7 +29,7 @@ use std::{
     },
     time::Duration,
 };
-use tokio::sync::{mpsc::channel, RwLock};
+use tokio::sync::{mpsc::channel, RwLock, RwLockReadGuard};
 use tracing::{debug, error, info, trace, warn};
 
 struct Cache {
@@ -37,6 +44,11 @@ struct Cache {
 
 impl Cache {
     fn new(cache_config: CacheConfig, file_store_version: u64) -> Self {
+        MAX_CACHE_SIZE.set(cache_config.max_cache_size as i64);
+        TARGET_CACHE_SIZE.set(cache_config.target_cache_size as i64);
+        CACHE_START_VERSION.set(file_store_version as i64);
+        CACHE_END_VERSION.set(file_store_version as i64);
+
         Self {
             start_version: file_store_version,
             file_store_version: AtomicU64::new(file_store_version),
@@ -61,6 +73,9 @@ impl Cache {
             self.start_version += 1;
         }
 
+        CACHE_SIZE.set(self.cache_size as i64);
+        CACHE_START_VERSION.set(self.start_version as i64);
+
         self.cache_size <= self.max_cache_size
     }
 
@@ -70,6 +85,8 @@ impl Cache {
             .map(|transaction| transaction.encoded_len())
             .sum::<usize>();
         self.transactions.extend(transactions);
+        CACHE_SIZE.set(self.cache_size as i64);
+        CACHE_END_VERSION.set(self.start_version as i64 + self.transactions.len() as i64);
     }
 
     fn get_transactions(
@@ -145,12 +162,14 @@ impl DataManager {
         }
     }
 
-    pub(crate) async fn start(&self) {
+    pub(crate) async fn start(&self, watch_file_store_version: bool) {
         info!("Starting DataManager loop.");
 
         'out: loop {
-            let mut fullnode_client = self.metadata_manager.get_fullnode_for_request();
             let cache = self.cache.read().await;
+            if watch_file_store_version {
+                self.update_file_store_version_in_cache(&cache).await;
+            }
             let request = GetTransactionsFromNodeRequest {
                 starting_version: Some(cache.start_version + cache.transactions.len() as u64),
                 transactions_count: Some(100000),
@@ -161,10 +180,12 @@ impl DataManager {
                 "Requesting transactions from fullnodes, starting_version: {}.",
                 request.starting_version.unwrap()
             );
+            let (address, mut fullnode_client) =
+                self.metadata_manager.get_fullnode_for_request(&request);
             let response = fullnode_client.get_transactions_from_node(request).await;
             if response.is_err() {
                 warn!(
-                    "Error when getting transactions from fullnode: {}",
+                    "Error when getting transactions from fullnode ({address}): {}",
                     response.err().unwrap()
                 );
                 tokio::time::sleep(Duration::from_millis(100)).await;
@@ -175,8 +196,10 @@ impl DataManager {
             while let Some(response_item) = response.next().await {
                 loop {
                     if self.cache.write().await.maybe_gc() {
+                        IS_FILE_STORE_LAGGING.set(0);
                         break;
                     }
+                    IS_FILE_STORE_LAGGING.set(1);
                     // If file store is lagging, we are not inserting more data.
                     let cache = self.cache.read().await;
                     warn!("Filestore is lagging behind, cache is full [{}, {}), known_latest_version ({}).",
@@ -184,6 +207,9 @@ impl DataManager {
                           cache.start_version + cache.transactions.len() as u64,
                           self.metadata_manager.get_known_latest_version());
                     tokio::time::sleep(Duration::from_millis(100)).await;
+                    if watch_file_store_version {
+                        self.update_file_store_version_in_cache(&cache).await;
+                    }
                 }
                 match response_item {
                     Ok(r) => {
@@ -229,11 +255,12 @@ impl DataManager {
                 if self.lagging(cache_next_version) {
                     debug!("GrpcManager is lagging, getting data from FN, requested_version: {start_version}, cache_next_version: {cache_next_version}.");
                     let request = GetTransactionsFromNodeRequest {
-                        starting_version: Some(cache_next_version),
+                        starting_version: Some(start_version),
                         transactions_count: Some(5000),
                     };
 
-                    let mut fullnode_client = self.metadata_manager.get_fullnode_for_request();
+                    let (_, mut fullnode_client) =
+                        self.metadata_manager.get_fullnode_for_request(&request);
                     let response = fullnode_client.get_transactions_from_node(request).await?;
                     let mut response = response.into_inner();
                     while let Some(Ok(response_item)) = response.next().await {
@@ -269,14 +296,16 @@ impl DataManager {
                 start_version,
                 /*retries=*/ 3,
                 /*max_files=*/ Some(1),
+                /*filter=*/ None,
+                /*ending_version=*/ None,
                 tx,
             )
             .await;
 
-        if let Some((transactions, _)) = rx.recv().await {
+        if let Some((transactions, _, _, range)) = rx.recv().await {
             debug!(
-                "Transactions returned from filestore: [{start_version}, {}).",
-                transactions.last().unwrap().version
+                "Transactions returned from filestore: [{}, {}].",
+                range.0, range.1
             );
             let first_version = transactions.first().unwrap().version;
             ensure!(
@@ -307,5 +336,30 @@ impl DataManager {
 
     pub(crate) async fn get_file_store_version(&self) -> u64 {
         self.file_store_reader.get_latest_version().await.unwrap()
+    }
+
+    pub(crate) async fn cache_stats(&self) -> String {
+        let cache = self.cache.read().await;
+        let len = cache.transactions.len() as u64;
+        format!(
+            "cache version: [{}, {}), # of txns: {}, file store version: {}, cache size: {}",
+            cache.start_version,
+            cache.start_version + len,
+            len,
+            cache.file_store_version.load(Ordering::SeqCst),
+            cache.cache_size
+        )
+    }
+
+    async fn update_file_store_version_in_cache(&self, cache: &RwLockReadGuard<'_, Cache>) {
+        let file_store_version = self.file_store_reader.get_latest_version().await;
+        if let Some(file_store_version) = file_store_version {
+            let file_store_version_before_update = cache
+                .file_store_version
+                .fetch_max(file_store_version, Ordering::SeqCst);
+            if file_store_version_before_update > file_store_version {
+                panic!("File store version is going backward, data might be corrupted. {file_store_version_before_update} v.s. {file_store_version}");
+            };
+        }
     }
 }

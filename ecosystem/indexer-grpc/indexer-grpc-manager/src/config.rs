@@ -8,9 +8,11 @@ use aptos_indexer_grpc_utils::config::IndexerGrpcFileStoreConfig;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tokio::sync::OnceCell;
+use warp::{reply::Response, Rejection};
 
-static GRPC_MANAGER: OnceCell<GrpcManager> = OnceCell::const_new();
+pub(crate) static GRPC_MANAGER: OnceCell<GrpcManager> = OnceCell::const_new();
 
+pub(crate) const MAX_MESSAGE_SIZE: usize = 256 * (1 << 20);
 pub(crate) type GrpcAddress = String;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -56,5 +58,9 @@ impl RunnableConfig for IndexerGrpcManagerConfig {
 
     fn get_server_name(&self) -> String {
         "grpc_manager".to_string()
+    }
+
+    async fn status_page(&self) -> Result<Response, Rejection> {
+        crate::status_page::status_page().await
     }
 }

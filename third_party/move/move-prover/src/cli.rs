@@ -9,15 +9,13 @@
 use anyhow::anyhow;
 use clap::{builder::PossibleValuesParser, Arg, ArgAction, ArgAction::SetTrue, Command};
 use codespan_reporting::diagnostic::Severity;
+use legacy_move_compiler::{command_line::SKIP_ATTRIBUTE_CHECKS, shared::NumericalAddress};
 use log::LevelFilter;
 use move_abigen::AbigenOptions;
-use move_compiler::{command_line::SKIP_ATTRIBUTE_CHECKS, shared::NumericalAddress};
 use move_docgen::DocgenOptions;
 use move_errmapgen::ErrmapOptions;
 use move_model::{
-    metadata::{CompilerVersion, LanguageVersion},
-    model::VerificationScope,
-    options::ModelBuilderOptions,
+    metadata::LanguageVersion, model::VerificationScope, options::ModelBuilderOptions,
 };
 use move_prover_boogie_backend::{
     options,
@@ -64,14 +62,14 @@ pub struct Options {
     /// The paths to the Move sources.
     /// Each source path should refer to either (1) a Move file or (2) a directory containing Move
     /// files, all to be compiled (e.g., not the root directory of a package---which contains
-    /// Move.toml---but a specific subdirectorysuch as `sources`, `scripts`, and/or `tests`,
+    /// Move.toml---but a specific subdirectory such as `sources`, `scripts`, and/or `tests`,
     /// depending on compilation mode).
     pub move_sources: Vec<String>,
     /// The paths to any dependencies for the Move sources. Those will not be verified but
     /// can be used by `move_sources`.
     /// Each move_dep path should refer to either (1) a Move file or (2) a directory containing
     /// Move files, all to be compiled (e.g., not the root directory of a package---which contains
-    /// Move.toml---but a specific subdirectorysuch as `sources`).
+    /// Move.toml---but a specific subdirectory such as `sources`).
     pub move_deps: Vec<String>,
     /// The values assigned to named addresses in the Move code being verified.
     pub move_named_address_values: Vec<String>,
@@ -79,8 +77,6 @@ pub struct Options {
     pub experimental_pipeline: bool,
     /// Whether to skip checking for unknown attributes
     pub skip_attribute_checks: bool,
-    /// Whether to use compiler v2 to compile Move code
-    pub compiler_v2: bool,
     /// The language version to use
     pub language_version: Option<LanguageVersion>,
     /// BEGIN OF STRUCTURED OPTIONS. DO NOT ADD VALUE FIELDS AFTER THIS
@@ -120,10 +116,6 @@ impl Default for Options {
             errmapgen: ErrmapOptions::default(),
             experimental_pipeline: false,
             skip_attribute_checks: false,
-            compiler_v2: match CompilerVersion::default() {
-                CompilerVersion::V1 => false,
-                CompilerVersion::V2_0 | CompilerVersion::V2_1 => true,
-            },
             language_version: Some(LanguageVersion::default()),
         }
     }
@@ -366,54 +358,6 @@ impl Options {
                     .value_parser(is_number)
                     .help(
                         "for benchmarking: how many times to call the backend on the verification problem",
-                    ),
-            )
-            .arg(
-                Arg::new("mutation")
-                    .long("mutation")
-                    .action(SetTrue)
-                    .help(
-                        "Specifies to use the mutation pass",
-                    ),
-            )
-            .arg(
-                Arg::new("mutation-add-sub")
-                    .long("mutation-add-sub")
-                    .value_name("COUNT")
-                    .value_parser(is_number)
-                    .help(
-                        "indicates that this program should mutate the indicated plus operation to a minus\
-                        specifically by modifyig the \"nth\" such operation",
-                    ),
-            )
-            .arg(
-                Arg::new("mutation-sub-add")
-                    .long("mutation-sub-add")
-                    .value_name("COUNT")
-                    .value_parser(is_number)
-                    .help(
-                        "indicates that this program should mutate the indicated minus operation to a plus\
-                        specifically by modifyig the \"nth\" such operation",
-                    ),
-            )
-            .arg(
-                Arg::new("mutation-mul-div")
-                    .long("mutation-mul-div")
-                    .value_name("COUNT")
-                    .value_parser(is_number)
-                    .help(
-                        "indicates that this program should mutate the indicated multiplication operation to a divide\
-                        specifically by modifyig the \"nth\" such operation",
-                    ),
-            )
-            .arg(
-                Arg::new("mutation-div-mul")
-                    .long("mutation-div-mul")
-                    .value_name("COUNT")
-                    .value_parser(is_number)
-                    .help(
-                        "indicates that this program should mutate the indicated divide operation to a multiplication\
-                        specifically by modifyig the \"nth\" such operation",
                     ),
             )
             .arg(
@@ -667,21 +611,6 @@ impl Options {
         {
             options.move_named_address_values = get_vec("named-addresses");
         }
-        if matches.get_flag("mutation") {
-            options.prover.mutation = true;
-        }
-        if matches.contains_id("mutation-add-sub") {
-            options.prover.mutation_add_sub = *matches.try_get_one("mutation-add-sub")?.unwrap();
-        }
-        if matches.contains_id("mutation-sub-add") {
-            options.prover.mutation_sub_add = *matches.try_get_one("mutation-sub-add")?.unwrap();
-        }
-        if matches.contains_id("mutation-mul-div") {
-            options.prover.mutation_mul_div = *matches.try_get_one("mutation-mul-div")?.unwrap();
-        }
-        if matches.contains_id("mutation-div-mul") {
-            options.prover.mutation_div_mul = *matches.try_get_one("mutation-div-mul")?.unwrap();
-        }
         if matches.contains_id("verify") {
             options.prover.verify_scope =
                 match matches.get_one::<String>("verify").unwrap().as_str() {
@@ -814,9 +743,6 @@ impl Options {
             options
                 .move_named_address_values
                 .push("Extensions=0x1".to_string())
-        }
-        if matches.get_flag("compiler-v2") {
-            options.compiler_v2 = true;
         }
         if matches.contains_id("language-version") {
             options.language_version = matches

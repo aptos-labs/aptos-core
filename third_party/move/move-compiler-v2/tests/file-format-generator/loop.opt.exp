@@ -4,80 +4,80 @@
 module 42.loops {
 
 
-nested_loop(Arg0: u64): u64 /* def_idx: 0 */ {
+nested_loop(x: u64): u64 /* def_idx: 0 */ {
 B0:
-	0: CopyLoc[0](Arg0: u64)
+	0: CopyLoc[0](x: u64)
 	1: LdU64(0)
 	2: Gt
 	3: BrFalse(18)
 B1:
-	4: CopyLoc[0](Arg0: u64)
+	4: CopyLoc[0](x: u64)
 	5: LdU64(10)
 	6: Gt
 	7: BrTrue(9)
 B2:
 	8: Branch(13)
 B3:
-	9: MoveLoc[0](Arg0: u64)
+	9: MoveLoc[0](x: u64)
 	10: LdU64(1)
 	11: Sub
-	12: StLoc[0](Arg0: u64)
+	12: StLoc[0](x: u64)
 B4:
-	13: MoveLoc[0](Arg0: u64)
+	13: MoveLoc[0](x: u64)
 	14: LdU64(1)
 	15: Sub
-	16: StLoc[0](Arg0: u64)
+	16: StLoc[0](x: u64)
 	17: Branch(0)
 B5:
-	18: MoveLoc[0](Arg0: u64)
+	18: MoveLoc[0](x: u64)
 	19: Ret
 }
-while_loop(Arg0: u64): u64 /* def_idx: 1 */ {
+while_loop(x: u64): u64 /* def_idx: 1 */ {
 B0:
-	0: CopyLoc[0](Arg0: u64)
+	0: CopyLoc[0](x: u64)
 	1: LdU64(0)
 	2: Gt
 	3: BrFalse(9)
 B1:
-	4: MoveLoc[0](Arg0: u64)
+	4: MoveLoc[0](x: u64)
 	5: LdU64(1)
 	6: Sub
-	7: StLoc[0](Arg0: u64)
+	7: StLoc[0](x: u64)
 	8: Branch(0)
 B2:
-	9: MoveLoc[0](Arg0: u64)
+	9: MoveLoc[0](x: u64)
 	10: Ret
 }
-while_loop_with_break_and_continue(Arg0: u64): u64 /* def_idx: 2 */ {
+while_loop_with_break_and_continue(x: u64): u64 /* def_idx: 2 */ {
 B0:
-	0: CopyLoc[0](Arg0: u64)
+	0: CopyLoc[0](x: u64)
 	1: LdU64(0)
 	2: Gt
 	3: BrTrue(5)
 B1:
 	4: Branch(10)
 B2:
-	5: CopyLoc[0](Arg0: u64)
+	5: CopyLoc[0](x: u64)
 	6: LdU64(42)
 	7: Eq
 	8: BrFalse(12)
 B3:
 	9: Branch(10)
 B4:
-	10: MoveLoc[0](Arg0: u64)
+	10: MoveLoc[0](x: u64)
 	11: Ret
 B5:
-	12: CopyLoc[0](Arg0: u64)
+	12: CopyLoc[0](x: u64)
 	13: LdU64(21)
 	14: Eq
 	15: BrFalse(17)
 B6:
 	16: Branch(0)
 B7:
-	17: MoveLoc[0](Arg0: u64)
+	17: MoveLoc[0](x: u64)
 	18: LdU64(1)
 	19: Sub
-	20: StLoc[0](Arg0: u64)
+	20: StLoc[0](x: u64)
 	21: Branch(0)
 }
 }

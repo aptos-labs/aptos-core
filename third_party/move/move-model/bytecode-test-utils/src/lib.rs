@@ -4,10 +4,10 @@
 
 use anyhow::anyhow;
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
+use legacy_move_compiler::shared::known_attributes::KnownAttribute;
 use move_command_line_common::testing::get_compiler_exp_extension;
-use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
-use move_compiler_v2::{self, env_pipeline::rewrite_target::RewritingScope, Experiment};
-use move_model::{model::GlobalEnv, options::ModelBuilderOptions, run_model_builder_with_options};
+use move_compiler_v2::{self, run_move_compiler_for_analysis, Options};
+use move_model::metadata::LanguageVersion;
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use move_stackless_bytecode::{
     function_target_pipeline::{
@@ -27,32 +27,19 @@ pub fn test_runner(
     path: &Path,
     pipeline_opt: Option<FunctionTargetPipeline>,
 ) -> anyhow::Result<()> {
-    let dep_sources = extract_test_directives(path, "// dep:")?;
-    let mut env: GlobalEnv = run_model_builder_with_options(
-        vec![PackagePaths {
-            name: None,
-            paths: vec![path.to_string_lossy().to_string()],
-            named_address_map: move_stdlib::move_stdlib_named_addresses(),
-        }],
-        vec![PackagePaths {
-            name: None,
-            paths: dep_sources,
-            named_address_map: move_stdlib::move_stdlib_named_addresses(),
-        }],
-        vec![],
-        ModelBuilderOptions::default(),
-        false,
-        KnownAttribute::get_all_attribute_names(),
-    )?;
-    let compiler_options =
-        move_compiler_v2::Options::default().set_experiment(Experiment::SPEC_REWRITE, true);
-    let pipeline = move_compiler_v2::check_and_rewrite_pipeline(
-        &compiler_options,
-        true,
-        RewritingScope::Everything,
-    );
-    env.set_extension(compiler_options);
-    pipeline.run(&mut env);
+    let options = Options {
+        sources_deps: extract_test_directives(path, "// dep:")?,
+        sources: vec![path.to_string_lossy().to_string()],
+        dependencies: vec![],
+        named_address_mapping: move_stdlib::move_stdlib_named_addresses_strings(),
+        language_version: Some(LanguageVersion::latest()),
+        compile_verify_code: true,
+        compile_test_code: false,
+        known_attributes: KnownAttribute::get_all_attribute_names().clone(),
+        ..Options::default()
+    };
+    let mut error_writer = Buffer::no_color();
+    let env = run_move_compiler_for_analysis(&mut error_writer, options)?;
     let out = if env.has_errors() {
         let mut error_writer = Buffer::no_color();
         env.report_diag(&mut error_writer, Severity::Error);

@@ -5,42 +5,42 @@ module 42.m {
 use 0000000000000000000000000000000000000000000000000000000000000001::vector;
 
 
-struct E<Ty0> has copy, drop, store {
-	key: Ty0
+struct E<Key> has copy, drop, store {
+	key: Key
 }
-struct Option<Ty0> has copy, drop, store {
-	vec: vector<Ty0>
+struct Option<Element> has copy, drop, store {
+	vec: vector<Element>
 }
 
-public destroy_none<Ty0>(Arg0: Option<Ty0>) /* def_idx: 0 */ {
+public destroy_none<Element>(t: Option<Element>) /* def_idx: 0 */ {
 B0:
-	0: ImmBorrowLoc[0](Arg0: Option<Ty0>)
-	1: Call is_none<Ty0>(&Option<Ty0>): bool
+	0: ImmBorrowLoc[0](t: Option<Element>)
+	1: Call is_none<Element>(&Option<Element>): bool
 	2: BrFalse(7)
 B1:
-	3: MoveLoc[0](Arg0: Option<Ty0>)
-	4: UnpackGeneric[0](Option<Ty0>)
+	3: MoveLoc[0](t: Option<Element>)
+	4: UnpackGeneric[0](Option<Element>)
 	5: VecUnpack(2, 0)
 	6: Ret
 B2:
 	7: LdU64(262144)
 	8: Abort
 }
-public foo<Ty0: drop + store>(Arg0: E<Ty0>, Arg1: &mut Ty0) /* def_idx: 1 */ {
+public foo<Key: drop + store>(data: E<Key>, v: &mut Key) /* def_idx: 1 */ {
 B0:
-	0: MoveLoc[0](Arg0: E<Ty0>)
-	1: UnpackGeneric[1](E<Ty0>)
-	2: PackGeneric[1](E<Ty0>)
-	3: UnpackGeneric[1](E<Ty0>)
-	4: MoveLoc[1](Arg1: &mut Ty0)
+	0: MoveLoc[0](data: E<Key>)
+	1: UnpackGeneric[1](E<Key>)
+	2: PackGeneric[1](E<Key>)
+	3: UnpackGeneric[1](E<Key>)
+	4: MoveLoc[1](v: &mut Key)
 	5: WriteRef
 	6: Ret
 }
-public is_none<Ty0>(Arg0: &Option<Ty0>): bool /* def_idx: 2 */ {
+public is_none<Element>(t: &Option<Element>): bool /* def_idx: 2 */ {
 B0:
-	0: MoveLoc[0](Arg0: &Option<Ty0>)
-	1: ImmBorrowFieldGeneric[0](Option.vec: vector<Ty0>)
-	2: Call vector::is_empty<Ty0>(&vector<Ty0>): bool
+	0: MoveLoc[0](t: &Option<Element>)
+	1: ImmBorrowFieldGeneric[0](Option.vec: vector<Element>)
+	2: Call vector::is_empty<Element>(&vector<Element>): bool
 	3: Ret
 }
 }

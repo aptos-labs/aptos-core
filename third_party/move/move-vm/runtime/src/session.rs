@@ -3,37 +3,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::VMConfig,
-    data_cache::TransactionDataCache,
-    loader::{LegacyModuleStorageAdapter, LoadedFunction},
-    module_traversal::TraversalContext,
-    move_vm::MoveVM,
-    native_extensions::NativeContextExtensions,
-    storage::{module_storage::ModuleStorage, ty_layout_converter::LoaderLayoutConverter},
-    CodeStorage, LayoutConverter,
+    data_cache::TransactionDataCache, loader::LoadedFunction, module_traversal::TraversalContext,
+    move_vm::MoveVM, native_extensions::NativeContextExtensions,
+    storage::module_storage::ModuleStorage, CodeStorage,
 };
-use bytes::Bytes;
-use move_binary_format::{compatibility::Compatibility, errors::*, file_format::LocalIndex};
+use move_binary_format::{errors::*, file_format::LocalIndex};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Changes},
-    gas_algebra::NumBytes,
-    identifier::{IdentStr, Identifier},
+    identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
-use move_vm_types::{
-    gas::GasMeter,
-    loaded_data::runtime_types::{Type, TypeBuilder},
-    values::{GlobalValue, Value},
-};
-use std::{borrow::Borrow, collections::BTreeSet};
+use move_vm_types::{gas::GasMeter, values::Value};
+use std::borrow::Borrow;
 
-pub struct Session<'r, 'l> {
-    pub(crate) move_vm: &'l MoveVM,
+pub struct Session<'r> {
     pub(crate) data_cache: TransactionDataCache<'r>,
-    pub(crate) module_store: LegacyModuleStorageAdapter,
     pub(crate) native_extensions: NativeContextExtensions<'r>,
 }
 
@@ -48,7 +35,7 @@ pub struct SerializedReturnValues {
     pub return_values: Vec<(Vec<u8>, MoveTypeLayout)>,
 }
 
-impl<'r, 'l> Session<'r, 'l> {
+impl<'r> Session<'r> {
     /// Execute a Move entry function.
     ///
     /// NOTE: There are NO checks on the `args` except that they can deserialize
@@ -75,11 +62,10 @@ impl<'r, 'l> Session<'r, 'l> {
             .finish(Location::Module(module_id)));
         }
 
-        self.move_vm.runtime.execute_function_instantiation(
+        MoveVM::execute_loaded_function(
             func,
             args,
             &mut self.data_cache,
-            &self.module_store,
             gas_meter,
             traversal_context,
             &mut self.native_extensions,
@@ -99,20 +85,11 @@ impl<'r, 'l> Session<'r, 'l> {
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
-        let func = self.move_vm.runtime.loader().load_function(
-            module_id,
-            function_name,
-            &ty_args,
-            &mut self.data_cache,
-            &self.module_store,
-            module_storage,
-        )?;
-
-        self.move_vm.runtime.execute_function_instantiation(
+        let func = module_storage.load_function(module_id, function_name, &ty_args)?;
+        MoveVM::execute_loaded_function(
             func,
             args,
             &mut self.data_cache,
-            &self.module_store,
             gas_meter,
             traversal_context,
             &mut self.native_extensions,
@@ -128,11 +105,10 @@ impl<'r, 'l> Session<'r, 'l> {
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
-        self.move_vm.runtime.execute_function_instantiation(
+        MoveVM::execute_loaded_function(
             func,
             args,
             &mut self.data_cache,
-            &self.module_store,
             gas_meter,
             traversal_context,
             &mut self.native_extensions,
@@ -156,7 +132,7 @@ impl<'r, 'l> Session<'r, 'l> {
     ///
     /// In case an invariant violation occurs, the whole Session should be considered corrupted and
     /// one shall not proceed with effect generation.
-    pub fn execute_script(
+    pub fn load_and_execute_script(
         &mut self,
         script: impl Borrow<[u8]>,
         ty_args: Vec<TypeTag>,
@@ -165,112 +141,17 @@ impl<'r, 'l> Session<'r, 'l> {
         traversal_context: &mut TraversalContext,
         code_storage: &impl CodeStorage,
     ) -> VMResult<()> {
-        self.move_vm.runtime.execute_script(
-            script,
-            ty_args,
+        let main = code_storage.load_script(script.borrow(), &ty_args)?;
+        MoveVM::execute_loaded_function(
+            main,
             args,
             &mut self.data_cache,
-            &self.module_store,
             gas_meter,
             traversal_context,
             &mut self.native_extensions,
             code_storage,
-        )
-    }
-
-    /// Publish the given module.
-    ///
-    /// The Move VM MUST return a user error, i.e., an error that's not an invariant violation, if
-    ///   - The module fails to deserialize or verify.
-    ///   - The sender address does not match that of the module.
-    ///   - (Republishing-only) the module to be updated is not backward compatible with the old module.
-    ///   - (Republishing-only) the module to be updated introduces cyclic dependencies.
-    ///
-    /// The Move VM should not be able to produce other user errors.
-    /// Besides, no user input should cause the Move VM to return an invariant violation.
-    ///
-    /// In case an invariant violation occurs, the whole Session should be considered corrupted and
-    /// one shall not proceed with effect generation.
-    #[deprecated]
-    pub fn publish_module(
-        &mut self,
-        module: Vec<u8>,
-        sender: AccountAddress,
-        gas_meter: &mut impl GasMeter,
-    ) -> VMResult<()> {
-        #[allow(deprecated)]
-        self.publish_module_bundle(vec![module], sender, gas_meter)
-    }
-
-    /// Publish a series of modules.
-    ///
-    /// The Move VM MUST return a user error, i.e., an error that's not an invariant violation, if
-    /// any module fails to deserialize or verify (see the full list of  failing conditions in the
-    /// `publish_module` API). The publishing of the module series is an all-or-nothing action:
-    /// either all modules are published to the data store or none is.
-    ///
-    /// Similar to the `publish_module` API, the Move VM should not be able to produce other user
-    /// errors. Besides, no user input should cause the Move VM to return an invariant violation.
-    ///
-    /// In case an invariant violation occurs, the whole Session should be considered corrupted and
-    /// one shall not proceed with effect generation.
-    ///
-    /// This operation performs compatibility checks if a module is replaced. See also
-    /// `move_binary_format::compatibility`.
-    #[deprecated]
-    pub fn publish_module_bundle(
-        &mut self,
-        modules: Vec<Vec<u8>>,
-        sender: AccountAddress,
-        gas_meter: &mut impl GasMeter,
-    ) -> VMResult<()> {
-        #[allow(deprecated)]
-        self.move_vm.runtime.publish_module_bundle(
-            modules,
-            sender,
-            &mut self.data_cache,
-            &self.module_store,
-            gas_meter,
-            Compatibility::full_check(),
-        )
-    }
-
-    /// Same like `publish_module_bundle` but with a custom compatibility check.
-    #[deprecated]
-    pub fn publish_module_bundle_with_compat_config(
-        &mut self,
-        modules: Vec<Vec<u8>>,
-        sender: AccountAddress,
-        gas_meter: &mut impl GasMeter,
-        compat_config: Compatibility,
-    ) -> VMResult<()> {
-        #[allow(deprecated)]
-        self.move_vm.runtime.publish_module_bundle(
-            modules,
-            sender,
-            &mut self.data_cache,
-            &self.module_store,
-            gas_meter,
-            compat_config,
-        )
-    }
-
-    #[deprecated]
-    pub fn publish_module_bundle_relax_compatibility(
-        &mut self,
-        modules: Vec<Vec<u8>>,
-        sender: AccountAddress,
-        gas_meter: &mut impl GasMeter,
-    ) -> VMResult<()> {
-        #[allow(deprecated)]
-        self.move_vm.runtime.publish_module_bundle(
-            modules,
-            sender,
-            &mut self.data_cache,
-            &self.module_store,
-            gas_meter,
-            Compatibility::no_check(),
-        )
+        )?;
+        Ok(())
     }
 
     pub fn num_mutated_resources(&self, sender: &AccountAddress) -> u64 {
@@ -284,7 +165,7 @@ impl<'r, 'l> Session<'r, 'l> {
     /// This MUST NOT be called if there is a previous invocation that failed with an invariant violation.
     pub fn finish(self, module_storage: &impl ModuleStorage) -> VMResult<ChangeSet> {
         self.data_cache
-            .into_effects(self.move_vm.runtime.loader(), module_storage)
+            .into_effects(module_storage)
             .map_err(|e| e.finish(Location::Undefined))
     }
 
@@ -292,13 +173,9 @@ impl<'r, 'l> Session<'r, 'l> {
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
         module_storage: &impl ModuleStorage,
-    ) -> VMResult<Changes<Bytes, Resource>> {
+    ) -> VMResult<Changes<Resource>> {
         self.data_cache
-            .into_custom_effects(
-                resource_converter,
-                self.move_vm.runtime.loader(),
-                module_storage,
-            )
+            .into_custom_effects(resource_converter, module_storage)
             .map_err(|e| e.finish(Location::Undefined))
     }
 
@@ -313,7 +190,7 @@ impl<'r, 'l> Session<'r, 'l> {
             ..
         } = self;
         let change_set = data_cache
-            .into_effects(self.move_vm.runtime.loader(), module_storage)
+            .into_effects(module_storage)
             .map_err(|e| e.finish(Location::Undefined))?;
         Ok((change_set, native_extensions))
     }
@@ -322,305 +199,20 @@ impl<'r, 'l> Session<'r, 'l> {
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
         module_storage: &impl ModuleStorage,
-    ) -> VMResult<(Changes<Bytes, Resource>, NativeContextExtensions<'r>)> {
+    ) -> VMResult<(Changes<Resource>, NativeContextExtensions<'r>)> {
         let Session {
             data_cache,
             native_extensions,
             ..
         } = self;
         let change_set = data_cache
-            .into_custom_effects(
-                resource_converter,
-                self.move_vm.runtime.loader(),
-                module_storage,
-            )
+            .into_custom_effects(resource_converter, module_storage)
             .map_err(|e| e.finish(Location::Undefined))?;
         Ok((change_set, native_extensions))
-    }
-
-    /// Try to load a resource from remote storage and create a corresponding GlobalValue
-    /// that is owned by the data store.
-    pub fn load_resource(
-        &mut self,
-        module_storage: &impl ModuleStorage,
-        addr: AccountAddress,
-        ty: &Type,
-    ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
-        self.data_cache.load_resource(
-            self.move_vm.runtime.loader(),
-            module_storage,
-            addr,
-            ty,
-            &self.module_store,
-        )
-    }
-
-    /// DO NOT USE THIS API!
-    ///
-    /// It is only used to extract metadata from a module, which in loader V2 design will be done
-    /// via ModuleStorage directly.
-    #[deprecated]
-    pub fn fetch_module_from_data_store(&self, module_id: &ModuleId) -> VMResult<Bytes> {
-        self.data_cache
-            .load_module(module_id)
-            .map_err(|e| e.finish(Location::Undefined))
-    }
-
-    /// Check if this module exists.
-    #[deprecated]
-    pub fn exists_module(&self, module_id: &ModuleId) -> VMResult<bool> {
-        #[allow(deprecated)]
-        self.data_cache.exists_module(module_id)
-    }
-
-    /// Load a script and all of its types into cache
-    pub fn load_script(
-        &mut self,
-        code_storage: &impl CodeStorage,
-        script: impl Borrow<[u8]>,
-        ty_args: &[TypeTag],
-    ) -> VMResult<LoadedFunction> {
-        self.move_vm.runtime.loader().load_script(
-            script.borrow(),
-            ty_args,
-            &mut self.data_cache,
-            &self.module_store,
-            code_storage,
-        )
-    }
-
-    /// Load a module, a function, and all of its types into cache
-    pub fn load_function_with_type_arg_inference(
-        &mut self,
-        module_storage: &impl ModuleStorage,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
-        expected_return_type: &Type,
-    ) -> VMResult<LoadedFunction> {
-        self.move_vm
-            .runtime
-            .loader()
-            .load_function_with_type_arg_inference(
-                module_id,
-                function_name,
-                expected_return_type,
-                &mut self.data_cache,
-                &self.module_store,
-                module_storage,
-            )
-    }
-
-    /// Load a module, a function, and all of its types into cache
-    pub fn load_function(
-        &mut self,
-        module_storage: &impl ModuleStorage,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
-        ty_args: &[TypeTag],
-    ) -> VMResult<LoadedFunction> {
-        self.move_vm.runtime.loader().load_function(
-            module_id,
-            function_name,
-            ty_args,
-            &mut self.data_cache,
-            &self.module_store,
-            module_storage,
-        )
-    }
-
-    pub fn load_type(
-        &mut self,
-        type_tag: &TypeTag,
-        module_storage: &impl ModuleStorage,
-    ) -> VMResult<Type> {
-        self.move_vm.runtime.loader().load_type(
-            type_tag,
-            &mut self.data_cache,
-            &self.module_store,
-            module_storage,
-        )
-    }
-
-    pub fn get_type_layout(
-        &mut self,
-        type_tag: &TypeTag,
-        module_storage: &impl ModuleStorage,
-    ) -> VMResult<MoveTypeLayout> {
-        self.move_vm.runtime.loader().get_type_layout(
-            type_tag,
-            &mut self.data_cache,
-            &self.module_store,
-            module_storage,
-        )
-    }
-
-    pub fn get_fully_annotated_type_layout(
-        &mut self,
-        type_tag: &TypeTag,
-        module_storage: &impl ModuleStorage,
-    ) -> VMResult<MoveTypeLayout> {
-        self.move_vm
-            .runtime
-            .loader()
-            .get_fully_annotated_type_layout(
-                type_tag,
-                &mut self.data_cache,
-                &self.module_store,
-                module_storage,
-            )
-    }
-
-    pub fn get_type_tag(
-        &self,
-        ty: &Type,
-        module_storage: &impl ModuleStorage,
-    ) -> VMResult<TypeTag> {
-        self.move_vm
-            .runtime
-            .loader()
-            .type_to_type_tag(ty, module_storage)
-            .map_err(|e| e.finish(Location::Undefined))
-    }
-
-    pub fn get_type_layout_from_ty(
-        &self,
-        ty: &Type,
-        module_storage: &impl ModuleStorage,
-    ) -> VMResult<MoveTypeLayout> {
-        LoaderLayoutConverter::new(
-            self.move_vm.runtime.loader(),
-            &self.module_store,
-            module_storage,
-        )
-        .type_to_type_layout(ty)
-        .map_err(|e| e.finish(Location::Undefined))
-    }
-
-    pub fn get_fully_annotated_type_layout_from_ty(
-        &self,
-        ty: &Type,
-        module_storage: &impl ModuleStorage,
-    ) -> VMResult<MoveTypeLayout> {
-        LoaderLayoutConverter::new(
-            self.move_vm.runtime.loader(),
-            &self.module_store,
-            module_storage,
-        )
-        .type_to_fully_annotated_layout(ty)
-        .map_err(|e| e.finish(Location::Undefined))
     }
 
     /// Gets the underlying native extensions.
     pub fn get_native_extensions(&mut self) -> &mut NativeContextExtensions<'r> {
         &mut self.native_extensions
-    }
-
-    pub fn get_move_vm(&self) -> &'l MoveVM {
-        self.move_vm
-    }
-
-    pub fn get_vm_config(&self) -> &'l VMConfig {
-        self.move_vm.runtime.loader().vm_config()
-    }
-
-    pub fn get_ty_builder(&self) -> &'l TypeBuilder {
-        self.move_vm.runtime.loader().ty_builder()
-    }
-
-    /// If type is a (generic or non-generic) struct or enum, returns its name. Otherwise, returns
-    /// [None].
-    pub fn get_struct_name(
-        &self,
-        ty: &Type,
-        module_storage: &dyn ModuleStorage,
-    ) -> PartialVMResult<Option<(ModuleId, Identifier)>> {
-        use Type::*;
-
-        Ok(match ty {
-            Struct { idx, .. } | StructInstantiation { idx, .. } => {
-                let struct_identifier = self
-                    .move_vm
-                    .runtime
-                    .loader()
-                    .struct_name_index_map(module_storage)
-                    .idx_to_struct_name(*idx)?;
-                Some((struct_identifier.module, struct_identifier.name))
-            },
-            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | TyParam(_)
-            | Vector(_) | Reference(_) | MutableReference(_) => None,
-        })
-    }
-
-    pub fn check_type_tag_dependencies_and_charge_gas(
-        &mut self,
-        module_storage: &impl ModuleStorage,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        ty_tags: &[TypeTag],
-    ) -> VMResult<()> {
-        // Charge gas based on the distinct ordered module ids.
-        let ordered_ty_tags = ty_tags
-            .iter()
-            .flat_map(|ty_tag| ty_tag.preorder_traversal_iter())
-            .filter_map(TypeTag::struct_tag)
-            .map(|struct_tag| {
-                let module_id = traversal_context
-                    .referenced_module_ids
-                    .alloc(struct_tag.module_id());
-                (module_id.address(), module_id.name())
-            })
-            .collect::<BTreeSet<_>>();
-
-        self.check_dependencies_and_charge_gas(
-            module_storage,
-            gas_meter,
-            traversal_context,
-            ordered_ty_tags,
-        )
-    }
-
-    pub fn check_dependencies_and_charge_gas<'a, I>(
-        &mut self,
-        module_storage: &impl ModuleStorage,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext<'a>,
-        ids: I,
-    ) -> VMResult<()>
-    where
-        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
-        I::IntoIter: DoubleEndedIterator,
-    {
-        self.move_vm
-            .runtime
-            .loader()
-            .check_dependencies_and_charge_gas(
-                &self.module_store,
-                &mut self.data_cache,
-                gas_meter,
-                &mut traversal_context.visited,
-                traversal_context.referenced_modules,
-                ids,
-                module_storage,
-            )
-    }
-
-    pub fn check_script_dependencies_and_check_gas(
-        &mut self,
-        code_storage: &impl CodeStorage,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        script: impl Borrow<[u8]>,
-    ) -> VMResult<()> {
-        self.move_vm
-            .runtime
-            .loader()
-            .check_script_dependencies_and_check_gas(
-                &self.module_store,
-                &mut self.data_cache,
-                gas_meter,
-                traversal_context,
-                script.borrow(),
-                code_storage,
-            )
     }
 }

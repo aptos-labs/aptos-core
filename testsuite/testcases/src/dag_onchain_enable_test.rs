@@ -11,6 +11,7 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{
         ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig, ValidatorTxnConfig,
+        DEFAULT_WINDOW_SIZE,
     },
 };
 use async_trait::async_trait;
@@ -73,13 +74,14 @@ impl NetworkLoadTest for DagOnChainEnableTest {
 
         assert!(matches!(
             current_consensus_config,
-            OnChainConsensusConfig::V3 { .. }
+            OnChainConsensusConfig::V4 { .. }
         ));
 
-        // Change to V2
-        let new_consensus_config = OnChainConsensusConfig::V3 {
+        // Change to V4
+        let new_consensus_config = OnChainConsensusConfig::V4 {
             alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
             vtxn: ValidatorTxnConfig::default_disabled(),
+            window_size: DEFAULT_WINDOW_SIZE,
         };
 
         let update_consensus_config_script = format!(
@@ -124,13 +126,14 @@ impl NetworkLoadTest for DagOnChainEnableTest {
 
         assert!(matches!(
             current_consensus_config,
-            OnChainConsensusConfig::V3 { .. }
+            OnChainConsensusConfig::V4 { .. }
         ));
 
         // Change to DAG
-        let new_consensus_config = OnChainConsensusConfig::V3 {
+        let new_consensus_config = OnChainConsensusConfig::V4 {
             alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
             vtxn: ValidatorTxnConfig::default_disabled(),
+            window_size: DEFAULT_WINDOW_SIZE,
         };
 
         let update_consensus_config_script = format!(
@@ -177,7 +180,7 @@ impl NetworkLoadTest for DagOnChainEnableTest {
 
         assert!(matches!(
             current_consensus_config,
-            OnChainConsensusConfig::V3 { .. }
+            OnChainConsensusConfig::V4 { .. }
         ));
 
         // Change back to initial

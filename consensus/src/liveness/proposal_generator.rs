@@ -10,16 +10,17 @@ use crate::{
     counters::{
         CHAIN_HEALTH_BACKOFF_TRIGGERED, EXECUTION_BACKPRESSURE_ON_PROPOSAL_TRIGGERED,
         PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED, PROPOSER_DELAY_PROPOSAL,
-        PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS, PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING,
-        PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE, PROPOSER_PENDING_BLOCKS_COUNT,
-        PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
+        PROPOSER_ESTIMATED_CALIBRATED_BLOCK_GAS, PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS,
+        PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING, PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE,
+        PROPOSER_PENDING_BLOCKS_COUNT, PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
     },
     payload_client::PayloadClient,
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_config::config::{
-    ChainHealthBackoffValues, ExecutionBackpressureConfig, PipelineBackpressureValues,
+    ChainHealthBackoffValues, ExecutionBackpressureConfig, ExecutionBackpressureMetric,
+    PipelineBackpressureValues,
 };
 use aptos_consensus_types::{
     block::Block,
@@ -156,53 +157,79 @@ impl PipelineBackpressureConfig {
             })
     }
 
-    pub fn get_execution_block_size_backoff(
+    fn compute_lookback_blocks(
+        &self,
+        block_execution_times: &[ExecutionSummary],
+        f: impl Fn(&ExecutionSummary) -> Option<u64>,
+    ) -> Vec<u64> {
+        block_execution_times
+            .iter()
+            .flat_map(|summary| {
+                // for each block, compute target (re-calibrated) block size
+                f(summary)
+            })
+            .sorted()
+            .collect::<Vec<_>>()
+    }
+
+    fn compute_lookback_metric(&self, blocks: &[u64], metric: &ExecutionBackpressureMetric) -> u64 {
+        match metric {
+            ExecutionBackpressureMetric::Mean => {
+                if blocks.is_empty() {
+                    return 0;
+                }
+                (blocks.iter().sum::<u64>() as f64 / blocks.len() as f64) as u64
+            },
+            ExecutionBackpressureMetric::Percentile(percentile) => *blocks
+                .get(((percentile * blocks.len() as f64) as usize).min(blocks.len() - 1))
+                .expect("guaranteed to be within vector size"),
+        }
+    }
+
+    /// TODO: disable txn limit backoff and use only gas limit based backoff once execution pool is deployed.
+    ///
+    /// Until then, we need to compute wanted block size to create.
+    /// Unfortunately, there is multiple layers where transactions are filtered.
+    /// After deduping/reordering logic is applied, max_txns_to_execute limits the transactions
+    /// passed to executor (`summary.payload_len` here), and then some are discarded for various
+    /// reasons, which we approximate are cheaply ignored.
+    /// For the rest, only `summary.to_commit` fraction of `summary.to_commit + summary.to_retry`
+    /// was executed. And so assuming same discard rate, we scale `summary.payload_len` with it.
+    fn get_execution_block_size_backoff(
         &self,
         block_execution_times: &[ExecutionSummary],
         max_block_txns: u64,
     ) -> Option<u64> {
         self.execution.as_ref().and_then(|config| {
-            let sizes = block_execution_times
-                .iter()
-                .flat_map(|summary| {
-                    // for each block, compute target (re-calibrated) block size
+            let config = config.txn_limit.as_ref()?;
 
-                    let execution_time_ms = summary.execution_time.as_millis();
-                    // Only block above the time threshold are considered giving enough signal to support calibration
-                    // so we filter out shorter locks
-                    if execution_time_ms > config.min_block_time_ms_to_activate as u128
-                        && summary.payload_len > 0
-                    {
-                        // TODO: After cost of "retries" is reduced with execution pool, we
-                        // should be computing block gas limit here, simply as:
-                        // `config.target_block_time_ms / execution_time_ms * gas_consumed_by_block``
-                        //
-                        // Until then, we need to compute wanted block size to create.
-                        // Unfortunatelly, there is multiple layers where transactions are filtered.
-                        // After deduping/reordering logic is applied, max_txns_to_execute limits the transactions
-                        // passed to executor (`summary.payload_len` here), and then some are discarded for various
-                        // reasons, which we approximate are cheaply ignored.
-                        // For the rest, only `summary.to_commit` fraction of `summary.to_commit + summary.to_retry`
-                        // was executed. And so assuming same discard rate, we scale `summary.payload_len` with it.
-                        Some(
-                            ((config.target_block_time_ms as f64 / execution_time_ms as f64
-                                * (summary.to_commit as f64
-                                    / (summary.to_commit + summary.to_retry) as f64)
-                                * summary.payload_len as f64)
-                                .floor() as u64)
-                                .max(1),
-                        )
-                    } else {
-                        None
-                    }
-                })
-                .sorted()
-                .collect::<Vec<_>>();
-            if sizes.len() >= config.min_blocks_to_activate {
-                let calibrated_block_size = (*sizes
-                    .get(((config.percentile * sizes.len() as f64) as usize).min(sizes.len() - 1))
-                    .expect("guaranteed to be within vector size"))
-                .max(config.min_calibrated_txns_per_block);
+            let lookback_config = &config.lookback_config;
+            let min_calibrated_txns_per_block =
+                config.min_calibrated_txns_per_block;
+            let sizes = self.compute_lookback_blocks(block_execution_times, |summary| {
+                let execution_time_ms = summary.execution_time.as_millis();
+                // Only block above the time threshold are considered giving enough signal to support calibration
+                // so we filter out shorter locks
+                if execution_time_ms as u64 > lookback_config.min_block_time_ms_to_activate as u64
+                    && summary.payload_len > 0
+                {
+                    Some(
+                        ((lookback_config.target_block_time_ms as f64
+                            / summary.execution_time.as_millis() as f64
+                            * (summary.to_commit as f64
+                                / (summary.to_commit + summary.to_retry) as f64)
+                            * summary.payload_len as f64)
+                            .floor() as u64)
+                            .max(1),
+                    )
+                } else {
+                    None
+                }
+            });
+            if sizes.len() >= lookback_config.min_blocks_to_activate {
+                let calibrated_block_size = self
+                    .compute_lookback_metric(&sizes, &lookback_config.metric)
+                    .max(min_calibrated_txns_per_block);
                 PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS.observe(calibrated_block_size as f64);
                 // Check if calibrated block size is reduction in size, to turn on backpressure.
                 if max_block_txns > calibrated_block_size {
@@ -210,7 +237,7 @@ impl PipelineBackpressureConfig {
                         block_execution_times = format!("{:?}", block_execution_times),
                         estimated_calibrated_block_sizes = format!("{:?}", sizes),
                         calibrated_block_size = calibrated_block_size,
-                        "Execution backpressure recalibration: proposing reducing from {} to {}",
+                        "Execution backpressure recalibration: txn limit: proposing reducing from {} to {}",
                         max_block_txns,
                         calibrated_block_size,
                     );
@@ -222,6 +249,112 @@ impl PipelineBackpressureConfig {
                 None
             }
         })
+    }
+
+    /// TODO: once execution pool is deployed, enable gas limit based backoff in execution (via onchain config).
+    ///
+    /// Until it is enabled in execution, the printed log is useful for auditing and calibrating
+    /// the computed backoff.
+    fn get_execution_gas_limit_backoff(
+        &self,
+        block_execution_times: &[ExecutionSummary],
+        max_block_gas_limit: u64,
+    ) -> Option<u64> {
+        self.execution.as_ref().and_then(|config| {
+            let config = config.gas_limit.as_ref()?;
+
+            let lookback_config = &config.lookback_config;
+            let block_execution_overhead_ms = config.block_execution_overhead_ms;
+            let min_calibrated_block_gas_limit =
+                config.min_calibrated_block_gas_limit;
+            let gas_limit_estimates =
+                self.compute_lookback_blocks(block_execution_times, |summary| {
+                    let execution_time_ms = summary.execution_time.as_millis() as u64;
+                    let execution_time_ms =
+                        execution_time_ms.saturating_sub(block_execution_overhead_ms);
+                    // Only block above the time threshold are considered giving enough signal to support calibration
+                    // so we filter out shorter locks
+                    if execution_time_ms > lookback_config.min_block_time_ms_to_activate as u64 {
+                        if let Some(gas_used) = summary.gas_used {
+                            if gas_used >= min_calibrated_block_gas_limit {
+                                Some(
+                                    ((lookback_config.target_block_time_ms as f64
+                                        / execution_time_ms as f64
+                                        * gas_used as f64)
+                                        .floor() as u64)
+                                        .max(min_calibrated_block_gas_limit),
+                                )
+                            } else {
+                                None
+                            }
+                        } else {
+                            warn!("Block execution summary missing gas used, skipping");
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                });
+            if gas_limit_estimates.len() >= lookback_config.min_blocks_to_activate {
+                let calibrated_gas_limit = self
+                    .compute_lookback_metric(&gas_limit_estimates, &lookback_config.metric)
+                    .max(min_calibrated_block_gas_limit);
+                PROPOSER_ESTIMATED_CALIBRATED_BLOCK_GAS.observe(calibrated_gas_limit as f64);
+                // Check if calibrated block size is reduction in size, to turn on backpressure.
+                if max_block_gas_limit > calibrated_gas_limit {
+                    warn!(
+                        block_execution_times = format!("{:?}", block_execution_times),
+                        computed_target_block_gas_limits = format!("{:?}", gas_limit_estimates),
+                        computed_target_block_gas_limit = calibrated_gas_limit,
+                        "Execution backpressure recalibration: gas limit: proposing reducing from {} to {}",
+                        max_block_gas_limit,
+                        calibrated_gas_limit,
+                    );
+                    Some(calibrated_gas_limit)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn num_blocks_to_look_at(&self) -> Option<usize> {
+        let config = self.execution.as_ref()?;
+
+        let mut num_blocks_to_look_at = None;
+        if let Some(config) = &config.txn_limit {
+            num_blocks_to_look_at = Some(
+                config
+                    .lookback_config
+                    .num_blocks_to_look_at
+                    .max(num_blocks_to_look_at.unwrap_or(0)),
+            );
+        }
+        if let Some(config) = &config.gas_limit {
+            num_blocks_to_look_at = Some(
+                config
+                    .lookback_config
+                    .num_blocks_to_look_at
+                    .max(num_blocks_to_look_at.unwrap_or(0)),
+            );
+        }
+        num_blocks_to_look_at
+    }
+
+    pub fn get_execution_block_txn_and_gas_limit_backoff(
+        &self,
+        block_execution_times: &[ExecutionSummary],
+        max_block_txns: u64,
+        max_block_gas_limit: Option<u64>,
+    ) -> (Option<u64>, Option<u64>) {
+        let txn_limit_backoff =
+            self.get_execution_block_size_backoff(block_execution_times, max_block_txns);
+        let gas_limit_backoff = max_block_gas_limit.and_then(|max_block_gas_limit| {
+            self.get_execution_gas_limit_backoff(block_execution_times, max_block_gas_limit)
+        });
+        (txn_limit_backoff, gas_limit_backoff)
     }
 }
 
@@ -260,6 +393,7 @@ pub struct ProposalGenerator {
     /// Applied to execution, pipeline and chain health backpressure.
     /// Needed as we cannot subsplit QS batches.
     min_max_txns_in_block_after_filtering_from_backpressure: u64,
+    max_block_gas_limit: Option<u64>,
 
     pipeline_backpressure_config: PipelineBackpressureConfig,
     chain_health_backoff_config: ChainHealthBackoffConfig,
@@ -286,6 +420,7 @@ impl ProposalGenerator {
         max_inline_txns: PayloadTxnsSize,
         max_failed_authors_to_store: usize,
         min_max_txns_in_block_after_filtering_from_backpressure: u64,
+        max_block_gas_limit: Option<u64>,
         pipeline_backpressure_config: PipelineBackpressureConfig,
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
@@ -304,6 +439,7 @@ impl ProposalGenerator {
             min_max_txns_in_block_after_filtering_from_backpressure,
             max_inline_txns,
             max_failed_authors_to_store,
+            max_block_gas_limit,
             pipeline_backpressure_config,
             chain_health_backoff_config,
             last_round_generated: Mutex::new(0),
@@ -411,6 +547,7 @@ impl ProposalGenerator {
                 max_block_txns,
                 max_block_txns_after_filtering,
                 max_txns_from_block_to_execute,
+                block_gas_limit_override,
                 proposal_delay,
             ) = self
                 .calculate_max_block_sizes(voting_power_ratio, timestamp, round)
@@ -480,7 +617,12 @@ impl ProposalGenerator {
                 && max_txns_from_block_to_execute.is_some()
                 && max_txns_from_block_to_execute.map_or(false, |v| payload.len() as u64 > v)
             {
-                payload = payload.transform_to_quorum_store_v2(max_txns_from_block_to_execute);
+                payload = payload.transform_to_quorum_store_v2(
+                    max_txns_from_block_to_execute,
+                    block_gas_limit_override,
+                );
+            } else if block_gas_limit_override.is_some() {
+                payload = payload.transform_to_quorum_store_v2(None, block_gas_limit_override);
             }
             (validator_txns, payload, timestamp.as_micros() as u64)
         };
@@ -522,10 +664,11 @@ impl ProposalGenerator {
         voting_power_ratio: f64,
         timestamp: Duration,
         round: Round,
-    ) -> (PayloadTxnsSize, u64, Option<u64>, Duration) {
+    ) -> (PayloadTxnsSize, u64, Option<u64>, Option<u64>, Duration) {
         let mut values_max_block_txns_after_filtering = vec![self.max_block_txns_after_filtering];
         let mut values_max_block = vec![self.max_block_txns];
         let mut values_proposal_delay = vec![Duration::ZERO];
+        let mut block_gas_limit_override = None;
 
         let chain_health_backoff = self
             .chain_health_backoff_config
@@ -561,17 +704,24 @@ impl ProposalGenerator {
         };
 
         let mut execution_backpressure_applied = false;
-        if let Some(config) = &self.pipeline_backpressure_config.execution {
-            let execution_backpressure = self
+        if let Some(num_blocks_to_look_at) =
+            self.pipeline_backpressure_config.num_blocks_to_look_at()
+        {
+            let (txn_limit, gas_limit) = self
                 .pipeline_backpressure_config
-                .get_execution_block_size_backoff(
+                .get_execution_block_txn_and_gas_limit_backoff(
                     &self
                         .block_store
-                        .get_recent_block_execution_times(config.num_blocks_to_look_at),
+                        .get_recent_block_execution_times(num_blocks_to_look_at),
                     self.max_block_txns_after_filtering,
+                    self.max_block_gas_limit,
                 );
-            if let Some(execution_backpressure_block_size) = execution_backpressure {
-                values_max_block_txns_after_filtering.push(execution_backpressure_block_size);
+            if let Some(txn_limit) = txn_limit {
+                values_max_block_txns_after_filtering.push(txn_limit);
+                execution_backpressure_applied = true;
+            }
+            block_gas_limit_override = gas_limit;
+            if gas_limit.is_some() {
                 execution_backpressure_applied = true;
             }
         }
@@ -616,6 +766,8 @@ impl ProposalGenerator {
             max_txns_from_block_to_execute =
                 max_txns_from_block_to_execute.unwrap_or(max_block_txns_after_filtering),
             max_block_size = max_block_size,
+            block_gas_limit_override =
+                block_gas_limit_override.unwrap_or(self.max_block_gas_limit.unwrap_or(0)),
             is_pipeline_backpressure = pipeline_backpressure.is_some(),
             is_execution_backpressure = execution_backpressure_applied,
             is_chain_health_backoff = chain_health_backoff.is_some(),
@@ -627,6 +779,7 @@ impl ProposalGenerator {
             max_block_size,
             max_block_txns_after_filtering,
             max_txns_from_block_to_execute,
+            block_gas_limit_override,
             proposal_delay,
         )
     }

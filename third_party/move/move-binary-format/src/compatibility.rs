@@ -6,7 +6,8 @@ use crate::{
     access::ModuleAccess,
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        Signature, SignatureToken, StructHandleIndex, StructTypeParameter, VariantIndex, Visibility,
+        FunctionAttribute, Signature, SignatureToken, StructHandleIndex, StructTypeParameter,
+        VariantIndex, Visibility,
     },
     file_format_common::VERSION_5,
     views::{
@@ -81,6 +82,7 @@ impl Compatibility {
     }
 
     /// Check compatibility for `new_module` relative to old module `old_module`.
+    #[allow(clippy::nonminimal_bool)] // simplification is more unreadable
     pub fn check(
         &self,
         old_module: &CompiledModule,
@@ -141,15 +143,24 @@ impl Compatibility {
         //
         // - old module's public functions are a subset of the new module's public functions
         //   (i.e. we cannot remove or change public functions)
-        // - old module's script functions are a subset of the new module's script functions
-        //   (i.e. we cannot remove or change script functions)
+        // - old module's entry functions are a subset of the new module's entry functions
+        //   (i.e. we cannot remove or change entry functions). This can be turned off by
+        //   `!self.check_friend_linking`.
         // - for any friend function that is removed or changed in the old module
         //   - if the function visibility is upgraded to public, it is OK
         //   - otherwise, it is considered as incompatible.
+        // - moreover, a function marked as `#[persistent]` is treated as a public function.
         //
         for old_func in old_view.functions() {
+            let old_is_persistent = old_func
+                .attributes()
+                .contains(&FunctionAttribute::Persistent);
+
             // private, non entry function doesn't need to follow any checks here, skip
-            if old_func.visibility() == Visibility::Private && !old_func.is_entry() {
+            if old_func.visibility() == Visibility::Private
+                && !old_func.is_entry()
+                && !old_is_persistent
+            {
                 // Function not exposed, continue with next one
                 continue;
             }
@@ -157,15 +168,19 @@ impl Compatibility {
                 Some(new_func) => new_func,
                 None => {
                     // Function has been removed
-                    // Function is NOT a private, non entry function.
-                    if !matches!(old_func.visibility(), Visibility::Friend)
+                    // Function is NOT a private, non entry function, or it is persistent.
+                    if old_is_persistent
+                        || !matches!(old_func.visibility(), Visibility::Friend)
                         // Above: Either Private Entry, or Public
                         || self.check_friend_linking
                         // Here we know that the old_function has to be Friend.
-                        // And if friends are not considered private (self.check_friend_linking is true), we can't update.
+                        // And if friends are not considered private (self.check_friend_linking is
+                        // true), we can't update.
                         || (old_func.is_entry() && self.treat_entry_as_public)
-                    // Here we know that the old_func has to be Friend, and the check_friend_linking is set to false.
-                    // We make sure that we don't allow any Entry functions to be deleted, when self.treat_entry_as_public is set (treats entry as public)
+                    // Here we know that the old_func has to be Friend, and the
+                    // check_friend_linking is set to false. We make sure that we don't allow
+                    // any Entry functions to be deleted, when self.treat_entry_as_public is
+                    // set (treats entry as public)
                     {
                         errors.push(format!("removed function `{}`", old_func.name()));
                     }
@@ -173,9 +188,11 @@ impl Compatibility {
                 },
             };
 
-            if matches!(old_func.visibility(), Visibility::Friend)
+            if !old_is_persistent
+                && matches!(old_func.visibility(), Visibility::Friend)
                 && !self.check_friend_linking
-                // Above: We want to skip linking checks for public(friend) if self.check_friend_linking is set to false.
+                // Above: We want to skip linking checks for public(friend) if
+                // self.check_friend_linking is set to false.
                 && !(old_func.is_entry() && self.treat_entry_as_public)
             // However, public(friend) entry function still needs to be checked.
             {
@@ -202,10 +219,14 @@ impl Compatibility {
                     // If it was not an entry function, it is allowed to become one.
                     !old_func.is_entry() || new_func.is_entry()
                 };
+            let is_attribute_compatible =
+                FunctionAttribute::is_compatible_with(old_func.attributes(), new_func.attributes());
             let error_msg = if !is_vis_compatible {
                 Some("changed visibility")
             } else if !is_entry_compatible {
                 Some("removed `entry` modifier")
+            } else if !is_attribute_compatible {
+                Some("removed required attributes")
             } else if !signature_compatible(
                 old_module,
                 old_func.parameters(),
