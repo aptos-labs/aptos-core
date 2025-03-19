@@ -36,7 +36,7 @@ pub async fn delete_container(container_name: &str) -> Result<()> {
     let result = docker.remove_container(container_name, options).await;
 
     match result {
-        Ok(_) => info!("Succesfully removed container {}", container_name),
+        Ok(_) => info!("Successfully removed container {}", container_name),
         Err(err) => warn!(
             "Failed to remove container {}: {:#} (it probably didn't exist)",
             container_name, err
@@ -64,7 +64,7 @@ pub async fn stop_container(container_name: &str) -> Result<()> {
     let result = docker.stop_container(container_name, options).await;
 
     match result {
-        Ok(_) => info!("Succesfully stopped container {}", container_name),
+        Ok(_) => info!("Successfully stopped container {}", container_name),
         Err(err) => warn!(
             "Failed to stop container {}: {:#} (it probably didn't exist)",
             container_name, err
@@ -174,7 +174,7 @@ pub async fn delete_volume(volume_name: &str) -> Result<()> {
         .context(format!("Failed to remove volume {}", volume_name))?;
 
     info!(
-        "Succesfully removed volume {} (if it existed in the first place)",
+        "Successfully removed volume {} (if it existed in the first place)",
         volume_name
     );
 
