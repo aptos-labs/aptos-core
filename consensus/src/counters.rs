@@ -8,9 +8,9 @@ use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     quorum_store,
 };
-use aptos_consensus_types::pipelined_block::PipelinedBlock;
+use aptos_consensus_types::{block::Block, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
-use aptos_executor_types::ExecutorError;
+use aptos_executor_types::{state_compute_result::StateComputeResult, ExecutorError};
 use aptos_logger::prelude::{error, warn};
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_counter,
@@ -34,6 +34,13 @@ pub const TXN_COMMIT_FAILED_DUPLICATE_LABEL: &str = "failed_duplicate";
 pub const TXN_COMMIT_FAILED_EXPIRED_LABEL: &str = "failed_expired";
 /// Transaction commit was unsuccessful, but will be retried
 pub const TXN_COMMIT_RETRY_LABEL: &str = "retry";
+
+fn gas_buckets() -> Vec<f64> {
+    exponential_buckets(
+        /*start=*/ 1.0, /*factor=*/ 1.5, /*count=*/ 30,
+    )
+    .unwrap()
+}
 
 //////////////////////
 // HEALTH COUNTERS
@@ -388,6 +395,16 @@ pub static PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS: Lazy<Histogram> = Lazy::new
         "aptos_proposer_estimated_calibrated_block_txns",
         "Histogram for max number of transactions calibrated block should have, based on the proposer",
         NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+/// Histogram for max gas calibrated block should have, based on the proposer
+pub static PROPOSER_ESTIMATED_CALIBRATED_BLOCK_GAS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_proposer_estimated_calibrated_block_gas",
+        "Histogram for max gas calibrated block should have, based on the proposer",
+        gas_buckets()
     )
     .unwrap()
 });
@@ -836,7 +853,7 @@ pub static NUM_BYTES_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
 // * 0.3 to 2.0: step 0.1
 // * 2.0 to 4.0: step 0.2
 // * 4.0 to 7.5: step 0.5
-const BLOCK_TRACING_BUCKETS: &[f64] = &[
+const TRACING_BUCKETS: &[f64] = &[
     0.005, 0.01, 0.025, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1,
     1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6, 3.8, 4.0,
     4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 10.0,
@@ -848,7 +865,18 @@ pub static BLOCK_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
         "aptos_consensus_block_tracing",
         "Histogram for different stages of a block",
         &["stage"],
-        BLOCK_TRACING_BUCKETS.to_vec()
+        TRACING_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+/// Traces pipeline stages
+pub static PIPELINE_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_consensus_pipeline_tracing",
+        "Histogram for different stages of a block's pipeline",
+        &["stage", "type"],
+        TRACING_BUCKETS.to_vec()
     )
     .unwrap()
 });
@@ -1123,6 +1151,7 @@ pub fn log_executor_error_occurred(
     e: ExecutorError,
     counter: &Lazy<IntCounterVec>,
     block_id: HashValue,
+    new_pipeline_enabled: bool,
 ) {
     match e {
         ExecutorError::CouldNotGetData => {
@@ -1141,10 +1170,17 @@ pub fn log_executor_error_occurred(
         },
         e => {
             counter.with_label_values(&["UnexpectedError"]).inc();
-            error!(
-                block_id = block_id,
-                "Execution error {:?} for {}", e, block_id
-            );
+            if new_pipeline_enabled {
+                warn!(
+                    block_id = block_id,
+                    "Execution error {:?} for {}", e, block_id
+                );
+            } else {
+                error!(
+                    block_id = block_id,
+                    "Execution error {:?} for {}", e, block_id
+                );
+            }
         },
     }
 }
@@ -1239,51 +1275,53 @@ pub static FETCH_COMMIT_HISTORY_DURATION: Lazy<DurationHistogram> = Lazy::new(||
     )
 });
 
+pub fn update_counters_for_block(block: &Block) {
+    observe_block(block.timestamp_usecs(), BlockStage::COMMITTED);
+    NUM_BYTES_PER_BLOCK.observe(block.payload().map_or(0, |payload| payload.size()) as f64);
+    COMMITTED_BLOCKS_COUNT.inc();
+    LAST_COMMITTED_ROUND.set(block.round() as i64);
+    let failed_rounds = block
+        .block_data()
+        .failed_authors()
+        .map(|v| v.len())
+        .unwrap_or(0);
+    if failed_rounds > 0 {
+        COMMITTED_FAILED_ROUNDS_COUNT.inc_by(failed_rounds as u64);
+    }
+    quorum_store::counters::NUM_BATCH_PER_BLOCK.observe(block.payload_size() as f64);
+}
+
+pub fn update_counters_for_compute_result(compute_result: &StateComputeResult) {
+    let txn_status = compute_result.compute_status_for_input_txns();
+    LAST_COMMITTED_VERSION.set(compute_result.last_version_or_0() as i64);
+    NUM_TXNS_PER_BLOCK.observe(txn_status.len() as f64);
+    for status in txn_status.iter() {
+        let commit_status = match status {
+            TransactionStatus::Keep(_) => TXN_COMMIT_SUCCESS_LABEL,
+            TransactionStatus::Discard(reason) => {
+                if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
+                    TXN_COMMIT_RETRY_LABEL
+                } else if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD {
+                    TXN_COMMIT_FAILED_DUPLICATE_LABEL
+                } else if *reason == DiscardedVMStatus::TRANSACTION_EXPIRED {
+                    TXN_COMMIT_FAILED_EXPIRED_LABEL
+                } else {
+                    TXN_COMMIT_FAILED_LABEL
+                }
+            },
+            TransactionStatus::Retry => TXN_COMMIT_RETRY_LABEL,
+        };
+        COMMITTED_TXNS_COUNT
+            .with_label_values(&[commit_status])
+            .inc();
+    }
+}
+
 /// Update various counters for committed blocks
 pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<PipelinedBlock>]) {
     for block in blocks_to_commit {
-        observe_block(block.block().timestamp_usecs(), BlockStage::COMMITTED);
-        let txn_status = block.compute_result().compute_status_for_input_txns();
-        NUM_TXNS_PER_BLOCK.observe(txn_status.len() as f64);
-        NUM_BYTES_PER_BLOCK
-            .observe(block.block().payload().map_or(0, |payload| payload.size()) as f64);
-        COMMITTED_BLOCKS_COUNT.inc();
-        LAST_COMMITTED_ROUND.set(block.round() as i64);
-        LAST_COMMITTED_VERSION.set(block.compute_result().last_version_or_0() as i64);
-
-        let failed_rounds = block
-            .block()
-            .block_data()
-            .failed_authors()
-            .map(|v| v.len())
-            .unwrap_or(0);
-        if failed_rounds > 0 {
-            COMMITTED_FAILED_ROUNDS_COUNT.inc_by(failed_rounds as u64);
-        }
-
-        // Quorum store metrics
-        quorum_store::counters::NUM_BATCH_PER_BLOCK.observe(block.block().payload_size() as f64);
-
-        for status in txn_status.iter() {
-            let commit_status = match status {
-                TransactionStatus::Keep(_) => TXN_COMMIT_SUCCESS_LABEL,
-                TransactionStatus::Discard(reason) => {
-                    if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
-                        TXN_COMMIT_RETRY_LABEL
-                    } else if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD {
-                        TXN_COMMIT_FAILED_DUPLICATE_LABEL
-                    } else if *reason == DiscardedVMStatus::TRANSACTION_EXPIRED {
-                        TXN_COMMIT_FAILED_EXPIRED_LABEL
-                    } else {
-                        TXN_COMMIT_FAILED_LABEL
-                    }
-                },
-                TransactionStatus::Retry => TXN_COMMIT_RETRY_LABEL,
-            };
-            COMMITTED_TXNS_COUNT
-                .with_label_values(&[commit_status])
-                .inc();
-        }
+        update_counters_for_block(block.block());
+        update_counters_for_compute_result(block.compute_result());
     }
 }
 
@@ -1350,3 +1388,19 @@ pub static CONSENSUS_PROPOSAL_PAYLOAD_BATCH_AVAILABILITY_IN_QS: Lazy<IntCounterV
         .unwrap()
     },
 );
+
+pub static OPTQS_EXCLUDE_AUTHORS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_optqs_exclude_authors",
+        "The number of times a batch author appears on the exclude list",
+        &["author"]
+    )
+    .unwrap()
+});
+
+pub static OPTQS_LAST_CONSECUTIVE_SUCCESS_COUNT: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_optqs_last_consecutive_successes",
+        "The number of last consecutive successes capped at window length",
+    )
+});

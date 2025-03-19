@@ -35,7 +35,7 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
         named_address_mapping: vec!["std=0x1".to_string()],
         ..Options::default()
     };
-    options = options.set_language_version(LanguageVersion::V2_1);
+    options = options.set_language_version(LanguageVersion::latest_stable());
     let mut test_output = String::new();
     let mut error_writer = Buffer::no_color();
     match run_move_compiler_for_analysis(&mut error_writer, options) {
@@ -96,22 +96,22 @@ fn generate_output(target: &FunctionTarget, test_output: &mut String) -> Option<
     };
     *test_output += &format!(
         "--- Raw Generated AST\n{}\n\n",
-        exp.display_for_fun(target.func_env.clone())
+        exp.display_for_fun(target.func_env)
     );
     let exp = astifier::transform_assigns(target, exp);
     *test_output += &format!(
         "--- Assign-Transformed Generated AST\n{}\n\n",
-        exp.display_for_fun(target.func_env.clone())
+        exp.display_for_fun(target.func_env)
     );
     let exp = astifier::transform_conditionals(target, exp);
     *test_output += &format!(
         "--- If-Transformed Generated AST\n{}\n\n",
-        exp.display_for_fun(target.func_env.clone())
+        exp.display_for_fun(target.func_env)
     );
     let exp = astifier::bind_free_vars(target, exp);
     *test_output += &format!(
         "--- Var-Bound Generated AST\n{}\n\n",
-        exp.display_for_fun(target.func_env.clone())
+        exp.display_for_fun(target.func_env)
     );
     Some(exp)
 }

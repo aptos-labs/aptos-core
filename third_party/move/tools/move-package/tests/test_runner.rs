@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::bail;
+use legacy_move_compiler::shared::known_attributes::KnownAttribute;
 use move_command_line_common::testing::{
-    add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT, EXP_EXT_V2,
+    add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT,
 };
-use move_compiler::shared::known_attributes::KnownAttribute;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{
     compilation::{build_plan::BuildPlan, model_builder::ModelBuilder},
@@ -82,7 +82,7 @@ fn run_test_impl(
                 .into())
             },
             (true, _) => match BuildPlan::create(resolved_package)
-                .and_then(|bp| bp.compile_no_exit(&compiler_config.clone(), &mut Vec::new()))
+                .and_then(|bp| bp.compile_no_exit(&compiler_config.clone(), vec![], &mut vec![]))
             {
                 Ok((mut pkg, _)) => {
                     pkg.compiled_package_info.source_digest =
@@ -122,13 +122,8 @@ fn check_or_update(
     path: &Path,
     output: String,
     update_baseline: bool,
-    compiler_version: CompilerVersion,
 ) -> datatest_stable::Result<()> {
-    let exp_ext = if compiler_version == CompilerVersion::V2_0 {
-        EXP_EXT_V2
-    } else {
-        EXP_EXT
-    };
+    let exp_ext = EXP_EXT;
     let exp_path = path.with_extension(exp_ext);
     let exp_exists = exp_path.is_file();
     if update_baseline {
@@ -168,12 +163,7 @@ pub fn run_test(path: &Path) -> datatest_stable::Result<()> {
 
     let output_v1 = run_test_impl(path, CompilerVersion::default())?;
     let update_baseline = read_env_update_baseline();
-    check_or_update(
-        path,
-        output_v1.clone(),
-        update_baseline,
-        CompilerVersion::default(),
-    )
+    check_or_update(path, output_v1.clone(), update_baseline)
 }
 
 /// Some dummy hooks for testing the hook mechanism

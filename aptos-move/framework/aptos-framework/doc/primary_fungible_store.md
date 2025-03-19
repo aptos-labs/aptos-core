@@ -28,12 +28,14 @@ fungible asset to it. This emits an deposit event.
 -  [Function `primary_store_address_inlined`](#0x1_primary_fungible_store_primary_store_address_inlined)
 -  [Function `primary_store_inlined`](#0x1_primary_fungible_store_primary_store_inlined)
 -  [Function `primary_store_exists_inlined`](#0x1_primary_fungible_store_primary_store_exists_inlined)
+-  [Function `grant_permission`](#0x1_primary_fungible_store_grant_permission)
+-  [Function `grant_apt_permission`](#0x1_primary_fungible_store_grant_apt_permission)
 -  [Function `balance`](#0x1_primary_fungible_store_balance)
 -  [Function `is_balance_at_least`](#0x1_primary_fungible_store_is_balance_at_least)
 -  [Function `is_frozen`](#0x1_primary_fungible_store_is_frozen)
 -  [Function `withdraw`](#0x1_primary_fungible_store_withdraw)
 -  [Function `deposit`](#0x1_primary_fungible_store_deposit)
--  [Function `force_deposit`](#0x1_primary_fungible_store_force_deposit)
+-  [Function `deposit_with_signer`](#0x1_primary_fungible_store_deposit_with_signer)
 -  [Function `transfer`](#0x1_primary_fungible_store_transfer)
 -  [Function `transfer_assert_minimum_deposit`](#0x1_primary_fungible_store_transfer_assert_minimum_deposit)
 -  [Function `mint`](#0x1_primary_fungible_store_mint)
@@ -52,7 +54,7 @@ fungible asset to it. This emits an deposit event.
 <b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
 <b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
+<b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 </code></pre>
 
@@ -365,6 +367,73 @@ Use instead of the corresponding view functions for dispatchable hooks to avoid 
 
 </details>
 
+<a id="0x1_primary_fungible_store_grant_permission"></a>
+
+## Function `grant_permission`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_grant_permission">grant_permission</a>&lt;T: key&gt;(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_grant_permission">grant_permission</a>&lt;T: key&gt;(
+    master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    metadata: Object&lt;T&gt;,
+    amount: u64
+) {
+    <a href="fungible_asset.md#0x1_fungible_asset_grant_permission_by_address">fungible_asset::grant_permission_by_address</a>(
+        master,
+        permissioned,
+        <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address_inlined">primary_store_address_inlined</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(permissioned), metadata),
+        amount
+    );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_primary_fungible_store_grant_apt_permission"></a>
+
+## Function `grant_apt_permission`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_grant_apt_permission">grant_apt_permission</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_grant_apt_permission">grant_apt_permission</a>(
+    master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    amount: u64
+) {
+    <a href="fungible_asset.md#0x1_fungible_asset_grant_permission_by_address">fungible_asset::grant_permission_by_address</a>(
+        master,
+        permissioned,
+        <a href="object.md#0x1_object_create_user_derived_object_address">object::create_user_derived_object_address</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(permissioned), @aptos_fungible_asset),
+        amount
+    );
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_primary_fungible_store_balance"></a>
 
 ## Function `balance`
@@ -384,7 +453,7 @@ Get the balance of <code><a href="account.md#0x1_account">account</a></code>'s p
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_balance">balance</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: Object&lt;T&gt;): u64 {
     <b>if</b> (<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_exists">primary_store_exists</a>(<a href="account.md#0x1_account">account</a>, metadata)) {
-        <a href="fungible_asset.md#0x1_fungible_asset_balance">fungible_asset::balance</a>(<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>(<a href="account.md#0x1_account">account</a>, metadata))
+        <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_derived_balance">dispatchable_fungible_asset::derived_balance</a>(<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>(<a href="account.md#0x1_account">account</a>, metadata))
     } <b>else</b> {
         0
     }
@@ -413,7 +482,7 @@ Get the balance of <code><a href="account.md#0x1_account">account</a></code>'s p
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_is_balance_at_least">is_balance_at_least</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: Object&lt;T&gt;, amount: u64): bool {
     <b>if</b> (<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_exists">primary_store_exists</a>(<a href="account.md#0x1_account">account</a>, metadata)) {
-        <a href="fungible_asset.md#0x1_fungible_asset_is_balance_at_least">fungible_asset::is_balance_at_least</a>(<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>(<a href="account.md#0x1_account">account</a>, metadata), amount)
+        <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_is_derived_balance_at_least">dispatchable_fungible_asset::is_derived_balance_at_least</a>(<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>(<a href="account.md#0x1_account">account</a>, metadata), amount)
     } <b>else</b> {
         amount == 0
     }
@@ -471,7 +540,7 @@ Withdraw <code>amount</code> of fungible asset from the given account's primary 
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_withdraw">withdraw</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: Object&lt;T&gt;, amount: u64): FungibleAsset <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> {
-    <b>let</b> store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner), metadata);
+    <b>let</b> store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(owner), metadata);
     // Check <b>if</b> the store <a href="object.md#0x1_object">object</a> <b>has</b> been burnt or not. If so, unburn it first.
     <a href="primary_fungible_store.md#0x1_primary_fungible_store_may_be_unburn">may_be_unburn</a>(owner, store);
     <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_withdraw">dispatchable_fungible_asset::withdraw</a>(owner, store, amount)
@@ -509,14 +578,17 @@ Deposit fungible asset <code>fa</code> to the given account's primary store.
 
 </details>
 
-<a id="0x1_primary_fungible_store_force_deposit"></a>
+<a id="0x1_primary_fungible_store_deposit_with_signer"></a>
 
-## Function `force_deposit`
+## Function `deposit_with_signer`
 
-Deposit fungible asset <code>fa</code> to the given account's primary store.
+Deposit fungible asset <code>fa</code> to the given account's primary store using signer.
+
+If <code>owner</code> is a permissioned signer, the signer will be granted with permission to withdraw
+the same amount of fund in the future.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_force_deposit">force_deposit</a>(owner: <b>address</b>, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_deposit_with_signer">deposit_with_signer</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)
 </code></pre>
 
 
@@ -525,10 +597,18 @@ Deposit fungible asset <code>fa</code> to the given account's primary store.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_force_deposit">force_deposit</a>(owner: <b>address</b>, fa: FungibleAsset) <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_deposit_with_signer">deposit_with_signer</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, fa: FungibleAsset) <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> {
+    <a href="fungible_asset.md#0x1_fungible_asset_refill_permission">fungible_asset::refill_permission</a>(
+        owner,
+        <a href="fungible_asset.md#0x1_fungible_asset_amount">fungible_asset::amount</a>(&fa),
+        <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address_inlined">primary_store_address_inlined</a>(
+            <a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(owner),
+            <a href="fungible_asset.md#0x1_fungible_asset_metadata_from_asset">fungible_asset::metadata_from_asset</a>(&fa),
+        )
+    );
     <b>let</b> metadata = <a href="fungible_asset.md#0x1_fungible_asset_asset_metadata">fungible_asset::asset_metadata</a>(&fa);
-    <b>let</b> store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(owner, metadata);
-    <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">fungible_asset::deposit_internal</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store), fa);
+    <b>let</b> store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(owner), metadata);
+    <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_deposit">dispatchable_fungible_asset::deposit</a>(store, fa);
 }
 </code></pre>
 
@@ -558,7 +638,7 @@ Transfer <code>amount</code> of fungible asset from sender's primary store to re
     recipient: <b>address</b>,
     amount: u64,
 ) <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> {
-    <b>let</b> sender_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender), metadata);
+    <b>let</b> sender_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(sender), metadata);
     // Check <b>if</b> the sender store <a href="object.md#0x1_object">object</a> <b>has</b> been burnt or not. If so, unburn it first.
     <a href="primary_fungible_store.md#0x1_primary_fungible_store_may_be_unburn">may_be_unburn</a>(sender, sender_store);
     <b>let</b> recipient_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(recipient, metadata);
@@ -594,7 +674,7 @@ Use the minimum deposit assertion api to make sure receipient will receive a min
     amount: u64,
     expected: u64,
 ) <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> {
-    <b>let</b> sender_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender), metadata);
+    <b>let</b> sender_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(sender), metadata);
     // Check <b>if</b> the sender store <a href="object.md#0x1_object">object</a> <b>has</b> been burnt or not. If so, unburn it first.
     <a href="primary_fungible_store.md#0x1_primary_fungible_store_may_be_unburn">may_be_unburn</a>(sender, sender_store);
     <b>let</b> recipient_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(recipient, metadata);

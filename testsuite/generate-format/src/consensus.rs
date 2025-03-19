@@ -14,10 +14,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     block_metadata_ext::BlockMetadataExt,
     contract_event, event,
-    state_store::{
-        state_key::StateKey,
-        state_value::{PersistedStateValueMetadata, StateValueMetadata},
-    },
+    state_store::{state_key::StateKey, state_value::PersistedStateValueMetadata},
     transaction,
     transaction::block_epilogue::BlockEpiloguePayload,
     validator_txn::ValidatorTransaction,
@@ -89,9 +86,7 @@ pub fn get_registry() -> Result<Registry> {
         &aptos_consensus_types::block::Block::make_genesis_block(),
     )?;
     tracer.trace_value(&mut samples, &event::EventKey::random())?;
-    tracer.trace_value(&mut samples, &write_set::WriteOp::Deletion {
-        metadata: StateValueMetadata::none(),
-    })?;
+    tracer.trace_value(&mut samples, &write_set::WriteOp::legacy_deletion())?;
 
     // 2. Trace the main entry point(s) + every enum separately.
     tracer.trace_type::<contract_event::ContractEvent>(&samples)?;
@@ -105,6 +100,8 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::WriteSetPayload>(&samples)?;
     tracer.trace_type::<transaction::BlockEpiloguePayload>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AccountAuthenticator>(&samples)?;
+    tracer.trace_type::<transaction::authenticator::AbstractionAuthData>(&samples)?;
+    tracer.trace_type::<transaction::authenticator::DomainAccount>(&samples)?;
     tracer.trace_type::<transaction::authenticator::TransactionAuthenticator>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnyPublicKey>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnySignature>(&samples)?;
@@ -122,6 +119,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<aptos_consensus_types::block_retrieval::BlockRetrievalStatus>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::payload::PayloadExecutionLimit>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::common::Payload>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::block_retrieval::BlockRetrievalRequest>(&samples)?;
 
     // aliases within StructTag
     tracer.ignore_aliases("StructTag", &["type_params"])?;

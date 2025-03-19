@@ -12,6 +12,7 @@ default-run = "aptos-comparison-testing"
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-block-executor = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
 aptos-rest-client = { workspace = true }
@@ -22,8 +23,8 @@ bcs = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }
+legacy-move-compiler = { workspace = true }
 move-binary-format = { workspace = true }
-move-compiler = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
 move-package = { workspace = true }

@@ -7,7 +7,7 @@ use crate::{
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
 };
 use aptos_logger::info;
-use aptos_schemadb::SchemaBatch;
+use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::sync::Arc;
@@ -23,8 +23,8 @@ impl DBSubPruner for TransactionAccumulatorPruner {
     }
 
     fn prune(&self, current_progress: Version, target_version: Version) -> Result<()> {
-        let batch = SchemaBatch::new();
-        TransactionAccumulatorDb::prune(current_progress, target_version, &batch)?;
+        let mut batch = SchemaBatch::new();
+        TransactionAccumulatorDb::prune(current_progress, target_version, &mut batch)?;
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::TransactionAccumulatorPrunerProgress,
             &DbMetadataValue::Version(target_version),

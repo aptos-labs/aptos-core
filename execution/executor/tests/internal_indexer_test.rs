@@ -152,10 +152,10 @@ fn test_db_indexer_data() {
     // assert the data matches the expected data
     let version = internal_indexer_db.get_persisted_version().unwrap();
     assert_eq!(version, None);
-    let mut start_version = version.map_or(0, |v| v + 1);
-    while start_version < total_version {
-        start_version = db_indexer.process_a_batch(start_version).unwrap();
-    }
+    let start_version = version.map_or(0, |v| v + 1);
+    db_indexer
+        .process_a_batch(start_version, total_version)
+        .unwrap();
     // wait for the commit to finish
     thread::sleep(Duration::from_millis(100));
     // indexer has process all the transactions
@@ -175,7 +175,7 @@ fn test_db_indexer_data() {
 
     let x = internal_indexer_db.get_event_by_key_iter().unwrap();
     let res: Vec<_> = x.collect();
-    assert_eq!(res.len(), 4);
+    assert_eq!(res.len(), 16);
 
     let core_kv_iter = db_indexer
         .get_prefixed_state_value_iterator(
@@ -204,7 +204,9 @@ fn test_db_indexer_data() {
         ident_str!("acl"),
         ident_str!("any"),
         ident_str!("bcs"),
+        ident_str!("cmp"),
         ident_str!("dkg"),
+        ident_str!("mem"),
         ident_str!("code"),
         ident_str!("coin"),
         ident_str!("guid"),
@@ -235,12 +237,14 @@ fn test_db_indexer_data() {
         ident_str!("features"),
         ident_str!("from_bcs"),
         ident_str!("pool_u64"),
+        ident_str!("auth_data"),
         ident_str!("secp256k1"),
         ident_str!("timestamp"),
         ident_str!("type_info"),
         ident_str!("aggregator"),
         ident_str!("aptos_coin"),
         ident_str!("aptos_hash"),
+        ident_str!("bcs_stream"),
         ident_str!("big_vector"),
         ident_str!("bit_vector"),
         ident_str!("capability"),
@@ -248,6 +252,7 @@ fn test_db_indexer_data() {
         ident_str!("math_fixed"),
         ident_str!("randomness"),
         ident_str!("simple_map"),
+        ident_str!("ordered_map"),
         ident_str!("smart_table"),
         ident_str!("storage_gas"),
         ident_str!("chain_status"),
@@ -255,6 +260,7 @@ fn test_db_indexer_data() {
         ident_str!("gas_schedule"),
         ident_str!("managed_coin"),
         ident_str!("math_fixed64"),
+        ident_str!("rate_limiter"),
         ident_str!("ristretto255"),
         ident_str!("smart_vector"),
         ident_str!("string_utils"),
@@ -272,6 +278,7 @@ fn test_db_indexer_data() {
         ident_str!("crypto_algebra"),
         ident_str!("fungible_asset"),
         ident_str!("staking_config"),
+        ident_str!("big_ordered_map"),
         ident_str!("delegation_pool"),
         ident_str!("keyless_account"),
         ident_str!("reconfiguration"),
@@ -288,8 +295,10 @@ fn test_db_indexer_data() {
         ident_str!("randomness_config"),
         ident_str!("table_with_length"),
         ident_str!("aggregator_factory"),
+        ident_str!("account_abstraction"),
         ident_str!("governance_proposal"),
         ident_str!("optional_aggregator"),
+        ident_str!("permissioned_signer"),
         ident_str!("transaction_context"),
         ident_str!("jwk_consensus_config"),
         ident_str!("ristretto255_elgamal"),
@@ -298,6 +307,8 @@ fn test_db_indexer_data() {
         ident_str!("object_code_deployment"),
         ident_str!("primary_fungible_store"),
         ident_str!("transaction_validation"),
+        ident_str!("permissioned_delegation"),
+        ident_str!("storage_slots_allocator"),
         ident_str!("randomness_api_v0_config"),
         ident_str!("randomness_config_seqnum"),
         ident_str!("reconfiguration_with_dkg"),
@@ -342,12 +353,14 @@ fn test_db_indexer_data() {
         (false, "0x1::reconfiguration::Configuration"),
         (false, "0x1::aptos_governance::VotingRecords"),
         (false, "0x1::state_storage::StateStorageUsage"),
+        (false, "0x1::aptos_governance::VotingRecordsV2"),
         (false, "0x1::consensus_config::ConsensusConfig"),
         (false, "0x1::execution_config::ExecutionConfig"),
         (false, "0x1::timestamp::CurrentTimeMicroseconds"),
         (false, "0x1::aptos_governance::GovernanceConfig"),
         (false, "0x1::aptos_governance::GovernanceEvents"),
         (false, "0x1::randomness_config::RandomnessConfig"),
+        (false, "0x1::staking_config::StakingRewardsConfig"),
         (false, "0x1::aggregator_factory::AggregatorFactory"),
         (false, "0x1::transaction_fee::AptosCoinCapabilities"),
         (false, "0x1::transaction_fee::AptosCoinMintCapability"),
@@ -363,6 +376,10 @@ fn test_db_indexer_data() {
         (
             false,
             "0x1::randomness_config_seqnum::RandomnessConfigSeqNum",
+        ),
+        (
+            false,
+            "0x1::account_abstraction::DomainDispatchableAuthenticator",
         ),
         (false, "0x1::coin::CoinInfo<0x1::aptos_coin::AptosCoin>"),
         (

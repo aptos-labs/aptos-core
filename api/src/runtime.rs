@@ -29,7 +29,7 @@ use poem::{
     handler,
     http::Method,
     listener::{Listener, RustlsCertificate, RustlsConfig, TcpListener},
-    middleware::Cors,
+    middleware::{Compression, Cors},
     web::Html,
     EndpointExt, Route, Server,
 };
@@ -180,6 +180,7 @@ pub fn attach_poem_to_runtime(
     let spec_json = spec_endpoint_json(&api_service);
     let spec_yaml = spec_endpoint_yaml(&api_service);
 
+    let config = config.clone();
     let mut address = config.api.address;
 
     if random_port {
@@ -251,6 +252,7 @@ pub fn attach_poem_to_runtime(
                     ),
             )
             .with(cors)
+            .with_if(config.api.compression_enabled, Compression::new())
             .with(PostSizeLimit::new(size_limit))
             // NOTE: Make sure to keep this after all the `with` middleware.
             .catch_all_error(convert_error)

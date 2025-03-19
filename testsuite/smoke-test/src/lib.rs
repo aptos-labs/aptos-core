@@ -35,6 +35,8 @@ mod keyless;
 #[cfg(test)]
 mod network;
 #[cfg(test)]
+mod permissioned_delegation;
+#[cfg(test)]
 mod randomness;
 #[cfg(test)]
 mod rest_api;
@@ -66,5 +68,7 @@ mod utils;
 #[cfg(test)]
 mod validator_txns;
 
+#[cfg(test)]
+mod execution_pool;
 #[cfg(test)]
 mod workspace_builder;

@@ -34,12 +34,19 @@ use move_core_types::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{collections::BTreeMap, str::FromStr};
-use tsify_next::Tsify;
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, HashMap},
+    str::FromStr,
+};
 use wasm_bindgen::prelude::*;
 
+thread_local! {
+    static LOADED_MODULES: RefCell<BTreeMap<ModuleId, CompiledModule>> = const { RefCell::new(BTreeMap::new()) };
+}
+
 #[wasm_bindgen]
-#[derive(Tsify, Clone, Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub struct AllocatedLocal {
     op_type: ArgumentOperation,
     is_parameter: bool,
@@ -62,7 +69,6 @@ struct BuilderCall {
 #[derive(Clone, Debug)]
 #[wasm_bindgen]
 pub struct TransactionComposer {
-    modules: BTreeMap<ModuleId, CompiledModule>,
     builder: CompiledScriptBuilder,
     calls: Vec<BuilderCall>,
     parameters: Vec<Vec<u8>>,
@@ -84,7 +90,6 @@ impl TransactionComposer {
 
         let builder = CompiledScriptBuilder::new(script);
         Self {
-            modules: BTreeMap::new(),
             builder,
             calls: vec![],
             parameters: vec![],
@@ -105,7 +110,6 @@ impl TransactionComposer {
 
         let builder = CompiledScriptBuilder::new(script);
         Self {
-            modules: BTreeMap::new(),
             builder,
             calls: vec![],
             parameters: vec![],
@@ -169,16 +173,22 @@ impl TransactionComposer {
         module: String,
         function: String,
         ty_args: Vec<String>,
-        args: Vec<CallArgument>,
-    ) -> Result<Vec<CallArgument>, JsValue> {
-        self.add_batched_call(module, function, ty_args, args)
-            .map_err(|err| JsValue::from(format!("{:?}", err)))
+        args: Vec<CallArgumentWasm>,
+    ) -> Result<Vec<CallArgumentWasm>, JsValue> {
+        self.add_batched_call(
+            module,
+            function,
+            ty_args,
+            args.into_iter().map(|a| a.into()).collect(),
+        )
+        .map_err(|err| JsValue::from(format!("{:?}", err)))
+        .map(|results| results.into_iter().map(|a| a.into()).collect())
     }
 }
 
 impl TransactionComposer {
     pub fn insert_module(&mut self, module: CompiledModule) {
-        self.modules.insert(module.self_id(), module);
+        LOADED_MODULES.with(|modules| modules.borrow_mut().insert(module.self_id(), module));
     }
 
     fn check_argument_compatibility(
@@ -235,21 +245,20 @@ impl TransactionComposer {
             .collect::<anyhow::Result<Vec<_>>>()?;
         let module = ModuleId::from_str(&module)?;
         let function = Identifier::new(function)?;
+        let call_idx = LOADED_MODULES.with(|modules| match modules.borrow().get(&module) {
+            Some(module_ref) => self
+                .builder
+                .import_call_by_name(function.as_ident_str(), module_ref)
+                .map_err(|err| anyhow!("Cannot import module {}: {:?}", module, err)),
+            None => Err(anyhow!("Module {} is not yet loaded", module)),
+        })?;
 
-        let target_module = match self.modules.get(&module) {
-            Some(module) => module,
-            None => {
-                bail!("Module {} is not yet loaded", module);
-            },
-        };
-
-        let call_idx = self
-            .builder
-            .import_call_by_name(function.as_ident_str(), target_module)?;
-        let type_arguments = ty_args
-            .iter()
-            .map(|ty| import_type_tag(&mut self.builder, ty, &self.modules))
-            .collect::<PartialVMResult<Vec<_>>>()?;
+        let type_arguments = LOADED_MODULES.with(|modules| {
+            ty_args
+                .iter()
+                .map(|ty| import_type_tag(&mut self.builder, ty, &modules.borrow()))
+                .collect::<PartialVMResult<Vec<_>>>()
+        })?;
 
         let mut arguments = vec![];
         let expected_args_ty = {
@@ -312,14 +321,35 @@ impl TransactionComposer {
                 .collect::<Vec<_>>()
         };
 
-        for return_ty in expected_returns_ty {
+        let mut returned_arguments = vec![];
+        let num_of_calls = self.calls.len() as u16;
+
+        for (idx, return_ty) in expected_returns_ty.into_iter().enumerate() {
+            let ability = BinaryIndexedView::Script(self.builder.as_script())
+                .abilities(&return_ty, &[])
+                .map_err(|_| anyhow!("Failed to calculate ability for type"))?;
+
             let local_idx = self.locals_ty.len() as u16;
             self.locals_ty.push(return_ty);
             self.locals_availability.push(true);
             returns.push(local_idx);
+
+            // For values that has drop and copy ability, use copy by default to avoid calling copy manually
+            // on the client side.
+            returned_arguments.push(CallArgument::PreviousResult(PreviousResult {
+                operation_type: if ability.has_drop() && ability.has_copy() {
+                    ArgumentOperation::Copy
+                } else {
+                    ArgumentOperation::Move
+                },
+                call_idx: num_of_calls,
+                return_idx: idx as u16,
+            }));
         }
 
-        let num_of_calls = self.calls.len() as u16;
+        if self.parameters.len() + self.locals_ty.len() > u8::MAX as usize {
+            bail!("Too many locals being allocated, please truncate the transaction");
+        }
 
         self.calls.push(BuilderCall {
             type_args: type_arguments,
@@ -330,15 +360,7 @@ impl TransactionComposer {
             type_tags: ty_args,
         });
 
-        Ok((0..returns.len())
-            .map(|idx| {
-                CallArgument::PreviousResult(PreviousResult {
-                    operation_type: ArgumentOperation::Move,
-                    call_idx: num_of_calls,
-                    return_idx: idx as u16,
-                })
-            })
-            .collect())
+        Ok(returned_arguments)
     }
 
     fn check_drop_at_end(&self) -> anyhow::Result<()> {
@@ -360,6 +382,7 @@ impl TransactionComposer {
         self.check_drop_at_end()?;
         let parameters_count = self.parameters_ty.len() as u16;
         let mut script = self.builder.into_script();
+        let mut instantiations = HashMap::new();
         for call in self.calls {
             for arg in call.arguments {
                 script.code.code.push(arg.to_instruction(parameters_count)?);
@@ -372,24 +395,29 @@ impl TransactionComposer {
                 if script.function_instantiations.len() >= TableIndex::MAX as usize {
                     bail!("Too many function instantiations");
                 }
-                let fi_idx =
-                    FunctionInstantiationIndex(script.function_instantiations.len() as u16);
-
                 let type_parameters = import_signature(&mut script, Signature(call.type_args))?;
 
-                script.function_instantiations.push(FunctionInstantiation {
+                let inst = FunctionInstantiation {
                     handle: call.call_idx,
                     type_parameters,
-                });
-                script.code.code.push(Bytecode::CallGeneric(fi_idx));
+                };
+                if let Some(idx) = instantiations.get(&inst) {
+                    script.code.code.push(Bytecode::CallGeneric(*idx));
+                } else {
+                    let fi_idx =
+                        FunctionInstantiationIndex(script.function_instantiations.len() as u16);
+                    script.function_instantiations.push(inst.clone());
+                    instantiations.insert(inst, fi_idx);
+                    script.code.code.push(Bytecode::CallGeneric(fi_idx));
+                }
             }
 
             // Storing return values
-            for arg in call.returns {
+            for arg in call.returns.iter().rev() {
                 script
                     .code
                     .code
-                    .push(Bytecode::StLoc((arg + parameters_count) as u8));
+                    .push(Bytecode::StLoc((*arg + parameters_count) as u8));
             }
         }
         script.code.code.push(Bytecode::Ret);
@@ -445,12 +473,9 @@ impl TransactionComposer {
 
         match bytes_result {
             Ok(bytes_hex) => {
-                self.modules.insert(
-                    module_id,
-                    CompiledModule::deserialize(
-                        hex::decode(bytes_hex.replace("0x", "").replace('\"', ""))?.as_slice(),
-                    )?,
-                );
+                self.insert_module(CompiledModule::deserialize(
+                    hex::decode(bytes_hex.replace("0x", "").replace('\"', ""))?.as_slice(),
+                )?);
                 Ok(())
             },
             Err(_message) => Ok(()),
@@ -552,5 +577,91 @@ impl AllocatedLocal {
             ArgumentOperation::Move => Bytecode::MoveLoc(local_idx as u8),
             ArgumentOperation::Copy => Bytecode::CopyLoc(local_idx as u8),
         })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum ArgumentType {
+    Signer,
+    Raw,
+    PreviousResult,
+}
+
+/// WASM Representation of CallArgument. This is because wasm_bindgen can only support c-style enum.
+#[wasm_bindgen(js_name = "CallArgument")]
+#[derive(Clone, Debug)]
+pub struct CallArgumentWasm {
+    ty: ArgumentType,
+    signer: Option<u16>,
+    raw: Option<Vec<u8>>,
+    previous_result: Option<PreviousResult>,
+}
+
+impl From<CallArgument> for CallArgumentWasm {
+    fn from(value: CallArgument) -> Self {
+        match value {
+            CallArgument::PreviousResult(r) => CallArgumentWasm {
+                ty: ArgumentType::PreviousResult,
+                signer: None,
+                raw: None,
+                previous_result: Some(r),
+            },
+            CallArgument::Raw(b) => CallArgumentWasm {
+                ty: ArgumentType::Raw,
+                signer: None,
+                raw: Some(b),
+                previous_result: None,
+            },
+            CallArgument::Signer(i) => CallArgumentWasm {
+                ty: ArgumentType::Signer,
+                signer: Some(i),
+                raw: None,
+                previous_result: None,
+            },
+        }
+    }
+}
+
+impl From<CallArgumentWasm> for CallArgument {
+    fn from(value: CallArgumentWasm) -> Self {
+        match value.ty {
+            ArgumentType::PreviousResult => {
+                CallArgument::PreviousResult(value.previous_result.unwrap())
+            },
+            ArgumentType::Raw => CallArgument::Raw(value.raw.unwrap()),
+            ArgumentType::Signer => CallArgument::Signer(value.signer.unwrap()),
+        }
+    }
+}
+
+#[wasm_bindgen(js_class = "CallArgument")]
+impl CallArgumentWasm {
+    #[wasm_bindgen(js_name = newBytes)]
+    pub fn new_bytes(bytes: Vec<u8>) -> Self {
+        CallArgument::Raw(bytes).into()
+    }
+
+    #[wasm_bindgen(js_name = newSigner)]
+    pub fn new_signer(signer_idx: u16) -> Self {
+        CallArgument::Signer(signer_idx).into()
+    }
+
+    pub fn borrow(&self) -> Result<Self, String> {
+        self.change_op_type(ArgumentOperation::Borrow)
+    }
+
+    #[wasm_bindgen(js_name = borrowMut)]
+    pub fn borrow_mut(&self) -> Result<Self, String> {
+        self.change_op_type(ArgumentOperation::BorrowMut)
+    }
+
+    pub fn copy(&self) -> Result<Self, String> {
+        self.change_op_type(ArgumentOperation::Copy)
+    }
+
+    fn change_op_type(&self, operation_type: ArgumentOperation) -> Result<Self, String> {
+        Ok(CallArgument::from(self.clone())
+            .change_op_type(operation_type)?
+            .into())
     }
 }

@@ -9,7 +9,13 @@ use std::{ops::Deref, sync::Arc};
 
 pub trait WithBytes {
     fn bytes(&self) -> &Bytes;
+}
 
+pub trait WithSize {
+    fn size_in_bytes(&self) -> usize;
+}
+
+impl<T: WithBytes> WithSize for T {
     fn size_in_bytes(&self) -> usize {
         self.bytes().len()
     }
@@ -59,6 +65,11 @@ where
     /// Returns new verified code.
     pub fn from_verified(verified_code: V) -> Self {
         Self::Verified(Arc::new(verified_code))
+    }
+
+    /// Returns new verified code from [Arc]ed instance.
+    pub fn from_arced_verified(verified_code: Arc<V>) -> Self {
+        Self::Verified(verified_code)
     }
 
     /// Returns true if the code is verified.

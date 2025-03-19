@@ -3,11 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    code_cache_global::ImmutableModuleCache,
-    counters,
+    code_cache_global::GlobalModuleCache,
+    code_cache_global_manager::AptosModuleCacheManagerGuard,
     counters::{
-        PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
-        TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
+        self, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK, PARALLEL_EXECUTION_SECONDS,
+        RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, VM_INIT_SECONDS,
+        WORK_WITH_TASK_SECONDS,
     },
     errors::*,
     executor_utilities::*,
@@ -17,6 +18,7 @@ use crate::{
     task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::{KeyKind, TxnLastInputOutput},
+    txn_provider::TxnProvider,
     types::ReadWriteSummary,
     view::{LatestView, ParallelState, SequentialState, ViewState},
 };
@@ -25,7 +27,7 @@ use aptos_aggregator::{
     delta_change_set::serialize,
 };
 use aptos_drop_helper::DEFAULT_DROPPER;
-use aptos_logger::{debug, error, info};
+use aptos_logger::{error, info};
 use aptos_mvhashmap::{
     types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
     unsync_map::UnsyncMap,
@@ -35,7 +37,6 @@ use aptos_mvhashmap::{
 use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     error::{code_invariant_error, expect_ok, PanicError, PanicOr},
-    executable::Executable,
     on_chain_config::BlockGasLimitType,
     state_store::{state_value::StateValue, TStateView},
     transaction::{
@@ -44,6 +45,7 @@ use aptos_types::{
     vm::modules::AptosModuleExtension,
     write_set::{TransactionWrite, WriteOp},
 };
+use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
 use aptos_vm_types::{
     change_set::randomly_check_layout_matches, module_write_set::ModuleWrite,
@@ -56,7 +58,7 @@ use fail::fail_point;
 use move_binary_format::CompiledModule;
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
-use move_vm_types::code::ModuleCache;
+use move_vm_types::{code::ModuleCache, delayed_values::delayed_field_id::DelayedFieldID};
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
@@ -69,44 +71,40 @@ use std::{
     },
 };
 
-pub struct BlockExecutor<T, E, S, L, X> {
+pub struct BlockExecutor<T, E, S, L, TP> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     config: BlockExecutorConfig,
     executor_thread_pool: Arc<rayon::ThreadPool>,
-    global_module_cache:
-        Arc<ImmutableModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>>,
     transaction_commit_hook: Option<L>,
-    phantom: PhantomData<(T, E, S, L, X)>,
+    phantom: PhantomData<(T, E, S, L, TP)>,
 }
 
-impl<T, E, S, L, X> BlockExecutor<T, E, S, L, X>
+impl<T, E, S, L, TP> BlockExecutor<T, E, S, L, TP>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
     L: TransactionCommitHook<Output = E::Output>,
-    X: Executable + 'static,
+    TP: TxnProvider<T> + Sync,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
     pub fn new(
         config: BlockExecutorConfig,
         executor_thread_pool: Arc<ThreadPool>,
-        global_module_cache: Arc<
-            ImmutableModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
-        >,
         transaction_commit_hook: Option<L>,
     ) -> Self {
+        let num_cpus = num_cpus::get();
         assert!(
-            config.local.concurrency_level > 0 && config.local.concurrency_level <= num_cpus::get(),
-            "Parallel execution concurrency level {} should be between 1 and number of CPUs",
-            config.local.concurrency_level
+            config.local.concurrency_level > 0 && config.local.concurrency_level <= num_cpus,
+            "Parallel execution concurrency level {} should be between 1 and number of CPUs ({})",
+            config.local.concurrency_level,
+            num_cpus,
         );
         Self {
             config,
             executor_thread_pool,
-            global_module_cache,
             transaction_commit_hook,
             phantom: PhantomData,
         }
@@ -115,22 +113,22 @@ where
     fn execute(
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
-        signature_verified_block: &[T],
+        signature_verified_block: &TP,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         executor: &E,
         base_view: &S,
-        global_module_cache: &ImmutableModuleCache<
+        global_module_cache: &GlobalModuleCache<
             ModuleId,
             CompiledModule,
             Module,
             AptosModuleExtension,
         >,
         runtime_environment: &RuntimeEnvironment,
-        parallel_state: ParallelState<T, X>,
+        parallel_state: ParallelState<T>,
     ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
-        let txn = &signature_verified_block[idx_to_execute as usize];
+        let txn = signature_verified_block.get_txn(idx_to_execute);
 
         // VM execution.
         let sync_view = LatestView::new(
@@ -185,12 +183,6 @@ where
                             group_key,
                         )));
                     },
-                    Some(KeyKind::Module) => {
-                        return Err(code_invariant_error(format!(
-                            "Group key {:?} recorded as module KeyKind",
-                            group_key,
-                        )));
-                    },
                     None => {
                         // Previously no write to the group at all.
                         needs_suffix_validation = true;
@@ -221,7 +213,7 @@ where
 
             let resource_write_set = output.resource_write_set();
 
-            // Then, process resource & aggregator_v1 & module writes.
+            // Then, process resource & aggregator_v1 writes.
             for (k, v, maybe_layout) in resource_write_set.clone().into_iter().chain(
                 output
                     .aggregator_v1_write_set()
@@ -234,21 +226,6 @@ where
                 versioned_cache
                     .data()
                     .write(k, idx_to_execute, incarnation, v, maybe_layout);
-            }
-
-            for (k, v) in output.module_write_set().into_iter() {
-                if !runtime_environment.vm_config().use_loader_v2 {
-                    if prev_modified_keys.remove(&k).is_none() {
-                        needs_suffix_validation = true;
-                    }
-
-                    #[allow(deprecated)]
-                    versioned_cache.deprecated_modules().write(
-                        k,
-                        idx_to_execute,
-                        v.into_write_op(),
-                    );
-                }
             }
 
             // Then, apply deltas.
@@ -347,14 +324,6 @@ where
             use KeyKind::*;
             match kind {
                 Resource => versioned_cache.data().remove(&k, idx_to_execute),
-                Module => {
-                    if !runtime_environment.vm_config().use_loader_v2 {
-                        #[allow(deprecated)]
-                        versioned_cache
-                            .deprecated_modules()
-                            .remove(&k, idx_to_execute);
-                    }
-                },
                 Group(tags) => {
                     // A change in state observable during speculative execution
                     // (which includes group metadata and size) changes, suffix
@@ -381,34 +350,26 @@ where
             versioned_cache.delayed_fields().remove(&id, idx_to_execute);
         }
 
-        if !last_input_output.record(
+        last_input_output.record(
             idx_to_execute,
             read_set,
             result,
             resource_write_set,
             group_keys_and_tags,
-            runtime_environment,
-        ) {
-            // Module R/W is an expected fallback behavior, no alert is required.
-            debug!("[Execution] At txn {}, Module read & write", idx_to_execute);
-
-            return Err(PanicOr::Or(
-                ParallelBlockExecutionError::ModulePathReadWriteError,
-            ));
-        }
+        );
         Ok(needs_suffix_validation)
     }
 
     fn validate(
         idx_to_validate: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        global_module_cache: &ImmutableModuleCache<
+        global_module_cache: &GlobalModuleCache<
             ModuleId,
             CompiledModule,
             Module,
             AptosModuleExtension,
         >,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler: &Scheduler,
     ) -> bool {
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
@@ -438,8 +399,7 @@ where
     fn update_transaction_on_abort(
         txn_idx: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-        runtime_environment: &RuntimeEnvironment,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
     ) {
         counters::SPECULATIVE_ABORT_COUNT.inc();
 
@@ -452,16 +412,6 @@ where
                 use KeyKind::*;
                 match kind {
                     Resource => versioned_cache.data().mark_estimate(&k, txn_idx),
-                    Module => {
-                        // In V2 loader implementation, all modules writes are "estimates":
-                        // they are pending and not visible until committed.
-                        if !runtime_environment.vm_config().use_loader_v2 {
-                            #[allow(deprecated)]
-                            versioned_cache
-                                .deprecated_modules()
-                                .mark_estimate(&k, txn_idx)
-                        }
-                    },
                     Group(tags) => {
                         // Validation for both group size and metadata is based on values.
                         // Execution may wait for estimates.
@@ -492,19 +442,13 @@ where
         valid: bool,
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler: &Scheduler,
-        runtime_environment: &RuntimeEnvironment,
     ) -> Result<SchedulerTask, PanicError> {
         let aborted = !valid && scheduler.try_abort(txn_idx, incarnation);
 
         if aborted {
-            Self::update_transaction_on_abort(
-                txn_idx,
-                last_input_output,
-                versioned_cache,
-                runtime_environment,
-            );
+            Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
             scheduler.finish_abort(txn_idx, incarnation)
         } else {
             scheduler.finish_validation(txn_idx, validation_wave);
@@ -522,7 +466,7 @@ where
     /// returns false (indicating that transaction needs to be re-executed).
     fn validate_and_commit_delayed_fields(
         txn_idx: TxnIndex,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
     ) -> Result<bool, PanicError> {
         let read_set = last_input_output
@@ -560,20 +504,27 @@ where
     /// in outputs, which is heavier (due to serialization / deserialization, copies, etc). Moreover,
     /// since prepare_and_queue_commit_ready_txns takes care of synchronization in the flag-combining
     /// way, the materialization can be almost embarrassingly parallelizable.
+    #[allow(clippy::too_many_arguments)]
     fn prepare_and_queue_commit_ready_txns(
         &self,
         block_gas_limit_type: &BlockGasLimitType,
         scheduler: &Scheduler,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler_task: &mut SchedulerTask,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         base_view: &S,
+        global_module_cache: &GlobalModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >,
         runtime_environment: &RuntimeEnvironment,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         executor: &E,
-        block: &[T],
+        block: &TP,
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let mut block_limit_processor = shared_commit_state.acquire();
@@ -587,12 +538,7 @@ where
             )? {
                 // Transaction needs to be re-executed, one final time.
 
-                Self::update_transaction_on_abort(
-                    txn_idx,
-                    last_input_output,
-                    versioned_cache,
-                    runtime_environment,
-                );
+                Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
                 // We are going to skip reducing validation index here, as we
                 // are executing immediately, and will reduce it unconditionally
                 // after execution, inside finish_execution_during_commit.
@@ -605,7 +551,7 @@ where
                     versioned_cache,
                     executor,
                     base_view,
-                    self.global_module_cache.as_ref(),
+                    global_module_cache,
                     runtime_environment,
                     ParallelState::new(
                         versioned_cache,
@@ -617,19 +563,17 @@ where
 
                 // Publish modules before we decrease validation index so that validations observe
                 // the new module writes as well.
-                if runtime_environment.vm_config().use_loader_v2 {
-                    let module_write_set = last_input_output.module_write_set(txn_idx);
-                    if !module_write_set.is_empty() {
-                        executed_at_commit = true;
-                        Self::publish_module_writes(
-                            txn_idx,
-                            module_write_set,
-                            self.global_module_cache.as_ref(),
-                            versioned_cache,
-                            scheduler,
-                            runtime_environment,
-                        )?;
-                    }
+                let module_write_set = last_input_output.module_write_set(txn_idx);
+                if !module_write_set.is_empty() {
+                    executed_at_commit = true;
+                    Self::publish_module_writes(
+                        txn_idx,
+                        module_write_set,
+                        global_module_cache,
+                        versioned_cache,
+                        scheduler,
+                        runtime_environment,
+                    )?;
                 }
 
                 scheduler.wake_dependencies_and_decrease_validation_idx(txn_idx)?;
@@ -637,7 +581,7 @@ where
                 let validation_result = Self::validate(
                     txn_idx,
                     last_input_output,
-                    self.global_module_cache.as_ref(),
+                    global_module_cache,
                     versioned_cache,
                     scheduler,
                 );
@@ -660,13 +604,13 @@ where
             // If transaction was committed without delayed fields failing, i.e., without
             // re-execution, we make the published modules visible here. As a result, we need to
             // decrease the validation index to make sure the subsequent transactions see changes.
-            if !executed_at_commit && runtime_environment.vm_config().use_loader_v2 {
+            if !executed_at_commit {
                 let module_write_set = last_input_output.module_write_set(txn_idx);
                 if !module_write_set.is_empty() {
                     Self::publish_module_writes(
                         txn_idx,
                         module_write_set,
-                        self.global_module_cache.as_ref(),
+                        global_module_cache,
                         versioned_cache,
                         scheduler,
                         runtime_environment,
@@ -688,7 +632,7 @@ where
                         .map(|approx_output| {
                             approx_output
                                 + if block_gas_limit_type.include_user_txn_size_in_block_output() {
-                                    block[txn_idx as usize].user_txn_bytes_len()
+                                    block.get_txn(txn_idx).user_txn_bytes_len()
                                 } else {
                                     0
                                 } as u64
@@ -755,13 +699,13 @@ where
     fn publish_module_writes(
         txn_idx: TxnIndex,
         module_write_set: BTreeMap<T::Key, ModuleWrite<T::Value>>,
-        global_module_cache: &ImmutableModuleCache<
+        global_module_cache: &GlobalModuleCache<
             ModuleId,
             CompiledModule,
             Module,
             AptosModuleExtension,
         >,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler: &Scheduler,
         runtime_environment: &RuntimeEnvironment,
     ) -> Result<(), PanicError> {
@@ -783,7 +727,7 @@ where
     fn materialize_aggregator_v1_delta_writes(
         txn_idx: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         base_view: &S,
     ) -> Vec<(T::Key, WriteOp)> {
         // Materialize all the aggregator v1 deltas.
@@ -835,16 +779,22 @@ where
     fn materialize_txn_commit(
         &self,
         txn_idx: TxnIndex,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler: &Scheduler,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         base_view: &S,
+        global_module_cache: &GlobalModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >,
         runtime_environment: &RuntimeEnvironment,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
     ) -> Result<(), PanicError> {
-        let parallel_state = ParallelState::<T, X>::new(
+        let parallel_state = ParallelState::<T>::new(
             versioned_cache,
             scheduler,
             start_shared_counter,
@@ -852,7 +802,7 @@ where
         );
         let latest_view = LatestView::new(
             base_view,
-            self.global_module_cache.as_ref(),
+            global_module_cache,
             runtime_environment,
             ViewState::Sync(parallel_state),
             txn_idx,
@@ -939,13 +889,19 @@ where
 
     fn worker_loop(
         &self,
-        env: &E::Environment,
-        block: &[T],
+        environment: &AptosEnvironment,
+        block: &TP,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler: &Scheduler,
         // TODO: should not need to pass base view.
         base_view: &S,
+        global_module_cache: &GlobalModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
@@ -953,13 +909,13 @@ where
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
-        let num_txns = block.len();
+        let num_txns = block.num_txns();
         let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(env.clone(), base_view);
+        let executor = E::init(environment, base_view);
         drop(init_timer);
 
         // Shared environment used by each executor.
-        let runtime_environment = env.runtime_environment();
+        let runtime_environment = environment.runtime_environment();
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::Retry;
@@ -974,6 +930,7 @@ where
                     shared_counter,
                     last_input_output,
                     base_view,
+                    global_module_cache,
                     runtime_environment,
                     final_results,
                 )?;
@@ -1001,6 +958,7 @@ where
                     last_input_output,
                     shared_commit_state,
                     base_view,
+                    global_module_cache,
                     runtime_environment,
                     start_shared_counter,
                     shared_counter,
@@ -1018,7 +976,7 @@ where
                     let valid = Self::validate(
                         txn_idx,
                         last_input_output,
-                        self.global_module_cache.as_ref(),
+                        global_module_cache,
                         versioned_cache,
                         scheduler,
                     );
@@ -1030,7 +988,6 @@ where
                         last_input_output,
                         versioned_cache,
                         scheduler,
-                        runtime_environment,
                     )?
                 },
                 SchedulerTask::ExecutionTask(
@@ -1046,7 +1003,7 @@ where
                         versioned_cache,
                         &executor,
                         base_view,
-                        self.global_module_cache.as_ref(),
+                        global_module_cache,
                         runtime_environment,
                         ParallelState::new(
                             versioned_cache,
@@ -1081,9 +1038,9 @@ where
 
     pub(crate) fn execute_transactions_parallel(
         &self,
-        env: &E::Environment,
-        signature_verified_block: &[T],
+        signature_verified_block: &TP,
         base_view: &S,
+        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
     ) -> Result<BlockOutput<E::Output>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
@@ -1099,15 +1056,16 @@ where
         let start_shared_counter = gen_id_start_value(false);
         let shared_counter = AtomicU32::new(start_shared_counter);
 
-        if signature_verified_block.is_empty() {
+        let num_txns = signature_verified_block.num_txns();
+        if num_txns == 0 {
             return Ok(BlockOutput::new(vec![], self.empty_block_end_info()));
         }
 
-        let num_txns = signature_verified_block.len();
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
 
         let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             self.config.onchain.block_gas_limit_type.clone(),
+            self.config.onchain.block_gas_limit_override(),
             num_txns,
         ));
         let shared_maybe_error = AtomicBool::new(false);
@@ -1130,12 +1088,13 @@ where
             for _ in 0..num_workers {
                 s.spawn(|_| {
                     if let Err(err) = self.worker_loop(
-                        env,
+                        module_cache_manager_guard.environment(),
                         signature_verified_block,
                         &last_input_output,
                         &versioned_cache,
                         &scheduler,
                         base_view,
+                        module_cache_manager_guard.module_cache(),
                         start_shared_counter,
                         &shared_counter,
                         &shared_commit_state,
@@ -1168,8 +1127,9 @@ where
         }
 
         counters::update_state_counters(versioned_cache.stats(), true);
-        self.global_module_cache
-            .insert_verified_unchecked(versioned_cache.take_modules_iter())
+        module_cache_manager_guard
+            .module_cache_mut()
+            .insert_verified(versioned_cache.take_modules_iter())
             .map_err(|err| {
                 alert!("[BlockSTM] Encountered panic error: {:?}", err);
             })?;
@@ -1198,7 +1158,7 @@ where
         write: ModuleWrite<T::Value>,
         txn_idx: TxnIndex,
         runtime_environment: &RuntimeEnvironment,
-        global_module_cache: &ImmutableModuleCache<
+        global_module_cache: &GlobalModuleCache<
             ModuleId,
             CompiledModule,
             Module,
@@ -1220,22 +1180,17 @@ where
 
         // Since we have successfully serialized the module when converting into this transaction
         // write, the deserialization should never fail.
-        let (compiled_module, _, _) = runtime_environment
+        let compiled_module = runtime_environment
             .deserialize_into_compiled_module(state_value.bytes())
             .map_err(|err| {
                 let msg = format!("Failed to construct the module from state value: {:?}", err);
                 PanicError::CodeInvariantError(msg)
             })?;
-        let extension = AptosModuleExtension::new(state_value);
+        let extension = Arc::new(AptosModuleExtension::new(state_value));
 
-        global_module_cache.mark_invalid(&id);
+        global_module_cache.mark_overridden(&id);
         per_block_module_cache
-            .insert_deserialized_module(
-                id.clone(),
-                compiled_module,
-                Arc::new(extension),
-                Some(txn_idx),
-            )
+            .insert_deserialized_module(id.clone(), compiled_module, extension, Some(txn_idx))
             .map_err(|err| {
                 let msg = format!(
                     "Failed to insert code for module {}::{} at version {} to module cache: {:?}",
@@ -1252,13 +1207,13 @@ where
     fn apply_output_sequential(
         txn_idx: TxnIndex,
         runtime_environment: &RuntimeEnvironment,
-        global_module_cache: &ImmutableModuleCache<
+        global_module_cache: &GlobalModuleCache<
             ModuleId,
             CompiledModule,
             Module,
             AptosModuleExtension,
         >,
-        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, T::Identifier>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         output: &E::Output,
         resource_write_set: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
     ) -> Result<(), SequentialBlockExecutionError<E::Error>> {
@@ -1277,19 +1232,14 @@ where
             unsync_map.write(key, Arc::new(write_op), None);
         }
 
-        for (key, write) in output.module_write_set().into_iter() {
-            if runtime_environment.vm_config().use_loader_v2 {
-                Self::add_module_write_to_module_cache(
-                    write,
-                    txn_idx,
-                    runtime_environment,
-                    global_module_cache,
-                    unsync_map.module_cache(),
-                )?;
-            } else {
-                #[allow(deprecated)]
-                unsync_map.write_module(key, write.into_write_op());
-            }
+        for (_, write) in output.module_write_set().into_iter() {
+            Self::add_module_write_to_module_cache(
+                write,
+                txn_idx,
+                runtime_environment,
+                global_module_cache,
+                unsync_map.module_cache(),
+            )?;
         }
 
         let mut second_phase = Vec::new();
@@ -1344,34 +1294,33 @@ where
 
     pub(crate) fn execute_transactions_sequential(
         &self,
-        env: &E::Environment,
-        signature_verified_block: &[T],
+        signature_verified_block: &TP,
         base_view: &S,
+        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
         resource_group_bcs_fallback: bool,
     ) -> Result<BlockOutput<E::Output>, SequentialBlockExecutionError<E::Error>> {
-        let num_txns = signature_verified_block.len();
+        let num_txns = signature_verified_block.num_txns();
         let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(env.clone(), base_view);
+        let environment = module_cache_manager_guard.environment();
+        let executor = E::init(environment, base_view);
         drop(init_timer);
 
-        let runtime_environment = env.runtime_environment();
-
+        let runtime_environment = environment.runtime_environment();
         let start_counter = gen_id_start_value(true);
         let counter = RefCell::new(start_counter);
         let unsync_map = UnsyncMap::new();
         let mut ret = Vec::with_capacity(num_txns);
         let mut block_limit_processor = BlockGasLimitProcessor::<T>::new(
             self.config.onchain.block_gas_limit_type.clone(),
+            self.config.onchain.block_gas_limit_override(),
             num_txns,
         );
 
-        let last_input_output: TxnLastInputOutput<T, E::Output, E::Error> =
-            TxnLastInputOutput::new(num_txns as TxnIndex);
-
-        for (idx, txn) in signature_verified_block.iter().enumerate() {
-            let latest_view = LatestView::<T, S, X>::new(
+        for idx in 0..num_txns {
+            let txn = signature_verified_block.get_txn(idx as TxnIndex);
+            let latest_view = LatestView::<T, S>::new(
                 base_view,
-                self.global_module_cache.as_ref(),
+                module_cache_manager_guard.module_cache(),
                 runtime_environment,
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
@@ -1445,17 +1394,6 @@ where
                                 output.get_write_summary(),
                             )
                         });
-
-                    #[allow(clippy::collapsible_if)]
-                    if !runtime_environment.vm_config().use_loader_v2 {
-                        #[allow(deprecated)]
-                        if last_input_output.check_and_append_module_rw_conflict(
-                            sequential_reads.deprecated_module_reads.iter(),
-                            output.module_write_set().keys(),
-                        ) {
-                            block_limit_processor.process_module_rw_conflict();
-                        }
-                    }
 
                     block_limit_processor.accumulate_fee_statement(
                         fee_statement,
@@ -1563,7 +1501,7 @@ where
                     Self::apply_output_sequential(
                         idx as TxnIndex,
                         runtime_environment,
-                        self.global_module_cache.as_ref(),
+                        module_cache_manager_guard.module_cache(),
                         &unsync_map,
                         &output,
                         resource_write_set.clone(),
@@ -1651,8 +1589,9 @@ where
         ret.resize_with(num_txns, E::Output::skip_output);
 
         counters::update_state_counters(unsync_map.stats(), false);
-        self.global_module_cache
-            .insert_verified_unchecked(unsync_map.into_modules_iter())?;
+        module_cache_manager_guard
+            .module_cache_mut()
+            .insert_verified(unsync_map.into_modules_iter())?;
 
         let block_end_info = if self
             .config
@@ -1688,13 +1627,18 @@ where
 
     pub fn execute_block(
         &self,
-        env: E::Environment,
-        signature_verified_block: &[T],
+        signature_verified_block: &TP,
         base_view: &S,
+        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
     ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
+        let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
+
         if self.config.local.concurrency_level > 1 {
-            let parallel_result =
-                self.execute_transactions_parallel(&env, signature_verified_block, base_view);
+            let parallel_result = self.execute_transactions_parallel(
+                signature_verified_block,
+                base_view,
+                module_cache_manager_guard,
+            );
 
             // If parallel gave us result, return it
             if let Ok(output) = parallel_result {
@@ -1707,19 +1651,25 @@ where
 
             // All logs from the parallel execution should be cleared and not reported.
             // Clear by re-initializing the speculative logs.
-            init_speculative_logs(signature_verified_block.len());
+            init_speculative_logs(signature_verified_block.num_txns());
 
-            // Flush the cache and the environment to re-run from the "clean" state.
-            env.runtime_environment()
-                .flush_struct_name_and_info_caches();
-            self.global_module_cache.flush_unchecked();
+            // Flush all caches to re-run from the "clean" state.
+            module_cache_manager_guard
+                .environment()
+                .runtime_environment()
+                .flush_struct_name_and_tag_caches();
+            module_cache_manager_guard.module_cache_mut().flush();
 
             info!("parallel execution requiring fallback");
         }
 
         // If we didn't run parallel, or it didn't finish successfully - run sequential
-        let sequential_result =
-            self.execute_transactions_sequential(&env, signature_verified_block, base_view, false);
+        let sequential_result = self.execute_transactions_sequential(
+            signature_verified_block,
+            base_view,
+            module_cache_manager_guard,
+            false,
+        );
 
         // If sequential gave us result, return it
         let sequential_error = match sequential_result {
@@ -1735,12 +1685,12 @@ where
                 // and whether clearing them below is needed at all.
                 // All logs from the first pass of sequential execution should be cleared and not reported.
                 // Clear by re-initializing the speculative logs.
-                init_speculative_logs(signature_verified_block.len());
+                init_speculative_logs(signature_verified_block.num_txns());
 
                 let sequential_result = self.execute_transactions_sequential(
-                    &env,
                     signature_verified_block,
                     base_view,
+                    module_cache_manager_guard,
                     true,
                 );
 
@@ -1772,8 +1722,7 @@ where
                     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
                 },
             };
-            let ret = signature_verified_block
-                .iter()
+            let ret = (0..signature_verified_block.num_txns())
                 .map(|_| E::Output::discard_output(error_code))
                 .collect();
             return Ok(BlockOutput::new(ret, self.empty_block_end_info()));

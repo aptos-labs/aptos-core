@@ -12,6 +12,17 @@ anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 colored = { workspace = true }
 itertools = { workspace = true }
+legacy-move-compiler = { workspace = true }
+move-abigen = { workspace = true }
+move-binary-format = { workspace = true }
+move-bytecode-source-map = { workspace = true }
+move-bytecode-utils = { workspace = true }
+move-command-line-common = { workspace = true }
+move-compiler-v2 = { workspace = true }
+move-core-types = { workspace = true }
+move-docgen = { workspace = true }
+move-model = { workspace = true }
+move-symbol-pool = { workspace = true }
 named-lock = { workspace = true }
 once_cell = { workspace = true }
 petgraph = { workspace = true }
@@ -20,27 +31,9 @@ serde = { workspace = true, features = ["derive"] }
 serde_yaml = { workspace = true }
 sha2 = { workspace = true }
 tempfile = { workspace = true }
+termcolor = { workspace = true }
 toml = { workspace = true }
 walkdir = { workspace = true }
-
-evm-exec-utils = { path = "../../evm/exec-utils", optional = true }
-hex = { workspace = true, optional = true }
-move-abigen = { path = "../../move-prover/move-abigen" }
-
-move-binary-format = { path = "../../move-binary-format" }
-move-bytecode-source-map = { path = "../../move-ir-compiler/move-bytecode-source-map" }
-move-bytecode-utils = { path = "../move-bytecode-utils" }
-move-command-line-common = { path = "../../move-command-line-common" }
-move-compiler = { path = "../../move-compiler" }
-move-compiler-v2 = { path = "../../move-compiler-v2" }
-move-core-types = { path = "../../move-core/types" }
-move-docgen = { path = "../../move-prover/move-docgen" }
-move-model = { path = "../../move-model" }
-move-symbol-pool = { path = "../../move-symbol-pool" }
-
-move-to-yul = { path = "../../evm/move-to-yul", optional = true }
-termcolor = { workspace = true }
-
 whoami = { workspace = true }
 
 [dev-dependencies]
@@ -50,6 +43,3 @@ move-stdlib = { path = "../../move-stdlib" }
 [[test]]
 name = "test_runner"
 harness = false
-
-[features]
-evm-backend = ["move-to-yul", "evm-exec-utils", "hex"]

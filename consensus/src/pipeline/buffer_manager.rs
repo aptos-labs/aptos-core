@@ -38,8 +38,7 @@ use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::Protoc
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress, epoch_change::EpochChangeProof, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
+    account_address::AccountAddress, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
 };
 use bytes::Bytes;
 use fail::fail_point;
@@ -127,8 +126,12 @@ pub struct BufferManager {
     commit_proof_rb_handle: Option<DropGuard>,
 
     // message received from the network
-    commit_msg_rx:
-        Option<aptos_channels::aptos_channel::Receiver<AccountAddress, IncomingCommitRequest>>,
+    commit_msg_rx: Option<
+        aptos_channels::aptos_channel::Receiver<
+            AccountAddress,
+            (AccountAddress, IncomingCommitRequest),
+        >,
+    >,
 
     persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
     persisting_phase_rx: Receiver<ExecutorResult<Round>>,
@@ -171,6 +174,7 @@ pub struct BufferManager {
     // If the buffer manager receives a commit vote for a block that is not in buffer items, then
     // the vote will be cached. We can cache upto max_pending_rounds_in_commit_vote_cache (100) blocks.
     pending_commit_votes: BTreeMap<Round, HashMap<AccountAddress, CommitVote>>,
+    new_pipeline_enabled: bool,
 }
 
 impl BufferManager {
@@ -186,7 +190,7 @@ impl BufferManager {
         commit_msg_tx: Arc<NetworkSender>,
         commit_msg_rx: aptos_channels::aptos_channel::Receiver<
             AccountAddress,
-            IncomingCommitRequest,
+            (AccountAddress, IncomingCommitRequest),
         >,
         persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
         persisting_phase_rx: Receiver<ExecutorResult<Round>>,
@@ -202,6 +206,7 @@ impl BufferManager {
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
         max_pending_rounds_in_commit_vote_cache: u64,
+        new_pipeline_enabled: bool,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
@@ -266,6 +271,7 @@ impl BufferManager {
 
             max_pending_rounds_in_commit_vote_cache,
             pending_commit_votes: BTreeMap::new(),
+            new_pipeline_enabled,
         }
     }
 
@@ -393,7 +399,8 @@ impl BufferManager {
         } = ordered_blocks;
 
         info!(
-            "Receive ordered block {}, the queue size is {}",
+            "Receive {} ordered block ends with {}, the queue size is {}",
+            ordered_blocks.len(),
             ordered_proof.commit_info(),
             self.buffer.len() + 1,
         );
@@ -473,6 +480,7 @@ impl BufferManager {
             let request = self.create_new_request(SigningRequest {
                 ordered_ledger_info: executed_item.ordered_proof.clone(),
                 commit_ledger_info: executed_item.partial_commit_proof.data().clone(),
+                blocks: executed_item.executed_blocks.clone(),
             });
             if cursor == self.signing_root {
                 let sender = self.signing_phase_tx.clone();
@@ -539,12 +547,6 @@ impl BufferManager {
                     }))
                     .await
                     .expect("Failed to send persist request");
-                // this needs to be done after creating the persisting request to avoid it being lost
-                if commit_proof.ledger_info().ends_epoch() {
-                    self.commit_msg_tx
-                        .send_epoch_change(EpochChangeProof::new(vec![commit_proof], false))
-                        .await;
-                }
                 info!("Advance head to {:?}", self.buffer.head_cursor());
                 self.previous_commit_time = Instant::now();
                 return;
@@ -557,6 +559,13 @@ impl BufferManager {
     /// Internal requests are managed with ongoing_tasks.
     /// Incoming ordered blocks are pulled, it should only have existing blocks but no new blocks until reset finishes.
     async fn reset(&mut self) {
+        while let Some(item) = self.buffer.pop_front() {
+            for b in item.get_blocks() {
+                if let Some(futs) = b.abort_pipeline() {
+                    futs.wait_until_finishes().await;
+                }
+            }
+        }
         self.buffer = Buffer::new();
         self.execution_root = None;
         self.signing_root = None;
@@ -640,6 +649,7 @@ impl BufferManager {
                     e,
                     &counters::BUFFER_MANAGER_RECEIVED_EXECUTOR_ERROR_COUNT,
                     block_id,
+                    self.new_pipeline_enabled,
                 );
                 return;
             },
@@ -763,7 +773,7 @@ impl BufferManager {
                 // find the corresponding item
                 let author = vote.author();
                 let commit_info = vote.commit_info().clone();
-                trace!("Receive commit vote {} from {}", commit_info, author);
+                debug!("Receive commit vote {} from {}", commit_info, author);
                 let target_block_id = vote.commit_info().id();
                 let current_cursor = self
                     .buffer
@@ -936,12 +946,12 @@ impl BufferManager {
         let epoch_state = self.epoch_state.clone();
         let bounded_executor = self.bounded_executor.clone();
         spawn_named!("buffer manager verification", async move {
-            while let Some(commit_msg) = commit_msg_rx.next().await {
+            while let Some((sender, commit_msg)) = commit_msg_rx.next().await {
                 let tx = verified_commit_msg_tx.clone();
                 let epoch_state_clone = epoch_state.clone();
                 bounded_executor
                     .spawn(async move {
-                        match commit_msg.req.verify(&epoch_state_clone.verifier) {
+                        match commit_msg.req.verify(sender, &epoch_state_clone.verifier) {
                             Ok(_) => {
                                 let _ = tx.unbounded_send(commit_msg);
                             },
@@ -990,8 +1000,10 @@ impl BufferManager {
                     }});
                 },
                 _ = self.execution_schedule_retry_rx.next() => {
-                    monitor!("buffer_manager_process_execution_schedule_retry",
-                    self.retry_schedule_phase().await);
+                    if !self.new_pipeline_enabled {
+                        monitor!("buffer_manager_process_execution_schedule_retry",
+                            self.retry_schedule_phase().await);
+                    }
                 },
                 Some(response) = self.signing_phase_rx.next() => {
                     monitor!("buffer_manager_process_signing_response", {

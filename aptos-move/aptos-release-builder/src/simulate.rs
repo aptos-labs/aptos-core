@@ -26,6 +26,7 @@ use aptos::{
     common::types::PromptOptions, governance::compile_in_temp_dir, move_tool::FrameworkPackageArgs,
 };
 use aptos_crypto::HashValue;
+use aptos_gas_profiling::GasProfiler;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_language_e2e_tests::account::AccountData;
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
@@ -35,24 +36,20 @@ use aptos_types::{
     account_config::ChainIdResource,
     on_chain_config::{ApprovedExecutionHashes, Features, GasScheduleV2, OnChainConfig},
     state_store::{
-        in_memory_state_view::InMemoryStateView, state_key::StateKey,
-        state_storage_usage::StateStorageUsage, state_value::StateValue,
-        Result as StateStoreResult, StateView, TStateView,
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        StateView, StateViewResult as StateStoreResult, TStateView,
     },
     transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
     write_set::{TransactionWrite, WriteSet},
 };
-use aptos_vm::{
-    data_cache::AsMoveResolver,
-    move_vm_ext::{flush_warm_vm_cache, SessionId},
-    AptosVM,
-};
+use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::SessionId, AptosVM};
 use aptos_vm_environment::{
     environment::AptosEnvironment, prod_configs::aptos_prod_deserializer_config,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
-    module_and_script_storage::AsAptosCodeStorage, storage::change_set_configs::ChangeSetConfigs,
+    module_and_script_storage::AsAptosCodeStorage, module_write_set::ModuleWriteSet,
+    storage::change_set_configs::ChangeSetConfigs,
 };
 use clap::Parser;
 use move_binary_format::{
@@ -69,9 +66,10 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
     move_resource::MoveResource,
+    value::MoveValue,
 };
 use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
-use move_vm_types::{gas::UnmeteredGasMeter, resolver::ModuleResolver};
+use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use serde::Serialize;
@@ -180,6 +178,7 @@ fn add_simple_native_function(
         return_,
         type_parameters: vec![],
         access_specifiers: None,
+        attributes: vec![],
     };
     let func_handle_idx = FunctionHandleIndex(m.function_handles.len() as u16);
     m.function_handles.push(func_handle);
@@ -305,10 +304,6 @@ where
     fn get_usage(&self) -> StateStoreResult<StateStorageUsage> {
         Ok(StateStorageUsage::Untracked)
     }
-
-    fn as_in_memory_state_view(&self) -> InMemoryStateView {
-        panic!("not supported")
-    }
 }
 
 /***************************************************************************************************
@@ -343,9 +338,8 @@ fn patch_module<F>(
 where
     F: FnOnce(&mut CompiledModule) -> Result<()>,
 {
-    let resolver = state_view.as_move_resolver();
-    let blob = resolver
-        .get_module(module_id)?
+    let blob = state_view
+        .get_state_value_bytes(&StateKey::module_id(module_id))?
         .ok_or_else(|| anyhow!("module {} does not exist", module_id))?;
 
     let mut m = CompiledModule::deserialize_with_config(&blob, deserializer_config)?;
@@ -464,11 +458,10 @@ fn add_script_execution_hash(
  *
  **************************************************************************************************/
 fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<()> {
-    flush_warm_vm_cache();
     let env = AptosEnvironment::new_with_injected_create_signer_for_gov_sim(&state_view);
-    let vm = AptosVM::new(env.clone(), &state_view);
+    let vm = AptosVM::new(&env, &state_view);
     let resolver = state_view.as_move_resolver();
-    let module_storage = state_view.as_aptos_code_storage(env);
+    let module_storage = state_view.as_aptos_code_storage(&env);
 
     let gas_schedule =
         GasScheduleV2::fetch_config(&state_view).context("failed to fetch gas schedule v2")?;
@@ -483,21 +476,18 @@ fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<(
         &MODULE_ID_APTOS_GOVERNANCE,
         IdentStr::new("force_end_epoch").unwrap(),
         vec![],
-        vec![bcs::to_bytes(&AccountAddress::ONE)?],
+        vec![MoveValue::Signer(AccountAddress::ONE)
+            .simple_serialize()
+            .unwrap()],
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
         &module_storage,
     )?;
-    let (mut change_set, empty_module_write_set) =
-        sess.finish(&change_set_configs, &module_storage)?;
-    assert!(
-        empty_module_write_set.is_empty(),
-        "Modules cannot be published by 'force_end_epoch'"
-    );
+    let mut change_set = sess.finish(&change_set_configs, &module_storage)?;
 
     change_set.try_materialize_aggregator_v1_delta_set(&resolver)?;
     let (write_set, _events) = change_set
-        .try_combine_into_storage_change_set(empty_module_write_set)
+        .try_combine_into_storage_change_set(ModuleWriteSet::empty())
         .expect("Failed to convert to storage ChangeSet")
         .into_inner();
 
@@ -510,6 +500,7 @@ pub async fn simulate_multistep_proposal(
     remote_url: Url,
     proposal_dir: &Path,
     proposal_scripts: &[PathBuf],
+    profile_gas: bool,
 ) -> Result<()> {
     println!("Simulating proposal at {}", proposal_dir.display());
 
@@ -616,38 +607,65 @@ pub async fn simulate_multistep_proposal(
         println!("    {}", script_name);
 
         // Create a new VM to ensure the loader is clean.
-        // The warm vm cache also needs to be explicitly flushed as it cannot detect the
-        // patches we performed.
-        flush_warm_vm_cache();
         let env = AptosEnvironment::new_with_injected_create_signer_for_gov_sim(&state_view);
-        let vm = AptosVM::new(env.clone(), &state_view);
+        let vm = AptosVM::new(&env, &state_view);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let resolver = state_view.as_move_resolver();
-        let code_storage = state_view.as_aptos_code_storage(env);
+        let code_storage = state_view.as_aptos_code_storage(&env);
 
-        let (_vm_status, vm_output) = vm.execute_user_transaction(
-            &resolver,
-            &code_storage,
-            &account
-                .account()
-                .transaction()
-                .script(Script::new(script_blob, vec![], vec![
-                    TransactionArgument::U64(DUMMY_PROPOSAL_ID), // dummy proposal id, ignored by the patched function
-                ]))
-                .chain_id(chain_id.chain_id())
-                .sequence_number(script_idx as u64)
-                .gas_unit_price(gas_params.vm.txn.min_price_per_gas_unit.into())
-                .max_gas_amount(100000)
-                .ttl(u64::MAX)
-                .sign(),
-            &log_context,
-        );
+        let txn = account
+            .account()
+            .transaction()
+            .script(Script::new(script_blob, vec![], vec![
+                TransactionArgument::U64(DUMMY_PROPOSAL_ID), // dummy proposal id, ignored by the patched function
+            ]))
+            .chain_id(chain_id.chain_id())
+            .sequence_number(script_idx as u64)
+            .gas_unit_price(gas_params.vm.txn.min_price_per_gas_unit.into())
+            .max_gas_amount(100000)
+            .ttl(u64::MAX)
+            .sign();
+
+        let vm_output = if !profile_gas {
+            let (_vm_status, vm_output) =
+                vm.execute_user_transaction(&resolver, &code_storage, &txn, &log_context);
+            vm_output
+        } else {
+            let (_vm_status, vm_output, gas_profiler) = vm
+                .execute_user_transaction_with_modified_gas_meter(
+                    &resolver,
+                    &code_storage,
+                    &txn,
+                    &log_context,
+                    GasProfiler::new_script,
+                )?;
+
+            let gas_log = gas_profiler.finish();
+            let report_path = proposal_dir
+                .join("gas-profiling")
+                .join(script_path.file_stem().unwrap());
+            gas_log.generate_html_report(&report_path, format!("Gas Report - {}", script_name))?;
+
+            println!("        Gas report saved to {}", report_path.display());
+
+            vm_output
+        };
         // TODO: ensure all scripts trigger reconfiguration.
+
+        println!(
+            "{}",
+            format!("Fee statement: {:#?}", vm_output.fee_statement())
+                .lines()
+                .map(|line| format!("        {}", line))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
 
         let txn_output = vm_output
             .try_materialize_into_transaction_output(&resolver)
             .context("failed to materialize transaction output")?;
+
         let txn_status = txn_output.status();
         match txn_status {
             TransactionStatus::Keep(ExecutionStatus::Success) => {
@@ -710,7 +728,11 @@ pub fn collect_proposals(root_dir: &Path) -> Result<Vec<(PathBuf, Vec<PathBuf>)>
     Ok(result)
 }
 
-pub async fn simulate_all_proposals(remote_url: Url, output_dir: &Path) -> Result<()> {
+pub async fn simulate_all_proposals(
+    remote_url: Url,
+    output_dir: &Path,
+    profile_gas: bool,
+) -> Result<()> {
     let proposals =
         collect_proposals(output_dir).context("failed to collect proposals for simulation")?;
 
@@ -735,11 +757,14 @@ pub async fn simulate_all_proposals(remote_url: Url, output_dir: &Path) -> Resul
     }
 
     for (proposal_dir, proposal_scripts) in &proposals {
-        simulate_multistep_proposal(remote_url.clone(), proposal_dir, proposal_scripts)
-            .await
-            .with_context(|| {
-                format!("failed to simulate proposal at {}", proposal_dir.display())
-            })?;
+        simulate_multistep_proposal(
+            remote_url.clone(),
+            proposal_dir,
+            proposal_scripts,
+            profile_gas,
+        )
+        .await
+        .with_context(|| format!("failed to simulate proposal at {}", proposal_dir.display()))?;
     }
 
     println!("All proposals succeeded!");

@@ -18,8 +18,8 @@ use crate::{
 use anyhow::{bail, Context, Result};
 use aptos_logger::{error, info};
 use aptos_sdk::transaction_builder::TransactionFactory;
-use aptos_transaction_generator_lib::{args::TransactionTypeArg, AccountType, WorkflowProgress};
-use aptos_types::keyless::test_utils::get_sample_esk;
+use aptos_transaction_generator_lib::{AccountType, TransactionType};
+use aptos_types::{account_address::AccountAddress, keyless::test_utils::get_sample_esk};
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
     sync::Arc,
@@ -29,12 +29,13 @@ use std::{
 pub async fn emit_transactions(
     cluster_args: &ClusterArgs,
     emit_args: &EmitArgs,
+    transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
 ) -> Result<TxnStats> {
     if emit_args.coordination_delay_between_instances.is_none() {
         let cluster = Cluster::try_from_cluster_args(cluster_args)
             .await
             .context("Failed to build cluster")?;
-        emit_transactions_with_cluster(&cluster, emit_args).await
+        emit_transactions_with_cluster(&cluster, emit_args, transaction_mix_per_phase).await
     } else {
         let initial_delay_after_minting = emit_args.coordination_delay_between_instances.unwrap();
         let start_time = Instant::now();
@@ -61,7 +62,12 @@ pub async fn emit_transactions(
                 .await
                 .context("Failed to build cluster")?;
 
-            let result = emit_transactions_with_cluster(&cluster, &cur_emit_args).await;
+            let result = emit_transactions_with_cluster(
+                &cluster,
+                &cur_emit_args,
+                transaction_mix_per_phase.clone(),
+            )
+            .await;
             match result {
                 Ok(value) => return Ok(value),
                 Err(e) => {
@@ -76,6 +82,7 @@ pub async fn emit_transactions(
 pub async fn emit_transactions_with_cluster(
     cluster: &Cluster,
     args: &EmitArgs,
+    transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
 ) -> Result<TxnStats> {
     let emitter_mode = EmitJobMode::create(args.mempool_backlog, args.target_tps);
 
@@ -87,16 +94,9 @@ pub async fn emit_transactions_with_cluster(
             .with_transaction_expiration_time(args.txn_expiration_time_secs)
             .with_gas_unit_price(aptos_global_constants::GAS_UNIT_PRICE),
         StdRng::from_entropy(),
+        client,
     );
 
-    let transaction_mix_per_phase = TransactionTypeArg::args_to_transaction_mix_per_phase(
-        &args.transaction_type,
-        &args.transaction_weights,
-        &args.transaction_phases,
-        args.module_working_set_size.unwrap_or(1),
-        args.sender_use_account_pool.unwrap_or(false),
-        WorkflowProgress::when_done_default(),
-    );
     let mut emit_job_request =
         EmitJobRequest::new(cluster.all_instances().map(Instance::rest_client).collect())
             .mode(emitter_mode)
@@ -230,12 +230,17 @@ pub async fn create_accounts_command(
 
     let account_generator = if let Some(jwt) = &create_accounts_args.keyless_jwt {
         emit_job_request = emit_job_request.keyless_jwt(jwt);
+        let keyless_config = client
+            .get_resource(AccountAddress::ONE, "0x1::keyless_account::Configuration")
+            .await?
+            .into_inner();
 
         create_keyless_account_generator(
             get_sample_esk(),
             0,
             jwt,
             create_accounts_args.proof_file_path.as_deref(),
+            keyless_config,
         )?
     } else {
         Box::new(PrivateKeyAccountGenerator)

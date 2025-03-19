@@ -134,7 +134,7 @@ Publishes the Version config.
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
 
     <b>move_to</b>(aptos_framework, <a href="version.md#0x1_version_Version">Version</a> { major: initial_version });
-    // Give aptos framework <a href="account.md#0x1_account">account</a> capability <b>to</b> call set <a href="version.md#0x1_version">version</a>. This allows on chain governance <b>to</b> do it through
+    // Give aptos framework <a href="account.md#0x1_account">account</a> <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> <b>to</b> call set <a href="version.md#0x1_version">version</a>. This allows on chain governance <b>to</b> do it through
     // control of the aptos framework <a href="account.md#0x1_account">account</a>.
     <b>move_to</b>(aptos_framework, <a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a> {});
 }

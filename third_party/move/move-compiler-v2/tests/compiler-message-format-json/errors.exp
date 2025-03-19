@@ -1,0 +1,4 @@
+
+Diagnostics:
+{"severity":"Error","code":null,"message":"cannot use `bool` with an operator which expects a value of type `integer`","labels":[{"style":"Primary","file_id":"tests/compiler-message-format-json/errors.move","range":{"start":51,"end":55},"message":""}],"notes":[]}
+{"severity":"Error","code":null,"message":"cannot use `bool` with an operator which expects a value of type `integer`","labels":[{"style":"Primary","file_id":"tests/compiler-message-format-json/errors.move","range":{"start":69,"end":73},"message":""}],"notes":[]}

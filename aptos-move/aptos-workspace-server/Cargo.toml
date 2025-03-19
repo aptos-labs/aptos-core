@@ -12,16 +12,31 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos = { workspace = true }
+# aptos deps
 aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
 aptos-faucet-core = { workspace = true }
+aptos-localnet = { workspace = true }
 aptos-node = { workspace = true }
 aptos-types = { workspace = true }
 
+# third party deps
 anyhow = { workspace = true }
+bollard = { workspace = true }
+clap = { workspace = true }
+diesel = { workspace = true, features = [
+    "postgres_backend",
+] }
+diesel-async = { workspace = true }
 futures = { workspace = true }
+maplit = { workspace = true }
 rand = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 url = { workspace = true }
+uuid = { workspace = true }
+
+# indexer deps
+processor = { workspace = true }
+server-framework = { workspace = true }

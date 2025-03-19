@@ -4,21 +4,22 @@
 
 use crate::{
     ast::{
-        AddressSpecifier, Exp, ExpData, Operation, Pattern, ResourceSpecifier, TempIndex, Value,
+        AccessSpecifierKind, AddressSpecifier, Exp, ExpData, LambdaCaptureKind, Operation, Pattern,
+        ResourceSpecifier, TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
     exp_builder::ExpBuilder,
     model::{
-        AbilitySet, FieldEnv, FunId, FunctionEnv, GlobalEnv, ModuleId, NodeId, Parameter,
-        QualifiedId, QualifiedInstId, StructId, TypeParameter, Visibility,
+        FieldEnv, FunId, FunctionEnv, GlobalEnv, ModuleId, NodeId, Parameter, QualifiedId,
+        QualifiedInstId, StructId, TypeParameter, Visibility,
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type, TypeDisplayContext},
 };
 use itertools::Itertools;
-use move_binary_format::file_format::AccessKind;
-use std::collections::BTreeMap;
+use move_core_types::ability::AbilitySet;
+use std::collections::{BTreeMap, BTreeSet};
 //
 // ========================================================================================
 //
@@ -175,9 +176,9 @@ impl<'a> Sourcifier<'a> {
                     emit!(self.writer, "!")
                 }
                 match &spec.kind {
-                    AccessKind::Reads => emit!(self.writer, "reads "),
-                    AccessKind::Writes => emit!(self.writer, "writes "),
-                    AccessKind::Acquires => emit!(self.writer, "acquires "),
+                    AccessSpecifierKind::Reads => emit!(self.writer, "reads "),
+                    AccessSpecifierKind::Writes => emit!(self.writer, "writes "),
+                    AccessSpecifierKind::LegacyAcquires => emit!(self.writer, "acquires "),
                 }
                 match &spec.resource.1 {
                     ResourceSpecifier::Any => emit!(self.writer, "*"),
@@ -527,7 +528,7 @@ impl<'a> ExpSourcifier<'a> {
             Invalid(_) => emit!(self.wr(), "*invalid*"),
             Value(_, v) => {
                 let ty = self.env().get_node_type(exp.node_id());
-                self.parent.print_value(v, Some(&ty))
+                self.parent.print_value(v, Some(&ty));
             },
             LocalVar(_, name) => {
                 emit!(self.wr(), "{}", self.sym(*name))
@@ -540,12 +541,15 @@ impl<'a> ExpSourcifier<'a> {
                 }
             },
             // Following forms may require parenthesis
-            Lambda(_, pat, body) => {
+            Lambda(_, pat, body, capture_kind) => {
                 self.parenthesize(context_prio, Prio::General, || {
+                    if *capture_kind != LambdaCaptureKind::Default {
+                        emit!(self.wr(), "{} ", capture_kind);
+                    };
                     emit!(self.wr(), "|");
                     self.print_pat(pat);
                     emit!(self.wr(), "| ");
-                    self.print_exp(Prio::General, true, body)
+                    self.print_exp(Prio::General, true, body);
                 });
             },
             Block(..) | Sequence(..) => {
@@ -574,7 +578,7 @@ impl<'a> ExpSourcifier<'a> {
                                     LetOrStm::Stm(stm) => {
                                         if last &&
                                             (stm.is_unit_exp() ||
-                                            is_result && matches!(stm.as_ref(), Return(_, e) if e.is_unit_exp())) {
+                                                is_result && matches!(stm.as_ref(), Return(_, e) if e.is_unit_exp())) {
                                             // We can omit it
                                         } else {
                                             self.print_exp(Prio::General, last && is_result, stm);
@@ -582,7 +586,7 @@ impl<'a> ExpSourcifier<'a> {
                                                 emitln!(self.wr())
                                             }
                                         }
-                                    },
+                                    }
                                     LetOrStm::Let(pat, binding) => {
                                         emit!(self.wr(), "let ");
                                         self.print_pat(pat);
@@ -593,7 +597,7 @@ impl<'a> ExpSourcifier<'a> {
                                         if last {
                                             emitln!(self.wr())
                                         }
-                                    },
+                                    }
                                 }
                             }
                         })
@@ -793,6 +797,55 @@ impl<'a> ExpSourcifier<'a> {
                     self.print_exp_list("(", ")", args)
                 })
             },
+            Operation::Closure(mid, fid, mask) => {
+                self.parenthesize(context_prio, Prio::Postfix, || {
+                    // We need to generate `|t| f(captured, t)` to represent the closure.
+                    // For that, we first create the closure expression, then call
+                    // sourcifier again.
+                    let loc = self.env().get_node_loc(id);
+                    let ty = self.env().get_node_type(id);
+                    let Type::Fun(arg_ty, res_ty, _) = ty else {
+                        emit!(self.wr(), "<<wrongly typed closure expression>>");
+                        return;
+                    };
+                    let mut lambda_params = vec![];
+                    let mut lambda_param_tys = vec![];
+                    let mut lambda_param_exps = vec![];
+                    for (i, ty) in arg_ty.flatten().into_iter().enumerate() {
+                        let name = self.new_unique_name(args, &format!("arg{}", i));
+                        let local_id = self.env().new_node(loc.clone(), ty.clone());
+                        lambda_params.push(Pattern::Var(local_id, name));
+                        lambda_param_exps.push(ExpData::LocalVar(local_id, name).into_exp());
+                        lambda_param_tys.push(ty);
+                    }
+                    let Some(all_args) = mask.compose(args.iter().cloned(), lambda_param_exps)
+                    else {
+                        emit!(self.wr(), "<<inconsistent closure mask>>");
+                        return;
+                    };
+                    let call_exp = ExpData::Call(
+                        self.env().new_node(loc.clone(), res_ty.as_ref().clone()),
+                        Operation::MoveFunction(*mid, *fid),
+                        all_args,
+                    )
+                    .into_exp();
+                    let lambda_pat = if lambda_params.len() != 1 {
+                        Pattern::Tuple(
+                            self.env()
+                                .new_node(loc.clone(), Type::tuple(lambda_param_tys)),
+                            lambda_params,
+                        )
+                    } else {
+                        lambda_params.pop().unwrap()
+                    };
+                    self.print_exp(
+                        context_prio,
+                        false,
+                        &ExpData::Lambda(id, lambda_pat, call_exp, LambdaCaptureKind::Default)
+                            .into_exp(),
+                    )
+                })
+            },
             Operation::Pack(mid, sid, variant) => {
                 self.parenthesize(context_prio, Prio::Postfix, || {
                     let qid = mid.qualified_inst(*sid, self.env().get_node_instantiation(id));
@@ -962,7 +1015,6 @@ impl<'a> ExpSourcifier<'a> {
             | Operation::EventStoreIncludes
             | Operation::EventStoreIncludedIn
             | Operation::SpecFunction(_, _, _)
-            | Operation::Closure(_, _)
             | Operation::UpdateField(_, _, _)
             | Operation::Result(_)
             | Operation::Index
@@ -1024,7 +1076,11 @@ impl<'a> ExpSourcifier<'a> {
         self.parenthesize(context_prio, prio, || {
             self.print_exp(prio, false, &args[0]);
             emit!(self.wr(), " {} ", repr);
-            self.print_exp(prio + 1, false, &args[1])
+            if args.len() > 1 {
+                self.print_exp(prio + 1, false, &args[1])
+            } else {
+                emit!(self.wr(), "ERROR")
+            }
         })
     }
 
@@ -1119,5 +1175,27 @@ impl<'a> ExpSourcifier<'a> {
 
     fn env(&self) -> &GlobalEnv {
         self.parent.env()
+    }
+
+    /// Creates a new name which has no clashes with free names in given expressions.
+    /// Note: if this turns to be too inefficient for sourcifier, we can use
+    /// a ref-call counter instead.
+    fn new_unique_name(&self, for_scope: &[Exp], base_name: &str) -> Symbol {
+        let mut free_vars = BTreeSet::new();
+        let spool = self.env().symbol_pool();
+        for e in for_scope {
+            free_vars.append(&mut e.free_vars());
+        }
+        for i in 0..256 {
+            let name = if i > 0 {
+                spool.make(&format!("{}_{}", base_name, i))
+            } else {
+                spool.make(base_name)
+            };
+            if !free_vars.contains(&name) {
+                return name;
+            }
+        }
+        panic!("too many fruitless attempts to generate unique name")
     }
 }

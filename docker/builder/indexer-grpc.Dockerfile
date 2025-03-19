@@ -2,22 +2,12 @@
 
 FROM debian-base AS indexer-grpc
 
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \   
-    apt-get update && apt-get install --no-install-recommends -y \    
-    libssl1.1 \
-    ca-certificates \
-    net-tools \
-    tcpdump \
-    iproute2 \
-    netcat \
-    libpq-dev \
-    curl
-
 COPY --link --from=indexer-builder /aptos/dist/aptos-indexer-grpc-cache-worker /usr/local/bin/aptos-indexer-grpc-cache-worker
 COPY --link --from=indexer-builder /aptos/dist/aptos-indexer-grpc-file-store /usr/local/bin/aptos-indexer-grpc-file-store
 COPY --link --from=indexer-builder /aptos/dist/aptos-indexer-grpc-data-service /usr/local/bin/aptos-indexer-grpc-data-service
 COPY --link --from=indexer-builder /aptos/dist/aptos-indexer-grpc-file-checker /usr/local/bin/aptos-indexer-grpc-file-checker
+COPY --link --from=indexer-builder /aptos/dist/aptos-indexer-grpc-data-service-v2 /usr/local/bin/aptos-indexer-grpc-data-service-v2
+COPY --link --from=indexer-builder /aptos/dist/aptos-indexer-grpc-manager /usr/local/bin/aptos-indexer-grpc-manager
 
 # The health check port
 EXPOSE 8080

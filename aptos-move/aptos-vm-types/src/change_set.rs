@@ -411,18 +411,18 @@ impl VMChangeSet {
             if let Some(write_op) = aggregator_v1_write_set.get_mut(&state_key) {
                 // In this case, delta follows a write op.
                 match write_op {
-                    Creation { data, .. } | Modification { data, .. } => {
+                    Creation(v) | Modification(v) => {
                         // Apply delta on top of creation or modification.
                         // TODO[agg_v1](cleanup): This will not be needed anymore once aggregator
                         // change sets carry non-serialized information.
-                        let base: u128 = bcs::from_bytes(data)
+                        let base: u128 = bcs::from_bytes(v.bytes())
                             .expect("Deserializing into an aggregator value always succeeds");
                         let value = additional_delta_op
                             .apply_to(base)
                             .map_err(PartialVMError::from)?;
-                        *data = serialize(&value).into();
+                        v.set_bytes(serialize(&value).into())
                     },
-                    Deletion { .. } => {
+                    Deletion(..) => {
                         // This case (applying a delta to deleted item) should
                         // never happen. Let's still return an error instead of
                         // panicking.
@@ -824,9 +824,7 @@ pub fn create_vm_change_set_with_module_write_set_when_delayed_field_optimizatio
         BTreeMap::new(),
     );
 
-    // The flag if modules have been published to a special address is irrelevant because
-    // write set transaction does not run an epilogue. Therefore, it is simply set to true.
-    let module_write_set = ModuleWriteSet::new(true, module_write_ops);
+    let module_write_set = ModuleWriteSet::new(module_write_ops);
     (change_set, module_write_set)
 }
 
@@ -883,7 +881,7 @@ impl ChangeSetInterface for VMChangeSet {
                 key,
                 op_size: op.materialized_size(),
                 prev_size: op.prev_materialized_size(key, executor_view)?,
-                metadata_mut: op.get_metadata_mut(),
+                metadata_mut: op.metadata_mut(),
             })
         });
         let v1_aggregators = self.aggregator_v1_write_set.iter_mut().map(|(key, op)| {
@@ -893,7 +891,7 @@ impl ChangeSetInterface for VMChangeSet {
                 prev_size: executor_view
                     .get_aggregator_v1_state_value_size(key)?
                     .unwrap_or(0),
-                metadata_mut: op.get_metadata_mut(),
+                metadata_mut: op.metadata_mut(),
             })
         });
 

@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metrics::INDEXER_DB_LATENCY;
 use anyhow::Result;
 use aptos_config::config::{internal_indexer_db_config::InternalIndexerDBConfig, NodeConfig};
 use aptos_db_indexer::{
@@ -9,13 +10,12 @@ use aptos_db_indexer::{
     indexer_reader::IndexerReaders,
 };
 use aptos_indexer_grpc_utils::counters::{log_grpc_step, IndexerGrpcStep};
-use aptos_logger::info;
 use aptos_storage_interface::DbReader;
 use aptos_types::{indexer::indexer_db_reader::IndexerReader, transaction::Version};
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
-    time::Duration,
+    time::Instant,
 };
 use tokio::{runtime::Handle, sync::watch::Receiver as WatchReceiver};
 
@@ -24,14 +24,14 @@ const INTERNAL_INDEXER_DB: &str = "internal_indexer_db";
 
 pub struct InternalIndexerDBService {
     pub db_indexer: Arc<DBIndexer>,
-    pub update_receiver: WatchReceiver<Version>,
+    pub update_receiver: WatchReceiver<(Instant, Version)>,
 }
 
 impl InternalIndexerDBService {
     pub fn new(
         db_reader: Arc<dyn DbReader>,
         internal_indexer_db: InternalIndexerDB,
-        update_receiver: WatchReceiver<Version>,
+        update_receiver: WatchReceiver<(Instant, Version)>,
     ) -> Self {
         let internal_db_indexer = Arc::new(DBIndexer::new(internal_indexer_db, db_reader));
         Self {
@@ -50,7 +50,9 @@ impl InternalIndexerDBService {
             open_internal_indexer_db(db_path_buf.as_path(), &rocksdb_config)
                 .expect("Failed to open internal indexer db"),
         );
-        let internal_indexer_db_config = InternalIndexerDBConfig::new(true, true, true, 10_000);
+
+        let internal_indexer_db_config =
+            InternalIndexerDBConfig::new(true, true, true, 0, true, 10_000);
         Some(InternalIndexerDB::new(arc_db, internal_indexer_db_config))
     }
 
@@ -136,28 +138,50 @@ impl InternalIndexerDBService {
             }
         }
 
+        if node_config.indexer_db_config.enable_event_v2_translation() {
+            let event_v2_translation_start_version = self
+                .db_indexer
+                .indexer_db
+                .get_event_v2_translation_version()?
+                .map_or(0, |v| v + 1);
+            if node_config
+                .indexer_db_config
+                .event_v2_translation_ignores_below_version()
+                < start_version
+                && start_version != event_v2_translation_start_version
+            {
+                panic!(
+                    "Cannot start event v2 translation indexer because the progress doesn't match. \
+                    start_version: {}, event_v2_translation_start_version: {}",
+                    start_version, event_v2_translation_start_version
+                );
+            }
+            if !node_config.indexer_db_config.enable_event() {
+                panic!("Cannot start event v2 translation indexer because event indexer is not enabled.");
+            }
+        }
+
         Ok(start_version)
     }
 
     pub async fn run(&mut self, node_config: &NodeConfig) -> Result<()> {
         let mut start_version = self.get_start_version(node_config).await?;
+        let mut target_version = self.db_indexer.main_db_reader.ensure_synced_version()?;
+        let mut step_timer = std::time::Instant::now();
 
         loop {
-            let start_time: std::time::Instant = std::time::Instant::now();
-            let next_version = self.db_indexer.process_a_batch(start_version)?;
-
-            if next_version == start_version {
-                if let Ok(recv_res) =
-                    tokio::time::timeout(Duration::from_millis(100), self.update_receiver.changed())
-                        .await
-                {
-                    if recv_res.is_err() {
-                        info!("update sender is dropped");
-                        return Ok(());
-                    }
+            if target_version <= start_version {
+                match self.update_receiver.changed().await {
+                    Ok(_) => {
+                        (step_timer, target_version) = *self.update_receiver.borrow();
+                    },
+                    Err(e) => {
+                        panic!("Failed to get update from update_receiver: {}", e);
+                    },
                 }
-                continue;
-            };
+            }
+            let next_version = self.db_indexer.process(start_version, target_version)?;
+            INDEXER_DB_LATENCY.set(step_timer.elapsed().as_millis() as i64);
             log_grpc_step(
                 SERVICE_TYPE,
                 IndexerGrpcStep::InternalIndexerDBProcessed,
@@ -165,7 +189,7 @@ impl InternalIndexerDBService {
                 Some(next_version as i64),
                 None,
                 None,
-                Some(start_time.elapsed().as_secs_f64()),
+                Some(step_timer.elapsed().as_secs_f64()),
                 None,
                 Some((next_version - start_version) as i64),
                 None,
@@ -180,18 +204,14 @@ impl InternalIndexerDBService {
         node_config: &NodeConfig,
         end_version: Option<Version>,
     ) -> Result<()> {
-        let mut start_version = self.get_start_version(node_config).await?;
-        while start_version <= end_version.unwrap_or(std::u64::MAX) {
-            let next_version = self.db_indexer.process_a_batch(start_version)?;
-            if next_version == start_version {
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                continue;
-            }
-            start_version = next_version;
+        let start_version = self.get_start_version(node_config).await?;
+        let end_version = end_version.unwrap_or(std::u64::MAX);
+        let mut next_version = start_version;
+        while next_version < end_version {
+            next_version = self.db_indexer.process(start_version, end_version)?;
+            // We shouldn't stop the internal indexer so that internal indexer can catch up with the main DB
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
-        // We should never stop the internal indexer
-        tokio::time::sleep(std::time::Duration::from_secs(100)).await;
-
         Ok(())
     }
 }
@@ -205,7 +225,7 @@ impl MockInternalIndexerDBService {
     pub fn new_for_test(
         db_reader: Arc<dyn DbReader>,
         node_config: &NodeConfig,
-        update_receiver: WatchReceiver<Version>,
+        update_receiver: WatchReceiver<(Instant, Version)>,
         end_version: Option<Version>,
     ) -> Self {
         if !node_config

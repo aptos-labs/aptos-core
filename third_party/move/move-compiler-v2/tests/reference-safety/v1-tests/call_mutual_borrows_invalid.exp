@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: cannot transfer mutable local `s1` since it is borrowed
+error: cannot transfer mutable value since it is borrowed
    ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:15:9
    │
 14 │         let f = freeze(s1);
@@ -8,7 +8,7 @@ error: cannot transfer mutable local `s1` since it is borrowed
 15 │         mut_imm(s1, f);
    │         ^^^^^^^^^^^^^^ transfer attempted here
 
-error: cannot transfer mutable local `s1` since it is borrowed
+error: cannot transfer mutable value since it is borrowed
    ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:17:9
    │
 16 │         let f = &s1.f;
@@ -39,11 +39,11 @@ error: cannot transfer mutable local `s1` since it is borrowed
    │
 23 │         mut_mut(s1, s1);
    │         ^^^^^^^^^^^^^^^
-   │         │
+   │         │       │
+   │         │       previously mutably borrowed here
    │         transfer attempted here
-   │         previously mutably borrowed here
 
-error: cannot transfer mutable local `s1` since it is borrowed
+error: cannot transfer mutable value since it is borrowed
    ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:25:9
    │
 24 │         let f = &mut s1.f;
@@ -70,7 +70,7 @@ error: cannot transfer mutable local `s1` since it is borrowed
 29 │         *s;
    │         -- conflicting reference `s` used here
 
-error: cannot transfer mutable local `s1` since it is borrowed
+error: cannot transfer mutable value since it is borrowed
    ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:31:9
    │
 30 │         let f = id_mut(&mut s1.f);

@@ -30,7 +30,8 @@ use crate::pipeline::{
 };
 use abstract_domain_derive::AbstractDomain;
 use codespan_reporting::diagnostic::Severity;
-use move_binary_format::file_format::{Ability, CodeOffset};
+use move_binary_format::file_format::CodeOffset;
+use move_core_types::ability::Ability;
 use move_model::{
     ast::TempIndex,
     exp_generator::ExpGenerator,

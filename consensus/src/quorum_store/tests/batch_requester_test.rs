@@ -7,12 +7,14 @@ use crate::{
         batch_requester::BatchRequester,
         types::{Batch, BatchRequest, BatchResponse},
     },
+    test_utils::create_vec_signed_transactions,
 };
 use aptos_consensus_types::{
     common::Author,
     proof_of_store::{BatchId, ProofOfStore, SignedBatchInfo},
 };
 use aptos_crypto::HashValue;
+use aptos_infallible::Mutex;
 use aptos_types::{
     aggregate_signature::PartialSignatures,
     block_info::BlockInfo,
@@ -20,8 +22,13 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
+use claims::{assert_err, assert_ok_eq};
+use maplit::btreeset;
 use move_core_types::account_address::AccountAddress;
-use std::time::{Duration, Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::oneshot;
 
 #[derive(Clone)]
@@ -69,9 +76,10 @@ impl QuorumStoreSender for MockBatchRequester {
 
 #[tokio::test]
 async fn test_batch_request_exists() {
+    let txns = create_vec_signed_transactions(1);
     let batch = Batch::new(
         BatchId::new_for_test(1),
-        vec![],
+        txns.clone(),
         1,
         1,
         AccountAddress::random(),
@@ -80,7 +88,6 @@ async fn test_batch_request_exists() {
     let batch_response = BatchResponse::Batch(batch.clone());
 
     let validator_signer = ValidatorSigner::random(None);
-    let (tx, mut rx) = tokio::sync::oneshot::channel();
     let batch_requester = BatchRequester::new(
         1,
         AccountAddress::random(),
@@ -98,16 +105,11 @@ async fn test_batch_request_exists() {
         .request_batch(
             *batch.digest(),
             batch.expiration(),
-            vec![AccountAddress::random()],
-            tx,
+            Arc::new(Mutex::new(btreeset![AccountAddress::random()])),
             subscriber_rx,
         )
         .await;
-    assert!(result.is_some());
-    if let Some((batch_info, _payload)) = result {
-        assert_eq!(batch_info, *batch.batch_info());
-    }
-    assert!(rx.try_recv().is_ok());
+    assert_ok_eq!(result, txns);
 }
 
 fn create_ledger_info_with_timestamp(
@@ -175,7 +177,6 @@ async fn test_batch_request_not_exists_not_expired() {
         AccountAddress::random(),
         0,
     );
-    let (tx, mut rx) = tokio::sync::oneshot::channel();
     let batch_response = BatchResponse::NotFound(ledger_info_with_signatures);
     let batch_requester = BatchRequester::new(
         1,
@@ -194,14 +195,12 @@ async fn test_batch_request_not_exists_not_expired() {
         .request_batch(
             *batch.digest(),
             batch.expiration(),
-            vec![AccountAddress::random()],
-            tx,
+            Arc::new(Mutex::new(btreeset![AccountAddress::random()])),
             subscriber_rx,
         )
         .await;
     let request_duration = request_start.elapsed();
-    assert!(result.is_none());
-    assert!(rx.try_recv().is_ok());
+    assert_err!(result);
     // Retried at least once
     assert!(request_duration > Duration::from_millis(retry_interval_ms as u64));
 }
@@ -223,7 +222,6 @@ async fn test_batch_request_not_exists_expired() {
         AccountAddress::random(),
         0,
     );
-    let (tx, mut rx) = tokio::sync::oneshot::channel();
     let batch_response = BatchResponse::NotFound(ledger_info_with_signatures);
     let batch_requester = BatchRequester::new(
         1,
@@ -242,14 +240,12 @@ async fn test_batch_request_not_exists_expired() {
         .request_batch(
             *batch.digest(),
             batch.expiration(),
-            vec![AccountAddress::random()],
-            tx,
+            Arc::new(Mutex::new(btreeset![AccountAddress::random()])),
             subscriber_rx,
         )
         .await;
     let request_duration = request_start.elapsed();
-    assert!(result.is_none());
-    assert!(rx.try_recv().is_ok());
+    assert_err!(result);
     // No retry because of short-circuiting of expired batch
     assert!(request_duration < Duration::from_millis(retry_interval_ms as u64));
 }

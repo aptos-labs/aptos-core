@@ -15,10 +15,7 @@ use aptos_types::{
     account_config::{CoinStoreResource, DepositEvent, WithdrawEvent},
     block_metadata_ext::BlockMetadataExt,
     contract_event, event,
-    state_store::{
-        state_key::StateKey,
-        state_value::{PersistedStateValueMetadata, StateValueMetadata},
-    },
+    state_store::{state_key::StateKey, state_value::PersistedStateValueMetadata},
     transaction::{
         self,
         authenticator::{AccountAuthenticator, TransactionAuthenticator},
@@ -95,9 +92,7 @@ pub fn get_registry() -> Result<Registry> {
     // 1. Record samples for types with custom deserializers.
     trace_crypto_values(&mut tracer, &mut samples)?;
     tracer.trace_value(&mut samples, &event::EventKey::random())?;
-    tracer.trace_value(&mut samples, &write_set::WriteOp::Deletion {
-        metadata: StateValueMetadata::none(),
-    })?;
+    tracer.trace_value(&mut samples, &write_set::WriteOp::legacy_deletion())?;
 
     // 2. Trace the main entry point(s) + every enum separately.
     // stdlib types
@@ -122,6 +117,8 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::authenticator::AnySignature>(&samples)?;
     tracer.trace_type::<transaction::webauthn::AssertionSignature>(&samples)?;
     tracer.trace_type::<aptos_types::keyless::EphemeralCertificate>(&samples)?;
+    tracer.trace_type::<transaction::authenticator::AbstractionAuthData>(&samples)?;
+    tracer.trace_type::<transaction::authenticator::DomainAccount>(&samples)?;
 
     // events
     tracer.trace_type::<WithdrawEvent>(&samples)?;

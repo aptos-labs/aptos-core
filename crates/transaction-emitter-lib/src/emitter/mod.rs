@@ -717,13 +717,15 @@ impl EmitJob {
 pub struct TxnEmitter {
     txn_factory: TransactionFactory,
     rng: StdRng,
+    rest_cli: RestClient,
 }
 
 impl TxnEmitter {
-    pub fn new(transaction_factory: TransactionFactory, rng: StdRng) -> Self {
+    pub fn new(transaction_factory: TransactionFactory, rng: StdRng, rest_cli: RestClient) -> Self {
         Self {
             txn_factory: transaction_factory,
             rng,
+            rest_cli,
         }
     }
 
@@ -775,6 +777,11 @@ impl TxnEmitter {
                         .expect("keyless_ephem_secret_key to not be None")
                         .as_ref(),
                 )?;
+                let keyless_config = self
+                    .rest_cli
+                    .get_resource(AccountAddress::ONE, "0x1::keyless_account::Configuration")
+                    .await?
+                    .into_inner();
                 create_keyless_account_generator(
                     ephem_sk,
                     req.epk_expiry_date_secs
@@ -783,6 +790,7 @@ impl TxnEmitter {
                         .as_deref()
                         .expect("keyless_jwt to not be None"),
                     req.proof_file_path.as_deref(),
+                    keyless_config,
                 )?
             },
         };
@@ -819,7 +827,7 @@ impl TxnEmitter {
             prompt_before_spending: req.prompt_before_spending,
         };
         let (txn_generator_creator, _, _) = create_txn_generator_creator(
-            &req.transaction_mix_per_phase,
+            req.transaction_mix_per_phase,
             source_account_manager,
             &mut all_accounts,
             vec![],

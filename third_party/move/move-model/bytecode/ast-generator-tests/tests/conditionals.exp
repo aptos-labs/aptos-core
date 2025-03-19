@@ -20,11 +20,11 @@ fun m::if_1($t0|c: bool): u8 {
   1: $t1 := $t2
   2: $t3 := move($t0)
   3: if ($t3) goto 4 else goto 8
-  4: label L1
+  4: label L0
   5: $t4 := 1
   6: $t1 := $t4
   7: goto 8
-  8: label L0
+  8: label L2
   9: $t5 := move($t1)
  10: return $t5
 }
@@ -79,18 +79,18 @@ fun m::if_else_1($t0|c: bool): u8 {
      var $t4: u8
      var $t5: u8
   0: $t2 := move($t0)
-  1: if ($t2) goto 2 else goto 6
+  1: if ($t2) goto 2 else goto 9
   2: label L1
   3: $t3 := 1
   4: $t1 := $t3
-  5: goto 10
-  6: label L0
-  7: $t4 := 2
-  8: $t1 := $t4
-  9: goto 10
- 10: label L2
- 11: $t5 := move($t1)
- 12: return $t5
+  5: goto 6
+  6: label L2
+  7: $t4 := move($t1)
+  8: return $t4
+  9: label L0
+ 10: $t5 := 2
+ 11: $t1 := $t5
+ 12: goto 6
 }
 
 --- Raw Generated AST
@@ -102,12 +102,12 @@ loop {
     _t1: u8 = _t3;
     break[1]
   };
-  _t4: u8 = 2;
-  _t1: u8 = _t4;
+  _t5: u8 = 2;
+  _t1: u8 = _t5;
   break
 };
-_t5: u8 = _t1;
-return _t5
+_t4: u8 = _t1;
+return _t4
 
 --- Assign-Transformed Generated AST
 loop {
@@ -165,27 +165,25 @@ fun m::if_else_2($t0|c: bool, $t1|d: bool): u8 {
      var $t7: u8
      var $t8: u8
   0: $t3 := move($t0)
-  1: if ($t3) goto 2 else goto 15
+  1: if ($t3) goto 2 else goto 16
   2: label L1
   3: $t4 := move($t1)
-  4: if ($t4) goto 5 else goto 9
+  4: if ($t4) goto 5 else goto 12
   5: label L3
   6: $t5 := 1
   7: $t2 := $t5
-  8: goto 13
-  9: label L2
- 10: $t6 := 2
- 11: $t2 := $t6
- 12: goto 13
- 13: label L4
- 14: goto 19
- 15: label L0
- 16: $t7 := 3
- 17: $t2 := $t7
- 18: goto 19
- 19: label L5
- 20: $t8 := move($t2)
- 21: return $t8
+  8: goto 9
+  9: label L4
+ 10: $t6 := move($t2)
+ 11: return $t6
+ 12: label L2
+ 13: $t7 := 2
+ 14: $t2 := $t7
+ 15: goto 9
+ 16: label L0
+ 17: $t8 := 3
+ 18: $t2 := $t8
+ 19: goto 9
 }
 
 --- Raw Generated AST
@@ -193,8 +191,8 @@ _t3: bool = c;
 loop {
   loop {
     if (_t3) break;
-    _t7: u8 = 3;
-    _t2: u8 = _t7;
+    _t8: u8 = 3;
+    _t2: u8 = _t8;
     break[1]
   };
   _t4: bool = d;
@@ -204,12 +202,12 @@ loop {
     _t2: u8 = _t5;
     break[1]
   };
-  _t6: u8 = 2;
-  _t2: u8 = _t6;
+  _t7: u8 = 2;
+  _t2: u8 = _t7;
   break
 };
-_t8: u8 = _t2;
-return _t8
+_t6: u8 = _t2;
+return _t6
 
 --- Assign-Transformed Generated AST
 loop {
@@ -271,18 +269,18 @@ fun m::if_else_3($t0|c: bool): u64 {
      var $t4: u64
      var $t5: u64
   0: $t2 := move($t0)
-  1: if ($t2) goto 2 else goto 6
+  1: if ($t2) goto 2 else goto 9
   2: label L1
   3: $t3 := 1
   4: $t1 := $t3
-  5: goto 10
-  6: label L0
-  7: $t4 := 2
-  8: $t1 := $t4
-  9: goto 10
- 10: label L2
- 11: $t5 := move($t1)
- 12: return $t5
+  5: goto 6
+  6: label L2
+  7: $t4 := move($t1)
+  8: return $t4
+  9: label L0
+ 10: $t5 := 2
+ 11: $t1 := $t5
+ 12: goto 6
 }
 
 --- Raw Generated AST
@@ -294,12 +292,12 @@ loop {
     _t1: u64 = _t3;
     break[1]
   };
-  _t4: u64 = 2;
-  _t1: u64 = _t4;
+  _t5: u64 = 2;
+  _t1: u64 = _t5;
   break
 };
-_t5: u64 = _t1;
-return _t5
+_t4: u64 = _t1;
+return _t4
 
 --- Assign-Transformed Generated AST
 loop {
@@ -350,30 +348,30 @@ fun m::if_else_if($t0|c: bool, $t1|d: bool): u8 {
      var $t2|return: u8
      var $t3: bool
      var $t4: u8
-     var $t5: bool
-     var $t6: u8
+     var $t5: u8
+     var $t6: bool
      var $t7: u8
      var $t8: u8
   0: $t3 := move($t0)
-  1: if ($t3) goto 2 else goto 6
+  1: if ($t3) goto 2 else goto 9
   2: label L1
   3: $t4 := 1
   4: $t2 := $t4
-  5: goto 17
-  6: label L0
-  7: $t5 := move($t1)
-  8: if ($t5) goto 9 else goto 13
-  9: label L4
- 10: $t6 := 2
- 11: $t2 := $t6
- 12: goto 17
- 13: label L3
- 14: $t7 := 3
- 15: $t2 := $t7
- 16: goto 17
- 17: label L2
- 18: $t8 := move($t2)
- 19: return $t8
+  5: goto 6
+  6: label L4
+  7: $t5 := move($t2)
+  8: return $t5
+  9: label L0
+ 10: $t6 := move($t1)
+ 11: if ($t6) goto 12 else goto 16
+ 12: label L3
+ 13: $t7 := 2
+ 14: $t2 := $t7
+ 15: goto 6
+ 16: label L2
+ 17: $t8 := 3
+ 18: $t2 := $t8
+ 19: goto 6
 }
 
 --- Raw Generated AST
@@ -385,19 +383,19 @@ loop {
     _t2: u8 = _t4;
     break[1]
   };
-  _t5: bool = d;
+  _t6: bool = d;
   loop {
-    if (Not(_t5)) break;
-    _t6: u8 = 2;
-    _t2: u8 = _t6;
+    if (Not(_t6)) break;
+    _t7: u8 = 2;
+    _t2: u8 = _t7;
     break[1]
   };
-  _t7: u8 = 3;
-  _t2: u8 = _t7;
+  _t8: u8 = 3;
+  _t2: u8 = _t8;
   break
 };
-_t8: u8 = _t2;
-return _t8
+_t5: u8 = _t2;
+return _t5
 
 --- Assign-Transformed Generated AST
 loop {
@@ -454,8 +452,8 @@ fun if_else_with_shared_exp(x: u64): u64 {
 
 --- Stackless Bytecode
 fun m::if_else_with_shared_exp($t0|x: u64): u64 {
-     var $t1|$t5: u64
-     var $t2|$t7: u64 [unused]
+     var $t1|$t3: u64
+     var $t2: u64
      var $t3: u64
      var $t4: u64
      var $t5: u64
@@ -463,63 +461,62 @@ fun m::if_else_with_shared_exp($t0|x: u64): u64 {
      var $t7: u64
      var $t8: u64
      var $t9: u64
-     var $t10: u64
-     var $t11: bool
+     var $t10: bool
+     var $t11: u64
      var $t12: u64
      var $t13: u64
      var $t14: u64
      var $t15: u64
      var $t16: u64
      var $t17: u64
-     var $t18: u64
-  0: $t3 := copy($t0)
-  1: $t4 := move($t0)
-  2: $t5 := +($t3, $t4)
-  3: $t0 := $t5
-  4: $t6 := copy($t0)
-  5: $t7 := move($t0)
-  6: $t8 := *($t6, $t7)
-  7: $t0 := $t8
-  8: $t9 := copy($t0)
-  9: $t10 := 0
- 10: $t11 := >($t9, $t10)
- 11: if ($t11) goto 12 else goto 18
+  0: $t2 := copy($t0)
+  1: $t3 := move($t0)
+  2: $t4 := +($t2, $t3)
+  3: $t0 := $t4
+  4: $t5 := copy($t0)
+  5: $t6 := move($t0)
+  6: $t7 := *($t5, $t6)
+  7: $t0 := $t7
+  8: $t8 := copy($t0)
+  9: $t9 := 0
+ 10: $t10 := >($t8, $t9)
+ 11: if ($t10) goto 12 else goto 21
  12: label L1
- 13: $t12 := move($t0)
- 14: $t13 := 1
- 15: $t14 := +($t12, $t13)
- 16: $t1 := $t14
- 17: goto 24
- 18: label L0
- 19: $t15 := move($t0)
- 20: $t16 := 1
- 21: $t17 := -($t15, $t16)
- 22: $t1 := $t17
- 23: goto 24
- 24: label L2
- 25: $t18 := move($t1)
- 26: return $t18
+ 13: $t11 := move($t0)
+ 14: $t12 := 1
+ 15: $t13 := +($t11, $t12)
+ 16: $t1 := $t13
+ 17: goto 18
+ 18: label L2
+ 19: $t14 := move($t1)
+ 20: return $t14
+ 21: label L0
+ 22: $t15 := move($t0)
+ 23: $t16 := 1
+ 24: $t17 := -($t15, $t16)
+ 25: $t1 := $t17
+ 26: goto 18
 }
 
 --- Raw Generated AST
+_t2: u64 = x;
 _t3: u64 = x;
-_t4: u64 = x;
-_t5: u64 = Add(_t3, _t4);
-x: u64 = _t5;
+_t4: u64 = Add(_t2, _t3);
+x: u64 = _t4;
+_t5: u64 = x;
 _t6: u64 = x;
-_t7: u64 = x;
-_t8: u64 = Mul(_t6, _t7);
-x: u64 = _t8;
-_t9: u64 = x;
-_t10: u64 = 0;
-_t11: bool = Gt(_t9, _t10);
+_t7: u64 = Mul(_t5, _t6);
+x: u64 = _t7;
+_t8: u64 = x;
+_t9: u64 = 0;
+_t10: bool = Gt(_t8, _t9);
 loop {
   loop {
-    if (Not(_t11)) break;
-    _t12: u64 = x;
-    _t13: u64 = 1;
-    _t14: u64 = Add(_t12, _t13);
-    _t1: u64 = _t14;
+    if (Not(_t10)) break;
+    _t11: u64 = x;
+    _t12: u64 = 1;
+    _t13: u64 = Add(_t11, _t12);
+    _t1: u64 = _t13;
     break[1]
   };
   _t15: u64 = x;
@@ -528,8 +525,8 @@ loop {
   _t1: u64 = _t17;
   break
 };
-_t18: u64 = _t1;
-return _t18
+_t14: u64 = _t1;
+return _t14
 
 --- Assign-Transformed Generated AST
 x: u64 = Add(x, x);

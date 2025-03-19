@@ -12,7 +12,10 @@ The script includes several functions to manage and execute fuzz tests:
     ```bash
     ./fuzz.sh add <fuzz_target_name>
     ```
-
+- `block-builder`: Run rust utility to build fuzzers.
+    ```bash
+    ./fuzz.sh block-builder <utility> [args]
+    ```
 - `build`: Build specified fuzz targets or all targets.
     ```bash
     ./fuzz.sh build <fuzz_target|all> [target_dir]
@@ -22,7 +25,27 @@ The script includes several functions to manage and execute fuzz tests:
     ```bash
     ./fuzz.sh build-oss-fuzz <target_dir>
     ```
-
+- `cmin`: Distillate corpora
+    ```bash
+    ./fuzz.sh cmin <fuzz_target> [corpora_directory]
+    ```
+- `coverage`: Generates coverage report in HTML format
+    ```bash
+    ./fuzz.sh coverage <fuzz_target>
+    ```
+    > rustup +nightly-2024-04-06 component add llvm-tools-preview
+- `coverage-cleanup`:
+    ```bash
+    ./fuzz.sh clean-coverage <fuzz_target|all>
+    ```
+- `degub`: Run fuzzer with GDB and pass test_case as input
+    ```bash
+    ./fuzz.sh debug <fuzz_target> <test_case>
+    ```
+- `flamegraph`: Generates flamegraph report (might requires addition setups on the os)
+    ```
+    ./fuzz.sh flamegraph <fuzz_target> <test_case>
+    ```
 - `list`: List all existing fuzz targets.
     ```bash
     ./fuzz.sh list
@@ -97,10 +120,36 @@ When building in the OSS-Fuzz environment, `fuzz.sh` will place the corpus archi
 - **Error Handling:** Implement robust error handling to intercept crashes or unwanted/unexpected behavior.
 - **Performance Optimization:** Optimize for performance to enable more iterations and deeper fuzzing.
 
+## Generate Corpora
+Some fuzzers operate better if a good initial corpus is provided. In order to generate the corpus, utilities are available via `./fuzz.sh block-builder`. Once a corpus is obtained, to feed it to fuzzers running on OSS-Fuzz, building a ZIP archive with a specific name is required: `$FUZZERNAME_seed_corpus.zip`. Upload it to a publicly accessible cloud, e.g., GCP Bucket or S3; avoid GDrive. Obtain a public link and add it to the `CORPUS_ZIPS` array in `fuzz.sh`. It will automatically be downloaded and used inside Google's infrastructure.
+### Aptos-VM Publish & Run
+`./fuzz.sh block-builder generate_runnable_state /tmp/modules.csv /tmp/Modules`
+The CSV file is structured as follows:  
+- Column 1: Module name  
+- Column 2: Module address  
+- Column 3: Base64-encoded bytecode of the module
+
+You can generate a test case from any valid Move project (arguments to function calls might need attention TODO). It's helpful for testing new functionalities or increasing coverage completeness. For native functions, please follow the structure in the data folder.
+
+> Create an entry function, which may accept a signer or no parameters. Generic T functions are not allowed as entry.
+
+The first argument is the project, and the second one is the target directory.
+`./fuzz.sh block-builder generate_runnable_state_from_project data/0x1/string/generic fuzz/corpus/move_aptosvm_publish_and_run`
+
+> Verify your testcase runs as expected by appending `DEBUG=1` while calling the fuzzer and using the newly generated test case as the second parameter.
+
+## Debug Crashes
+Flamegraph and GDB are integrated into fuzz.sh for advanced metrics and debugging. A more rudimentary option is also available: since we have symbolized binaries, we can directly use the stack trace produced by the fuzzer. However, for INVARIANT_VIOLATIONS, the stack trace is incorrect. To obtain the correct stack trace, you can use the following command:
+```bash
+DEBUG_VM_STATUS=<status_reported_by_the_fuzzer> ./fuzz.sh run <fuzzer_target> <test_case>
+```
+This command is selective, so only the specified, comma-separated statuses will trigger the panic in PartialVMError.
+
 ## References
 - [Rust Fuzz Book](https://rust-fuzz.github.io/book/)
 - [Google OSS-Fuzz](https://google.github.io/oss-fuzz/)
 - [Arbitrary](https://docs.rs/arbitrary/latest/arbitrary/)
+- [Native Functions](https://aptos.dev/en/build/smart-contracts/move-reference?branch=mainnet&page=move-stdlib%2Fdoc%2Fmem.md)
 
 ## Contribute
 Contributions to enhance the `fuzz.sh` script and the fuzz testing suite are welcome.

@@ -165,6 +165,17 @@ async fn warn_detailed_error(
     err: Result<&aptos_types::transaction::TransactionInfo, &RestError>,
 ) {
     let sender = txn.sender();
+    use aptos_types::transaction::TransactionPayload::*;
+    let payload = match txn.payload() {
+        Script(_) => "script".to_string(),
+        ModuleBundle(_) => "module_bundle".to_string(),
+        EntryFunction(entry_function) => format!(
+            "entry {}::{}",
+            entry_function.module(),
+            entry_function.function()
+        ),
+        Multisig(_) => "multisig".to_string(),
+    };
     let (last_transactions, seq_num) =
         if let Ok(account) = rest_client.get_account_bcs(sender).await {
             let inner = account.into_inner();
@@ -194,11 +205,12 @@ async fn warn_detailed_error(
         .map_or(-1, |v| v.into_inner() as i128);
 
     warn!(
-        "[{:?}] Failed {} transaction: {:?}, seq num: {}, gas: unit {} and max {}, for account {}, last seq_num {:?}, balance of {} and last transaction for account: {:?}",
+        "[{:?}] Failed {} transaction: {:?}, seq num: {}, payload: {}, gas: unit {} and max {}, for account {}, last seq_num {:?}, balance of {} and last transaction for account: {:?}",
         rest_client.path_prefix_string(),
         call_name,
         err,
         txn.sequence_number(),
+        payload,
         txn.gas_unit_price(),
         txn.max_gas_amount(),
         sender,
@@ -277,17 +289,11 @@ pub async fn query_sequence_number_with_client(
 ) -> Result<u64> {
     let result = FETCH_ACCOUNT_RETRY_POLICY
         .retry_if(
-            move || rest_client.get_account_bcs(account_address),
+            move || rest_client.get_account_sequence_number(account_address),
             |error: &RestError| !is_account_not_found(error),
         )
         .await;
-    match result {
-        Ok(account) => Ok(account.into_inner().sequence_number()),
-        Err(error) => match is_account_not_found(&error) {
-            true => Ok(0),
-            false => Err(error.into()),
-        },
-    }
+    Ok(*result?.inner())
 }
 
 fn is_account_not_found(error: &RestError) -> bool {

@@ -29,7 +29,7 @@ use ark_groth16::{prepare_verifying_key, PreparedVerifyingKey};
 use base64::{encode_config, URL_SAFE_NO_PAD};
 use move_core_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
-use ring::signature;
+use ring::{signature, signature::RsaKeyPair};
 
 static DUMMY_EPHEMERAL_SIGNATURE: Lazy<EphemeralSignature> = Lazy::new(|| {
     let sk = Ed25519PrivateKey::generate_for_testing();
@@ -308,6 +308,20 @@ pub fn get_sample_jwt_token_from_payload(payload: &str) -> String {
     format!("{}.{}", msg, base64url_string)
 }
 
+pub fn oidc_provider_sign(sk: &RsaKeyPair, msg: &[u8]) -> Vec<u8> {
+    let mut jwt_sig = vec![0u8; sk.public_modulus_len()];
+    let rng = ring::rand::SystemRandom::new();
+    sk.sign(
+        &signature::RSA_PKCS1_SHA256,
+        &rng,
+        msg,
+        jwt_sig.as_mut_slice(),
+    )
+    .unwrap();
+
+    jwt_sig
+}
+
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
 /// desired TXN.
 pub fn get_sample_openid_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
@@ -389,14 +403,14 @@ mod test {
                 get_sample_epk_blinder, get_sample_esk, get_sample_exp_date,
                 get_sample_groth16_sig_and_pk, get_sample_jwt_token, get_sample_pepper,
             },
-            Configuration, Groth16Proof, OpenIdSig, DEVNET_VERIFICATION_KEY,
+            Configuration, Groth16Proof, OpenIdSig, VERIFICATION_KEY_FOR_TESTING,
         },
         transaction::authenticator::EphemeralPublicKey,
     };
     use aptos_crypto::PrivateKey;
     use ark_ff::PrimeField;
     use reqwest::Client;
-    use serde_json::{json, Value};
+    use serde_json::{json, to_string_pretty, Value};
     use std::ops::Deref;
 
     /// Since our proof generation toolkit is incomplete; currently doing it here.
@@ -430,9 +444,8 @@ mod test {
         public_inputs_hash: [u8; 32],
     }
 
-    // Run the prover service locally - https://github.com/aptos-labs/prover-service
-    // Then run ./scripts/dev_setup.sh
-    // Lastly run ./scripts/run_test_server.sh
+    // Run the prover service locally - https://github.com/aptos-labs/keyless-zk-proofs/tree/main/prover
+    // Follow the README and make sure to use port 8083
     #[ignore]
     #[tokio::test]
     async fn fetch_sample_proofs_from_prover() {
@@ -449,6 +462,9 @@ mod test {
             "extra_field": SAMPLE_JWT_EXTRA_FIELD_KEY,
             "use_insecure_test_jwk": true,
         });
+
+        println!("Request Body: {}", to_string_pretty(&body).unwrap());
+
         make_prover_request(&client, body, "SAMPLE_PROOF").await;
 
         let body = json!({
@@ -507,7 +523,7 @@ mod test {
             // Verify the proof with the test verifying key.  If this fails the verifying key does not match the proving used
             // to generate the proof.
             proof
-                .verify_proof(public_inputs_hash, DEVNET_VERIFICATION_KEY.deref())
+                .verify_proof(public_inputs_hash, VERIFICATION_KEY_FOR_TESTING.deref())
                 .unwrap();
 
             prover_response

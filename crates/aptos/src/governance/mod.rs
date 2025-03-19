@@ -9,7 +9,7 @@ use crate::common::utils::read_from_file;
 use crate::{
     common::{
         types::{
-            CliError, CliTypedResult, MovePackageDir, PoolAddressArgs, ProfileOptions,
+            CliError, CliTypedResult, MovePackageOptions, PoolAddressArgs, ProfileOptions,
             PromptOptions, RestOptions, TransactionOptions, TransactionSummary,
         },
         utils::prompt_yes_with_override,
@@ -43,7 +43,10 @@ use move_core_types::{
     ident_str, language_storage::ModuleId, parser::parse_type_tag,
     transaction_argument::TransactionArgument,
 };
-use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_model::metadata::{
+    CompilerVersion, LanguageVersion, LATEST_STABLE_COMPILER_VERSION,
+    LATEST_STABLE_LANGUAGE_VERSION,
+};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -909,20 +912,20 @@ pub struct CompileScriptFunction {
     #[clap(flatten)]
     pub framework_package_args: FrameworkPackageArgs,
 
-    #[clap(long, default_value_if("move_2", "true", "7"))]
+    #[clap(long)]
     pub bytecode_version: Option<u32>,
 
+    /// Specify the version of the compiler.
+    /// Defaults to the latest stable compiler version (at least 2)
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
-           default_value_if("move_2", "true", "2.0"))]
+           default_value = LATEST_STABLE_COMPILER_VERSION,)]
     pub compiler_version: Option<CompilerVersion>,
 
+    /// Specify the language version to be supported.
+    /// Defaults to the latest stable language version (at least 2)
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
-           default_value_if("move_2", "true", "2.0"))]
+           default_value = LATEST_STABLE_LANGUAGE_VERSION,)]
     pub language_version: Option<LanguageVersion>,
-
-    /// Select bytecode, language, compiler for Move 2
-    #[clap(long)]
-    pub move_2: bool,
 }
 
 impl CompileScriptFunction {
@@ -968,8 +971,10 @@ impl CompileScriptFunction {
             &self.framework_package_args,
             prompt_options,
             self.bytecode_version,
-            self.language_version,
-            self.compiler_version,
+            self.language_version
+                .or_else(|| Some(LanguageVersion::latest_stable())),
+            self.compiler_version
+                .or_else(|| Some(CompilerVersion::latest_stable())),
         )
     }
 }
@@ -1003,7 +1008,7 @@ pub struct GenerateUpgradeProposal {
     pub(crate) next_execution_hash: String,
 
     #[clap(flatten)]
-    pub(crate) move_options: MovePackageDir,
+    pub(crate) move_options: MovePackageOptions,
 }
 
 #[async_trait]

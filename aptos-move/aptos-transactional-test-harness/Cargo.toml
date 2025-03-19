@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-api-types = { workspace = true }
+aptos-block-executor = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-framework = { workspace = true }
@@ -33,7 +34,6 @@ hex = { workspace = true }
 move-binary-format = { workspace = true, features = ["fuzzing"] }
 move-bytecode-verifier = { workspace = true }
 move-command-line-common = { workspace = true }
-move-compiler = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
 move-model = { workspace = true }

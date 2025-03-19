@@ -112,7 +112,7 @@ impl UnverifiedEvent {
             //TODO: no need to sign and verify the proposal
             UnverifiedEvent::ProposalMsg(p) => {
                 if !self_message {
-                    p.verify(validator, proof_cache, quorum_store_enabled)?;
+                    p.verify(peer_id, validator, proof_cache, quorum_store_enabled)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["proposal"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -121,7 +121,7 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::VoteMsg(v) => {
                 if !self_message {
-                    v.verify(validator)?;
+                    v.verify(peer_id, validator)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["vote"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -139,7 +139,7 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::OrderVoteMsg(v) => {
                 if !self_message {
-                    v.verify_order_vote(validator)?;
+                    v.verify_order_vote(peer_id, validator)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["order_vote"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -1135,6 +1135,20 @@ impl RoundManager {
 
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
         let proposal_round = proposal.round();
+        let sync_info = self.block_store.sync_info();
+
+        if proposal_round <= sync_info.highest_round() {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(1)),
+                warn!(
+                    sync_info = sync_info,
+                    proposal = proposal,
+                    "Ignoring proposal. SyncInfo round is higher than proposal round."
+                )
+            );
+            return Ok(());
+        }
+
         let vote = self.create_vote(proposal).await?;
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());

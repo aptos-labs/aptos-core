@@ -13,7 +13,7 @@ use aptos_config::{
 };
 use aptos_forge::{LocalNode, NodeExt, Swarm};
 use aptos_types::on_chain_config::{
-    ConsensusAlgorithmConfig, OnChainConsensusConfig, ValidatorTxnConfig,
+    ConsensusAlgorithmConfig, OnChainConsensusConfig, ValidatorTxnConfig, DEFAULT_WINDOW_SIZE,
 };
 use std::sync::Arc;
 
@@ -117,9 +117,10 @@ async fn test_consensus_observer_fullnode_sync_disable_quorum_store() {
             enable_consensus_observer(true, config);
         }))
         .with_init_genesis_config(Arc::new(|genesis_config| {
-            genesis_config.consensus_config = OnChainConsensusConfig::V3 {
+            genesis_config.consensus_config = OnChainConsensusConfig::V4 {
                 alg: ConsensusAlgorithmConfig::default_with_quorum_store_disabled(),
                 vtxn: ValidatorTxnConfig::default_for_genesis(),
+                window_size: DEFAULT_WINDOW_SIZE,
             };
         }))
         .with_vfn_config(vfn_config)

@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::types::{AccountAddressWrapper, CliCommand, CliTypedResult, MovePackageDir},
+    common::types::{AccountAddressWrapper, CliCommand, CliTypedResult, MovePackageOptions},
     move_tool::IncludedArtifacts,
 };
 use aptos_framework::{BuildOptions, BuiltPackage};
 use async_trait::async_trait;
 use clap::Parser;
 use move_compiler_v2::Experiment;
-use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_linter::MoveLintChecks;
+use move_model::metadata::{CompilerVersion, LanguageVersion, LATEST_STABLE_LANGUAGE_VERSION};
 use move_package::source_package::std_lib::StdVersion;
 use std::{collections::BTreeMap, path::PathBuf};
 
@@ -29,10 +30,10 @@ pub struct LintPackage {
 
     /// ...or --language LANGUAGE_VERSION
     /// Specify the language version to be supported.
-    /// Currently, defaults to `2.0`.
+    /// Defaults to the latest stable language version.
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
            alias = "language",
-           default_value = "2.0",
+           default_value = LATEST_STABLE_LANGUAGE_VERSION,
            verbatim_doc_comment)]
     pub language_version: Option<LanguageVersion>,
 
@@ -69,15 +70,13 @@ pub struct LintPackage {
     #[clap(long)]
     pub dev: bool,
 
-    /// Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code.
-    /// NOTE: this behavior will become the default in the future.
-    /// See <https://github.com/aptos-labs/aptos-core/issues/10335>
-    #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
-    pub check_test_code: bool,
+    /// Experiments
+    #[clap(long, hide(true))]
+    pub experiments: Vec<String>,
 }
 
 impl LintPackage {
-    fn to_move_options(&self) -> MovePackageDir {
+    fn to_move_options(&self) -> MovePackageOptions {
         let LintPackage {
             dev,
             package_dir,
@@ -87,9 +86,9 @@ impl LintPackage {
             skip_fetch_latest_git_deps,
             language_version,
             skip_attribute_checks,
-            check_test_code,
+            experiments,
         } = self.clone();
-        MovePackageDir {
+        MovePackageOptions {
             dev,
             package_dir,
             output_dir,
@@ -98,8 +97,8 @@ impl LintPackage {
             skip_fetch_latest_git_deps,
             language_version,
             skip_attribute_checks,
-            check_test_code,
-            ..MovePackageDir::new()
+            experiments,
+            ..MovePackageOptions::new()
         }
     }
 }
@@ -111,8 +110,8 @@ impl CliCommand<&'static str> for LintPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        let move_options = MovePackageDir {
-            compiler_version: Some(CompilerVersion::V2_0),
+        let move_options = MovePackageOptions {
+            compiler_version: Some(CompilerVersion::latest_stable()),
             ..self.to_move_options()
         };
         let more_experiments = vec![
@@ -131,7 +130,17 @@ impl CliCommand<&'static str> for LintPackage {
                 true,
             )?
         };
-        BuiltPackage::build(package_path, build_options)?;
+
+        let build_config = BuiltPackage::create_build_config(&build_options)?;
+        let resolved_graph =
+            BuiltPackage::prepare_resolution_graph(package_path, build_config.clone())?;
+        BuiltPackage::build_with_external_checks(
+            resolved_graph,
+            build_options,
+            build_config,
+            vec![MoveLintChecks::make()],
+        )?;
+
         Ok("succeeded")
     }
 }

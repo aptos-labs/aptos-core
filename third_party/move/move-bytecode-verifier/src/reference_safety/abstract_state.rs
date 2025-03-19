@@ -11,11 +11,10 @@ use move_binary_format::{
     binary_views::FunctionView,
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        CodeOffset, FunctionDefinitionIndex, LocalIndex, Signature, SignatureToken,
+        CodeOffset, FunctionDefinitionIndex, LocalIndex, MemberCount, Signature, SignatureToken,
         StructDefinitionIndex,
     },
     safe_unwrap,
-    views::FieldOrVariantIndex,
 };
 use move_borrow_graph::references::RefID;
 use move_core_types::vm_status::StatusCode;
@@ -59,7 +58,7 @@ impl AbstractValue {
 enum Label {
     Local(LocalIndex),
     Global(StructDefinitionIndex),
-    Field(FieldOrVariantIndex),
+    Field(MemberCount),
 }
 
 // Needed for debugging with the borrow graph
@@ -68,10 +67,7 @@ impl std::fmt::Display for Label {
         match self {
             Label::Local(i) => write!(f, "local#{}", i),
             Label::Global(i) => write!(f, "resource@{}", i),
-            Label::Field(FieldOrVariantIndex::FieldIndex(i)) => write!(f, "field#{}", i),
-            Label::Field(FieldOrVariantIndex::VariantFieldIndex(i)) => {
-                write!(f, "variant_field#{}", i)
-            },
+            Label::Field(i) => write!(f, "field#{}", i),
         }
     }
 }
@@ -176,7 +172,7 @@ impl AbstractState {
         self.borrow_graph.add_weak_borrow((), parent, child)
     }
 
-    fn add_field_borrow(&mut self, parent: RefID, field: FieldOrVariantIndex, child: RefID) {
+    fn add_field_borrow(&mut self, parent: RefID, field: MemberCount, child: RefID) {
         self.borrow_graph
             .add_strong_field_borrow((), parent, Label::Field(field), child)
     }
@@ -217,12 +213,12 @@ impl AbstractState {
         self.borrow_graph.is_writable(id)
     }
 
-    fn is_freezable(&self, id: RefID, at_field_opt: Option<FieldOrVariantIndex>) -> bool {
+    fn is_freezable(&self, id: RefID, at_field_opt: Option<MemberCount>) -> bool {
         self.borrow_graph
             .is_freezable(id, at_field_opt.map(Label::Field))
     }
 
-    fn is_readable(&self, id: RefID, at_field_opt: Option<FieldOrVariantIndex>) -> bool {
+    fn is_readable(&self, id: RefID, at_field_opt: Option<MemberCount>) -> bool {
         self.borrow_graph
             .is_readable(id, at_field_opt.map(Label::Field))
     }
@@ -399,7 +395,7 @@ impl AbstractState {
         offset: CodeOffset,
         mut_: bool,
         id: RefID,
-        field: FieldOrVariantIndex,
+        field: MemberCount,
     ) -> PartialVMResult<AbstractValue> {
         // Any field borrows will be factored out, so don't check in the mutable case
         let is_mut_borrow_with_full_borrows = || mut_ && self.has_full_borrows(id);
@@ -500,7 +496,17 @@ impl AbstractState {
                 return Err(self.error(StatusCode::GLOBAL_REFERENCE_ERROR, offset));
             }
         }
+        // Check arguments and return, and abstract value transition
+        self.core_call(offset, arguments, &return_.0, meter)
+    }
 
+    fn core_call(
+        &mut self,
+        offset: CodeOffset,
+        arguments: Vec<AbstractValue>,
+        result_tys: &[SignatureToken],
+        meter: &mut impl Meter,
+    ) -> PartialVMResult<Vec<AbstractValue>> {
         // Check mutable references can be transfered
         let mut all_references_to_borrow_from = BTreeSet::new();
         let mut mutable_references_to_borrow_from = BTreeSet::new();
@@ -518,8 +524,7 @@ impl AbstractState {
 
         // Track borrow relationships of return values on inputs
         let mut returned_refs = 0;
-        let return_values = return_
-            .0
+        let return_values = result_tys
             .iter()
             .map(|return_type| match return_type {
                 SignatureToken::MutableReference(_) => {
@@ -557,6 +562,18 @@ impl AbstractState {
             self.release(id)
         }
         Ok(return_values)
+    }
+
+    /// Records the evaluation of a closure in the abstract state. This is currently the
+    /// same as calling the function.
+    pub fn call_closure(
+        &mut self,
+        offset: CodeOffset,
+        arguments: Vec<AbstractValue>,
+        result_tys: &[SignatureToken],
+        meter: &mut impl Meter,
+    ) -> PartialVMResult<Vec<AbstractValue>> {
+        self.core_call(offset, arguments, result_tys, meter)
     }
 
     pub fn ret(&mut self, offset: CodeOffset, values: Vec<AbstractValue>) -> PartialVMResult<()> {

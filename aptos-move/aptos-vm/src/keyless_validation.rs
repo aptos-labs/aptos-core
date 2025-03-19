@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{aptos_vm::fetch_module_metadata_for_struct_tag, move_vm_ext::AptosMoveResolver};
+use crate::move_vm_ext::AptosMoveResolver;
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_types::{
     invalid_signature,
@@ -15,7 +15,6 @@ use aptos_types::{
     transaction::authenticator::{EphemeralPublicKey, EphemeralSignature},
     vm_status::{StatusCode, VMStatus},
 };
-use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use ark_bn254::Bn254;
 use ark_groth16::PreparedVerifyingKey;
 use move_binary_format::errors::Location;
@@ -23,6 +22,7 @@ use move_core_types::{
     account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS,
     move_resource::MoveStructType,
 };
+use move_vm_runtime::ModuleStorage;
 use serde::Deserialize;
 
 macro_rules! value_deserialization_error {
@@ -36,7 +36,7 @@ macro_rules! value_deserialization_error {
 
 fn get_resource_on_chain<T: MoveStructType + for<'a> Deserialize<'a>>(
     resolver: &impl AptosMoveResolver,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
 ) -> anyhow::Result<T, VMStatus> {
     get_resource_on_chain_at_addr(&CORE_CODE_ADDRESS, resolver, module_storage)
 }
@@ -44,12 +44,14 @@ fn get_resource_on_chain<T: MoveStructType + for<'a> Deserialize<'a>>(
 fn get_resource_on_chain_at_addr<T: MoveStructType + for<'a> Deserialize<'a>>(
     addr: &AccountAddress,
     resolver: &impl AptosMoveResolver,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
 ) -> anyhow::Result<T, VMStatus> {
-    let metadata = fetch_module_metadata_for_struct_tag(&T::struct_tag(), resolver, module_storage)
+    let struct_tag = T::struct_tag();
+    let metadata = module_storage
+        .fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
         .map_err(|e| e.into_vm_status())?;
     let bytes = resolver
-        .get_resource_bytes_with_metadata_and_layout(addr, &T::struct_tag(), &metadata, None)
+        .get_resource_bytes_with_metadata_and_layout(addr, &struct_tag, &metadata, None)
         .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
         .0
         .ok_or_else(|| {
@@ -87,21 +89,21 @@ fn get_jwks_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<Patched
 fn get_federated_jwks_onchain(
     resolver: &impl AptosMoveResolver,
     jwk_addr: &AccountAddress,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
 ) -> anyhow::Result<FederatedJWKs, VMStatus> {
     get_resource_on_chain_at_addr::<FederatedJWKs>(jwk_addr, resolver, module_storage)
 }
 
 pub(crate) fn get_groth16_vk_onchain(
     resolver: &impl AptosMoveResolver,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
 ) -> anyhow::Result<Groth16VerificationKey, VMStatus> {
     get_resource_on_chain::<Groth16VerificationKey>(resolver, module_storage)
 }
 
 fn get_configs_onchain(
     resolver: &impl AptosMoveResolver,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
 ) -> anyhow::Result<Configuration, VMStatus> {
     get_resource_on_chain::<Configuration>(resolver, module_storage)
 }
@@ -160,7 +162,7 @@ pub(crate) fn validate_authenticators(
     authenticators: &Vec<(AnyKeylessPublicKey, KeylessSignature)>,
     features: &Features,
     resolver: &impl AptosMoveResolver,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
 ) -> Result<(), VMStatus> {
     let mut with_zk = false;
     for (pk, sig) in authenticators {

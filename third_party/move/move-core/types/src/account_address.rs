@@ -11,14 +11,16 @@ use std::{convert::TryFrom, fmt, str::FromStr};
 /// A struct that represents an account address.
 #[derive(Ord, PartialOrd, Eq, PartialEq, Hash, Clone, Copy)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 pub struct AccountAddress([u8; AccountAddress::LENGTH]);
 
 impl AccountAddress {
     /// Hex address: 0x4
     pub const FOUR: Self = Self::get_hex_address_four();
     /// The number of bytes in an address.
-    /// Default to 16 bytes, can be set to 20 bytes with address20 feature.
     pub const LENGTH: usize = 32;
     /// Max address: 0xff....
     pub const MAX_ADDRESS: Self = Self([0xFF; Self::LENGTH]);

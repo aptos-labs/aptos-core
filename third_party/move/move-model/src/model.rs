@@ -17,9 +17,10 @@
 
 use crate::{
     ast::{
-        AccessSpecifier, Address, AddressSpecifier, Attribute, ConditionKind, Exp, ExpData,
-        FriendDecl, GlobalInvariant, ModuleName, PropertyBag, PropertyValue, ResourceSpecifier,
-        Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl, Value,
+        AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Attribute, ConditionKind,
+        Exp, ExpData, FriendDecl, GlobalInvariant, ModuleName, PropertyBag, PropertyValue,
+        ResourceSpecifier, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl,
+        Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -31,9 +32,9 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{
-        AbilityInference, AbilityInferer, NoUnificationContext, Type, TypeDisplayContext,
-        TypeUnificationAdapter, Variance,
+        AbilityInference, AbilityInferer, NoUnificationContext, Type, TypeDisplayContext, Variance,
     },
+    ty_invariant_analysis::TypeUnificationAdapter,
     well_known,
 };
 use anyhow::bail;
@@ -43,18 +44,19 @@ use codespan_reporting::{
     term::{emit, termcolor::WriteColor, Config},
 };
 use itertools::Itertools;
+use legacy_move_compiler::command_line as cli;
 #[allow(unused_imports)]
-use log::{info, warn};
-pub use move_binary_format::file_format::{AbilitySet, Visibility};
+use log::{debug, info, warn};
+pub use move_binary_format::file_format::Visibility;
 #[allow(deprecated)]
 use move_binary_format::normalized::Type as MType;
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     file_format::{
-        AccessKind, Bytecode, CodeOffset, Constant as VMConstant, ConstantPoolIndex,
-        FunctionDefinitionIndex, FunctionHandleIndex, MemberCount, SignatureIndex, SignatureToken,
-        StructDefinitionIndex, VariantIndex,
+        Bytecode, CodeOffset, Constant as VMConstant, ConstantPoolIndex, FunctionDefinitionIndex,
+        FunctionHandleIndex, MemberCount, SignatureIndex, SignatureToken, StructDefinitionIndex,
+        VariantIndex,
     },
     views::{FunctionDefinitionView, FunctionHandleView, StructHandleView},
     CompiledModule,
@@ -63,7 +65,7 @@ use move_bytecode_source_map::{mapping::SourceMapping, source_map::SourceMap};
 use move_command_line_common::{
     address::NumericalAddress, env::read_bool_env_var, files::FileHash,
 };
-use move_compiler::command_line as cli;
+pub use move_core_types::ability::AbilitySet;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
@@ -84,6 +86,8 @@ use std::{
     fmt::{self, Formatter, Write},
     rc::Rc,
 };
+
+static DEBUG_TRACE: bool = true;
 
 // =================================================================================================
 /// # Constants
@@ -200,13 +204,21 @@ impl Loc {
             && self.inlined_from_loc == other.inlined_from_loc
             && GlobalEnv::enclosing_span(self.span, other.span)
     }
+
+    /// Returns true if this location is the default one.
+    pub fn is_default(&self) -> bool {
+        *self == Loc::default()
+    }
 }
 
 impl Default for Loc {
     fn default() -> Self {
-        let mut files = Files::new();
-        let dummy_id = files.add(String::new(), String::new());
-        Loc::new(dummy_id, Span::default())
+        static DEFAULT: Lazy<Loc> = Lazy::new(|| {
+            let mut files = Files::new();
+            let dummy_id = files.add(String::new(), String::new());
+            Loc::new(dummy_id, Span::default())
+        });
+        DEFAULT.clone()
     }
 }
 
@@ -690,6 +702,11 @@ impl GlobalEnv {
         self.address_alias_map = map
     }
 
+    /// Gets the global address alias map
+    pub fn get_address_alias_map(&self) -> &BTreeMap<Symbol, AccountAddress> {
+        &self.address_alias_map
+    }
+
     /// Indicates that all modules in the environment should be treated as
     /// target modules, i.e. `module.is_target()` returns true. This can be
     /// used to temporarily override the default which distinguishes
@@ -875,6 +892,17 @@ impl GlobalEnv {
         target_modules
     }
 
+    /// Find all primary target modules and return in a vector
+    pub fn get_primary_target_modules(&self) -> Vec<ModuleEnv> {
+        let mut target_modules: Vec<ModuleEnv> = vec![];
+        for module_env in self.get_modules() {
+            if module_env.is_primary_target() {
+                target_modules.push(module_env);
+            }
+        }
+        target_modules
+    }
+
     fn add_backtrace(msg: &str, _is_bug: bool) -> String {
         // Note that you need both MOVE_COMPILER_BACKTRACE=1 and RUST_BACKTRACE=1 for this to
         // actually generate a backtrace.
@@ -884,11 +912,15 @@ impl GlobalEnv {
         });
         if *DUMP_BACKTRACE {
             let bt = Backtrace::capture();
-            if BacktraceStatus::Captured == bt.status() {
+            let msg_out = if BacktraceStatus::Captured == bt.status() {
                 format!("{}\nBacktrace: {:#?}", msg, bt)
             } else {
                 msg.to_owned()
+            };
+            if DEBUG_TRACE {
+                debug!("{}", msg_out);
             }
+            msg_out
         } else {
             msg.to_owned()
         }
@@ -1188,7 +1220,12 @@ impl GlobalEnv {
 
     /// Writes accumulated diagnostics of given or higher severity.
     pub fn report_diag<W: WriteColor>(&self, writer: &mut W, severity: Severity) {
-        self.report_diag_with_filter(writer, |d| d.severity >= severity)
+        self.report_diag_with_filter(
+            |files, diag| {
+                emit(writer, &Config::default(), files, diag).expect("emit must not fail")
+            },
+            |d| d.severity >= severity,
+        );
     }
 
     /// Helper function to report diagnostics, check for errors, and fail with a message on
@@ -1287,11 +1324,11 @@ impl GlobalEnv {
     }
 
     /// Writes accumulated diagnostics that pass through `filter`
-    pub fn report_diag_with_filter<W: WriteColor, F: FnMut(&Diagnostic<FileId>) -> bool>(
-        &self,
-        writer: &mut W,
-        mut filter: F,
-    ) {
+    pub fn report_diag_with_filter<E, F>(&self, mut emitter: E, mut filter: F)
+    where
+        E: FnMut(&Files<String>, &Diagnostic<FileId>),
+        F: FnMut(&Diagnostic<FileId>) -> bool,
+    {
         let mut shown = BTreeSet::new();
         self.diags.borrow_mut().sort_by(|a, b| {
             let reported_ordering = a.1.cmp(&b.1);
@@ -1313,8 +1350,7 @@ impl GlobalEnv {
                 // Avoid showing the same message twice. This can happen e.g. because of
                 // duplication of expressions via schema inclusion.
                 if shown.insert(format!("{:?}", diag)) {
-                    emit(writer, &Config::default(), &self.source_files, diag)
-                        .expect("emit must not fail");
+                    emitter(&self.source_files, diag);
                 }
                 *reported = true;
             }
@@ -1628,11 +1664,16 @@ impl GlobalEnv {
                 FunId(self.symbol_pool.make(name_str))
             };
 
-            // While releasing any mutation, compute the called functions if needed.
+            // While releasing any mutation, compute the used/called functions if needed.
             let fun_data = &self.module_data[module_id.0 as usize]
                 .function_data
                 .get(&fun_id)
                 .unwrap();
+            let used_funs = if fun_data.used_funs.is_none() {
+                Some(self.get_used_funs_from_bytecode(&module, def_idx))
+            } else {
+                None
+            };
             let called_funs = if fun_data.called_funs.is_none() {
                 Some(self.get_called_funs_from_bytecode(&module, def_idx))
             } else {
@@ -1644,6 +1685,9 @@ impl GlobalEnv {
                 fun_data.def_idx = Some(def_idx);
                 fun_data.handle_idx = Some(handle_idx);
                 mod_data.function_idx_to_id.insert(def_idx, fun_id);
+                if let Some(used_funs) = used_funs {
+                    fun_data.used_funs = Some(used_funs);
+                }
                 if let Some(called_funs) = called_funs {
                     fun_data.called_funs = Some(called_funs);
                 }
@@ -1658,6 +1702,36 @@ impl GlobalEnv {
         mod_data.friend_modules = friend_modules;
         mod_data.compiled_module = Some(module);
         mod_data.source_map = Some(source_map);
+    }
+
+    fn get_used_funs_from_bytecode(
+        &self,
+        module: &CompiledModule,
+        def_idx: FunctionDefinitionIndex,
+    ) -> BTreeSet<QualifiedId<FunId>> {
+        let function_definition = module.function_def_at(def_idx);
+        let function_definition_view = FunctionDefinitionView::new(module, function_definition);
+        let used_funs: BTreeSet<QualifiedId<FunId>> = match function_definition_view.code() {
+            Some(unit) => unit
+                .code
+                .iter()
+                .filter_map(|c| {
+                    let handle_idx = match c {
+                        Bytecode::Call(i) | Bytecode::PackClosure(i, ..) => Some(*i),
+                        Bytecode::CallGeneric(i) | Bytecode::PackClosureGeneric(i, ..) => {
+                            Some(module.function_instantiation_at(*i).handle)
+                        },
+                        _ => None,
+                    };
+                    handle_idx.map(|idx| {
+                        ModuleEnv::get_used_function_from_compiled_module(self, idx, module)
+                            .get_qualified_id()
+                    })
+                })
+                .collect(),
+            None => BTreeSet::default(),
+        };
+        used_funs
     }
 
     fn get_called_funs_from_bytecode(
@@ -1865,6 +1939,11 @@ impl GlobalEnv {
         self.get_module(fun.module_id).into_function(fun.id)
     }
 
+    pub fn get_function_opt(&self, fun: QualifiedId<FunId>) -> Option<FunctionEnv<'_>> {
+        self.get_module_opt(fun.module_id)
+            .map(|module| module.into_function(fun.id))
+    }
+
     /// Sets the AST based definition of the function.
     pub fn set_function_def(&mut self, fun: QualifiedId<FunId>, def: Exp) {
         let data = self
@@ -1874,8 +1953,21 @@ impl GlobalEnv {
             .function_data
             .get_mut(&fun.id)
             .unwrap();
+        data.used_funs = Some(def.used_funs());
         data.called_funs = Some(def.called_funs());
         data.def = Some(def);
+    }
+
+    /// Sets the inferred acquired structs of this function.
+    pub fn set_acquired_structs(&mut self, fun: QualifiedId<FunId>, acquires: BTreeSet<StructId>) {
+        let data = self
+            .module_data
+            .get_mut(fun.module_id.to_usize())
+            .unwrap()
+            .function_data
+            .get_mut(&fun.id)
+            .unwrap();
+        data.acquired_structs = Some(acquires)
     }
 
     /// Adds a new function definition.
@@ -1891,6 +1983,7 @@ impl GlobalEnv {
         result_type: Type,
         def: Exp,
     ) {
+        let used_funs = def.used_funs();
         let called_funs = def.called_funs();
         let data = FunctionData {
             name,
@@ -1910,11 +2003,15 @@ impl GlobalEnv {
             params,
             result_type,
             access_specifiers: None,
+            acquired_structs: None,
             spec: RefCell::new(Default::default()),
             def: Some(def),
             called_funs: Some(called_funs),
             calling_funs: RefCell::new(None),
             transitive_closure_of_called_funs: RefCell::new(None),
+            used_funs: Some(used_funs),
+            using_funs: RefCell::new(None),
+            transitive_closure_of_used_funs: RefCell::new(None),
         };
         assert!(self
             .module_data
@@ -2030,6 +2127,15 @@ impl GlobalEnv {
             env: self,
             data: module_data,
         }
+    }
+
+    /// Gets a module by id.
+    pub fn get_module_opt(&self, id: ModuleId) -> Option<ModuleEnv<'_>> {
+        let module_data = self.module_data.get(id.0 as usize);
+        module_data.map(|module_data| ModuleEnv {
+            env: self,
+            data: module_data,
+        })
     }
 
     pub(crate) fn get_module_data_mut(&mut self, id: ModuleId) -> &mut ModuleData {
@@ -2354,7 +2460,7 @@ impl GlobalEnv {
 
     // Removes all functions not matching the predicate from
     //   module_data fields function_data and function_idx_to_id
-    //   remaining function_data fields called_funs and calling_funs
+    //   remaining function_data fields used_funs and using_funs
     pub fn filter_functions<F>(&mut self, mut predicate: F)
     where
         F: FnMut(&QualifiedId<FunId>) -> bool,
@@ -2368,11 +2474,11 @@ impl GlobalEnv {
                 .function_idx_to_id
                 .retain(|_, fun_id| predicate(&module_id.qualified(*fun_id)));
             module_data.function_data.values_mut().for_each(|fun_data| {
-                if let Some(called_funs) = fun_data.called_funs.as_mut() {
-                    called_funs.retain(|qfun_id| predicate(qfun_id))
+                if let Some(used_funs) = fun_data.used_funs.as_mut() {
+                    used_funs.retain(|qfun_id| predicate(qfun_id))
                 }
-                if let Some(calling_funs) = &mut *fun_data.calling_funs.borrow_mut() {
-                    calling_funs.retain(|qfun_id| predicate(qfun_id))
+                if let Some(using_funs) = &mut *fun_data.using_funs.borrow_mut() {
+                    using_funs.retain(|qfun_id| predicate(qfun_id))
                 }
             });
         }
@@ -2564,9 +2670,9 @@ impl GlobalEnv {
                     emit!(writer, "!")
                 }
                 match &spec.kind {
-                    AccessKind::Reads => emit!(writer, "reads "),
-                    AccessKind::Writes => emit!(writer, "writes "),
-                    AccessKind::Acquires => emit!(writer, "acquires "),
+                    AccessSpecifierKind::Reads => emit!(writer, "reads "),
+                    AccessSpecifierKind::Writes => emit!(writer, "writes "),
+                    AccessSpecifierKind::LegacyAcquires => emit!(writer, "acquires "),
                 }
                 match &spec.resource.1 {
                     ResourceSpecifier::Any => emit!(writer, "*"),
@@ -2608,7 +2714,7 @@ impl GlobalEnv {
         if let Some(exp) = fun_def {
             emitln!(writer, " {");
             writer.indent();
-            emitln!(writer, "{}", exp.display_for_fun(fun.clone()));
+            emitln!(writer, "{}", exp.display_for_fun(fun));
             writer.unindent();
             emitln!(writer, "}");
         } else {
@@ -2811,6 +2917,11 @@ impl<'env> ModuleEnv<'env> {
         &self.data.use_decls
     }
 
+    /// Returns the friend declarations of this module.
+    pub fn get_friend_decls(&self) -> &[FriendDecl] {
+        &self.data.friend_decls
+    }
+
     /// Does this module declare `module_id` as a friend?
     pub fn has_friend(&self, module_id: &ModuleId) -> bool {
         self.data.friend_modules.contains(module_id)
@@ -2921,26 +3032,25 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Returns the set of modules in the current package,
-    /// whose public(package) functions are called in the current module.
-    /// Requires: `self` is a primary target.
+    /// whose public(package) functions are called or referenced in the current module.
     pub fn need_to_be_friended_by(&self) -> BTreeSet<ModuleId> {
-        debug_assert!(self.is_primary_target());
         let mut deps = BTreeSet::new();
         if self.is_script_module() {
             return deps;
         }
         for fun_env in self.get_functions() {
-            let called_funs = fun_env.get_called_functions().expect("called functions");
-            for fun in called_funs {
-                let mod_id = fun.module_id;
-                if self.get_id() == mod_id {
+            for used_fun in fun_env.get_used_functions().expect("used functions") {
+                let used_mod_id = used_fun.module_id;
+                if self.get_id() == used_mod_id {
                     // no need to friend self
                     continue;
                 }
-                let mod_env = self.env.get_module(mod_id);
-                let fun_env = mod_env.get_function(fun.id);
-                if fun_env.has_package_visibility() && self.can_call_package_fun_in(&mod_env) {
-                    deps.insert(mod_id);
+                let used_mod_env = self.env.get_module(used_mod_id);
+                let used_fun_env = used_mod_env.get_function(used_fun.id);
+                if used_fun_env.has_package_visibility()
+                    && self.can_call_package_fun_in(&used_mod_env)
+                {
+                    deps.insert(used_mod_id);
                 }
             }
         }
@@ -2948,12 +3058,12 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Returns true if functions in the current module can call a public(package) function in the given module.
-    /// Requires: `self` is a primary target.
     fn can_call_package_fun_in(&self, other: &Self) -> bool {
-        debug_assert!(self.is_primary_target());
         !self.is_script_module()
             && !other.is_script_module()
-            && other.is_primary_target()
+            // TODO(#13745): fix this when we have a way to check if
+            // two non-primary targets are in the same package
+            && (!self.is_primary_target() || other.is_primary_target())
             && self.self_address() == other.self_address()
     }
 
@@ -3309,7 +3419,7 @@ impl<'env> ModuleEnv<'env> {
         self.data.module_spec.borrow()
     }
 
-    /// Returns whether a spec fun is ever called or not.
+    /// Returns whether a spec fun is ever called/referenced or not.
     pub fn spec_fun_is_used(&self, spec_fun_id: SpecFunId) -> bool {
         self.env
             .used_spec_funs
@@ -3479,6 +3589,11 @@ pub struct StructEnv<'env> {
 }
 
 impl<'env> StructEnv<'env> {
+    /// Shortcut to access the env
+    pub fn env(&self) -> &GlobalEnv {
+        self.module_env.env
+    }
+
     /// Returns the name of this struct.
     pub fn get_name(&self) -> Symbol {
         self.data.name
@@ -3792,6 +3907,19 @@ impl<'env> StructEnv<'env> {
             ..self.module_env.get_type_display_ctx()
         }
     }
+
+    /// If this is a function type wrapper (`struct W(|T|R)`), get the underlying
+    /// function type, instantiated.
+    pub fn get_function_wrapper_type(&self, inst: &[Type]) -> Option<Type> {
+        if self.get_field_count() == 1 {
+            let field = self.get_fields().next().unwrap();
+            let ty = field.get_type();
+            if field.is_positional() && ty.is_function() {
+                return Some(ty.instantiate(inst));
+            }
+        }
+        None
+    }
 }
 
 // =================================================================================================
@@ -4056,6 +4184,20 @@ impl Default for TypeParameterKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Parameter(pub Symbol, pub Type, pub Loc);
 
+impl Parameter {
+    pub fn get_name(&self) -> Symbol {
+        self.0
+    }
+
+    pub fn get_type(&self) -> Type {
+        self.1.clone()
+    }
+
+    pub fn get_loc(&self) -> Loc {
+        self.2.clone()
+    }
+}
+
 impl EqIgnoringLoc for Parameter {
     /// equal ignoring Loc
     fn eq_ignoring_loc(&self, other: &Self) -> bool {
@@ -4132,11 +4274,14 @@ pub struct FunctionData {
     /// Access specifiers.
     pub(crate) access_specifiers: Option<Vec<AccessSpecifier>>,
 
+    /// Acquires information, if available. This is either inferred or annotated by the
+    /// user via a legacy acquires declaration.
+    pub(crate) acquired_structs: Option<BTreeSet<StructId>>,
+
     /// Specification associated with this function.
     pub(crate) spec: RefCell<Spec>,
 
-    /// Optional definition associated with this function. The definition is available if
-    /// the model is build with option `ModelBuilderOptions::compile_via_model`.
+    /// Optional definition associated with this function.
     pub(crate) def: Option<Exp>,
 
     /// A cache for the called functions.
@@ -4147,6 +4292,15 @@ pub struct FunctionData {
 
     /// A cache for the transitive closure of the called functions.
     pub(crate) transitive_closure_of_called_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+
+    /// A cache for the used functions.  Used functions are those called or with values taken here.
+    pub(crate) used_funs: Option<BTreeSet<QualifiedId<FunId>>>,
+
+    /// A cache for the using functions.  Using functions are those which call or take value of this.
+    pub(crate) using_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+
+    /// A cache for the transitive closure of the used functions.
+    pub(crate) transitive_closure_of_used_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
 }
 
 impl FunctionData {
@@ -4165,11 +4319,15 @@ impl FunctionData {
             params: vec![],
             result_type: Type::unit(),
             access_specifiers: None,
+            acquired_structs: None,
             spec: RefCell::new(Default::default()),
             def: None,
             called_funs: None,
             calling_funs: RefCell::new(None),
             transitive_closure_of_called_funs: RefCell::new(None),
+            used_funs: None,
+            using_funs: RefCell::new(None),
+            transitive_closure_of_used_funs: RefCell::new(None),
         }
     }
 }
@@ -4192,6 +4350,11 @@ pub struct FunctionEnv<'env> {
 }
 
 impl<'env> FunctionEnv<'env> {
+    /// Shortcut to access the env
+    pub fn env(&self) -> &GlobalEnv {
+        self.module_env.env
+    }
+
     /// Returns the name of this function.
     pub fn get_name(&self) -> Symbol {
         self.data.name
@@ -4634,6 +4797,12 @@ impl<'env> FunctionEnv<'env> {
         self.data.access_specifiers.as_deref()
     }
 
+    /// Returns the inferred acquired structs of this function. This is checked
+    /// against declared acquires from `get_access_specifiers`.
+    pub fn get_acquired_structs(&self) -> Option<&BTreeSet<StructId>> {
+        self.data.acquired_structs.as_ref()
+    }
+
     /// Get the name to be used for a local by index, if available.
     /// Otherwise generate a unique name.
     pub fn get_local_name(&self, idx: usize) -> Symbol {
@@ -4712,8 +4881,7 @@ impl<'env> FunctionEnv<'env> {
         self.data.spec.borrow_mut()
     }
 
-    /// Returns associated definition. The definition of the function, in Exp form, is available
-    /// if the model is build with `ModelBuilderOptions::compile_via_model`
+    /// Returns associated definition if available.
     pub fn get_def(&self) -> Option<&Exp> {
         self.data.def.as_ref()
     }
@@ -4788,6 +4956,58 @@ impl<'env> FunctionEnv<'env> {
     /// Determine whether this function is explicitly deactivated for verification.
     pub fn is_explicitly_not_verified(&self, scope: &VerificationScope) -> bool {
         !matches!(scope, VerificationScope::Only(..)) && self.is_pragma_false(VERIFY_PRAGMA)
+    }
+
+    /// Get the functions that use this one, if available.
+    pub fn get_using_functions(&self) -> Option<BTreeSet<QualifiedId<FunId>>> {
+        if let Some(using) = &*self.data.using_funs.borrow() {
+            return Some(using.clone());
+        }
+        let mut set: BTreeSet<QualifiedId<FunId>> = BTreeSet::new();
+        for module_env in self.module_env.env.get_modules() {
+            for fun_env in module_env.get_functions() {
+                if fun_env
+                    .get_used_functions()?
+                    .contains(&self.get_qualified_id())
+                {
+                    set.insert(fun_env.get_qualified_id());
+                }
+            }
+        }
+        *self.data.using_funs.borrow_mut() = Some(set.clone());
+        Some(set)
+    }
+
+    /// Get the functions that this one uses, if available.
+    pub fn get_used_functions(&self) -> Option<&'_ BTreeSet<QualifiedId<FunId>>> {
+        self.data.used_funs.as_ref()
+    }
+
+    /// Get the transitive closure of the used functions. This requires that all functions
+    /// in the closure have `get_used_functions` available; if one of them not, this
+    /// function panics.
+    pub fn get_transitive_closure_of_used_functions(&self) -> BTreeSet<QualifiedId<FunId>> {
+        if let Some(trans_used) = &*self.data.transitive_closure_of_used_funs.borrow() {
+            return trans_used.clone();
+        }
+
+        let mut set = BTreeSet::new();
+        let mut reachable_funcs = VecDeque::new();
+        reachable_funcs.push_back(self.clone());
+
+        // BFS in reachable_funcs to collect all reachable functions
+        while !reachable_funcs.is_empty() {
+            let fnc = reachable_funcs.pop_front().unwrap();
+            for callee in fnc.get_used_functions().expect("call info available") {
+                let f = self.module_env.env.get_function(*callee);
+                let qualified_id = f.get_qualified_id();
+                if set.insert(qualified_id) {
+                    reachable_funcs.push_back(f.clone());
+                }
+            }
+        }
+        *self.data.transitive_closure_of_used_funs.borrow_mut() = Some(set.clone());
+        set
     }
 
     /// Get the functions that call this one, if available.
@@ -5035,6 +5255,20 @@ impl GetNameString for QualifiedId<SpecFunId> {
     }
 }
 
+impl<'a, T> fmt::Display for EnvDisplay<'a, Vec<T>>
+where
+    EnvDisplay<'a, T>: std::fmt::Display,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let xs = self
+            .val
+            .iter()
+            .map(|x| format!("{}", self.env.display(x)))
+            .collect_vec();
+        write!(f, "({})", xs.iter().join(","))
+    }
+}
+
 impl<'a, Id: Clone> fmt::Display for EnvDisplay<'a, QualifiedId<Id>>
 where
     QualifiedId<Id>: GetNameString,
@@ -5067,5 +5301,17 @@ where
 impl<'a> fmt::Display for EnvDisplay<'a, Symbol> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.val.display(self.env.symbol_pool()))
+    }
+}
+
+impl<'a> fmt::Display for EnvDisplay<'a, Parameter> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let p = self.val;
+        write!(
+            f,
+            "{}:{}",
+            p.get_name().display(self.env.symbol_pool()),
+            p.get_type().display(&self.env.get_type_display_ctx())
+        )
     }
 }

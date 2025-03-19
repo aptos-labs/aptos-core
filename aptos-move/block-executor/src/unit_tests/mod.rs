@@ -5,20 +5,21 @@
 mod code_cache_tests;
 
 use crate::{
-    code_cache_global::ImmutableModuleCache,
+    code_cache_global_manager::AptosModuleCacheManagerGuard,
     errors::SequentialBlockExecutionError,
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
         types::{
-            DeltaDataView, KeyType, MockEnvironment, MockEvent, MockIncarnation, MockOutput,
-            MockTask, MockTransaction, NonEmptyGroupDataView, ValueType,
+            DeltaDataView, KeyType, MockEvent, MockIncarnation, MockOutput, MockTask,
+            MockTransaction, NonEmptyGroupDataView, ValueType,
         },
     },
     scheduler::{
         DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask, TWaitForDependency,
     },
     txn_commit_hook::NoOpTransactionCommitHook,
+    txn_provider::default::DefaultTxnProvider,
 };
 use aptos_aggregator::{
     bounded_math::SignedU128,
@@ -27,11 +28,8 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    block_executor::config::BlockExecutorConfig,
-    contract_event::TransactionEvent,
-    executable::{ExecutableTestType, ModulePath},
-    state_store::state_value::StateValueMetadata,
-    write_set::WriteOpKind,
+    block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
+    executable::ModulePath, state_store::state_value::StateValueMetadata, write_set::WriteOpKind,
 };
 use claims::{assert_matches, assert_ok};
 use fail::FailScenario;
@@ -83,22 +81,24 @@ fn test_resource_group_deletion() {
         MockTask<KeyType<u32>, MockEvent>,
         NonEmptyGroupDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        ExecutableTestType,
+        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
-        Arc::new(ImmutableModuleCache::empty()),
         None,
     );
 
-    let env = MockEnvironment::new();
+    let mut guard = AptosModuleCacheManagerGuard::none();
+    let txn_provider = DefaultTxnProvider::new(transactions);
     assert_ok!(block_executor.execute_transactions_sequential(
-        &env,
-        &transactions,
+        &txn_provider,
         &data_view,
+        &mut guard,
         false
     ));
-    assert_ok!(block_executor.execute_transactions_parallel(&env, &transactions, &data_view));
+
+    let mut guard = AptosModuleCacheManagerGuard::none();
+    assert_ok!(block_executor.execute_transactions_parallel(&txn_provider, &data_view, &mut guard));
 }
 
 #[test]
@@ -150,17 +150,18 @@ fn resource_group_bcs_fallback() {
         MockTask<KeyType<u32>, MockEvent>,
         NonEmptyGroupDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        ExecutableTestType,
+        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
-        Arc::new(ImmutableModuleCache::empty()),
         None,
     );
 
+    let txn_provider = DefaultTxnProvider::new(transactions);
     // Execute the block normally.
-    let env = MockEnvironment::new();
-    let output = block_executor.execute_transactions_parallel(&env, &transactions, &data_view);
+    let mut guard = AptosModuleCacheManagerGuard::none();
+    let output =
+        block_executor.execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
     match output {
         Ok(block_output) => {
             let txn_outputs = block_output.into_transaction_outputs_forced();
@@ -178,22 +179,27 @@ fn resource_group_bcs_fallback() {
     fail::cfg("fail-point-resource-group-serialization", "return()").unwrap();
     assert!(!fail::list().is_empty());
 
-    let env = MockEnvironment::new();
-    let par_output = block_executor.execute_transactions_parallel(&env, &transactions, &data_view);
+    let mut guard = AptosModuleCacheManagerGuard::none();
+    let par_output =
+        block_executor.execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
     assert_matches!(par_output, Err(()));
 
-    let env = MockEnvironment::new();
-    let seq_output =
-        block_executor.execute_transactions_sequential(&env, &transactions, &data_view, false);
+    let mut guard = AptosModuleCacheManagerGuard::none();
+    let seq_output = block_executor.execute_transactions_sequential(
+        &txn_provider,
+        &data_view,
+        &mut guard,
+        false,
+    );
     assert_matches!(
         seq_output,
         Err(SequentialBlockExecutionError::ResourceGroupSerializationError)
     );
 
     // Now execute with fallback handling for resource group serialization error:
-    let env = MockEnvironment::new();
+    let mut guard = AptosModuleCacheManagerGuard::none();
     let fallback_output = block_executor
-        .execute_transactions_sequential(&env, &transactions, &data_view, true)
+        .execute_transactions_sequential(&txn_provider, &data_view, &mut guard, true)
         .map_err(|e| match e {
             SequentialBlockExecutionError::ResourceGroupSerializationError => {
                 panic!("Unexpected error")
@@ -201,8 +207,8 @@ fn resource_group_bcs_fallback() {
             SequentialBlockExecutionError::ErrorToReturn(err) => err,
         });
 
-    let env = MockEnvironment::new();
-    let fallback_output_block = block_executor.execute_block(env, &transactions, &data_view);
+    let mut guard = AptosModuleCacheManagerGuard::none();
+    let fallback_output_block = block_executor.execute_block(&txn_provider, &data_view, &mut guard);
     for output in [fallback_output, fallback_output_block] {
         match output {
             Ok(block_output) => {
@@ -222,6 +228,38 @@ fn resource_group_bcs_fallback() {
 }
 
 #[test]
+fn interrupt_requested() {
+    let transactions = Vec::from([MockTransaction::Abort, MockTransaction::InterruptRequested]);
+    let txn_provider = DefaultTxnProvider::new(transactions);
+    let mut guard = AptosModuleCacheManagerGuard::none();
+
+    let data_view = DeltaDataView::<KeyType<u32>> {
+        phantom: PhantomData,
+    };
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+    let block_executor = BlockExecutor::<
+        MockTransaction<KeyType<u32>, MockEvent>,
+        MockTask<KeyType<u32>, MockEvent>,
+        DeltaDataView<KeyType<u32>>,
+        NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
+        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
+    >::new(
+        BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+        executor_thread_pool,
+        None,
+    );
+
+    // MockTransaction::InterruptRequested will only return if interrupt is requested (here, due
+    // to abort from the first transaction). O.w. the test will hang.
+    let _ = block_executor.execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+}
+
+#[test]
 fn block_output_err_precedence() {
     let incarnation: MockIncarnation<KeyType<u32>, MockEvent> = MockIncarnation::new(
         vec![KeyType::<u32>(1, false)],
@@ -235,6 +273,7 @@ fn block_output_err_precedence() {
     );
     let txn = MockTransaction::from_behavior(incarnation);
     let transactions = Vec::from([txn.clone(), txn]);
+    let txn_provider = DefaultTxnProvider::new(transactions);
 
     let data_view = DeltaDataView::<KeyType<u32>> {
         phantom: PhantomData,
@@ -250,11 +289,10 @@ fn block_output_err_precedence() {
         MockTask<KeyType<u32>, MockEvent>,
         DeltaDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        ExecutableTestType,
+        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
-        Arc::new(ImmutableModuleCache::empty()),
         None,
     );
 
@@ -264,8 +302,9 @@ fn block_output_err_precedence() {
     assert!(!fail::list().is_empty());
     // Pause the thread that processes the aborting txn1, so txn2 can halt the scheduler first.
     // Confirm that the fatal VM error is still detected and sequential fallback triggered.
-    let env = MockEnvironment::new();
-    let output = block_executor.execute_transactions_parallel(&env, &transactions, &data_view);
+    let mut guard = AptosModuleCacheManagerGuard::none();
+    let output =
+        block_executor.execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
     assert_matches!(output, Err(()));
     scenario.teardown();
 }
@@ -275,6 +314,7 @@ fn skip_rest_gas_limit() {
     // The contents of the second txn does not matter, as the first should hit the gas limit and
     // also skip. But it ensures block is not finished at the first txn (different processing).
     let transactions = Vec::from([MockTransaction::SkipRest(10), MockTransaction::SkipRest(10)]);
+    let txn_provider = DefaultTxnProvider::new(transactions);
 
     let data_view = DeltaDataView::<KeyType<u32>> {
         phantom: PhantomData,
@@ -290,17 +330,16 @@ fn skip_rest_gas_limit() {
         MockTask<KeyType<u32>, MockEvent>,
         DeltaDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        ExecutableTestType,
+        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), Some(5)),
         executor_thread_pool,
-        Arc::new(ImmutableModuleCache::empty()),
         None,
     );
 
     // Should hit block limit on the skip transaction.
-    let env = MockEnvironment::new();
-    let _ = block_executor.execute_transactions_parallel(&env, &transactions, &data_view);
+    let mut guard = AptosModuleCacheManagerGuard::none();
+    let _ = block_executor.execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
 }
 
 // TODO: add unit test for block gas limit!
@@ -320,22 +359,22 @@ where
             .unwrap(),
     );
 
-    let env = MockEnvironment::new();
+    let mut guard = AptosModuleCacheManagerGuard::none();
+    let txn_provider = DefaultTxnProvider::new(transactions);
     let output = BlockExecutor::<
         MockTransaction<K, E>,
         MockTask<K, E>,
         DeltaDataView<K>,
         NoOpTransactionCommitHook<MockOutput<K, E>, usize>,
-        ExecutableTestType,
+        _,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
-        Arc::new(ImmutableModuleCache::empty()),
         None,
     )
-    .execute_transactions_parallel(&env, &transactions, &data_view);
+    .execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
 
-    let baseline = BaselineOutput::generate(&transactions, None);
+    let baseline = BaselineOutput::generate(txn_provider.get_txns(), None);
     baseline.assert_parallel_output(&output);
 }
 

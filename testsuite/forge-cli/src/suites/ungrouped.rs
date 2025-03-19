@@ -403,16 +403,19 @@ fn consensus_stress_test() -> ForgeConfig {
     )
 }
 
-fn background_emit_request() -> EmitJobRequest {
-    EmitJobRequest::default()
+fn background_emit_request(high_gas_price: bool) -> EmitJobRequest {
+    let mut result = EmitJobRequest::default()
         .num_accounts_mode(NumAccountsMode::TransactionsPerAccount(1))
-        .mode(EmitJobMode::ConstTps { tps: 10 })
-        .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+        .mode(EmitJobMode::ConstTps { tps: 10 });
+    if high_gas_price {
+        result = result.gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE);
+    }
+    result
 }
 
 pub fn background_traffic_for_sweep(num_cases: usize) -> Option<BackgroundTraffic> {
     Some(BackgroundTraffic {
-        traffic: background_emit_request(),
+        traffic: background_emit_request(true),
         criteria: std::iter::repeat(9.5)
             .take(num_cases)
             .map(|min_tps| {
@@ -425,15 +428,16 @@ pub fn background_traffic_for_sweep(num_cases: usize) -> Option<BackgroundTraffi
 }
 
 pub fn background_traffic_for_sweep_with_latency(
-    criteria: &[(f32, f32)],
+    criteria_expired_p50_and_p90: &[(f64, f32, f32)],
+    high_gas_price: bool,
 ) -> Option<BackgroundTraffic> {
     Some(BackgroundTraffic {
-        traffic: background_emit_request(),
-        criteria: criteria
+        traffic: background_emit_request(high_gas_price),
+        criteria: criteria_expired_p50_and_p90
             .iter()
-            .map(|(p50, p90)| {
+            .map(|(expired, p50, p90)| {
                 SuccessCriteria::new_float(9.5)
-                    .add_max_expired_tps(0.1)
+                    .add_max_expired_tps(*expired)
                     .add_max_failed_submission_tps(0.0)
                     .add_latency_threshold(*p50, LatencyType::P50)
                     .add_latency_threshold(*p90, LatencyType::P90)
@@ -536,6 +540,80 @@ pub fn mixed_emit_job() -> EmitJobRequest {
                 TransactionTypeArg::TokenV1FTMintAndTransfer.materialize_default(),
                 10000,
             ),
+        ])
+}
+
+// framework_usecases can have new features, so might fail publishing.
+pub fn mixed_compatible_emit_job() -> EmitJobRequest {
+    EmitJobRequest::default()
+        .mode(EmitJobMode::MaxLoad {
+            mempool_backlog: 10000,
+        })
+        .transaction_mix(vec![
+            // To test both variants, make module publish with such frequency, so that there are
+            // similar number of sequential and parallel blocks.
+            // For other transactions, make more expensive transactions somewhat rarer.
+            (
+                TransactionTypeArg::AccountGeneration.materialize_default(),
+                10000,
+            ),
+            (
+                TransactionTypeArg::CoinTransfer.materialize_default(),
+                10000,
+            ),
+            (TransactionTypeArg::PublishPackage.materialize_default(), 3),
+            (
+                TransactionTypeArg::Batch100Transfer.materialize_default(),
+                100,
+            ),
+            (
+                TransactionTypeArg::VectorPicture30k.materialize_default(),
+                100,
+            ),
+            (
+                TransactionTypeArg::SmartTablePicture30KWith200Change.materialize(
+                    1,
+                    true,
+                    WorkflowProgress::when_done_default(),
+                ),
+                100,
+            ),
+            (
+                TransactionTypeArg::TokenV2AmbassadorMint.materialize_default(),
+                10000,
+            ),
+            // (
+            //     TransactionTypeArg::ModifyGlobalResource.materialize_default(),
+            //     1000,
+            // ),
+            // (
+            //     TransactionTypeArg::ModifyGlobalResourceAggV2.materialize_default(),
+            //     1000,
+            // ),
+            // (
+            //     TransactionTypeArg::ModifyGlobalFlagAggV2.materialize_default(),
+            //     1000,
+            // ),
+            // (
+            //     TransactionTypeArg::ModifyGlobalBoundedAggV2.materialize_default(),
+            //     1000,
+            // ),
+            // (
+            //     TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB.materialize_default(),
+            //     1000,
+            // ),
+            // (
+            //     TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB.materialize_default(),
+            //     1000,
+            // ),
+            // (
+            //     TransactionTypeArg::TokenV1NFTMintAndTransferSequential.materialize_default(),
+            //     1000,
+            // ),
+            // (
+            //     TransactionTypeArg::TokenV1FTMintAndTransfer.materialize_default(),
+            //     10000,
+            // ),
         ])
 }
 

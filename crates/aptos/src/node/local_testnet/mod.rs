@@ -1,18 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-mod docker;
-mod indexer_api;
 mod logging;
 mod postgres;
-mod processors;
 mod ready_server;
 mod utils;
 
 // This is to allow external crates to use the localnode.
+pub mod docker;
 pub mod faucet;
 pub mod health_checker;
+pub mod indexer_api;
 pub mod node;
+pub mod processors;
 pub mod traits;
 
 use self::{
@@ -99,7 +99,7 @@ pub struct RunLocalnet {
     /// By default all services running on the host system will be bound to 127.0.0.1,
     /// unless you're running the CLI inside a container, in which case it will run
     /// them on 0.0.0.0. You can use this flag to override this behavior in both cases.
-    #[clap(long, hide = true)]
+    #[clap(long)]
     bind_to: Option<Ipv4Addr>,
 
     /// By default, tracing output goes to files. With this set, it goes to stdout.

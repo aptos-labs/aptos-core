@@ -5,7 +5,7 @@ use aptos_aggregator::resolver::{TAggregatorV1View, TDelayedFieldView};
 use aptos_types::{
     serde_helper::bcs_utils::size_u32_as_uleb128,
     state_store::{
-        errors::StateviewError,
+        errors::StateViewError,
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
@@ -18,6 +18,21 @@ use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::collections::{BTreeMap, HashMap};
+
+/// Allows requesting an immediate interrupt to ongoing transaction execution. For example, this
+/// allows an early return from a useless speculative execution when block execution has already
+/// halted (e.g. due to gas limit, committing only a block prefix).
+pub trait BlockSynchronizationKillSwitch {
+    fn interrupt_requested(&self) -> bool;
+}
+
+pub struct NoopBlockSynchronizationKillSwitch {}
+
+impl BlockSynchronizationKillSwitch for NoopBlockSynchronizationKillSwitch {
+    fn interrupt_requested(&self) -> bool {
+        false
+    }
+}
 
 /// Allows to query resources from the state.
 pub trait TResourceView {
@@ -140,45 +155,16 @@ pub trait TResourceGroupView {
     ) -> Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>>;
 }
 
-/// Allows to query modules from the state.
-pub trait TModuleView {
-    type Key;
-
-    /// Returns
-    ///   -  Ok(None)         if the module is not in storage,
-    ///   -  Ok(Some(...))    if the module exists in storage,
-    ///   -  Err(...)         otherwise (e.g. storage error).
-    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>>;
-
-    fn get_module_bytes(&self, state_key: &Self::Key) -> PartialVMResult<Option<Bytes>> {
-        let maybe_state_value = self.get_module_state_value(state_key)?;
-        Ok(maybe_state_value.map(|state_value| state_value.bytes().clone()))
-    }
-
-    fn get_module_state_value_metadata(
-        &self,
-        state_key: &Self::Key,
-    ) -> PartialVMResult<Option<StateValueMetadata>> {
-        let maybe_state_value = self.get_module_state_value(state_key)?;
-        Ok(maybe_state_value.map(StateValue::into_metadata))
-    }
-
-    fn get_module_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<Option<u64>> {
-        let maybe_state_value = self.get_module_state_value(state_key)?;
-        Ok(maybe_state_value.map(|state_value| state_value.size() as u64))
-    }
-
-    fn module_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
-        self.get_module_state_value(state_key)
-            .map(|maybe_state_value| maybe_state_value.is_some())
-    }
-}
-
 /// Allows to query state information, e.g. its usage.
 pub trait StateStorageView {
+    type Key;
+
     fn id(&self) -> StateViewId;
 
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError>;
+    /// Reads the state value from the DB. Used to enforce read-before-write for module writes.
+    fn read_state_value(&self, state_key: &Self::Key) -> Result<(), StateViewError>;
+
+    fn get_usage(&self) -> Result<StateStorageUsage, StateViewError>;
 }
 
 /// A fine-grained view of the state during execution.
@@ -188,8 +174,8 @@ pub trait StateStorageView {
 ///   state values.
 /// - The `ExecutorView` trait is used at executor level, e.g. BlockSTM. When
 ///   a block is executed, the types of accesses are always known (for example,
-///   whether a resource is accessed or a module). Fine-grained structure of
-///   `ExecutorView` allows to:
+///   whether a resource is accessed). Fine-grained structure of `ExecutorView`
+///   allows to:
 ///     1. Specialize on access type,
 ///     2. Separate execution and storage abstractions.
 ///
@@ -198,33 +184,25 @@ pub trait StateStorageView {
 /// TODO: audit and reconsider the default implementation (e.g. should not
 /// resolve AggregatorV2 via the state-view based default implementation, as it
 /// doesn't provide a value exchange functionality).
-pub trait TExecutorView<K, T, L, I, V>:
+pub trait TExecutorView<K, T, L, V>:
     TResourceView<Key = K, Layout = L>
-    + TModuleView<Key = K>
     + TAggregatorV1View<Identifier = K>
-    + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
-    + StateStorageView
+    + TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = K, ResourceGroupTag = T>
+    + StateStorageView<Key = K>
 {
 }
 
-impl<A, K, T, L, I, V> TExecutorView<K, T, L, I, V> for A where
+impl<A, K, T, L, V> TExecutorView<K, T, L, V> for A where
     A: TResourceView<Key = K, Layout = L>
-        + TModuleView<Key = K>
         + TAggregatorV1View<Identifier = K>
-        + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
-        + StateStorageView
+        + TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = K, ResourceGroupTag = T>
+        + StateStorageView<Key = K>
 {
 }
 
-pub trait ExecutorView:
-    TExecutorView<StateKey, StructTag, MoveTypeLayout, DelayedFieldID, WriteOp>
-{
-}
+pub trait ExecutorView: TExecutorView<StateKey, StructTag, MoveTypeLayout, WriteOp> {}
 
-impl<T> ExecutorView for T where
-    T: TExecutorView<StateKey, StructTag, MoveTypeLayout, DelayedFieldID, WriteOp>
-{
-}
+impl<T> ExecutorView for T where T: TExecutorView<StateKey, StructTag, MoveTypeLayout, WriteOp> {}
 
 pub trait ResourceGroupView:
     TResourceGroupView<GroupKey = StateKey, ResourceTag = StructTag, Layout = MoveTypeLayout>
@@ -258,32 +236,32 @@ where
     }
 }
 
-impl<S> TModuleView for S
+impl<S> StateStorageView for S
 where
     S: StateView,
 {
     type Key = StateKey;
 
-    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
-        self.get_state_value(state_key).map_err(|e| {
-            PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
-                "Unexpected storage error for module at {:?}: {:?}",
-                state_key, e
-            ))
-        })
-    }
-}
-
-impl<S> StateStorageView for S
-where
-    S: StateView,
-{
     fn id(&self) -> StateViewId {
         self.id()
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
+    fn read_state_value(&self, state_key: &Self::Key) -> Result<(), StateViewError> {
+        self.get_state_value(state_key)?;
+        Ok(())
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
         self.get_usage().map_err(Into::into)
+    }
+}
+
+impl<S> BlockSynchronizationKillSwitch for S
+where
+    S: StateView,
+{
+    fn interrupt_requested(&self) -> bool {
+        false
     }
 }
 

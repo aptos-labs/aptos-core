@@ -19,7 +19,7 @@ use aptos_crypto::{ed25519::Ed25519PrivateKey, hash::HashValue, SigningKey};
 use aptos_db::AptosDB;
 use aptos_executor::{block_executor::BlockExecutor, db_bootstrapper};
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_framework::BuiltPackage;
+use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_indexer_grpc_table_info::internal_indexer_db_service::MockInternalIndexerDBService;
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_mempool_notifications::MempoolNotificationSender;
@@ -31,7 +31,9 @@ use aptos_sdk::{
         transaction::SignedTransaction, AccountKey, LocalAccount,
     },
 };
-use aptos_storage_interface::{state_view::DbStateView, DbReaderWriter};
+use aptos_storage_interface::{
+    state_store::state_view::db_state_view::DbStateView, DbReaderWriter,
+};
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::{create_multisig_account_address, AccountAddress},
@@ -40,6 +42,7 @@ use aptos_types::{
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
+    function_info::FunctionInfo,
     indexer::indexer_db_reader::IndexerReader,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{
@@ -47,13 +50,19 @@ use aptos_types::{
         TransactionPayload, TransactionStatus, Version,
     },
 };
-use aptos_vm::AptosVM;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use aptos_vm_validator::vm_validator::PooledVMValidator;
 use bytes::Bytes;
 use hyper::{HeaderMap, Response};
 use rand::SeedableRng;
 use serde_json::{json, Value};
-use std::{boxed::Box, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    boxed::Box,
+    net::SocketAddr,
+    path::PathBuf,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::watch::channel;
 use warp::{http::header::CONTENT_TYPE, Filter, Rejection, Reply};
 use warp_reverse_proxy::reverse_proxy_filter;
@@ -129,7 +138,7 @@ pub fn new_test_context_inner(
     let (root_key, genesis, genesis_waypoint, validators) = builder.build(&mut rng).unwrap();
     let (validator_identity, _, _, _) = validators[0].get_key_objects(None).unwrap();
     let validator_owner = validator_identity.account_address.unwrap();
-    let (sender, recver) = channel::<Version>(0);
+    let (sender, recver) = channel::<(Instant, Version)>((Instant::now(), 0 as Version));
     let (db, db_rw) = if use_db_with_indexer {
         let mut aptos_db = AptosDB::new_for_test_with_indexer(
             &tmp_dir,
@@ -168,8 +177,12 @@ pub fn new_test_context_inner(
         }
         DbReaderWriter::wrap(aptos_db)
     };
-    let ret =
-        db_bootstrapper::maybe_bootstrap::<AptosVM>(&db_rw, &genesis, genesis_waypoint).unwrap();
+    let ret = db_bootstrapper::maybe_bootstrap::<AptosVMBlockExecutor>(
+        &db_rw,
+        &genesis,
+        genesis_waypoint,
+    )
+    .unwrap();
     assert!(ret.is_some());
 
     let mempool = MockSharedMempool::new_in_runtime(&db_rw, PooledVMValidator::new(db.clone(), 1));
@@ -204,7 +217,7 @@ pub fn new_test_context_inner(
         rng,
         root_key,
         validator_owner,
-        Box::new(BlockExecutor::<AptosVM>::new(db_rw)),
+        Box::new(BlockExecutor::<AptosVMBlockExecutor>::new(db_rw)),
         mempool,
         db,
         test_name,
@@ -367,6 +380,56 @@ impl TestContext {
         )
     }
 
+    pub async fn enable_feature(&mut self, feature: u64) {
+        // This function executes the following script as the root account:
+        // script {
+        //   fun main(root: &signer, feature: u64) {
+        //     let aptos_framework = aptos_framework::aptos_governance::get_signer_testnet_only(root, @0x1);
+        //     std::features::change_feature_flags_for_next_epoch(&aptos_framework, vector[feature], vector[]);
+        //     aptos_framework::aptos_governance::reconfigure(&aptos_framework);
+        //     std::features::on_new_epoch(&aptos_framework);
+        //   }
+        // }
+        let mut root = self.root_account().await;
+        self.api_execute_script(
+            &mut root,
+            "a11ceb0b0700000a06010004030418051c1707336f08a2012006c201260000000100020301000101030502000100040602000101050602000102060c03010c0002060c05010303060c0a030a0301060c106170746f735f676f7665726e616e6365086665617475726573176765745f7369676e65725f746573746e65745f6f6e6c79236368616e67655f666561747572655f666c6167735f666f725f6e6578745f65706f63680b7265636f6e6669677572650c6f6e5f6e65775f65706f63680000000000000000000000000000000000000000000000000000000000000001052000000000000000000000000000000000000000000000000000000000000000010a0301000000010e0b00070011000c020e020b0140040100000000000000070111010e0211020e02110302",
+            json!([]),
+            json!([feature.to_string()]),
+        ).await;
+        self.wait_for_internal_indexer_caught_up().await;
+    }
+
+    pub async fn disable_feature(&mut self, feature: u64) {
+        // This function executes the following script as the root account:
+        // script {
+        //   fun main(root: &signer, feature: u64) {
+        //     let aptos_framework = aptos_framework::aptos_governance::get_signer_testnet_only(root, @0x1);
+        //     std::features::change_feature_flags_for_next_epoch(&aptos_framework, vector[], vector[feature]);
+        //     aptos_framework::aptos_governance::reconfigure(&aptos_framework);
+        //     std::features::on_new_epoch(&aptos_framework);
+        //   }
+        // }
+        let mut root = self.root_account().await;
+        self.api_execute_script(
+            &mut root,
+            "a11ceb0b0700000a06010004030418051c1707336f08a2012006c201260000000100020301000101030502000100040602000101050602000102060c03010c0002060c05010303060c0a030a0301060c106170746f735f676f7665726e616e6365086665617475726573176765745f7369676e65725f746573746e65745f6f6e6c79236368616e67655f666561747572655f666c6167735f666f725f6e6578745f65706f63680b7265636f6e6669677572650c6f6e5f6e65775f65706f63680000000000000000000000000000000000000000000000000000000000000001052000000000000000000000000000000000000000000000000000000000000000010a0301000000010e0b00070011000c020e0207010b014004010000000000000011010e0211020e02110302",
+            json!([]),
+            json!([feature.to_string()]),
+        ).await;
+        self.wait_for_internal_indexer_caught_up().await;
+    }
+
+    pub async fn is_feature_enabled(&self, feature: u64) -> bool {
+        let request = json!({
+            "function":"0x1::features::is_enabled",
+            "arguments": vec![feature.to_string()],
+            "type_arguments": Vec::<String>::new(),
+        });
+        let resp = self.post("/view", request).await;
+        resp[0].as_bool().unwrap()
+    }
+
     pub fn latest_state_view(&self) -> DbStateView {
         self.context
             .state_view_at_version(self.get_latest_ledger_info().version())
@@ -395,6 +458,46 @@ impl TestContext {
         account
     }
 
+    pub async fn api_create_account(&mut self) -> LocalAccount {
+        let root = &mut self.root_account().await;
+        let account = self.gen_account();
+        self.api_execute_aptos_account_transfer(root, account.address(), TRANSFER_AMOUNT)
+            .await;
+        account
+    }
+
+    pub async fn api_execute_aptos_account_transfer(
+        &mut self,
+        sender: &mut LocalAccount,
+        receiver: AccountAddress,
+        amount: u64,
+    ) {
+        self.api_execute_entry_function(
+            sender,
+            "0x1::aptos_account::transfer",
+            json!([]),
+            json!([receiver.to_hex_literal(), amount.to_string()]),
+        )
+        .await;
+        self.wait_for_internal_indexer_caught_up().await;
+    }
+
+    pub async fn wait_for_internal_indexer_caught_up(&self) {
+        let (internal_indexer_ledger_info_opt, storage_ledger_info) = self
+            .context
+            .get_latest_internal_and_storage_ledger_info::<BasicError>()
+            .expect("cannot get ledger info");
+        if let Some(mut internal_indexer_ledger_info) = internal_indexer_ledger_info_opt {
+            while internal_indexer_ledger_info.version() < storage_ledger_info.version() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+                internal_indexer_ledger_info = self
+                    .context
+                    .get_latest_internal_indexer_ledger_info::<BasicError>()
+                    .expect("cannot get internal indexer version");
+            }
+        }
+    }
+
     pub async fn create_user_account(&self, account: &LocalAccount) -> SignedTransaction {
         let mut tc = self.root_account().await;
         self.create_user_account_by(&mut tc, account)
@@ -406,6 +509,19 @@ impl TestContext {
         tc.sign_with_transaction_builder(
             factory
                 .account_transfer(account.address(), TRANSFER_AMOUNT)
+                .expiration_timestamp_secs(u64::MAX),
+        )
+    }
+
+    pub async fn add_dispatchable_authentication_function(
+        &self,
+        account: &LocalAccount,
+        func: FunctionInfo,
+    ) -> SignedTransaction {
+        let factory = self.transaction_factory();
+        account.sign_with_transaction_builder(
+            factory
+                .add_dispatchable_authentication_function(func)
                 .expiration_timestamp_secs(u64::MAX),
         )
     }
@@ -640,11 +756,28 @@ impl TestContext {
         path: PathBuf,
         named_addresses: Vec<(String, AccountAddress)>,
     ) -> TransactionPayload {
-        let mut build_options = aptos_framework::BuildOptions::default();
+        Self::build_package_with_options(path, named_addresses, BuildOptions::default())
+    }
+
+    pub fn build_package_with_latest_language(
+        path: PathBuf,
+        named_addresses: Vec<(String, AccountAddress)>,
+    ) -> TransactionPayload {
+        Self::build_package_with_options(
+            path,
+            named_addresses,
+            BuildOptions::default().set_latest_language(),
+        )
+    }
+
+    fn build_package_with_options(
+        path: PathBuf,
+        named_addresses: Vec<(String, AccountAddress)>,
+        mut build_options: BuildOptions,
+    ) -> TransactionPayload {
         named_addresses.into_iter().for_each(|(name, address)| {
             build_options.named_addresses.insert(name, address);
         });
-
         let package = BuiltPackage::build(path, build_options).unwrap();
         let code = package.extract_code();
         let metadata = package.extract_metadata().unwrap();
@@ -675,7 +808,10 @@ impl TestContext {
         }
     }
 
-    pub async fn commit_block(&mut self, signed_txns: &[SignedTransaction]) {
+    pub async fn try_commit_block(
+        &mut self,
+        signed_txns: &[SignedTransaction],
+    ) -> Vec<TransactionStatus> {
         let metadata = self.new_block_metadata();
         let timestamp = metadata.timestamp_usecs();
         let txns: Vec<Transaction> = std::iter::once(Transaction::BlockMetadata(metadata.clone()))
@@ -699,28 +835,36 @@ impl TestContext {
             .unwrap();
         let compute_status = result.compute_status_for_input_txns().clone();
         assert_eq!(compute_status.len(), txns.len(), "{:?}", result);
-        // But the rest of the txns must be Kept.
-        for st in compute_status {
+        if !compute_status
+            .iter()
+            .any(|s| !matches!(&s, TransactionStatus::Keep(_)))
+        {
+            self.executor
+                .commit_blocks(
+                    vec![metadata.id()],
+                    // StateCheckpoint/BlockEpilogue is added on top of the input transactions.
+                    self.new_ledger_info(&metadata, result.root_hash(), txns.len() + 1),
+                )
+                .unwrap();
+
+            self.mempool
+                .mempool_notifier
+                .notify_new_commit(txns, timestamp)
+                .await
+                .unwrap();
+        }
+        compute_status
+    }
+
+    pub async fn commit_block(&mut self, signed_txns: &[SignedTransaction]) {
+        // The txns must be kept.
+        for st in self.try_commit_block(signed_txns).await {
             match st {
                 TransactionStatus::Discard(st) => panic!("transaction is discarded: {:?}", st),
                 TransactionStatus::Retry => panic!("should not retry"),
                 TransactionStatus::Keep(_) => (),
             }
         }
-
-        self.executor
-            .commit_blocks(
-                vec![metadata.id()],
-                // StateCheckpoint/BlockEpilogue is added on top of the input transactions.
-                self.new_ledger_info(&metadata, result.root_hash(), txns.len() + 1),
-            )
-            .unwrap();
-
-        self.mempool
-            .mempool_notifier
-            .notify_new_commit(txns, timestamp)
-            .await
-            .unwrap();
     }
 
     pub async fn get_sequence_number(&self, account: AccountAddress) -> u64 {
@@ -854,6 +998,27 @@ impl TestContext {
             json!({
                 "type": "entry_function_payload",
                 "function": function,
+                "type_arguments": type_args,
+                "arguments": args
+            }),
+        )
+        .await;
+    }
+
+    pub async fn api_execute_script(
+        &mut self,
+        account: &mut LocalAccount,
+        bytecode: &str,
+        type_args: serde_json::Value,
+        args: serde_json::Value,
+    ) {
+        self.api_execute_txn(
+            account,
+            json!({
+                "type": "script_payload",
+                "code": {
+                    "bytecode": bytecode,
+                },
                 "type_arguments": type_args,
                 "arguments": args
             }),

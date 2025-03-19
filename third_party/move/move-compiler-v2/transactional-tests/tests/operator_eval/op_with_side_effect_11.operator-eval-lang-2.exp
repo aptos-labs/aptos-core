@@ -5,8 +5,6 @@ Error: Function execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(1),
     location: 0xc0ffee::m,
-    indices: redacted,
-    offsets: redacted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
 }
-
-==> Compiler v2 delivered same results!

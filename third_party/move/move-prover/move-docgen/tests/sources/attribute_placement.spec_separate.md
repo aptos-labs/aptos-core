@@ -179,9 +179,9 @@
 
 
 
-<a id="main"></a>
+<a id="<SELF>_0"></a>
 
-# Script `main`
+# Script `<SELF>_0`
 
 
 
@@ -205,18 +205,18 @@
 ## Constants
 
 
-<a id="main_C"></a>
+<a id="<SELF>_0_C"></a>
 
 
 
-<pre><code><b>const</b> <a href="attribute_placement.md#main_C">C</a>: u64 = 0;
+<pre><code><b>const</b> <a href="attribute_placement.md#<SELF>_0_C">C</a>: u64 = 0;
 </code></pre>
 
 
 
 
 <pre><code>#[attr14]
-<b>fun</b> <a href="attribute_placement.md#main">main</a>()
+<b>fun</b> <a href="attribute_placement.md#<SELF>_0_main">main</a>()
 </code></pre>
 
 
@@ -225,7 +225,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="attribute_placement.md#main">main</a>() {
+<pre><code><b>fun</b> <a href="attribute_placement.md#<SELF>_0_main">main</a>() {
     <a href="attribute_placement.md#0x42_M_foo">M::foo</a>();
 }
 </code></pre>
@@ -245,5 +245,5 @@
 
 
 <pre><code>#[attr14]
-<b>fun</b> <a href="attribute_placement.md#main">main</a>()
+<b>fun</b> <a href="attribute_placement.md#<SELF>_0_main">main</a>()
 </code></pre>

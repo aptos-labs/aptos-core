@@ -113,7 +113,8 @@ impl Block {
                 Payload::InQuorumStore(pos) => pos.proofs.len(),
                 Payload::DirectMempool(_txns) => 0,
                 Payload::InQuorumStoreWithLimit(pos) => pos.proof_with_data.proofs.len(),
-                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
+                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
+                | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
                     inline_batches.len() + proof_with_data.proofs.len()
                 },
                 Payload::OptQuorumStore(opt_quorum_store_payload) => {
@@ -360,6 +361,11 @@ impl Block {
                 "Reconfiguration suffix should not carry payload"
             );
         }
+
+        if let Some(payload) = self.payload() {
+            payload.verify_epoch(self.epoch())?;
+        }
+
         if let Some(failed_authors) = self.block_data().failed_authors() {
             // when validating for being well formed,
             // allow for missing failed authors,

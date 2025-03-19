@@ -14,20 +14,27 @@ use crate::{
 };
 use aptos_abstract_gas_usage::CalibrationAlgebra;
 use aptos_bitvec::BitVec;
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    code_cache_global_manager::AptosModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
+    txn_provider::default::DefaultTxnProvider,
+};
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
 use aptos_gas_algebra::DynamicExpression;
-use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
+use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_keygen::KeyGen;
 use aptos_types::{
     account_config::{
         new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource,
-        ConcurrentSupply, NewBlockEvent, ObjectGroupResource, CORE_CODE_ADDRESS,
+        ConcurrentSupplyResource, NewBlockEvent, ObjectGroupResource, CORE_CODE_ADDRESS,
     },
-    block_executor::config::{
-        BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
+    block_executor::{
+        config::{
+            BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
+            BlockExecutorModuleCacheLocalConfig,
+        },
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -47,7 +54,7 @@ use aptos_types::{
     AptosCoinType, CoinType,
 };
 use aptos_vm::{
-    block_executor::{AptosTransactionOutput, BlockAptosVM},
+    block_executor::{AptosTransactionOutput, AptosVMBlockExecutorWrapper},
     data_cache::AsMoveResolver,
     gas::make_prod_gas_meter,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
@@ -58,6 +65,8 @@ use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, Genes
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
     module_and_script_storage::{module_storage::AptosModuleStorage, AsAptosCodeStorage},
+    module_write_set::ModuleWriteSet,
+    resolver::NoopBlockSynchronizationKillSwitch,
     storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
@@ -67,6 +76,7 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     move_resource::{MoveResource, MoveStructType},
+    value::MoveValue,
 };
 use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
@@ -82,7 +92,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
     sync::{Arc, Mutex},
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
@@ -135,6 +145,39 @@ pub struct FakeExecutor {
 pub enum GasMeterType {
     RegularGasMeter,
     UnmeteredGasMeter,
+}
+
+#[derive(Clone)]
+pub struct Measurement {
+    elapsed: Duration,
+    /// In internal gas units
+    execution_gas: u64,
+    /// In internal gas units
+    io_gas: u64,
+}
+
+const GAS_SCALING_FACTOR: f64 = 1_000_000.0;
+
+impl Measurement {
+    pub fn elapsed_micros(&self) -> u128 {
+        self.elapsed.as_micros()
+    }
+
+    pub fn elapsed_secs_f64(&self) -> f64 {
+        self.elapsed.as_secs_f64()
+    }
+
+    pub fn elapsed_micros_f64(&self) -> f64 {
+        self.elapsed.as_secs_f64() * 1_000_000.0
+    }
+
+    pub fn execution_gas_units(&self) -> f64 {
+        self.execution_gas as f64 / GAS_SCALING_FACTOR
+    }
+
+    pub fn io_gas_units(&self) -> f64 {
+        self.io_gas as f64 / GAS_SCALING_FACTOR
+    }
 }
 
 pub enum ExecFuncTimerDynamicArgs {
@@ -438,10 +481,10 @@ impl FakeExecutor {
                 let mut fa_resource_group = self
                     .read_resource_group::<ObjectGroupResource>(&AccountAddress::TEN)
                     .expect("resource group must exist in data store");
-                let mut supply = bcs::from_bytes::<ConcurrentSupply>(
+                let mut supply = bcs::from_bytes::<ConcurrentSupplyResource>(
                     fa_resource_group
                         .group
-                        .get(&ConcurrentSupply::struct_tag())
+                        .get(&ConcurrentSupplyResource::struct_tag())
                         .unwrap(),
                 )
                 .unwrap();
@@ -451,7 +494,7 @@ impl FakeExecutor {
                 fa_resource_group
                     .group
                     .insert(
-                        ConcurrentSupply::struct_tag(),
+                        ConcurrentSupplyResource::struct_tag(),
                         bcs::to_bytes(&supply).unwrap(),
                     )
                     .unwrap();
@@ -619,7 +662,7 @@ impl FakeExecutor {
 
     fn execute_transaction_block_impl_with_state_view(
         &self,
-        txn_block: &[SignatureVerifiedTransaction],
+        txn_block: Vec<SignatureVerifiedTransaction>,
         onchain_config: BlockExecutorConfigFromOnchain,
         sequential: bool,
         state_view: &(impl StateView + Sync),
@@ -633,17 +676,23 @@ impl FakeExecutor {
                 },
                 allow_fallback: self.allow_block_executor_fallback,
                 discard_failed_blocks: false,
+                module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
             },
             onchain: onchain_config,
         };
-        BlockAptosVM::execute_block_on_thread_pool_without_global_module_cache::<
+        let txn_provider = DefaultTxnProvider::new(txn_block);
+        AptosVMBlockExecutorWrapper::execute_block_on_thread_pool::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            _,
         >(
             self.executor_thread_pool.clone(),
-            txn_block,
+            &txn_provider,
             &state_view,
+            // Do not use shared module caches in tests.
+            &AptosModuleCacheManager::new(),
             config,
+            TransactionSliceMetadata::unknown(),
             None,
         )
         .map(BlockOutput::into_transaction_outputs_forced)
@@ -682,7 +731,7 @@ impl FakeExecutor {
 
         let sequential_output = if mode != ExecutorMode::ParallelOnly {
             Some(self.execute_transaction_block_impl_with_state_view(
-                &sig_verified_block,
+                sig_verified_block.clone(),
                 onchain_config.clone(),
                 true,
                 state_view,
@@ -693,7 +742,7 @@ impl FakeExecutor {
 
         let parallel_output = if mode != ExecutorMode::SequentialOnly {
             Some(self.execute_transaction_block_impl_with_state_view(
-                &sig_verified_block,
+                sig_verified_block,
                 onchain_config,
                 false,
                 state_view,
@@ -759,11 +808,9 @@ impl FakeExecutor {
         let mut outputs = self
             .execute_block(txn_block)
             .expect("The VM should not fail to startup");
-        let mut txn_output = outputs
+        outputs
             .pop()
-            .expect("A block with one transaction should have one output");
-        txn_output.fill_error_status();
-        txn_output
+            .expect("A block with one transaction should have one output")
     }
 
     pub fn execute_transaction_with_gas_profiler(
@@ -778,10 +825,10 @@ impl FakeExecutor {
 
         // TODO(Gas): revisit this.
         let env = AptosEnvironment::new(&self.data_store);
-        let vm = AptosVM::new(env.clone(), self.get_state_view());
+        let vm = AptosVM::new(&env, self.get_state_view());
 
         let resolver = self.data_store.as_move_resolver();
-        let code_storage = self.get_state_view().as_aptos_code_storage(env.clone());
+        let code_storage = self.get_state_view().as_aptos_code_storage(&env);
 
         let (_status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,
@@ -851,11 +898,11 @@ impl FakeExecutor {
     /// Validates the given transaction by running it through the VM validator.
     pub fn validate_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
         let env = AptosEnvironment::new(&self.data_store);
-        let vm = AptosVM::new(env.clone(), self.get_state_view());
+        let vm = AptosVM::new(&env, self.get_state_view());
         vm.validate_transaction(
             txn,
             &self.data_store,
-            &self.data_store.as_aptos_code_storage(env),
+            &self.data_store.as_aptos_code_storage(&env),
         )
     }
 
@@ -960,7 +1007,7 @@ impl FakeExecutor {
         iterations: u64,
         dynamic_args: ExecFuncTimerDynamicArgs,
         gas_meter_type: GasMeterType,
-    ) -> u128 {
+    ) -> Measurement {
         let mut extra_accounts = match &dynamic_args {
             ExecFuncTimerDynamicArgs::DistinctSigners
             | ExecFuncTimerDynamicArgs::DistinctSignersAndFixed(_) => (0..iterations)
@@ -971,22 +1018,21 @@ impl FakeExecutor {
 
         let env = AptosEnvironment::new(&self.data_store);
         let resolver = self.data_store.as_move_resolver();
-        let vm = MoveVmExt::new(env.clone(), &resolver);
+        let vm = MoveVmExt::new(&env);
 
         // Create module storage, and ensure the module for the function we want to execute is
         // cached.
-        let module_storage = self.data_store.as_aptos_code_storage(env.clone());
+        let module_storage = self.data_store.as_aptos_code_storage(&env);
         assert_ok!(module_storage.fetch_verified_module(module.address(), module.name()));
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;
-        let mut times = Vec::new();
+        let mut measurements = Vec::new();
         while i < iterations {
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             // load function name into cache to ensure cache is hot
-            let _ = session.load_function(
-                &module_storage,
+            let _ = module_storage.load_function(
                 module,
                 &Self::name(function_name),
                 &type_params.clone(),
@@ -998,13 +1044,23 @@ impl FakeExecutor {
             let mut arg = args.clone();
             match &dynamic_args {
                 ExecFuncTimerDynamicArgs::DistinctSigners => {
-                    arg.insert(0, bcs::to_bytes(&extra_accounts.pop().unwrap()).unwrap());
+                    arg.insert(
+                        0,
+                        MoveValue::Signer(extra_accounts.pop().unwrap())
+                            .simple_serialize()
+                            .unwrap(),
+                    );
                 },
                 ExecFuncTimerDynamicArgs::DistinctSignersAndFixed(signers) => {
                     for signer in signers.iter().rev() {
-                        arg.insert(0, bcs::to_bytes(&signer).unwrap());
+                        arg.insert(0, MoveValue::Signer(*signer).simple_serialize().unwrap());
                     }
-                    arg.insert(0, bcs::to_bytes(&extra_accounts.pop().unwrap()).unwrap());
+                    arg.insert(
+                        0,
+                        MoveValue::Signer(extra_accounts.pop().unwrap())
+                            .simple_serialize()
+                            .unwrap(),
+                    );
                 },
                 _ => {},
             }
@@ -1017,6 +1073,7 @@ impl FakeExecutor {
                         env.storage_gas_params().as_ref().unwrap().clone(),
                         false,
                         1_000_000_000_000_000.into(),
+                        &NoopBlockSynchronizationKillSwitch {},
                     )),
                     None,
                 ),
@@ -1049,24 +1106,41 @@ impl FakeExecutor {
             let elapsed = start.elapsed();
             if let Err(err) = result {
                 if !should_error {
-                    println!("Shouldn't error, but ignoring for now... {}", err);
+                    println!(
+                        "Entry function under measurement failed with an error. Continuing, but measurements are probably not what is expected. Error: {}",
+                        err
+                    );
                 }
             }
-            times.push(elapsed.as_micros());
+            measurements.push(Measurement {
+                elapsed,
+                execution_gas: regular
+                    .as_ref()
+                    .map_or(0, |gas| gas.algebra().execution_gas_used().into()),
+                io_gas: regular
+                    .as_ref()
+                    .map_or(0, |gas| gas.algebra().io_gas_used().into()),
+            });
             i += 1;
         }
 
         // take median of all running time iterations as a more robust measurement
-        times.sort();
-        let length = times.len();
+        measurements.sort_by_key(|v| v.elapsed);
+        let length = measurements.len();
         let mid = length / 2;
-        let mut running_time = times[mid];
+        let mut measurement = measurements[mid].clone();
 
         if length % 2 == 0 {
-            running_time = (times[mid - 1] + times[mid]) / 2;
+            measurement = Measurement {
+                elapsed: (measurements[mid - 1].elapsed + measurements[mid].elapsed) / 2,
+                execution_gas: (measurements[mid - 1].execution_gas
+                    + measurements[mid].execution_gas)
+                    / 2,
+                io_gas: (measurements[mid - 1].io_gas + measurements[mid].io_gas) / 2,
+            };
         }
 
-        running_time
+        measurement
     }
 
     /// record abstract usage using a modified gas meter
@@ -1089,9 +1163,9 @@ impl FakeExecutor {
                 }),
             );
             let resolver = self.data_store.as_move_resolver();
-            let vm = MoveVmExt::new(env.clone(), &resolver);
+            let vm = MoveVmExt::new(&env);
 
-            let module_storage = self.data_store.as_aptos_code_storage(env.clone());
+            let module_storage = self.data_store.as_aptos_code_storage(&env);
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             let fun_name = Self::name(function_name);
@@ -1110,6 +1184,7 @@ impl FakeExecutor {
                         env.storage_gas_params().as_ref().unwrap().clone(),
                         false,
                         10_000_000_000_000,
+                        &NoopBlockSynchronizationKillSwitch {},
                     ),
                     shared_buffer: Arc::clone(&a1),
                 }),
@@ -1149,9 +1224,9 @@ impl FakeExecutor {
         let (write_set, events) = {
             let env = AptosEnvironment::new(&self.data_store);
             let resolver = self.data_store.as_move_resolver();
-            let vm = MoveVmExt::new(env.clone(), &resolver);
+            let vm = MoveVmExt::new(&env);
 
-            let module_storage = self.data_store.as_aptos_code_storage(env.clone());
+            let module_storage = self.data_store.as_aptos_code_storage(&env);
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
             let storage = TraversalStorage::new();
             session
@@ -1192,9 +1267,9 @@ impl FakeExecutor {
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
         let env = AptosEnvironment::new(&self.data_store);
         let resolver = self.data_store.as_move_resolver();
-        let vm = MoveVmExt::new(env.clone(), &resolver);
+        let vm = MoveVmExt::new(&env);
 
-        let module_storage = self.data_store.as_aptos_code_storage(env.clone());
+        let module_storage = self.data_store.as_aptos_code_storage(&env);
 
         let mut session = vm.new_session(&resolver, SessionId::void(), None);
         let traversal_storage = TraversalStorage::new();
@@ -1242,13 +1317,12 @@ fn finish_session_assert_no_modules(
     module_storage: &impl AptosModuleStorage,
     change_set_configs: &ChangeSetConfigs,
 ) -> (WriteSet, Vec<ContractEvent>) {
-    let (change_set, empty_module_write_set) = session
+    let change_set = session
         .finish(change_set_configs, module_storage)
         .expect("Failed to finish the session");
-    assert_ok!(empty_module_write_set.is_empty_or_invariant_violation());
 
     change_set
-        .try_combine_into_storage_change_set(empty_module_write_set)
+        .try_combine_into_storage_change_set(ModuleWriteSet::empty())
         .expect("Failed to convert to storage ChangeSet")
         .into_inner()
 }

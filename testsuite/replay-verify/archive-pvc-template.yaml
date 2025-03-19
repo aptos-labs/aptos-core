@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    volume.kubernetes.io/storage-provisioner: pd.csi.storage.gke.io
+  name: testnet-archive-claim
+  labels:
+    run: some-label
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 10Ti
+  storageClassName: ssd-data-xfs-immediate
+  volumeMode: Filesystem
+  dataSourceRef:
+    name: testnet-archive
+    kind: VolumeSnapshot
+    apiGroup: snapshot.storage.k8s.io

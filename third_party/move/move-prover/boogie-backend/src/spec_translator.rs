@@ -270,8 +270,12 @@ impl<'env> SpecTranslator<'env> {
             // so we don't need to translate it.
             return;
         }
-        if let Type::Tuple(..) | Type::Fun(..) = fun.result_type {
-            self.error(&fun.loc, "function or tuple result type not yet supported");
+        if let Type::Tuple(..) = fun.result_type {
+            self.error(&fun.loc, "tuple result type not yet supported");
+            return;
+        }
+        if let Type::Fun(..) = fun.result_type {
+            self.error(&fun.loc, "function result type not yet supported"); // TODO(LAMBDA)
             return;
         }
         let qid = module_env.get_id().qualified(id);
@@ -310,11 +314,27 @@ impl<'env> SpecTranslator<'env> {
             }
         };
         let type_info_params = if type_reflection {
+            let mut covered = BTreeSet::new();
             (0..fun.type_params.len())
                 .map(|i| {
+                    // Apply type instantiation if present
+                    let ty = self
+                        .type_inst
+                        .get(i)
+                        .cloned()
+                        .unwrap_or_else(|| Type::TypeParameter(i as u16));
+                    // There can be name clashes after instantiation. Parameters still need
+                    // to be there but all are instantiated with the same type. We escape
+                    // the redundant parameters.
+                    let prefix = if !covered.insert(ty.clone()) {
+                        format!("_{}_", i)
+                    } else {
+                        "".to_string()
+                    };
                     format!(
-                        "{}_info: $TypeParamInfo",
-                        boogie_type(self.env, &Type::TypeParameter(i as u16))
+                        "{}{}_info: $TypeParamInfo",
+                        prefix,
+                        boogie_type(self.env, &ty)
                     )
                 })
                 .collect_vec()
@@ -528,7 +548,7 @@ impl<'env> SpecTranslator<'env> {
                 | Type::Struct(_, _, _)
                 | Type::TypeParameter(_)
                 | Type::Reference(_, _)
-                | Type::Fun(_, _)
+                | Type::Fun(..)
                 | Type::TypeDomain(_)
                 | Type::ResourceDomain(_, _, _)
                 | Type::Error
@@ -684,6 +704,7 @@ impl<'env> SpecTranslator<'env> {
             },
             ExpData::Invoke(node_id, ..) => {
                 self.error(&self.env.get_node_loc(*node_id), "Invoke not yet supported");
+                // TODO(LAMBDA)
             },
             ExpData::Lambda(node_id, ..) => self.error(
                 &self.env.get_node_loc(*node_id),
@@ -836,7 +857,6 @@ impl<'env> SpecTranslator<'env> {
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
         match oper {
-            Operation::Closure(..) => unimplemented!("closures in specs"),
             // Operators we introduced in the top level public entry `SpecTranslator::translate`,
             // mapping between Boogies single value domain and our typed world.
             Operation::BoxValue | Operation::UnboxValue => panic!("unexpected box/unbox"),
@@ -861,7 +881,7 @@ impl<'env> SpecTranslator<'env> {
                 self.translate_select(node_id, *module_id, *struct_id, *field_id, args)
             },
             Operation::SelectVariants(module_id, struct_id, field_ids) => {
-                self.translate_select(node_id, *module_id, *struct_id, field_ids[0], args);
+                self.translate_select_variant(node_id, *module_id, *struct_id, field_ids, args);
             },
             Operation::TestVariants(module_id, struct_id, variants) => {
                 self.translate_test_variants(node_id, *module_id, *struct_id, variants, args);
@@ -1012,12 +1032,12 @@ impl<'env> SpecTranslator<'env> {
             | Operation::Deref
             | Operation::MoveTo
             | Operation::MoveFrom
+            | Operation::Closure(..)
             | Operation::Old => {
                 self.env.error(
                     &self.env.get_node_loc(node_id),
                     &format!(
-                        "bug: operation {} is not supported \
-                in the current context",
+                        "bug: operation {} is not supported in the current context",
                         oper.display(self.env, node_id)
                     ),
                 );
@@ -1146,13 +1166,9 @@ impl<'env> SpecTranslator<'env> {
             .env
             .spec_fun_uses_generic_type_reflection(&module_id.qualified_inst(fun_id, inst.clone()))
         {
-            for i in 0..fun_decl.type_params.len() {
+            for ty in inst {
                 maybe_comma();
-                emit!(
-                    self.writer,
-                    "{}_info",
-                    boogie_type(self.env, &Type::TypeParameter(i as u16))
-                )
+                emit!(self.writer, "{}_info", boogie_type(self.env, ty))
             }
         }
         // Add memory parameters.
@@ -1255,6 +1271,59 @@ impl<'env> SpecTranslator<'env> {
         let field_env = struct_env.get_field(field_id);
         self.translate_exp(&args[0]);
         emit!(self.writer, "->{}", boogie_field_sel(&field_env));
+    }
+
+    fn translate_select_variant(
+        &self,
+        node_id: NodeId,
+        module_id: ModuleId,
+        struct_id: StructId,
+        field_ids: &[FieldId],
+        args: &[Exp],
+    ) {
+        let struct_env = self.env.get_module(module_id).into_struct(struct_id);
+        if struct_env.is_intrinsic() || field_ids.is_empty() {
+            self.env.error(
+                &self.env.get_node_loc(node_id),
+                "cannot select field of intrinsic struct",
+            );
+        }
+        let struct_type = &self.get_node_type(args[0].node_id());
+        let (_, _, inst) = struct_type.skip_reference().require_struct();
+        let l = self.fresh_var_name("l");
+        emit!(self.writer, "(var {} := ", l);
+        self.translate_exp(&args[0]);
+        emit!(self.writer, ";");
+        let mut else_symbol = "";
+        // When translating into boogie representation,
+        // field with the same name is attached with the corresponding variant name
+        // to avoid type error when they have different types in different variants
+        for field_id in field_ids.iter() {
+            let field_env = struct_env.get_field(*field_id);
+
+            let struct_variant_name =
+                boogie_struct_variant_name(&struct_env, inst, field_env.get_variant().unwrap());
+            let match_condition = format!("{} is {}", l, struct_variant_name);
+            emit!(self.writer, "{} if {} then ", else_symbol, match_condition);
+            emit!(self.writer, "{} -> {}", l, boogie_field_sel(&field_env));
+            if else_symbol.is_empty() {
+                else_symbol = " else ";
+            }
+        }
+        emit!(self.writer, " else ");
+        let global_state = &self
+            .env
+            .get_extension::<GlobalNumberOperationState>()
+            .expect("global number operation state");
+        let exp_bv_flag = global_state.get_node_num_oper(node_id) == Bitwise;
+        emit!(
+            self.writer,
+            &format!(
+                "$Arbitrary_value_of'{}'()",
+                boogie_type_suffix_bv(self.env, &self.get_node_type(node_id), exp_bv_flag)
+            )
+        );
+        emit!(self.writer, ")");
     }
 
     fn translate_test_variants(
@@ -1464,7 +1533,7 @@ impl<'env> SpecTranslator<'env> {
                 | Type::Tuple(_)
                 | Type::TypeParameter(_)
                 | Type::Reference(_, _)
-                | Type::Fun(_, _)
+                | Type::Fun(..)
                 | Type::TypeDomain(_)
                 | Type::ResourceDomain(_, _, _)
                 | Type::Error
@@ -1627,7 +1696,7 @@ impl<'env> SpecTranslator<'env> {
                 | Type::Tuple(_)
                 | Type::TypeParameter(_)
                 | Type::Reference(_, _)
-                | Type::Fun(_, _)
+                | Type::Fun(..)
                 | Type::Error
                 | Type::Var(_) => panic!("unexpected type"),
             }

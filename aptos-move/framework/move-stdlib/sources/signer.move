@@ -1,10 +1,27 @@
 module std::signer {
-    /// Borrows the address of the signer
-    /// Conceptually, you can think of the `signer` as being a struct wrapper around an
-    /// address
+    /// signer is a builtin move type that represents an address that has been verfied by the VM.
+    ///
+    /// VM Runtime representation is equivalent to following:
     /// ```
-    /// struct signer has drop { addr: address }
+    /// enum signer has drop {
+    ///     Master { account: address },
+    ///     Permissioned { account: address, permissions_address: address },
+    /// }
     /// ```
+    ///
+    /// for bcs serialization:
+    ///
+    /// ```
+    /// struct signer has drop {
+    ///     account: address,
+    /// }
+    /// ```
+    /// ^ The discrepency is needed to maintain backwards compatibility of signer serialization
+    /// semantics.
+
+    /// Calling address_of on a permissioned signer.
+    const EADDRESS_OF_PERMISSIONED: u64 = 0;
+
     /// `borrow_address` borrows this inner field
     native public fun borrow_address(s: &signer): &address;
 

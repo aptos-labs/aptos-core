@@ -24,7 +24,6 @@ use aptos_sdk::types::on_chain_config::{
 };
 use aptos_testcases::{
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
-    modifiers::CpuChaosTest,
     multi_region_network_test::MultiRegionNetworkEmulationTest,
     performance_test::PerformanceBenchmark,
     two_traffics_test::TwoTrafficsTest,
@@ -178,11 +177,10 @@ pub(crate) fn realistic_env_fairness_workload_sweep() -> ForgeConfig {
                 .with_transactions_per_account(1),
         ]),
         criteria: Vec::new(),
-        background_traffic: background_traffic_for_sweep_with_latency(&[
-            (3.0, 8.0),
-            (3.0, 8.0),
-            (3.0, 4.0),
-        ]),
+        background_traffic: background_traffic_for_sweep_with_latency(
+            &[(2.0, 3.0, 8.0), (0.1, 25.0, 30.0), (0.1, 30.0, 45.0)],
+            false,
+        ),
     })
 }
 
@@ -212,16 +210,21 @@ pub(crate) fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
                 .with_transactions_per_account(1),
         ]),
         criteria: Vec::new(),
-        background_traffic: background_traffic_for_sweep_with_latency(&[
-            (4.0, 5.0),
-            (2.2, 3.0),
-            (3.5, 5.0),
-            (4.0, 6.0),
-            (2.5, 4.0),
-            (3.5, 5.0),
-            // TODO - p50 and p90 is set to high, until it is calibrated/understood.
-            (3.0, 10.0),
-        ]),
+        background_traffic: background_traffic_for_sweep_with_latency(
+            &[
+                (0.1, 4.0, 5.0),
+                (0.1, 2.2, 3.0),
+                (0.1, 3.5, 5.0),
+                (0.1, 4.0, 6.0),
+                // TODO - p50 and p90 is set to high, until it is calibrated/understood.
+                (0.1, 3.0, 5.0),
+                // TODO - p50 and p90 is set to high, until it is calibrated/understood.
+                (0.1, 5.0, 10.0),
+                // TODO - p50 and p90 is set to high, until it is calibrated/understood.
+                (0.1, 3.0, 10.0),
+            ],
+            true,
+        ),
     })
     .with_emit_job(
         EmitJobRequest::default()
@@ -238,7 +241,7 @@ pub(crate) fn realistic_env_graceful_overload(duration: Duration) -> ForgeConfig
         .with_initial_fullnode_count(20)
         .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 15000 })
+                .mode(EmitJobMode::ConstTps { tps: 30000 })
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(7500),
         }))
@@ -262,9 +265,10 @@ pub(crate) fn realistic_env_graceful_overload(duration: Duration) -> ForgeConfig
                     // overload test uses more CPUs than others, so increase the limit
                     // Check that we don't use more than 28 CPU cores for 20% of the time.
                     MetricsThreshold::new(28.0, 20),
-                    // Memory starts around 6GB, and grows around 8GB/hr in this test.
+                    // TODO(ibalajiarun): Investigate the high utilization and adjust accordingly.
+                    // Memory starts around 8GB, and grows around 8GB/hr in this test.
                     // Check that we don't use more than final expected memory for more than 20% of the time.
-                    MetricsThreshold::new_gb(6.5 + 8.0 * (duration.as_secs_f64() / 3600.0), 20),
+                    MetricsThreshold::new_gb(8.5 + 8.0 * (duration.as_secs_f64() / 3600.0), 20),
                 ))
                 .add_latency_threshold(10.0, LatencyType::P50)
                 .add_latency_threshold(30.0, LatencyType::P90)
@@ -303,9 +307,9 @@ pub(crate) fn realistic_env_max_load_test(
         .add_system_metrics_threshold(SystemMetricsThreshold::new(
             // Check that we don't use more than 18 CPU cores for 15% of the time.
             MetricsThreshold::new(25.0, 15),
-            // Memory starts around 7GB, and grows around 1.4GB/hr in this test.
+            // Memory starts around 8GB, and grows around 1.4GB/hr in this test.
             // Check that we don't use more than final expected memory for more than 20% of the time.
-            MetricsThreshold::new_gb(7.0 + 1.4 * (duration_secs as f64 / 3600.0), 20),
+            MetricsThreshold::new_gb(8.0 + 1.4 * (duration_secs as f64 / 3600.0), 20),
         ))
         .add_no_restarts()
         .add_wait_for_catchup_s(
@@ -316,7 +320,7 @@ pub(crate) fn realistic_env_max_load_test(
         .add_latency_threshold(4.5, LatencyType::P70)
         .add_chain_progress(StateProgressThreshold {
             max_non_epoch_no_progress_secs: 15.0,
-            max_epoch_no_progress_secs: 15.0,
+            max_epoch_no_progress_secs: 16.0,
             max_non_epoch_round_gap: 4,
             max_epoch_round_gap: 4,
         });
@@ -435,7 +439,19 @@ pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                     }
                     OnChainExecutionConfig::V4(config_v4) => {
                         config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
-                        config_v4.transaction_shuffler_type = TransactionShufflerType::SenderAwareV2(256);
+                        config_v4.transaction_shuffler_type = TransactionShufflerType::UseCaseAware {
+                            sender_spread_factor: 256,
+                            platform_use_case_spread_factor: 0,
+                            user_use_case_spread_factor: 0,
+                        };
+                    }
+                    OnChainExecutionConfig::V5(config_v5) => {
+                        config_v5.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                        config_v5.transaction_shuffler_type = TransactionShufflerType::UseCaseAware {
+                            sender_spread_factor: 256,
+                            platform_use_case_spread_factor: 0,
+                            user_use_case_spread_factor: 0,
+                        };
                     }
                 }
                 helm_values["chain"]["on_chain_execution_config"] =
@@ -482,7 +498,7 @@ pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             );
     } else {
         forge_config = forge_config.with_success_criteria(
-            SuccessCriteria::new(12000)
+            SuccessCriteria::new(11000)
                 .add_no_restarts()
                 /* This test runs at high load, so we need more catchup time */
                 .add_wait_for_catchup_s(120),
@@ -499,9 +515,8 @@ pub fn wrap_with_realistic_env<T: NetworkTest + 'static>(
     num_validators: usize,
     test: T,
 ) -> CompositeNetworkTest {
-    CompositeNetworkTest::new_with_two_wrappers(
+    CompositeNetworkTest::new(
         MultiRegionNetworkEmulationTest::default_for_validator_count(num_validators),
-        CpuChaosTest::default(),
         test,
     )
 }

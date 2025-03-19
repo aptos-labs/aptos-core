@@ -97,6 +97,10 @@ impl RestoreHandler {
         )
     }
 
+    pub fn force_state_version_for_kv_restore(&self, version: Option<Version>) -> Result<()> {
+        self.state_store.init_state_ignoring_summary(version)
+    }
+
     pub fn save_transactions_and_replay_kv(
         &self,
         first_version: Version,
@@ -132,7 +136,7 @@ impl RestoreHandler {
     }
 
     pub fn get_in_progress_state_kv_snapshot_version(&self) -> Result<Option<Version>> {
-        let db = self.aptosdb.ledger_db.metadata_db_arc();
+        let db = self.aptosdb.state_kv_db.metadata_db_arc();
         let mut iter = db.iter::<DbMetadataSchema>()?;
         iter.seek_to_first();
         while let Some((k, _v)) = iter.next().transpose()? {

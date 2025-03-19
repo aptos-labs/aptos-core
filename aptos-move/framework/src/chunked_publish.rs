@@ -9,8 +9,8 @@ use move_core_types::{account_address::AccountAddress, ident_str, language_stora
 pub const LARGE_PACKAGES_MODULE_ADDRESS: &str =
     "0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7";
 
-/// Maximum code & metadata chunk size to be included in a transaction
-pub const MAX_CHUNK_SIZE_IN_BYTES: usize = 60_000;
+/// The default chunk size for splitting code and metadata to fit within the transaction size limits.
+pub const CHUNK_SIZE_IN_BYTES: usize = 55_000;
 
 pub enum PublishType {
     AccountDeploy,
@@ -24,9 +24,10 @@ pub fn chunk_package_and_create_payloads(
     publish_type: PublishType,
     object_address: Option<AccountAddress>,
     large_packages_module_address: AccountAddress,
+    chunk_size: usize,
 ) -> Vec<TransactionPayload> {
     // Chunk the metadata
-    let mut metadata_chunks = create_chunks(metadata);
+    let mut metadata_chunks = create_chunks(metadata, chunk_size);
     // Separate last chunk for special handling
     let mut metadata_chunk = metadata_chunks.pop().expect("Metadata is required");
 
@@ -42,9 +43,9 @@ pub fn chunk_package_and_create_payloads(
     let mut code_chunks: Vec<Vec<u8>> = vec![];
 
     for (idx, module_code) in package_code.into_iter().enumerate() {
-        let chunked_module = create_chunks(module_code);
+        let chunked_module = create_chunks(module_code, chunk_size);
         for chunk in chunked_module {
-            if taken_size + chunk.len() > MAX_CHUNK_SIZE_IN_BYTES {
+            if taken_size + chunk.len() > chunk_size {
                 // Create a payload and reset accumulators
                 let payload = large_packages_stage_code_chunk(
                     metadata_chunk,
@@ -94,8 +95,8 @@ pub fn chunk_package_and_create_payloads(
 }
 
 // Create chunks of data based on the defined maximum chunk size.
-fn create_chunks(data: Vec<u8>) -> Vec<Vec<u8>> {
-    data.chunks(MAX_CHUNK_SIZE_IN_BYTES)
+fn create_chunks(data: Vec<u8>, chunk_size: usize) -> Vec<Vec<u8>> {
+    data.chunks(chunk_size)
         .map(|chunk| chunk.to_vec())
         .collect()
 }

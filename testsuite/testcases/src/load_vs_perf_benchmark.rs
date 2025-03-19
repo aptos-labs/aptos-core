@@ -196,9 +196,9 @@ impl TransactionWorkload {
             );
             request.transaction_mix_per_phase(vec![
                 // warmup
+                vec![(account_creation_type.clone(), 1)],
                 vec![(account_creation_type, 1)],
-                vec![(account_creation_type, 1)],
-                vec![(write_type, 1)],
+                vec![(write_type.clone(), 1)],
                 // cooldown
                 vec![(write_type, 1)],
             ])

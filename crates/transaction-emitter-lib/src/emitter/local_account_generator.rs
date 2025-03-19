@@ -6,7 +6,10 @@ use aptos_sdk::types::{
     AccountKey, EphemeralKeyPair, EphemeralPrivateKey, KeylessAccount, LocalAccount,
 };
 use aptos_transaction_generator_lib::ReliableTransactionSubmitter;
-use aptos_types::keyless::{Claims, OpenIdSig, Pepper, ZeroKnowledgeSig};
+use aptos_types::{
+    keyless,
+    keyless::{Claims, OpenIdSig, Pepper, ZeroKnowledgeSig},
+};
 use async_trait::async_trait;
 use futures::StreamExt;
 use rand::rngs::StdRng;
@@ -36,6 +39,7 @@ pub fn create_keyless_account_generator(
     epk_expiry_date_secs: u64,
     jwt: &str,
     proof_file_path: Option<&str>,
+    keyless_config: keyless::Configuration,
 ) -> anyhow::Result<Box<dyn LocalAccountGenerator>> {
     let parts: Vec<&str> = jwt.split('.').collect();
     let header_bytes = base64::decode(parts[0]).unwrap();
@@ -51,6 +55,7 @@ pub fn create_keyless_account_generator(
         uid_key: "sub".to_owned(),
         uid_val: claims.oidc_claims.sub,
         jwt_header_json,
+        keyless_config,
     }))
 }
 
@@ -109,6 +114,9 @@ pub struct KeylessAccountGenerator {
     uid_key: String,
     uid_val: String,
     jwt_header_json: String,
+    /// We assume the on-chain keyless config won't change and cache it here.
+    /// Needed by nonce generation.
+    keyless_config: keyless::Configuration,
 }
 
 #[async_trait]
@@ -153,7 +161,8 @@ impl LocalAccountGenerator for KeylessAccountGenerator {
                 &self.uid_key,
                 &self.uid_val,
                 &self.jwt_header_json,
-                EphemeralKeyPair::new(
+                EphemeralKeyPair::new_with_keyless_config(
+                    &self.keyless_config,
                     esk,
                     self.epk_expiry_date_secs,
                     vec![0; OpenIdSig::EPK_BLINDER_NUM_BYTES],

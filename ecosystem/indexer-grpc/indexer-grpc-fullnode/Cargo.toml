@@ -43,9 +43,7 @@ aptos-runtimes = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 
-move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
-move-package = { workspace = true }
 
 [dev-dependencies]
 goldenfile = { workspace = true }

@@ -16,6 +16,23 @@ pub type VMResult<T> = ::std::result::Result<T, VMError>;
 pub type BinaryLoaderResult<T> = ::std::result::Result<T, PartialVMError>;
 pub type PartialVMResult<T> = ::std::result::Result<T, PartialVMError>;
 
+/// This macro is used to panic while debugging fuzzing crashes obtaining the right stack trace.
+/// e.g. DEBUG_VM_STATUS=ABORTED,UNKNOWN_INVARIANT_VIOLATION_ERROR ./fuzz.sh run move_aptosvm_publish_and_run <testcase>
+/// third_party/move/move-core/types/src/vm_status.rs:506 for the list of status codes.
+#[cfg(feature = "fuzzing")]
+macro_rules! fuzzing_maybe_panic {
+    ($major_status:expr, $message:expr) => {{
+        if let Ok(debug_statuses) = std::env::var("DEBUG_VM_STATUS") {
+            if debug_statuses
+                .split(',')
+                .any(|s| s.trim() == format!("{:?}", $major_status))
+            {
+                panic!("PartialVMError: {:?} {:?}", $major_status, $message);
+            }
+        }
+    }};
+}
+
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Location {
     Undefined,
@@ -104,18 +121,7 @@ impl VMError {
                         };
                     },
                 };
-                // Errors for OUT_OF_GAS do not always have index set: if it does not, it should already return above.
-                debug_assert!(
-                    offsets.len() == 1,
-                    "Unexpected offsets. major_status: {:?}\
-                    sub_status: {:?}\
-                    location: {:?}\
-                    offsets: {:#?}",
-                    major_status,
-                    sub_status,
-                    location,
-                    offsets
-                );
+                // offset can be None if it comes from `check_dependencies_and_charge_gas` for example
                 let (function, code_offset) = match offsets.pop() {
                     None => {
                         return VMStatus::Error {
@@ -239,7 +245,7 @@ impl VMError {
         }))
     }
 
-    pub fn format_test_output(&self, verbose: bool, comparison_mode: bool) -> String {
+    pub fn format_test_output(&self, verbose: bool) -> String {
         let location_string = match &self.location() {
             Location::Undefined => "undefined".to_owned(),
             Location::Script => "script".to_owned(),
@@ -247,18 +253,8 @@ impl VMError {
                 format!("0x{}::{}", id.address().short_str_lossless(), id.name())
             },
         };
-        let indices = if comparison_mode {
-            // During comparison testing, abstract this data.
-            "redacted".to_string()
-        } else {
-            format!("{:?}", self.indices())
-        };
-        let offsets = if comparison_mode {
-            // During comparison testing, abstract this data.
-            "redacted".to_string()
-        } else {
-            format!("{:?}", self.offsets())
-        };
+        let indices = format!("{:?}", self.indices());
+        let offsets = format!("{:?}", self.offsets());
 
         if verbose {
             let message_str = match &self.message() {
@@ -438,6 +434,10 @@ impl PartialVMError {
         } else {
             None
         };
+
+        #[cfg(feature = "fuzzing")]
+        fuzzing_maybe_panic!(major_status, message);
+
         Self(Box::new(PartialVMError_ {
             major_status,
             sub_status: None,
@@ -446,6 +446,10 @@ impl PartialVMError {
             indices: vec![],
             offsets: vec![],
         }))
+    }
+
+    pub fn new_invariant_violation(msg: impl ToString) -> PartialVMError {
+        Self::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(msg.to_string())
     }
 
     pub fn major_status(&self) -> StatusCode {

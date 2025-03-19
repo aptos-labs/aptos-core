@@ -13,14 +13,13 @@ use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, transaction::Version, waypoint::Waypoint,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use either::Either;
 use std::{fs, path::Path, sync::Arc, time::Instant};
 use tokio::{
     runtime::Runtime,
     sync::watch::{channel, Receiver as WatchReceiver},
 };
-
 pub(crate) fn maybe_apply_genesis(
     db_rw: &DbReaderWriter,
     node_config: &NodeConfig,
@@ -33,8 +32,9 @@ pub(crate) fn maybe_apply_genesis(
         .unwrap_or(&node_config.base.waypoint)
         .genesis_waypoint();
     if let Some(genesis) = get_genesis_txn(node_config) {
-        let ledger_info_opt = maybe_bootstrap::<AptosVM>(db_rw, genesis, genesis_waypoint)
-            .map_err(|err| anyhow!("DB failed to bootstrap {}", err))?;
+        let ledger_info_opt =
+            maybe_bootstrap::<AptosVMBlockExecutor>(db_rw, genesis, genesis_waypoint)
+                .map_err(|err| anyhow!("DB failed to bootstrap {}", err))?;
         Ok(ledger_info_opt)
     } else {
         info ! ("Genesis txn not provided! This is fine only if you don't expect to apply it. Otherwise, the config is incorrect!");
@@ -50,11 +50,11 @@ pub(crate) fn bootstrap_db(
     DbReaderWriter,
     Option<Runtime>,
     Option<InternalIndexerDB>,
-    Option<WatchReceiver<u64>>,
+    Option<WatchReceiver<(Instant, Version)>>,
 )> {
     let internal_indexer_db = InternalIndexerDBService::get_indexer_db(node_config);
     let (update_sender, update_receiver) = if internal_indexer_db.is_some() {
-        let (sender, receiver) = channel::<u64>(0);
+        let (sender, receiver) = channel::<(Instant, Version)>((Instant::now(), 0 as Version));
         (Some(sender), Some(receiver))
     } else {
         (None, None)
@@ -176,7 +176,7 @@ pub fn initialize_database_and_checkpoints(
     Option<Runtime>,
     Waypoint,
     Option<InternalIndexerDB>,
-    Option<WatchReceiver<Version>>,
+    Option<WatchReceiver<(Instant, Version)>>,
 )> {
     // If required, create RocksDB checkpoints and change the working directory.
     // This is test-only.

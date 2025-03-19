@@ -140,6 +140,11 @@ pub struct BoogieOptions {
     pub random_seed: usize,
     /// The number of cores to use for parallel processing of verification conditions.
     pub proc_cores: usize,
+    /// The number of shards to split the verification problem into.
+    pub shards: usize,
+    /// If there are shards, specifies to only run the given shard. Shards are numbered
+    /// starting at 1.
+    pub only_shard: Option<usize>,
     /// A (soft) timeout for the solver, per verification condition, in seconds.
     pub vc_timeout: usize,
     /// Whether allow local timeout overwrites the global one
@@ -159,6 +164,11 @@ pub struct BoogieOptions {
     /// A hard timeout for boogie execution; if the process does not terminate within
     /// this time frame, it will be killed. Zero for no timeout.
     pub hard_timeout_secs: u64,
+    /// Whether to skip verification of type instantiations of functions. This may miss
+    /// some verification conditions if different type instantiations can create
+    /// different behavior via type reflection or storage access, but can speed up
+    /// verification.
+    pub skip_instance_check: bool,
     /// What vector theory to use.
     pub vector_theory: VectorTheory,
     /// Whether to generate a z3 trace file and where to put it.
@@ -193,7 +203,9 @@ impl Default for BoogieOptions {
             vector_using_sequences: false,
             random_seed: 1,
             proc_cores: 4,
-            vc_timeout: 80,
+            shards: 1,
+            only_shard: None,
+            vc_timeout: 40,
             global_timeout_overwrite: true,
             keep_artifacts: false,
             eager_threshold: 100,
@@ -207,6 +219,7 @@ impl Default for BoogieOptions {
             custom_natives: None,
             loop_unroll: None,
             borrow_aggregates: vec![],
+            skip_instance_check: false,
         }
     }
 }

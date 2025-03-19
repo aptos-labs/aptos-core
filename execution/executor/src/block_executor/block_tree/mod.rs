@@ -207,12 +207,12 @@ impl BlockTree {
     fn root_from_db(block_lookup: &Arc<BlockLookup>, db: &Arc<dyn DbReader>) -> Result<Arc<Block>> {
         let ledger_info_with_sigs = db.get_latest_ledger_info()?;
         let ledger_info = ledger_info_with_sigs.ledger_info();
-        let ledger_view = db.get_latest_executed_trees()?;
+        let ledger_summary = db.get_pre_committed_ledger_summary()?;
 
         ensure!(
-            ledger_view.version() == Some(ledger_info.version()),
+            ledger_summary.version() == Some(ledger_info.version()),
             "Missing ledger info at the end of the ledger. latest version {:?}, LI version {}",
-            ledger_view.version(),
+            ledger_summary.version(),
             ledger_info.version(),
         );
 
@@ -222,10 +222,7 @@ impl BlockTree {
             ledger_info.consensus_block_id()
         };
 
-        let output = PartialStateComputeResult::new_empty(
-            ledger_view.state().clone(),
-            ledger_view.txn_accumulator().clone(),
-        );
+        let output = PartialStateComputeResult::new_empty(ledger_summary);
 
         block_lookup.fetch_or_add_block(id, output, None)
     }
@@ -260,8 +257,9 @@ impl BlockTree {
             last_committed_block
         };
         root.output
-            .expect_result_state()
-            .current
+            .expect_state_checkpoint_output()
+            .state_summary
+            .global_state_summary
             .log_generation("block_tree_base");
         let old_root = std::mem::replace(&mut *self.root.lock(), root);
 

@@ -11,7 +11,7 @@ use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     move_utils::MemberId,
     on_chain_config::FeatureFlag,
-    transaction::{ExecutionStatus, TransactionPayload},
+    transaction::{ExecutionStatus, TransactionPayload, TransactionStatus},
 };
 use claims::assert_ok;
 use move_core_types::{
@@ -242,17 +242,10 @@ fn code_publishing_upgrade_loader_cache_consistency() {
             |_| {},
         ),
     ];
-    let result = h.run_block_get_output(txns);
-    assert_success!(result[0].status().to_owned());
-    assert_success!(result[1].status().to_owned());
-    assert_eq!(
-        result[2]
-            .auxiliary_data()
-            .get_detail_error_message()
-            .unwrap()
-            .status_code(),
-        StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE
-    )
+    let result = h.run_block(txns);
+    assert_success!(result[0]);
+    assert_success!(result[1]);
+    assert_vm_status!(result[2], StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
 
 #[test]
@@ -427,7 +420,6 @@ fn test_module_publishing_does_not_fallback() {
     executor.disable_block_executor_fallback();
 
     let mut h = MoveHarness::new_with_executor(executor);
-    h.enable_features(vec![FeatureFlag::ENABLE_LOADER_V2], vec![]);
     let addr = AccountAddress::from_hex_literal("0x123").unwrap();
     let account = h.new_account_at(addr);
 
@@ -530,7 +522,6 @@ fn test_module_publishing_does_not_leak_speculative_information() {
     executor.disable_block_executor_fallback();
 
     let mut h = MoveHarness::new_with_executor(executor);
-    h.enable_features(vec![FeatureFlag::ENABLE_LOADER_V2], vec![]);
     let addr = AccountAddress::random();
     let account = h.new_account_at(addr);
 
@@ -573,20 +564,7 @@ fn test_module_publishing_does_not_leak_speculative_information() {
         let status = output.status().clone();
         match maybe_abort_code {
             Some(abort_code) => {
-                let status = assert_ok!(status.as_kept_status());
-                if let ExecutionStatus::MoveAbort {
-                    location: _,
-                    code,
-                    info: _,
-                } = status
-                {
-                    assert_eq!(code, abort_code);
-                } else {
-                    panic!(
-                        "Transaction should succeed with abort code {}, got {:?}",
-                        abort_code, status
-                    );
-                }
+                assert_move_abort(status, abort_code);
             },
             None => {
                 assert_success!(status);
@@ -596,4 +574,37 @@ fn test_module_publishing_does_not_leak_speculative_information() {
             },
         }
     }
+}
+
+fn assert_move_abort(status: TransactionStatus, expected_abort_code: u64) {
+    let status = assert_ok!(status.as_kept_status());
+    if let ExecutionStatus::MoveAbort {
+        location: _,
+        code,
+        info: _,
+    } = status
+    {
+        assert_eq!(code, expected_abort_code);
+    } else {
+        panic!(
+            "Transaction should succeed with abort code {}, got {:?}",
+            expected_abort_code, status
+        );
+    }
+}
+
+#[test]
+fn test_init_module_should_not_publish_modules() {
+    let mut h = MoveHarness::new();
+    let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
+    let account = h.new_account_at(addr);
+
+    let txn = h.create_publish_package_cache_building(
+        &account,
+        &common::test_dir_path("code_publishing.data/pack_init_module_code_publish"),
+        |_| {},
+    );
+    let output = h.run_block_get_output(vec![txn]).pop().unwrap();
+    // The abort code corresponds to EALREADY_REQUESTED.
+    assert_move_abort(output.status().clone(), 0x03_0000);
 }

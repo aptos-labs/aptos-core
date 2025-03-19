@@ -8,13 +8,19 @@ fun m::foo($t0: u64, $t1: u64): u64 {
      var $t5: u64
      var $t6: u64
      var $t7: u64
-  0: $t3 := +($t0, $t1)
-  1: $t5 := 1
-  2: $t4 := +($t3, $t5)
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+  0: $t4 := infer($t0)
+  1: $t3 := +($t4, $t1)
+  2: $t6 := infer($t3)
   3: $t7 := 1
-  4: $t6 := +($t4, $t7)
-  5: $t2 := infer($t6)
-  6: return $t2
+  4: $t5 := +($t6, $t7)
+  5: $t9 := infer($t5)
+  6: $t10 := 1
+  7: $t8 := +($t9, $t10)
+  8: $t2 := infer($t8)
+  9: return $t2
 }
 
 ============ after uninitialized_use_checker: ================
@@ -27,18 +33,47 @@ fun m::foo($t0: u64, $t1: u64): u64 {
      var $t5: u64
      var $t6: u64
      var $t7: u64
-     # before: { no: $t2, $t3, $t4, $t5, $t6, $t7 }, after: { no: $t2, $t4, $t5, $t6, $t7 }
-  0: $t3 := +($t0, $t1)
-     # before: { no: $t2, $t4, $t5, $t6, $t7 }, after: { no: $t2, $t4, $t6, $t7 }
-  1: $t5 := 1
-     # before: { no: $t2, $t4, $t6, $t7 }, after: { no: $t2, $t6, $t7 }
-  2: $t4 := +($t3, $t5)
-     # before: { no: $t2, $t6, $t7 }, after: { no: $t2, $t6 }
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     # before: { no: $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t2, $t3, $t5, $t6, $t7, $t8, $t9, $t10 }
+  0: $t4 := infer($t0)
+     # before: { no: $t2, $t3, $t5, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t2, $t5, $t6, $t7, $t8, $t9, $t10 }
+  1: $t3 := +($t4, $t1)
+     # before: { no: $t2, $t5, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t2, $t5, $t7, $t8, $t9, $t10 }
+  2: $t6 := infer($t3)
+     # before: { no: $t2, $t5, $t7, $t8, $t9, $t10 }, after: { no: $t2, $t5, $t8, $t9, $t10 }
   3: $t7 := 1
-     # before: { no: $t2, $t6 }, after: { no: $t2 }
-  4: $t6 := +($t4, $t7)
+     # before: { no: $t2, $t5, $t8, $t9, $t10 }, after: { no: $t2, $t8, $t9, $t10 }
+  4: $t5 := +($t6, $t7)
+     # before: { no: $t2, $t8, $t9, $t10 }, after: { no: $t2, $t8, $t10 }
+  5: $t9 := infer($t5)
+     # before: { no: $t2, $t8, $t10 }, after: { no: $t2, $t8 }
+  6: $t10 := 1
+     # before: { no: $t2, $t8 }, after: { no: $t2 }
+  7: $t8 := +($t9, $t10)
      # before: { no: $t2 }, after: all initialized
-  5: $t2 := infer($t6)
+  8: $t2 := infer($t8)
      # before: all initialized, after: all initialized
-  6: return $t2
+  9: return $t2
 }
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0.m {
+
+
+foo(p: u64, q: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](p: u64)
+	1: MoveLoc[1](q: u64)
+	2: Add
+	3: LdU64(1)
+	4: Add
+	5: LdU64(1)
+	6: Add
+	7: Ret
+}
+}
+============ bytecode verification succeeded ========

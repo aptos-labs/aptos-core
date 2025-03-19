@@ -136,6 +136,9 @@ pub enum EntryFunctionCall {
     /// does not come with a proof-of-knowledge of the underlying SK. Nonetheless, we need this functionality due to
     /// the introduction of non-standard key algorithms, such as passkeys, which cannot produce proofs-of-knowledge in
     /// the format expected in `rotate_authentication_key`.
+    ///
+    /// If you'd like to followup with updating the `OriginatingAddress` table, you can call
+    /// `set_originating_address()`.
     AccountRotateAuthenticationKeyCall {
         new_auth_key: Vec<u8>,
     },
@@ -146,6 +149,74 @@ pub enum EntryFunctionCall {
         new_public_key_bytes: Vec<u8>,
         cap_update_table: Vec<u8>,
     },
+
+    /// For the given account, add an entry to `OriginatingAddress` table mapping the account's
+    /// authentication key to the account's address.
+    ///
+    /// Can be used as a followup to `rotate_authentication_key_call()` to reconcile the
+    /// `OriginatingAddress` table, or to establish a mapping for a new account that has not yet had
+    /// its authentication key rotated.
+    ///
+    /// Aborts if there is already an entry in the `OriginatingAddress` table for the account's
+    /// authentication key.
+    ///
+    /// Kept as a private entry function to ensure that after an unproven rotation via
+    /// `rotate_authentication_key_call()`, the `OriginatingAddress` table is only updated under the
+    /// authority of the new authentication key.
+    AccountSetOriginatingAddress {},
+
+    /// Add dispatchable authentication function that enables account abstraction via this function.
+    /// Note: it is a private entry function that can only be called directly from transaction.
+    AccountAbstractionAddAuthenticationFunction {
+        module_address: AccountAddress,
+        module_name: Vec<u8>,
+        function_name: Vec<u8>,
+    },
+
+    AccountAbstractionAddDispatchableAuthenticationFunction {
+        _module_address: AccountAddress,
+        _module_name: Vec<u8>,
+        _function_name: Vec<u8>,
+    },
+
+    AccountAbstractionInitialize {},
+
+    /// Add dispatchable domain-scoped authentication function, that enables account abstraction via this function.
+    /// This means all accounts within the domain can use it to authenticate, without needing an initialization (unlike non-domain AA).
+    /// dispatchable function needs to verify two things:
+    /// - that signing_data.domain_authenticator() is a valid signature of signing_data.digest() (just like regular AA)
+    /// - that signing_data.domain_account_identity() is correct identity representing the authenticator
+    ///   (missing this step would allow impersonation)
+    ///
+    /// Note: This is  public entry function, as it requires framework signer, and that can
+    /// only be obtained as a part of the governance script.
+    AccountAbstractionRegisterDomainWithAuthenticationFunction {
+        module_address: AccountAddress,
+        module_name: Vec<u8>,
+        function_name: Vec<u8>,
+    },
+
+    /// Remove dispatchable authentication function that enables account abstraction via this function.
+    /// dispatchable function needs to verify that signing_data.authenticator() is a valid signature of signing_data.digest().
+    /// Note: it is a private entry function that can only be called directly from transaction.
+    AccountAbstractionRemoveAuthenticationFunction {
+        module_address: AccountAddress,
+        module_name: Vec<u8>,
+        function_name: Vec<u8>,
+    },
+
+    /// Remove dispatchable authenticator so that all dispatchable authentication functions will be removed as well.
+    /// After calling this function, the account is not abstracted at all.
+    /// Note: it is a private entry function that can only be called directly from transaction.
+    AccountAbstractionRemoveAuthenticator {},
+
+    AccountAbstractionRemoveDispatchableAuthenticationFunction {
+        _module_address: AccountAddress,
+        _module_name: Vec<u8>,
+        _function_name: Vec<u8>,
+    },
+
+    AccountAbstractionRemoveDispatchableAuthenticator {},
 
     /// Batch version of APT transfer.
     AptosAccountBatchTransfer {
@@ -303,6 +374,12 @@ pub enum EntryFunctionCall {
     /// Create APT pairing by passing `AptosCoin`.
     CoinCreatePairing {
         coin_type: TypeTag,
+    },
+
+    /// Migrate to fungible store for `CoinType` if not yet.
+    CoinMigrateCoinStoreToFungibleStore {
+        coin_type: TypeTag,
+        accounts: Vec<AccountAddress>,
     },
 
     /// Voluntarily migrate to fungible store for `CoinType` if not yet.
@@ -786,6 +863,15 @@ pub enum EntryFunctionCall {
         code: Vec<Vec<u8>>,
     },
 
+    /// Revoke all storable permission handle of the signer immediately.
+    PermissionedSignerRevokeAllHandles {},
+
+    /// Revoke a specific storable permission handle immediately. This will disallow owner of
+    /// the storable permission handle to derive signer from it anymore.
+    PermissionedSignerRevokePermissionStorageAddress {
+        permissions_storage_addr: AccountAddress,
+    },
+
     /// Creates a new resource account and rotates the authentication key to either
     /// the optional auth key if it is non-empty (though auth keys are 32-bytes)
     /// or the source accounts current auth key.
@@ -1191,6 +1277,57 @@ impl EntryFunctionCall {
                 new_public_key_bytes,
                 cap_update_table,
             ),
+            AccountSetOriginatingAddress {} => account_set_originating_address(),
+            AccountAbstractionAddAuthenticationFunction {
+                module_address,
+                module_name,
+                function_name,
+            } => account_abstraction_add_authentication_function(
+                module_address,
+                module_name,
+                function_name,
+            ),
+            AccountAbstractionAddDispatchableAuthenticationFunction {
+                _module_address,
+                _module_name,
+                _function_name,
+            } => account_abstraction_add_dispatchable_authentication_function(
+                _module_address,
+                _module_name,
+                _function_name,
+            ),
+            AccountAbstractionInitialize {} => account_abstraction_initialize(),
+            AccountAbstractionRegisterDomainWithAuthenticationFunction {
+                module_address,
+                module_name,
+                function_name,
+            } => account_abstraction_register_domain_with_authentication_function(
+                module_address,
+                module_name,
+                function_name,
+            ),
+            AccountAbstractionRemoveAuthenticationFunction {
+                module_address,
+                module_name,
+                function_name,
+            } => account_abstraction_remove_authentication_function(
+                module_address,
+                module_name,
+                function_name,
+            ),
+            AccountAbstractionRemoveAuthenticator {} => account_abstraction_remove_authenticator(),
+            AccountAbstractionRemoveDispatchableAuthenticationFunction {
+                _module_address,
+                _module_name,
+                _function_name,
+            } => account_abstraction_remove_dispatchable_authentication_function(
+                _module_address,
+                _module_name,
+                _function_name,
+            ),
+            AccountAbstractionRemoveDispatchableAuthenticator {} => {
+                account_abstraction_remove_dispatchable_authenticator()
+            },
             AptosAccountBatchTransfer {
                 recipients,
                 amounts,
@@ -1279,6 +1416,10 @@ impl EntryFunctionCall {
             } => code_publish_package_txn(metadata_serialized, code),
             CoinCreateCoinConversionMap {} => coin_create_coin_conversion_map(),
             CoinCreatePairing { coin_type } => coin_create_pairing(coin_type),
+            CoinMigrateCoinStoreToFungibleStore {
+                coin_type,
+                accounts,
+            } => coin_migrate_coin_store_to_fungible_store(coin_type, accounts),
             CoinMigrateToFungibleStore { coin_type } => coin_migrate_to_fungible_store(coin_type),
             CoinTransfer {
                 coin_type,
@@ -1564,6 +1705,10 @@ impl EntryFunctionCall {
                 metadata_serialized,
                 code,
             } => object_code_deployment_publish(metadata_serialized, code),
+            PermissionedSignerRevokeAllHandles {} => permissioned_signer_revoke_all_handles(),
+            PermissionedSignerRevokePermissionStorageAddress {
+                permissions_storage_addr,
+            } => permissioned_signer_revoke_permission_storage_address(permissions_storage_addr),
             ResourceAccountCreateResourceAccount {
                 seed,
                 optional_auth_key,
@@ -1993,6 +2138,9 @@ pub fn account_rotate_authentication_key(
 /// does not come with a proof-of-knowledge of the underlying SK. Nonetheless, we need this functionality due to
 /// the introduction of non-standard key algorithms, such as passkeys, which cannot produce proofs-of-knowledge in
 /// the format expected in `rotate_authentication_key`.
+///
+/// If you'd like to followup with updating the `OriginatingAddress` table, you can call
+/// `set_originating_address()`.
 pub fn account_rotate_authentication_key_call(new_auth_key: Vec<u8>) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -2030,6 +2178,211 @@ pub fn account_rotate_authentication_key_with_rotation_capability(
             bcs::to_bytes(&new_public_key_bytes).unwrap(),
             bcs::to_bytes(&cap_update_table).unwrap(),
         ],
+    ))
+}
+
+/// For the given account, add an entry to `OriginatingAddress` table mapping the account's
+/// authentication key to the account's address.
+///
+/// Can be used as a followup to `rotate_authentication_key_call()` to reconcile the
+/// `OriginatingAddress` table, or to establish a mapping for a new account that has not yet had
+/// its authentication key rotated.
+///
+/// Aborts if there is already an entry in the `OriginatingAddress` table for the account's
+/// authentication key.
+///
+/// Kept as a private entry function to ensure that after an unproven rotation via
+/// `rotate_authentication_key_call()`, the `OriginatingAddress` table is only updated under the
+/// authority of the new authentication key.
+pub fn account_set_originating_address() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("set_originating_address").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Add dispatchable authentication function that enables account abstraction via this function.
+/// Note: it is a private entry function that can only be called directly from transaction.
+pub fn account_abstraction_add_authentication_function(
+    module_address: AccountAddress,
+    module_name: Vec<u8>,
+    function_name: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account_abstraction").to_owned(),
+        ),
+        ident_str!("add_authentication_function").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&module_address).unwrap(),
+            bcs::to_bytes(&module_name).unwrap(),
+            bcs::to_bytes(&function_name).unwrap(),
+        ],
+    ))
+}
+
+pub fn account_abstraction_add_dispatchable_authentication_function(
+    _module_address: AccountAddress,
+    _module_name: Vec<u8>,
+    _function_name: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account_abstraction").to_owned(),
+        ),
+        ident_str!("add_dispatchable_authentication_function").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&_module_address).unwrap(),
+            bcs::to_bytes(&_module_name).unwrap(),
+            bcs::to_bytes(&_function_name).unwrap(),
+        ],
+    ))
+}
+
+pub fn account_abstraction_initialize() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account_abstraction").to_owned(),
+        ),
+        ident_str!("initialize").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Add dispatchable domain-scoped authentication function, that enables account abstraction via this function.
+/// This means all accounts within the domain can use it to authenticate, without needing an initialization (unlike non-domain AA).
+/// dispatchable function needs to verify two things:
+/// - that signing_data.domain_authenticator() is a valid signature of signing_data.digest() (just like regular AA)
+/// - that signing_data.domain_account_identity() is correct identity representing the authenticator
+///   (missing this step would allow impersonation)
+///
+/// Note: This is  public entry function, as it requires framework signer, and that can
+/// only be obtained as a part of the governance script.
+pub fn account_abstraction_register_domain_with_authentication_function(
+    module_address: AccountAddress,
+    module_name: Vec<u8>,
+    function_name: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account_abstraction").to_owned(),
+        ),
+        ident_str!("register_domain_with_authentication_function").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&module_address).unwrap(),
+            bcs::to_bytes(&module_name).unwrap(),
+            bcs::to_bytes(&function_name).unwrap(),
+        ],
+    ))
+}
+
+/// Remove dispatchable authentication function that enables account abstraction via this function.
+/// dispatchable function needs to verify that signing_data.authenticator() is a valid signature of signing_data.digest().
+/// Note: it is a private entry function that can only be called directly from transaction.
+pub fn account_abstraction_remove_authentication_function(
+    module_address: AccountAddress,
+    module_name: Vec<u8>,
+    function_name: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account_abstraction").to_owned(),
+        ),
+        ident_str!("remove_authentication_function").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&module_address).unwrap(),
+            bcs::to_bytes(&module_name).unwrap(),
+            bcs::to_bytes(&function_name).unwrap(),
+        ],
+    ))
+}
+
+/// Remove dispatchable authenticator so that all dispatchable authentication functions will be removed as well.
+/// After calling this function, the account is not abstracted at all.
+/// Note: it is a private entry function that can only be called directly from transaction.
+pub fn account_abstraction_remove_authenticator() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account_abstraction").to_owned(),
+        ),
+        ident_str!("remove_authenticator").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn account_abstraction_remove_dispatchable_authentication_function(
+    _module_address: AccountAddress,
+    _module_name: Vec<u8>,
+    _function_name: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account_abstraction").to_owned(),
+        ),
+        ident_str!("remove_dispatchable_authentication_function").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&_module_address).unwrap(),
+            bcs::to_bytes(&_module_name).unwrap(),
+            bcs::to_bytes(&_function_name).unwrap(),
+        ],
+    ))
+}
+
+pub fn account_abstraction_remove_dispatchable_authenticator() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account_abstraction").to_owned(),
+        ),
+        ident_str!("remove_dispatchable_authenticator").to_owned(),
+        vec![],
+        vec![],
     ))
 }
 
@@ -2509,6 +2862,25 @@ pub fn coin_create_pairing(coin_type: TypeTag) -> TransactionPayload {
         ident_str!("create_pairing").to_owned(),
         vec![coin_type],
         vec![],
+    ))
+}
+
+/// Migrate to fungible store for `CoinType` if not yet.
+pub fn coin_migrate_coin_store_to_fungible_store(
+    coin_type: TypeTag,
+    accounts: Vec<AccountAddress>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("coin").to_owned(),
+        ),
+        ident_str!("migrate_coin_store_to_fungible_store").to_owned(),
+        vec![coin_type],
+        vec![bcs::to_bytes(&accounts).unwrap()],
     ))
 }
 
@@ -3812,6 +4184,41 @@ pub fn object_code_deployment_publish(
     ))
 }
 
+/// Revoke all storable permission handle of the signer immediately.
+pub fn permissioned_signer_revoke_all_handles() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("permissioned_signer").to_owned(),
+        ),
+        ident_str!("revoke_all_handles").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Revoke a specific storable permission handle immediately. This will disallow owner of
+/// the storable permission handle to derive signer from it anymore.
+pub fn permissioned_signer_revoke_permission_storage_address(
+    permissions_storage_addr: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("permissioned_signer").to_owned(),
+        ),
+        ident_str!("revoke_permission_storage_address").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&permissions_storage_addr).unwrap()],
+    ))
+}
+
 /// Creates a new resource account and rotates the authentication key to either
 /// the optional auth key if it is non-empty (though auth keys are 32-bytes)
 /// or the source accounts current auth key.
@@ -5064,6 +5471,126 @@ mod decoder {
         }
     }
 
+    pub fn account_set_originating_address(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::AccountSetOriginatingAddress {})
+        } else {
+            None
+        }
+    }
+
+    pub fn account_abstraction_add_authentication_function(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountAbstractionAddAuthenticationFunction {
+                    module_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    module_name: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    function_name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn account_abstraction_add_dispatchable_authentication_function(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountAbstractionAddDispatchableAuthenticationFunction {
+                    _module_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    _module_name: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    _function_name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn account_abstraction_initialize(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::AccountAbstractionInitialize {})
+        } else {
+            None
+        }
+    }
+
+    pub fn account_abstraction_register_domain_with_authentication_function(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountAbstractionRegisterDomainWithAuthenticationFunction {
+                    module_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    module_name: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    function_name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn account_abstraction_remove_authentication_function(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountAbstractionRemoveAuthenticationFunction {
+                    module_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    module_name: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    function_name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn account_abstraction_remove_authenticator(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::AccountAbstractionRemoveAuthenticator {})
+        } else {
+            None
+        }
+    }
+
+    pub fn account_abstraction_remove_dispatchable_authentication_function(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountAbstractionRemoveDispatchableAuthenticationFunction {
+                    _module_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    _module_name: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    _function_name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn account_abstraction_remove_dispatchable_authenticator(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::AccountAbstractionRemoveDispatchableAuthenticator {})
+        } else {
+            None
+        }
+    }
+
     pub fn aptos_account_batch_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosAccountBatchTransfer {
@@ -5332,6 +5859,19 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CoinCreatePairing {
                 coin_type: script.ty_args().get(0)?.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn coin_migrate_coin_store_to_fungible_store(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CoinMigrateCoinStoreToFungibleStore {
+                coin_type: script.ty_args().get(0)?.clone(),
+                accounts: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -6072,6 +6612,30 @@ mod decoder {
         }
     }
 
+    pub fn permissioned_signer_revoke_all_handles(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::PermissionedSignerRevokeAllHandles {})
+        } else {
+            None
+        }
+    }
+
+    pub fn permissioned_signer_revoke_permission_storage_address(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::PermissionedSignerRevokePermissionStorageAddress {
+                    permissions_storage_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn resource_account_create_resource_account(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -6792,6 +7356,42 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::account_rotate_authentication_key_with_rotation_capability),
         );
         map.insert(
+            "account_set_originating_address".to_string(),
+            Box::new(decoder::account_set_originating_address),
+        );
+        map.insert(
+            "account_abstraction_add_authentication_function".to_string(),
+            Box::new(decoder::account_abstraction_add_authentication_function),
+        );
+        map.insert(
+            "account_abstraction_add_dispatchable_authentication_function".to_string(),
+            Box::new(decoder::account_abstraction_add_dispatchable_authentication_function),
+        );
+        map.insert(
+            "account_abstraction_initialize".to_string(),
+            Box::new(decoder::account_abstraction_initialize),
+        );
+        map.insert(
+            "account_abstraction_register_domain_with_authentication_function".to_string(),
+            Box::new(decoder::account_abstraction_register_domain_with_authentication_function),
+        );
+        map.insert(
+            "account_abstraction_remove_authentication_function".to_string(),
+            Box::new(decoder::account_abstraction_remove_authentication_function),
+        );
+        map.insert(
+            "account_abstraction_remove_authenticator".to_string(),
+            Box::new(decoder::account_abstraction_remove_authenticator),
+        );
+        map.insert(
+            "account_abstraction_remove_dispatchable_authentication_function".to_string(),
+            Box::new(decoder::account_abstraction_remove_dispatchable_authentication_function),
+        );
+        map.insert(
+            "account_abstraction_remove_dispatchable_authenticator".to_string(),
+            Box::new(decoder::account_abstraction_remove_dispatchable_authenticator),
+        );
+        map.insert(
             "aptos_account_batch_transfer".to_string(),
             Box::new(decoder::aptos_account_batch_transfer),
         );
@@ -6882,6 +7482,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "coin_create_pairing".to_string(),
             Box::new(decoder::coin_create_pairing),
+        );
+        map.insert(
+            "coin_migrate_coin_store_to_fungible_store".to_string(),
+            Box::new(decoder::coin_migrate_coin_store_to_fungible_store),
         );
         map.insert(
             "coin_migrate_to_fungible_store".to_string(),
@@ -7108,6 +7712,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "object_code_deployment_publish".to_string(),
             Box::new(decoder::object_code_deployment_publish),
+        );
+        map.insert(
+            "permissioned_signer_revoke_all_handles".to_string(),
+            Box::new(decoder::permissioned_signer_revoke_all_handles),
+        );
+        map.insert(
+            "permissioned_signer_revoke_permission_storage_address".to_string(),
+            Box::new(decoder::permissioned_signer_revoke_permission_storage_address),
         );
         map.insert(
             "resource_account_create_resource_account".to_string(),

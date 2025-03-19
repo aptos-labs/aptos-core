@@ -11,9 +11,7 @@ use crate::{
     contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
     keyless::{KeylessPublicKey, KeylessSignature},
     ledger_info::LedgerInfo,
-    on_chain_config::{FeatureFlag, Features},
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
-    state_store::ShardedStateUpdates,
     transaction::authenticator::{
         AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
         TransactionAuthenticator,
@@ -54,12 +52,16 @@ pub mod user_transaction_context;
 pub mod webauthn;
 
 pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload};
-#[cfg(any(test, feature = "fuzzing"))]
-use crate::state_store::create_empty_sharded_state_updates;
 use crate::{
-    block_metadata_ext::BlockMetadataExt, contract_event::TransactionEvent, executable::ModulePath,
-    fee_statement::FeeStatement, keyless::FederatedKeylessPublicKey,
-    proof::accumulator::InMemoryEventAccumulator, validator_txn::ValidatorTransaction,
+    block_metadata_ext::BlockMetadataExt,
+    contract_event::TransactionEvent,
+    executable::ModulePath,
+    fee_statement::FeeStatement,
+    function_info::FunctionInfo,
+    keyless::FederatedKeylessPublicKey,
+    proof::accumulator::InMemoryEventAccumulator,
+    state_store::{state_key::StateKey, state_value::StateValue},
+    validator_txn::ValidatorTransaction,
     write_set::TransactionWrite,
 };
 pub use block_output::BlockOutput;
@@ -67,9 +69,6 @@ pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 pub use move_core_types::transaction_argument::TransactionArgument;
 use move_core_types::vm_status::AbortLocation;
-use move_vm_types::delayed_values::delayed_field_id::{
-    ExtractUniqueIndex, ExtractWidth, TryFromMoveValue, TryIntoMoveValue,
-};
 pub use multisig::{ExecutionError, Multisig, MultisigTransactionPayload};
 use once_cell::sync::OnceCell;
 pub use script::{
@@ -77,10 +76,26 @@ pub use script::{
     TypeArgumentABI,
 };
 use serde::de::DeserializeOwned;
-use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
+use std::{
+    collections::BTreeSet,
+    hash::Hash,
+    ops::Deref,
+    sync::{atomic::AtomicU64, Arc},
+};
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
+
+#[derive(Clone)]
+pub enum Auth<'a> {
+    Ed25519(&'a Ed25519PrivateKey),
+    Abstraction(FunctionInfo, Arc<dyn Fn(&[u8]) -> Vec<u8>>),
+    DomainAbstraction {
+        function_info: FunctionInfo,
+        account_identity: Vec<u8>,
+        sign_function: Arc<dyn Fn(&[u8]) -> Vec<u8>>,
+    },
+}
 
 /// RawTransaction is the portion of a transaction that a client signs.
 #[derive(
@@ -320,6 +335,64 @@ impl RawTransaction {
         ))
     }
 
+    pub fn sign_aa_transaction(
+        self,
+        sender_auth: Auth,
+        secondary_signers: Vec<AccountAddress>,
+        secondary_auths: Vec<Auth>,
+        fee_payer: Option<(AccountAddress, Auth)>,
+    ) -> Result<SignatureCheckedTransaction> {
+        let user_signed_message = if fee_payer.is_some() {
+            RawTransactionWithData::new_fee_payer(
+                self.clone(),
+                secondary_signers.clone(),
+                AccountAddress::ZERO,
+            )
+        } else {
+            RawTransactionWithData::new_multi_agent(self.clone(), secondary_signers.clone())
+        };
+        let sender_authenticator = gen_auth(sender_auth, &user_signed_message)?;
+
+        if secondary_auths.len() != secondary_signers.len() {
+            return Err(format_err!(
+                "number of secondary private keys and number of secondary signers don't match"
+            ));
+        }
+        let mut secondary_authenticators = vec![];
+        for auth in secondary_auths {
+            let secondary_authenticator = gen_auth(auth, &user_signed_message)?;
+            secondary_authenticators.push(secondary_authenticator);
+        }
+
+        if let Some((fee_payer_address, fee_payer_auth)) = fee_payer {
+            let user_signed_message = RawTransactionWithData::new_fee_payer(
+                self.clone(),
+                secondary_signers.clone(),
+                fee_payer_address,
+            );
+            let fee_payer_authenticator = gen_auth(fee_payer_auth, &user_signed_message)?;
+            Ok(SignatureCheckedTransaction(
+                SignedTransaction::new_fee_payer(
+                    self,
+                    sender_authenticator,
+                    secondary_signers,
+                    secondary_authenticators,
+                    fee_payer_address,
+                    fee_payer_authenticator,
+                ),
+            ))
+        } else {
+            Ok(SignatureCheckedTransaction(
+                SignedTransaction::new_multi_agent(
+                    self,
+                    sender_authenticator,
+                    secondary_signers,
+                    secondary_authenticators,
+                ),
+            ))
+        }
+    }
+
     /// Signs the given `RawTransaction`. Note that this consumes the `RawTransaction` and turns it
     /// into a `SignatureCheckedTransaction`.
     ///
@@ -360,6 +433,41 @@ impl RawTransaction {
     pub fn signing_message(&self) -> Result<Vec<u8>, CryptoMaterialError> {
         signing_message(self)
     }
+}
+
+fn gen_auth(
+    auth: Auth,
+    user_signed_message: &RawTransactionWithData,
+) -> Result<AccountAuthenticator> {
+    Ok(match auth {
+        Auth::Ed25519(private_key) => {
+            let sender_signature = private_key.sign(user_signed_message)?;
+            AccountAuthenticator::ed25519(Ed25519PublicKey::from(private_key), sender_signature)
+        },
+        Auth::Abstraction(function_info, sign_function) => {
+            let digest =
+                HashValue::sha3_256_of(signing_message(user_signed_message)?.as_slice()).to_vec();
+            AccountAuthenticator::abstraction(
+                function_info.clone(),
+                digest.clone(),
+                sign_function(digest.as_ref()),
+            )
+        },
+        Auth::DomainAbstraction {
+            function_info,
+            account_identity,
+            sign_function,
+        } => {
+            let digest =
+                HashValue::sha3_256_of(signing_message(user_signed_message)?.as_slice()).to_vec();
+            AccountAuthenticator::domain_abstraction(
+                function_info.clone(),
+                digest.clone(),
+                sign_function(digest.as_ref()),
+                account_identity.clone(),
+            )
+        },
+    })
 }
 
 #[derive(
@@ -433,7 +541,7 @@ impl TransactionPayload {
 }
 
 /// Two different kinds of WriteSet transactions.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum WriteSetPayload {
     /// Directly passing in the WriteSet.
     Direct(ChangeSet),
@@ -912,22 +1020,6 @@ impl ExecutionStatus {
             _ => ExecutionStatus::MiscellaneousError(None),
         }
     }
-
-    pub fn remove_error_detail(self) -> Self {
-        match self {
-            ExecutionStatus::MoveAbort {
-                location,
-                code,
-                info: _,
-            } => ExecutionStatus::MoveAbort {
-                location,
-                code,
-                info: None,
-            },
-            ExecutionStatus::MiscellaneousError(_) => ExecutionStatus::MiscellaneousError(None),
-            _ => self,
-        }
-    }
 }
 
 /// The status of executing a transaction. The VM decides whether or not we should `Keep` the
@@ -977,15 +1069,10 @@ impl TransactionStatus {
         }
     }
 
-    pub fn from_vm_status(
-        vm_status: VMStatus,
-        charge_invariant_violation: bool,
-        features: &Features,
-    ) -> (Self, TransactionAuxiliaryData) {
+    pub fn from_vm_status(vm_status: VMStatus, charge_invariant_violation: bool) -> Self {
         let status_code = vm_status.status_code();
-        let txn_aux = TransactionAuxiliaryData::from_vm_status(&vm_status);
         // TODO: keep_or_discard logic should be deprecated from Move repo and refactored into here.
-        let status = match vm_status.keep_or_discard() {
+        match vm_status.keep_or_discard() {
             Ok(recorded) => match recorded {
                 // TODO(bowu):status code should be removed from transaction status
                 KeptVMStatus::MiscellaneousError => {
@@ -1002,21 +1089,6 @@ impl TransactionStatus {
                     TransactionStatus::Discard(code)
                 }
             },
-        };
-
-        if features.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH) {
-            (status.remove_error_detail(), txn_aux)
-        } else {
-            (status, txn_aux)
-        }
-    }
-
-    pub fn remove_error_detail(self) -> Self {
-        match self {
-            TransactionStatus::Keep(status) => {
-                TransactionStatus::Keep(status.remove_error_detail())
-            },
-            _ => self,
         }
     }
 
@@ -1055,7 +1127,8 @@ impl VMValidatorResult {
                 Some(status) =>
                     status.status_type() == StatusType::Unknown
                         || status.status_type() == StatusType::Validation
-                        || status.status_type() == StatusType::InvariantViolation,
+                        || status.status_type() == StatusType::InvariantViolation
+                        || status.status_type() == StatusType::Execution,
             },
             "Unexpected discarded status: {:?}",
             vm_status
@@ -1264,17 +1337,6 @@ impl TransactionOutput {
         (write_set, events, gas_used, status, auxiliary_data)
     }
 
-    // This function is supposed to be called in various tests only
-    pub fn fill_error_status(&mut self) {
-        if let TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)) = self.status {
-            if let Some(detail) = self.auxiliary_data.get_detail_error_message() {
-                self.status = TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
-                    detail.status_code(),
-                )));
-            }
-        }
-    }
-
     pub fn ensure_match_transaction_info(
         &self,
         version: Version,
@@ -1348,6 +1410,10 @@ impl TransactionOutput {
 
     pub fn has_new_epoch_event(&self) -> bool {
         self.events.iter().any(ContractEvent::is_new_epoch_event)
+    }
+
+    pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
+        self.write_set.state_update_refs()
     }
 }
 
@@ -1515,7 +1581,6 @@ impl Display for TransactionInfo {
 pub struct TransactionToCommit {
     pub transaction: Transaction,
     pub transaction_info: TransactionInfo,
-    pub state_updates: ShardedStateUpdates,
     pub write_set: WriteSet,
     pub events: Vec<ContractEvent>,
     pub is_reconfig: bool,
@@ -1526,7 +1591,6 @@ impl TransactionToCommit {
     pub fn new(
         transaction: Transaction,
         transaction_info: TransactionInfo,
-        state_updates: ShardedStateUpdates,
         write_set: WriteSet,
         events: Vec<ContractEvent>,
         is_reconfig: bool,
@@ -1535,7 +1599,6 @@ impl TransactionToCommit {
         TransactionToCommit {
             transaction,
             transaction_info,
-            state_updates,
             write_set,
             events,
             is_reconfig,
@@ -1548,7 +1611,6 @@ impl TransactionToCommit {
         Self {
             transaction: Transaction::StateCheckpoint(HashValue::zero()),
             transaction_info: TransactionInfo::dummy(),
-            state_updates: create_empty_sharded_state_updates(),
             write_set: Default::default(),
             events: vec![],
             is_reconfig: false,
@@ -1608,12 +1670,12 @@ impl TransactionToCommit {
         self.transaction_info = txn_info
     }
 
-    pub fn state_updates(&self) -> &ShardedStateUpdates {
-        &self.state_updates
-    }
-
     pub fn write_set(&self) -> &WriteSet {
         &self.write_set
+    }
+
+    pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
+        self.write_set.state_update_refs()
     }
 
     pub fn events(&self) -> &[ContractEvent] {
@@ -2109,22 +2171,6 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + Debug
         + DeserializeOwned
         + Serialize;
-    /// Delayed field identifier type.
-    type Identifier: PartialOrd
-        + Ord
-        + Send
-        + Sync
-        + Clone
-        + Hash
-        + Eq
-        + Debug
-        + Copy
-        + From<u64>
-        + From<(u32, u32)>
-        + ExtractUniqueIndex
-        + ExtractWidth
-        + TryIntoMoveValue
-        + TryFromMoveValue<Hint = ()>;
     type Value: Send + Sync + Debug + Clone + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + TransactionEvent;
 

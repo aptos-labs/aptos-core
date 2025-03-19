@@ -4,20 +4,19 @@
 
 #![allow(clippy::non_canonical_partial_ord_impl)]
 
+use crate::loaded_data::struct_name_indexing::StructNameIndex;
 use derivative::Derivative;
 use itertools::Itertools;
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        Ability, AbilitySet, SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex,
-        VariantIndex,
+        SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex, VariantIndex,
     },
 };
-#[cfg(test)]
-use move_core_types::account_address::AccountAddress;
 use move_core_types::{
+    ability::{Ability, AbilitySet},
     identifier::Identifier,
-    language_storage::{ModuleId, StructTag, TypeTag},
+    language_storage::{FunctionTag, ModuleId, StructTag, TypeTag},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
 use serde::Serialize;
@@ -133,8 +132,6 @@ pub struct StructType {
     pub phantom_ty_params_mask: SmallBitVec,
     pub abilities: AbilitySet,
     pub ty_params: Vec<StructTypeParameter>,
-    pub name: Identifier,
-    pub module: ModuleId,
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
@@ -249,19 +246,14 @@ impl StructType {
     #[cfg(test)]
     pub fn for_test() -> StructType {
         Self {
-            idx: StructNameIndex(0),
+            idx: StructNameIndex::new(0),
             layout: StructLayout::Single(vec![]),
             phantom_ty_params_mask: SmallBitVec::new(),
             abilities: AbilitySet::EMPTY,
             ty_params: vec![],
-            name: Identifier::new("Foo").unwrap(),
-            module: ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap()),
         }
     }
 }
-
-#[derive(Debug, Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct StructNameIndex(pub usize);
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructIdentifier {
@@ -286,6 +278,11 @@ pub enum Type {
         idx: StructNameIndex,
         ty_args: TriompheArc<Vec<Type>>,
         ability: AbilityInfo,
+    },
+    Function {
+        args: Vec<Type>,
+        results: Vec<Type>,
+        abilities: AbilitySet,
     },
     Reference(Box<Type>),
     MutableReference(Box<Type>),
@@ -329,6 +326,11 @@ impl<'a> Iterator for TypePreorderTraversalIter<'a> {
                     },
 
                     StructInstantiation { ty_args, .. } => self.stack.extend(ty_args.iter().rev()),
+
+                    Function { args, results, .. } => {
+                        self.stack.extend(args.iter());
+                        self.stack.extend(results.iter())
+                    },
                 }
                 Some(ty)
             },
@@ -469,6 +471,44 @@ impl Type {
         Ok(())
     }
 
+    pub fn paranoid_check_assignable(&self, expected_ty: &Self) -> PartialVMResult<()> {
+        let ok = match (expected_ty, self) {
+            (
+                Type::Function {
+                    args,
+                    results,
+                    abilities,
+                },
+                Type::Function {
+                    args: given_args,
+                    results: given_results,
+                    abilities: given_abilities,
+                },
+            ) => {
+                args == given_args
+                    && results == given_results
+                    && abilities.is_subset(*given_abilities)
+            },
+            (Type::Reference(ty), Type::Reference(given)) => {
+                given.paranoid_check_assignable(ty)?;
+                true
+            },
+            (Type::MutableReference(ty), Type::MutableReference(given)) => {
+                given.paranoid_check_assignable(ty)?;
+                true
+            },
+            _ => expected_ty == self,
+        };
+        if !ok {
+            let msg = format!(
+                "Expected type {}, got {} which is not assignable ",
+                expected_ty, self
+            );
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
     pub fn paranoid_check_is_vec_ty(&self, expected_elem_ty: &Self) -> PartialVMResult<()> {
         if let Self::Vector(elem_ty) = self {
             return elem_ty.paranoid_check_eq(expected_elem_ty);
@@ -478,10 +518,9 @@ impl Type {
         paranoid_failure!(msg)
     }
 
-    pub fn paranoid_check_is_vec_ref_ty(
+    pub fn paranoid_check_is_vec_ref_ty<const IS_MUT: bool>(
         &self,
         expected_elem_ty: &Self,
-        is_mut: bool,
     ) -> PartialVMResult<()> {
         if let Self::MutableReference(inner_ty) = self {
             if let Self::Vector(elem_ty) = inner_ty.as_ref() {
@@ -491,7 +530,7 @@ impl Type {
         }
 
         if let Self::Reference(inner_ty) = self {
-            if !is_mut {
+            if !IS_MUT {
                 if let Self::Vector(elem_ty) = inner_ty.as_ref() {
                     elem_ty.paranoid_check_eq(expected_elem_ty)?;
                     return Ok(());
@@ -501,24 +540,23 @@ impl Type {
 
         let msg = format!(
             "Expected a (mutable: {}) vector reference, got {}",
-            is_mut, self
+            IS_MUT, self
         );
         paranoid_failure!(msg)
     }
 
     /// Returns an error if the type is not a (mutable) vector reference. Otherwise, returns
     /// a (mutable) reference to its element type.
-    pub fn paranoid_check_and_get_vec_elem_ref_ty(
+    pub fn paranoid_check_and_get_vec_elem_ref_ty<const IS_MUT: bool>(
         &self,
         expected_elem_ty: &Self,
-        is_mut: bool,
     ) -> PartialVMResult<Self> {
-        self.paranoid_check_is_vec_ref_ty(expected_elem_ty, is_mut)?;
+        self.paranoid_check_is_vec_ref_ty::<IS_MUT>(expected_elem_ty)?;
         let elem_ty = Box::new(self.get_vec_ref_elem_ty());
 
         // SAFETY: This type construction satisfies all constraints on size/depth because the parent
         //         vector reference type has been safely constructed.
-        Ok(if is_mut {
+        Ok(if IS_MUT {
             Type::MutableReference(elem_ty)
         } else {
             Type::Reference(elem_ty)
@@ -527,12 +565,11 @@ impl Type {
 
     /// Returns an error if the type is not a (mutable) vector reference. Otherwise, returns
     /// its element type.
-    pub fn paranoid_check_and_get_vec_elem_ty(
+    pub fn paranoid_check_and_get_vec_elem_ty<const IS_MUT: bool>(
         &self,
         expected_elem_ty: &Self,
-        is_mut: bool,
     ) -> PartialVMResult<Self> {
-        self.paranoid_check_is_vec_ref_ty(expected_elem_ty, is_mut)?;
+        self.paranoid_check_is_vec_ref_ty::<IS_MUT>(expected_elem_ty)?;
         Ok(self.get_vec_ref_elem_ty())
     }
 
@@ -602,6 +639,28 @@ impl Type {
         }
     }
 
+    /// If the type is a mutable or immutable reference, returns the inner type it points to.
+    /// Otherwise, returns [None].
+    pub fn get_ref_inner_ty(&self) -> Option<&Self> {
+        match self {
+            Type::Reference(ty) | Type::MutableReference(ty) => Some(ty.as_ref()),
+            Type::Bool
+            | Type::U8
+            | Type::U64
+            | Type::U16
+            | Type::U32
+            | Type::U256
+            | Type::U128
+            | Type::Address
+            | Type::Signer
+            | Type::Vector(_)
+            | Type::Struct { .. }
+            | Type::StructInstantiation { .. }
+            | Type::Function { .. }
+            | Type::TyParam(_) => None,
+        }
+    }
+
     pub fn abilities(&self) -> PartialVMResult<AbilitySet> {
         match self {
             Type::Bool
@@ -625,6 +684,10 @@ impl Type {
                 AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
                     ty.abilities()?
                 ])
+                .map_err(|e| {
+                    PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION)
+                        .with_message(e.to_string())
+                })
             },
             Type::Struct { ability, .. } => Ok(ability.base_ability_set),
             Type::StructInstantiation {
@@ -645,7 +708,12 @@ impl Type {
                     phantom_ty_args_mask.iter(),
                     type_argument_abilities,
                 )
+                .map_err(|e| {
+                    PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION)
+                        .with_message(e.to_string())
+                })
             },
+            Type::Function { abilities, .. } => Ok(*abilities),
         }
     }
 
@@ -712,7 +780,8 @@ impl Type {
                     | Struct { .. }
                     | Reference(..)
                     | MutableReference(..)
-                    | StructInstantiation { .. } => n += 1,
+                    | StructInstantiation { .. }
+                    | Function { .. } => n += 1,
                 }
             }
 
@@ -746,7 +815,7 @@ impl fmt::Display for Type {
             Address => f.write_str("address"),
             Signer => f.write_str("signer"),
             Vector(et) => write!(f, "vector<{}>", et),
-            Struct { idx, ability: _ } => write!(f, "s#{}", idx.0),
+            Struct { idx, ability: _ } => write!(f, "s#{}", idx),
             StructInstantiation {
                 idx,
                 ty_args,
@@ -754,8 +823,19 @@ impl fmt::Display for Type {
             } => write!(
                 f,
                 "s#{}<{}>",
-                idx.0,
+                idx,
                 ty_args.iter().map(|t| t.to_string()).join(",")
+            ),
+            Function {
+                args,
+                results,
+                abilities,
+            } => write!(
+                f,
+                "|{}|{}{}",
+                args.iter().map(|t| t.to_string()).join(","),
+                results.iter().map(|t| t.to_string()).join(","),
+                abilities.display_postfix()
             ),
             Reference(t) => write!(f, "&{}", t),
             MutableReference(t) => write!(f, "&mut {}", t),
@@ -815,6 +895,14 @@ impl TypeBuilder {
     #[inline]
     pub fn create_u256_ty(&self) -> Type {
         Type::U256
+    }
+
+    pub fn create_address_ty(&self) -> Type {
+        Type::Address
+    }
+
+    pub fn create_signer_ty(&self) -> Type {
+        Type::Signer
     }
 
     /// Creates a (possibly mutable) reference type from the given inner type.
@@ -1128,6 +1216,28 @@ impl TypeBuilder {
                     ability: ability.clone(),
                 }
             },
+            Function {
+                args,
+                results,
+                abilities,
+            } => {
+                let subs_elem = |count: &mut u64, ty: &Type| -> PartialVMResult<Type> {
+                    Self::apply_subst(ty, subst, count, depth + 1, check)
+                };
+                let args = args
+                    .iter()
+                    .map(|ty| subs_elem(count, ty))
+                    .collect::<PartialVMResult<Vec<_>>>()?;
+                let results = results
+                    .iter()
+                    .map(|ty| subs_elem(count, ty))
+                    .collect::<PartialVMResult<Vec<_>>>()?;
+                Function {
+                    args,
+                    results,
+                    abilities: *abilities,
+                }
+            },
         })
     }
 
@@ -1187,6 +1297,23 @@ impl TypeBuilder {
                     }
                 }
             },
+            T::Function(fun) => {
+                let FunctionTag {
+                    args,
+                    results,
+                    abilities,
+                } = fun.as_ref();
+                let mut to_list = |ts: &[TypeTag]| {
+                    ts.iter()
+                        .map(|t| self.create_ty_impl(t, resolver, count, depth + 1))
+                        .collect::<VMResult<Vec<_>>>()
+                };
+                Function {
+                    args: to_list(args)?,
+                    results: to_list(results)?,
+                    abilities: *abilities,
+                }
+            },
         })
     }
 
@@ -1208,7 +1335,7 @@ mod unit_tests {
 
     fn struct_instantiation_ty_for_test(ty_args: Vec<Type>) -> Type {
         Type::StructInstantiation {
-            idx: StructNameIndex(0),
+            idx: StructNameIndex::new(0),
             ability: AbilityInfo::struct_(AbilitySet::EMPTY),
             ty_args: TriompheArc::new(ty_args),
         }
@@ -1216,7 +1343,7 @@ mod unit_tests {
 
     fn struct_ty_for_test() -> Type {
         Type::Struct {
-            idx: StructNameIndex(0),
+            idx: StructNameIndex::new(0),
             ability: AbilityInfo::struct_(AbilitySet::EMPTY),
         }
     }
@@ -1359,7 +1486,7 @@ mod unit_tests {
 
     #[test]
     fn test_create_struct_ty() {
-        let idx = StructNameIndex(0);
+        let idx = StructNameIndex::new(0);
         let ability_info = AbilityInfo::struct_(AbilitySet::EMPTY);
 
         // Limits are not relevant here.

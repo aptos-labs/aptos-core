@@ -18,19 +18,12 @@ Ok(
             gas_used: 3,
             status: Keep(
                 MiscellaneousError(
-                    None,
+                    Some(
+                        LOOKUP_FAILED,
+                    ),
                 ),
             ),
-            auxiliary_data: V1(
-                TransactionAuxiliaryDataV1 {
-                    detail_error_message: Some(
-                        VMErrorDetail {
-                            status_code: LOOKUP_FAILED,
-                            message: None,
-                        },
-                    ),
-                },
-            ),
+            auxiliary_data: None,
         },
     ],
 )

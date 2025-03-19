@@ -460,8 +460,14 @@ mod testing {
                     )?;
                 }
             },
+            MoveValue::Closure(clos) => {
+                write!(out, "{}", clos).map_err(fmt_error_to_partial_vm_error)?;
+            },
             MoveValue::Struct(move_struct) => match move_struct {
-                MoveStruct::WithTypes { type_, mut fields } => {
+                MoveStruct::WithTypes {
+                    _type_: type_,
+                    _fields: mut fields,
+                } => {
                     let type_tag = TypeTag::from(type_.clone());
 
                     // Check if struct is an std::string::String

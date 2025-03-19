@@ -301,7 +301,9 @@ fn test_module() {
 
     run_txn(builder, &mut h);
 
-    // Create a copyable value and move it twice
+    // Create a droppable and copyable value and move it twice. This is ok because the builder
+    // will use copy instruction instead of move instruction for values that are both copyable
+    // and droppable.
     let mut builder = TransactionComposer::single_signer();
     load_module(&mut builder, &h, "0x1::batched_execution");
     let returns_1 = builder
@@ -329,10 +331,51 @@ fn test_module() {
         )
         .unwrap();
 
-    assert!(builder
+    builder
         .add_batched_call(
             "0x1::batched_execution".to_string(),
             "consume_copyable_value".to_string(),
+            vec![],
+            vec![
+                returns_1,
+                CallArgument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+            ],
+        )
+        .unwrap();
+
+    run_txn(builder, &mut h);
+
+    // Create a droppable value and move it twice
+    let mut builder = TransactionComposer::single_signer();
+    load_module(&mut builder, &h, "0x1::batched_execution");
+    let returns_1 = builder
+        .add_batched_call(
+            "0x1::batched_execution".to_string(),
+            "create_droppable_value".to_string(),
+            vec![],
+            vec![CallArgument::new_bytes(
+                MoveValue::U8(10).simple_serialize().unwrap(),
+            )],
+        )
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    builder
+        .add_batched_call(
+            "0x1::batched_execution".to_string(),
+            "consume_droppable_value".to_string(),
+            vec![],
+            vec![
+                returns_1.clone(),
+                CallArgument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+            ],
+        )
+        .unwrap();
+    assert!(builder
+        .add_batched_call(
+            "0x1::batched_execution".to_string(),
+            "consume_droppable_value".to_string(),
             vec![],
             vec![
                 returns_1,
@@ -578,6 +621,32 @@ fn test_module() {
         .unwrap();
     run_txn(builder, &mut h);
 
+    // Adding two calls to the same functions
+    let mut builder = TransactionComposer::single_signer();
+    load_module(&mut builder, &h, "0x1::batched_execution");
+    builder
+        .add_batched_call(
+            "0x1::batched_execution".to_string(),
+            "create_generic_droppable_value".to_string(),
+            vec!["0x1::batched_execution::Foo".to_string()],
+            vec![CallArgument::new_bytes(
+                MoveValue::U8(10).simple_serialize().unwrap(),
+            )],
+        )
+        .unwrap();
+
+    builder
+        .add_batched_call(
+            "0x1::batched_execution".to_string(),
+            "create_generic_droppable_value".to_string(),
+            vec!["0x1::batched_execution::Foo".to_string()],
+            vec![CallArgument::new_bytes(
+                MoveValue::U8(10).simple_serialize().unwrap(),
+            )],
+        )
+        .unwrap();
+    run_txn(builder, &mut h);
+
     // Create a generic value and consume it
     let mut builder = TransactionComposer::single_signer();
     load_module(&mut builder, &h, "0x1::batched_execution");
@@ -635,4 +704,31 @@ fn test_module() {
             ],
         )
         .is_err());
+
+    // Test functions with multiple return values.
+    // Create a copyable value and copy it twice
+    let mut builder = TransactionComposer::single_signer();
+    load_module(&mut builder, &h, "0x1::batched_execution");
+    let returns = builder
+        .add_batched_call(
+            "0x1::batched_execution".to_string(),
+            "multiple_returns".to_string(),
+            vec![],
+            vec![],
+        )
+        .unwrap();
+
+    builder
+        .add_batched_call(
+            "0x1::batched_execution".to_string(),
+            "consume_non_droppable_value".to_string(),
+            vec![],
+            vec![
+                returns[1].clone(),
+                CallArgument::new_bytes(MoveValue::U8(1).simple_serialize().unwrap()),
+            ],
+        )
+        .unwrap();
+
+    run_txn(builder, &mut h);
 }

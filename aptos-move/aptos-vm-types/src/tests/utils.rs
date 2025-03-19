@@ -16,7 +16,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
-    transaction::{ExecutionStatus, TransactionAuxiliaryData, TransactionStatus},
+    transaction::{ExecutionStatus, TransactionStatus},
     write_set::WriteOp,
 };
 use move_binary_format::errors::PartialVMResult;
@@ -249,10 +249,9 @@ pub(crate) fn build_vm_output(
             .with_aggregator_v1_write_set(aggregator_v1_write_set)
             .with_aggregator_v1_delta_set(aggregator_v1_delta_set)
             .build(),
-        ModuleWriteSet::new(false, module_write_set.into_iter().collect()),
+        ModuleWriteSet::new(module_write_set.into_iter().collect()),
         FeeStatement::new(GAS_USED, GAS_USED, 0, 0, 0),
         STATUS,
-        TransactionAuxiliaryData::default(),
     )
 }
 

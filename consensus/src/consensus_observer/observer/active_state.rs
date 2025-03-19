@@ -16,7 +16,6 @@ use crate::{
     state_replication::StateComputerCommitCallBackType,
 };
 use aptos_config::config::NodeConfig;
-use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, warn};
@@ -42,6 +41,9 @@ pub struct ActiveObserverState {
 
     // The current epoch state
     epoch_state: Option<Arc<EpochState>>,
+
+    // Execution pool window size (if none, execution pool is disabled)
+    execution_pool_window_size: Option<u64>,
 
     // Whether quorum store is enabled for the current epoch
     quorum_store_enabled: bool,
@@ -79,8 +81,9 @@ impl ActiveObserverState {
         Self {
             node_config,
             consensus_publisher,
-            epoch_state: None,
-            quorum_store_enabled: false,
+            epoch_state: None,                // This is updated on epoch change
+            execution_pool_window_size: None, // This is updated by the on-chain configs
+            quorum_store_enabled: false,      // This is updated by the on-chain configs
             reconfig_events,
             root: Arc::new(Mutex::new(root)),
         }
@@ -103,20 +106,29 @@ impl ActiveObserverState {
         &self,
         pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
         block_payload_store: Arc<Mutex<BlockPayloadStore>>,
-    ) -> StateComputerCommitCallBackType {
+    ) -> Box<dyn FnOnce(LedgerInfoWithSignatures) + Send + Sync> {
         // Clone the root pointer
         let root = self.root.clone();
 
         // Create the commit callback
-        Box::new(move |blocks, ledger_info: LedgerInfoWithSignatures| {
+        Box::new(move |ledger_info: LedgerInfoWithSignatures| {
             handle_committed_blocks(
                 pending_ordered_blocks,
                 block_payload_store,
                 root,
-                blocks,
                 ledger_info,
             );
         })
+    }
+
+    /// Creates and returns the commit callback used by old pipeline.
+    pub fn create_commit_callback_deprecated(
+        &self,
+        pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
+        block_payload_store: Arc<Mutex<BlockPayloadStore>>,
+    ) -> StateComputerCommitCallBackType {
+        let callback = self.create_commit_callback(pending_ordered_blocks, block_payload_store);
+        Box::new(move |_, ledger_info| callback(ledger_info))
     }
 
     /// Returns the current epoch state
@@ -124,6 +136,11 @@ impl ActiveObserverState {
         self.epoch_state
             .clone()
             .expect("The epoch state is not set! This should never happen!")
+    }
+
+    /// Returns the execution pool window size
+    pub fn execution_pool_window_size(&self) -> Option<u64> {
+        self.execution_pool_window_size
     }
 
     /// Returns true iff the quorum store is enabled for the current epoch
@@ -160,11 +177,12 @@ impl ActiveObserverState {
 
         // Update the local epoch state and quorum store config
         self.epoch_state = Some(epoch_state.clone());
+        self.execution_pool_window_size = consensus_config.window_size();
         self.quorum_store_enabled = consensus_config.quorum_store_enabled();
         info!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                "New epoch started: {:?}. Updated the epoch state! Quorum store enabled: {:?}",
-                epoch_state.epoch, self.quorum_store_enabled,
+                "New epoch started: {:?}. Execution pool window: {:?}. Quorum store enabled: {:?}",
+                epoch_state.epoch, self.execution_pool_window_size, self.quorum_store_enabled,
             ))
         );
 
@@ -185,6 +203,11 @@ impl ActiveObserverState {
             execution_config,
             randomness_config,
         )
+    }
+
+    /// Returns whether the pipeline is enabled
+    pub fn pipeline_enabled(&self) -> bool {
+        self.node_config.consensus_observer.enable_pipeline
     }
 }
 
@@ -285,11 +308,13 @@ fn handle_committed_blocks(
     pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
     block_payload_store: Arc<Mutex<BlockPayloadStore>>,
     root: Arc<Mutex<LedgerInfoWithSignatures>>,
-    blocks: &[Arc<PipelinedBlock>],
     ledger_info: LedgerInfoWithSignatures,
 ) {
     // Remove the committed blocks from the payload and pending stores
-    block_payload_store.lock().remove_committed_blocks(blocks);
+    block_payload_store.lock().remove_blocks_for_epoch_round(
+        ledger_info.commit_info().epoch(),
+        ledger_info.commit_info().round(),
+    );
     pending_ordered_blocks
         .lock()
         .remove_blocks_for_commit(&ledger_info);
@@ -334,6 +359,7 @@ mod test {
     use aptos_consensus_types::{
         block::Block,
         block_data::{BlockData, BlockType},
+        pipelined_block::{OrderedBlockWindow, PipelinedBlock},
         quorum_cert::QuorumCert,
     };
     use aptos_crypto::HashValue;
@@ -421,7 +447,6 @@ mod test {
             ordered_block_store.clone(),
             block_payload_store.clone(),
             root.clone(),
-            &[],
             create_ledger_info(epoch + 1, round + 1),
         );
         assert_eq!(root.lock().commit_info().epoch(), epoch);
@@ -431,7 +456,6 @@ mod test {
             ordered_block_store.clone(),
             block_payload_store.clone(),
             root.clone(),
-            &[],
             create_ledger_info(epoch, round - 1),
         );
         assert_eq!(root.lock().commit_info().round(), round);
@@ -466,7 +490,6 @@ mod test {
             ordered_block_store.clone(),
             block_payload_store.clone(),
             root.clone(),
-            &committed_blocks,
             committed_ledger_info.clone(),
         );
 
@@ -493,16 +516,21 @@ mod test {
         let mut observer_state =
             ActiveObserverState::new_with_root(NodeConfig::default(), reconfig_events, None, root);
 
+        // Verify that the execution pool window size is not set
+        assert!(observer_state.execution_pool_window_size().is_none());
+
         // Verify that quorum store is not enabled
         assert!(!observer_state.is_quorum_store_enabled());
 
-        // Manually update the epoch state and quorum store flag
+        // Manually update the epoch state, execution pool window, and quorum store flag
         let epoch_state = Arc::new(EpochState::empty());
         observer_state.epoch_state = Some(epoch_state.clone());
+        observer_state.execution_pool_window_size = Some(1);
         observer_state.quorum_store_enabled = true;
 
         // Verify the epoch state and quorum store flag are updated
         assert_eq!(observer_state.epoch_state(), epoch_state);
+        assert_eq!(observer_state.execution_pool_window_size(), Some(1));
         assert!(observer_state.is_quorum_store_enabled());
     }
 
@@ -536,7 +564,10 @@ mod test {
                 BlockType::Genesis,
             );
             let block = Block::new_for_testing(block_info.id(), block_data, None);
-            let pipelined_block = Arc::new(PipelinedBlock::new_ordered(block));
+            let pipelined_block = Arc::new(PipelinedBlock::new_ordered(
+                block,
+                OrderedBlockWindow::empty(),
+            ));
 
             // Create an ordered block
             let blocks = vec![pipelined_block];
@@ -594,7 +625,10 @@ mod test {
             BlockType::Genesis,
         );
         let block = Block::new_for_testing(block_info.id(), block_data, None);
-        Arc::new(PipelinedBlock::new_ordered(block))
+        Arc::new(PipelinedBlock::new_ordered(
+            block,
+            OrderedBlockWindow::empty(),
+        ))
     }
 
     /// Creates and returns a reconfig notifier and listener

@@ -21,7 +21,7 @@ impl DbWriter for AptosDB {
                 .expect("Concurrent committing detected.");
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["pre_commit_ledger"]);
 
-            chunk.latest_in_memory_state.current.log_generation("db_save");
+            chunk.state_summary.latest().global_state_summary.log_generation("db_save");
 
             self.pre_commit_validation(&chunk)?;
             let _new_root_hash = self.calculate_and_commit_ledger_and_state_kv(
@@ -30,17 +30,13 @@ impl DbWriter for AptosDB {
             )?;
 
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["save_transactions__others"]);
-            {
-                let mut buffered_state = self.state_store.buffered_state().lock();
 
-                let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___update"]);
-                buffered_state.update(
-                    chunk.state_updates_until_last_checkpoint,
-                    chunk.latest_in_memory_state,
-                    sync_commit || chunk.is_reconfig,
-                )?;
-            }
-            self.ledger_db.metadata_db().set_pre_committed_version(chunk.expect_last_version());
+            self.state_store.buffered_state().lock().update(
+                chunk.result_ledger_state_with_summary(),
+                chunk.estimated_total_state_updates(),
+                sync_commit || chunk.is_reconfig,
+            )?;
+
             Ok(())
         })
     }
@@ -64,10 +60,10 @@ impl DbWriter for AptosDB {
 
             let old_committed_ver = self.get_and_check_commit_range(version)?;
 
-            let ledger_batch = SchemaBatch::new();
+            let mut ledger_batch = SchemaBatch::new();
             // Write down LedgerInfo if provided.
             if let Some(li) = ledger_info_with_sigs {
-                self.check_and_put_ledger_info(version, li, &ledger_batch)?;
+                self.check_and_put_ledger_info(version, li, &mut ledger_batch)?;
             }
             // Write down commit progress
             ledger_batch.put::<DbMetadataSchema>(
@@ -136,8 +132,8 @@ impl DbWriter for AptosDB {
 
             // Create a single change set for all further write operations
             let mut ledger_db_batch = LedgerDbSchemaBatches::new();
-            let mut sharded_kv_batch = new_sharded_kv_schema_batch();
-            let state_kv_metadata_batch = SchemaBatch::new();
+            let mut sharded_kv_batch = self.state_kv_db.new_sharded_native_batches();
+            let mut state_kv_metadata_batch = SchemaBatch::new();
             // Save the target transactions, outputs, infos and events
             let (transactions, outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
                 output_with_proof
@@ -166,7 +162,7 @@ impl DbWriter for AptosDB {
                 Some((
                     &mut ledger_db_batch,
                     &mut sharded_kv_batch,
-                    &state_kv_metadata_batch,
+                    &mut state_kv_metadata_batch,
                 )),
                 false,
             )?;
@@ -208,7 +204,6 @@ impl DbWriter for AptosDB {
                 .save_min_readable_version(version)?;
 
             restore_utils::update_latest_ledger_info(self.ledger_db.metadata_db(), ledger_infos)?;
-            self.ledger_db.metadata_db().set_pre_committed_version(version);
             self.state_store.reset();
 
             Ok(())
@@ -221,46 +216,19 @@ impl AptosDB {
         &self,
         chunk: &ChunkToCommit,
     ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["save_transactions_validation"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["save_transactions_validation"]);
 
+        ensure!(!chunk.is_empty(), "chunk is empty, nothing to save.");
+
+        let next_version = self.state_store.current_state_locked().next_version();
+        // Ensure the incoming committing requests are always consecutive and the version in
+        // buffered state is consistent with that in db.
         ensure!(
-            !chunk.is_empty(),
-            "chunk is empty, nothing to save.",
+            chunk.first_version == next_version,
+            "The first version passed in ({}), and the next version expected by db ({}) are inconsistent.",
+            chunk.first_version,
+            next_version,
         );
-        ensure!(
-            Some(chunk.expect_last_version()) == chunk.latest_in_memory_state.current_version,
-            "the last_version {:?} to commit doesn't match the current_version {:?} in latest_in_memory_state",
-            chunk.expect_last_version(),
-            chunk.latest_in_memory_state.current_version.expect("Must exist"),
-        );
-
-        let num_transactions_in_db = self.get_pre_committed_version()?.map_or(0, |v| v + 1);
-        {
-            let buffered_state = self.state_store.buffered_state().lock();
-            ensure!(
-                chunk.base_state_version == buffered_state.current_state().base_version,
-                "base_state_version {:?} does not equal to the base_version {:?} in buffered state with current version {:?}",
-                chunk.base_state_version,
-                buffered_state.current_state().base_version,
-                buffered_state.current_state().current_version,
-            );
-
-            // Ensure the incoming committing requests are always consecutive and the version in
-            // buffered state is consistent with that in db.
-            let next_version_in_buffered_state = buffered_state
-                .current_state()
-                .current_version
-                .map(|version| version + 1)
-                .unwrap_or(0);
-            ensure!(num_transactions_in_db == chunk.first_version && num_transactions_in_db == next_version_in_buffered_state,
-                "The first version passed in ({}), the next version in buffered state ({}) and the next version in db ({}) are inconsistent.",
-                chunk.first_version,
-                next_version_in_buffered_state,
-                num_transactions_in_db,
-            );
-        }
 
         Ok(())
     }
@@ -270,9 +238,8 @@ impl AptosDB {
         chunk: &ChunkToCommit,
         skip_index_and_usage: bool,
     ) -> Result<HashValue> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["save_transactions__work"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["save_transactions__work"]);
+
         let mut new_root_hash = HashValue::zero();
         THREAD_MANAGER.get_non_exe_cpu_pool().scope(|s| {
             // TODO(grao): Write progress for each of the following databases, and handle the
@@ -288,7 +255,7 @@ impl AptosDB {
                     .write_set_db()
                     .commit_write_sets(
                         chunk.first_version,
-                        chunk.transaction_outputs.par_iter().map(TransactionOutput::write_set)
+                        chunk.transaction_outputs,
                     )
                     .unwrap()
             });
@@ -314,12 +281,6 @@ impl AptosDB {
                     .commit_transaction_accumulator(chunk.first_version, chunk.transaction_infos)
                     .unwrap()
             });
-            s.spawn(|_| {
-                self.commit_transaction_auxiliary_data(
-                    chunk.first_version,
-                    chunk.transaction_outputs.iter().map(TransactionOutput::auxiliary_data))
-                    .unwrap()
-            });
         });
 
         Ok(new_root_hash)
@@ -330,31 +291,17 @@ impl AptosDB {
         chunk: &ChunkToCommit,
         skip_index_and_usage: bool,
     ) -> Result<()> {
-        if chunk.is_empty() {
-            return Ok(());
-        }
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_state_kv_and_ledger_metadata"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_state_kv_and_ledger_metadata"]);
 
-        let ledger_metadata_batch = SchemaBatch::new();
-        let sharded_state_kv_batches = new_sharded_kv_schema_batch();
-        let state_kv_metadata_batch = SchemaBatch::new();
+        let mut ledger_metadata_batch = SchemaBatch::new();
+        let mut sharded_state_kv_batches = self.state_kv_db.new_sharded_native_batches();
 
-        // TODO(grao): Make state_store take sharded state updates.
-        self.state_store.put_value_sets(
-            chunk.per_version_state_updates,
-            chunk.first_version,
-            chunk.latest_in_memory_state.current.usage(),
-            chunk.sharded_state_cache,
-            &ledger_metadata_batch,
-            &sharded_state_kv_batches,
-            // Always put in state value index for now.
-            // TODO(grao): remove after APIs migrated off the DB to the indexer.
-            self.state_store.state_kv_db.enabled_sharding(),
-            chunk.transaction_infos
-                .iter()
-                .rposition(|t| t.state_checkpoint_hash().is_some()),
+        self.state_store.put_state_updates(
+            chunk.state,
+            &chunk.state_update_refs.per_version,
+            chunk.state_reads,
+            &mut ledger_metadata_batch,
+            &mut sharded_state_kv_batches,
         )?;
 
         // Write block index if event index is skipped.
@@ -367,7 +314,7 @@ impl AptosDB {
                             LedgerMetadataDb::put_block_info(
                                 version,
                                 event,
-                                &ledger_metadata_batch,
+                                &mut ledger_metadata_batch,
                             )?;
                         }
                     }
@@ -382,9 +329,7 @@ impl AptosDB {
             )
             .unwrap();
 
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_state_kv_and_ledger_metadata___commit"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_state_kv_and_ledger_metadata___commit"]);
         rayon::scope(|s| {
             s.spawn(|_| {
                 self.ledger_db
@@ -396,7 +341,7 @@ impl AptosDB {
                 self.state_kv_db
                     .commit(
                         chunk.expect_last_version(),
-                        state_kv_metadata_batch,
+                        None,
                         sharded_state_kv_batches,
                     )
                     .unwrap();
@@ -412,28 +357,36 @@ impl AptosDB {
         transaction_outputs: &[TransactionOutput],
         skip_index: bool,
     ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_events"])
-            .start_timer();
-        let batch = SchemaBatch::new();
-        transaction_outputs
-            .par_iter()
-            .with_min_len(optimal_min_len(transaction_outputs.len(), 128))
-            .enumerate()
-            .try_for_each(|(i, txn_out)| -> Result<()> {
-                self.ledger_db.event_db().put_events(
-                    first_version + i as Version,
-                    txn_out.events(),
-                    skip_index,
-                    &batch,
-                )?;
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_events"]);
 
-                Ok(())
-            })?;
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_events___commit"])
-            .start_timer();
-        self.ledger_db.event_db().write_schemas(batch)
+        let chunk_size = transaction_outputs.len() / 4 + 1;
+        let batches = transaction_outputs
+            .par_chunks(chunk_size)
+            .enumerate()
+            .map(|(chunk_idx, chunk)| {
+                let mut batch = self.ledger_db.event_db().db().new_native_batch();
+                let chunk_first_ver = first_version + (chunk_size * chunk_idx) as u64;
+                chunk.iter().enumerate().try_for_each(|(i, txn_out)| {
+                    self.ledger_db.event_db().put_events(
+                        chunk_first_ver + i as Version,
+                        txn_out.events(),
+                        skip_index,
+                        &mut batch,
+                    )
+                })?;
+                Ok(batch)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        {
+            let _timer = OTHER_TIMERS_SECONDS
+                .with_label_values(&["commit_events___commit"])
+                .start_timer();
+            for batch in batches {
+                self.ledger_db.event_db().db().write_schemas(batch)?
+            }
+            Ok(())
+        }
     }
 
     fn commit_transaction_accumulator(
@@ -441,30 +394,26 @@ impl AptosDB {
         first_version: Version,
         transaction_infos: &[TransactionInfo],
     ) -> Result<HashValue> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_transaction_accumulator"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transaction_accumulator"]);
 
         let num_txns = transaction_infos.len() as Version;
 
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         let root_hash = self
             .ledger_db
             .transaction_accumulator_db()
             .put_transaction_accumulator(
                 first_version,
                 transaction_infos,
-                &batch,
+                &mut batch,
             )?;
 
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_transaction_accumulator___commit"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transaction_accumulator___commit"]);
         self.ledger_db
             .transaction_accumulator_db()
             .write_schemas(batch)?;
 
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         let all_versions: Vec<_> =
             (first_version..first_version + num_txns).collect();
         THREAD_MANAGER
@@ -494,16 +443,15 @@ impl AptosDB {
         Ok(root_hash)
     }
 
+    #[allow(dead_code)]
     fn commit_transaction_auxiliary_data<'a>(
         &self,
         first_version: Version,
         auxiliary_data: impl IntoIterator<Item = &'a TransactionAuxiliaryData>,
     ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_transaction_auxiliary_data"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transaction_auxiliary_data"]);
 
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         auxiliary_data
             .into_iter()
             .enumerate()
@@ -511,15 +459,13 @@ impl AptosDB {
                 TransactionAuxiliaryDataDb::put_transaction_auxiliary_data(
                     first_version + i as Version,
                     aux_data,
-                    &batch,
+                    &mut batch,
                 )?;
 
                 Ok(())
             })?;
 
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_transaction_auxiliary_data___commit"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transaction_auxiliary_data___commit"]);
         self.ledger_db
             .transaction_auxiliary_data_db()
             .write_schemas(batch)
@@ -530,28 +476,24 @@ impl AptosDB {
         first_version: Version,
         txn_infos: &[TransactionInfo],
     ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_transaction_infos"])
-            .start_timer();
-        let batch = SchemaBatch::new();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transaction_infos"]);
+
+        let mut batch = SchemaBatch::new();
         txn_infos
-            .par_iter()
-            .with_min_len(optimal_min_len(txn_infos.len(), 128))
+            .iter()
             .enumerate()
             .try_for_each(|(i, txn_info)| -> Result<()> {
                 let version = first_version + i as u64;
                 TransactionInfoDb::put_transaction_info(
                     version,
                     txn_info,
-                    &batch,
+                    &mut batch,
                 )?;
 
                 Ok(())
             })?;
 
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_transaction_infos___commit"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transaction_infos___commit"]);
         self.ledger_db.transaction_info_db().write_schemas(batch)
     }
 
@@ -560,7 +502,7 @@ impl AptosDB {
         version_to_commit: Version,
     ) -> Result<Option<Version>> {
         let old_committed_ver = self.ledger_db.metadata_db().get_synced_version()?;
-        let pre_committed_ver = self.ledger_db.metadata_db().get_pre_committed_version();
+        let pre_committed_ver = self.state_store.current_state_locked().version();
         ensure!(
             old_committed_ver.is_none() || version_to_commit >= old_committed_ver.unwrap(),
             "Version too old to commit. Committed: {:?}; Trying to commit with LI: {}",
@@ -580,7 +522,7 @@ impl AptosDB {
         &self,
         version: Version,
         ledger_info_with_sig: &LedgerInfoWithSignatures,
-        ledger_batch: &SchemaBatch
+        ledger_batch: &mut SchemaBatch
     ) -> Result<(), AptosDbError> {
         let ledger_info = ledger_info_with_sig.ledger_info();
 
@@ -615,6 +557,18 @@ impl AptosDB {
             current_epoch,
         );
 
+        // Ensure that state tree at the end of the epoch is persisted.
+        if ledger_info_with_sig.ledger_info().ends_epoch() {
+            let state_snapshot = self.state_store.get_state_snapshot_before(version + 1)?;
+            ensure!(
+                state_snapshot.is_some() && state_snapshot.as_ref().unwrap().0 == version,
+                "State checkpoint not persisted at the end of the epoch, version {}, next_epoch {}, snapshot in db: {:?}",
+                version,
+                ledger_info_with_sig.ledger_info().next_block_epoch(),
+                state_snapshot,
+            );
+        }
+
         // Put write to batch.
         self.ledger_db
             .metadata_db()
@@ -639,7 +593,7 @@ impl AptosDB {
             LATEST_TXN_VERSION.set(version as i64);
             if let Some(update_sender) = &self.update_subscriber {
                 update_sender.send(
-                    version
+                    (Instant::now(), version)
                 ).map_err(| err | {
                         AptosDbError::Other(format!("Failed to send update to subscriber: {}", err))
                     })?;
