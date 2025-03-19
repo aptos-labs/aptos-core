@@ -140,7 +140,7 @@ pub fn flush_speculative_logs(num_to_flush: usize) {
     }
 }
 
-/// Clear speculative logs recorded for a specific transction, useful when transaction
+/// Clear speculative logs recorded for a specific transaction, useful when transaction
 /// execution fails validation and aborts - setting stage for the re-execution.
 pub fn clear_speculative_txn_logs(txn_idx: usize) {
     if speculation_disabled() {
