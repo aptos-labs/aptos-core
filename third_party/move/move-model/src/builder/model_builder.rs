@@ -21,8 +21,8 @@ use crate::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
+use legacy_move_compiler::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
 use move_binary_format::file_format::Visibility;
-use move_compiler::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
 use move_core_types::{ability::AbilitySet, account_address::AccountAddress};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -582,6 +582,21 @@ impl<'env> ModelBuilder<'env> {
             ),
             _ => (vec![], false),
         }
+    }
+
+    pub fn get_function_wrapper_type(&self, id: &QualifiedInstId<StructId>) -> Option<Type> {
+        let entry = self.lookup_struct_entry(id.to_qualified_id());
+        match &entry.layout {
+            StructLayout::Singleton(fields, true) if fields.len() == 1 => {
+                if let Some((_, field)) = fields.first_key_value() {
+                    if field.ty.is_function() {
+                        return Some(field.ty.instantiate(&id.inst));
+                    }
+                }
+            },
+            _ => {},
+        }
+        None
     }
 
     /// Looks up a receiver function for a given type.

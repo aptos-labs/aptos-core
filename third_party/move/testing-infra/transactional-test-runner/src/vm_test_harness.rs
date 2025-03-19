@@ -3,29 +3,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    framework::{either_or_no_modules, run_test_impl, CompiledState, MoveTestAdapter},
+    framework::{run_test_impl, CompiledState, MoveTestAdapter},
     tasks::{EmptyCommand, InitCommand, SyntaxChoice, TaskInput},
 };
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
+use legacy_move_compiler::{
+    compiled_unit::{AnnotatedCompiledModule, AnnotatedCompiledUnit},
+    shared::known_attributes::KnownAttribute,
+};
 use move_binary_format::{
     access::ModuleAccess, compatibility::Compatibility, errors::VMResult,
     file_format::CompiledScript, file_format_common, CompiledModule,
 };
 use move_bytecode_verifier::VerifierConfig;
 use move_command_line_common::{
-    address::ParsedAddress,
-    env::{get_move_compiler_block_v1_from_env, read_bool_env_var},
-    files::verify_and_create_named_address_mapping,
+    address::ParsedAddress, env::read_bool_env_var, files::verify_and_create_named_address_mapping,
     testing::EXP_EXT,
-};
-use move_compiler::{
-    compiled_unit::AnnotatedCompiledUnit,
-    shared::{
-        known_attributes::KnownAttribute, string_packagepath_to_symbol_packagepath, Flags,
-        NumericalAddress, PackagePaths,
-    },
-    FullyCompiledProgram,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -43,7 +37,7 @@ use move_vm_runtime::{
     move_vm::MoveVM,
     session::{SerializedReturnValues, Session},
     AsUnsyncCodeStorage, AsUnsyncModuleStorage, ModuleStorage, RuntimeEnvironment,
-    StagingModuleStorage, WithRuntimeEnvironment,
+    StagingModuleStorage,
 };
 use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
@@ -55,40 +49,14 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     iter::Iterator,
     path::Path,
-    rc::Rc,
 };
 
 const STD_ADDR: AccountAddress = AccountAddress::ONE;
 
-struct RuntimeEnvironmentAdapter(Rc<RuntimeEnvironment>);
-
-impl RuntimeEnvironmentAdapter {
-    fn new(runtime_environment: RuntimeEnvironment) -> Self {
-        Self(Rc::new(runtime_environment))
-    }
-}
-
-impl Clone for RuntimeEnvironmentAdapter {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
-impl WithRuntimeEnvironment for RuntimeEnvironmentAdapter {
-    fn runtime_environment(&self) -> &RuntimeEnvironment {
-        self.0.runtime_environment()
-    }
-}
-
 struct SimpleVMTestAdapter<'a> {
     compiled_state: CompiledState<'a>,
-
-    // VM and runtime environment to be shared by all tasks. If we use V1 loader, we store None here.
-    vm_and_runtime_environment: (Option<Rc<MoveVM>>, RuntimeEnvironmentAdapter),
     storage: InMemoryStorage,
-
     default_syntax: SyntaxChoice,
-    comparison_mode: bool,
     run_config: TestRunConfig,
 }
 
@@ -144,10 +112,8 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
 
     fn init(
         default_syntax: SyntaxChoice,
-        comparison_mode: bool,
         run_config: TestRunConfig,
-        pre_compiled_deps_v1: Option<&'a (FullyCompiledProgram, Vec<PackagePaths>)>,
-        pre_compiled_deps_v2: Option<&'a PrecompiledFilesModules>,
+        pre_compiled_deps_v2: &'a PrecompiledFilesModules,
         task_opt: Option<TaskInput<(InitCommand, EmptyCommand)>>,
     ) -> (Self, Option<String>) {
         let additional_mapping = match task_opt.map(|t| t.command) {
@@ -169,105 +135,60 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         }
 
         let vm_config = vm_config();
-        let use_loader_v2 = vm_config.use_loader_v2;
-
-        let runtime_environment =
-            RuntimeEnvironmentAdapter::new(create_runtime_environment(vm_config));
-        let vm = use_loader_v2.then(|| {
-            let vm = MoveVM::new_with_runtime_environment(&runtime_environment.0);
-            Rc::new(vm)
-        });
-        let vm_and_runtime_environment = (vm, runtime_environment);
+        let runtime_environment = create_runtime_environment(vm_config);
+        let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
 
         let mut adapter = Self {
-            compiled_state: CompiledState::new(
-                named_address_mapping,
-                pre_compiled_deps_v1,
-                pre_compiled_deps_v2,
-                None,
-            ),
+            compiled_state: CompiledState::new(named_address_mapping, pre_compiled_deps_v2, None),
             default_syntax,
-            comparison_mode,
             run_config,
-            vm_and_runtime_environment,
-            storage: InMemoryStorage::new(),
+            storage,
         };
 
-        let (_, runtime_environment) = adapter.vm_and_runtime_environment();
-        let module_storage = adapter
-            .storage
-            .clone()
-            .into_unsync_module_storage(runtime_environment.clone());
+        let module_storage = adapter.storage.clone().into_unsync_module_storage();
 
-        if runtime_environment.0.vm_config().use_loader_v2 {
-            let addresses = either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
-                .iter()
-                .map(|tmod| *tmod.named_module.module.self_addr())
-                .collect::<BTreeSet<_>>();
-            assert_eq!(addresses.len(), 1);
+        let addresses = pre_compiled_deps_v2
+            .get_pre_compiled_modules()
+            .iter()
+            .map(|tmod| *tmod.named_module.module.self_addr())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(addresses.len(), 1);
 
-            let sender = *addresses.first().unwrap();
-            let module_bundle = either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
-                .into_iter()
-                .map(|tmod| {
-                    let mut module_bytes = vec![];
-                    tmod.named_module
-                        .module
-                        .serialize_for_version(
-                            Some(file_format_common::VERSION_MAX),
-                            &mut module_bytes,
-                        )
-                        .unwrap();
-                    module_bytes.into()
-                })
-                .collect();
+        let sender = *addresses.first().unwrap();
+        let module_bundle = pre_compiled_deps_v2
+            .get_pre_compiled_modules()
+            .into_iter()
+            .map(|tmod| {
+                let mut module_bytes = vec![];
+                tmod.named_module
+                    .module
+                    .serialize_for_version(Some(file_format_common::VERSION_MAX), &mut module_bytes)
+                    .unwrap();
+                module_bytes.into()
+            })
+            .collect();
 
-            StagingModuleStorage::create(&sender, &module_storage, module_bundle)
-                .expect("All modules should publish")
-                .release_verified_module_bundle()
-                .into_iter()
-                .for_each(|(module_id, bytes)| {
-                    adapter
-                        .storage
-                        .add_module_bytes(module_id.address(), module_id.name(), bytes);
-                });
-        } else {
-            adapter
-                .perform_session_action(None, &module_storage, |session, gas_status| {
-                    for module in either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
-                        .into_iter()
-                        .map(|tmod| &tmod.named_module.module)
-                    {
-                        let mut module_bytes = vec![];
-                        module
-                            .serialize_for_version(
-                                Some(file_format_common::VERSION_MAX),
-                                &mut module_bytes,
-                            )
-                            .unwrap();
-                        let id = module.self_id();
-                        let sender = *id.address();
-                        #[allow(deprecated)]
-                        session
-                            .publish_module(module_bytes, sender, gas_status)
-                            .unwrap();
-                    }
-                    Ok(())
-                })
-                .unwrap();
-        }
+        StagingModuleStorage::create(&sender, &module_storage, module_bundle)
+            .expect("All modules should publish")
+            .release_verified_module_bundle()
+            .into_iter()
+            .for_each(|(module_id, bytes)| {
+                adapter
+                    .storage
+                    .add_module_bytes(module_id.address(), module_id.name(), bytes);
+            });
 
         let mut addr_to_name_mapping = BTreeMap::new();
         for (name, addr) in move_stdlib_named_addresses() {
             let prev = addr_to_name_mapping.insert(addr, Symbol::from(name));
             assert!(prev.is_none());
         }
-        let missing_modules: Vec<_> =
-            either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
-                .into_iter()
-                .map(|tmod| &tmod.named_module.module)
-                .filter(|module| !adapter.compiled_state.is_precompiled_dep(&module.self_id()))
-                .collect();
+        let missing_modules: Vec<_> = pre_compiled_deps_v2
+            .get_pre_compiled_modules()
+            .into_iter()
+            .map(|tmod| &tmod.named_module.module)
+            .filter(|module| !adapter.compiled_state.is_precompiled_dep(&module.self_id()))
+            .collect();
         for module in missing_modules {
             adapter
                 .compiled_state
@@ -280,14 +201,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         &mut self,
         module: CompiledModule,
         _named_addr_opt: Option<Identifier>,
-        gas_budget: Option<u64>,
+        _gas_budget: Option<u64>,
         extra_args: Self::ExtraPublishArgs,
     ) -> Result<(Option<String>, CompiledModule)> {
-        let (vm, runtime_environment) = self.vm_and_runtime_environment();
-        let module_storage = self
-            .storage
-            .clone()
-            .into_unsync_module_storage(runtime_environment.clone());
+        let module_storage = self.storage.clone().into_unsync_module_storage();
 
         let mut module_bytes = vec![];
         module.serialize_for_version(Some(file_format_common::VERSION_MAX), &mut module_bytes)?;
@@ -305,54 +222,27 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 false,
             )
         };
-        if vm.vm_config().use_loader_v2 {
-            let staging_module_storage = StagingModuleStorage::create_with_compat_config(
-                &sender,
-                compat,
-                &module_storage,
-                vec![module_bytes.into()],
+        let staging_module_storage = StagingModuleStorage::create_with_compat_config(
+            &sender,
+            compat,
+            &module_storage,
+            vec![module_bytes.into()],
+        )
+        .map_err(|err| {
+            anyhow!(
+                "Unable to publish module '{}'. Got VMError: {}",
+                module.self_id(),
+                err.format_test_output(move_test_debug() || verbose)
             )
-            .map_err(|err| {
-                anyhow!(
-                    "Unable to publish module '{}'. Got VMError: {}",
-                    module.self_id(),
-                    err.format_test_output(
-                        move_test_debug() || verbose,
-                        !move_test_debug() && self.comparison_mode
-                    )
-                )
-            })?;
-            for (module_id, bytes) in staging_module_storage
-                .release_verified_module_bundle()
-                .into_iter()
-            {
-                self.storage
-                    .add_module_bytes(module_id.address(), module.name(), bytes);
-            }
-            Ok((None, module))
-        } else {
-            let result =
-                self.perform_session_action(gas_budget, &module_storage, |session, gas_status| {
-                    #[allow(deprecated)]
-                    session.publish_module_bundle_with_compat_config(
-                        vec![module_bytes],
-                        sender,
-                        gas_status,
-                        compat,
-                    )
-                });
-            match result {
-                Ok(_) => Ok((None, module)),
-                Err(err) => Err(anyhow!(
-                    "Unable to publish module '{}'. Got VMError: {}",
-                    module.self_id(),
-                    err.format_test_output(
-                        move_test_debug() || verbose,
-                        !move_test_debug() && self.comparison_mode
-                    )
-                )),
-            }
+        })?;
+        for (module_id, bytes) in staging_module_storage
+            .release_verified_module_bundle()
+            .into_iter()
+        {
+            self.storage
+                .add_module_bytes(module_id.address(), module.name(), bytes);
         }
+        Ok((None, module))
     }
 
     fn execute_script(
@@ -364,11 +254,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
     ) -> Result<Option<String>> {
-        let (_, runtime_environment) = self.vm_and_runtime_environment();
-        let code_storage = self
-            .storage
-            .clone()
-            .into_unsync_code_storage(runtime_environment.clone());
+        let code_storage = self.storage.clone().into_unsync_code_storage();
 
         let signers: Vec<_> = signers
             .into_iter()
@@ -391,7 +277,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let verbose = extra_args.verbose;
         let traversal_storage = TraversalStorage::new();
         self.perform_session_action(gas_budget, &code_storage, |session, gas_status| {
-            session.execute_script(
+            session.load_and_execute_script(
                 script_bytes,
                 type_args,
                 args,
@@ -403,10 +289,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         .map_err(|vm_error| {
             anyhow!(
                 "Script execution failed with VMError: {}",
-                vm_error.format_test_output(
-                    move_test_debug() || verbose,
-                    !move_test_debug() && self.comparison_mode
-                )
+                vm_error.format_test_output(move_test_debug() || verbose)
             )
         })?;
         Ok(None)
@@ -422,11 +305,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
     ) -> Result<(Option<String>, SerializedReturnValues)> {
-        let (_, runtime_environment) = self.vm_and_runtime_environment();
-        let module_storage = self
-            .storage
-            .clone()
-            .into_unsync_module_storage(runtime_environment.clone());
+        let module_storage = self.storage.clone().into_unsync_module_storage();
 
         let signers: Vec<_> = signers
             .into_iter()
@@ -460,10 +339,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .map_err(|vm_error| {
                 anyhow!(
                     "Function execution failed with VMError: {}",
-                    vm_error.format_test_output(
-                        move_test_debug() || verbose,
-                        !move_test_debug() && self.comparison_mode
-                    )
+                    vm_error.format_test_output(move_test_debug() || verbose)
                 )
             })?;
         Ok((None, serialized_return_values))
@@ -503,32 +379,19 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
 }
 
 impl<'a> SimpleVMTestAdapter<'a> {
-    fn vm_and_runtime_environment(&self) -> (Rc<MoveVM>, RuntimeEnvironmentAdapter) {
-        let vm = match &self.vm_and_runtime_environment.0 {
-            Some(vm) => vm.clone(),
-            None => {
-                let vm =
-                    MoveVM::new_with_runtime_environment(&self.vm_and_runtime_environment.1 .0);
-                Rc::new(vm)
-            },
-        };
-        (vm, self.vm_and_runtime_environment.1.clone())
-    }
-
     fn perform_session_action<Ret>(
         &mut self,
         gas_budget: Option<u64>,
         module_storage: &impl ModuleStorage,
         f: impl FnOnce(&mut Session, &mut GasStatus) -> VMResult<Ret>,
     ) -> VMResult<Ret> {
-        let (vm, _) = self.vm_and_runtime_environment();
         let (mut session, mut gas_status) = {
             let gas_status = get_gas_status(
                 &move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE,
                 gas_budget,
             )
             .unwrap();
-            let session = vm.new_session(&self.storage);
+            let session = MoveVM::new_session(&self.storage);
             (session, gas_status)
         };
 
@@ -576,34 +439,6 @@ fn get_gas_status(cost_table: &CostTable, gas_budget: Option<u64>) -> Result<Gas
     Ok(gas_status)
 }
 
-static PRECOMPILED_MOVE_STDLIB: Lazy<Option<(FullyCompiledProgram, Vec<PackagePaths>)>> =
-    Lazy::new(|| {
-        if get_move_compiler_block_v1_from_env() {
-            return None;
-        }
-        let lib_paths = PackagePaths {
-            name: None,
-            paths: move_stdlib::move_stdlib_files(),
-            named_address_map: move_stdlib::move_stdlib_named_addresses(),
-        };
-        let lib_paths_movesym =
-            string_packagepath_to_symbol_packagepath::<NumericalAddress>(&lib_paths);
-        let program_res = move_compiler::construct_pre_compiled_lib(
-            vec![lib_paths],
-            None,
-            Flags::empty().set_skip_attribute_checks(true), // no point in checking.
-            KnownAttribute::get_all_attribute_names(),
-        )
-        .unwrap();
-        match program_res {
-            Ok(stdlib) => Some((stdlib, vec![lib_paths_movesym])),
-            Err((files, errors)) => {
-                eprintln!("!!!Standard library failed to compile!!!");
-                move_compiler::diagnostics::report_diagnostics(&files, errors)
-            },
-        }
-    });
-
 pub struct PrecompiledFilesModules(Vec<String>, Vec<AnnotatedCompiledUnit>);
 
 impl PrecompiledFilesModules {
@@ -617,6 +452,19 @@ impl PrecompiledFilesModules {
 
     pub fn units(&self) -> &Vec<AnnotatedCompiledUnit> {
         &self.1
+    }
+
+    pub fn get_pre_compiled_modules(&self) -> Vec<&AnnotatedCompiledModule> {
+        self.units()
+            .iter()
+            .filter_map(|unit| {
+                if let AnnotatedCompiledUnit::Module(m) = unit {
+                    Some(m)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }
 
@@ -638,14 +486,10 @@ static PRECOMPILED_MOVE_STDLIB_V2: Lazy<PrecompiledFilesModules> = Lazy::new(|| 
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub enum TestRunConfig {
-    CompilerV1,
     CompilerV2 {
         language_version: LanguageVersion,
-        v2_experiments: Vec<(String, bool)>,
-    },
-    ComparisonV1V2 {
-        language_version: LanguageVersion,
-        v2_experiments: Vec<(String, bool)>,
+        /// List of experiments and whether to enable them or not.
+        experiments: Vec<(String, bool)>,
     },
 }
 
@@ -653,34 +497,14 @@ pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     run_test_with_config(
         TestRunConfig::CompilerV2 {
             language_version: LanguageVersion::default(),
-            v2_experiments: vec![],
+            experiments: vec![],
         },
         path,
     )
 }
 
-pub fn run_test_v1(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    run_test_with_config(TestRunConfig::CompilerV1, path)
-}
-
-fn precompiled_v1_stdlib_if_needed(
-    config: &TestRunConfig,
-) -> Option<&'static (FullyCompiledProgram, Vec<PackagePaths>)> {
-    match config {
-        TestRunConfig::CompilerV1 { .. } => PRECOMPILED_MOVE_STDLIB.as_ref(),
-        TestRunConfig::ComparisonV1V2 { .. } => PRECOMPILED_MOVE_STDLIB.as_ref(),
-        TestRunConfig::CompilerV2 { .. } => None,
-    }
-}
-
-fn precompiled_v2_stdlib_if_needed(
-    config: &TestRunConfig,
-) -> Option<&'static PrecompiledFilesModules> {
-    match config {
-        TestRunConfig::CompilerV1 { .. } => None,
-        TestRunConfig::ComparisonV1V2 { .. } => Some(&*PRECOMPILED_MOVE_STDLIB_V2),
-        TestRunConfig::CompilerV2 { .. } => Some(&*PRECOMPILED_MOVE_STDLIB_V2),
-    }
+fn precompiled_v2_stdlib() -> &'static PrecompiledFilesModules {
+    &PRECOMPILED_MOVE_STDLIB_V2
 }
 
 pub fn run_test_with_config(
@@ -688,9 +512,8 @@ pub fn run_test_with_config(
     path: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (suffix, config) = (Some(EXP_EXT.to_owned()), config);
-    let v1_lib = precompiled_v1_stdlib_if_needed(&config);
-    let v2_lib = precompiled_v2_stdlib_if_needed(&config);
-    run_test_impl::<SimpleVMTestAdapter>(config, path, v1_lib, v2_lib, &suffix)
+    let v2_lib = precompiled_v2_stdlib();
+    run_test_impl::<SimpleVMTestAdapter>(config, path, v2_lib, &suffix)
 }
 
 pub fn run_test_with_config_and_exp_suffix(
@@ -698,7 +521,6 @@ pub fn run_test_with_config_and_exp_suffix(
     path: &Path,
     exp_suffix: &Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let v1_lib = precompiled_v1_stdlib_if_needed(&config);
-    let v2_lib = precompiled_v2_stdlib_if_needed(&config);
-    run_test_impl::<SimpleVMTestAdapter>(config, path, v1_lib, v2_lib, exp_suffix)
+    let v2_lib = precompiled_v2_stdlib();
+    run_test_impl::<SimpleVMTestAdapter>(config, path, v2_lib, exp_suffix)
 }

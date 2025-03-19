@@ -12,7 +12,7 @@ use crate::{
     live_data_service::in_memory_cache::InMemoryCache,
     metrics::{COUNTER, TIMER},
 };
-use aptos_protos::indexer::v1::{GetTransactionsRequest, TransactionsResponse};
+use aptos_protos::indexer::v1::{GetTransactionsRequest, ProcessedRange, TransactionsResponse};
 use aptos_transaction_filter::BooleanTransactionFilter;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -175,7 +175,7 @@ impl<'a> LiveDataService<'a> {
                 continue;
             }
 
-            if let Some((transactions, batch_size_bytes)) = self
+            if let Some((transactions, batch_size_bytes, last_processed_version)) = self
                 .in_memory_cache
                 .get_data(
                     next_version,
@@ -189,12 +189,16 @@ impl<'a> LiveDataService<'a> {
                 let _timer = TIMER
                     .with_label_values(&["live_data_service_send_batch"])
                     .start_timer();
-                next_version += transactions.len() as u64;
-                size_bytes += batch_size_bytes as u64;
                 let response = TransactionsResponse {
                     transactions,
                     chain_id: Some(self.chain_id),
+                    processed_range: Some(ProcessedRange {
+                        first_version: next_version,
+                        last_version: last_processed_version,
+                    }),
                 };
+                next_version = last_processed_version + 1;
+                size_bytes += batch_size_bytes as u64;
                 if response_sender.send(Ok(response)).await.is_err() {
                     info!(stream_id = id, "Client dropped.");
                     COUNTER

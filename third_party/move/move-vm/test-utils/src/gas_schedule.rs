@@ -522,6 +522,10 @@ impl GasMeter for GasStatus {
     ) -> PartialVMResult<()> {
         Ok(())
     }
+
+    fn charge_heap_memory(&mut self, _amount: u64) -> PartialVMResult<()> {
+        Ok(())
+    }
 }
 
 pub fn new_from_instructions(mut instrs: Vec<(Bytecode, GasCost)>) -> CostTable {

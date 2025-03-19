@@ -344,6 +344,44 @@ pub struct FunctionHandle {
         proptest(filter = "|x| x.as_ref().map(|v| v.len() <= 64).unwrap_or(true)")
     )]
     pub access_specifiers: Option<Vec<AccessSpecifier>>,
+    /// A list of attributes the referenced function definition had at compilation time.
+    /// Depending on the attribute kind, those need to be also present in the actual
+    /// function definition, which is checked in the dependency verifier.
+    #[cfg_attr(
+        any(test, feature = "fuzzing"),
+        proptest(strategy = "vec(any::<FunctionAttribute>(), 0..8)")
+    )]
+    pub attributes: Vec<FunctionAttribute>,
+}
+
+/// Attribute associated with the function, as far as it is relevant for verification
+/// and execution.
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), proptest(params = "usize"))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
+pub enum FunctionAttribute {
+    /// The function is treated like a public function on upgrade.
+    Persistent,
+    /// During execution of the function, a module reentrancy lock is established.
+    ModuleLock,
+}
+
+impl FunctionAttribute {
+    /// Returns true if the attributes in `with` are compatible with
+    /// the attributes in `this`. Typically, `this` is an imported
+    /// function handle and `with` the matching definition. Currently,
+    /// only the `Persistent` attribute is relevant for this check.
+    pub fn is_compatible_with(this: &[Self], with: &[Self]) -> bool {
+        if this.contains(&FunctionAttribute::Persistent) {
+            with.contains(&FunctionAttribute::Persistent)
+        } else {
+            true
+        }
+    }
 }
 
 /// A field access info (owner type and offset)
@@ -588,7 +626,9 @@ pub struct VariantDefinition {
 
 /// `Visibility` restricts the accessibility of the associated entity.
 /// - For function visibility, it restricts who may call into the associated function.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, Eq, PartialEq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 #[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
 #[cfg_attr(
@@ -780,7 +820,7 @@ pub type TypeParameterIndex = u16;
     derive(proptest_derive::Arbitrary, dearbitrary::Dearbitrary)
 )]
 pub struct AccessSpecifier {
-    /// The kind of access: read, write, or both.
+    /// The kind of access.
     pub kind: AccessKind,
     /// Whether the specifier is negated.
     pub negated: bool,
@@ -788,17 +828,6 @@ pub struct AccessSpecifier {
     pub resource: ResourceSpecifier,
     /// The address where the resource is stored.
     pub address: AddressSpecifier,
-}
-
-impl AccessSpecifier {
-    // Old style of acquires is by default for bytecode version 6 or below.
-    // New style of acquires was introduced in AIP-56: Resource Access Control
-    pub fn is_old_style_acquires(&self) -> bool {
-        self.kind == AccessKind::Acquires
-            && !self.negated
-            && self.address == AddressSpecifier::Any
-            && matches!(self.resource, ResourceSpecifier::Resource(_))
-    }
 }
 
 /// The kind of specified access.
@@ -809,31 +838,12 @@ impl AccessSpecifier {
     derive(proptest_derive::Arbitrary, dearbitrary::Dearbitrary)
 )]
 pub enum AccessKind {
+    /// The resource is read. If used in negation context, this
+    /// means the resource is neither read nor written.
     Reads,
+    /// The resource is read or written. If used in negation context,
+    /// this means the resource is not written to.
     Writes,
-    Acquires, // reads or writes
-}
-
-impl AccessKind {
-    /// Returns true if this access kind subsumes the other.
-    pub fn subsumes(&self, other: &Self) -> bool {
-        use AccessKind::*;
-        match (self, other) {
-            (Acquires, _) => true,
-            (_, Acquires) => false,
-            _ => self == other,
-        }
-    }
-
-    /// Tries to join two kinds, returns None if no intersection.
-    pub fn try_join(self, other: Self) -> Option<Self> {
-        use AccessKind::*;
-        match (self, other) {
-            (Acquires, k) | (k, Acquires) => Some(k),
-            (k1, k2) if k1 == k2 => Some(k1),
-            _ => None,
-        }
-    }
 }
 
 impl fmt::Display for AccessKind {
@@ -842,7 +852,6 @@ impl fmt::Display for AccessKind {
         match self {
             Reads => f.write_str("reads"),
             Writes => f.write_str("writes"),
-            Acquires => f.write_str("acquires"),
         }
     }
 }
@@ -964,8 +973,8 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIter<'a> {
                     },
 
                     Function(args, result, _) => {
-                        self.stack.extend(args.iter().rev());
                         self.stack.extend(result.iter().rev());
+                        self.stack.extend(args.iter().rev());
                     },
 
                     Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Struct(_)
@@ -1003,9 +1012,9 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIterWithDepth<'a> {
 
                     Function(args, result, _) => {
                         self.stack
-                            .extend(args.iter().map(|tok| (tok, depth + 1)).rev());
-                        self.stack
                             .extend(result.iter().map(|tok| (tok, depth + 1)).rev());
+                        self.stack
+                            .extend(args.iter().map(|tok| (tok, depth + 1)).rev());
                     },
 
                     Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Struct(_)
@@ -1150,6 +1159,12 @@ impl SignatureToken {
                 SignatureToken::Function(args1, results1, abs1),
                 SignatureToken::Function(args2, results2, abs2),
             ) => args1 == args2 && results1 == results2 && abs1.is_subset(*abs2),
+            (SignatureToken::Reference(ty1), SignatureToken::Reference(ty2)) => {
+                ty1.is_assignable_from(ty2)
+            },
+            (SignatureToken::MutableReference(ty1), SignatureToken::MutableReference(ty2)) => {
+                ty1.is_assignable_from(ty2)
+            },
             _ => self == source,
         }
     }
@@ -3301,6 +3316,7 @@ pub fn basic_test_module() -> CompiledModule {
         return_: SignatureIndex(0),
         type_parameters: vec![],
         access_specifiers: None,
+        attributes: vec![],
     });
     m.identifiers
         .push(Identifier::new("foo".to_string()).unwrap());

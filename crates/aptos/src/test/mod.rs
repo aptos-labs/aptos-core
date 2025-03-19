@@ -17,7 +17,7 @@ use crate::{
             account_address_from_public_key, AccountAddressWrapper, ArgWithTypeVec,
             AuthenticationKeyInputOptions, ChunkedPublishOption, CliError, CliTypedResult,
             EncodingOptions, EntryFunctionArguments, FaucetOptions, GasOptions, KeyType,
-            MoveManifestAccountWrapper, MovePackageDir, OptionalPoolAddressArgs,
+            MoveManifestAccountWrapper, MovePackageOptions, OptionalPoolAddressArgs,
             OverrideSizeCheckOption, PoolAddressArgs, PrivateKeyInputOptions, PromptOptions,
             PublicKeyInputOptions, RestOptions, RngArgs, SaveFile, ScriptFunctionArguments,
             TransactionOptions, TransactionSummary, TypeArgVec,
@@ -1106,12 +1106,12 @@ impl CliTestFramework {
             .join("aptos-framework")
     }
 
-    pub fn move_options(&self, account_strs: BTreeMap<&str, &str>) -> MovePackageDir {
-        MovePackageDir {
+    pub fn move_options(&self, account_strs: BTreeMap<&str, &str>) -> MovePackageOptions {
+        MovePackageOptions {
             dev: true,
             named_addresses: Self::named_addresses(account_strs),
             package_dir: Some(self.move_dir()),
-            ..MovePackageDir::new()
+            ..MovePackageOptions::new()
         }
     }
 
