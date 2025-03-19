@@ -16,6 +16,7 @@ use move_binary_format::{
     file_format as FF,
     file_format::{CodeOffset, FunctionDefinitionIndex},
 };
+use move_core_types::{ability, function::ClosureMask};
 use move_model::{
     ast::{ExpData, Spec, SpecBlockTarget, TempIndex},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
@@ -150,27 +151,24 @@ impl<'a> FunctionGenerator<'a> {
                 type_parameters: fun_env.get_type_parameters(),
                 def_idx,
             });
-            if fun_gen.spec_blocks.is_empty() {
-                // Currently, peephole optimizations require that there are no inline spec blocks.
-                // This is to ensure that spec-related data structures do not refer to code
-                // offsets which could be changed by the peephole optimizer.
-                let options = ctx
-                    .env
-                    .get_extension::<Options>()
-                    .expect("Options is available");
-                if options.experiment_on(Experiment::PEEPHOLE_OPTIMIZATION) {
-                    let transformed_code_chunk = peephole_optimizer::optimize(&code.code);
-                    // Fix the source map for the optimized code.
-                    fun_gen
-                        .gen
-                        .source_map
-                        .remap_code_map(def_idx, transformed_code_chunk.original_offsets)
-                        .expect(SOURCE_MAP_OK);
-                    // Replace the code with the optimized one.
-                    code.code = transformed_code_chunk.code;
-                }
-            } else {
-                // Write the spec block table back to the environment.
+            let options = ctx
+                .env
+                .get_extension::<Options>()
+                .expect("Options is available");
+            if options.experiment_on(Experiment::PEEPHOLE_OPTIMIZATION) {
+                let transformed_code_chunk = peephole_optimizer::optimize(&code.code);
+                // Fix the source map for the optimized code.
+                fun_gen
+                    .gen
+                    .source_map
+                    .remap_code_map(def_idx, &transformed_code_chunk.original_offsets)
+                    .expect(SOURCE_MAP_OK);
+                // Replace the code with the optimized one.
+                code.code = transformed_code_chunk.code;
+                // Remap the spec blocks to the new code offsets.
+                fun_gen.remap_spec_blocks(&transformed_code_chunk.original_offsets);
+            }
+            if !fun_gen.spec_blocks.is_empty() {
                 fun_env.get_mut_spec().on_impl = fun_gen.spec_blocks;
             }
             (fun_gen.gen, Some(code))
@@ -411,6 +409,12 @@ impl<'a> FunctionGenerator<'a> {
         match oper {
             Operation::Function(mid, fid, inst) => {
                 self.gen_call(ctx, dest, mid.qualified(*fid), inst, source);
+            },
+            Operation::Closure(mid, fid, inst, mask) => {
+                self.gen_closure(ctx, dest, mid.qualified(*fid), inst, *mask, source);
+            },
+            Operation::Invoke => {
+                self.gen_invoke(ctx, dest, source);
             },
             Operation::Pack(mid, sid, inst) => {
                 self.gen_struct_oper(
@@ -679,6 +683,55 @@ impl<'a> FunctionGenerator<'a> {
         self.abstract_push_result(ctx, dest);
     }
 
+    /// Generates code for construction of a closure.
+    fn gen_closure(
+        &mut self,
+        ctx: &BytecodeContext,
+        dest: &[TempIndex],
+        id: QualifiedId<FunId>,
+        inst: &[Type],
+        mask: ClosureMask,
+        source: &[TempIndex],
+    ) {
+        let fun_ctx = ctx.fun_ctx;
+        self.abstract_push_args(ctx, source, None);
+        if inst.is_empty() {
+            let idx = self.gen.function_index(
+                &fun_ctx.module,
+                &fun_ctx.loc,
+                &fun_ctx.module.env.get_function(id),
+            );
+            self.emit(FF::Bytecode::PackClosure(idx, mask))
+        } else {
+            let idx = self.gen.function_instantiation_index(
+                &fun_ctx.module,
+                &fun_ctx.loc,
+                &fun_ctx.module.env.get_function(id),
+                inst.to_vec(),
+            );
+            self.emit(FF::Bytecode::PackClosureGeneric(idx, mask))
+        }
+        self.abstract_pop_n(ctx, source.len());
+        self.abstract_push_result(ctx, dest);
+    }
+
+    /// Generates code for invoking of a closure.
+    fn gen_invoke(&mut self, ctx: &BytecodeContext, dest: &[TempIndex], source: &[TempIndex]) {
+        let clos_type = ctx
+            .fun_ctx
+            .fun
+            .get_local_type(*source.last().expect("invoke has function argument last"));
+        let sign_idx = self
+            .gen
+            .signature(&ctx.fun_ctx.module, &ctx.fun_ctx.loc, vec![
+                clos_type.clone()
+            ]);
+        self.abstract_push_args(ctx, source, None);
+        self.emit(FF::Bytecode::CallClosure(sign_idx));
+        self.abstract_pop_n(ctx, source.len());
+        self.abstract_push_result(ctx, dest);
+    }
+
     /// Generates code for an operation working on a structure. This can be a structure with or
     /// without generics: the two passed functions allow the caller to determine which bytecode
     /// to create for each case.
@@ -910,6 +963,34 @@ impl<'a> FunctionGenerator<'a> {
             .rewrite_spec_descent(&SpecBlockTarget::Inline, spec);
         self.spec_blocks.insert(self.code.len() as CodeOffset, spec);
         self.emit(FF::Bytecode::Nop)
+    }
+
+    /// Remap the spec blocks, given the mapping of new offsets to original offsets.
+    fn remap_spec_blocks(&mut self, new_to_original_offsets: &[CodeOffset]) {
+        if new_to_original_offsets.is_empty() {
+            return;
+        }
+        let old_to_new = new_to_original_offsets
+            .iter()
+            .enumerate()
+            .map(|(new_offset, old_offset)| (*old_offset, new_offset as CodeOffset))
+            .collect::<BTreeMap<_, _>>();
+        let largest_offset = (new_to_original_offsets.len() - 1) as CodeOffset;
+
+        // Rewrite the spec blocks mapping.
+        self.spec_blocks = std::mem::take(&mut self.spec_blocks)
+            .into_iter()
+            .map(|(old_offset, spec)| {
+                // If there is no mapping found for the old offset, then we use the next largest
+                // offset. If there is no such offset, then we use the overall largest offset.
+                let new_offset = old_to_new
+                    .range(old_offset..)
+                    .next()
+                    .map(|(_, v)| *v)
+                    .unwrap_or(largest_offset);
+                (new_offset, spec)
+            })
+            .collect::<BTreeMap<_, _>>();
     }
 
     /// Emits a file-format bytecode.
@@ -1200,7 +1281,7 @@ impl<'env> FunctionContext<'env> {
         self.module
             .env
             .type_abilities(self.temp_type(temp), &self.type_parameters)
-            .has_ability(FF::Ability::Copy)
+            .has_ability(ability::Ability::Copy)
     }
 
     /// Returns true of the given temporary can/should be dropped when flushing the stack.
@@ -1208,7 +1289,7 @@ impl<'env> FunctionContext<'env> {
         self.module
             .env
             .type_abilities(self.temp_type(temp), &self.type_parameters)
-            .has_ability(FF::Ability::Drop)
+            .has_ability(ability::Ability::Drop)
     }
 }
 

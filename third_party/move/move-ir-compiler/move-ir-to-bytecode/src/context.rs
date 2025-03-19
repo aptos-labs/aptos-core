@@ -6,7 +6,7 @@ use anyhow::{bail, format_err, Result};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        AbilitySet, AddressIdentifierIndex, CodeOffset, Constant, ConstantPoolIndex, FieldHandle,
+        AddressIdentifierIndex, CodeOffset, Constant, ConstantPoolIndex, FieldHandle,
         FieldHandleIndex, FieldInstantiation, FieldInstantiationIndex, FunctionDefinitionIndex,
         FunctionHandle, FunctionHandleIndex, FunctionInstantiation, FunctionInstantiationIndex,
         FunctionSignature, IdentifierIndex, ModuleHandle, ModuleHandleIndex, Signature,
@@ -17,6 +17,7 @@ use move_binary_format::{
 };
 use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::{
+    ability::AbilitySet,
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
 };
@@ -667,6 +668,7 @@ impl<'a> Context<'a> {
             return_: SignatureIndex(return_idx as TableIndex),
             type_parameters,
             access_specifiers: None,
+            attributes: vec![],
         };
         // handle duplicate declarations
         // erroring on duplicates needs to be done by the bytecode verifier
@@ -767,6 +769,9 @@ impl<'a> Context<'a> {
             SignatureToken::Vector(inner) => {
                 let correct_inner = self.reindex_signature_token(dep, *inner)?;
                 SignatureToken::Vector(Box::new(correct_inner))
+            },
+            SignatureToken::Function(..) => {
+                unimplemented!("function types not supported by MoveIR")
             },
             SignatureToken::Reference(inner) => {
                 let correct_inner = self.reindex_signature_token(dep, *inner)?;

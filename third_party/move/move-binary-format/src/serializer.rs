@@ -18,7 +18,8 @@
 use crate::{file_format::*, file_format_common::*};
 use anyhow::{anyhow, bail, Result};
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, metadata::Metadata,
+    ability::AbilitySet, account_address::AccountAddress, function::ClosureMask,
+    identifier::Identifier, metadata::Metadata,
 };
 
 impl CompiledScript {
@@ -158,6 +159,10 @@ fn serialize_struct_def_inst_index(
     idx: &StructDefInstantiationIndex,
 ) -> Result<()> {
     write_as_uleb128(binary, idx.0, STRUCT_DEF_INST_INDEX_MAX)
+}
+
+fn serialize_closure_mask(binary: &mut BinaryData, mask: &ClosureMask) -> Result<()> {
+    write_as_uleb128(binary, mask.bits(), u64::MAX)
 }
 
 fn seiralize_table_offset(binary: &mut BinaryData, offset: u32) -> Result<()> {
@@ -536,17 +541,18 @@ fn serialize_function_handle(
     serialize_signature_index(binary, &function_handle.return_)?;
     serialize_ability_sets(binary, &function_handle.type_parameters)?;
     if major_version >= VERSION_7 {
-        serialize_access_specifiers(binary, &function_handle.access_specifiers)
-    } else if function_handle.access_specifiers.is_some()
-        && function_handle
-            .access_specifiers
-            .as_ref()
-            .unwrap()
-            .iter()
-            .any(|sp| !sp.is_old_style_acquires())
-    {
-        Err(anyhow!(
+        serialize_access_specifiers(binary, &function_handle.access_specifiers)?
+    } else if function_handle.access_specifiers.is_some() {
+        return Err(anyhow!(
             "Access specifiers not supported in bytecode version {}",
+            major_version
+        ));
+    }
+    if major_version >= VERSION_8 {
+        serialize_function_attributes(binary, &function_handle.attributes)
+    } else if !function_handle.attributes.is_empty() {
+        Err(anyhow!(
+            "Function attributes not supported in bytecode version {}",
             major_version
         ))
     } else {
@@ -800,6 +806,12 @@ fn serialize_signature_token_single_node_impl(
             binary.push(SerializedType::TYPE_PARAMETER as u8)?;
             serialize_type_parameter_index(binary, *idx)?;
         },
+        SignatureToken::Function(args, results, abilities) => {
+            binary.push(SerializedType::FUNCTION as u8)?;
+            serialize_ability_set(binary, *abilities)?;
+            serialize_signature_size(binary, args.len())?;
+            serialize_signature_size(binary, results.len())?;
+        },
     }
     Ok(())
 }
@@ -846,6 +858,28 @@ fn serialize_ability_sets(binary: &mut BinaryData, sets: &[AbilitySet]) -> Resul
     Ok(())
 }
 
+fn serialize_function_attributes(
+    binary: &mut BinaryData,
+    attributes: &[FunctionAttribute],
+) -> Result<()> {
+    write_as_uleb128(binary, attributes.len() as u64, ATTRIBUTE_COUNT_MAX)?;
+    for attr in attributes {
+        serialize_function_attribute(binary, attr)?;
+    }
+    Ok(())
+}
+
+fn serialize_function_attribute(
+    binary: &mut BinaryData,
+    attribute: &FunctionAttribute,
+) -> Result<()> {
+    use FunctionAttribute::*;
+    match attribute {
+        Persistent => binary.push(SerializedFunctionAttribute::PERSISTENT as u8),
+        ModuleLock => binary.push(SerializedFunctionAttribute::MODULE_LOCK as u8),
+    }
+}
+
 fn serialize_access_specifiers(
     binary: &mut BinaryData,
     accesses: &Option<Vec<AccessSpecifier>>,
@@ -863,7 +897,6 @@ fn serialize_access_specifier(binary: &mut BinaryData, acc: &AccessSpecifier) ->
     binary.push(match acc.kind {
         AccessKind::Reads => SerializedAccessKind::READ,
         AccessKind::Writes => SerializedAccessKind::WRITE,
-        AccessKind::Acquires => SerializedAccessKind::ACQUIRES,
     } as u8)?;
     binary.push(
         if acc.negated {
@@ -1091,6 +1124,20 @@ fn serialize_instruction_inner(
         Bytecode::TestVariantGeneric(class_idx) => {
             binary.push(Opcodes::TEST_VARIANT_GENERIC as u8)?;
             serialize_struct_variant_inst_index(binary, class_idx)
+        },
+        Bytecode::PackClosure(idx, mask) => {
+            binary.push(Opcodes::PACK_CLOSURE as u8)?;
+            serialize_function_handle_index(binary, idx)?;
+            serialize_closure_mask(binary, mask)
+        },
+        Bytecode::PackClosureGeneric(idx, mask) => {
+            binary.push(Opcodes::PACK_CLOSURE_GENERIC as u8)?;
+            serialize_function_inst_index(binary, idx)?;
+            serialize_closure_mask(binary, mask)
+        },
+        Bytecode::CallClosure(idx) => {
+            binary.push(Opcodes::CALL_CLOSURE as u8)?;
+            serialize_signature_index(binary, idx)
         },
         Bytecode::ReadRef => binary.push(Opcodes::READ_REF as u8),
         Bytecode::WriteRef => binary.push(Opcodes::WRITE_REF as u8),
@@ -1582,7 +1629,6 @@ impl ModuleSerializer {
         function_definition: &FunctionDefinition,
     ) -> Result<()> {
         serialize_function_handle_index(binary, &function_definition.function)?;
-
         let mut flags = 0;
         if self.common.major_version < VERSION_5 {
             let visibility = if function_definition.visibility == Visibility::Public
@@ -1605,6 +1651,7 @@ impl ModuleSerializer {
         binary.push(flags)?;
 
         serialize_acquires(binary, &function_definition.acquires_global_resources)?;
+
         if let Some(code) = &function_definition.code {
             serialize_code_unit(self.common.major_version(), binary, code)?;
         }

@@ -1,0 +1,61 @@
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+
+
+consume(_a: u64, _b: u64, _c: u64, _d: u64, _e: u64, _f: u64) /* def_idx: 0 */ {
+B0:
+	0: Ret
+}
+multi(): u64 * u64 * u64 * u64 * u64 * u64 /* def_idx: 1 */ {
+B0:
+	0: Call one(): u64
+	1: Call one(): u64
+	2: Call one(): u64
+	3: Call one(): u64
+	4: Call one(): u64
+	5: Call one(): u64
+	6: Ret
+}
+one(): u64 /* def_idx: 2 */ {
+B0:
+	0: LdU64(1)
+	1: Ret
+}
+test() /* def_idx: 3 */ {
+L0:	$t6: u64
+L1:	a: u64
+L2:	$t11: u64
+L3:	$t10: u64
+L4:	$t9: u64
+L5:	$t8: u64
+B0:
+	0: Call multi(): u64 * u64 * u64 * u64 * u64 * u64
+	1: Call one(): u64
+	2: StLoc[0]($t6: u64)
+	3: Pop
+	4: Pop
+	5: Pop
+	6: Pop
+	7: Pop
+	8: Call one(): u64
+	9: Call one(): u64
+	10: Call one(): u64
+	11: Call one(): u64
+	12: StLoc[2]($t11: u64)
+	13: StLoc[3]($t10: u64)
+	14: StLoc[4]($t9: u64)
+	15: StLoc[5]($t8: u64)
+	16: StLoc[1](a: u64)
+	17: MoveLoc[0]($t6: u64)
+	18: MoveLoc[1](a: u64)
+	19: MoveLoc[5]($t8: u64)
+	20: MoveLoc[4]($t9: u64)
+	21: MoveLoc[3]($t10: u64)
+	22: MoveLoc[2]($t11: u64)
+	23: Call consume(u64, u64, u64, u64, u64, u64)
+	24: Ret
+}
+}
+============ bytecode verification succeeded ========

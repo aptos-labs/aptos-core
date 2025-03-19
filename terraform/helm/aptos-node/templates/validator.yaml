@@ -134,6 +134,17 @@ spec:
         {{- end }}
       {{- with $.Values.validator }}
         imagePullPolicy: {{ .image.pullPolicy }}
+        {{- if $.Values.validator.useConsensusHealthCheckAsStartupProbe }}
+        startupProbe:
+          httpGet:
+            path: /consensus_health_check
+            port: 9101
+            scheme: HTTP
+          failureThreshold: 2147483647 # set it to the max value since we don't want to restart the pod automatically even if it can't participate in consensus
+          periodSeconds: 1
+          successThreshold: 1
+          timeoutSeconds: 3
+        {{- end }}
         args:
           - /bin/bash
           - -c

@@ -26,7 +26,7 @@ fun Generics::remove<#0>($t0|a: address): 0x42::Generics::R<#0> {
      var $t1: 0x42::Generics::R<#0>
      var $t2: num
   0: assume CanModify<0x42::Generics::R<#0>>($t0)
-     # VC: caller does not have permission to modify `Generics::R<#0>` at given address at tests/spec_instrumentation/generics.move:11:9+9
+     # VC: caller does not have permission to modify `Generics::R<#0>` at given address at tests/spec_instrumentation/generics.move:11:9+18
   1: assert CanModify<0x42::Generics::R<#0>>($t0)
   2: $t1 := move_from<0x42::Generics::R<#0>>($t0) on_abort goto 6 with $t2
   3: label L1

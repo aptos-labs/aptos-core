@@ -17,7 +17,8 @@ use move_model::{
         CONDITION_SUSPENDABLE_PROP, DELEGATE_INVARIANTS_TO_CALLER_PRAGMA,
         DISABLE_INVARIANTS_IN_BODY_PRAGMA, VERIFY_PRAGMA,
     },
-    ty::{NoUnificationContext, TypeUnificationAdapter, Variance},
+    ty::{NoUnificationContext, Variance},
+    ty_invariant_analysis::TypeUnificationAdapter,
 };
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},

@@ -102,7 +102,13 @@ impl<'a> AcquiresVerifier<'a> {
                 self.struct_acquire(si.def, offset)
             },
 
-            Bytecode::Pop
+            // Note that closure pack operation do not acquire resources; these are acquired
+            // when the function is called later, and acquires check at this point of time
+            // happen dynamically at runtime.
+            Bytecode::PackClosure(..)
+            | Bytecode::PackClosureGeneric(..)
+            | Bytecode::CallClosure(_)
+            | Bytecode::Pop
             | Bytecode::BrTrue(_)
             | Bytecode::BrFalse(_)
             | Bytecode::Abort

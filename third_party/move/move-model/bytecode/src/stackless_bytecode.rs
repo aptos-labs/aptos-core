@@ -6,7 +6,7 @@ use crate::function_target::FunctionTarget;
 use ethnum::U256;
 use itertools::Itertools;
 use move_binary_format::file_format::CodeOffset;
-use move_core_types::{u256, value::MoveValue};
+use move_core_types::{function::ClosureMask, u256, value::MoveValue};
 use move_model::{
     ast,
     ast::{Address, Exp, ExpData, MemoryLabel, Spec, TempIndex, TraceKind, Value},
@@ -168,6 +168,16 @@ impl Constant {
             },
         }
     }
+
+    /// Canonicalizes the constant.
+    pub fn to_canonical(&self) -> Constant {
+        use Constant::*;
+        match self {
+            ByteArray(v) => Vector(v.iter().map(|e| U8(*e)).collect()),
+            AddressArray(v) => Vector(v.iter().map(|e| Address(e.clone())).collect()),
+            _ => self.clone(),
+        }
+    }
 }
 
 /// An operation -- target of a call. This contains user functions, builtin functions, and
@@ -188,6 +198,10 @@ pub enum Operation {
     MoveTo(ModuleId, StructId, Vec<Type>),
     MoveFrom(ModuleId, StructId, Vec<Type>),
     Exists(ModuleId, StructId, Vec<Type>),
+
+    // Closures
+    Closure(ModuleId, FunId, Vec<Type>, ClosureMask),
+    Invoke,
 
     // Variants
     // Below the `Symbol` is the name of the variant. In the case of `Vec<Symbol>`,
@@ -289,6 +303,8 @@ impl Operation {
             Operation::Function(_, _, _) => true,
             Operation::OpaqueCallBegin(_, _, _) => false,
             Operation::OpaqueCallEnd(_, _, _) => false,
+            Operation::Closure(..) => false,
+            Operation::Invoke => true,
             Operation::Pack(_, _, _) => false,
             Operation::Unpack(_, _, _) => false,
             Operation::TestVariant(_, _, _, _) => false,
@@ -1133,19 +1149,21 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use Operation::*;
         match self.oper {
-            // User function
+            // User functions and closures
             Function(mid, fid, targs)
             | OpaqueCallBegin(mid, fid, targs)
-            | OpaqueCallEnd(mid, fid, targs) => {
+            | OpaqueCallEnd(mid, fid, targs)
+            | Closure(mid, fid, targs, _) => {
                 let func_env = self
                     .func_target
                     .global_env()
                     .get_module(*mid)
                     .into_function(*fid);
                 write!(f, "{}", match self.oper {
-                    OpaqueCallBegin(_, _, _) => "opaque begin: ",
-                    OpaqueCallEnd(_, _, _) => "opaque end: ",
-                    _ => "",
+                    OpaqueCallBegin(_, _, _) => "opaque begin: ".to_string(),
+                    OpaqueCallEnd(_, _, _) => "opaque end: ".to_string(),
+                    Closure(_, _, _, mask) => format!("closure#{} ", mask),
+                    _ => "".to_string(),
                 })?;
                 write!(
                     f,
@@ -1158,6 +1176,7 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
                 )?;
                 self.fmt_type_args(f, targs)?;
             },
+            Invoke => write!(f, "invoke")?,
 
             // Pack/Unpack
             Pack(mid, sid, targs) => {

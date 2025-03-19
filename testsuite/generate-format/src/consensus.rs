@@ -100,6 +100,8 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::WriteSetPayload>(&samples)?;
     tracer.trace_type::<transaction::BlockEpiloguePayload>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AccountAuthenticator>(&samples)?;
+    tracer.trace_type::<transaction::authenticator::AbstractionAuthData>(&samples)?;
+    tracer.trace_type::<transaction::authenticator::DomainAccount>(&samples)?;
     tracer.trace_type::<transaction::authenticator::TransactionAuthenticator>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnyPublicKey>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnySignature>(&samples)?;
@@ -117,6 +119,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<aptos_consensus_types::block_retrieval::BlockRetrievalStatus>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::payload::PayloadExecutionLimit>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::common::Payload>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::block_retrieval::BlockRetrievalRequest>(&samples)?;
 
     // aliases within StructTag
     tracer.ignore_aliases("StructTag", &["type_params"])?;

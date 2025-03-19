@@ -530,7 +530,7 @@ async fn test_db_restart() {
         quit_flag.clone(),
     ));
 
-    for round in 0..3 {
+    for round in 0..10 {
         info!("{LINE} Restart round {round}");
         for (v, vid) in restarting_validator_ids.iter().enumerate() {
             let validator = swarm.validator_mut(*vid).unwrap();

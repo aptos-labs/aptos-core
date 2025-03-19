@@ -1,0 +1,28 @@
+[package]
+name = "legacy-move-compiler"
+version = "0.0.1"
+authors = ["Diem Association <opensource@diem.com>"]
+description = "Legacy Move Compiler Passes"
+publish = false
+edition = "2021"
+license = "Apache-2.0"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+codespan-reporting = { workspace = true }
+hex = { workspace = true }
+once_cell = { workspace = true }
+petgraph = { workspace = true }
+regex = { workspace = true }
+tempfile = { workspace = true }
+
+bcs = { workspace = true }
+
+move-binary-format = { workspace = true }
+move-bytecode-source-map = { workspace = true }
+move-bytecode-verifier = { workspace = true }
+move-command-line-common = { workspace = true }
+move-core-types = { workspace = true }
+move-ir-types = { workspace = true }
+move-symbol-pool = { workspace = true }

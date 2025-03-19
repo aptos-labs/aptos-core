@@ -88,7 +88,7 @@ module aptos_framework::transaction_fee {
                 aptos_account::burn_from_fungible_store_for_gas(&burn_ref, account, fee);
                 coin::return_paired_burn_ref(burn_ref, burn_receipt);
             } else {
-                coin::burn_from<AptosCoin>(
+                coin::burn_from_for_gas<AptosCoin>(
                     account,
                     fee,
                     burn_cap,
@@ -101,7 +101,7 @@ module aptos_framework::transaction_fee {
     public(friend) fun mint_and_refund(account: address, refund: u64) acquires AptosCoinMintCapability {
         let mint_cap = &borrow_global<AptosCoinMintCapability>(@aptos_framework).mint_cap;
         let refund_coin = coin::mint(refund, mint_cap);
-        coin::force_deposit(account, refund_coin);
+        coin::deposit_for_gas_fee(account, refund_coin);
     }
 
     /// Only called during genesis.

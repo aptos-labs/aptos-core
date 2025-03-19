@@ -45,6 +45,10 @@ spec:
             {{- end }}
             - --metadata-cache-dir
             - /tmp/aptos-backup-verify-metadata
+            {{- if .Values.backup_verify.config.concurrent_downloads }}
+            - --concurrent-downloads
+            - "{{ .Values.backup_verify.config.concurrent_downloads }}"
+            {{- end }}
             - --command-adapter-config
             # use the same config with the backup sts
             - /opt/aptos/etc/{{ .Values.backup.config.location }}.yaml

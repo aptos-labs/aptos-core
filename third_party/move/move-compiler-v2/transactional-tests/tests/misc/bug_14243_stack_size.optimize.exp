@@ -1,7 +1,7 @@
 processed 1 task
 
 task 0 'print-bytecode'. lines 2-14:
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 
 
@@ -28,5 +28,3 @@ B0:
 	11: Ret
 }
 }
-
-==> Compiler v2 delivered same results!

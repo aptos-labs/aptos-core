@@ -188,22 +188,22 @@ Staking reward configurations that will be stored with the @aptos_framework acco
 
 
 
-<a id="0x1_staking_config_BPS_DENOMINATOR"></a>
-
-Denominator of number in basis points. 1 bps(basis points) = 0.01%.
-
-
-<pre><code><b>const</b> <a href="staking_config.md#0x1_staking_config_BPS_DENOMINATOR">BPS_DENOMINATOR</a>: u64 = 10000;
-</code></pre>
-
-
-
 <a id="0x1_staking_config_EDEPRECATED_FUNCTION"></a>
 
 The function has been deprecated.
 
 
 <pre><code><b>const</b> <a href="staking_config.md#0x1_staking_config_EDEPRECATED_FUNCTION">EDEPRECATED_FUNCTION</a>: u64 = 10;
+</code></pre>
+
+
+
+<a id="0x1_staking_config_BPS_DENOMINATOR"></a>
+
+Denominator of number in basis points. 1 bps(basis points) = 0.01%.
+
+
+<pre><code><b>const</b> <a href="staking_config.md#0x1_staking_config_BPS_DENOMINATOR">BPS_DENOMINATOR</a>: u64 = 10000;
 </code></pre>
 
 

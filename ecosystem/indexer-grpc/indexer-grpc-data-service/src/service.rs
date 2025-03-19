@@ -699,6 +699,7 @@ fn get_transactions_responses_builder(
         .map(|chunk| TransactionsResponse {
             chain_id: Some(chain_id as u64),
             transactions: chunk,
+            processed_range: None,
         })
         .collect();
     (responses, num_stripped)
@@ -986,7 +987,7 @@ fn strip_transactions(
         .map(|mut txn| {
             // Note: `is_allowed` means the txn matches the filter, in which case
             // we strip it.
-            if txns_to_strip_filter.is_allowed(&txn) {
+            if txns_to_strip_filter.matches(&txn) {
                 stripped_count += 1;
                 if let Some(info) = txn.info.as_mut() {
                     info.changes = vec![];

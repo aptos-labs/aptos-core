@@ -2,9 +2,9 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use legacy_move_compiler::shared::NumericalAddress;
 use log::LevelFilter;
 use move_command_line_common::files::{extension_equals, find_filenames, MOVE_EXTENSION};
-use move_compiler::shared::NumericalAddress;
 use std::{collections::BTreeMap, path::PathBuf};
 
 #[cfg(test)]

@@ -52,38 +52,33 @@ pub trait TransactionValidation: Send + Sync + Clone {
     fn notify_commit(&mut self);
 }
 
-/// Returns a new VM for validation, with configs initialized based on the provided state.
-fn new_vm_for_validation(state_view: &impl StateView) -> AptosVM {
-    info!(
-        AdapterLogSchema::new(state_view.id(), 0),
-        "AptosVM created for Validation"
-    );
-    let env = AptosEnvironment::new(state_view);
-    AptosVM::new(env, state_view)
-}
-
 /// Represents the state used for validation. Stores raw data, module cache and the execution
-/// runtime environment stored in the VM. Note that the state can get out-of-date, and it is the
-/// responsibility of the owner of the struct to ensure it is up-to-date.
+/// runtime environment. Note that the state can get out-of-date, and it is the responsibility of
+/// the owner of the struct to ensure it is up-to-date.
 struct ValidationState<S> {
     /// The raw snapshot of the state used for validation.
     state_view: S,
+    /// Stores configs needed for execution.
+    environment: AptosEnvironment,
     /// Versioned cache for deserialized and verified Move modules. The versioning allows to detect
     /// when the version of the code is no longer up-to-date (a newer version has been committed to
     /// the state view) and update the cache accordingly.
     module_cache: UnsyncModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension, usize>,
-    vm: AptosVM,
 }
 
 impl<S: StateView> ValidationState<S> {
     /// Creates a new state based on the state view snapshot, with empty module cache and VM
     /// initialized based on configs from the state.
     fn new(state_view: S) -> Self {
-        let vm = new_vm_for_validation(&state_view);
+        info!(
+            AdapterLogSchema::new(state_view.id(), 0),
+            "Validation environment and module cache created"
+        );
+        let environment = AptosEnvironment::new(&state_view);
         Self {
             state_view,
+            environment,
             module_cache: UnsyncModuleCache::empty(),
-            vm,
         }
     }
 
@@ -97,14 +92,14 @@ impl<S: StateView> ValidationState<S> {
     /// state view snapshot.
     fn reset_all(&mut self, state_view: S) {
         self.state_view = state_view;
+        self.environment = AptosEnvironment::new(&self.state_view);
         self.module_cache = UnsyncModuleCache::empty();
-        self.vm = new_vm_for_validation(&self.state_view);
     }
 }
 
 impl<S> WithRuntimeEnvironment for ValidationState<S> {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
-        self.vm.runtime_environment()
+        self.environment.runtime_environment()
     }
 }
 
@@ -186,7 +181,7 @@ impl<S: StateView> ModuleCache for ValidationState<S> {
             Some((module, version))
         } else {
             let compiled_module = self
-                .vm
+                .environment
                 .runtime_environment()
                 .deserialize_into_compiled_module(state_value.bytes())?;
             let extension = Arc::new(AptosModuleExtension::new(state_value));
@@ -332,7 +327,11 @@ impl TransactionValidation for PooledVMValidator {
         let vm_validator_locked = vm_validator.lock().unwrap();
 
         use aptos_vm::VMValidator;
-        Ok(vm_validator_locked.state.vm.validate_transaction(
+        let vm = AptosVM::new(
+            &vm_validator_locked.state.environment,
+            &vm_validator_locked.state.state_view,
+        );
+        Ok(vm.validate_transaction(
             txn,
             &vm_validator_locked.state.state_view,
             &vm_validator_locked.state,
@@ -371,9 +370,12 @@ mod tests {
     #[test]
     fn test_module_cache_consistency() {
         // Have 3 modules in the state.
-        let a = empty_module_with_dependencies_and_friends("a", vec![], vec![]);
-        let b = empty_module_with_dependencies_and_friends("b", vec![], vec![]);
-        let c = empty_module_with_dependencies_and_friends("c", vec![], vec![]);
+        let a =
+            empty_module_with_dependencies_and_friends("a", vec![], vec![]).set_default_version();
+        let b =
+            empty_module_with_dependencies_and_friends("b", vec![], vec![]).set_default_version();
+        let c =
+            empty_module_with_dependencies_and_friends("c", vec![], vec![]).set_default_version();
 
         let state_view = MockStateView::new(HashMap::from([
             (
@@ -419,8 +421,10 @@ mod tests {
         assert_eq!(state.module_cache.get_module_version(&c.self_id()), Some(0));
 
         // Change module "a" by adding dependencies and also add a new module "d".
-        let d = empty_module_with_dependencies_and_friends("d", vec![], vec![]);
-        let a_new = empty_module_with_dependencies_and_friends("a", vec!["b", "c"], vec![]);
+        let d =
+            empty_module_with_dependencies_and_friends("d", vec![], vec![]).set_default_version();
+        let a_new = empty_module_with_dependencies_and_friends("a", vec!["b", "c"], vec![])
+            .set_default_version();
         assert_ne!(&a, &a_new);
 
         let new_state_view = MockStateView::new(HashMap::from([

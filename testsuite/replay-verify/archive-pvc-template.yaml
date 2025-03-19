@@ -12,7 +12,7 @@ spec:
   resources:
     requests:
       storage: 10Ti
-  storageClassName: ssd-data-xfs
+  storageClassName: ssd-data-xfs-immediate
   volumeMode: Filesystem
   dataSourceRef:
     name: testnet-archive

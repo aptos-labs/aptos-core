@@ -12,7 +12,7 @@ use crate::{
             observer_client::ConsensusObserverClient,
             observer_message::{
                 BlockPayload, CommitDecision, ConsensusObserverDirectSend,
-                ConsensusObserverMessage, OrderedBlock,
+                ConsensusObserverMessage, OrderedBlock, OrderedBlockWithWindow,
             },
         },
         observer::{
@@ -271,6 +271,32 @@ impl ConsensusObserver {
             ))
         );
 
+        if self.pipeline_enabled() {
+            let block = ordered_block.first_block();
+            let mut parent_fut = if let Some(futs) = self.get_parent_pipeline_futs(&block) {
+                Some(futs)
+            } else {
+                warn!(
+                            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                                "Parent block's pipeline futures for ordered block is missing! Ignoring: {:?}",
+                                ordered_block.proof_block_info()
+                            ))
+                        );
+                return;
+            };
+            for block in ordered_block.blocks() {
+                let commit_callback = self.active_observer_state.create_commit_callback(
+                    self.ordered_block_store.clone(),
+                    self.block_payload_store.clone(),
+                );
+                self.pipeline_builder().build(
+                    block,
+                    parent_fut.take().expect("future should be set"),
+                    commit_callback,
+                );
+                parent_fut = Some(block.pipeline_futs().expect("pipeline futures just built"));
+            }
+        }
         // Create the commit callback (to be called after the execution pipeline)
         let commit_callback = self
             .active_observer_state
@@ -329,6 +355,11 @@ impl ConsensusObserver {
         self.active_observer_state.epoch_state()
     }
 
+    /// Returns the window size for the execution pool
+    fn get_execution_pool_window_size(&self) -> Option<u64> {
+        self.active_observer_state.execution_pool_window_size()
+    }
+
     /// Returns the highest committed block epoch and round
     fn get_highest_committed_epoch_round(&self) -> (u64, Round) {
         if let Some(epoch_round) = self
@@ -354,17 +385,19 @@ impl ConsensusObserver {
         }
     }
 
-    /// Returns the last block's pipeline futures, should only be called when pipeline is enabled
-    fn get_last_pipeline_futs(&self) -> PipelineFutures {
-        if let Some(last_ordered_block) = self.ordered_block_store.lock().get_last_ordered_block() {
-            last_ordered_block
-                .pipeline_futs()
-                .expect("Pipeline futures should exist when enabled")
+    /// Returns the parent block's pipeline futures, should only be called when pipeline is enabled
+    fn get_parent_pipeline_futs(&self, block: &PipelinedBlock) -> Option<PipelineFutures> {
+        if let Some(last_ordered_block) = self
+            .ordered_block_store
+            .lock()
+            .get_ordered_block(block.epoch(), block.quorum_cert().certified_block().round())
+        {
+            last_ordered_block.last_block().pipeline_futs()
         } else {
-            self.pipeline_builder().build_root(
+            Some(self.pipeline_builder().build_root(
                 StateComputeResult::new_dummy(),
                 self.active_observer_state.root().clone(),
-            )
+            ))
         }
     }
 
@@ -416,13 +449,15 @@ impl ConsensusObserver {
 
         // Verify the block payload digests
         if let Err(error) = block_payload.verify_payload_digests() {
+            // Log the error and update the invalid message counter
             error!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Failed to verify block payload digests! Ignoring block: {:?}. Error: {:?}",
-                    block_payload.block(),
+                    "Failed to verify block payload digests! Ignoring block: {:?}, from peer: {:?}. Error: {:?}",
+                    block_payload.block(), peer_network_id,
                     error
                 ))
             );
+            increment_invalid_message_counter(&peer_network_id, metrics::BLOCK_PAYLOAD_LABEL);
             return;
         }
 
@@ -431,12 +466,14 @@ impl ConsensusObserver {
         let verified_payload = if block_epoch == epoch_state.epoch {
             // Verify the block proof signatures
             if let Err(error) = block_payload.verify_payload_signatures(&epoch_state) {
+                // Log the error and update the invalid message counter
                 error!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Failed to verify block payload signatures! Ignoring block: {:?}. Error: {:?}",
-                        block_payload.block(), error
+                        "Failed to verify block payload signatures! Ignoring block: {:?}, from peer: {:?}. Error: {:?}",
+                        block_payload.block(), peer_network_id, error
                     ))
                 );
+                increment_invalid_message_counter(&peer_network_id, metrics::BLOCK_PAYLOAD_LABEL);
                 return;
             }
 
@@ -492,13 +529,16 @@ impl ConsensusObserver {
         if commit_epoch == epoch_state.epoch {
             // Verify the commit decision
             if let Err(error) = commit_decision.verify_commit_proof(&epoch_state) {
+                // Log the error and update the invalid message counter
                 error!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Failed to verify commit decision! Ignoring: {:?}, Error: {:?}",
+                        "Failed to verify commit decision! Ignoring: {:?}, from peer: {:?}. Error: {:?}",
                         commit_decision.proof_block_info(),
+                        peer_network_id,
                         error
                     ))
                 );
+                increment_invalid_message_counter(&peer_network_id, metrics::COMMIT_DECISION_LABEL);
                 return;
             }
 
@@ -606,12 +646,8 @@ impl ConsensusObserver {
             .subscription_manager
             .verify_message_for_subscription(peer_network_id)
         {
-            // Increment the rejected message counter
-            metrics::increment_counter(
-                &metrics::OBSERVER_REJECTED_MESSAGES,
-                message.get_label(),
-                &peer_network_id,
-            );
+            // Update the rejected message counter
+            increment_rejected_message_counter(&peer_network_id, &message);
 
             // Log the error and return
             warn!(
@@ -624,11 +660,7 @@ impl ConsensusObserver {
         }
 
         // Increment the received message counter
-        metrics::increment_counter(
-            &metrics::OBSERVER_RECEIVED_MESSAGES,
-            message.get_label(),
-            &peer_network_id,
-        );
+        increment_received_message_counter(&peer_network_id, &message);
 
         // Process the message based on the type
         match message {
@@ -655,6 +687,14 @@ impl ConsensusObserver {
                 )
                 .await;
             },
+            ConsensusObserverDirectSend::OrderedBlockWithWindow(ordered_block_with_window) => {
+                self.process_ordered_block_with_window_message(
+                    peer_network_id,
+                    message_received_time,
+                    ordered_block_with_window,
+                )
+                .await;
+            },
         }
 
         // Update the metrics for the processed blocks
@@ -668,15 +708,31 @@ impl ConsensusObserver {
         message_received_time: Instant,
         ordered_block: OrderedBlock,
     ) {
+        // If execution pool is enabled, ignore the message
+        if self.get_execution_pool_window_size().is_some() {
+            // Log the failure and update the invalid message counter
+            warn!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Received ordered block message from peer: {:?}, but execution pool is enabled! Ignoring: {:?}",
+                    peer_network_id, ordered_block.proof_block_info()
+                ))
+            );
+            increment_invalid_message_counter(&peer_network_id, metrics::ORDERED_BLOCK_LABEL);
+            return;
+        }
+
         // Verify the ordered blocks before processing
         if let Err(error) = ordered_block.verify_ordered_blocks() {
+            // Log the error and update the invalid message counter
             error!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Failed to verify ordered blocks! Ignoring: {:?}, Error: {:?}",
+                    "Failed to verify ordered blocks! Ignoring: {:?}, from peer: {:?}. Error: {:?}",
                     ordered_block.proof_block_info(),
+                    peer_network_id,
                     error
                 ))
             );
+            increment_invalid_message_counter(&peer_network_id, metrics::ORDERED_BLOCK_LABEL);
             return;
         };
 
@@ -733,13 +789,16 @@ impl ConsensusObserver {
         let epoch_state = self.get_epoch_state();
         if ordered_block.proof_block_info().epoch() == epoch_state.epoch {
             if let Err(error) = ordered_block.verify_ordered_proof(&epoch_state) {
-                warn!(
+                // Log the error and update the invalid message counter
+                error!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Failed to verify ordered proof! Ignoring: {:?}, Error: {:?}",
+                        "Failed to verify ordered proof! Ignoring: {:?}, from peer: {:?}. Error: {:?}",
                         ordered_block.proof_block_info(),
+                        peer_network_id,
                         error
                     ))
                 );
+                increment_invalid_message_counter(&peer_network_id, metrics::ORDERED_BLOCK_LABEL);
                 return;
             }
         } else {
@@ -759,13 +818,16 @@ impl ConsensusObserver {
             .lock()
             .verify_payloads_against_ordered_block(&ordered_block)
         {
+            // Log the error and update the invalid message counter
             error!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Failed to verify block payloads against ordered block! Ignoring: {:?}, Error: {:?}",
+                    "Failed to verify block payloads against ordered block! Ignoring: {:?}, from peer: {:?}. Error: {:?}",
                     ordered_block.proof_block_info(),
+                    peer_network_id,
                     error
                 ))
             );
+            increment_invalid_message_counter(&peer_network_id, metrics::ORDERED_BLOCK_LABEL);
             return;
         }
 
@@ -779,19 +841,6 @@ impl ConsensusObserver {
                 metrics::ORDERED_BLOCK_LABEL,
             );
 
-            if self.pipeline_enabled() {
-                for block in ordered_block.blocks() {
-                    let commit_callback = self.active_observer_state.create_commit_callback(
-                        self.ordered_block_store.clone(),
-                        self.block_payload_store.clone(),
-                    );
-                    self.pipeline_builder().build(
-                        block,
-                        self.get_last_pipeline_futs(),
-                        commit_callback,
-                    );
-                }
-            }
             // Insert the ordered block into the pending blocks
             self.ordered_block_store
                 .lock()
@@ -809,6 +858,101 @@ impl ConsensusObserver {
                 ))
             );
         }
+    }
+
+    /// Processes the ordered block with window message
+    async fn process_ordered_block_with_window_message(
+        &mut self,
+        peer_network_id: PeerNetworkId,
+        _message_received_time: Instant,
+        ordered_block_with_window: OrderedBlockWithWindow,
+    ) {
+        // If execution pool is disabled, ignore the message
+        let execution_pool_window_size = match self.get_execution_pool_window_size() {
+            Some(window_size) => window_size,
+            None => {
+                // Log the failure and update the invalid message counter
+                warn!(
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "Received ordered block with window message from peer: {:?}, but execution pool is disabled! Ignoring: {:?}",
+                        peer_network_id,
+                        ordered_block_with_window.ordered_block().proof_block_info()
+                    ))
+                );
+                increment_invalid_message_counter(
+                    &peer_network_id,
+                    metrics::ORDERED_BLOCK_WITH_WINDOW_LABEL,
+                );
+                return;
+            },
+        };
+
+        // Verify the ordered blocks before processing
+        let ordered_block = ordered_block_with_window.ordered_block();
+        if let Err(error) = ordered_block.verify_ordered_blocks() {
+            // Log the error and update the invalid message counter
+            error!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Failed to verify ordered block with window! Ignoring: {:?}, from peer: {:?}. Error: {:?}",
+                    ordered_block.proof_block_info(),
+                    peer_network_id,
+                    error
+                ))
+            );
+            increment_invalid_message_counter(
+                &peer_network_id,
+                metrics::ORDERED_BLOCK_WITH_WINDOW_LABEL,
+            );
+            return;
+        };
+
+        // Verify the execution pool window contents
+        let execution_pool_window = ordered_block_with_window.execution_pool_window();
+        if let Err(error) = execution_pool_window.verify_window_contents(execution_pool_window_size)
+        {
+            // Log the error and update the invalid message counter
+            error!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Failed to verify execution pool window contents! Ignoring: {:?}, from peer: {:?}. Error: {:?}",
+                    ordered_block.proof_block_info(),
+                    peer_network_id,
+                    error
+                ))
+            );
+            increment_invalid_message_counter(
+                &peer_network_id,
+                metrics::ORDERED_BLOCK_WITH_WINDOW_LABEL,
+            );
+            return;
+        };
+
+        // Get the epoch and round of the first block
+        let first_block = ordered_block.first_block();
+        let first_block_epoch_round = (first_block.epoch(), first_block.round());
+
+        // Determine if the block is behind the last ordered block, or if it is already pending
+        let last_ordered_block = self.get_last_ordered_block();
+        let block_out_of_date =
+            first_block_epoch_round <= (last_ordered_block.epoch(), last_ordered_block.round());
+        let block_pending = self
+            .pending_block_store
+            .lock()
+            .existing_pending_block(ordered_block);
+
+        // If the block is out of date or already pending, ignore it
+        if block_out_of_date || block_pending {
+            // Update the metrics for the dropped ordered block with window
+            update_metrics_for_dropped_ordered_block_with_window_message(
+                peer_network_id,
+                ordered_block,
+            );
+            return;
+        }
+
+        // Update the metrics for the received ordered block with window
+        update_metrics_for_ordered_block_with_window_message(peer_network_id, ordered_block);
+
+        // TODO: process the ordered block with window message (instead of just dropping it!)
     }
 
     /// Processes the given state sync notification
@@ -1008,6 +1152,7 @@ impl ConsensusObserver {
                 None,
                 rand_msg_rx,
                 0,
+                self.pipeline_enabled(),
             )
             .await;
         if self.pipeline_enabled() {
@@ -1148,12 +1293,8 @@ fn update_metrics_for_dropped_block_payload_message(
     peer_network_id: PeerNetworkId,
     block_payload: &BlockPayload,
 ) {
-    // Increment the dropped message counter
-    metrics::increment_counter(
-        &metrics::OBSERVER_DROPPED_MESSAGES,
-        metrics::BLOCK_PAYLOAD_LABEL,
-        &peer_network_id,
-    );
+    // Update the dropped message counter
+    increment_dropped_message_counter(&peer_network_id, metrics::BLOCK_PAYLOAD_LABEL);
 
     // Log the dropped block payload message
     debug!(
@@ -1171,12 +1312,8 @@ fn update_metrics_for_dropped_commit_decision_message(
     peer_network_id: PeerNetworkId,
     commit_decision: &CommitDecision,
 ) {
-    // Increment the dropped message counter
-    metrics::increment_counter(
-        &metrics::OBSERVER_DROPPED_MESSAGES,
-        metrics::COMMITTED_BLOCKS_LABEL,
-        &peer_network_id,
-    );
+    // Update the dropped message counter
+    increment_dropped_message_counter(&peer_network_id, metrics::COMMITTED_BLOCKS_LABEL);
 
     // Log the dropped commit decision message
     debug!(
@@ -1194,17 +1331,32 @@ fn update_metrics_for_dropped_ordered_block_message(
     peer_network_id: PeerNetworkId,
     ordered_block: &OrderedBlock,
 ) {
-    // Increment the dropped message counter
-    metrics::increment_counter(
-        &metrics::OBSERVER_DROPPED_MESSAGES,
-        metrics::ORDERED_BLOCK_LABEL,
-        &peer_network_id,
-    );
+    // Update the dropped message counter
+    increment_dropped_message_counter(&peer_network_id, metrics::ORDERED_BLOCK_LABEL);
 
     // Log the dropped ordered block message
     debug!(
         LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
             "Ignoring ordered block message from peer: {:?}! Block epoch and round: ({}, {})",
+            peer_network_id,
+            ordered_block.proof_block_info().epoch(),
+            ordered_block.proof_block_info().round()
+        ))
+    );
+}
+
+/// Updates the metrics for the dropped ordered block with window message
+fn update_metrics_for_dropped_ordered_block_with_window_message(
+    peer_network_id: PeerNetworkId,
+    ordered_block: &OrderedBlock,
+) {
+    // Increment the dropped message counter
+    increment_dropped_message_counter(&peer_network_id, metrics::ORDERED_BLOCK_WITH_WINDOW_LABEL);
+
+    // Log the dropped ordered block with window message
+    debug!(
+        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+            "Ignoring ordered block with window message from peer: {:?}! Block epoch and round: ({}, {})",
             peer_network_id,
             ordered_block.proof_block_info().epoch(),
             ordered_block.proof_block_info().round()
@@ -1230,5 +1382,68 @@ fn update_metrics_for_ordered_block_message(
         &metrics::OBSERVER_RECEIVED_MESSAGE_ROUNDS,
         metrics::ORDERED_BLOCK_LABEL,
         ordered_block.proof_block_info().round(),
+    );
+}
+
+/// Updates the metrics for the received ordered block with window message
+fn update_metrics_for_ordered_block_with_window_message(
+    peer_network_id: PeerNetworkId,
+    ordered_block: &OrderedBlock,
+) {
+    // Log the received ordered block with window message
+    let log_message = format!(
+        "Received ordered block with window: {}, from peer: {}!",
+        ordered_block.proof_block_info(),
+        peer_network_id
+    );
+    log_received_message(log_message);
+
+    // Update the metrics for the received ordered block with window
+    metrics::set_gauge_with_label(
+        &metrics::OBSERVER_RECEIVED_MESSAGE_ROUNDS,
+        metrics::ORDERED_BLOCK_WITH_WINDOW_LABEL,
+        ordered_block.proof_block_info().round(),
+    );
+}
+
+/// Increments the dropped message counter for the given peer and message
+fn increment_dropped_message_counter(peer_network_id: &PeerNetworkId, message_label: &str) {
+    metrics::increment_counter(
+        &metrics::OBSERVER_DROPPED_MESSAGES,
+        message_label,
+        peer_network_id,
+    );
+}
+
+/// Increments the invalid message counter for the given peer and message
+fn increment_invalid_message_counter(peer_network_id: &PeerNetworkId, message_label: &str) {
+    metrics::increment_counter(
+        &metrics::OBSERVER_INVALID_MESSAGES,
+        message_label,
+        peer_network_id,
+    );
+}
+
+/// Increments the received message counter for the given peer and message
+fn increment_received_message_counter(
+    peer_network_id: &PeerNetworkId,
+    message: &ConsensusObserverDirectSend,
+) {
+    metrics::increment_counter(
+        &metrics::OBSERVER_RECEIVED_MESSAGES,
+        message.get_label(),
+        peer_network_id,
+    );
+}
+
+/// Increments the rejected message counter for the given peer and message
+fn increment_rejected_message_counter(
+    peer_network_id: &PeerNetworkId,
+    message: &ConsensusObserverDirectSend,
+) {
+    metrics::increment_counter(
+        &metrics::OBSERVER_REJECTED_MESSAGES,
+        message.get_label(),
+        peer_network_id,
     );
 }

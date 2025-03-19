@@ -4,8 +4,8 @@ name: "Windows CLI Build"
 on:
   workflow_dispatch:
   pull_request:
-    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
-  schedule: 
+    types: [ labeled, opened, synchronize, reopened, auto_merge_enabled ]
+  schedule:
     # Run twice a day at 12PM PT and 8PM PT Monday through Friday
     - cron: "0 19,3 * * 1-5"
     # Run once a day at 12PM PT on Saturday and Sunday
@@ -31,6 +31,11 @@ jobs:
 
       - name: Set up WinGet
         run: Set-Variable ProgressPreference SilentlyContinue ; PowerShell -ExecutionPolicy Bypass -File scripts/windows_dev_setup.ps1
+
+      # Ensure that long paths work
+      - name: Ensure long paths work
+        run: git config --global core.longpaths true
+        shell: bash
 
       # This action will cache ~/.cargo and ./target (or the equivalent on Windows in
       # this case). See more here:

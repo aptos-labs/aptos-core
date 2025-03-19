@@ -152,10 +152,10 @@ fn test_db_indexer_data() {
     // assert the data matches the expected data
     let version = internal_indexer_db.get_persisted_version().unwrap();
     assert_eq!(version, None);
-    let mut start_version = version.map_or(0, |v| v + 1);
-    while start_version < total_version {
-        start_version = db_indexer.process_a_batch(start_version).unwrap();
-    }
+    let start_version = version.map_or(0, |v| v + 1);
+    db_indexer
+        .process_a_batch(start_version, total_version)
+        .unwrap();
     // wait for the commit to finish
     thread::sleep(Duration::from_millis(100));
     // indexer has process all the transactions
@@ -175,7 +175,7 @@ fn test_db_indexer_data() {
 
     let x = internal_indexer_db.get_event_by_key_iter().unwrap();
     let res: Vec<_> = x.collect();
-    assert_eq!(res.len(), 4);
+    assert_eq!(res.len(), 16);
 
     let core_kv_iter = db_indexer
         .get_prefixed_state_value_iterator(
@@ -376,6 +376,10 @@ fn test_db_indexer_data() {
         (
             false,
             "0x1::randomness_config_seqnum::RandomnessConfigSeqNum",
+        ),
+        (
+            false,
+            "0x1::account_abstraction::DomainDispatchableAuthenticator",
         ),
         (false, "0x1::coin::CoinInfo<0x1::aptos_coin::AptosCoin>"),
         (

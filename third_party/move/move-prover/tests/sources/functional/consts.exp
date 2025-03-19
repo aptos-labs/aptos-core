@@ -33,8 +33,6 @@ error: unknown assertion failed
 67 │             assert v1[0] == @0x111 && v1[1] == @0x222 && v1[2] == @0x333;
    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/consts.move:65: array_in_fun_incorrect
-   =         v1 = <redacted>
    =     at tests/sources/functional/consts.move:67: array_in_fun_incorrect
 
 error: unknown assertion failed
@@ -43,6 +41,4 @@ error: unknown assertion failed
 74 │             assert v1[0] == false && v1[1] == false && v1[2] == false;
    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/consts.move:72: array_in_fun_incorrect_bool
-   =         v1 = <redacted>
    =     at tests/sources/functional/consts.move:74: array_in_fun_incorrect_bool

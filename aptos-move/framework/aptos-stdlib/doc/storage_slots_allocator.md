@@ -23,14 +23,13 @@ for example:
 
 
 -  [Enum `Link`](#0x1_storage_slots_allocator_Link)
--  [Enum `StorageSlotsAllocatorConfig`](#0x1_storage_slots_allocator_StorageSlotsAllocatorConfig)
 -  [Enum `StorageSlotsAllocator`](#0x1_storage_slots_allocator_StorageSlotsAllocator)
 -  [Struct `ReservedSlot`](#0x1_storage_slots_allocator_ReservedSlot)
 -  [Struct `StoredSlot`](#0x1_storage_slots_allocator_StoredSlot)
 -  [Constants](#@Constants_0)
 -  [Function `new`](#0x1_storage_slots_allocator_new)
--  [Function `new_default_config`](#0x1_storage_slots_allocator_new_default_config)
--  [Function `new_config`](#0x1_storage_slots_allocator_new_config)
+-  [Function `allocate_spare_slots`](#0x1_storage_slots_allocator_allocate_spare_slots)
+-  [Function `get_num_spare_slot_count`](#0x1_storage_slots_allocator_get_num_spare_slot_count)
 -  [Function `add`](#0x1_storage_slots_allocator_add)
 -  [Function `remove`](#0x1_storage_slots_allocator_remove)
 -  [Function `destroy_empty`](#0x1_storage_slots_allocator_destroy_empty)
@@ -52,7 +51,8 @@ for example:
 -  [Specification](#@Specification_1)
 
 
-<pre><code><b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="table_with_length.md#0x1_table_with_length">0x1::table_with_length</a>;
 </code></pre>
 
@@ -107,51 +107,6 @@ Data stored in an individual slot
 <dl>
 <dt>
 <code>next: u64</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-</details>
-
-</details>
-
-<a id="0x1_storage_slots_allocator_StorageSlotsAllocatorConfig"></a>
-
-## Enum `StorageSlotsAllocatorConfig`
-
-
-
-<pre><code>enum <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocatorConfig">StorageSlotsAllocatorConfig</a> <b>has</b> <b>copy</b>, drop
-</code></pre>
-
-
-
-<details>
-<summary>Variants</summary>
-
-
-<details>
-<summary>V1</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>should_reuse: bool</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>num_to_preallocate: u32</code>
 </dt>
 <dd>
 
@@ -293,6 +248,15 @@ and there is unique owner for each slot.
 ## Constants
 
 
+<a id="0x1_storage_slots_allocator_ECANNOT_HAVE_SPARES_WITHOUT_REUSE"></a>
+
+
+
+<pre><code><b>const</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ECANNOT_HAVE_SPARES_WITHOUT_REUSE">ECANNOT_HAVE_SPARES_WITHOUT_REUSE</a>: u64 = 2;
+</code></pre>
+
+
+
 <a id="0x1_storage_slots_allocator_EINTERNAL_INVARIANT_BROKEN"></a>
 
 
@@ -335,7 +299,7 @@ and there is unique owner for each slot.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_new">new</a>&lt;T: store&gt;(config: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocatorConfig">storage_slots_allocator::StorageSlotsAllocatorConfig</a>): <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_new">new</a>&lt;T: store&gt;(should_reuse: bool): <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;
 </code></pre>
 
 
@@ -344,47 +308,13 @@ and there is unique owner for each slot.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_new">new</a>&lt;T: store&gt;(config: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocatorConfig">StorageSlotsAllocatorConfig</a>): <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt; {
-    <b>let</b> result = StorageSlotsAllocator::V1 {
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_new">new</a>&lt;T: store&gt;(should_reuse: bool): <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt; {
+    StorageSlotsAllocator::V1 {
         slots: <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
         new_slot_index: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_FIRST_INDEX">FIRST_INDEX</a>,
-        should_reuse: config.should_reuse,
+        should_reuse,
         reuse_head_index: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_NULL_INDEX">NULL_INDEX</a>,
         reuse_spare_count: 0,
-    };
-
-    for (i in 0..config.num_to_preallocate) {
-        <b>let</b> slot_index = result.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_next_slot_index">next_slot_index</a>();
-        result.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_maybe_push_to_reuse_queue">maybe_push_to_reuse_queue</a>(slot_index);
-    };
-
-    result
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_storage_slots_allocator_new_default_config"></a>
-
-## Function `new_default_config`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_new_default_config">new_default_config</a>(): <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocatorConfig">storage_slots_allocator::StorageSlotsAllocatorConfig</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_new_default_config">new_default_config</a>(): <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocatorConfig">StorageSlotsAllocatorConfig</a> {
-    StorageSlotsAllocatorConfig::V1 {
-        should_reuse: <b>false</b>,
-        num_to_preallocate: 0,
     }
 }
 </code></pre>
@@ -393,13 +323,13 @@ and there is unique owner for each slot.
 
 </details>
 
-<a id="0x1_storage_slots_allocator_new_config"></a>
+<a id="0x1_storage_slots_allocator_allocate_spare_slots"></a>
 
-## Function `new_config`
+## Function `allocate_spare_slots`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_new_config">new_config</a>(should_reuse: bool, num_to_preallocate: u32): <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocatorConfig">storage_slots_allocator::StorageSlotsAllocatorConfig</a>
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_allocate_spare_slots">allocate_spare_slots</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;, num_to_allocate: u64)
 </code></pre>
 
 
@@ -408,11 +338,37 @@ and there is unique owner for each slot.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_new_config">new_config</a>(should_reuse: bool, num_to_preallocate: u32): <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocatorConfig">StorageSlotsAllocatorConfig</a> {
-    StorageSlotsAllocatorConfig::V1 {
-        should_reuse,
-        num_to_preallocate,
-    }
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_allocate_spare_slots">allocate_spare_slots</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;, num_to_allocate: u64) {
+    <b>assert</b>!(self.should_reuse, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ECANNOT_HAVE_SPARES_WITHOUT_REUSE">ECANNOT_HAVE_SPARES_WITHOUT_REUSE</a>));
+    for (i in 0..num_to_allocate) {
+        <b>let</b> slot_index = self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_next_slot_index">next_slot_index</a>();
+        self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_maybe_push_to_reuse_queue">maybe_push_to_reuse_queue</a>(slot_index);
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_storage_slots_allocator_get_num_spare_slot_count"></a>
+
+## Function `get_num_spare_slot_count`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_get_num_spare_slot_count">get_num_spare_slot_count</a>&lt;T: store&gt;(self: &<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;): u32
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_get_num_spare_slot_count">get_num_spare_slot_count</a>&lt;T: store&gt;(self: &<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;): u32 {
+    <b>assert</b>!(self.should_reuse, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ECANNOT_HAVE_SPARES_WITHOUT_REUSE">ECANNOT_HAVE_SPARES_WITHOUT_REUSE</a>));
+    self.reuse_spare_count
 }
 </code></pre>
 

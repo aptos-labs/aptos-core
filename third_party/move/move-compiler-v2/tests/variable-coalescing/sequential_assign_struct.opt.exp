@@ -98,13 +98,12 @@ fun m::sequential($t0: 0xc0ffee::m::Foo): 0xc0ffee::m::Foo {
      var $t4: 0xc0ffee::m::Foo [unused]
      var $t5: 0xc0ffee::m::Foo [unused]
      var $t6: 0xc0ffee::m::Foo [unused]
-  0: $t0 := move($t0)
-  1: return $t0
+  0: return $t0
 }
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 struct Foo has copy {
 	a: u64,
@@ -114,9 +113,9 @@ struct Foo has copy {
 	e: u64
 }
 
-sequential(Arg0: Foo): Foo /* def_idx: 0 */ {
+sequential(p: Foo): Foo /* def_idx: 0 */ {
 B0:
-	0: MoveLoc[0](Arg0: Foo)
+	0: MoveLoc[0](p: Foo)
 	1: Ret
 }
 }

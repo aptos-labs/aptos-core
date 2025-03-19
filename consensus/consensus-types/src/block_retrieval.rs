@@ -15,15 +15,55 @@ pub const NUM_PEERS_PER_RETRY: usize = 3;
 pub const RETRY_INTERVAL_MSEC: u64 = 500;
 pub const RPC_TIMEOUT_MSEC: u64 = 5000;
 
-/// RPC to get a chain of block of the given length starting from the given block id.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct BlockRetrievalRequest {
+pub enum BlockRetrievalRequest {
+    V1(BlockRetrievalRequestV1),
+    V2(BlockRetrievalRequestV2),
+}
+
+impl BlockRetrievalRequest {
+    pub fn new_with_target_round(block_id: HashValue, num_blocks: u64, target_round: u64) -> Self {
+        Self::V2(BlockRetrievalRequestV2 {
+            block_id,
+            num_blocks,
+            target_round,
+        })
+    }
+
+    pub fn block_id(&self) -> HashValue {
+        match self {
+            BlockRetrievalRequest::V1(req) => req.block_id,
+            BlockRetrievalRequest::V2(req) => req.block_id,
+        }
+    }
+
+    pub fn num_blocks(&self) -> u64 {
+        match self {
+            BlockRetrievalRequest::V1(req) => req.num_blocks,
+            BlockRetrievalRequest::V2(req) => req.num_blocks,
+        }
+    }
+}
+
+/// RPC to get a chain of block of the given length starting from the given block id.
+/// TODO @bchocho @hariria fix comment after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
+///
+/// NOTE:
+/// 1. The [`BlockRetrievalRequest`](BlockRetrievalRequest) struct was renamed to
+///    [`BlockRetrievalRequestV1`](BlockRetrievalRequestV1) and deprecated
+/// 2. [`BlockRetrievalRequest`](BlockRetrievalRequest) enum was introduced to replace the old
+///    [`BlockRetrievalRequest`](BlockRetrievalRequest) struct
+///
+/// Please use the [`BlockRetrievalRequest`](BlockRetrievalRequest) enum going forward once this enum
+/// is introduced in the next release
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct BlockRetrievalRequestV1 {
     block_id: HashValue,
     num_blocks: u64,
     target_block_id: Option<HashValue>,
 }
 
-impl BlockRetrievalRequest {
+impl BlockRetrievalRequestV1 {
     pub fn new(block_id: HashValue, num_blocks: u64) -> Self {
         Self {
             block_id,
@@ -61,11 +101,67 @@ impl BlockRetrievalRequest {
     }
 }
 
-impl fmt::Display for BlockRetrievalRequest {
+impl fmt::Display for BlockRetrievalRequestV1 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "[BlockRetrievalRequest starting from id {} with {} blocks]",
+            "[BlockRetrievalRequestV1 starting from id {} with {} blocks]",
+            self.block_id, self.num_blocks
+        )
+    }
+}
+
+/// RPC to get a chain of block of the given length starting from the given block id.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct BlockRetrievalRequestV2 {
+    block_id: HashValue,
+    num_blocks: u64,
+    target_round: u64,
+}
+
+impl BlockRetrievalRequestV2 {
+    pub fn new(block_id: HashValue, num_blocks: u64, target_round: u64) -> Self {
+        BlockRetrievalRequestV2 {
+            block_id,
+            num_blocks,
+            target_round,
+        }
+    }
+
+    pub fn new_with_target_round(block_id: HashValue, num_blocks: u64, target_round: u64) -> Self {
+        BlockRetrievalRequestV2 {
+            block_id,
+            num_blocks,
+            target_round,
+        }
+    }
+
+    pub fn block_id(&self) -> HashValue {
+        self.block_id
+    }
+
+    pub fn num_blocks(&self) -> u64 {
+        self.num_blocks
+    }
+
+    pub fn target_round(&self) -> u64 {
+        self.target_round
+    }
+
+    /// The window start block is either exactly at the target round, or it is at a higher round
+    /// and its parent is at a lower round than the target round.
+    pub fn is_window_start_block(&self, block: &Block) -> bool {
+        block.round() == self.target_round()
+            || (block.round() > self.target_round()
+                && block.quorum_cert().certified_block().round() < self.target_round())
+    }
+}
+
+impl fmt::Display for BlockRetrievalRequestV2 {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "[BlockRetrievalRequestV2 starting from id {} with {} blocks]",
             self.block_id, self.num_blocks
         )
     }
@@ -103,27 +199,70 @@ impl BlockRetrievalResponse {
         &self.blocks
     }
 
+    pub fn verify_inner(&self, retrieval_request: &BlockRetrievalRequest) -> anyhow::Result<()> {
+        match &retrieval_request {
+            BlockRetrievalRequest::V1(retrieval_request) => {
+                ensure!(
+                    self.status != BlockRetrievalStatus::Succeeded
+                        || self.blocks.len() as u64 == retrieval_request.num_blocks(),
+                    "not enough blocks returned, expect {}, get {}",
+                    retrieval_request.num_blocks(),
+                    self.blocks.len(),
+                );
+                ensure!(
+                    self.status == BlockRetrievalStatus::SucceededWithTarget
+                        || !self
+                            .blocks
+                            .iter()
+                            .any(|block| retrieval_request.match_target_id(block.id())),
+                    "target was found, but response is not marked as SucceededWithTarget",
+                );
+                ensure!(
+                    self.status != BlockRetrievalStatus::SucceededWithTarget
+                        || self
+                            .blocks
+                            .last()
+                            .map_or(false, |block| retrieval_request.match_target_id(block.id())),
+                    "target not found in blocks returned, expect {:?}",
+                    retrieval_request.target_block_id(),
+                );
+            },
+            BlockRetrievalRequest::V2(retrieval_request) => {
+                ensure!(
+                    self.status != BlockRetrievalStatus::Succeeded
+                        || self.blocks.len() as u64 == retrieval_request.num_blocks(),
+                    "not enough blocks returned, expect {}, get {}",
+                    retrieval_request.num_blocks(),
+                    self.blocks.len(),
+                );
+                ensure!(
+                    self.status == BlockRetrievalStatus::SucceededWithTarget
+                        || !self.blocks.last().map_or(false, |block| {
+                            block.round() < retrieval_request.target_round()
+                                || retrieval_request.is_window_start_block(block)
+                        }),
+                    "smaller than target round or window start block was found, but response is not marked as SucceededWithTarget",
+                );
+                ensure!(
+                    self.status != BlockRetrievalStatus::SucceededWithTarget
+                        || self.blocks.last().map_or(false, |block| retrieval_request
+                            .is_window_start_block(block)),
+                    "target not found in blocks returned, expect {},",
+                    retrieval_request.target_round(),
+                );
+            },
+        }
+
+        Ok(())
+    }
+
     pub fn verify(
         &self,
         retrieval_request: BlockRetrievalRequest,
         sig_verifier: &ValidatorVerifier,
     ) -> anyhow::Result<()> {
-        ensure!(
-            self.status != BlockRetrievalStatus::Succeeded
-                || self.blocks.len() as u64 == retrieval_request.num_blocks(),
-            "not enough blocks returned, expect {}, get {}",
-            retrieval_request.num_blocks(),
-            self.blocks.len(),
-        );
-        ensure!(
-            self.status != BlockRetrievalStatus::SucceededWithTarget
-                || self
-                    .blocks
-                    .last()
-                    .map_or(false, |block| retrieval_request.match_target_id(block.id())),
-            "target not found in blocks returned, expect {:?}",
-            retrieval_request.target_block_id(),
-        );
+        self.verify_inner(&retrieval_request)?;
+
         self.blocks
             .iter()
             .try_fold(retrieval_request.block_id(), |expected_id, block| {

@@ -59,7 +59,7 @@ impl AptosEnvironment {
     /// block executor where this optimization is needed. Note: whether the optimization will be
     /// enabled or not depends on the feature flag.
     pub fn new_with_delayed_field_optimization_enabled(state_view: &impl StateView) -> Self {
-        let env = Environment::new(state_view, true, None).try_enable_delayed_field_optimization();
+        let env = Environment::new(state_view, false, None).try_enable_delayed_field_optimization();
         Self(Arc::new(env))
     }
 
@@ -370,5 +370,27 @@ pub mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_environment_with_injected_create_signer_for_gov_sim() {
+        let state_view = MockStateView::empty();
+
+        let not_injected_envs = [
+            AptosEnvironment::new(&state_view),
+            AptosEnvironment::new_with_gas_hook(&state_view, Arc::new(|_| {})),
+            AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view),
+        ];
+        for env in not_injected_envs {
+            #[allow(deprecated)]
+            let not_enabled = !env.inject_create_signer_for_gov_sim();
+            assert!(not_enabled);
+        }
+
+        // Injected.
+        let env = AptosEnvironment::new_with_injected_create_signer_for_gov_sim(&state_view);
+        #[allow(deprecated)]
+        let enabled = env.inject_create_signer_for_gov_sim();
+        assert!(enabled);
     }
 }

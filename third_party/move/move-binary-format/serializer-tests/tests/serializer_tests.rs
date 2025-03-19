@@ -6,12 +6,12 @@ use move_binary_format::{
     access::ModuleAccess,
     deserializer::DeserializerConfig,
     file_format::{
-        empty_module, AbilitySet, CompiledModule, FunctionHandle, IdentifierIndex, Signature,
-        SignatureIndex, SignatureToken,
+        empty_module, CompiledModule, FunctionHandle, IdentifierIndex, Signature, SignatureIndex,
+        SignatureToken,
     },
     file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_MAX},
 };
-use move_core_types::identifier::Identifier;
+use move_core_types::{ability::AbilitySet, identifier::Identifier};
 use proptest::prelude::*;
 
 proptest! {
@@ -72,6 +72,7 @@ fn simple_generic_module_round_trip() {
         return_: sig_unit_idx,
         type_parameters: vec![AbilitySet::EMPTY],
         access_specifiers: None,
+        attributes: vec![],
     });
 
     let mut serialized = Vec::with_capacity(2048);

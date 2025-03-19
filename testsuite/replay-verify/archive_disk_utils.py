@@ -17,6 +17,7 @@ from typing import Tuple, List, Optional, Any
 
 # Constants
 DISK_COPIES = 1
+STORAGE_CLASS = "ssd-data-xfs-immediate"
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -418,7 +419,7 @@ def create_persistent_volume(
                 read_only=read_only,
             ),
             persistent_volume_reclaim_policy="Delete",
-            storage_class_name="ssd-data-xfs",
+            storage_class_name=STORAGE_CLASS,
         ),
     )
 
@@ -433,7 +434,7 @@ def create_persistent_volume(
         spec=client.V1PersistentVolumeClaimSpec(
             access_modes=[access_mode],
             resources=client.V1ResourceRequirements(requests={"storage": storage_size}),
-            storage_class_name="ssd-data-xfs",
+            storage_class_name=STORAGE_CLASS,
             volume_name=pv_name,
             # Remove the selector since we're using volume_name for direct binding
         ),
@@ -506,7 +507,8 @@ def create_one_pvc_from_snapshot(
 ) -> str:
     config.load_kube_config()
     api_instance = client.CoreV1Api()
-    storage_size = "10Ti" if TESTNET_SNAPSHOT_NAME in snapshot_name else "8Ti"
+    # testnet and mainnet disk size could be different
+    storage_size = "10Ti" if TESTNET_SNAPSHOT_NAME in snapshot_name else "10Ti"
     # Define the PVC manifest
     pvc_manifest = {
         "apiVersion": "v1",
@@ -521,7 +523,7 @@ def create_one_pvc_from_snapshot(
         "spec": {
             "accessModes": ["ReadOnlyMany"],
             "resources": {"requests": {"storage": storage_size}},
-            "storageClassName": "ssd-data-xfs",
+            "storageClassName": STORAGE_CLASS,
             "volumeMode": "Filesystem",
             "dataSource": {
                 "name": f"{snapshot_name}",

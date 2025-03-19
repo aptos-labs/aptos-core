@@ -146,28 +146,26 @@ module 0x42::VerifyVector {
     }
 
     // Moves all of the elements of the `other` vector into the `v` vector.
-    fun verify_append<Element>(v: &mut vector<Element>, other: vector<Element>) {
-        let o = &mut other;
-        vector::reverse(o);
+    fun verify_append<Element>(v: &mut vector<Element>, other: &mut vector<Element>) {
+        vector::reverse(other);
         while ({
             spec {
                 invariant len(v) >= len(old(v));
-                invariant len(o) <= len(other);
-                invariant len(v) + len(o) == len(old(v)) + len(other);
+                invariant len(other) <= len(old(other));
+                invariant len(v) + len(other) == len(old(v)) + len(old(other));
                 invariant forall k in 0..len(old(v)): v[k] == old(v)[k];
-                invariant forall k in 0..len(o): o[k] == other[len(other)-1-k];
-                invariant forall k in len(old(v))..len(v): v[k] == other[k-len(old(v))];
+                invariant forall k in 0..len(other): other[k] == old(other)[len(old(other))-1-k];
+                invariant forall k in len(old(v))..len(v): v[k] == old(other)[k-len(old(v))];
             };
-            !vector::is_empty(o)
+            !vector::is_empty(other)
         }) {
-            vector::push_back(v, vector::pop_back(o))
+            vector::push_back(v, vector::pop_back(other))
         };
-        vector::destroy_empty(other);
     }
     spec verify_append {
-        ensures len(v) == old(len(v)) + len(other);
+        ensures len(v) == old(len(v)) + old(len(other));
         ensures v[0..len(old(v))] == old(v);
-        ensures v[len(old(v))..len(v)] == other;
+        ensures v[len(old(v))..len(v)] == old(other);
     }
 
     fun verify_append_with_unroll<Element>(v: &mut vector<Element>, other: vector<Element>) {

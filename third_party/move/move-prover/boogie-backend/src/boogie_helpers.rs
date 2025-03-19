@@ -13,12 +13,15 @@ use move_core_types::account_address::AccountAddress;
 use move_model::{
     ast::{Address, MemoryLabel, TempIndex, Value},
     model::{
-        FieldEnv, FunctionEnv, GlobalEnv, ModuleEnv, QualifiedInstId, SpecFunId, StructEnv,
-        StructId, SCRIPT_MODULE_NAME,
+        FieldEnv, FieldId, FunctionEnv, GlobalEnv, ModuleEnv, QualifiedInstId, SpecFunId,
+        StructEnv, StructId, SCRIPT_MODULE_NAME,
     },
     pragmas::INTRINSIC_TYPE_MAP,
     symbol::Symbol,
     ty::{PrimitiveType, Type},
+};
+use move_prover_bytecode_pipeline::number_operation::{
+    GlobalNumberOperationState, NumOperation::Bitwise,
 };
 use move_stackless_bytecode::{function_target::FunctionTarget, stackless_bytecode::Constant};
 use num::BigUint;
@@ -80,9 +83,23 @@ pub fn boogie_struct_name_bv(struct_env: &StructEnv<'_>, inst: &[Type], bv_flag:
 /// Return field selector for given field.
 pub fn boogie_field_sel(field_env: &FieldEnv<'_>) -> String {
     let struct_env = &field_env.struct_env;
+    // Attach variant name to field name if it is an enum field
+    // to distinguish fields with the same name but different types in different variants
+    let variant = if field_env.get_variant().is_some() {
+        format!(
+            "_{}",
+            field_env
+                .get_variant()
+                .unwrap()
+                .display(struct_env.symbol_pool())
+        )
+    } else {
+        "".to_string()
+    };
     format!(
-        "${}",
+        "${}{}",
         field_env.get_name().display(struct_env.symbol_pool()),
+        variant
     )
 }
 
@@ -95,6 +112,65 @@ pub fn boogie_field_update(field_env: &FieldEnv<'_>, inst: &[Type]) -> String {
         suffix,
         field_env.get_name().display(struct_env.symbol_pool()),
     )
+}
+
+/// Return field update for given field in variant.
+pub fn boogie_variant_field_update(
+    field_env: &FieldEnv<'_>,
+    field_type_name: String,
+    inst: &[Type],
+) -> String {
+    let struct_env = &field_env.struct_env;
+    let suffix = boogie_type_suffix_for_struct(struct_env, inst, false);
+    format!(
+        "$Update'{}'_{}_{}",
+        suffix,
+        // remove parentheses and spaces from field type name
+        field_type_name.replace(['(', ')'], "").replace(' ', "_"),
+        field_env.get_name().display(struct_env.symbol_pool()),
+    )
+}
+
+/// Return true if the field is a bitwise field
+pub fn field_bv_flag_global_state(
+    global_state: &GlobalNumberOperationState,
+    field_env: &FieldEnv,
+) -> bool {
+    let operation_map = &global_state.struct_operation_map;
+    let mid = field_env.struct_env.module_env.get_id();
+    let sid = field_env.struct_env.get_id();
+    let field_id = if field_env.struct_env.has_variants() {
+        let variant = field_env
+            .get_variant()
+            .expect("each field of enum must have a corresponding variant");
+        let pool = field_env.struct_env.symbol_pool();
+        FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
+            pool.string(variant).as_str(),
+            pool.string(field_env.get_name()).as_str(),
+        )))
+    } else {
+        field_env.get_id()
+    };
+    if let Some(struct_info) = operation_map.get(&(mid, sid)) {
+        matches!(struct_info.get(&field_id), Some(&Bitwise))
+    } else {
+        false
+    }
+}
+
+/// Return boogie type for given field
+pub fn boogie_type_for_struct_field(
+    global_state: &GlobalNumberOperationState,
+    field: &FieldEnv,
+    env: &GlobalEnv,
+    ty: &Type,
+) -> String {
+    let bv_flag = field_bv_flag_global_state(global_state, field);
+    if bv_flag {
+        boogie_bv_type(env, ty)
+    } else {
+        boogie_type(env, ty)
+    }
 }
 
 /// Return boogie name of given function.
@@ -592,7 +668,6 @@ pub fn boogie_value(env: &GlobalEnv, _options: &BoogieOptions, val: &Value) -> S
                 .collect_vec(),
         ),
         Value::Tuple(vec) => format!("<<unsupported Tuple({:?})>>", vec),
-        Value::Function(mid, fid) => format!("<unimplemented value Function({:?}, {:?}>", mid, fid), // TODO(LAMBDA)
     }
 }
 

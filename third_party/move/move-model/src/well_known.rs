@@ -28,6 +28,8 @@ pub fn is_verify_only_attribute_name(s: &str) -> bool {
 pub const VECTOR_MODULE: &str = "vector";
 pub const VECTOR_BORROW_MUT: &str = "vector::borrow_mut";
 pub const EVENT_EMIT_EVENT: &str = "event::emit_event";
+pub const BORROW_NAME: &str = "borrow";
+pub const BORROW_MUT_NAME: &str = "borrow_mut";
 
 pub const TYPE_NAME_MOVE: &str = "type_info::type_name";
 pub const TYPE_NAME_SPEC: &str = "type_info::$type_name";
@@ -63,3 +65,7 @@ pub const UNSPECIFIED_ABORT_CODE: u64 = make_abort_code(0);
 
 // Used when a runtime value falls through a match.
 pub const INCOMPLETE_MATCH_ABORT_CODE: u64 = make_abort_code(1);
+
+// Well known attributes
+pub const PERSISTENT_ATTRIBUTE: &str = "persistent";
+pub const MODULE_LOCK_ATTRIBUTE: &str = "module_lock";

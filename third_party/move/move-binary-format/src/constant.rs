@@ -20,6 +20,7 @@ fn sig_to_ty(sig: &SignatureToken) -> Option<MoveTypeLayout> {
         SignatureToken::Reference(_)
         | SignatureToken::MutableReference(_)
         | SignatureToken::Struct(_)
+        | SignatureToken::Function(..)
         | SignatureToken::TypeParameter(_)
         | SignatureToken::StructInstantiation(_, _) => None,
     }
@@ -39,6 +40,7 @@ fn construct_ty_for_constant(layout: &MoveTypeLayout) -> Option<SignatureToken> 
             construct_ty_for_constant(l.as_ref())?,
         ))),
         MoveTypeLayout::Struct(_) => None,
+        MoveTypeLayout::Function(_) => None,
         MoveTypeLayout::Bool => Some(SignatureToken::Bool),
 
         // It is not possible to have native layout for constant values.

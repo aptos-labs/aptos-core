@@ -112,29 +112,8 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(false),
         },
         Experiment {
-            name: Experiment::LAMBDA_FIELDS.to_string(),
-            description: "Turns on or off function values in struct fields".to_string(),
-            default: Given(false),
-        },
-        Experiment {
-            name: Experiment::LAMBDA_LIFTING.to_string(),
-            description: "Turns on or off lambda lifting".to_string(),
-            default: Given(false),
-        },
-        Experiment {
-            name: Experiment::LAMBDA_IN_PARAMS.to_string(),
-            description: "Turns on or off function values as parameters to non-inline functions"
-                .to_string(),
-            default: Given(false),
-        },
-        Experiment {
-            name: Experiment::LAMBDA_IN_RETURNS.to_string(),
-            description: "Turns on or off function values in function return values".to_string(),
-            default: Given(false),
-        },
-        Experiment {
-            name: Experiment::LAMBDA_VALUES.to_string(),
-            description: "Turns on or off first-class function values".to_string(),
+            name: Experiment::LAMBDA_LIFTING_INLINE.to_string(),
+            description: "Whether inline functions shall be included in lambda lifting".to_string(),
             default: Given(false),
         },
         Experiment {
@@ -225,10 +204,10 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         },
         Experiment {
             name: Experiment::GEN_ACCESS_SPECIFIERS.to_string(),
-            description: "Whether to generate access specifiers in the file format.\
-             This is currently off by default to mitigate bug #12623."
+            description: "Whether to generate access specifiers in the file format if \
+            language version supports them."
                 .to_string(),
-            default: Given(false),
+            default: Given(true),
         },
         Experiment {
             name: Experiment::ATTACH_COMPILED_MODULE.to_string(),
@@ -276,6 +255,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             description: "Enable json format for compiler messages".to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::FAIL_ON_WARNING.to_string(),
+            description: "Fail compilation if there is a warning".to_string(),
+            default: Given(false),
+        },
     ];
     experiments
         .into_iter()
@@ -296,16 +280,13 @@ impl Experiment {
     pub const COPY_PROPAGATION: &'static str = "copy-propagation";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
     pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";
+    pub const FAIL_ON_WARNING: &'static str = "fail-on-warning";
     pub const FLUSH_WRITES_OPTIMIZATION: &'static str = "flush-writes-optimization";
     pub const GEN_ACCESS_SPECIFIERS: &'static str = "gen-access-specifiers";
     pub const INLINING: &'static str = "inlining";
     pub const KEEP_INLINE_FUNS: &'static str = "keep-inline-funs";
     pub const KEEP_UNINIT_ANNOTATIONS: &'static str = "keep-uninit-annotations";
-    pub const LAMBDA_FIELDS: &'static str = "lambda-fields";
-    pub const LAMBDA_IN_PARAMS: &'static str = "lambda-in-params";
-    pub const LAMBDA_IN_RETURNS: &'static str = "lambda-in-returns";
-    pub const LAMBDA_LIFTING: &'static str = "lambda-lifting";
-    pub const LAMBDA_VALUES: &'static str = "lambda-values";
+    pub const LAMBDA_LIFTING_INLINE: &'static str = "lambda-lifting-inline";
     pub const LINT_CHECKS: &'static str = "lint-checks";
     pub const MESSAGE_FORMAT_JSON: &'static str = "compiler-message-format-json";
     pub const OPTIMIZE: &'static str = "optimize";

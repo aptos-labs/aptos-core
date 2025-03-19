@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::IncludedArtifactsArgs;
-use crate::common::types::{CliCommand, CliError, CliResult, CliTypedResult, MovePackageDir};
+use crate::common::types::{CliCommand, CliError, CliResult, CliTypedResult, MovePackageOptions};
 use anyhow::Context;
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_types::transaction::EntryABI;
@@ -43,7 +43,7 @@ pub struct ShowAbi {
     included_artifacts_args: IncludedArtifactsArgs,
 
     #[clap(flatten)]
-    move_options: MovePackageDir,
+    move_options: MovePackageOptions,
 }
 
 #[async_trait]

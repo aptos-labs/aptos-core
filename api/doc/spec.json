@@ -1266,8 +1266,8 @@
         "tags": [
           "Accounts"
         ],
-        "summary": "Get account resources",
-        "description": "Retrieves all account resources for a given account and a specific ledger version.  If the\nledger version is not specified in the request, the latest ledger version is used.\n\nThe Aptos nodes prune account state history, via a configurable time window.\nIf the requested ledger version has been pruned, the server responds with a 410.",
+        "summary": "Get account balance",
+        "description": "Retrieves account balance for coins / fungible asset (only for primary fungible asset store)\nfor a given account, asset type and a specific ledger version.  If the\nledger version is not specified in the request, the latest ledger version is used.\n\nThe Aptos nodes prune account state history, via a configurable time window.\nIf the requested ledger version has been pruned, the server responds with a 410.",
         "parameters": [
           {
             "name": "address",

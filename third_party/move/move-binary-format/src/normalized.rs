@@ -8,12 +8,12 @@ use crate::{
     access::ModuleAccess,
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        AbilitySet, CompiledModule, FieldDefinition, FunctionDefinition, SignatureToken,
-        StructDefinition, StructFieldInformation, StructTypeParameter, TypeParameterIndex,
-        Visibility,
+        CompiledModule, FieldDefinition, FunctionDefinition, SignatureToken, StructDefinition,
+        StructFieldInformation, StructTypeParameter, TypeParameterIndex, Visibility,
     },
 };
 use move_core_types::{
+    ability::AbilitySet,
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
@@ -192,6 +192,8 @@ impl Type {
             TypeParameter(i) => Type::TypeParameter(*i),
             Reference(t) => Type::Reference(Box::new(Type::new(m, t))),
             MutableReference(t) => Type::MutableReference(Box::new(Type::new(m, t))),
+
+            Function(..) => panic!("normalized representation does not support function types"),
         }
     }
 
@@ -396,6 +398,7 @@ impl From<TypeTag> for Type {
                 name: s.name,
                 type_arguments: s.type_args.into_iter().map(|ty| ty.into()).collect(),
             },
+            TypeTag::Function(_) => panic!("function types not supported in normalized types"),
         }
     }
 }

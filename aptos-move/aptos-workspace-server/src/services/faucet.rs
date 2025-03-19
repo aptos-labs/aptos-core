@@ -1,7 +1,10 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::{ArcError, IP_LOCAL_HOST};
+use crate::{
+    common::{ArcError, IP_LOCAL_HOST},
+    no_panic_println,
+};
 use anyhow::{anyhow, Context, Result};
 use aptos_faucet_core::server::{FunderKeyEnum, RunConfig};
 use aptos_localnet::health_checker::HealthChecker;
@@ -38,7 +41,7 @@ pub fn start_faucet(
             .await
             .context("failed to start faucet: indexer grpc did not start successfully")?;
 
-        println!("Starting faucet..");
+        no_panic_println!("Starting faucet..");
 
         let faucet_run_config = RunConfig::build_for_cli(
             Url::parse(&format!("http://{}:{}", IP_LOCAL_HOST, api_port)).unwrap(),
@@ -67,9 +70,10 @@ pub fn start_faucet(
             HealthChecker::http_checker_from_port(faucet_port, "Faucet".to_string());
         faucet_health_checker.wait(None).await?;
 
-        println!(
+        no_panic_println!(
             "Faucet is ready. Endpoint: http://{}:{}",
-            IP_LOCAL_HOST, faucet_port
+            IP_LOCAL_HOST,
+            faucet_port
         );
 
         Ok(faucet_port)

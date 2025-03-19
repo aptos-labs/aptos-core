@@ -3,9 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
+use legacy_move_compiler::{
+    shared::{known_attributes::KnownAttribute, PackagePaths},
+    Flags,
+};
 use move_command_line_common::testing::get_compiler_exp_extension;
-use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
-use move_model::{options::ModelBuilderOptions, run_model_builder_with_options};
+use move_model::{
+    options::ModelBuilderOptions, run_model_builder_with_options_and_compilation_flags,
+};
 use move_prover_test_utils::baseline_test::verify_or_update_baseline;
 use std::path::Path;
 
@@ -15,12 +20,12 @@ fn test_runner(path: &Path, options: ModelBuilderOptions) -> datatest_stable::Re
         paths: vec![path.to_str().unwrap().to_string()],
         named_address_map: std::collections::BTreeMap::<String, _>::new(),
     }];
-    let env = run_model_builder_with_options(
+    let env = run_model_builder_with_options_and_compilation_flags(
         targets,
         vec![],
         vec![],
         options,
-        false,
+        Flags::verification(),
         KnownAttribute::get_all_attribute_names(),
     )?;
     let diags = if env.diag_count(Severity::Warning) > 0 {
@@ -36,14 +41,9 @@ fn test_runner(path: &Path, options: ModelBuilderOptions) -> datatest_stable::Re
 }
 
 fn runner(path: &Path) -> datatest_stable::Result<()> {
-    if path.display().to_string().contains("/compile_via_model/") {
-        test_runner(path, ModelBuilderOptions {
-            compile_via_model: true,
-            ..Default::default()
-        })
-    } else {
-        test_runner(path, ModelBuilderOptions::default())
-    }
+    test_runner(path, ModelBuilderOptions {
+        ..Default::default()
+    })
 }
 
 datatest_stable::harness!(runner, "tests/sources", r".*\.move$");

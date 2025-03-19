@@ -118,11 +118,11 @@ backup:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: 8
+      cpu: 6
       memory: 8Gi
     requests:
       cpu: 4
-      memory: 8Gi
+      memory: 4Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -135,6 +135,9 @@ backup:
       bucket:
     gcs:
       bucket:
+    r2:
+      bucket:
+      endpoint_url:
     azure:
       account:
       container:
@@ -151,14 +154,16 @@ backup_verify:
   schedule: "@daily"
   resources:
     limits:
-      cpu: 8
-      memory: 16Gi
+      cpu: 32
+      memory: 60Gi
     requests:
       cpu: 8
-      memory: 16Gi
+      memory: 8Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  config:
+    concurrent_downloads: 50
 
 backup_compaction:
   # -- The schedule for backup compaction

@@ -128,9 +128,10 @@ impl AccountsApi {
         .await
     }
 
-    /// Get account resources
+    /// Get account balance
     ///
-    /// Retrieves all account resources for a given account and a specific ledger version.  If the
+    /// Retrieves account balance for coins / fungible asset (only for primary fungible asset store)
+    /// for a given account, asset type and a specific ledger version.  If the
     /// ledger version is not specified in the request, the latest ledger version is used.
     ///
     /// The Aptos nodes prune account state history, via a configurable time window.
@@ -603,7 +604,7 @@ impl Account {
         field_name: Identifier,
     ) -> Result<EventKey, BasicErrorWith404> {
         // Parse the struct tag
-        let struct_tag: StructTag = struct_tag
+        let struct_tag: StructTag = (&struct_tag)
             .try_into()
             .context("Given event handle was invalid")
             .map_err(|err| {

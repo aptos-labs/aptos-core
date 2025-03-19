@@ -30,7 +30,7 @@ mod online_execution;
 
 pub use data_collection::*;
 pub use execution::*;
-use move_compiler::compiled_unit::CompiledUnitEnum;
+use legacy_move_compiler::compiled_unit::CompiledUnitEnum;
 use move_core_types::language_storage::ModuleId;
 use move_model::metadata::CompilerVersion;
 use move_package::{

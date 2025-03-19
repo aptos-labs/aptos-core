@@ -16,19 +16,24 @@ pub mod utils;
 #[cfg(test)]
 mod tests;
 
-use anyhow::anyhow;
+use crate::utils::ensure_max_open_files_limit;
+use anyhow::{anyhow, Context};
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
 use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
+use aptos_genesis::builder::GenesisConfiguration;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
-use aptos_types::{chain_id::ChainId, on_chain_config::OnChainJWKConsensusConfig};
+use aptos_types::{
+    chain_id::ChainId, keyless::Groth16VerificationKey, on_chain_config::OnChainJWKConsensusConfig,
+};
 use clap::Parser;
 use futures::channel::{mpsc, oneshot};
 use hex::{FromHex, FromHexError};
 use rand::{rngs::StdRng, SeedableRng};
+use serde_json::Value;
 use std::{
     env, fs,
     io::Write,
@@ -236,6 +241,12 @@ pub fn start_and_report_ports(
 
     // Instantiate the global logger
     let (remote_log_receiver, logger_filter_update) = logger::create_logger(&config, log_file);
+
+    // Ensure `ulimit -n`.
+    ensure_max_open_files_limit(
+        config.storage.ensure_rlimit_nofile,
+        config.storage.assert_rlimit_nofile,
+    );
 
     assert!(
         !cfg!(feature = "testing") && !cfg!(feature = "fuzzing"),
@@ -573,13 +584,26 @@ where
             genesis_config.allow_new_validators = true;
             genesis_config.epoch_duration_secs = EPOCH_LENGTH_SECS;
             genesis_config.recurring_lockup_duration_secs = 7200;
-            genesis_config.jwk_consensus_config_override = match env::var("INITIALIZE_JWK_CONSENSUS") {
+
+            match env::var("ENABLE_KEYLESS_DEFAULT") {
                 Ok(val) if val.as_str() == "1" => {
-                    let config = OnChainJWKConsensusConfig::default_enabled();
-                    println!("Flag `INITIALIZE_JWK_CONSENSUS` detected, will enable JWK Consensus for all default OIDC providers in genesis: {:?}", config);
-                    Some(config)
-                }
-                _ => None,
+                    let response = ureq::get("https://api.devnet.aptoslabs.com/v1/accounts/0x1/resource/0x1::keyless_account::Groth16VerificationKey").call();
+                    let json: Value = response.into_json().expect("Failed to parse JSON");
+                    configure_keyless_with_vk(genesis_config, json).unwrap();
+                },
+                _ => {},
+            };
+
+            if let Ok(url) = env::var("INSTALL_KEYLESS_GROTH16_VK_FROM_URL") {
+                let response = ureq::get(&url).call();
+                let json: Value = response.into_json().expect("Failed to parse JSON");
+                configure_keyless_with_vk(genesis_config, json).unwrap();
+            };
+
+            if let Ok(path) = env::var("INSTALL_KEYLESS_GROTH16_VK_FROM_PATH") {
+                let file_content = fs::read_to_string(&path).unwrap_or_else(|_| panic!("Failed to read verification key file: {}", path));
+                let json: Value = serde_json::from_str(&file_content).expect("Failed to parse JSON");
+                configure_keyless_with_vk(genesis_config, json).unwrap();
             };
         })))
         .with_randomize_first_validator_ports(random_ports);
@@ -605,6 +629,55 @@ where
     node_config.admin_service.enabled = Some(true);
 
     Ok(node_config)
+}
+
+fn configure_keyless_with_vk(
+    genesis_config: &mut GenesisConfiguration,
+    json: Value,
+) -> anyhow::Result<()> {
+    let vk = parse_groth16_vk_from_json(&json)?;
+    genesis_config.keyless_groth16_vk = Some(vk);
+    genesis_config.jwk_consensus_config_override =
+        Some(OnChainJWKConsensusConfig::default_enabled());
+    Ok(())
+}
+
+fn parse_groth16_vk_from_json(json: &Value) -> Result<Groth16VerificationKey, anyhow::Error> {
+    println!(
+        "Loading verification key from JSON:\n{}",
+        serde_json::to_string_pretty(&json).unwrap()
+    );
+    let vk_data = json["data"].clone();
+    let gamma_abc_g1 = vk_data["gamma_abc_g1"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|val| {
+            let hex_str = val.as_str().unwrap();
+            let cleaned_hex = hex_str.strip_prefix("0x").unwrap_or(hex_str);
+            hex::decode(cleaned_hex).expect("Failed to decode gamma_abc_g1 hex")
+        })
+        .collect::<Vec<Vec<u8>>>();
+
+    Ok(Groth16VerificationKey {
+        alpha_g1: decode_hex_field(&vk_data, "alpha_g1").unwrap(),
+        beta_g2: decode_hex_field(&vk_data, "beta_g2").unwrap(),
+        gamma_g2: decode_hex_field(&vk_data, "gamma_g2").unwrap(),
+        delta_g2: decode_hex_field(&vk_data, "delta_g2").unwrap(),
+        gamma_abc_g1,
+    })
+}
+
+fn decode_hex_field(json: &Value, field: &str) -> Result<Vec<u8>, anyhow::Error> {
+    let hex_str = json[field]
+        .as_str()
+        .ok_or_else(|| anyhow!("Missing or invalid {} in verification key file", field))?;
+
+    // Strip "0x" prefix if present
+    let cleaned_hex = hex_str.strip_prefix("0x").unwrap_or(hex_str);
+
+    // Decode hex string
+    hex::decode(cleaned_hex).with_context(|| format!("Failed to decode hex for field {}", field))
 }
 
 /// Initializes the node environment and starts the node

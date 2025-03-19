@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: captured variable `x` cannot be modified inside of a lambda
+  ┌─ tests/checking-lang-v2.2/lambda/inline-parity/op_with_side_effect_49.move:9:22
+  │
+9 │         x + call(|| {x = x + 1; x}) + call(|| {x = x + 7; x})
+  │                      ^
+
+error: captured variable `x` cannot be modified inside of a lambda
+  ┌─ tests/checking-lang-v2.2/lambda/inline-parity/op_with_side_effect_49.move:9:48
+  │
+9 │         x + call(|| {x = x + 1; x}) + call(|| {x = x + 7; x})
+  │                                                ^

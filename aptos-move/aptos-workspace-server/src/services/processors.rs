@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{node::get_data_service_url, postgres::get_postgres_connection_string};
-use crate::common::{make_shared, ArcError};
+use crate::{
+    common::{make_shared, ArcError},
+    no_panic_println,
+};
 use anyhow::{anyhow, Context, Result};
 use aptos_localnet::{health_checker::HealthChecker, processors::get_processor_config};
 use diesel::Connection;
@@ -53,7 +56,7 @@ fn start_processor(
     let handle_processor = tokio::spawn(async move {
         let (postgres_port, indexer_grpc_port) = fut_prerequisites_.await?;
 
-        println!("Starting processor {}..", processor_name_);
+        no_panic_println!("Starting processor {}..", processor_name_);
 
         let config = IndexerGrpcProcessorConfig {
             processor_config: get_processor_config(&processor_name_)?,
@@ -99,7 +102,7 @@ fn start_processor(
 
         processor_health_checker.wait(None).await?;
 
-        println!("Processor {} is ready.", processor_name_);
+        no_panic_println!("Processor {} is ready.", processor_name_);
 
         Ok(())
     };
@@ -130,7 +133,7 @@ pub fn start_all_processors(
             .await
             .context("failed to run migration: postgres did not start successfully")?;
 
-        println!("Starting migration..");
+        no_panic_println!("Starting migration..");
 
         let connection_string = get_postgres_connection_string(postgres_port);
 
@@ -147,7 +150,7 @@ pub fn start_all_processors(
         .await
         .map_err(|err| anyhow!("failed to join task handle: {}", err))??;
 
-        println!("Migration done.");
+        no_panic_println!("Migration done.");
 
         Ok(postgres_port)
     };

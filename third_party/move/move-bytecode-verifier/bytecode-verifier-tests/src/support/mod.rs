@@ -29,6 +29,7 @@ pub fn dummy_procedure_module(code: Vec<Bytecode>) -> CompiledModule {
         return_: SignatureIndex(0),
         type_parameters: vec![],
         access_specifiers: None,
+        attributes: vec![],
     };
 
     module.function_handles.push(fun_handle);

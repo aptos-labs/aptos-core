@@ -44,6 +44,16 @@ data "aws_iam_policy_document" "backup-assume-role" {
       values   = ["sts.amazonaws.com"]
     }
   }
+  # Allow the AWS Backup service to assume this role
+  statement {
+    actions = ["sts:AssumeRole"]
+    effect  = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["backup.amazonaws.com"]
+    }
+  }
 }
 
 data "aws_iam_policy_document" "backup" {
@@ -69,10 +79,9 @@ data "aws_iam_policy_document" "backup" {
 }
 
 resource "aws_iam_role" "backup" {
-  name                 = "aptos-${local.workspace_name}-backup"
-  path                 = var.iam_path
-  permissions_boundary = var.permissions_boundary_policy
-  assume_role_policy   = data.aws_iam_policy_document.backup-assume-role.json
+  name               = "aptos-${local.workspace_name}-backup"
+  path               = var.iam_path
+  assume_role_policy = data.aws_iam_policy_document.backup-assume-role.json
 }
 
 resource "aws_iam_role_policy" "backup" {

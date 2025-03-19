@@ -1,4 +1,6 @@
 ---
+AbilitySet:
+  NEWTYPESTRUCT: U8
 AbortInfo:
   STRUCT:
     - reason_name: STR
@@ -18,6 +20,13 @@ AbstractionAuthData:
         STRUCT:
           - signing_message_digest: BYTES
           - authenticator: BYTES
+    1:
+      DomainV1:
+        STRUCT:
+          - signing_message_digest: BYTES
+          - authenticator: BYTES
+          - account:
+              TYPENAME: DomainAccount
 AccessPath:
   STRUCT:
     - address:
@@ -241,6 +250,12 @@ DKGTranscriptMetadata:
 DepositEvent:
   STRUCT:
     - amount: U64
+DomainAccount:
+  ENUM:
+    0:
+      V1:
+        STRUCT:
+          - account_identity: BYTES
 DeprecatedPayload:
   STRUCT:
     - dummy_value: U64
@@ -341,6 +356,16 @@ FunctionInfo:
         TYPENAME: AccountAddress
     - module_name: STR
     - function_name: STR
+FunctionTag:
+  STRUCT:
+    - args:
+        SEQ:
+          TYPENAME: TypeTag
+    - results:
+        SEQ:
+          TYPENAME: TypeTag
+    - abilities:
+        TYPENAME: AbilitySet
 G1Bytes:
   NEWTYPESTRUCT:
     TUPLEARRAY:
@@ -782,6 +807,10 @@ TypeTag:
       u32: UNIT
     10:
       u256: UNIT
+    11:
+      Function:
+        NEWTYPE:
+          TYPENAME: FunctionTag
 ValidatorTransaction:
   ENUM:
     0:

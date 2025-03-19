@@ -28,6 +28,7 @@ module 0x42::m {
         s.receiver_ref_mut(x);
         s.receiver_more_generics(22);
         s.receiver_needs_type_args::<u64, u8>(x);
+        s.receiver_needs_type_args::<u64, u8>(x);
     }
 
     // Inference of receiver function

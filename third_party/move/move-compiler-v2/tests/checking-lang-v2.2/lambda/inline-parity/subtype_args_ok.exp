@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: unexpected token
+   ┌─ tests/checking-lang-v2.2/lambda/inline-parity/subtype_args_ok.move:23:37
+   │
+23 │     fun t2(f: |&u64, &mut u64| with copy) {
+   │           -                         ^ Expected ')'
+   │           │
+   │           To match this '('

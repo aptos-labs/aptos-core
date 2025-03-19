@@ -63,7 +63,7 @@ fn assert_value_conversion<S: StateView, V: Serialize>(
     expected_vm_value: VmMoveValue,
 ) {
     let move_type: MoveType = serde_json::from_value(json!(json_move_type)).unwrap();
-    let type_tag = move_type.try_into().unwrap();
+    let type_tag = (&move_type).try_into().unwrap();
     let vm_value = converter
         .try_into_vm_value(&type_tag, json!(json_value))
         .unwrap();
@@ -81,7 +81,7 @@ fn assert_value_conversion_bytes<S: StateView>(
     vm_bytes: &[u8],
 ) {
     let move_type: MoveType = serde_json::from_value(json!(json_move_type)).unwrap();
-    let type_tag = move_type.try_into().unwrap();
+    let type_tag = (&move_type).try_into().unwrap();
 
     let move_value_back = converter
         .try_into_move_value(&type_tag, &bcs::to_bytes(vm_bytes).unwrap())

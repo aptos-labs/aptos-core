@@ -87,6 +87,8 @@ pub const ACCESS_SPECIFIER_COUNT_MAX: u64 = 64;
 
 pub const SIGNATURE_TOKEN_DEPTH_MAX: usize = 256;
 
+pub const ATTRIBUTE_COUNT_MAX: u64 = 16;
+
 /// Constants for table types in the binary.
 ///
 /// The binary contains a subset of those tables. A table specification is a tuple (table type,
@@ -140,6 +142,7 @@ pub enum SerializedType {
     U16                     = 0xD,
     U32                     = 0xE,
     U256                    = 0xF,
+    FUNCTION                = 0x10
 }
 
 /// A marker for an option in the serialized output.
@@ -203,6 +206,16 @@ pub enum SerializedNativeStructFlag {
     NATIVE                  = 0x1,
     DECLARED                = 0x2,
     DECLARED_VARIANTS       = 0x3,
+}
+
+/// List of function attributes.
+#[rustfmt::skip]
+#[allow(non_camel_case_types)]
+#[repr(u8)]
+#[derive(Clone, Copy, Debug)]
+pub enum SerializedFunctionAttribute {
+    PERSISTENT   = 0x1,
+    MODULE_LOCK  = 0x2,
 }
 
 /// List of opcodes constants.
@@ -299,10 +312,14 @@ pub enum Opcodes {
     UNPACK_VARIANT_GENERIC      = 0x55,
     TEST_VARIANT                = 0x56,
     TEST_VARIANT_GENERIC        = 0x57,
+    // Since bytecode version 8
+    PACK_CLOSURE                = 0x58,
+    PACK_CLOSURE_GENERIC        = 0x59,
+    CALL_CLOSURE                = 0x5A,
 }
 
 /// Upper limit on the binary size
-pub const BINARY_SIZE_LIMIT: usize = usize::max_value();
+pub const BINARY_SIZE_LIMIT: usize = usize::MAX;
 
 /// A wrapper for the binary vector
 #[derive(Default, Debug)]
@@ -510,12 +527,11 @@ pub const VERSION_6: u32 = 6;
 pub const VERSION_7: u32 = 7;
 
 /// Version 8: changes compared to version 7
-/// + TBD
+/// + closure instructions
 pub const VERSION_8: u32 = 8;
 
-/// Mark which version is the latest version. Should be set to v8 once features
-/// are added.
-pub const VERSION_MAX: u32 = VERSION_7;
+/// Mark which version is the latest version.
+pub const VERSION_MAX: u32 = VERSION_8;
 
 /// Mark which version is the default version. This is the version used by default by tools like
 /// the compiler. Notice that this version might be different from the one supported on nodes.
@@ -789,6 +805,10 @@ pub fn instruction_key(instruction: &Bytecode) -> u8 {
         UnpackVariantGeneric(_) => Opcodes::UNPACK_VARIANT_GENERIC,
         TestVariant(_) => Opcodes::TEST_VARIANT,
         TestVariantGeneric(_) => Opcodes::TEST_VARIANT_GENERIC,
+        // Since bytecode version 8
+        PackClosure(..) => Opcodes::PACK_CLOSURE,
+        PackClosureGeneric(..) => Opcodes::PACK_CLOSURE_GENERIC,
+        CallClosure(_) => Opcodes::CALL_CLOSURE,
     };
     opcode as u8
 }

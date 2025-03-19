@@ -8,8 +8,9 @@ error: post-condition does not hold
    =     at tests/sources/functional/choice.move:16: simple_incorrect
    =         b = <redacted>
    =     at tests/sources/functional/choice.move:17: simple_incorrect
+   =         return = <redacted>
+   =     at tests/sources/functional/choice.move:17: simple_incorrect
    =         result = <redacted>
-   =     at tests/sources/functional/choice.move:18: simple_incorrect
    =     at tests/sources/functional/choice.move:22: simple_incorrect (spec)
    =         `TRACE(choose x: u64 where x >= 4 && x <= 5)` = <redacted>
 
@@ -49,6 +50,7 @@ error: post-condition does not hold
    =     at tests/sources/functional/choice.move:82: test_not_using_min_incorrect
    =         v = <redacted>
    =     at tests/sources/functional/choice.move:83: test_not_using_min_incorrect
+   =     at tests/sources/functional/choice.move:75: test_not_using_min_incorrect
    =         result = <redacted>
    =     at tests/sources/functional/choice.move:84: test_not_using_min_incorrect
    =     at tests/sources/functional/choice.move:87: test_not_using_min_incorrect (spec)
@@ -132,7 +134,7 @@ error: post-condition does not hold
     =     at tests/sources/functional/choice.move:275: new_ballot_id
     =         result = <redacted>
     =     at tests/sources/functional/choice.move:278: new_ballot_id
-    =     at tests/sources/functional/choice.move:287: create_ballot
+    =     at tests/sources/functional/choice.move:282: create_ballot
     =         result = <redacted>
     =     at tests/sources/functional/choice.move:288: create_ballot
     =     at tests/sources/functional/choice.move:302: create_ballot (spec)

@@ -1,8 +1,0 @@
-Move prover returns: exiting with checking errors
-error: name clash between specification and Move function `double`
-  ┌─ tests/sources/functional/duplicate_function_declarations.move:5:9
-  │
-5 │ ╭         fun double(x: u8): u8 {
-6 │ │             x * 2
-7 │ │         }
-  │ ╰─────────^

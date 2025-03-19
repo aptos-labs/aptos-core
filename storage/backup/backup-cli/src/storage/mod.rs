@@ -194,7 +194,7 @@ pub enum StorageOpt {
     #[clap(
         about = "Select the CommandAdapter backup storage type, which reads shell commands with which \
     it communicates with either a local file system or a remote cloud storage. Compression or other \
-    fitlers can be added as part of the commands. See a sample config here: \
+    filters can be added as part of the commands. See a sample config here: \
     https://github.com/aptos-labs/aptos-core/tree/main/storage/backup/backup-cli/src/storage/command_adapter/sample_configs/"
     )]
     CommandAdapter(CommandAdapterOpt),
@@ -225,7 +225,7 @@ pub struct DBToolStorageOpt {
         long,
         help = "Select the CommandAdapter backup storage type, which reads shell commands with which \
     it communicates with either a local file system or a remote cloud storage. Compression or other \
-    fitlers can be added as part of the commands. See a sample config here: \
+    filters can be added as part of the commands. See a sample config here: \
     https://github.com/aptos-labs/aptos-networks/tree/main/testnet/backups "
     )]
     command_adapter_config: Option<CommandAdapterOpt>,

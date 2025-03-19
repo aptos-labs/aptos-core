@@ -64,6 +64,7 @@ jobs:
           
           cat ./imported_transactions/imported_transactions.yaml  # Print the updated file for verification
           cargo run -- --testing-folder ./imported_transactions --output-folder ../indexer-test-transactions/src/new_json_transactions
+          cargo run -- --testing-folder ./imported_transactions --output-folder ../indexer-test-transactions/src/new_json_transactions --mode=script
 
       - name: Install jq
         run: sudo apt-get install jq  # Ensure jq is installed for JSON processing

@@ -508,7 +508,6 @@ fn run_epilogue(
             )
         }
     }
-    .map(|_return_vals| ())
     .map_err(expect_no_verification_errors)?;
 
     // Emit the FeeStatement event
@@ -527,17 +526,16 @@ fn emit_fee_statement(
     fee_statement: FeeStatement,
     traversal_context: &mut TraversalContext,
 ) -> VMResult<()> {
-    session
-        .execute_function_bypass_visibility(
-            &TRANSACTION_FEE_MODULE,
-            EMIT_FEE_STATEMENT,
-            vec![],
-            vec![bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")],
-            &mut UnmeteredGasMeter,
-            traversal_context,
-            module_storage,
-        )
-        .map(|_return_vals| ())
+    session.execute_function_bypass_visibility(
+        &TRANSACTION_FEE_MODULE,
+        EMIT_FEE_STATEMENT,
+        vec![],
+        vec![bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")],
+        &mut UnmeteredGasMeter,
+        traversal_context,
+        module_storage,
+    )?;
+    Ok(())
 }
 
 /// Run the epilogue of a transaction by calling into `EPILOGUE_NAME` function stored
@@ -600,9 +598,9 @@ pub(crate) fn run_failure_epilogue(
         traversal_context,
         is_simulation,
     )
-    .or_else(|e| {
+    .or_else(|err| {
         expect_only_successful_execution(
-            e,
+            err,
             APTOS_TRANSACTION_VALIDATION.user_epilogue_name.as_str(),
             log_context,
         )

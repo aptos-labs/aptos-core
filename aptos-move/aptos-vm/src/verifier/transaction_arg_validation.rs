@@ -134,13 +134,13 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     }
 
     let allowed_structs = get_allowed_structs(are_struct_constructors_enabled);
-    let ty_builder = session.get_ty_builder();
+    let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
 
     // Need to keep this here to ensure we return the historic correct error code for replay
     for ty in func.param_tys()[signer_param_cnt..].iter() {
         let subst_res = ty_builder.create_ty_with_subst(ty, func.ty_args());
         let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-        let valid = is_valid_txn_arg(session, module_storage, &ty, allowed_structs);
+        let valid = is_valid_txn_arg(module_storage, &ty, allowed_structs);
         if !valid {
             return Err(VMStatus::error(
                 StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
@@ -190,9 +190,11 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     Ok(combined_args)
 }
 
-// Return whether the argument is valid/allowed and whether it needs construction.
+/// Returns true if the argument is valid (that is, it is a primitive type or a struct with a
+/// known constructor function). Otherwise, (for structs without constructors, signers or
+/// references) returns false. An error is returned in cases when a struct type is encountered and
+/// its name cannot be queried for some reason.
 pub(crate) fn is_valid_txn_arg(
-    session: &SessionExt,
     module_storage: &impl AptosModuleStorage,
     ty: &Type,
     allowed_structs: &ConstructorMap,
@@ -201,14 +203,24 @@ pub(crate) fn is_valid_txn_arg(
 
     match ty {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
-        Vector(inner) => is_valid_txn_arg(session, module_storage, inner, allowed_structs),
-        Struct { idx, .. } | StructInstantiation { idx, .. } => session
-            .fetch_struct_ty_by_idx(*idx, module_storage)
-            .is_some_and(|st| {
-                let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
-                allowed_structs.contains_key(&full_name)
-            }),
-        Signer | Reference(_) | MutableReference(_) | TyParam(_) => false,
+        Vector(inner) => is_valid_txn_arg(module_storage, inner, allowed_structs),
+        Struct { .. } | StructInstantiation { .. } => {
+            // Note: Original behavior was to return false even if the module loading fails (e.g.,
+            //       if struct does not exist. This preserves it.
+            module_storage
+                .runtime_environment()
+                .get_struct_name(ty)
+                .ok()
+                .flatten()
+                .is_some_and(|(module_id, identifier)| {
+                    allowed_structs.contains_key(&format!(
+                        "{}::{}",
+                        module_id.short_str_lossless(),
+                        identifier
+                    ))
+                })
+        },
+        Signer | Reference(_) | MutableReference(_) | TyParam(_) | Function { .. } => false,
     }
 }
 
@@ -231,7 +243,7 @@ pub(crate) fn construct_args(
         return Err(invalid_signature());
     }
 
-    let ty_builder = session.get_ty_builder();
+    let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
     for (ty, arg) in types.iter().zip(args) {
         let subst_res = ty_builder.create_ty_with_subst(ty, ty_args);
         let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
@@ -300,7 +312,9 @@ fn construct_arg(
                 Err(invalid_signature())
             }
         },
-        Reference(_) | MutableReference(_) | TyParam(_) => Err(invalid_signature()),
+        Reference(_) | MutableReference(_) | TyParam(_) | Function { .. } => {
+            Err(invalid_signature())
+        },
     }
 }
 
@@ -340,12 +354,17 @@ pub(crate) fn recursively_construct_arg(
                 len -= 1;
             }
         },
-        Struct { idx, .. } | StructInstantiation { idx, .. } => {
-            let st = session
-                .fetch_struct_ty_by_idx(*idx, module_storage)
+        Struct { .. } | StructInstantiation { .. } => {
+            let (module_id, identifier) = module_storage
+                .runtime_environment()
+                .get_struct_name(ty)
+                .map_err(|_| {
+                    // Note: The original behaviour was to map all errors to an invalid signature
+                    //       error, here we want to preserve it for now.
+                    invalid_signature()
+                })?
                 .ok_or_else(invalid_signature)?;
-
-            let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
+            let full_name = format!("{}::{}", module_id.short_str_lossless(), identifier);
             let constructor = allowed_structs
                 .get(&full_name)
                 .ok_or_else(invalid_signature)?;
@@ -369,7 +388,9 @@ pub(crate) fn recursively_construct_arg(
         U64 => read_n_bytes(8, cursor, arg)?,
         U128 => read_n_bytes(16, cursor, arg)?,
         U256 | Address => read_n_bytes(32, cursor, arg)?,
-        Signer | Reference(_) | MutableReference(_) | TyParam(_) => return Err(invalid_signature()),
+        Signer | Reference(_) | MutableReference(_) | TyParam(_) | Function { .. } => {
+            return Err(invalid_signature())
+        },
     };
     Ok(())
 }
@@ -439,14 +460,13 @@ fn validate_and_construct(
         *max_invocations -= 1;
     }
 
-    let function = session.load_function_with_type_arg_inference(
-        module_storage,
+    let function = module_storage.load_function_with_type_arg_inference(
         &constructor.module_id,
         constructor.func_name,
         expected_type,
     )?;
     let mut args = vec![];
-    let ty_builder = session.get_ty_builder();
+    let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
     for param_ty in function.param_tys() {
         let mut arg = vec![];
         let arg_ty = ty_builder

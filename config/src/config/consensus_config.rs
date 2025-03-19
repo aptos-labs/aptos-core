@@ -103,10 +103,14 @@ pub enum QcAggregatorType {
     NoDelay,
 }
 
-/// Execution backpressure which handles gas/s variance,
-/// and adjusts block sizes to "recalibrate it" to wanted range.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct ExecutionBackpressureConfig {
+pub enum ExecutionBackpressureMetric {
+    Mean,
+    Percentile(f64),
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ExecutionBackpressureLookbackConfig {
     /// Look at execution time for this many last blocks
     pub num_blocks_to_look_at: usize,
 
@@ -119,17 +123,36 @@ pub struct ExecutionBackpressureConfig {
     /// at least `min_blocks_to_activate` are above `min_block_time_ms_to_activate`
     pub min_blocks_to_activate: usize,
 
-    /// Out of blocks in the window, take this percentile (from 0-1 range), to use for calibration.
-    /// i.e. 0.5 means take a median of last `num_blocks_to_look_at` blocks.
-    pub percentile: f64,
+    /// Out of blocks in the window, the metric to use for calibration.
+    /// i.e. Percentile(0.5) means take a median of last `num_blocks_to_look_at` blocks.
+    pub metric: ExecutionBackpressureMetric,
     /// Recalibrating max block size, to target blocks taking this long.
     pub target_block_time_ms: usize,
+}
+
+/// Execution backpressure which handles txn/s variance,
+/// and adjusts block sizes to "recalibrate it" to wanted range.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ExecutionBackpressureTxnLimitConfig {
+    pub lookback_config: ExecutionBackpressureLookbackConfig,
     /// A minimal number of transactions per block, even if calibration suggests otherwise
     /// To make sure backpressure doesn't become too aggressive.
     pub min_calibrated_txns_per_block: u64,
-    // We compute re-calibrated block size, and use that for `max_txns_in_block`.
-    // But after execution pool and cost of overpacking being minimal - we should
-    // change so that backpressure sets `max_txns_to_execute` instead
+}
+
+/// Execution backpressure which handles gas/s variance,
+/// and adjusts gas limit to "recalibrate it" to wanted range.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ExecutionBackpressureGasLimitConfig {
+    pub lookback_config: ExecutionBackpressureLookbackConfig,
+    pub block_execution_overhead_ms: u64,
+    pub min_calibrated_block_gas_limit: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ExecutionBackpressureConfig {
+    pub txn_limit: Option<ExecutionBackpressureTxnLimitConfig>,
+    pub gas_limit: Option<ExecutionBackpressureGasLimitConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -195,13 +218,27 @@ impl Default for ConsensusConfig {
             vote_back_pressure_limit: 7,
             min_max_txns_in_block_after_filtering_from_backpressure: MIN_BLOCK_TXNS_AFTER_FILTERING,
             execution_backpressure: Some(ExecutionBackpressureConfig {
-                num_blocks_to_look_at: 12,
-                min_blocks_to_activate: 4,
-                percentile: 0.5,
-                target_block_time_ms: 250,
-                min_block_time_ms_to_activate: 100,
-                // allow at least two spreading group from reordering in a single block, to utilize paralellism
-                min_calibrated_txns_per_block: 8,
+                txn_limit: Some(ExecutionBackpressureTxnLimitConfig {
+                    lookback_config: ExecutionBackpressureLookbackConfig {
+                        num_blocks_to_look_at: 12,
+                        min_block_time_ms_to_activate: 100,
+                        min_blocks_to_activate: 4,
+                        metric: ExecutionBackpressureMetric::Percentile(0.5),
+                        target_block_time_ms: 200,
+                    },
+                    min_calibrated_txns_per_block: 8,
+                }),
+                gas_limit: Some(ExecutionBackpressureGasLimitConfig {
+                    lookback_config: ExecutionBackpressureLookbackConfig {
+                        num_blocks_to_look_at: 20,
+                        min_block_time_ms_to_activate: 10,
+                        min_blocks_to_activate: 4,
+                        metric: ExecutionBackpressureMetric::Mean,
+                        target_block_time_ms: 200,
+                    },
+                    block_execution_overhead_ms: 10,
+                    min_calibrated_block_gas_limit: 2000,
+                }),
             }),
             pipeline_backpressure: vec![
                 PipelineBackpressureValues {

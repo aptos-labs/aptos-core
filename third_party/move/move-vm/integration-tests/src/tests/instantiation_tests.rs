@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::file_format::{
-    AbilitySet, AddressIdentifierIndex, Bytecode::*, CodeUnit, CompiledModule, FieldDefinition,
+    AddressIdentifierIndex, Bytecode::*, CodeUnit, CompiledModule, FieldDefinition,
     FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandle,
     ModuleHandleIndex, Signature, SignatureIndex, SignatureToken::*, StructDefinition,
     StructFieldInformation, StructHandle, StructHandleIndex, StructTypeParameter, TypeSignature,
 };
 use move_core_types::{
+    ability::AbilitySet,
     account_address::AccountAddress,
     ident_str,
     identifier::Identifier,
@@ -15,11 +16,9 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    config::VMConfig, move_vm::MoveVM, session::Session, AsUnsyncCodeStorage, ModuleStorage,
-    RuntimeEnvironment, StagingModuleStorage,
+    config::VMConfig, AsUnsyncCodeStorage, ModuleStorage, RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
-use move_vm_types::gas::UnmeteredGasMeter;
 
 #[test]
 fn instantiation_err() {
@@ -62,6 +61,7 @@ fn instantiation_err() {
             return_: SignatureIndex(0),
             type_parameters: vec![AbilitySet::PRIMITIVES],
             access_specifiers: None,
+            attributes: vec![],
         }],
         field_handles: vec![],
         friend_decls: vec![],
@@ -114,10 +114,9 @@ fn instantiation_err() {
         ..VMConfig::default()
     };
     let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
-    let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
+    let storage: InMemoryStorage =
+        InMemoryStorage::new_with_runtime_environment(runtime_environment);
 
-    let storage: InMemoryStorage = InMemoryStorage::new();
-    let mut session = vm.new_session(&storage);
     let mut mod_bytes = vec![];
     cm.serialize(&mut mod_bytes).unwrap();
 
@@ -132,30 +131,17 @@ fn instantiation_err() {
         }));
     }
 
-    let module_storage = storage.as_unsync_code_storage(runtime_environment);
+    let module_storage = storage.as_unsync_code_storage();
 
     // Publish (must succeed!) and then load the function.
-    if vm.vm_config().use_loader_v2 {
-        let new_module_storage =
-            StagingModuleStorage::create(&addr, &module_storage, vec![mod_bytes.into()])
-                .expect("Module must publish");
-        load_function(&mut session, &new_module_storage, &cm.self_id(), &[ty_arg])
-    } else {
-        #[allow(deprecated)]
-        session
-            .publish_module(mod_bytes, addr, &mut UnmeteredGasMeter)
+    let new_module_storage =
+        StagingModuleStorage::create(&addr, &module_storage, vec![mod_bytes.into()])
             .expect("Module must publish");
-        load_function(&mut session, &module_storage, &cm.self_id(), &[ty_arg])
-    }
+    load_function(&new_module_storage, &cm.self_id(), &[ty_arg])
 }
 
-fn load_function(
-    session: &mut Session,
-    module_storage: &impl ModuleStorage,
-    module_id: &ModuleId,
-    ty_args: &[TypeTag],
-) {
-    let res = session.load_function(module_storage, module_id, ident_str!("f"), ty_args);
+fn load_function(module_storage: &impl ModuleStorage, module_id: &ModuleId, ty_args: &[TypeTag]) {
+    let res = module_storage.load_function(module_id, ident_str!("f"), ty_args);
     assert!(
         res.is_err(),
         "Instantiation must fail at load time when converting from type tag to type "

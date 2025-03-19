@@ -6,7 +6,6 @@
 pub mod account;
 pub mod common;
 pub mod config;
-pub mod ffi;
 pub mod genesis;
 pub mod governance;
 pub mod move_tool;

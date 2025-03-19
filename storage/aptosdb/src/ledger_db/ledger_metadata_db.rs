@@ -61,7 +61,7 @@ impl LedgerMetadataDb {
         )
     }
 
-    pub(super) fn db(&self) -> &DB {
+    pub(crate) fn db(&self) -> &DB {
         &self.db
     }
 

@@ -621,6 +621,32 @@ fn test_module() {
         .unwrap();
     run_txn(builder, &mut h);
 
+    // Adding two calls to the same functions
+    let mut builder = TransactionComposer::single_signer();
+    load_module(&mut builder, &h, "0x1::batched_execution");
+    builder
+        .add_batched_call(
+            "0x1::batched_execution".to_string(),
+            "create_generic_droppable_value".to_string(),
+            vec!["0x1::batched_execution::Foo".to_string()],
+            vec![CallArgument::new_bytes(
+                MoveValue::U8(10).simple_serialize().unwrap(),
+            )],
+        )
+        .unwrap();
+
+    builder
+        .add_batched_call(
+            "0x1::batched_execution".to_string(),
+            "create_generic_droppable_value".to_string(),
+            vec!["0x1::batched_execution::Foo".to_string()],
+            vec![CallArgument::new_bytes(
+                MoveValue::U8(10).simple_serialize().unwrap(),
+            )],
+        )
+        .unwrap();
+    run_txn(builder, &mut h);
+
     // Create a generic value and consume it
     let mut builder = TransactionComposer::single_signer();
     load_module(&mut builder, &h, "0x1::batched_execution");

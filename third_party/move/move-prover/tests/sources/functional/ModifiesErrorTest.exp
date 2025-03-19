@@ -3,7 +3,7 @@ error: caller does not have permission to modify `B::T` at given address
    ┌─ tests/sources/functional/ModifiesErrorTest.move:38:17
    │
 38 │         let t = borrow_global_mut<T>(addr1);
-   │                 ^^^^^^^^^^^^^^^^^
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    =     at tests/sources/functional/ModifiesErrorTest.move:36: mutate_at_test_incorrect
    =     at tests/sources/functional/ModifiesErrorTest.move:47: mutate_at_test_incorrect (spec)
@@ -18,7 +18,7 @@ error: caller does not have permission to modify `B::T` at given address
    ┌─ tests/sources/functional/ModifiesErrorTest.move:52:9
    │
 52 │         move_to<T>(account, T{x: 2});
-   │         ^^^^^^^
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    =     at tests/sources/functional/ModifiesErrorTest.move:50: move_to_test_incorrect
    =     at tests/sources/functional/ModifiesErrorTest.move:60: move_to_test_incorrect (spec)
@@ -33,7 +33,7 @@ error: caller does not have permission to modify `B::T` at given address
    ┌─ tests/sources/functional/ModifiesErrorTest.move:65:17
    │
 65 │         let v = move_from<T>(addr1);
-   │                 ^^^^^^^^^
+   │                 ^^^^^^^^^^^^^^^^^^^
    │
    =     at tests/sources/functional/ModifiesErrorTest.move:63: move_from_test_incorrect
    =     at tests/sources/functional/ModifiesErrorTest.move:74: move_from_test_incorrect (spec)

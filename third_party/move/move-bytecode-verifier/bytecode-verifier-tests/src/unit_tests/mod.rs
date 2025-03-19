@@ -24,3 +24,6 @@ pub mod signature_tests;
 pub mod struct_defs_tests;
 pub mod variant_name_test;
 pub mod vec_pack_tests;
+
+// TODO(#13806): add unit tests for enum verification
+// TODO(#15664): add unit tests for closure verification

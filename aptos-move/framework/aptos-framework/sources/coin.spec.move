@@ -325,7 +325,7 @@ spec aptos_framework::coin {
         aborts_if coin_store.frozen;
     }
 
-    spec force_deposit<CoinType>(account_addr: address, coin: Coin<CoinType>) {
+    spec deposit_for_gas_fee<CoinType>(account_addr: address, coin: Coin<CoinType>) {
         // TODO(fa_migration)
         pragma verify = false;
         modifies global<CoinStore<CoinType>>(account_addr);

@@ -3,6 +3,7 @@
 
 use crate::{
     common::{make_shared, ArcError, IP_LOCAL_HOST},
+    no_panic_println,
     services::docker_common::{create_docker_volume, create_start_and_inspect_container},
 };
 use anyhow::{anyhow, Context, Result};
@@ -170,7 +171,7 @@ pub fn start_postgres(
     impl Future<Output = Result<()>>,
     impl Future<Output = ()>,
 ) {
-    println!("Starting postgres..");
+    no_panic_println!("Starting postgres..");
 
     let volume_name = format!("aptos-workspace-{}-postgres", instance_id);
     let (fut_volume, fut_volume_clean_up) =
@@ -211,9 +212,10 @@ pub fn start_postgres(
                 HealthChecker::Postgres(get_postgres_connection_string(postgres_port));
             health_checker.wait(None).await?;
 
-            println!(
+            no_panic_println!(
                 "Postgres is ready. Endpoint: http://{}:{}",
-                IP_LOCAL_HOST, postgres_port
+                IP_LOCAL_HOST,
+                postgres_port
             );
 
             anyhow::Ok(postgres_port)

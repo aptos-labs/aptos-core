@@ -92,6 +92,12 @@ jobs:
           repository: 'aptos-labs/aptos-indexer-processor-sdk'
           event-type: 'proto-dependency-update'
           client-payload: '{"commit_hash": "${{ github.sha }}", "branch_name": "${{ steps.commit_hash.outputs.branch_name }}"}'
+      - name: Poll for Workflow Run and Wait for Job Completion
+        run: |
+          . scripts/indexer_proto_update_status_poll.sh
+        env:
+          PAT_TOKEN: ${{ steps.secrets.outputs.token }}
+          TARGET_BRANCH: ${{ steps.commit_hash.outputs.branch_name }}-update-aptos-protos-update-sdk
       # TOOD: enable this once the forge test is stable.
       # - name: Run Forge Tests
       #   uses: ./.github/workflows/workflow-run-forge

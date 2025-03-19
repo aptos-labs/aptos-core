@@ -213,6 +213,12 @@ impl CompiledScriptBuilder {
         sig: &SignatureToken,
     ) -> PartialVMResult<SignatureToken> {
         use SignatureToken::*;
+        let import_vec =
+            |s: &mut Self, v: &[SignatureToken]| -> PartialVMResult<Vec<SignatureToken>> {
+                v.iter()
+                    .map(|sig| s.import_signature_token(module, sig))
+                    .collect::<PartialVMResult<Vec<_>>>()
+            };
         Ok(match sig {
             U8 => U8,
             U16 => U16,
@@ -229,13 +235,15 @@ impl CompiledScriptBuilder {
                 MutableReference(Box::new(self.import_signature_token(module, ty)?))
             },
             Vector(ty) => Vector(Box::new(self.import_signature_token(module, ty)?)),
+            Function(args, result, abilities) => Function(
+                import_vec(self, args)?,
+                import_vec(self, result)?,
+                *abilities,
+            ),
             Struct(idx) => Struct(self.import_struct(module, *idx)?),
             StructInstantiation(idx, inst_tys) => StructInstantiation(
                 self.import_struct(module, *idx)?,
-                inst_tys
-                    .iter()
-                    .map(|sig| self.import_signature_token(module, sig))
-                    .collect::<PartialVMResult<Vec<_>>>()?,
+                import_vec(self, inst_tys)?,
             ),
         })
     }
@@ -290,6 +298,7 @@ impl CompiledScriptBuilder {
                     return_,
                     type_parameters: handle.type_parameters.clone(),
                     access_specifiers: handle.access_specifiers.clone(),
+                    attributes: handle.attributes.clone(),
                 });
                 self.function_pool.insert((module_id, name), idx);
                 Ok(idx)
