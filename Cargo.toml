@@ -206,8 +206,8 @@ members = [
     "third_party/move/move-bytecode-verifier/invalid-mutations",
     "third_party/move/move-bytecode-verifier/transactional-tests",
     "third_party/move/move-command-line-common",
-    "third_party/move/move-compiler",
     "third_party/move/move-compiler-v2",
+    "third_party/move/move-compiler-v2/legacy-move-compiler",
     "third_party/move/move-compiler-v2/transactional-tests",
     "third_party/move/move-core/types",
     "third_party/move/move-examples",
@@ -641,7 +641,7 @@ libsecp256k1 = "0.7.0"
 libtest-mimic = "0.5.2"
 log = "0.4.17"
 lru = "0.7.5"
-lz4 = "1.25.0"
+lz4 = "1.28.0"
 maplit = "1.0.2"
 merlin = "3"
 memchr = "2.7.4"
@@ -838,7 +838,7 @@ move-bytecode-utils = { path = "third_party/move/tools/move-bytecode-utils" }
 move-cli = { path = "third_party/move/tools/move-cli" }
 move-command-line-common = { path = "third_party/move/move-command-line-common" }
 move-coverage = { path = "third_party/move/tools/move-coverage" }
-move-compiler = { path = "third_party/move/move-compiler" }
+legacy-move-compiler = { path = "third_party/move/move-compiler-v2/legacy-move-compiler" }
 move-compiler-v2 = { path = "third_party/move/move-compiler-v2" }
 move-core-types = { path = "third_party/move/move-core/types" }
 move-decompiler = { path = "third_party/move/tools/move-decompiler" }

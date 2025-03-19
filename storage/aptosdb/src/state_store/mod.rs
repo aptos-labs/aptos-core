@@ -57,7 +57,7 @@ use aptos_storage_interface::{
             hot_state_view::HotStateView,
         },
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
-        versioned_state_value::{MemorizedStateRead, StateUpdateRef},
+        versioned_state_value::{DbStateUpdate, MemorizedStateRead, StateUpdateRef},
         NUM_STATE_SHARDS,
     },
     AptosDbError, DbReader, Result, StateSnapshotReceiver,
@@ -89,7 +89,7 @@ mod state_snapshot_committer;
 pub mod hot_state;
 mod persisted_state;
 #[cfg(test)]
-mod state_store_test;
+mod tests;
 
 type StateValueBatch = crate::state_restore::StateValueBatch<StateKey, Option<StateValue>>;
 
@@ -329,8 +329,8 @@ impl StateStore {
             state_kv_pruner,
             skip_usage,
         });
-        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_dummy()));
-        let persisted_state = PersistedState::new_dummy();
+        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty()));
+        let persisted_state = PersistedState::new_empty();
         let buffered_state = if empty_buffered_state_for_restore {
             BufferedState::new_at_snapshot(
                 &state_db,
@@ -486,8 +486,8 @@ impl StateStore {
             state_kv_pruner,
             skip_usage: false,
         });
-        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_dummy()));
-        let persisted_state = PersistedState::new_dummy();
+        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty()));
+        let persisted_state = PersistedState::new_empty();
         let _ = Self::create_buffered_state_from_latest_snapshot(
             &state_db,
             0,
@@ -881,13 +881,12 @@ impl StateStore {
                         MemorizedStateRead::NonExistent
                     });
 
-                if let MemorizedStateRead::Value {
+                if let MemorizedStateRead::StateUpdate(DbStateUpdate {
                     version: old_version,
-                    value: old_value,
-                } = old_entry
+                    value: old_value_opt,
+                }) = old_entry
                 {
-                    // Non-existing key can be in cache but is currently not persisted
-                    if !old_value.is_hot_non_existent() {
+                    if old_value_opt.map_or(false, |old_val| !old_val.is_hot_non_existent()) {
                         // The value at `old_version` can be pruned once the pruning window hits
                         // this `version`.
                         Self::put_state_kv_index(batch, enable_sharding, version, old_version, key)

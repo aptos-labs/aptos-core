@@ -8,7 +8,7 @@ use crate::{
 };
 use anyhow::Result;
 use itertools::Itertools;
-use move_compiler::shared::PackagePaths;
+use legacy_move_compiler::shared::PackagePaths;
 use move_compiler_v2::Options;
 use move_model::model::GlobalEnv;
 use termcolor::{ColorChoice, StandardStream};

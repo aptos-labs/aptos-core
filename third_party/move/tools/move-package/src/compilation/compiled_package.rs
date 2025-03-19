@@ -14,19 +14,19 @@ use crate::{
 use anyhow::{bail, ensure, Context, Result};
 use colored::Colorize;
 use itertools::{Either, Itertools};
+use legacy_move_compiler::{
+    compiled_unit::{self, CompiledUnit, NamedCompiledModule, NamedCompiledScript},
+    shared::{
+        known_attributes::{AttributeKind, KnownAttribute},
+        Flags, NamedAddressMap, NumericalAddress, PackagePaths,
+    },
+};
 use move_abigen::{Abigen, AbigenOptions};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
 use move_bytecode_source_map::utils::source_map_from_file;
 use move_bytecode_utils::Modules;
 use move_command_line_common::files::{
     extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION, SOURCE_MAP_EXTENSION,
-};
-use move_compiler::{
-    compiled_unit::{self, CompiledUnit, NamedCompiledModule, NamedCompiledScript},
-    shared::{
-        known_attributes::{AttributeKind, KnownAttribute},
-        Flags, NamedAddressMap, NumericalAddress, PackagePaths,
-    },
 };
 use move_compiler_v2::{external_checks::ExternalChecks, Experiment};
 use move_docgen::{Docgen, DocgenOptions};
@@ -259,7 +259,7 @@ impl OnDiskCompiledPackage {
                     let id = module.self_id();
                     let parsed_addr = NumericalAddress::new(
                         id.address().into_bytes(),
-                        move_compiler::shared::NumberFormat::Hex,
+                        legacy_move_compiler::shared::NumberFormat::Hex,
                     );
                     let module_name = FileName::from(id.name().as_str());
                     (parsed_addr, module_name)
@@ -1001,8 +1001,10 @@ pub(crate) fn named_address_mapping_for_compiler(
     resolution_table
         .iter()
         .map(|(ident, addr)| {
-            let parsed_addr =
-                NumericalAddress::new(addr.into_bytes(), move_compiler::shared::NumberFormat::Hex);
+            let parsed_addr = NumericalAddress::new(
+                addr.into_bytes(),
+                legacy_move_compiler::shared::NumberFormat::Hex,
+            );
             (*ident, parsed_addr)
         })
         .collect::<BTreeMap<_, _>>()

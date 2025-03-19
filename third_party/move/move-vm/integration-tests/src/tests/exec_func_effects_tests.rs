@@ -18,7 +18,6 @@ use move_vm_runtime::{
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
-use std::convert::TryInto;
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 const TEST_MODULE_ID: &str = "M";
@@ -97,8 +96,7 @@ fn run(
     let mut storage = InMemoryStorage::new();
     compile_modules(&mut storage, &modules);
 
-    let vm = MoveVM::new();
-    let mut session = vm.new_session(&storage);
+    let mut session = MoveVM::new_session(&storage);
 
     let fun_name = Identifier::new(fun_name).unwrap();
     let traversal_storage = TraversalStorage::new();
