@@ -2178,7 +2178,6 @@ impl SerializedAccessKind {
         match value {
             0x1 => Ok(Reads),
             0x2 => Ok(Writes),
-            0x3 => Ok(Acquires),
             _ => Err(PartialVMError::new(StatusCode::MALFORMED)
                 .with_message("malformed access kind".to_owned())),
         }

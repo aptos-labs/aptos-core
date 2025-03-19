@@ -333,11 +333,6 @@ impl InterpreterImpl<'_> {
                         current_frame = frame;
                         current_frame.pc += 1; // advance past the Call instruction in the caller
                     } else {
-                        // end of execution. `self` should no longer be used afterward
-                        // Clean up access control
-                        self.access_control
-                            .exit_function(&current_frame.function)
-                            .map_err(|e| self.set_location(e))?;
                         return Ok(self.operand_stack.value);
                     }
                 },

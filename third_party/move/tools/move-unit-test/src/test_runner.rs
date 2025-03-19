@@ -246,14 +246,11 @@ impl SharedTestingConfig {
         VMResult<Vec<Vec<u8>>>,
         TestRunInfo,
     ) {
-        // Note: While Move unit tests run concurrently, there is no publishing involved. To keep
-        // things simple, we create a new VM instance for each test.
-        let move_vm = MoveVM::new();
         let module_storage = self.starting_storage_state.as_unsync_module_storage();
 
         let extensions = extensions::new_extensions();
         let mut session =
-            move_vm.new_session_with_extensions(&self.starting_storage_state, extensions);
+            MoveVM::new_session_with_extensions(&self.starting_storage_state, extensions);
         let mut gas_meter = factory.lock().unwrap().new_gas_meter();
 
         // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
