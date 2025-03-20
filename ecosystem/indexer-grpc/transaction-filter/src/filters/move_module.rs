@@ -40,7 +40,7 @@ impl MoveStructTagFilter {
         self.standardized_address.get_or_init(|| {
             self.address
                 .as_ref()
-                .map(|address| standardize_address(&address))
+                .map(|address| standardize_address(address))
         })
     }
 }
