@@ -572,7 +572,11 @@ impl BufferManager {
         self.previous_commit_time = Instant::now();
         self.commit_proof_rb_handle.take();
         // purge the incoming blocks queue
-        while let Ok(Some(_)) = self.block_rx.try_next() {}
+        while let Ok(Some(ordered_blocks)) = self.block_rx.try_next() {
+            for block in &ordered_blocks.ordered_blocks {
+                block.executed_transactions_writer().cancel();
+            }
+        }
         // Wait for ongoing tasks to finish before sending back ack.
         while self.ongoing_tasks.load(Ordering::SeqCst) > 0 {
             tokio::time::sleep(Duration::from_millis(10)).await;

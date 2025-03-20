@@ -16,7 +16,7 @@ use aptos_executor_types::ExecutorResult;
 use aptos_types::transaction::SignedTransaction;
 use fail::fail_point;
 use futures::{future::Shared, stream::FuturesOrdered, StreamExt};
-use std::{future::Future, sync::Arc, time::Instant};
+use std::{collections::HashSet, future::Future, sync::Arc, time::Instant};
 
 pub struct BlockPreparer {
     payload_manager: Arc<dyn TPayloadManager>,
@@ -103,6 +103,12 @@ impl BlockPreparer {
             thread::sleep(Duration::from_millis(10));
             Err(ExecutorError::CouldNotGetData)
         });
+        let block_window = if self.is_execution_pool_enabled {
+            block_window
+        } else {
+            None
+        };
+
         let start_time = Instant::now();
         let (txns, max_txns_from_block_to_execute, block_gas_limit) =
             monitor!("get_transactions", {
@@ -114,9 +120,28 @@ impl BlockPreparer {
         let txn_shuffler = self.txn_shuffler.clone();
         let block_id = block.id();
         let block_timestamp_usecs = block.timestamp_usecs();
+        let block_window = block_window.cloned();
         // Transaction filtering, deduplication and shuffling are CPU intensive tasks, so we run them in a blocking task.
         let result = tokio::task::spawn_blocking(move || {
-            let filtered_txns = txn_filter.filter(block_id, block_timestamp_usecs, txns);
+            let remaining_txns: Vec<_> = {
+                if let Some(block_window) = block_window {
+                    let mut executed_transactions = HashSet::new();
+                    let blocks = block_window.pipelined_blocks();
+                    let len = blocks.len();
+                    // Filter transactions all blocks in window, except the latest one
+                    for b in blocks.into_iter().take(len.saturating_sub(1)) {
+                        for txn_hash in b.executed_transactions_reader().wait()?.iter() {
+                            executed_transactions.insert(*txn_hash);
+                        }
+                    }
+                    txns.into_iter()
+                        .filter(|txn| !executed_transactions.contains(&txn.committed_hash()))
+                        .collect()
+                } else {
+                    txns
+                }
+            };
+            let filtered_txns = txn_filter.filter(block_id, block_timestamp_usecs, remaining_txns);
             let deduped_txns = txn_deduper.dedup(filtered_txns);
             let mut shuffled_txns = {
                 let _timer = TXN_SHUFFLE_SECONDS.start_timer();

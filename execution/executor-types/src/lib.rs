@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #![forbid(unsafe_code)]
 
+use crate::transactions_with_output::TransactionsWithOutput;
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_scratchpad::SparseMerkleTree;
@@ -144,7 +145,7 @@ pub trait BlockExecutorTrait: Send + Sync {
         block: ExecutableBlock,
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> ExecutorResult<()>;
+    ) -> ExecutorResult<TransactionsWithOutput>;
 
     fn ledger_update(
         &self,
