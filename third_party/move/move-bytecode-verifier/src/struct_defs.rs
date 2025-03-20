@@ -10,6 +10,7 @@ use move_binary_format::{
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
         CompiledModule, SignatureToken, StructDefinitionIndex, StructHandleIndex, TableIndex,
+        VariantIndex,
     },
     internals::ModuleIndex,
     views::StructDefinitionView,
@@ -91,8 +92,20 @@ impl<'a> StructDefGraphBuilder<'a> {
         let struct_def = StructDefinitionView::new(self.module, struct_def);
         // The fields iterator is an option in the case of native structs. Flatten makes an empty
         // iterator for that case
-        for field in struct_def.fields().into_iter().flatten() {
-            self.add_signature_token(neighbors, idx, field.signature_token())?
+        let variant_count = struct_def.variant_count();
+        if variant_count > 0 {
+            for i in 0..variant_count {
+                for field in struct_def
+                    .fields_optional_variant(Some(i as VariantIndex))
+                    .into_iter()
+                {
+                    self.add_signature_token(neighbors, idx, field.signature_token())?
+                }
+            }
+        } else {
+            for field in struct_def.fields().into_iter().flatten() {
+                self.add_signature_token(neighbors, idx, field.signature_token())?
+            }
         }
         Ok(())
     }
