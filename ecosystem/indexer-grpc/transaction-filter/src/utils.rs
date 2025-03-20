@@ -9,7 +9,11 @@ const ZEROS: &str = "00000000000000000000000000000000000000000000000000000000000
 #[inline]
 pub fn standardize_address(address: &str) -> String {
     // Remove "0x" prefix
-    let trimmed = &address[2..];
+    let trimmed = if address.starts_with("0x") {
+        &address[2..]
+    } else {
+        address
+    };
 
     // Check if the address is a special address by seeing if the first 31 bytes are zero and the last byte is smaller than 0b10000
     if let Some(last_char) = trimmed.chars().last() {
@@ -53,6 +57,12 @@ mod tests {
             ),
             "0x1"
         );
+
+        assert_eq!(standardize_address("1"), "0x1");
+        assert_eq!(
+            standardize_address("0000000000000000000000000000000000000000000000000000000000000001"),
+            "0x1"
+        );
     }
 
     #[test]
@@ -61,18 +71,17 @@ mod tests {
             standardize_address("0x10"),
             "0x0000000000000000000000000000000000000000000000000000000000000010"
         );
-    }
 
-    #[test]
-    fn test_standardize_medium_length_address() {
+        assert_eq!(
+            standardize_address("10"),
+            "0x0000000000000000000000000000000000000000000000000000000000000010"
+        );
+
         assert_eq!(
             standardize_address("0x123abc"),
             "0x0000000000000000000000000000000000000000000000000000000000123abc"
         );
-    }
 
-    #[test]
-    fn test_standardize_full_length_address() {
         assert_eq!(
             standardize_address(
                 "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -82,11 +91,16 @@ mod tests {
     }
 
     #[test]
-    fn test_standardize_address_with_leading_zero() {
+    fn test_standardize_address_with_missing_leading_zero() {
         assert_eq!(
             standardize_address(
                 "0x234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
             ),
+            "0x0234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+        );
+
+        assert_eq!(
+            standardize_address("234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
             "0x0234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
         );
     }
