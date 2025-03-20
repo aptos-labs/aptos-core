@@ -22,7 +22,7 @@ pub fn standardize_address(address: &str) -> String {
             // Return special addresses in short format
             let mut result = String::with_capacity(3);
             result.push_str("0x");
-            result.push_str(&trimmed.trim_start_matches('0'));
+            result.push(last_char);
             return result;
         }
     }
