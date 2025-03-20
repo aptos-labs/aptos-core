@@ -4,7 +4,7 @@ spec aptos_token::property_map {
         pragma aborts_if_is_strict;
 
         let MAX_PROPERTY_MAP_SIZE = 1000;
-        let MAX_PROPERTY_NAME_LENGTH  = 128;
+        let MAX_PROPERTY_NAME_LENGTH = 128;
     }
 
     spec new (
@@ -17,8 +17,8 @@ spec aptos_token::property_map {
         let length = len(keys);
 
         aborts_if !(length <= MAX_PROPERTY_MAP_SIZE);
-        aborts_if !(length == values.length());
-        aborts_if !(length == types.length());
+        aborts_if !(length == len(values));
+        aborts_if !(length == len(types));
     }
 
     spec new_with_key_and_property_value (
@@ -27,7 +27,7 @@ spec aptos_token::property_map {
     ): PropertyMap {
         // TODO: Can't handle abort in loop.
         pragma aborts_if_is_partial;
-        let length = keys.length();
+        let length = len(keys);
         aborts_if !(length <= MAX_PROPERTY_MAP_SIZE);
         aborts_if !(length == len(values));
     }
@@ -85,7 +85,7 @@ spec aptos_token::property_map {
     }
 
     spec fun spec_utf8(bytes: vector<u8>): String {
-        String{bytes}
+        String { bytes }
     }
 
     spec read_u8(self: &PropertyMap, key: &String): u8 {
