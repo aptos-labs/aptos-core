@@ -6,7 +6,7 @@ use crate::{
     SwarmNetworkBandwidth, SwarmNetworkDelay, SwarmNetworkLoss, SwarmNetworkPartition, KUBECTL_BIN,
 };
 use anyhow::bail;
-use aptos_logger::info;
+use log::info;
 use aptos_sdk::{move_types::account_address::AccountAddress, types::PeerId};
 use std::process::{Command, Stdio};
 use tempfile::TempDir;
