@@ -105,7 +105,6 @@ pub fn get_registry() -> Result<Registry> {
 
     tracer.trace_type::<transaction::authenticator::AccountAuthenticator>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AbstractionAuthData>(&samples)?;
-    tracer.trace_type::<transaction::authenticator::DomainAccount>(&samples)?;
     tracer.trace_type::<transaction::authenticator::TransactionAuthenticator>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnyPublicKey>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnySignature>(&samples)?;
