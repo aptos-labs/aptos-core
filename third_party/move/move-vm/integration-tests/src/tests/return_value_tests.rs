@@ -51,8 +51,7 @@ fn run(
     let mut storage = InMemoryStorage::new();
     storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
-    let vm = MoveVM::new();
-    let mut sess = vm.new_session(&storage);
+    let mut sess = MoveVM::new_session(&storage);
 
     let fun_name = Identifier::new("foo").unwrap();
 

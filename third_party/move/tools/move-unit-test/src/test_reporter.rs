@@ -5,16 +5,16 @@
 use crate::{format_module_id, DEFAULT_EXECUTION_BOUND};
 use codespan_reporting::files::{Files, SimpleFiles};
 use colored::{control, Colorize};
+pub use legacy_move_compiler::unit_test::ExpectedMoveError as MoveError;
+use legacy_move_compiler::{
+    diagnostics::{self, Diagnostic, Diagnostics},
+    unit_test::{ModuleTestPlan, NamedOrBytecodeModule, TestName, TestPlan},
+};
 use move_binary_format::{
     access::ModuleAccess,
     errors::{ExecutionState, Location, VMError, VMResult},
 };
 use move_command_line_common::{env::read_bool_env_var, files::FileHash};
-pub use move_compiler::unit_test::ExpectedMoveError as MoveError;
-use move_compiler::{
-    diagnostics::{self, Diagnostic, Diagnostics},
-    unit_test::{ModuleTestPlan, NamedOrBytecodeModule, TestName, TestPlan},
-};
 use move_core_types::{effects::ChangeSet, language_storage::ModuleId, vm_status::StatusType};
 use move_ir_types::location::Loc;
 use move_symbol_pool::Symbol;

@@ -28,18 +28,18 @@ use derive_more::{Deref, DerefMut};
 use move_core_types::vm_status::VMStatus;
 
 #[derive(Deref, DerefMut)]
-pub struct EpilogueSession<'r, 'l> {
+pub struct EpilogueSession<'r> {
     #[deref]
     #[deref_mut]
-    session: RespawnedSession<'r, 'l>,
+    session: RespawnedSession<'r>,
     storage_refund: Fee,
     module_write_set: ModuleWriteSet,
 }
 
-impl<'r, 'l> EpilogueSession<'r, 'l> {
+impl<'r> EpilogueSession<'r> {
     pub fn on_user_session_success(
-        vm: &'l AptosVM,
-        txn_meta: &'l TransactionMetadata,
+        vm: &AptosVM,
+        txn_meta: &TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
         user_session_change_set: UserSessionChangeSet,
         storage_refund: Fee,
@@ -56,8 +56,8 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
     }
 
     pub fn on_user_session_failure(
-        vm: &'l AptosVM,
-        txn_meta: &'l TransactionMetadata,
+        vm: &AptosVM,
+        txn_meta: &TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
         previous_session_change_set: SystemSessionChangeSet,
     ) -> Self {
@@ -72,8 +72,8 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
     }
 
     fn new(
-        vm: &'l AptosVM,
-        txn_meta: &'l TransactionMetadata,
+        vm: &AptosVM,
+        txn_meta: &TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
         previous_session_change_set: VMChangeSet,
         module_write_set: ModuleWriteSet,

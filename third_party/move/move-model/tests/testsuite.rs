@@ -3,11 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
-use move_command_line_common::testing::get_compiler_exp_extension;
-use move_compiler::{
+use legacy_move_compiler::{
     shared::{known_attributes::KnownAttribute, PackagePaths},
     Flags,
 };
+use move_command_line_common::testing::get_compiler_exp_extension;
 use move_model::{
     options::ModelBuilderOptions, run_model_builder_with_options_and_compilation_flags,
 };

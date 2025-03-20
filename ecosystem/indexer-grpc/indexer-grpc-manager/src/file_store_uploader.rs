@@ -21,8 +21,9 @@ use tokio::{sync::mpsc::channel, time::Instant};
 use tracing::info;
 
 const NUM_TXNS_PER_FOLDER: u64 = 100000;
-const MAX_SIZE_PER_FILE: usize = 20 * (1 << 20);
+const MAX_SIZE_PER_FILE: usize = 50 * (1 << 20);
 const MAX_NUM_FOLDERS_TO_CHECK_FOR_RECOVERY: usize = 5;
+const MIN_UPDATE_FREQUENCY: Duration = Duration::from_secs(10);
 
 pub(crate) struct FileStoreUploader {
     chain_id: u64,
@@ -175,21 +176,30 @@ impl FileStoreUploader {
 
         let first_version = transactions.first().unwrap().version;
         let last_version = transactions.last().unwrap().version;
-        let data_file =
-            FileEntry::from_transactions(transactions, StorageFormat::Lz4CompressedProto);
+        let data_file = {
+            let _timer = TIMER
+                .with_label_values(&["do_upload__prepare_file"])
+                .start_timer();
+            FileEntry::from_transactions(transactions, StorageFormat::Lz4CompressedProto)
+        };
         let path = self.reader.get_path_for_version(first_version);
 
         info!("Dumping transactions [{first_version}, {last_version}] to file {path:?}.");
 
-        self.writer
-            .save_raw_file(path, data_file.into_inner())
-            .await?;
+        {
+            let _timer = TIMER
+                .with_label_values(&["do_upload__save_file"])
+                .start_timer();
+            self.writer
+                .save_raw_file(path, data_file.into_inner())
+                .await?;
+        }
 
         let mut update_batch_metadata = false;
         let max_update_frequency = self.writer.max_update_frequency();
         if self.last_batch_metadata_update_time.is_none()
             || Instant::now() - self.last_batch_metadata_update_time.unwrap()
-                >= max_update_frequency
+                >= MIN_UPDATE_FREQUENCY
         {
             update_batch_metadata = true;
         } else if end_batch {
@@ -205,12 +215,17 @@ impl FileStoreUploader {
         }
 
         let batch_metadata_path = self.reader.get_path_for_batch_metadata(first_version);
-        self.writer
-            .save_raw_file(
-                batch_metadata_path,
-                serde_json::to_vec(&batch_metadata).map_err(anyhow::Error::msg)?,
-            )
-            .await?;
+        {
+            let _timer = TIMER
+                .with_label_values(&["do_upload__update_batch_metadata"])
+                .start_timer();
+            self.writer
+                .save_raw_file(
+                    batch_metadata_path,
+                    serde_json::to_vec(&batch_metadata).map_err(anyhow::Error::msg)?,
+                )
+                .await?;
+        }
 
         if end_batch {
             self.last_batch_metadata_update_time = None;
@@ -219,6 +234,9 @@ impl FileStoreUploader {
         }
 
         if Instant::now() - self.last_metadata_update_time >= max_update_frequency {
+            let _timer = TIMER
+                .with_label_values(&["do_upload__update_metadata"])
+                .start_timer();
             self.update_file_store_metadata(last_version + 1).await?;
             self.last_metadata_update_time = Instant::now();
         }

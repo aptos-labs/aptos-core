@@ -24,19 +24,19 @@ fn unwrap_or_invariant_violation<T>(value: Option<T>, msg: &str) -> Result<T, VM
 /// epilogue. The latter needs to see the state view as if the change set is applied on top of
 /// the base state view, and this struct implements that.
 #[ouroboros::self_referencing]
-pub struct RespawnedSession<'r, 'l> {
+pub struct RespawnedSession<'r> {
     executor_view: ExecutorViewWithChangeSet<'r>,
     #[borrows(executor_view)]
     #[covariant]
     resolver: StorageAdapter<'this, ExecutorViewWithChangeSet<'r>>,
     #[borrows(resolver)]
     #[not_covariant]
-    session: Option<SessionExt<'this, 'l>>,
+    session: Option<SessionExt<'this>>,
 }
 
-impl<'r, 'l> RespawnedSession<'r, 'l> {
+impl<'r> RespawnedSession<'r> {
     pub fn spawn(
-        vm: &'l AptosVM,
+        vm: &AptosVM,
         session_id: SessionId,
         base: &'r impl AptosMoveResolver,
         previous_session_change_set: VMChangeSet,

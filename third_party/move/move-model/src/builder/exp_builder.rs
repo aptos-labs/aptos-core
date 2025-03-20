@@ -4,9 +4,9 @@
 
 use crate::{
     ast::{
-        AccessSpecifier, Address, AddressSpecifier, Exp, ExpData, LambdaCaptureKind, MatchArm,
-        ModuleName, Operation, Pattern, QualifiedSymbol, QuantKind, ResourceSpecifier,
-        RewriteResult, Spec, TempIndex, Value,
+        AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Exp, ExpData,
+        LambdaCaptureKind, MatchArm, ModuleName, Operation, Pattern, QualifiedSymbol, QuantKind,
+        ResourceSpecifier, RewriteResult, Spec, TempIndex, Value,
     },
     builder::{
         model_builder::{
@@ -30,8 +30,7 @@ use crate::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_binary_format::file_format::{self};
-use move_compiler::{
+use legacy_move_compiler::{
     expansion::ast::{self as EA},
     parser::ast::{self as PA, CallKind, Field},
     shared::{unique_map::UniqueMap, Identifier, Name},
@@ -397,21 +396,23 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             .update_node_instantiation(node_id, instantiation);
     }
 
-    /// Finalizes types in this translator, producing errors if some could not be inferred
+    /// Finalizes types in this translator, producing errors if post_process is true and
+    /// some could not be inferred
     /// and remained incomplete.
-    pub fn finalize_types(&mut self) {
+    /// TODO: refactor `finalize_types` to avoid running it two times before and after post processing
+    pub fn finalize_types(&mut self, post_process: bool) {
         if !*self.had_errors.borrow() {
             let mut reported_vars = BTreeSet::new();
             for i in self.node_counter_start..self.env().next_free_node_number() {
                 let node_id = NodeId::new(i);
                 if let Some(ty) = self.get_node_type_opt(node_id) {
-                    let ty = self.finalize_type(node_id, &ty, &mut reported_vars);
+                    let ty = self.finalize_type(node_id, &ty, &mut reported_vars, post_process);
                     self.update_node_type(node_id, ty);
                 }
                 if let Some(inst) = self.get_node_instantiation_opt(node_id) {
                     let inst = inst
                         .iter()
-                        .map(|ty| self.finalize_type(node_id, ty, &mut reported_vars))
+                        .map(|ty| self.finalize_type(node_id, ty, &mut reported_vars, post_process))
                         .collect_vec();
                     self.update_node_instantiation(node_id, inst);
                 }
@@ -427,6 +428,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         node_id: NodeId,
         ty: &Type,
         reported_vars: &mut BTreeSet<u32>,
+        post_process: bool,
     ) -> Type {
         let ty = self.subs.specialize_with_defaults(ty);
         let mut incomplete = false;
@@ -440,7 +442,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             }
         };
         ty.visit(&mut visitor);
-        if incomplete {
+        if incomplete && post_process {
             let displayed_ty = format!("{}", ty.display(&self.type_display_context()));
             // Skip displaying the error message if there is already an error in the type;
             // we must have another message about it already.
@@ -1083,21 +1085,25 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             type_args,
             address,
         } = &specifier.value;
-        if *kind != file_format::AccessKind::Acquires {
-            self.check_language_version(
-                &loc,
-                "read/write access specifiers. Try `acquires` instead.",
-                LanguageVersion::V2_0,
-            )?;
-        } else if *negated {
-            self.check_language_version(&loc, "access specifier negation", LanguageVersion::V2_0)?;
-        } else if type_args.is_some() && !type_args.as_ref().unwrap().is_empty() {
-            self.check_language_version(
-                &loc,
-                "access specifier type instantiation. Try removing the type instantiation.",
-                LanguageVersion::V2_0,
-            )?;
-        };
+        match kind {
+            EA::AccessSpecifierKind::LegacyAcquires => {
+                if *negated || type_args.is_some() || address.value != EA::AddressSpecifier_::Empty
+                {
+                    self.error(
+                        &loc,
+                        "only simple resource names can be used with `acquires`",
+                    )
+                }
+            },
+            EA::AccessSpecifierKind::Reads | EA::AccessSpecifierKind::Writes => {
+                self.check_language_version(
+                    &loc,
+                    "read/write access specifiers.",
+                    // TODO: should we move this into 2.3?
+                    LanguageVersion::V2_2,
+                )?;
+            },
+        }
         let resource = match (module_address, module_name, resource_name) {
             (None, None, None) => {
                 // This stems from a  specifier of the form `acquires *(0x1)`
@@ -1192,9 +1198,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             )?;
         };
         let address = self.translate_address_specifier(address)?;
+        let kind = match kind {
+            EA::AccessSpecifierKind::Reads => AccessSpecifierKind::Reads,
+            EA::AccessSpecifierKind::Writes => AccessSpecifierKind::Writes,
+            EA::AccessSpecifierKind::LegacyAcquires => AccessSpecifierKind::LegacyAcquires,
+        };
         Some(AccessSpecifier {
             loc: loc.clone(),
-            kind: *kind,
+            kind,
             negated: *negated,
             resource: (loc, resource),
             address,
@@ -2139,12 +2150,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             if ok {
                 receiver_param_type = subs.specialize(&receiver_param_type);
                 self.subs = subs;
-                let inst = inst
-                    .type_inst
-                    .iter()
-                    .map(|t| self.finalize_type(id, t, &mut BTreeSet::new()))
-                    .collect();
-                self.env().set_node_instantiation(id, inst)
+                self.env()
+                    .set_node_instantiation(id, inst.type_inst.clone())
             }
         }
         // Inject borrow operation if required.

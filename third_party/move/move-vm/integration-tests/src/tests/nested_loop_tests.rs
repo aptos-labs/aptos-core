@@ -108,12 +108,11 @@ fn test_run_script_with_nested_loops() {
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
-        let vm = MoveVM::new();
         let code_storage = storage.as_unsync_code_storage();
 
-        let mut sess = vm.new_session(&storage);
+        let mut sess = MoveVM::new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];
-        sess.execute_script(
+        sess.load_and_execute_script(
             s_blob.clone(),
             vec![],
             args,
@@ -135,12 +134,11 @@ fn test_run_script_with_nested_loops() {
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
-        let vm = MoveVM::new();
         let code_storage = storage.as_unsync_code_storage();
 
-        let mut sess = vm.new_session(&storage);
+        let mut sess = MoveVM::new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];
-        sess.execute_script(
+        sess.load_and_execute_script(
             s_blob,
             vec![],
             args,

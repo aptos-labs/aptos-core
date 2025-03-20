@@ -8,7 +8,7 @@ use crate::{
 use aptos_framework::extended_checks;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
-use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
+use legacy_move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_coverage::{
     coverage_map::CoverageMap,
     format_csv_summary, format_human_summary,

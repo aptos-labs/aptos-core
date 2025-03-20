@@ -6,11 +6,11 @@ use crate::{base::test_validation, NativeFunctionRecord};
 use anyhow::{bail, Result};
 use clap::*;
 use codespan_reporting::term::{termcolor, termcolor::StandardStream};
-use move_command_line_common::files::{FileHash, MOVE_COVERAGE_MAP_EXTENSION};
-use move_compiler::{
+use legacy_move_compiler::{
     shared::{NumberFormat, NumericalAddress},
     unit_test::TestPlan,
 };
+use move_command_line_common::files::{FileHash, MOVE_COVERAGE_MAP_EXTENSION};
 use move_compiler_v2::plan_builder as plan_builder_v2;
 use move_core_types::effects::ChangeSet;
 use move_coverage::coverage_map::{output_map_to_file, CoverageMap};

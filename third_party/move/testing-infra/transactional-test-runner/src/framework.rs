@@ -13,6 +13,7 @@ use crate::{
 };
 use anyhow::Result;
 use clap::Parser;
+use legacy_move_compiler::{compiled_unit::AnnotatedCompiledUnit, shared::NumericalAddress};
 use move_binary_format::{
     binary_views::BinaryIndexedView,
     file_format::{CompiledModule, CompiledScript},
@@ -25,7 +26,6 @@ use move_command_line_common::{
     types::ParsedType,
     values::{ParsableValue, ParsedValue},
 };
-use move_compiler::{compiled_unit::AnnotatedCompiledUnit, shared::NumericalAddress};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
@@ -654,11 +654,12 @@ impl<'a> CompiledState<'a> {
         self.check_not_precompiled(&id);
         let interface_file = NamedTempFile::new().unwrap();
         let path = interface_file.path().to_str().unwrap().to_owned();
-        let (_id, interface_text) = move_compiler::interface_generator::write_module_to_string(
-            &self.compiled_module_named_address_mapping,
-            &module,
-        )
-        .unwrap();
+        let (_id, interface_text) =
+            legacy_move_compiler::interface_generator::write_module_to_string(
+                &self.compiled_module_named_address_mapping,
+                &module,
+            )
+            .unwrap();
         interface_file
             .reopen()
             .unwrap()

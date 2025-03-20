@@ -542,14 +542,7 @@ fn serialize_function_handle(
     serialize_ability_sets(binary, &function_handle.type_parameters)?;
     if major_version >= VERSION_7 {
         serialize_access_specifiers(binary, &function_handle.access_specifiers)?
-    } else if function_handle.access_specifiers.is_some()
-        && function_handle
-            .access_specifiers
-            .as_ref()
-            .unwrap()
-            .iter()
-            .any(|sp| !sp.is_old_style_acquires())
-    {
+    } else if function_handle.access_specifiers.is_some() {
         return Err(anyhow!(
             "Access specifiers not supported in bytecode version {}",
             major_version
@@ -904,7 +897,6 @@ fn serialize_access_specifier(binary: &mut BinaryData, acc: &AccessSpecifier) ->
     binary.push(match acc.kind {
         AccessKind::Reads => SerializedAccessKind::READ,
         AccessKind::Writes => SerializedAccessKind::WRITE,
-        AccessKind::Acquires => SerializedAccessKind::ACQUIRES,
     } as u8)?;
     binary.push(
         if acc.negated {

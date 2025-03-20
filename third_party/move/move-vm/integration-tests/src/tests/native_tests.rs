@@ -70,9 +70,8 @@ fn test_publish_module_with_nested_loops() {
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
-        let vm = MoveVM::new();
 
-        let mut sess = vm.new_session(&storage);
+        let mut sess = MoveVM::new_session(&storage);
         let module_storage = storage.as_unsync_code_storage();
         let new_module_storage =
             StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob.clone().into()])

@@ -5,8 +5,8 @@
 use clap::ValueEnum;
 use codespan::{ByteIndex, Span};
 use itertools::Itertools;
+use legacy_move_compiler::parser::keywords::{BUILTINS, CONTEXTUAL_KEYWORDS, KEYWORDS};
 use log::info;
-use move_compiler::parser::keywords::{BUILTINS, CONTEXTUAL_KEYWORDS, KEYWORDS};
 use move_core_types::{ability::AbilitySet, account_address::AccountAddress};
 use move_model::{
     ast::{Address, Attribute, AttributeValue, ModuleName, SpecBlockInfo, SpecBlockTarget},

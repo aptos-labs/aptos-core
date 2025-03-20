@@ -121,18 +121,7 @@ impl VMError {
                         };
                     },
                 };
-                // Errors for OUT_OF_GAS do not always have index set: if it does not, it should already return above.
-                debug_assert!(
-                    offsets.len() == 1,
-                    "Unexpected offsets. major_status: {:?}\
-                    sub_status: {:?}\
-                    location: {:?}\
-                    offsets: {:#?}",
-                    major_status,
-                    sub_status,
-                    location,
-                    offsets
-                );
+                // offset can be None if it comes from `check_dependencies_and_charge_gas` for example
                 let (function, code_offset) = match offsets.pop() {
                     None => {
                         return VMStatus::Error {

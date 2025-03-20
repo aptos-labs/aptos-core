@@ -61,16 +61,15 @@ type AccountChangeSet = AccountChanges<BytesWithResourceLayout>;
 type ChangeSet = Changes<BytesWithResourceLayout>;
 pub type BytesWithResourceLayout = (Bytes, Option<Arc<MoveTypeLayout>>);
 
-pub struct SessionExt<'r, 'l> {
-    inner: Session<'r, 'l>,
+pub struct SessionExt<'r> {
+    inner: Session<'r>,
     resolver: &'r dyn AptosMoveResolver,
     is_storage_slot_metadata_enabled: bool,
 }
 
-impl<'r, 'l> SessionExt<'r, 'l> {
+impl<'r> SessionExt<'r> {
     pub(crate) fn new<R: AptosMoveResolver>(
         session_id: SessionId,
-        move_vm: &'l MoveVM,
         chain_id: ChainId,
         features: &Features,
         vm_config: &VMConfig,
@@ -107,7 +106,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let is_storage_slot_metadata_enabled = features.is_storage_slot_metadata_enabled();
         Self {
-            inner: move_vm.new_session_with_extensions(resolver, extensions),
+            inner: MoveVM::new_session_with_extensions(resolver, extensions),
             resolver,
             is_storage_slot_metadata_enabled,
         }
@@ -467,15 +466,15 @@ pub fn convert_modules_into_write_ops(
     woc.convert_modules_into_write_ops(module_storage, verified_module_bundle.into_iter())
 }
 
-impl<'r, 'l> Deref for SessionExt<'r, 'l> {
-    type Target = Session<'r, 'l>;
+impl<'r> Deref for SessionExt<'r> {
+    type Target = Session<'r>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-impl<'r, 'l> DerefMut for SessionExt<'r, 'l> {
+impl<'r> DerefMut for SessionExt<'r> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }

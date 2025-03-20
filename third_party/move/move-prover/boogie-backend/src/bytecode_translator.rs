@@ -25,9 +25,9 @@ use crate::{
 use codespan::LineIndex;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
+use legacy_move_compiler::interface_generator::NATIVE_INTERFACE;
 #[allow(unused_imports)]
 use log::{debug, info, log, warn, Level};
-use move_compiler::interface_generator::NATIVE_INTERFACE;
 use move_model::{
     ast::{Attribute, TempIndex, TraceKind},
     code_writer::CodeWriter,

@@ -8,12 +8,12 @@ pub mod test_runner;
 
 use crate::test_runner::TestRunner;
 use clap::*;
-use move_command_line_common::files::verify_and_create_named_address_mapping;
-use move_compiler::{
+use legacy_move_compiler::{
     self,
     shared::{self, NumericalAddress},
     unit_test::TestPlan,
 };
+use move_command_line_common::files::verify_and_create_named_address_mapping;
 use move_compiler_v2::plan_builder as plan_builder_v2;
 use move_core_types::{effects::ChangeSet, language_storage::ModuleId};
 use move_model::metadata::{CompilerVersion, LanguageVersion};

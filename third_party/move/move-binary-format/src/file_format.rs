@@ -820,7 +820,7 @@ pub type TypeParameterIndex = u16;
     derive(proptest_derive::Arbitrary, dearbitrary::Dearbitrary)
 )]
 pub struct AccessSpecifier {
-    /// The kind of access: read, write, or both.
+    /// The kind of access.
     pub kind: AccessKind,
     /// Whether the specifier is negated.
     pub negated: bool,
@@ -828,17 +828,6 @@ pub struct AccessSpecifier {
     pub resource: ResourceSpecifier,
     /// The address where the resource is stored.
     pub address: AddressSpecifier,
-}
-
-impl AccessSpecifier {
-    // Old style of acquires is by default for bytecode version 6 or below.
-    // New style of acquires was introduced in AIP-56: Resource Access Control
-    pub fn is_old_style_acquires(&self) -> bool {
-        self.kind == AccessKind::Acquires
-            && !self.negated
-            && self.address == AddressSpecifier::Any
-            && matches!(self.resource, ResourceSpecifier::Resource(_))
-    }
 }
 
 /// The kind of specified access.
@@ -849,31 +838,12 @@ impl AccessSpecifier {
     derive(proptest_derive::Arbitrary, dearbitrary::Dearbitrary)
 )]
 pub enum AccessKind {
+    /// The resource is read. If used in negation context, this
+    /// means the resource is neither read nor written.
     Reads,
+    /// The resource is read or written. If used in negation context,
+    /// this means the resource is not written to.
     Writes,
-    Acquires, // reads or writes
-}
-
-impl AccessKind {
-    /// Returns true if this access kind subsumes the other.
-    pub fn subsumes(&self, other: &Self) -> bool {
-        use AccessKind::*;
-        match (self, other) {
-            (Acquires, _) => true,
-            (_, Acquires) => false,
-            _ => self == other,
-        }
-    }
-
-    /// Tries to join two kinds, returns None if no intersection.
-    pub fn try_join(self, other: Self) -> Option<Self> {
-        use AccessKind::*;
-        match (self, other) {
-            (Acquires, k) | (k, Acquires) => Some(k),
-            (k1, k2) if k1 == k2 => Some(k1),
-            _ => None,
-        }
-    }
 }
 
 impl fmt::Display for AccessKind {
@@ -882,7 +852,6 @@ impl fmt::Display for AccessKind {
         match self {
             Reads => f.write_str("reads"),
             Writes => f.write_str("writes"),
-            Acquires => f.write_str("acquires"),
         }
     }
 }

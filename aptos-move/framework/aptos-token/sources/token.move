@@ -932,7 +932,7 @@ module aptos_token::token {
         assert!(table::contains(all_token_data, token_id.token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
         let token_data = table::borrow_mut(all_token_data, token_id.token_data_id);
 
-        // if default property is mutatable, token property is alwasy mutable
+        // if default property is mutatable, token property is always mutable
         // we only need to check TOKEN_PROPERTY_MUTABLE when default property is immutable
         if (!token_data.mutability_config.properties) {
             assert!(

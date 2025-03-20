@@ -9,9 +9,9 @@
 use anyhow::anyhow;
 use clap::{builder::PossibleValuesParser, Arg, ArgAction, ArgAction::SetTrue, Command};
 use codespan_reporting::diagnostic::Severity;
+use legacy_move_compiler::{command_line::SKIP_ATTRIBUTE_CHECKS, shared::NumericalAddress};
 use log::LevelFilter;
 use move_abigen::AbigenOptions;
-use move_compiler::{command_line::SKIP_ATTRIBUTE_CHECKS, shared::NumericalAddress};
 use move_docgen::DocgenOptions;
 use move_errmapgen::ErrmapOptions;
 use move_model::{
