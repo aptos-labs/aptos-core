@@ -6,7 +6,7 @@ use crate::consensus_observer::{
         logging::{LogEntry, LogSchema},
         metrics,
     },
-    network::observer_message::{CommitDecision, OrderedBlock},
+    network::observer_message::CommitDecision,
     observer::execution_pool::ObservedOrderedBlock,
 };
 use aptos_config::config::ConsensusObserverConfig;
@@ -63,11 +63,15 @@ impl OrderedBlockStore {
             })
     }
 
-    /// Returns the ordered block for the given epoch and round (if any)
-    pub fn get_ordered_block(&self, epoch: u64, round: Round) -> Option<OrderedBlock> {
+    /// Returns the observed ordered block for the given epoch and round (if any)
+    pub fn get_observed_ordered_block(
+        &self,
+        epoch: u64,
+        round: Round,
+    ) -> Option<ObservedOrderedBlock> {
         self.ordered_blocks
             .get(&(epoch, round))
-            .map(|(observed_ordered_block, _)| observed_ordered_block.ordered_block().clone())
+            .map(|(observed_ordered_block, _)| observed_ordered_block.clone())
     }
 
     /// Inserts the given ordered block into the ordered blocks. This function
@@ -218,6 +222,7 @@ impl OrderedBlockStore {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::consensus_observer::network::observer_message::OrderedBlock;
     use aptos_consensus_types::{
         block::Block,
         block_data::{BlockData, BlockType},
@@ -429,15 +434,15 @@ mod test {
         for ordered_block in &ordered_blocks {
             let block_info = ordered_block.last_block().block_info();
             let fetched_ordered_block = ordered_block_store
-                .get_ordered_block(block_info.epoch(), block_info.round())
+                .get_observed_ordered_block(block_info.epoch(), block_info.round())
                 .unwrap();
-            assert_eq!(ordered_block.clone(), fetched_ordered_block);
+            assert_eq!(ordered_block, fetched_ordered_block.ordered_block());
         }
 
         // Verify that a non-existent block cannot be retrieved
         let last_block = ordered_blocks.last().unwrap();
         let last_block_info = last_block.last_block().block_info();
-        let ordered_block = ordered_block_store.get_ordered_block(
+        let ordered_block = ordered_block_store.get_observed_ordered_block(
             last_block_info.epoch(),
             last_block_info.round() + 1, // Request a round that doesn't exist
         );
@@ -474,8 +479,8 @@ mod test {
         // Verify the ordered blocks were not inserted (they should have just been dropped)
         for ordered_block in &ordered_blocks {
             let block_info = ordered_block.last_block().block_info();
-            let fetched_ordered_block =
-                ordered_block_store.get_ordered_block(block_info.epoch(), block_info.round());
+            let fetched_ordered_block = ordered_block_store
+                .get_observed_ordered_block(block_info.epoch(), block_info.round());
             assert!(fetched_ordered_block.is_none());
         }
 

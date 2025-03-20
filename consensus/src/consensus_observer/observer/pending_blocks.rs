@@ -1,15 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::consensus_observer::{
-    common::{
-        logging::{LogEntry, LogSchema},
-        metrics,
+use crate::{
+    consensus_observer::{
+        common::{
+            logging::{LogEntry, LogSchema},
+            metrics,
+        },
+        network::observer_message::OrderedBlock,
+        observer::{execution_pool::ObservedOrderedBlock, payload_store::BlockPayloadStore},
     },
-    network::observer_message::OrderedBlock,
-    observer::{execution_pool::ObservedOrderedBlock, payload_store::BlockPayloadStore},
+    util::BlockStorage,
 };
 use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
+use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, warn};
@@ -312,6 +316,37 @@ impl PendingBlockStore {
             metrics::PENDING_BLOCKS_LABEL,
             highest_pending_round,
         );
+    }
+}
+
+/// Implement the BlockStorage trait for the PendingBlockStore.
+/// This is required to calculate and fetch the block window.
+impl BlockStorage for PendingBlockStore {
+    fn get_block(&self, block_id: &HashValue) -> Option<Arc<PipelinedBlock>> {
+        // Lookup the ordered block by hash
+        let pending_block_with_metadata = match self.get_pending_block_by_hash(*block_id) {
+            Some(pending_block_with_metadata) => pending_block_with_metadata,
+            None => {
+                return None; // The block is not in the store
+            },
+        };
+
+        // Extract the pipelined block (if it exists)
+        for pipelined_block in pending_block_with_metadata.ordered_block().blocks() {
+            if pipelined_block.block().id() == *block_id {
+                return Some(pipelined_block.clone());
+            }
+        }
+
+        // Log an error and return None. This should never really
+        // happen as the block was inserted into the store!
+        error!(
+            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                "The pipelined block was not found in the ordered block entry: {:?}",
+                pending_block_with_metadata.ordered_block().blocks()
+            ))
+        );
+        None
     }
 }
 
