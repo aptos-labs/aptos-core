@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Experiment, Options};
+use crate::Options;
 use codespan_reporting::diagnostic::Severity;
 use ethnum::U256;
 use itertools::Itertools;
@@ -10,6 +10,7 @@ use move_core_types::ability::Ability;
 use move_model::{
     ast::{Exp, ExpData, MatchArm, Operation, Pattern, SpecBlockTarget, TempIndex, Value},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
+    metadata::LanguageVersion,
     model::{
         FieldId, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId,
         QualifiedInstId, StructId,
@@ -28,7 +29,7 @@ use move_stackless_bytecode::{
 use num::ToPrimitive;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fmt, iter,
+    fmt,
 };
 // ======================================================================================
 // Entry
@@ -330,7 +331,10 @@ impl<'env> Generator<'env> {
             .env()
             .get_extension::<Options>()
             .expect("Options is available");
-        options.experiment_on(Experiment::FUNCTION_VALUES)
+        options
+            .language_version
+            .unwrap_or_default()
+            .is_at_least(LanguageVersion::V2_2)
     }
 
     fn expect_function_values_enabled(&self, id: NodeId) {
@@ -636,8 +640,35 @@ impl<'env> Generator<'env> {
 
 impl<'env> Generator<'env> {
     fn gen_invoke(&mut self, targets: Vec<TempIndex>, id: NodeId, fun: &Exp, args: &[Exp]) {
-        let args = args.iter().chain(iter::once(fun)).cloned().collect_vec();
-        self.gen_op_call(targets, id, BytecodeOperation::Invoke, &args)
+        // Arguments are first computed, finally the function. (On a stack machine, the
+        // function is on the top).
+        let mut arg_temps = self.gen_arg_list(args);
+        let fun_temp = self.gen_arg(fun, false);
+
+        // The function can be a wrapper `struct W(|T|S|)` which we need to unpack first.
+        let fun_ty = self.get_node_type(fun.node_id());
+        if let Some(raw_fun_ty) = fun_ty.get_function_wrapper_ty(self.env()) {
+            let raw_fun_temp = self.new_temp(raw_fun_ty);
+            // This here should be well-defined because only structs can be wrappers.
+            let (wrapper_struct, inst) = fun_ty.get_struct(self.env()).unwrap();
+            let struct_id = wrapper_struct.get_qualified_id();
+            let inst = inst.to_vec();
+            self.emit_with(id, |attr| {
+                Bytecode::Call(
+                    attr,
+                    vec![raw_fun_temp],
+                    BytecodeOperation::Unpack(struct_id.module_id, struct_id.id, inst),
+                    vec![fun_temp],
+                    None,
+                )
+            });
+            arg_temps.push(raw_fun_temp)
+        } else {
+            arg_temps.push(fun_temp)
+        };
+        self.emit_with(id, |attr| {
+            Bytecode::Call(attr, targets, BytecodeOperation::Invoke, arg_temps, None)
+        });
     }
 
     fn gen_call(&mut self, targets: Vec<TempIndex>, id: NodeId, op: &Operation, args: &[Exp]) {
@@ -817,12 +848,38 @@ impl<'env> Generator<'env> {
                         .get_function(mid.qualified(*fid))
                         .get_type_parameter_count(),
                 );
-                self.gen_op_call(
-                    targets,
-                    id,
-                    BytecodeOperation::Closure(*mid, *fid, inst, *mask),
-                    args,
-                )
+                let target_ty = self.temp_type(targets[0]).clone();
+                if let Type::Struct(wrapper_mid, wrapper_sid, wrapper_inst) = target_ty {
+                    // Implicitly convert to a function wrapper.
+                    let fun_ty = self
+                        .env()
+                        .get_struct(wrapper_mid.qualified(wrapper_sid))
+                        .get_function_wrapper_type(&wrapper_inst)
+                        .expect("function wrapper type");
+                    let temp = self.new_temp(fun_ty);
+                    self.gen_op_call(
+                        vec![temp],
+                        id,
+                        BytecodeOperation::Closure(*mid, *fid, inst, *mask),
+                        args,
+                    );
+                    self.emit_with(id, |attr| {
+                        Bytecode::Call(
+                            attr,
+                            targets,
+                            BytecodeOperation::Pack(wrapper_mid, wrapper_sid, wrapper_inst),
+                            vec![temp],
+                            None,
+                        )
+                    })
+                } else {
+                    self.gen_op_call(
+                        targets,
+                        id,
+                        BytecodeOperation::Closure(*mid, *fid, inst, *mask),
+                        args,
+                    )
+                }
             },
             Operation::TestVariants(mid, sid, variants) => {
                 self.gen_test_variants(targets, id, mid.qualified(*sid), variants, args)

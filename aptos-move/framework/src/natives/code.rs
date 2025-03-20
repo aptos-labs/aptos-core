@@ -212,14 +212,12 @@ impl NativeCodeContext {
         }
     }
 
-    pub fn extract_publish_request(&mut self, disable: bool) -> Option<PublishRequest> {
+    pub fn extract_publish_request(&mut self) -> Option<PublishRequest> {
         if !self.enabled {
             return None;
         }
 
-        if disable {
-            self.enabled = false;
-        }
+        self.enabled = false;
         self.requested_module_bundle.take()
     }
 }

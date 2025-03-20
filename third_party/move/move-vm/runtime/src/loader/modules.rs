@@ -6,14 +6,13 @@ use crate::{
     loader::{
         function::{Function, FunctionHandle, FunctionInstantiation},
         type_loader::intern_type,
-        BinaryCache,
     },
     native_functions::NativeFunctions,
 };
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
-    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    errors::{PartialVMError, PartialVMResult},
     file_format::{
         Bytecode, CompiledModule, FieldDefinition, FieldHandleIndex, FieldInstantiationIndex,
         FunctionDefinitionIndex, SignatureIndex, StructDefinition, StructDefinitionIndex,
@@ -21,163 +20,18 @@ use move_binary_format::{
         TableIndex, VariantFieldHandleIndex, VariantFieldInstantiationIndex, VariantIndex,
     },
 };
-use move_core_types::{
-    account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
-    language_storage::ModuleId,
-    vm_status::StatusCode,
-};
+use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::loaded_data::{
     runtime_types::{StructIdentifier, StructLayout, StructType, Type},
     struct_name_indexing::{StructNameIndex, StructNameIndexMap},
 };
-use parking_lot::RwLock;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
     ops::Deref,
     sync::Arc,
 };
-
-/// This trait provides an additional api for the Session to decide where the resolved modules should be stored.
-///
-/// The default api will store the modules inside MoveVM structure but the caller can also choose to store it
-/// elsewhere as long as it implements this `ModuleStorage` trait. Doing so would allow the caller, i.e: the
-/// adapter layer, to freely decide when to drop or persist the cache as well as determining its own eviction policy.
-pub trait LegacyModuleStorage {
-    fn store_module(&self, module_id: &ModuleId, binary: Module) -> Arc<Module>;
-    fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>>;
-    fn fetch_module_by_ref(&self, addr: &AccountAddress, name: &IdentStr) -> Option<Arc<Module>>;
-}
-
-pub(crate) struct LegacyModuleCache(RwLock<BinaryCache<ModuleId, Arc<Module>>>);
-
-impl LegacyModuleCache {
-    pub fn new() -> Self {
-        LegacyModuleCache(RwLock::new(BinaryCache::new()))
-    }
-
-    pub fn flush(&self) {
-        *self.0.write() = BinaryCache::new();
-    }
-}
-
-impl Clone for LegacyModuleCache {
-    fn clone(&self) -> Self {
-        LegacyModuleCache(RwLock::new(self.0.read().clone()))
-    }
-}
-
-impl LegacyModuleStorage for LegacyModuleCache {
-    fn store_module(&self, module_id: &ModuleId, binary: Module) -> Arc<Module> {
-        let mut cache = self.0.write();
-
-        if let Some(existing_binary) = cache.get(module_id) {
-            return existing_binary.clone();
-        }
-        cache.insert(module_id.clone(), Arc::new(binary)).clone()
-    }
-
-    fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>> {
-        self.0.read().get(module_id).cloned()
-    }
-
-    fn fetch_module_by_ref(&self, addr: &AccountAddress, name: &IdentStr) -> Option<Arc<Module>> {
-        self.0.read().get(&(addr, name)).cloned()
-    }
-}
-
-// TODO(loader_v2): Remove legacy V1 loader types.
-pub(crate) struct LegacyModuleStorageAdapter {
-    modules: Arc<dyn LegacyModuleStorage>,
-}
-
-impl LegacyModuleStorageAdapter {
-    pub(crate) fn new(modules: Arc<dyn LegacyModuleStorage>) -> Self {
-        Self { modules }
-    }
-
-    // Retrieve a module by `ModuleId`. The module may have not been loaded yet in which
-    // case `None` is returned
-    pub(crate) fn module_at(&self, id: &ModuleId) -> Option<Arc<Module>> {
-        self.modules.fetch_module(id)
-    }
-
-    pub(crate) fn module_at_by_ref(
-        &self,
-        addr: &AccountAddress,
-        name: &IdentStr,
-    ) -> Option<Arc<Module>> {
-        self.modules.fetch_module_by_ref(addr, name)
-    }
-
-    pub(crate) fn insert(
-        &self,
-        natives: &NativeFunctions,
-        id: ModuleId,
-        module_size: usize,
-        compiled_module: Arc<CompiledModule>,
-        struct_name_index_map: &StructNameIndexMap,
-    ) -> VMResult<Arc<Module>> {
-        if let Some(cached) = self.module_at(&id) {
-            return Ok(cached);
-        }
-
-        let module = Module::new(natives, module_size, compiled_module, struct_name_index_map)
-            .map_err(|e| e.finish(Location::Undefined))?;
-        Ok(self.modules.store_module(&id, module))
-    }
-
-    pub(crate) fn has_module(&self, module_id: &ModuleId) -> bool {
-        self.modules.fetch_module(module_id).is_some()
-    }
-
-    // Given a ModuleId::struct_name, retrieve the `StructType` and the index associated.
-    // Return and error if the type has not been loaded
-    pub(crate) fn get_struct_type_by_identifier(
-        &self,
-        struct_name: &IdentStr,
-        module_id: &ModuleId,
-    ) -> PartialVMResult<Arc<StructType>> {
-        self.modules
-            .fetch_module(module_id)
-            .and_then(|module| {
-                let idx = module.struct_map.get(struct_name)?;
-                Some(module.structs.get(*idx)?.definition_struct_type.clone())
-            })
-            .ok_or_else(|| {
-                PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(format!(
-                    "Cannot find {:?}::{:?} in cache",
-                    module_id, struct_name
-                ))
-            })
-    }
-
-    /// Given module address/name and the function name, returns the corresponding module
-    /// and function if they exist in module store cache. If not, an error is returned.
-    pub(crate) fn resolve_module_and_function_by_name(
-        &self,
-        module_id: &ModuleId,
-        func_name: &IdentStr,
-    ) -> PartialVMResult<(Arc<Module>, Arc<Function>)> {
-        let error = || {
-            PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(format!(
-                "Cannot find {:?}::{:?} in cache",
-                module_id, func_name
-            ))
-        };
-
-        let module = self.modules.fetch_module(module_id).ok_or_else(error)?;
-        let function = module
-            .function_map
-            .get(func_name)
-            .and_then(|idx| module.function_defs.get(*idx))
-            .cloned()
-            .ok_or_else(error)?;
-        Ok((module, function.clone()))
-    }
-}
 
 // A Module is very similar to a binary Module but data is "transformed" to a representation
 // more appropriate to execution.
@@ -188,6 +42,7 @@ pub struct Module {
     id: ModuleId,
 
     // size in bytes
+    #[allow(dead_code)]
     pub(crate) size: usize,
 
     // primitive pools

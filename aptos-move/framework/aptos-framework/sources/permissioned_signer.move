@@ -168,6 +168,10 @@ module aptos_framework::permissioned_signer {
         is_permissioned_signer_impl(s)
     }
 
+    public fun address_of(s: &signer): address {
+        *borrow_address(s)
+    }
+
     /// Grant the permissioned signer the permission to revoke granted permission handles under
     /// its address.
     public fun grant_revoke_permission(
@@ -194,7 +198,7 @@ module aptos_framework::permissioned_signer {
             check_permission_exists(s, RevokePermissionHandlePermission {}),
             error::permission_denied(ENOT_MASTER_SIGNER)
         );
-        let master_account_addr = signer::address_of(s);
+        let master_account_addr = address_of(s);
 
         assert!(
             exists<GrantedPermissionHandles>(master_account_addr),
@@ -219,7 +223,7 @@ module aptos_framework::permissioned_signer {
             check_permission_exists(s, RevokePermissionHandlePermission {}),
             error::permission_denied(ENOT_MASTER_SIGNER)
         );
-        let master_account_addr = signer::address_of(s);
+        let master_account_addr = address_of(s);
         if (!exists<GrantedPermissionHandles>(master_account_addr)) { return };
 
         let granted_permissions =
@@ -473,7 +477,7 @@ module aptos_framework::permissioned_signer {
         assert!(
             is_permissioned_signer(permissioned)
                 && !is_permissioned_signer(master)
-                && signer::address_of(master) == signer::address_of(permissioned),
+                && signer::address_of(master) == address_of(permissioned),
             error::permission_denied(ECANNOT_AUTHORIZE)
         );
         insert_or(
@@ -496,7 +500,7 @@ module aptos_framework::permissioned_signer {
         assert!(
             is_permissioned_signer(permissioned)
                 && !is_permissioned_signer(master)
-                && signer::address_of(master) == signer::address_of(permissioned),
+                && signer::address_of(master) == address_of(permissioned),
             error::permission_denied(ECANNOT_AUTHORIZE)
         );
         insert_or(
@@ -550,6 +554,8 @@ module aptos_framework::permissioned_signer {
         )
     }
 
+    // TODO: This will become a public api for external modules to check if a permission exists.
+    //       Change the api to return address such that the address_of can remain private.
     public(package) fun check_permission_exists<PermKey: copy + drop + store>(
         s: &signer, perm: PermKey
     ): bool acquires PermissionStorage {
@@ -557,6 +563,8 @@ module aptos_framework::permissioned_signer {
         check_permission_capacity_above(s, 1, perm)
     }
 
+    // TODO: This will become a public api for external modules to check if a permission exists.
+    //       Change the api to return address such that the address_of can remain private.
     public(package) fun check_permission_capacity_above<PermKey: copy + drop + store>(
         s: &signer, threshold: u256, perm: PermKey
     ): bool acquires PermissionStorage {
@@ -574,6 +582,8 @@ module aptos_framework::permissioned_signer {
         )
     }
 
+    // TODO: This will become a public api for external modules to check if a permission exists.
+    //       Change the api to return address such that the address_of can remain private.
     public(package) fun check_permission_consume<PermKey: copy + drop + store>(
         s: &signer, threshold: u256, perm: PermKey
     ): bool acquires PermissionStorage {
@@ -638,11 +648,13 @@ module aptos_framework::permissioned_signer {
     ///
     /// The implementation of this function requires to extend the value representation for signers in the VM.
     /// invariants:
-    ///   signer::address_of(master) == signer::address_of(signer_from_permissioned_handle(create_permissioned_handle(master))),
+    ///   signer::address_of(master) == address_of(signer_from_permissioned_handle(create_permissioned_handle(master))),
     ///
     native fun signer_from_permissioned_handle_impl(
         master_account_addr: address, permissions_storage_addr: address
     ): signer;
+    /// `borrow_address` borrows this inner field
+    native public fun borrow_address(s: &signer): &address;
 
     #[test(creator = @0xcafe)]
     fun signer_address_roundtrip(
@@ -653,7 +665,7 @@ module aptos_framework::permissioned_signer {
 
         let handle = create_permissioned_handle(creator);
         let perm_signer = signer_from_permissioned_handle(&handle);
-        assert!(signer::address_of(&perm_signer) == signer::address_of(creator), 1);
+        assert!(address_of(&perm_signer) == signer::address_of(creator), 1);
         assert!(
             permission_address(&perm_signer)
                 == handle.permissions_storage_addr,
@@ -665,7 +677,7 @@ module aptos_framework::permissioned_signer {
 
         let handle = create_storable_permissioned_handle(creator, 60);
         let perm_signer = signer_from_storable_permissioned_handle(&handle);
-        assert!(signer::address_of(&perm_signer) == signer::address_of(creator), 1);
+        assert!(address_of(&perm_signer) == signer::address_of(creator), 1);
         assert!(
             permission_address(&perm_signer)
                 == handle.permissions_storage_addr,

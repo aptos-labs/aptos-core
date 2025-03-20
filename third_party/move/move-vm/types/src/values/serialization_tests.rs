@@ -16,7 +16,9 @@ mod tests {
     use move_core_types::{
         ability::AbilitySet,
         account_address::AccountAddress,
-        function::{ClosureMask, MoveClosure, MoveFunctionLayout},
+        function::{
+            ClosureMask, MoveClosure, MoveFunctionLayout, FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
+        },
         identifier::Identifier,
         language_storage::{FunctionTag, ModuleId, StructTag, TypeTag},
         u256,
@@ -210,7 +212,7 @@ mod tests {
         MoveTypeLayout::Function(MoveFunctionLayout(
             vec![],
             vec![],
-            AbilitySet::MAXIMAL_FUNCTIONS,
+            AbilitySet::PUBLIC_FUNCTIONS,
         ))
     }
 
@@ -226,7 +228,7 @@ mod tests {
                     type_args: vec![TypeTag::Signer],
                 }))],
                 results: vec![TypeTag::Address],
-                abilities: AbilitySet::MAXIMAL_FUNCTIONS,
+                abilities: AbilitySet::PUBLIC_FUNCTIONS,
             })),
         ]
     }
@@ -353,6 +355,7 @@ mod tests {
         ) -> MockAbstractFunction {
             Self {
                 data: SerializedFunctionData {
+                    format_version: FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
                     module_id: ModuleId::new(AccountAddress::TWO, Identifier::new("m").unwrap()),
                     fun_id: Identifier::new(fun_name).unwrap(),
                     ty_args,

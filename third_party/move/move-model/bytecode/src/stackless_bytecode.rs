@@ -168,6 +168,16 @@ impl Constant {
             },
         }
     }
+
+    /// Canonicalizes the constant.
+    pub fn to_canonical(&self) -> Constant {
+        use Constant::*;
+        match self {
+            ByteArray(v) => Vector(v.iter().map(|e| U8(*e)).collect()),
+            AddressArray(v) => Vector(v.iter().map(|e| Address(e.clone())).collect()),
+            _ => self.clone(),
+        }
+    }
 }
 
 /// An operation -- target of a call. This contains user functions, builtin functions, and

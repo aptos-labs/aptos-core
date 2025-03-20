@@ -323,6 +323,16 @@ impl<'a, R: StateView> TableInfoParser<'a, R> {
                     }
                 }
             },
+            AnnotatedMoveValue::RawStruct(struct_value) => {
+                for val in &struct_value.field_values {
+                    self.parse_move_value(val)?
+                }
+            },
+            AnnotatedMoveValue::Closure(closure_value) => {
+                for capture in &closure_value.captured {
+                    self.parse_move_value(capture)?
+                }
+            },
 
             // there won't be tables in primitives
             AnnotatedMoveValue::U8(_) => {},

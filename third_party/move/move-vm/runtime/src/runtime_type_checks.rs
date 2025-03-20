@@ -84,7 +84,7 @@ pub fn verify_pack_closure(
     mask: ClosureMask,
 ) -> PartialVMResult<()> {
     // Accumulated abilities
-    let mut abilities = if func.is_public() {
+    let mut abilities = if func.function.is_persistent() {
         AbilitySet::PUBLIC_FUNCTIONS
     } else {
         AbilitySet::PRIVATE_FUNCTIONS
@@ -100,7 +100,7 @@ pub fn verify_pack_closure(
     {
         with_instantiation(resolver, func, expected, |expected| {
             // Intersect the captured type with the accumulated abilities
-            abilities = abilities.intersect(expected.abilities()?);
+            abilities = abilities.intersect(given.abilities()?);
             given.paranoid_check_assignable(expected)
         })?
     }
@@ -135,7 +135,6 @@ fn with_instantiation<R>(
     } else {
         action(
             &resolver
-                .loader()
                 .ty_builder()
                 .create_ty_with_subst(ty, func.ty_args())?,
         )
@@ -153,7 +152,6 @@ fn with_owned_instantiation<R>(
     } else {
         action(
             resolver
-                .loader()
                 .ty_builder()
                 .create_ty_with_subst(ty, func.ty_args())?,
         )
@@ -347,7 +345,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         ty_cache: &mut FrameTypeCache,
         instruction: &Bytecode,
     ) -> PartialVMResult<()> {
-        let ty_builder = resolver.loader().ty_builder();
+        let ty_builder = resolver.ty_builder();
 
         match instruction {
             Bytecode::BrTrue(_) | Bytecode::BrFalse(_) => (),

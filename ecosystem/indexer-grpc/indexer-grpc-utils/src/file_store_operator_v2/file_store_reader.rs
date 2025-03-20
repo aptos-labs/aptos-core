@@ -76,7 +76,8 @@ impl FileStoreReader {
         retries: u8,
         max_files: Option<usize>,
         filter: Option<BooleanTransactionFilter>,
-        tx: Sender<(Vec<Transaction>, usize, Timestamp)>,
+        ending_version: Option<u64>,
+        tx: Sender<(Vec<Transaction>, usize, Timestamp, (u64, u64))>,
     ) {
         trace!(
             "Getting transactions from file store, version: {version}, max_files: {max_files:?}."
@@ -109,6 +110,11 @@ impl FileStoreReader {
 
         for i in file_index..end_file_index {
             let current_version = batch_metadata.files[i].first_version;
+            if let Some(ending_version) = ending_version {
+                if current_version >= ending_version {
+                    break;
+                }
+            }
             let transactions = self
                 .get_transaction_file_at_version(current_version, retries)
                 .await;
@@ -118,13 +124,22 @@ impl FileStoreReader {
                 if num_to_skip > 0 {
                     transactions = transactions.split_off(num_to_skip);
                 }
+                let mut processed_range = (
+                    transactions.first().unwrap().version,
+                    transactions.last().unwrap().version,
+                );
+                if let Some(ending_version) = ending_version {
+                    transactions
+                        .truncate(transactions.partition_point(|t| t.version < ending_version));
+                    processed_range.1 = processed_range.1.min(ending_version - 1);
+                }
                 if let Some(ref filter) = filter {
                     transactions.retain(|t| filter.matches(t));
                 }
                 let size_bytes = transactions.iter().map(|t| t.encoded_len()).sum();
-                trace!("Got {} transactions from file store to send, size: {size_bytes}, first_version: {:?}", transactions.len(), transactions.first().map(|t| t.version));
+                trace!("Got {} transactions from file store to send, size: {size_bytes}, processed_range: [{}, {}]", transactions.len(), processed_range.0, processed_range.1);
                 if tx
-                    .send((transactions, size_bytes, timestamp))
+                    .send((transactions, size_bytes, timestamp, processed_range))
                     .await
                     .is_err()
                 {

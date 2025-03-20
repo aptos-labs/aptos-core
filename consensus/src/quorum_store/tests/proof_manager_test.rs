@@ -17,7 +17,7 @@ use std::{cmp::max, collections::HashSet};
 
 fn create_proof_manager() -> ProofManager {
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    ProofManager::new(PeerId::random(), 10, 10, batch_store, true, 1)
+    ProofManager::new(PeerId::random(), 10, 10, batch_store, true, true, 1)
 }
 
 fn create_proof(author: PeerId, expiration: u64, batch_sequence: u64) -> ProofOfStore {
@@ -74,6 +74,7 @@ fn assert_payload_response(
     payload: Payload,
     expected: &[ProofOfStore],
     max_txns_from_block_to_execute: Option<u64>,
+    expected_block_gas_limit: Option<u64>,
 ) {
     match payload {
         Payload::InQuorumStore(proofs) => {
@@ -96,7 +97,17 @@ fn assert_payload_response(
             }
             assert_eq!(max_txns_to_execute, max_txns_from_block_to_execute);
         },
-        // TODO: Check how to update this for Payload::QuorumStoreInlineHybrid
+        Payload::QuorumStoreInlineHybridV2(_inline_batches, proofs, execution_limits) => {
+            assert_eq!(proofs.proofs.len(), expected.len());
+            for proof in proofs.proofs {
+                assert!(expected.contains(&proof));
+            }
+            assert_eq!(
+                execution_limits.max_txns_to_execute(),
+                max_txns_from_block_to_execute
+            );
+            assert_eq!(execution_limits.block_gas_limit(), expected_block_gas_limit);
+        },
         _ => panic!("Unexpected variant"),
     }
 }
@@ -110,6 +121,7 @@ async fn get_proposal_and_assert(
     assert_payload_response(
         get_proposal(proof_manager, max_txns, filter).await,
         expected,
+        None,
         None,
     );
 }
@@ -134,10 +146,15 @@ async fn test_max_txns_from_block_to_execute() {
     let payload = get_proposal(&mut proof_manager, 100, &[]).await;
     // convert payload to v2 format and assert
     let max_txns_from_block_to_execute = 10;
+    let block_gas_limit = 10_000;
     assert_payload_response(
-        payload.transform_to_quorum_store_v2(Some(max_txns_from_block_to_execute)),
+        payload.transform_to_quorum_store_v2(
+            Some(max_txns_from_block_to_execute),
+            Some(block_gas_limit),
+        ),
         &vec![proof],
         Some(max_txns_from_block_to_execute),
+        Some(block_gas_limit),
     );
 }
 

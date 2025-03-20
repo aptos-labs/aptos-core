@@ -6,6 +6,9 @@ module aptos_std::secp256k1 {
     /// An error occurred while deserializing, for example due to wrong input size.
     const E_DESERIALIZE: u64 = 1;   // This code must be the same, if ever returned from the native Rust implementation.
 
+    /// Recovery ID needs to be either 0, 1, 2 or 3. If you are recovering from an (r, s, v) Ethereum signature, take its v value and, set the recovery_id as follows: if v == 27, set to 0, if v == 28, set to 1, if v == 37, set to 0, if v == 38, set to 1.
+    const E_BAD_RECOVERY_ID: u64 = 2;
+
     /// The size of a secp256k1-based ECDSA public key, in bytes.
     const RAW_PUBLIC_KEY_NUM_BYTES: u64 = 64;
     //const COMPRESSED_PUBLIC_KEY_SIZE: u64 = 33;
@@ -45,18 +48,37 @@ module aptos_std::secp256k1 {
         sig.bytes
     }
 
-    /// Recovers the signer's raw (64-byte) public key from a secp256k1 ECDSA `signature` given the `recovery_id` and the signed
-    /// `message` (32 byte digest).
+    /// Recovers the signer's raw (64-byte) public key from a secp256k1 ECDSA `signature` given the (2-bit) `recovery_id`
+    /// and the signed `message` (32 byte digest).
     ///
-    /// Note that an invalid signature, or a signature from a different message, will result in the recovery of an
-    /// incorrect public key. This recovery algorithm can only be used to check validity of a signature if the signer's
-    /// public key (or its hash) is known beforehand.
+    /// This recovery algorithm can only be used to check validity of a signature if the signer's public key (or its
+    /// hash) is known beforehand. When the algorithm returns a public key `pk`, this means that the signature in
+    /// `signature` verified on `message` under that `pk`. But, again, that is only meaningful if `pk` is the "right"
+    /// one (e.g., in Ethereum, the "right" `pk` is the one whose hash matches the account's address).
+    ///
+    /// If you do not understand this nuance, please learn more about ECDSA and pubkey recovery (see
+    /// https://alinush.github.io/ecdsa#pubkey-recovery), or you risk writing completely-insecure code.
+    ///
+    /// Note: This function does not apply any additional hashing on the `message`; it simply passes in the message as
+    /// raw bytes to the ECDSA recovery function. (The max allowed size ~32 bytes.)
+    ///  + Nonetheless, most applications will first hash the message to be signed. So, typically, `message` here tends
+    ///    to be a hash rather than an actual message. Therefore, the developer should be aware of what hash function
+    ///    was used for this.
+    ///  + In particular, if using this function to verify an Ethereum signature, you will likely have to input
+    ///    a keccak256 hash of the message as the `message` parameter.
     public fun ecdsa_recover(
         message: vector<u8>,
         recovery_id: u8,
         signature: &ECDSASignature,
     ): Option<ECDSARawPublicKey> {
+
+        // If recovery ID is not 0 or 1 or 2 or 3, help the caller out by aborting with `E_BAD_RECOVERY_ID`
+        if(recovery_id != 0 && recovery_id != 1 && recovery_id != 2 && recovery_id != 3) {
+            abort std::error::invalid_argument(E_BAD_RECOVERY_ID);
+        };
+
         let (pk, success) = ecdsa_recover_internal(message, recovery_id, signature.bytes);
+
         if (success) {
             std::option::some(ecdsa_raw_public_key_from_64_bytes(pk))
         } else {
@@ -79,6 +101,17 @@ module aptos_std::secp256k1 {
     //
     // Tests
     //
+
+    #[test]
+    #[expected_failure(abort_code = 65538, location = Self)]
+    /// Tests that bad recovery IDs get rejected
+    fun test_bad_ecdsa_recovery_id() {
+        let _ = ecdsa_recover(
+            b"test aptos secp256k1",
+            4,
+            &ECDSASignature { bytes: x"f7ad936da03f948c14c542020e3c5f4e02aaacd1f20427c11aa6e2fbf8776477646bba0e1a37f9e7c777c423a1d2849baafd7ff6a9930814a43c3f80d59db56f" },
+        );
+    }
 
     #[test]
     /// Test on a valid secp256k1 ECDSA signature created using sk = x"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"

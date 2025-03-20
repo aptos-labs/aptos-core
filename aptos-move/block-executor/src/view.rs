@@ -24,8 +24,7 @@ use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{
         GroupReadResult, MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError,
-        MVModulesError, MVModulesOutput, StorageVersion, TxnIndex, UnknownOrLayout,
-        UnsyncGroupError, ValueWithLayout,
+        StorageVersion, TxnIndex, UnknownOrLayout, UnsyncGroupError, ValueWithLayout,
     },
     unsync_map::UnsyncMap,
     versioned_delayed_fields::TVersionedDelayedFieldView,
@@ -33,7 +32,7 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     error::{code_invariant_error, expect_ok, PanicError, PanicOr},
-    executable::{ExecutableTestType, ModulePath},
+    executable::ModulePath,
     state_store::{
         errors::StateViewError,
         state_storage_usage::StateStorageUsage,
@@ -46,8 +45,8 @@ use aptos_types::{
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{
-    BlockSynchronizationKillSwitch, ResourceGroupSize, StateStorageView, TModuleView,
-    TResourceGroupView, TResourceView,
+    BlockSynchronizationKillSwitch, ResourceGroupSize, StateStorageView, TResourceGroupView,
+    TResourceView,
 };
 use bytes::Bytes;
 use claims::assert_ok;
@@ -469,24 +468,6 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
         self.versioned_map
             .delayed_fields()
             .set_base_value(id, base_value)
-    }
-
-    #[deprecated]
-    fn fetch_module(
-        &self,
-        key: &T::Key,
-        txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVModulesOutput<T::Value, ExecutableTestType>, MVModulesError> {
-        // Record for the R/W path intersection fallback for modules.
-        #[allow(deprecated)]
-        self.captured_reads
-            .borrow_mut()
-            .deprecated_module_reads
-            .push(key.clone());
-        #[allow(deprecated)]
-        self.versioned_map
-            .deprecated_modules()
-            .fetch_module(key, txn_idx)
     }
 
     fn read_group_size(
@@ -1574,68 +1555,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for Lat
         match &self.latest_view {
             ViewState::Sync(_) => true,
             ViewState::Unsync(_) => true,
-        }
-    }
-}
-
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TModuleView for LatestView<'a, T, S> {
-    type Key = T::Key;
-
-    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
-        debug_assert!(
-            state_key.is_module_path(),
-            "Reading a resource {:?} using ModuleView",
-            state_key,
-        );
-
-        // Enforce feature gating V2 loader implementation: TModuleView is no longer used in
-        // V2 interfaces because we implement storage traits directly. Use a debug assert to
-        // panic in tests, adn invariant violation for non-debug builds.
-        if self.runtime_environment.vm_config().use_loader_v2 {
-            let msg =
-                "ModuleView trait should not be used when loader V2 implementation is enabled"
-                    .to_string();
-            let err = Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(msg),
-            );
-            debug_assert!(err.is_ok());
-            return err;
-        }
-
-        match &self.latest_view {
-            ViewState::Sync(state) => {
-                use MVModulesError::*;
-                use MVModulesOutput::*;
-
-                #[allow(deprecated)]
-                match state.fetch_module(state_key, self.txn_idx) {
-                    Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
-                    Ok(Module((v, _))) => Ok(v.as_state_value()),
-                    Err(Dependency(_)) => {
-                        // Return anything (e.g. module does not exist) to avoid waiting,
-                        // because parallel execution will fall back to sequential anyway.
-                        Ok(None)
-                    },
-                    Err(NotFound) => self.get_raw_base_value(state_key),
-                }
-            },
-            ViewState::Unsync(state) => {
-                #[allow(deprecated)]
-                state
-                    .read_set
-                    .borrow_mut()
-                    .deprecated_module_reads
-                    .insert(state_key.clone());
-                #[allow(deprecated)]
-                state
-                    .unsync_map
-                    .fetch_module_for_loader_v1(state_key)
-                    .map_or_else(
-                        || self.get_raw_base_value(state_key),
-                        |v| Ok(v.as_state_value()),
-                    )
-            },
         }
     }
 }

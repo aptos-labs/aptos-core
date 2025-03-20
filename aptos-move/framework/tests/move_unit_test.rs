@@ -51,6 +51,12 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
     }
 }
 
+/// TODO: per @vgao1996:
+/// - There should be only one ground truth of `aptos_test_natives`.
+///   But rn it's defined here, in `move-examples` and in `framework-experimental`.
+/// - This function updates a global config (in `configure_extended_checks_for_unit_test`)
+///   then returns a list natives. This pattern is confusing.
+/// More discussion: https://github.com/aptos-labs/aptos-core/pull/15997#discussion_r1994469668
 pub fn aptos_test_natives() -> NativeFunctionTable {
     // By side effect, configure for unit tests
     natives::configure_for_unit_test();

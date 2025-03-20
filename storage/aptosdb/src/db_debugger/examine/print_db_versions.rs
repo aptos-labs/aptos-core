@@ -5,6 +5,7 @@ use crate::{
     db_debugger::ShardingConfig,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema},
+        epoch_by_version::EpochByVersionSchema,
         transaction::TransactionSchema,
         transaction_accumulator::TransactionAccumulatorSchema,
         transaction_info::TransactionInfoSchema,
@@ -49,27 +50,27 @@ impl Cmd {
 
         println!(
             "Overall Progress: {:?}",
-            ledger_db.metadata_db().get_synced_version()?
+            ledger_db.metadata_db().get_synced_version(),
         );
 
         println!(
             "Ledger Progress: {:?}",
-            ledger_db.metadata_db().get_ledger_commit_progress()?
+            ledger_db.metadata_db().get_ledger_commit_progress(),
         );
 
         println!(
             "StateKv Progress: {:?}",
-            get_state_kv_commit_progress(&state_kv_db)?
+            get_state_kv_commit_progress(&state_kv_db),
         );
 
         println!(
             "StateMerkle Progress: {:?}",
-            get_state_merkle_commit_progress(&state_merkle_db)?
+            get_state_merkle_commit_progress(&state_merkle_db),
         );
 
         println!(
             "LedgerPruner Progress: {:?}",
-            ledger_db.metadata_db().get_pruner_progress()?
+            ledger_db.metadata_db().get_pruner_progress(),
         );
 
         println!(
@@ -103,7 +104,7 @@ impl Cmd {
 
         println!(
             "Max JMT node version: {:?}",
-            get_current_version_in_state_merkle_db(&state_merkle_db)?,
+            get_current_version_in_state_merkle_db(&state_merkle_db),
         );
 
         println!(
@@ -122,12 +123,12 @@ impl Cmd {
 
         println!(
             "Max VersionData version: {:?}",
-            Self::get_latest_version_for_schema::<VersionDataSchema>(&ledger_db.metadata_db_arc())?,
+            Self::get_latest_version_for_schema::<VersionDataSchema>(&ledger_db.metadata_db_arc()),
         );
 
         println!(
             "Max WriteSet version: {:?}",
-            Self::get_latest_version_for_schema::<WriteSetSchema>(ledger_db.write_set_db_raw())?,
+            Self::get_latest_version_for_schema::<WriteSetSchema>(ledger_db.write_set_db_raw()),
         );
 
         {
@@ -143,6 +144,30 @@ impl Cmd {
             );
         }
 
+        println!("LedgerDB metadata items: ");
+        Self::print_metadata_items(ledger_db.metadata_db().db())?;
+        println!();
+
+        println!("StateKvDb metadata items: ");
+        Self::print_metadata_items(state_kv_db.metadata_db())?;
+        println!();
+
+        println!("StateMerkleDb metadata items: ");
+        Self::print_metadata_items(state_merkle_db.metadata_db())?;
+        println!();
+
+        println!("last epoch endings: ");
+        {
+            let mut iter = ledger_db
+                .metadata_db()
+                .db()
+                .rev_iter::<EpochByVersionSchema>()?;
+            iter.seek_to_last();
+            for item in iter.take(10) {
+                println!("{:?}", item);
+            }
+        }
+
         Ok(())
     }
 
@@ -153,5 +178,14 @@ impl Cmd {
         let mut iter = db.iter::<S>()?;
         iter.seek_to_last();
         Ok(iter.next().transpose()?.map(|kv| kv.0))
+    }
+
+    fn print_metadata_items(db: &DB) -> Result<()> {
+        let mut iter = db.iter::<DbMetadataSchema>()?;
+        iter.seek_to_first();
+        for item in iter {
+            println!("    {:?}", item);
+        }
+        Ok(())
     }
 }

@@ -11,11 +11,11 @@ use crate::{
 };
 use anyhow::Result;
 use colored::*;
-use move_binary_format::{errors::VMResult, file_format::CompiledModule};
-use move_bytecode_utils::Modules;
-use move_compiler::unit_test::{
+use legacy_move_compiler::unit_test::{
     ExpectedFailure, ModuleTestPlan, NamedOrBytecodeModule, TestCase, TestPlan,
 };
+use move_binary_format::{errors::VMResult, file_format::CompiledModule};
+use move_bytecode_utils::Modules;
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Op},
@@ -39,7 +39,6 @@ use std::{io::Write, marker::Send, sync::Mutex, time::Instant};
 pub struct SharedTestingConfig {
     save_storage_state_on_failure: bool,
     report_stacktrace_on_abort: bool,
-    native_function_table: NativeFunctionTable,
     starting_storage_state: InMemoryStorage,
     #[allow(dead_code)] // used by some features
     source_files: Vec<String>,
@@ -55,8 +54,9 @@ pub struct TestRunner {
 /// Setup storage state with the set of modules that will be needed for all tests
 fn setup_test_storage<'a>(
     modules: impl Iterator<Item = &'a CompiledModule>,
+    runtime_environment: RuntimeEnvironment,
 ) -> Result<InMemoryStorage> {
-    let mut storage = InMemoryStorage::new();
+    let mut storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
     let modules = Modules::new(modules);
     for module in modules
         .compute_dependency_graph()
@@ -76,7 +76,6 @@ fn print_resources_and_extensions(
     cs: &ChangeSet,
     extensions: &mut NativeContextExtensions,
     storage: &InMemoryStorage,
-    natives: &NativeFunctionTable,
 ) -> Result<String> {
     use std::fmt::Write;
     let mut buf = String::new();
@@ -95,8 +94,7 @@ fn print_resources_and_extensions(
         }
     }
 
-    let runtime_environment = RuntimeEnvironment::new(natives.clone());
-    let module_storage = storage.as_unsync_module_storage(runtime_environment);
+    let module_storage = storage.as_unsync_module_storage();
     let function_value_extension = module_storage.as_function_value_extension();
     extensions::print_change_sets(&mut buf, extensions, &function_value_extension);
 
@@ -115,6 +113,14 @@ impl TestRunner {
         genesis_state: Option<ChangeSet>,
         record_writeset: bool,
     ) -> Result<Self> {
+        let native_function_table = native_function_table.unwrap_or_else(|| {
+            move_stdlib::natives::all_natives(
+                AccountAddress::from_hex_literal("0x1").unwrap(),
+                move_stdlib::natives::GasParameters::zeros(),
+            )
+        });
+        let runtime_environment = RuntimeEnvironment::new(native_function_table);
+
         let source_files = tests
             .files
             .values()
@@ -124,22 +130,16 @@ impl TestRunner {
             NamedOrBytecodeModule::Named(named_compiled_module) => &named_compiled_module.module,
             NamedOrBytecodeModule::Bytecode(compiled_module) => compiled_module,
         });
-        let mut starting_storage_state = setup_test_storage(modules)?;
+        let mut starting_storage_state = setup_test_storage(modules, runtime_environment)?;
         if let Some(genesis_state) = genesis_state {
             starting_storage_state.apply(genesis_state)?;
         }
-        let native_function_table = native_function_table.unwrap_or_else(|| {
-            move_stdlib::natives::all_natives(
-                AccountAddress::from_hex_literal("0x1").unwrap(),
-                move_stdlib::natives::GasParameters::zeros(),
-            )
-        });
+
         Ok(Self {
             testing_config: SharedTestingConfig {
                 save_storage_state_on_failure,
                 report_stacktrace_on_abort,
                 starting_storage_state,
-                native_function_table,
                 source_files,
                 record_writeset,
             },
@@ -246,17 +246,11 @@ impl SharedTestingConfig {
         VMResult<Vec<Vec<u8>>>,
         TestRunInfo,
     ) {
-        // Note: While Move unit tests run concurrently, there is no publishing involved. To keep
-        // things simple, we create a new VM instance for each test.
-        let runtime_environment = RuntimeEnvironment::new(self.native_function_table.clone());
-        let move_vm = MoveVM::new_with_runtime_environment(&runtime_environment);
-        let module_storage = self
-            .starting_storage_state
-            .as_unsync_module_storage(runtime_environment.clone());
+        let module_storage = self.starting_storage_state.as_unsync_module_storage();
 
         let extensions = extensions::new_extensions();
         let mut session =
-            move_vm.new_session_with_extensions(&self.starting_storage_state, extensions);
+            MoveVM::new_session_with_extensions(&self.starting_storage_state, extensions);
         let mut gas_meter = factory.lock().unwrap().new_gas_meter();
 
         // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
@@ -333,7 +327,6 @@ impl SharedTestingConfig {
                                 &changeset,
                                 &mut extensions,
                                 &self.starting_storage_state,
-                                &self.native_function_table,
                             )
                             .ok()
                         })

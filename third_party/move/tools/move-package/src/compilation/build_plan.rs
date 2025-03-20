@@ -13,11 +13,7 @@ use crate::{
     CompilerConfig,
 };
 use anyhow::{Context, Result};
-use move_compiler::{
-    compiled_unit::AnnotatedCompiledUnit,
-    diagnostics::{report_diagnostics_to_color_buffer, report_warnings, FilesSourceText},
-    Compiler,
-};
+use legacy_move_compiler::{compiled_unit::AnnotatedCompiledUnit, diagnostics::FilesSourceText};
 use move_compiler_v2::external_checks::ExternalChecks;
 use move_model::model;
 use petgraph::algo::toposort;
@@ -38,7 +34,7 @@ pub type CompilerDriverResult = anyhow::Result<(
     // The compilation artifacts, including V1 intermediate ASTs.
     Vec<AnnotatedCompiledUnit>,
     // For compilation with V2, compiled program model.
-    Option<model::GlobalEnv>,
+    model::GlobalEnv,
 )>;
 
 impl BuildPlan {
@@ -66,22 +62,12 @@ impl BuildPlan {
         config: &CompilerConfig,
         writer: &mut W,
     ) -> Result<CompiledPackage> {
-        self.compile_with_driver(
-            writer,
-            config,
-            vec![],
-            |compiler| {
-                let (files, units) = compiler.build_and_report()?;
-                Ok((files, units, None))
-            },
-            build_and_report_v2_driver,
-        )
-        .map(|(package, _)| package)
+        self.compile_with_driver(writer, config, vec![], build_and_report_v2_driver)
+            .map(|(package, _)| package)
     }
 
     /// Compilation process does not exit even if warnings/failures are encountered.
-    /// External checks on Move code can be provided via `external_checks`, these checks
-    /// are only run when using the compiler v2.
+    /// External checks on Move code can be provided via `external_checks`.
     pub fn compile_no_exit<W: Write>(
         &self,
         config: &CompilerConfig,
@@ -92,23 +78,6 @@ impl BuildPlan {
             writer,
             config,
             external_checks,
-            |compiler| {
-                let (files, units_res) = compiler.build()?;
-                match units_res {
-                    Ok((units, warning_diags)) => {
-                        report_warnings(&files, warning_diags);
-                        Ok((files, units, None))
-                    },
-                    Err(error_diags) => {
-                        assert!(!error_diags.is_empty());
-                        let diags_buf = report_diagnostics_to_color_buffer(&files, error_diags);
-                        if let Err(err) = std::io::stdout().write_all(&diags_buf) {
-                            anyhow::bail!("Cannot output compiler diagnostics: {}", err);
-                        }
-                        anyhow::bail!("Compilation error");
-                    },
-                }
-            },
             build_and_report_no_exit_v2_driver,
         )
     }
@@ -118,8 +87,7 @@ impl BuildPlan {
         writer: &mut W,
         config: &CompilerConfig,
         external_checks: Vec<Arc<dyn ExternalChecks>>,
-        compiler_driver_v1: impl FnMut(Compiler) -> CompilerDriverResult,
-        compiler_driver_v2: impl FnMut(move_compiler_v2::Options) -> CompilerDriverResult,
+        driver: impl FnMut(move_compiler_v2::Options) -> CompilerDriverResult,
     ) -> Result<(CompiledPackage, Option<model::GlobalEnv>)> {
         let root_package = &self.resolution_graph.package_table[&self.root];
         let project_root = match &self.resolution_graph.build_options.install_dir {
@@ -164,8 +132,7 @@ impl BuildPlan {
             config,
             external_checks,
             &self.resolution_graph,
-            compiler_driver_v1,
-            compiler_driver_v2,
+            driver,
         )?;
 
         Self::clean(

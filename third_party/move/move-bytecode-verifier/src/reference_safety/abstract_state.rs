@@ -11,11 +11,10 @@ use move_binary_format::{
     binary_views::FunctionView,
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        CodeOffset, FunctionDefinitionIndex, LocalIndex, Signature, SignatureToken,
+        CodeOffset, FunctionDefinitionIndex, LocalIndex, MemberCount, Signature, SignatureToken,
         StructDefinitionIndex,
     },
     safe_unwrap,
-    views::FieldOrVariantIndex,
 };
 use move_borrow_graph::references::RefID;
 use move_core_types::vm_status::StatusCode;
@@ -59,7 +58,7 @@ impl AbstractValue {
 enum Label {
     Local(LocalIndex),
     Global(StructDefinitionIndex),
-    Field(FieldOrVariantIndex),
+    Field(MemberCount),
 }
 
 // Needed for debugging with the borrow graph
@@ -68,10 +67,7 @@ impl std::fmt::Display for Label {
         match self {
             Label::Local(i) => write!(f, "local#{}", i),
             Label::Global(i) => write!(f, "resource@{}", i),
-            Label::Field(FieldOrVariantIndex::FieldIndex(i)) => write!(f, "field#{}", i),
-            Label::Field(FieldOrVariantIndex::VariantFieldIndex(i)) => {
-                write!(f, "variant_field#{}", i)
-            },
+            Label::Field(i) => write!(f, "field#{}", i),
         }
     }
 }
@@ -176,7 +172,7 @@ impl AbstractState {
         self.borrow_graph.add_weak_borrow((), parent, child)
     }
 
-    fn add_field_borrow(&mut self, parent: RefID, field: FieldOrVariantIndex, child: RefID) {
+    fn add_field_borrow(&mut self, parent: RefID, field: MemberCount, child: RefID) {
         self.borrow_graph
             .add_strong_field_borrow((), parent, Label::Field(field), child)
     }
@@ -217,12 +213,12 @@ impl AbstractState {
         self.borrow_graph.is_writable(id)
     }
 
-    fn is_freezable(&self, id: RefID, at_field_opt: Option<FieldOrVariantIndex>) -> bool {
+    fn is_freezable(&self, id: RefID, at_field_opt: Option<MemberCount>) -> bool {
         self.borrow_graph
             .is_freezable(id, at_field_opt.map(Label::Field))
     }
 
-    fn is_readable(&self, id: RefID, at_field_opt: Option<FieldOrVariantIndex>) -> bool {
+    fn is_readable(&self, id: RefID, at_field_opt: Option<MemberCount>) -> bool {
         self.borrow_graph
             .is_readable(id, at_field_opt.map(Label::Field))
     }
@@ -399,7 +395,7 @@ impl AbstractState {
         offset: CodeOffset,
         mut_: bool,
         id: RefID,
-        field: FieldOrVariantIndex,
+        field: MemberCount,
     ) -> PartialVMResult<AbstractValue> {
         // Any field borrows will be factored out, so don't check in the mutable case
         let is_mut_borrow_with_full_borrows = || mut_ && self.has_full_borrows(id);

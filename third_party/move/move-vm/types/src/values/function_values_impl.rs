@@ -5,7 +5,7 @@ use crate::values::{DeserializationSeed, SerializationReadyValue, VMValueCast, V
 use better_any::Tid;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    function::{ClosureMask, MoveFunctionLayout},
+    function::{ClosureMask, MoveFunctionLayout, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
@@ -43,6 +43,7 @@ pub struct Closure(
 /// The representation of a function in storage.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct SerializedFunctionData {
+    pub format_version: u16,
     pub module_id: ModuleId,
     pub fun_id: Identifier,
     pub ty_args: Vec<TypeTag>,
@@ -123,7 +124,8 @@ impl<'c, 'l, 'v> serde::Serialize
         let data = fun_ext
             .get_serialization_data(fun.as_ref())
             .map_err(S::Error::custom)?;
-        let mut seq = serializer.serialize_seq(Some(4 + captured.len() * 2))?;
+        let mut seq = serializer.serialize_seq(Some(5 + captured.len() * 2))?;
+        seq.serialize_element(&data.format_version)?;
         seq.serialize_element(&data.module_id)?;
         seq.serialize_element(&data.fun_id)?;
         seq.serialize_element(&data.ty_args)?;
@@ -160,6 +162,13 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for ClosureVisitor<'c, 'l> {
             .ctx
             .required_function_extension()
             .map_err(A::Error::custom)?;
+        let format_version = read_required_value::<_, u16>(&mut seq)?;
+        if format_version != FUNCTION_DATA_SERIALIZATION_FORMAT_V1 {
+            return Err(A::Error::custom(format!(
+                "invalid function data version {}",
+                format_version
+            )));
+        }
         let module_id = read_required_value::<_, ModuleId>(&mut seq)?;
         let fun_id = read_required_value::<_, Identifier>(&mut seq)?;
         let ty_args = read_required_value::<_, Vec<TypeTag>>(&mut seq)?;
@@ -185,6 +194,7 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for ClosureVisitor<'c, 'l> {
         }
         let fun = fun_ext
             .create_from_serialization_data(SerializedFunctionData {
+                format_version: FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
                 module_id,
                 fun_id,
                 ty_args,

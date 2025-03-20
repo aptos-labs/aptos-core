@@ -11,9 +11,10 @@ use aptos_types::proof::{
     definition::NodeInProof, SparseMerkleInternalNode, SparseMerkleLeafNode, SparseMerkleProofExt,
 };
 use bitvec::prelude::*;
-use std::collections::{BTreeMap, HashMap};
+use dashmap::DashMap;
+use std::collections::BTreeMap;
 
-type Cache = HashMap<BitVec<u8, Msb0>, NodeInProof>;
+type Cache = DashMap<BitVec<u8, Msb0>, NodeInProof>;
 
 struct NaiveSubTree<'a> {
     leaves: &'a [(HashValue, HashValue)],
@@ -24,7 +25,7 @@ impl<'a> NaiveSubTree<'a> {
     fn get_proof(
         &'a self,
         key: &HashValue,
-        cache: &mut Cache,
+        cache: &Cache,
     ) -> (Option<SparseMerkleLeafNode>, Vec<NodeInProof>) {
         let (leaf, rev_proof) = self.get_proof_(key, cache);
         (leaf, rev_proof.into_iter().rev().collect())
@@ -33,7 +34,7 @@ impl<'a> NaiveSubTree<'a> {
     fn get_proof_(
         &'a self,
         key: &HashValue,
-        cache: &mut Cache,
+        cache: &Cache,
     ) -> (Option<SparseMerkleLeafNode>, Vec<NodeInProof>) {
         if self.is_empty() {
             (None, Vec::new())
@@ -61,7 +62,7 @@ impl<'a> NaiveSubTree<'a> {
         self.leaves.is_empty()
     }
 
-    fn get_node_in_proof(&self, cache: &mut Cache) -> NodeInProof {
+    fn get_node_in_proof(&self, cache: &Cache) -> NodeInProof {
         if self.leaves.is_empty() {
             return NodeInProof::from(*SPARSE_MERKLE_PLACEHOLDER_HASH);
         }
@@ -83,7 +84,7 @@ impl<'a> NaiveSubTree<'a> {
         }
     }
 
-    fn get_node_in_proof_uncached(&self, cache: &mut Cache) -> NodeInProof {
+    fn get_node_in_proof_uncached(&self, cache: &Cache) -> NodeInProof {
         assert!(!self.leaves.is_empty());
         if self.leaves.len() == 1 {
             let only_leaf = self.leaves[0];
@@ -148,22 +149,22 @@ impl NaiveSmt {
         }
     }
 
-    pub fn get_proof(&mut self, key: &HashValue) -> SparseMerkleProofExt {
+    pub fn get_proof(&self, key: &HashValue) -> SparseMerkleProofExt {
         let root = NaiveSubTree {
             leaves: &self.leaves,
             depth: 0,
         };
 
-        let (leaf, siblings) = root.get_proof(key, &mut self.cache);
+        let (leaf, siblings) = root.get_proof(key, &self.cache);
         SparseMerkleProofExt::new(leaf, siblings)
     }
 
-    pub fn get_root_hash(&mut self) -> HashValue {
+    pub fn get_root_hash(&self) -> HashValue {
         let root = NaiveSubTree {
             leaves: &self.leaves,
             depth: 0,
         };
 
-        root.get_node_in_proof(&mut self.cache).hash()
+        root.get_node_in_proof(&self.cache).hash()
     }
 }

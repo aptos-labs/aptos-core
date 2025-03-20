@@ -1405,7 +1405,7 @@ Return proposal_id when a proposal is successfully created.
     is_multi_step_proposal: bool,
 ): u64 <b>acquires</b> <a href="aptos_governance.md#0x1_aptos_governance_GovernanceConfig">GovernanceConfig</a>, <a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a> {
     <a href="aptos_governance.md#0x1_aptos_governance_check_governance_permission">check_governance_permission</a>(proposer);
-    <b>let</b> proposer_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(proposer);
+    <b>let</b> proposer_address = <a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(proposer);
     <b>assert</b>!(
         <a href="stake.md#0x1_stake_get_delegated_voter">stake::get_delegated_voter</a>(stake_pool) == proposer_address,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aptos_governance.md#0x1_aptos_governance_ENOT_DELEGATED_VOTER">ENOT_DELEGATED_VOTER</a>)

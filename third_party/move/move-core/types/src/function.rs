@@ -10,6 +10,9 @@ use crate::{
 use serde::{de::Error, ser::SerializeSeq, Deserialize, Serialize};
 use std::fmt;
 
+/// Version number for the serialization format of function data.
+pub const FUNCTION_DATA_SERIALIZATION_FORMAT_V1: u16 = 1;
+
 //===========================================================================================
 
 /// A `ClosureMask` is a value which determines how to distinguish those function arguments
@@ -234,6 +237,13 @@ impl<'d, 'a> serde::de::Visitor<'d> for ClosureVisitor<'a> {
     where
         A: serde::de::SeqAccess<'d>,
     {
+        let version = read_required_value::<_, u16>(&mut seq)?;
+        if version != FUNCTION_DATA_SERIALIZATION_FORMAT_V1 {
+            return Err(A::Error::custom(format!(
+                "unexpected function data version {}",
+                version
+            )));
+        }
         let module_id = read_required_value::<_, ModuleId>(&mut seq)?;
         let fun_id = read_required_value::<_, Identifier>(&mut seq)?;
         let ty_args = read_required_value::<_, Vec<TypeTag>>(&mut seq)?;
@@ -280,7 +290,8 @@ impl serde::Serialize for MoveClosure {
             mask,
             captured,
         } = self;
-        let mut s = serializer.serialize_seq(Some(4 + captured.len() * 2))?;
+        let mut s = serializer.serialize_seq(Some(5 + captured.len() * 2))?;
+        s.serialize_element(&FUNCTION_DATA_SERIALIZATION_FORMAT_V1)?;
         s.serialize_element(module_id)?;
         s.serialize_element(fun_id)?;
         s.serialize_element(ty_args)?;

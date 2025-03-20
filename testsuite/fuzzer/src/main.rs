@@ -35,6 +35,22 @@ fn main() {
                     .index(2),
                 )
         )
+        .subcommand(
+            Command::new("generate_runnable_state_from_project")
+                .about("Generates a runnable state from a project.")
+                .arg(
+                    Arg::new("project_path")
+                        .help("Path to the project to generate the runnable state from (e.g. ../data/transfer-resources)")
+                        .required(true)
+                        .index(1),
+                )
+                .arg(
+                    Arg::new("destination_path")
+                        .help("Path to write the runnable state to")
+                        .required(true)
+                        .index(2),
+                )
+        )
         // Add more subcommands or arguments here
         .get_matches();
 
@@ -56,6 +72,20 @@ fn main() {
 
             // Call the function with the provided arguments
             if let Err(e) = utils::cli::generate_runnable_state(csv_path, destination_path) {
+                eprintln!("Error generating runnable state: {}", e);
+                std::process::exit(1);
+            } else {
+                println!("Runnable state generated successfully.");
+            }
+        },
+        Some(("generate_runnable_state_from_project", sub_m)) => {
+            let project_path = sub_m.get_one::<String>("project_path").unwrap();
+            let destination_path = sub_m.get_one::<String>("destination_path").unwrap();
+
+            // Call the function with the provided arguments
+            if let Err(e) =
+                utils::cli::generate_runnable_state_from_project(project_path, destination_path)
+            {
                 eprintln!("Error generating runnable state: {}", e);
                 std::process::exit(1);
             } else {

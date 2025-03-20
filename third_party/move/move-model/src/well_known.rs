@@ -65,3 +65,7 @@ pub const UNSPECIFIED_ABORT_CODE: u64 = make_abort_code(0);
 
 // Used when a runtime value falls through a match.
 pub const INCOMPLETE_MATCH_ABORT_CODE: u64 = make_abort_code(1);
+
+// Well known attributes
+pub const PERSISTENT_ATTRIBUTE: &str = "persistent";
+pub const MODULE_LOCK_ATTRIBUTE: &str = "module_lock";

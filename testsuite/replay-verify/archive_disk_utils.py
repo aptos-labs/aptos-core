@@ -17,6 +17,7 @@ from typing import Tuple, List, Optional, Any
 
 # Constants
 DISK_COPIES = 1
+STORAGE_CLASS = "ssd-data-xfs-immediate"
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -418,7 +419,7 @@ def create_persistent_volume(
                 read_only=read_only,
             ),
             persistent_volume_reclaim_policy="Delete",
-            storage_class_name="ssd-data-xfs",
+            storage_class_name=STORAGE_CLASS,
         ),
     )
 
@@ -433,7 +434,7 @@ def create_persistent_volume(
         spec=client.V1PersistentVolumeClaimSpec(
             access_modes=[access_mode],
             resources=client.V1ResourceRequirements(requests={"storage": storage_size}),
-            storage_class_name="ssd-data-xfs",
+            storage_class_name=STORAGE_CLASS,
             volume_name=pv_name,
             # Remove the selector since we're using volume_name for direct binding
         ),
@@ -502,7 +503,7 @@ def parse_args() -> argparse.Namespace:
     ),
 )
 def create_one_pvc_from_snapshot(
-    pvc_name: str, snapshot_name: str, namespace: str, label: str
+    pvc_name: str, snapshot_name: str, namespace: str, label: str, ttl_secs: int
 ) -> str:
     config.load_kube_config()
     api_instance = client.CoreV1Api()
@@ -515,14 +516,15 @@ def create_one_pvc_from_snapshot(
         "metadata": {
             "name": f"{pvc_name}",
             "annotations": {
-                "volume.kubernetes.io/storage-provisioner": "pd.csi.storage.gke.io"
+                "volume.kubernetes.io/storage-provisioner": "pd.csi.storage.gke.io",
+                "k8s-ttl-controller.twin.sh/ttl": f"{ttl_secs}s",
             },
             "labels": {"run": f"{label}"},
         },
         "spec": {
             "accessModes": ["ReadOnlyMany"],
             "resources": {"requests": {"storage": storage_size}},
-            "storageClassName": "ssd-data-xfs",
+            "storageClassName": STORAGE_CLASS,
             "volumeMode": "Filesystem",
             "dataSource": {
                 "name": f"{snapshot_name}",
@@ -539,7 +541,7 @@ def create_one_pvc_from_snapshot(
 
 
 def create_replay_verify_pvcs_from_snapshot(
-    run_id: str, snapshot_name: str, namespace: str, pvc_num: int, label: str
+    run_id: str, snapshot_name: str, namespace: str, pvc_num: int, label: str, ttl_secs: int
 ) -> List[str]:
     config.load_kube_config()
     api_instance = client.CustomObjectsApi()
@@ -600,6 +602,7 @@ def create_replay_verify_pvcs_from_snapshot(
             snapshot_name,
             namespace,
             label,
+            ttl_secs,
         )
         for pvc_id in range(pvc_num)
     ]

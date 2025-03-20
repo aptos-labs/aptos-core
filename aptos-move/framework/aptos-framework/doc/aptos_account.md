@@ -59,6 +59,7 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
 <b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
+<b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store">0x1::primary_fungible_store</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 </code></pre>
@@ -579,6 +580,7 @@ Set whether <code><a href="account.md#0x1_account">account</a></code> can receiv
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_set_allow_direct_coin_transfers">set_allow_direct_coin_transfers</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, allow: bool) <b>acquires</b> <a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a> {
+    // TODO: [<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>] Is permissioned <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> allowed?
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>if</b> (<b>exists</b>&lt;<a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(addr)) {
         <b>let</b> direct_transfer_config = <b>borrow_global_mut</b>&lt;<a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(addr);
@@ -664,7 +666,7 @@ By default, this returns true if an account has not explicitly set whether the c
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_register_apt">register_apt</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_new_accounts_default_to_fa_apt_store_enabled">features::new_accounts_default_to_fa_apt_store_enabled</a>()) {
-        <a href="aptos_account.md#0x1_aptos_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(account_signer));
+        <a href="aptos_account.md#0x1_aptos_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(account_signer));
     } <b>else</b> {
         <a href="coin.md#0x1_coin_register">coin::register</a>&lt;AptosCoin&gt;(account_signer);
     }
@@ -699,7 +701,7 @@ to transfer APT) - if we want to allow APT PFS without account itself
 <pre><code><b>public</b>(<b>friend</b>) entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_fungible_transfer_only">fungible_transfer_only</a>(
     source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64
 ) {
-    <b>let</b> sender_store = <a href="aptos_account.md#0x1_aptos_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source));
+    <b>let</b> sender_store = <a href="aptos_account.md#0x1_aptos_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(source));
     <b>let</b> recipient_store = <a href="aptos_account.md#0x1_aptos_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<b>to</b>);
 
     // <b>use</b> <b>internal</b> APIs, <b>as</b> they skip:

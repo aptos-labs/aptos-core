@@ -36,6 +36,7 @@ fn mk_script_function_module() -> CompiledModule {
                 return_: SignatureIndex(0),
                 type_parameters: vec![],
                 access_specifiers: None,
+                attributes: vec![],
             },
             // fun g_fn<T>()
             FunctionHandle {
@@ -45,6 +46,7 @@ fn mk_script_function_module() -> CompiledModule {
                 return_: SignatureIndex(0),
                 type_parameters: vec![AbilitySet::EMPTY],
                 access_specifiers: None,
+                attributes: vec![],
             },
         ],
         function_defs: vec![
@@ -132,6 +134,7 @@ fn mk_invoking_module(use_generic: bool, valid: bool) -> CompiledModule {
                 return_: SignatureIndex(0),
                 type_parameters: vec![],
                 access_specifiers: None,
+                attributes: vec![],
             },
             // 0::M::fn()
             FunctionHandle {
@@ -141,6 +144,7 @@ fn mk_invoking_module(use_generic: bool, valid: bool) -> CompiledModule {
                 return_: SignatureIndex(0),
                 type_parameters: vec![],
                 access_specifiers: None,
+                attributes: vec![],
             },
             // 0::M::g_fn<T>()
             FunctionHandle {
@@ -150,6 +154,7 @@ fn mk_invoking_module(use_generic: bool, valid: bool) -> CompiledModule {
                 return_: SignatureIndex(0),
                 type_parameters: vec![AbilitySet::EMPTY],
                 access_specifiers: None,
+                attributes: vec![],
             },
         ],
         // 0::M::g_fn<u64>()
@@ -223,6 +228,7 @@ fn mk_invoking_script(use_generic: bool) -> CompiledScript {
                 return_: SignatureIndex(0),
                 type_parameters: vec![],
                 access_specifiers: None,
+                attributes: vec![],
             },
             // 0::M::g_fn<T>()
             FunctionHandle {
@@ -232,6 +238,7 @@ fn mk_invoking_script(use_generic: bool) -> CompiledScript {
                 return_: SignatureIndex(0),
                 type_parameters: vec![AbilitySet::EMPTY],
                 access_specifiers: None,
+                attributes: vec![],
             },
         ],
         // 0::M::g_fn<u64>()

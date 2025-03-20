@@ -363,7 +363,7 @@ the SignerCapability.
     };
 
     <b>if</b> (empty_container) {
-        <b>let</b> container = <b>move_from</b>(source_addr);
+        <b>let</b> container = <b>move_from</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr);
         <b>let</b> <a href="resource_account.md#0x1_resource_account_Container">Container</a> { store } = container;
         <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_destroy_empty">simple_map::destroy_empty</a>(store);
     };

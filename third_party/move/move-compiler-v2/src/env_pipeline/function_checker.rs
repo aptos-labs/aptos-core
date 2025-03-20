@@ -3,11 +3,12 @@
 
 //! Do a few checks of functions and function calls.
 
-use crate::{experiments::Experiment, Options};
+use crate::Options;
 use codespan_reporting::diagnostic::Severity;
 use move_binary_format::file_format::Visibility;
 use move_model::{
     ast::{ExpData, Operation, Pattern},
+    metadata::LanguageVersion,
     model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, NodeId, Parameter, QualifiedId},
     ty::Type,
 };
@@ -60,8 +61,12 @@ pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
     let options = env
         .get_extension::<Options>()
         .expect("Options is available");
-    let lambda_params_ok = options.experiment_on(Experiment::FUNCTION_VALUES);
-    let lambda_return_ok = options.experiment_on(Experiment::FUNCTION_VALUES);
+
+    let lambda_params_ok = options
+        .language_version
+        .unwrap_or_default()
+        .is_at_least(LanguageVersion::V2_2);
+    let lambda_return_ok = lambda_params_ok;
     if lambda_params_ok && lambda_return_ok {
         return;
     }

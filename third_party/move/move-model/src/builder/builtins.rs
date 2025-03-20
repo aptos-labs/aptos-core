@@ -10,7 +10,7 @@ use crate::{
     model::{Parameter, TypeParameter, TypeParameterKind},
     ty::{Constraint, PrimitiveType, ReferenceKind, Type},
 };
-use move_compiler::parser::ast as PA;
+use legacy_move_compiler::parser::ast as PA;
 use move_core_types::{
     ability::{Ability, AbilitySet},
     u256::U256,

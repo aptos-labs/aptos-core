@@ -13,9 +13,7 @@ use crate::{
     },
     versioned_node_cache::VersionedNodeCache,
 };
-use aptos_crypto::hash::CryptoHash;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
-use aptos_infallible::Mutex;
 use aptos_logger::trace;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
@@ -49,7 +47,7 @@ impl StateSnapshotCommitter {
         state_db: Arc<StateDb>,
         state_snapshot_commit_receiver: Receiver<CommitMessage<StateWithSummary>>,
         last_snapshot: StateWithSummary,
-        persisted_state: Arc<Mutex<PersistedState>>,
+        persisted_state: PersistedState,
     ) -> Self {
         // Note: This is to ensure we cache nodes in memory from previous batches before they get committed to DB.
         const_assert!(
@@ -65,7 +63,7 @@ impl StateSnapshotCommitter {
                 let committer = StateMerkleBatchCommitter::new(
                     arc_state_db,
                     state_merkle_batch_commit_receiver,
-                    persisted_state,
+                    persisted_state.clone(),
                 );
                 committer.run();
             })
@@ -103,6 +101,8 @@ impl StateSnapshotCommitter {
                             .get_shard_persisted_versions(base_version)
                             .unwrap();
 
+                        let min_version = self.last_snapshot.next_version();
+
                         THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
                             snapshot
                                 .make_delta(&self.last_snapshot)
@@ -124,11 +124,8 @@ impl StateSnapshotCommitter {
 
                                         updates
                                             .iter()
-                                            .map(|(k, w)| {
-                                                (
-                                                    CryptoHash::hash(&k),
-                                                    w.value.map(|v| (CryptoHash::hash(&v), k)),
-                                                )
+                                            .filter_map(|(k, db_update)| {
+                                                db_update.to_jmt_update_opt(k, min_version)
                                             })
                                             .collect_vec()
                                     };
@@ -150,7 +147,7 @@ impl StateSnapshotCommitter {
                         })
                     };
 
-                    let (root_hash, top_levels_batch) = {
+                    let (root_hash, leaf_count, top_levels_batch) = {
                         let _timer =
                             OTHER_TIMERS_SECONDS.timer_with(&["calculate_top_levels_batch"]);
                         self.state_db
@@ -170,6 +167,17 @@ impl StateSnapshotCommitter {
                         root_hash,
                         snapshot.summary().root_hash(),
                     );
+
+                    let usage = snapshot.state().usage();
+                    if !usage.is_untracked() {
+                        assert_eq!(
+                            leaf_count,
+                            usage.items(),
+                            "Num of state items mismatch: jmt: {}, state: {}",
+                            leaf_count,
+                            usage.items(),
+                        );
+                    }
 
                     self.last_snapshot = snapshot.clone();
 

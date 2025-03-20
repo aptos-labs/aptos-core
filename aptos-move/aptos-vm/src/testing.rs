@@ -108,7 +108,7 @@ impl AptosVM {
             .change_set_configs;
 
         let resolver = state_view.as_move_resolver();
-        let module_storage = state_view.as_aptos_code_storage(self.environment());
+        let module_storage = state_view.as_aptos_code_storage(self.runtime_environment());
 
         let traversal_storage = TraversalStorage::new();
         self.failed_transaction_cleanup(

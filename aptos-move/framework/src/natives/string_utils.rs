@@ -212,6 +212,13 @@ fn native_format_impl(
         MoveTypeLayout::Vector(ty) => {
             if let MoveTypeLayout::U8 = ty.as_ref() {
                 let bytes = val.value_as::<Vec<u8>>()?;
+                if context.context.timed_feature_enabled(
+                    aptos_types::on_chain_config::TimedFeatureFlag::ChargeBytesForPrints,
+                ) {
+                    context
+                        .context
+                        .charge(STRING_UTILS_PER_BYTE * NumBytes::new(bytes.len() as u64))?;
+                }
                 write!(out, "0x{}", hex::encode(bytes)).unwrap();
                 return Ok(());
             }

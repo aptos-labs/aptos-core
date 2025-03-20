@@ -626,6 +626,9 @@ with tempfile.TemporaryDirectory() as tmpdirname:
     move_e2e_benchmark_failed = False
     if not SKIP_MOVE_E2E:
         execute_command(f"cargo build {BUILD_FLAG} --package aptos-move-e2e-benchmark")
+        move_e2e_flags = (
+            "--only-landblocking" if SELECTED_FLOW == Flow.LAND_BLOCKING else ""
+        )
         try:
             execute_command(f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-move-e2e-benchmark")
         except:
@@ -993,7 +996,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                     ),
                 ],
             )
-            print_table(results, by_levels=False, only_fields=None)
+            print_table(results, by_levels=False, only_fields=[])
 
         if single_node_result.tps < criteria.min_tps:
             text = f"regression detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.min_tps}), {test.key} didn't meet TPS requirements"
@@ -1021,7 +1024,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             warnings.append(text)
 
 if HIDE_OUTPUT:
-    print_table(results, by_levels=False, single_field=None)
+    print_table(results, by_levels=False, only_fields=[])
 
 if warnings:
     print("Warnings: ")

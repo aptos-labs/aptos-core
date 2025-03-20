@@ -5,6 +5,7 @@ module aptos_framework::aptos_account {
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::event::{EventHandle, emit_event, emit};
     use aptos_framework::fungible_asset::{Self, Metadata, BurnRef, FungibleAsset};
+    use aptos_framework::permissioned_signer;
     use aptos_framework::primary_fungible_store;
     use aptos_framework::object;
 
@@ -178,6 +179,7 @@ module aptos_framework::aptos_account {
 
     /// Set whether `account` can receive direct transfers of coins that they have not explicitly registered to receive.
     public entry fun set_allow_direct_coin_transfers(account: &signer, allow: bool) acquires DirectTransferConfig {
+        // TODO: [signer::address_of] Is permissioned signer allowed?
         let addr = signer::address_of(account);
         if (exists<DirectTransferConfig>(addr)) {
             let direct_transfer_config = borrow_global_mut<DirectTransferConfig>(addr);
@@ -223,7 +225,7 @@ module aptos_framework::aptos_account {
 
     public(friend) fun register_apt(account_signer: &signer) {
         if (features::new_accounts_default_to_fa_apt_store_enabled()) {
-            ensure_primary_fungible_store_exists(signer::address_of(account_signer));
+            ensure_primary_fungible_store_exists(permissioned_signer::address_of(account_signer));
         } else {
             coin::register<AptosCoin>(account_signer);
         }
@@ -239,7 +241,7 @@ module aptos_framework::aptos_account {
     public(friend) entry fun fungible_transfer_only(
         source: &signer, to: address, amount: u64
     ) {
-        let sender_store = ensure_primary_fungible_store_exists(signer::address_of(source));
+        let sender_store = ensure_primary_fungible_store_exists(permissioned_signer::address_of(source));
         let recipient_store = ensure_primary_fungible_store_exists(to);
 
         // use internal APIs, as they skip:

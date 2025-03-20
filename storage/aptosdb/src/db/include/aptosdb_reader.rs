@@ -3,10 +3,11 @@
 
 use aptos_storage_interface::state_store::state::State;
 use aptos_storage_interface::state_store::state_summary::StateSummary;
+use aptos_storage_interface::state_store::state_view::hot_state_view::HotStateView;
 use aptos_types::block_info::BlockHeight;
 
 impl DbReader for AptosDB {
-    fn get_persisted_state(&self) -> Result<State> {
+    fn get_persisted_state(&self) -> Result<(Arc<dyn HotStateView>, State)> {
         gauged_api("get_persisted_state", || {
             self.state_store.get_persisted_state()
         })

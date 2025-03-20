@@ -121,7 +121,51 @@ fn friend_entry_change_sig_failure(use_new_checker: bool) {
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
 
+#[test]
+fn persistent_fun_change_success1() {
+    let result = check_upgrade_latest_move("fun f(){}", "#[persistent] fun f(){}");
+    assert_success!(result)
+}
+
+#[test]
+fn persistent_fun_change_success2() {
+    let result = check_upgrade_latest_move("#[persistent] fun f(){}", "#[persistent] fun f(){}");
+    assert_success!(result)
+}
+
+#[test]
+fn persistent_fun_change_failure1() {
+    let result = check_upgrade_latest_move("#[persistent] fun f(){}", "fun f(){}");
+    assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
+}
+
+#[test]
+fn persistent_fun_change_failure2() {
+    let result =
+        check_upgrade_latest_move("#[persistent] fun f(){}", "#[persistent] fun f(_x: u64){}");
+    assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
+}
+
+#[test]
+fn persistent_fun_change_failure3() {
+    let result = check_upgrade_latest_move("#[persistent] fun f(){}", "#[persistent] fun g(){}");
+    assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
+}
+
 fn check_upgrade(old_decls: &str, new_decls: &str, use_new_checker: bool) -> TransactionStatus {
+    check_upgrade_internal(old_decls, new_decls, use_new_checker, false)
+}
+
+fn check_upgrade_latest_move(old_decls: &str, new_decls: &str) -> TransactionStatus {
+    check_upgrade_internal(old_decls, new_decls, true, true)
+}
+
+fn check_upgrade_internal(
+    old_decls: &str,
+    new_decls: &str,
+    use_new_checker: bool,
+    latest_move: bool,
+) -> TransactionStatus {
     let (enabled, disabled) = if use_new_checker {
         (vec![FeatureFlag::USE_COMPATIBILITY_CHECKER_V2], vec![])
     } else {
@@ -144,7 +188,12 @@ fn check_upgrade(old_decls: &str, new_decls: &str, use_new_checker: bool) -> Tra
         ),
     );
     let path = builder.write_to_temp().unwrap();
-    assert_success!(h.publish_package_with_options(&acc, path.path(), BuildOptions::move_2()));
+    let opts = if latest_move {
+        BuildOptions::move_2().set_latest_language()
+    } else {
+        BuildOptions::move_2()
+    };
+    assert_success!(h.publish_package_with_options(&acc, path.path(), opts.clone()));
 
     // Now upgrade
     let mut builder = PackageBuilder::new("Package");
@@ -160,5 +209,5 @@ fn check_upgrade(old_decls: &str, new_decls: &str, use_new_checker: bool) -> Tra
         ),
     );
     let path = builder.write_to_temp().unwrap();
-    h.publish_package_with_options(&acc, path.path(), BuildOptions::move_2())
+    h.publish_package_with_options(&acc, path.path(), opts)
 }

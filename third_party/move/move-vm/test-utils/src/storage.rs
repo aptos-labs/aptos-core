@@ -21,9 +21,10 @@ use move_core_types::{
 };
 #[cfg(feature = "table-extension")]
 use move_table_extension::{TableChangeSet, TableHandle, TableResolver};
+use move_vm_runtime::{RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::{
     code::ModuleBytesStorage,
-    resolver::{resource_size, ModuleResolver, ResourceResolver},
+    resolver::{resource_size, ResourceResolver},
 };
 use std::{
     collections::{btree_map, BTreeMap},
@@ -46,16 +47,6 @@ impl ModuleBytesStorage for BlankStorage {
         _address: &AccountAddress,
         _module_name: &IdentStr,
     ) -> VMResult<Option<Bytes>> {
-        Ok(None)
-    }
-}
-
-impl ModuleResolver for BlankStorage {
-    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
-        vec![]
-    }
-
-    fn get_module(&self, _module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
         Ok(None)
     }
 }
@@ -92,18 +83,37 @@ struct InMemoryAccountStorage {
 }
 
 /// Simple in-memory storage that can be used as a Move VM storage backend for testing purposes.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct InMemoryStorage {
+    runtime_environment: RuntimeEnvironment,
     accounts: BTreeMap<AccountAddress, InMemoryAccountStorage>,
     #[cfg(feature = "table-extension")]
     tables: BTreeMap<TableHandle, BTreeMap<Vec<u8>, Bytes>>,
+}
+
+impl ModuleBytesStorage for InMemoryStorage {
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<Bytes>> {
+        Ok(self
+            .accounts
+            .get(address)
+            .and_then(|account_storage| account_storage.modules.get(module_name).cloned()))
+    }
+}
+impl WithRuntimeEnvironment for InMemoryStorage {
+    fn runtime_environment(&self) -> &RuntimeEnvironment {
+        &self.runtime_environment
+    }
 }
 
 impl CompiledModuleView for InMemoryStorage {
     type Item = CompiledModule;
 
     fn view_compiled_module(&self, id: &ModuleId) -> anyhow::Result<Option<Self::Item>> {
-        Ok(match self.get_module(id)? {
+        Ok(match self.fetch_module_bytes(id.address(), id.name())? {
             Some(bytes) => {
                 let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
                 Some(CompiledModule::deserialize_with_config(&bytes, &config)?)
@@ -170,8 +180,7 @@ where
 
 impl InMemoryAccountStorage {
     fn apply(&mut self, account_changeset: AccountChangeSet) -> PartialVMResult<()> {
-        let (modules, resources) = account_changeset.into_inner();
-        apply_changes(&mut self.modules, modules)?;
+        let resources = account_changeset.into_resources();
         apply_changes(&mut self.resources, resources)?;
         Ok(())
     }
@@ -240,6 +249,16 @@ impl InMemoryStorage {
 
     pub fn new() -> Self {
         Self {
+            runtime_environment: RuntimeEnvironment::new(vec![]),
+            accounts: BTreeMap::new(),
+            #[cfg(feature = "table-extension")]
+            tables: BTreeMap::new(),
+        }
+    }
+
+    pub fn new_with_runtime_environment(runtime_environment: RuntimeEnvironment) -> Self {
+        Self {
+            runtime_environment,
             accounts: BTreeMap::new(),
             #[cfg(feature = "table-extension")]
             tables: BTreeMap::new(),
@@ -267,32 +286,6 @@ impl InMemoryStorage {
     ) {
         let account = get_or_insert(&mut self.accounts, addr, InMemoryAccountStorage::new);
         account.resources.insert(struct_tag, blob.into());
-    }
-}
-
-impl ModuleBytesStorage for InMemoryStorage {
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
-        if let Some(account_storage) = self.accounts.get(address) {
-            return Ok(account_storage.modules.get(module_name).cloned());
-        }
-        Ok(None)
-    }
-}
-
-impl ModuleResolver for InMemoryStorage {
-    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
-        vec![]
-    }
-
-    fn get_module(&self, module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
-        if let Some(account_storage) = self.accounts.get(module_id.address()) {
-            return Ok(account_storage.modules.get(module_id.name()).cloned());
-        }
-        Ok(None)
     }
 }
 

@@ -36,7 +36,7 @@ so <code>left</code> and <code>right</code> references are always distinct.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>native</b> <b>fun</b> <a href="mem.md#0x1_mem_swap">swap</a>&lt;T&gt;(left: &<b>mut</b> T, right: &<b>mut</b> T);
+<pre><code><b>native</b> <b>friend</b> <b>fun</b> <a href="mem.md#0x1_mem_swap">swap</a>&lt;T&gt;(left: &<b>mut</b> T, right: &<b>mut</b> T);
 </code></pre>
 
 
@@ -60,7 +60,7 @@ and return the value it had before.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="mem.md#0x1_mem_replace">replace</a>&lt;T&gt;(ref: &<b>mut</b> T, new: T): T {
+<pre><code><b>friend</b> <b>fun</b> <a href="mem.md#0x1_mem_replace">replace</a>&lt;T&gt;(ref: &<b>mut</b> T, new: T): T {
     <a href="mem.md#0x1_mem_swap">swap</a>(ref, &<b>mut</b> new);
     new
 }

@@ -560,10 +560,17 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         let fun_name = self.gen_closure_function_name();
         let lambda_loc = env.get_node_loc(id).clone();
         let lambda_type = env.get_node_type(id);
-        let result_type = if let Type::Fun(_, result_type, _) = &lambda_type {
-            *result_type.clone()
-        } else {
-            Type::Error // type error reported
+        let result_type = match &lambda_type {
+            Type::Fun(_, result_type, _) => result_type.as_ref().clone(),
+            Type::Struct(mid, sid, inst) => {
+                let senv = env.get_struct(mid.qualified(*sid));
+                if let Some(Type::Fun(_, result_type, _)) = senv.get_function_wrapper_type(inst) {
+                    *result_type
+                } else {
+                    Type::Error // type error reported
+                }
+            },
+            _ => Type::Error, // type error reported
         };
 
         // Rewrite references to Temporary in the new functions body (#12317)

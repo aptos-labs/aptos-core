@@ -7,7 +7,7 @@ use crate::{
     metrics::{COUNTER, TIMER},
 };
 use aptos_indexer_grpc_utils::file_store_operator_v2::file_store_reader::FileStoreReader;
-use aptos_protos::indexer::v1::{GetTransactionsRequest, TransactionsResponse};
+use aptos_protos::indexer::v1::{GetTransactionsRequest, ProcessedRange, TransactionsResponse};
 use aptos_transaction_filter::BooleanTransactionFilter;
 use futures::executor::block_on;
 use std::{
@@ -167,14 +167,21 @@ impl HistoricalDataService {
                         /*retries=*/ 3,
                         /*max_files=*/ None,
                         filter,
+                        Some(ending_version),
                         tx,
                     )
                     .await;
             });
 
             let mut close_to_latest = false;
-            while let Some((transactions, batch_size_bytes, timestamp)) = rx.recv().await {
-                next_version += transactions.len() as u64;
+            while let Some((
+                transactions,
+                batch_size_bytes,
+                timestamp,
+                (first_processed_version, last_processed_version),
+            )) = rx.recv().await
+            {
+                next_version = last_processed_version + 1;
                 size_bytes += batch_size_bytes as u64;
                 let timestamp_since_epoch =
                     Duration::new(timestamp.seconds as u64, timestamp.nanos as u32);
@@ -186,28 +193,55 @@ impl HistoricalDataService {
                     close_to_latest = true;
                 }
 
-                if !transactions.is_empty() {
-                    let responses =
-                        transactions
-                            .chunks(max_num_transactions_per_batch)
-                            .map(|chunk| TransactionsResponse {
+                let responses = if !transactions.is_empty() {
+                    let mut current_version = first_processed_version;
+                    let mut responses: Vec<_> = transactions
+                        .chunks(max_num_transactions_per_batch)
+                        .map(|chunk| {
+                            let first_version = current_version;
+                            let last_version = chunk.last().unwrap().version;
+                            current_version = last_version + 1;
+                            TransactionsResponse {
                                 transactions: chunk.to_vec(),
                                 chain_id: Some(self.chain_id),
-                            });
-                    for response in responses {
-                        let _timer = TIMER
-                            .with_label_values(&["historical_data_service_send_batch"])
-                            .start_timer();
-                        if response_sender.send(Ok(response)).await.is_err() {
-                            // NOTE: We are not recalculating the version and size_bytes for the stream
-                            // progress since nobody cares about the accurate if client has dropped the
-                            // connection.
-                            info!(stream_id = id, "Client dropped.");
-                            COUNTER
-                                .with_label_values(&["historical_data_service_client_dropped"])
-                                .inc();
-                            break 'out;
-                        }
+                                processed_range: Some(ProcessedRange {
+                                    first_version,
+                                    last_version,
+                                }),
+                            }
+                        })
+                        .collect();
+                    responses
+                        .last_mut()
+                        .unwrap()
+                        .processed_range
+                        .unwrap()
+                        .last_version = last_processed_version;
+                    responses
+                } else {
+                    vec![TransactionsResponse {
+                        transactions: vec![],
+                        chain_id: Some(self.chain_id),
+                        processed_range: Some(ProcessedRange {
+                            first_version: first_processed_version,
+                            last_version: last_processed_version,
+                        }),
+                    }]
+                };
+
+                for response in responses {
+                    let _timer = TIMER
+                        .with_label_values(&["historical_data_service_send_batch"])
+                        .start_timer();
+                    if response_sender.send(Ok(response)).await.is_err() {
+                        // NOTE: We are not recalculating the version and size_bytes for the stream
+                        // progress since nobody cares about the accurate if client has dropped the
+                        // connection.
+                        info!(stream_id = id, "Client dropped.");
+                        COUNTER
+                            .with_label_values(&["historical_data_service_client_dropped"])
+                            .inc();
+                        break 'out;
                     }
                 }
             }

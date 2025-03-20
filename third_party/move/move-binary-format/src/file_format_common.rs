@@ -87,6 +87,8 @@ pub const ACCESS_SPECIFIER_COUNT_MAX: u64 = 64;
 
 pub const SIGNATURE_TOKEN_DEPTH_MAX: usize = 256;
 
+pub const ATTRIBUTE_COUNT_MAX: u64 = 16;
+
 /// Constants for table types in the binary.
 ///
 /// The binary contains a subset of those tables. A table specification is a tuple (table type,
@@ -204,6 +206,16 @@ pub enum SerializedNativeStructFlag {
     NATIVE                  = 0x1,
     DECLARED                = 0x2,
     DECLARED_VARIANTS       = 0x3,
+}
+
+/// List of function attributes.
+#[rustfmt::skip]
+#[allow(non_camel_case_types)]
+#[repr(u8)]
+#[derive(Clone, Copy, Debug)]
+pub enum SerializedFunctionAttribute {
+    PERSISTENT   = 0x1,
+    MODULE_LOCK  = 0x2,
 }
 
 /// List of opcodes constants.

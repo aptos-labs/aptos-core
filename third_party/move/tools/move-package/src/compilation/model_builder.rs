@@ -8,9 +8,9 @@ use crate::{
 };
 use anyhow::Result;
 use itertools::Itertools;
-use move_compiler::shared::PackagePaths;
+use legacy_move_compiler::shared::PackagePaths;
 use move_compiler_v2::Options;
-use move_model::{model::GlobalEnv, options::ModelBuilderOptions, run_model_builder_with_options};
+use move_model::model::GlobalEnv;
 use termcolor::{ColorChoice, StandardStream};
 
 #[derive(Debug, Clone)]
@@ -128,14 +128,7 @@ impl ModelBuilder {
             .compiler_config
             .known_attributes;
         match self.model_config.compiler_version {
-            CompilerVersion::V1 => run_model_builder_with_options(
-                all_targets,
-                vec![],
-                all_deps,
-                ModelBuilderOptions::default(),
-                skip_attribute_checks,
-                known_attributes,
-            ),
+            CompilerVersion::V1 => anyhow::bail!("Compiler v1 is no longer supported"),
             CompilerVersion::V2_0 | CompilerVersion::V2_1 => {
                 let mut options = make_options_for_v2_compiler(all_targets, all_deps);
                 options.language_version = self

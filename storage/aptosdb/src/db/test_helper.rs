@@ -49,7 +49,7 @@ pub fn kv_store_genesis() -> Vec<(StateKey, Option<StateValue>)> {
         .collect()
 }
 
-fn arb_key_universe(size: usize) -> impl Strategy<Value = Vec<StateKey>> {
+pub fn arb_key_universe(size: usize) -> impl Strategy<Value = Vec<StateKey>> {
     let genesis_keys = kv_genesis_keys();
     hash_set(
         any::<StateKey>().prop_filter(
@@ -63,11 +63,10 @@ fn arb_key_universe(size: usize) -> impl Strategy<Value = Vec<StateKey>> {
 
 prop_compose! {
     pub fn arb_state_kv_sets(
-        key_universe_size: usize,
+        keys: Vec<StateKey>,
         max_update_set_size: usize,
         max_versions: usize,
     )(
-        keys in arb_key_universe(key_universe_size),
         input in vec(
             vec(
                 any::<(Index, Option<StateValue>)>(),
@@ -94,7 +93,10 @@ prop_compose! {
         max_update_set_size: usize,
         max_versions: usize,
     )(
-        sets in arb_state_kv_sets(key_universe_size, max_update_set_size, max_versions - 1),
+        sets in arb_key_universe(key_universe_size)
+            .prop_flat_map(move |keys| {
+                arb_state_kv_sets(keys, max_update_set_size, max_versions - 1)
+            }),
     ) -> Vec<Vec<(StateKey, Option<StateValue>)>> {
         std::iter::once(kv_store_genesis())
         .chain(sets.into_iter())

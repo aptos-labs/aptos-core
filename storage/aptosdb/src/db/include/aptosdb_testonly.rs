@@ -112,14 +112,16 @@ impl AptosDB {
         let transactions_to_keep = TransactionsToKeep::make(first_version, transactions, transaction_outputs, is_reconfig);
 
         let current = self.state_store.current_state_locked().clone();
-        let persisted = self.state_store.persisted_state_locked().clone();
+        let (hot_state, persisted_state) = self.state_store.get_persisted_state()?;
         let (new_state, reads) = current.ledger_state().update_with_db_reader(
-            persisted.state(),
+            &persisted_state,
+            hot_state,
             transactions_to_keep.state_update_refs(),
             self.state_store.clone(),
         )?;
+        let persisted_summary = self.state_store.get_persisted_state_summary()?;
         let new_state_summary = current.ledger_state_summary().update(
-            &ProvableStateSummary::new(persisted.summary().clone(), self),
+            &ProvableStateSummary::new(persisted_summary, self),
             transactions_to_keep.state_update_refs(),
         )?;
 

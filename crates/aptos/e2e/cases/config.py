@@ -26,6 +26,7 @@ def test_config_show_profiles(run_helper: RunHelper, test_name=None):
         profile["has_private_key"] != True
         or profile["public_key"] != expected_profile.public_key
         or profile["account"] != expected_profile.account_address
+        or profile["network"] != expected_profile.network
     ):
         raise TestError(
             f"[aptos config show-profiles] shows incorrect profile {profile} -- \n expected {expected_profile}"

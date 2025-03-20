@@ -12,12 +12,12 @@ anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 colored = { workspace = true }
 itertools = { workspace = true }
+legacy-move-compiler = { workspace = true }
 move-abigen = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-source-map = { workspace = true }
 move-bytecode-utils = { workspace = true }
 move-command-line-common = { workspace = true }
-move-compiler = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-core-types = { workspace = true }
 move-docgen = { workspace = true }

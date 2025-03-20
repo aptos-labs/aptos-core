@@ -11,7 +11,7 @@
 
 use super::{update_binary, BinaryUpdater, UpdateRequiredInfo};
 use crate::common::{
-    types::{CliCommand, CliTypedResult},
+    types::{CliCommand, CliTypedResult, PromptOptions},
     utils::cli_build_information,
 };
 use anyhow::{anyhow, Context, Result};
@@ -42,6 +42,9 @@ pub struct AptosUpdateTool {
     /// If set, it will check if there are updates for the tool, but not actually update
     #[clap(long, default_value_t = false)]
     check: bool,
+
+    #[clap(flatten)]
+    pub prompt_options: PromptOptions,
 }
 
 impl BinaryUpdater for AptosUpdateTool {
@@ -105,6 +108,11 @@ impl BinaryUpdater for AptosUpdateTool {
                     "Detected this CLI comes from homebrew, use `brew upgrade aptos` instead"
                 ));
             },
+            InstallationMethod::PackageManager => {
+                return Err(anyhow!(
+                    "Detected this CLI comes from a package manager, use your package manager to update instead"
+                ));
+            },
             InstallationMethod::Other => {},
         }
 
@@ -141,8 +149,9 @@ impl BinaryUpdater for AptosUpdateTool {
                 // OpenSSL 3.x.x, meaning Ubuntu 22.04. Otherwise we use the one built
                 // on 20.04.
                 if version.starts_with('3') {
-                    "Ubuntu-22.04-x86_64"
+                    "Linux-x86_64"
                 } else {
+                    eprintln!("Warning: OpenSSL 1.x.x is deprecated, and so is the CLI associated.  It may not work or have future updates");
                     "Ubuntu-x86_64"
                 }
             },
@@ -165,6 +174,7 @@ impl BinaryUpdater for AptosUpdateTool {
             .current_version(current_version)
             .target_version_tag(&format!("aptos-cli-v{}", info.target_version))
             .target(target)
+            .no_confirm(self.prompt_options.assume_yes)
             .build()
             .map_err(|e| anyhow!("Failed to build self-update configuration: {:#}", e))
     }
@@ -173,6 +183,7 @@ impl BinaryUpdater for AptosUpdateTool {
 pub enum InstallationMethod {
     Source,
     Homebrew,
+    PackageManager,
     Other,
 }
 
@@ -184,6 +195,8 @@ impl InstallationMethod {
             InstallationMethod::Homebrew
         } else if exe_path.to_string_lossy().contains("target") {
             InstallationMethod::Source
+        } else if exe_path.to_string_lossy().contains("/usr/bin") {
+            InstallationMethod::PackageManager
         } else {
             InstallationMethod::Other
         };

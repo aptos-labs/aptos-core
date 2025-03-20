@@ -17,10 +17,7 @@ use crate::{
 use either::Either;
 use internment::LocalIntern;
 use itertools::{EitherOrBoth, Itertools};
-use move_binary_format::{
-    file_format,
-    file_format::{CodeOffset, Visibility},
-};
+use move_binary_format::file_format::{CodeOffset, Visibility};
 use move_core_types::{account_address::AccountAddress, function::ClosureMask};
 use num::BigInt;
 use std::{
@@ -508,10 +505,35 @@ pub struct FriendDecl {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AccessSpecifier {
     pub loc: Loc,
-    pub kind: file_format::AccessKind,
+    pub kind: AccessSpecifierKind,
     pub negated: bool,
     pub resource: (Loc, ResourceSpecifier),
     pub address: (Loc, AddressSpecifier),
+}
+
+impl AccessSpecifier {
+    pub fn used_vars(&self) -> Vec<Symbol> {
+        match &self.address.1 {
+            AddressSpecifier::Call(_, var) | AddressSpecifier::Parameter(var) => {
+                vec![*var]
+            },
+            _ => vec![],
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AccessSpecifierKind {
+    Reads,
+    Writes,
+    LegacyAcquires,
+}
+
+impl AccessSpecifierKind {
+    pub fn subsumes(&self, other: &Self) -> bool {
+        use AccessSpecifierKind::*;
+        matches!((self, other), (_, Reads) | (Writes, Writes))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -2955,7 +2977,7 @@ impl ModuleName {
     }
 
     pub fn from_address_bytes_and_name(
-        addr: move_compiler::shared::NumericalAddress,
+        addr: legacy_move_compiler::shared::NumericalAddress,
         name: Symbol,
     ) -> ModuleName {
         ModuleName(Address::Numerical(addr.into_inner()), name)
@@ -3720,6 +3742,16 @@ fn optional_variant_suffix(pool: &SymbolPool, variant: &Option<Symbol>) -> Strin
         format!("::{}", v.display(pool))
     } else {
         String::new()
+    }
+}
+
+impl fmt::Display for AccessSpecifierKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            AccessSpecifierKind::Reads => f.write_str("reads"),
+            AccessSpecifierKind::Writes => f.write_str("writes"),
+            AccessSpecifierKind::LegacyAcquires => f.write_str("acquires"),
+        }
     }
 }
 

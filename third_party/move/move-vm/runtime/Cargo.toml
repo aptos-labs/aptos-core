@@ -27,15 +27,14 @@ move-vm-types = { workspace = true }
 once_cell = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true }
-sha3 = { workspace = true }
 triomphe = { workspace = true }
 typed-arena = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
 hex = { workspace = true }
+legacy-move-compiler = { workspace = true }
 move-binary-format = { workspace = true, features = ["fuzzing"] }
-move-compiler = { workspace = true }
 move-ir-compiler = { workspace = true }
 move-vm-test-utils ={ workspace = true }
 move-vm-types = { workspace = true, features = ["testing"] }

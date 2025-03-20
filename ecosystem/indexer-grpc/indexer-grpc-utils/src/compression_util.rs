@@ -205,7 +205,7 @@ impl FileEntry {
                 };
                 t.encode(&mut bytes).expect("proto serialization failed.");
                 let mut compressed = EncoderBuilder::new()
-                    .level(4)
+                    .level(0)
                     .build(Vec::new())
                     .expect("Lz4 compression failed.");
                 compressed

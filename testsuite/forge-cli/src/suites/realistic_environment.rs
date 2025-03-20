@@ -24,7 +24,6 @@ use aptos_sdk::types::on_chain_config::{
 };
 use aptos_testcases::{
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
-    modifiers::CpuChaosTest,
     multi_region_network_test::MultiRegionNetworkEmulationTest,
     performance_test::PerformanceBenchmark,
     two_traffics_test::TwoTrafficsTest,
@@ -440,7 +439,19 @@ pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                     }
                     OnChainExecutionConfig::V4(config_v4) => {
                         config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
-                        config_v4.transaction_shuffler_type = TransactionShufflerType::SenderAwareV2(256);
+                        config_v4.transaction_shuffler_type = TransactionShufflerType::UseCaseAware {
+                            sender_spread_factor: 256,
+                            platform_use_case_spread_factor: 0,
+                            user_use_case_spread_factor: 0,
+                        };
+                    }
+                    OnChainExecutionConfig::V5(config_v5) => {
+                        config_v5.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                        config_v5.transaction_shuffler_type = TransactionShufflerType::UseCaseAware {
+                            sender_spread_factor: 256,
+                            platform_use_case_spread_factor: 0,
+                            user_use_case_spread_factor: 0,
+                        };
                     }
                 }
                 helm_values["chain"]["on_chain_execution_config"] =
@@ -504,9 +515,8 @@ pub fn wrap_with_realistic_env<T: NetworkTest + 'static>(
     num_validators: usize,
     test: T,
 ) -> CompositeNetworkTest {
-    CompositeNetworkTest::new_with_two_wrappers(
+    CompositeNetworkTest::new(
         MultiRegionNetworkEmulationTest::default_for_validator_count(num_validators),
-        CpuChaosTest::default(),
         test,
     )
 }
