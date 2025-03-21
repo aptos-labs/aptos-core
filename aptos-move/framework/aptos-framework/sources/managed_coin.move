@@ -222,9 +222,10 @@ module aptos_framework::managed_coin {
         coin::destroy_burn_cap(burn_cap);
     }
 
-    #[test(source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
+    #[test(framework = @aptos_framework, source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
     #[expected_failure(abort_code = 0x60001, location = Self)]
     public entry fun fail_mint(
+        framework: signer,
         source: signer,
         destination: signer,
         mod_account: signer,
@@ -235,6 +236,8 @@ module aptos_framework::managed_coin {
         aptos_framework::account::create_account_for_test(signer::address_of(&destination));
         aptos_framework::account::create_account_for_test(signer::address_of(&mod_account));
         aggregator_factory::initialize_aggregator_factory_for_test(&mod_account);
+        aptos_framework::coin::create_coin_conversion_map(&framework);
+
 
         initialize<FakeMoney>(&mod_account, b"Fake money", b"FMD", 1, true);
         coin::register<FakeMoney>(&mod_account);
@@ -244,9 +247,10 @@ module aptos_framework::managed_coin {
         mint<FakeMoney>(&destination, source_addr, 100);
     }
 
-    #[test(source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
+    #[test(framework = @aptos_framework, source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
     #[expected_failure(abort_code = 0x60001, location = Self)]
     public entry fun fail_burn(
+        framework: signer,
         source: signer,
         destination: signer,
         mod_account: signer,
@@ -257,6 +261,8 @@ module aptos_framework::managed_coin {
         aptos_framework::account::create_account_for_test(signer::address_of(&destination));
         aptos_framework::account::create_account_for_test(signer::address_of(&mod_account));
         aggregator_factory::initialize_aggregator_factory_for_test(&mod_account);
+        aptos_framework::coin::create_coin_conversion_map(&framework);
+
 
         initialize<FakeMoney>(&mod_account, b"Fake money", b"FMD", 1, true);
         coin::register<FakeMoney>(&mod_account);

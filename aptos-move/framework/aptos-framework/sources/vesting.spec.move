@@ -433,7 +433,8 @@ spec aptos_framework::vesting {
         pragma verify_duration_estimate = 300;
         pragma aborts_if_is_partial;
         aborts_if !account::exists_at(new_beneficiary);
-        aborts_if !coin::spec_is_account_registered<AptosCoin>(new_beneficiary);
+        // TODO(fa_migration)
+        // aborts_if !coin::spec_is_account_registered<AptosCoin>(new_beneficiary);
         include VerifyAdminAbortsIf;
         let post vesting_contract = global<VestingContract>(contract_address);
         ensures simple_map::spec_contains_key(vesting_contract.beneficiaries,shareholder);
