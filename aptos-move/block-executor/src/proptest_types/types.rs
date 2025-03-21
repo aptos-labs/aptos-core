@@ -150,7 +150,7 @@ impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> ModulePath for KeyType<K> 
 }
 
 // TODO: this is now very similar to WriteOp, should be a wrapper and remove boilerplate below.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ValueType {
     /// Wrapping the types used for testing to add TransactionWrite trait implementation (below).
     bytes: Option<Bytes>,

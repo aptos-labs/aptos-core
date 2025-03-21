@@ -16,6 +16,10 @@ pub(crate) enum SchedulerWrapper<'a> {
 }
 
 impl SchedulerWrapper<'_> {
+    pub(crate) fn is_v2(&self) -> bool {
+        matches!(self, SchedulerWrapper::V2(_))
+    }
+
     pub(crate) fn wake_dependencies_and_decrease_validation_idx(
         &self,
         txn_idx: TxnIndex,

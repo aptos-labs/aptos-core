@@ -136,6 +136,7 @@ trait ResourceState<T: Transaction> {
     fn read_cached_data_by_kind(
         &self,
         txn_idx: TxnIndex,
+        incarnation: Incarnation,
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
@@ -270,14 +271,11 @@ fn compute_delayed_field_try_add_delta_outcome_from_history(
         true
     };
 
-    Ok((
-        result,
-        DelayedFieldRead::HistoryBounded {
-            restriction: history,
-            max_value,
-            inner_aggregator_value: base_aggregator_value,
-        },
-    ))
+    Ok((result, DelayedFieldRead::HistoryBounded {
+        restriction: history,
+        max_value,
+        inner_aggregator_value: base_aggregator_value,
+    }))
 }
 
 fn compute_delayed_field_try_add_delta_outcome_first_time(
@@ -305,14 +303,11 @@ fn compute_delayed_field_try_add_delta_outcome_first_time(
         true
     };
 
-    Ok((
-        result,
-        DelayedFieldRead::HistoryBounded {
-            restriction: history,
-            max_value,
-            inner_aggregator_value: base_aggregator_value,
-        },
-    ))
+    Ok((result, DelayedFieldRead::HistoryBounded {
+        restriction: history,
+        max_value,
+        inner_aggregator_value: base_aggregator_value,
+    }))
 }
 // TODO[agg_v2](cleanup): see about the split with CapturedReads,
 // and whether anything should be moved there.
@@ -538,6 +533,7 @@ impl<'a, T: Transaction> ResourceState<T> for ParallelState<'a, T> {
     fn read_cached_data_by_kind(
         &self,
         txn_idx: TxnIndex,
+        incarnation: Incarnation,
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
@@ -555,7 +551,15 @@ impl<'a, T: Transaction> ResourceState<T> for ParallelState<'a, T> {
         }
 
         loop {
-            match self.versioned_map.data().fetch_data(key, txn_idx) {
+            let data = if self.scheduler.is_v2() {
+                self.versioned_map
+                    .data()
+                    .fetch_data_v2(key, txn_idx, incarnation)
+            } else {
+                self.versioned_map.data().fetch_data(key, txn_idx)
+            };
+
+            match data {
                 Ok(Versioned(version, value)) => {
                     // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                     if let UnknownOrLayout::Known(layout) = layout {
@@ -824,6 +828,7 @@ impl<'a, T: Transaction> ResourceState<T> for SequentialState<'a, T> {
     fn read_cached_data_by_kind(
         &self,
         _txn_idx: TxnIndex,
+        _incarnation: Incarnation,
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
@@ -976,6 +981,13 @@ impl<'a, T: Transaction> ViewState<'a, T> {
         match self {
             ViewState::Sync(state) => state,
             ViewState::Unsync(state) => state,
+        }
+    }
+
+    fn incarnation(&self) -> Incarnation {
+        match self {
+            ViewState::Sync(state) => state.incarnation,
+            ViewState::Unsync(_) => 0,
         }
     }
 }
@@ -1385,6 +1397,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
 
         let mut ret = state.read_cached_data_by_kind(
             self.txn_idx,
+            self.latest_view.incarnation(),
             state_key,
             kind.clone(),
             layout.clone(),
@@ -1402,6 +1415,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             // but need to fetch it from versioned_map again.
             ret = state.read_cached_data_by_kind(
                 self.txn_idx,
+                self.latest_view.incarnation(),
                 state_key,
                 kind,
                 layout.clone(),
@@ -3112,16 +3126,6 @@ mod test {
                 .get_resource_state_value(&KeyType::<u32>(3, false), None)
                 .unwrap(),
             Some(state_value_3.clone())
-        );
-
-        // TODO[agg_v2](test): This is printing Ok(Versioned(Err(StorageVersion), ValueType { bytes: Some(b"!0\0\0\0\0\0\0"), metadata: None }, None))
-        // Is Err(StorageVersion) expected here?
-        println!(
-            "data: {:?}",
-            holder
-                .versioned_map
-                .data()
-                .fetch_data(&KeyType::<u32>(3, false), 1)
         );
 
         let patched_value = create_struct_value(create_aggregator_value_u64(id.as_u64(), 30));
