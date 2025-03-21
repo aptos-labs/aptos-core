@@ -95,10 +95,7 @@ impl<'a> StructDefGraphBuilder<'a> {
         let variant_count = struct_def.variant_count();
         if variant_count > 0 {
             for i in 0..variant_count {
-                for field in struct_def
-                    .fields_optional_variant(Some(i as VariantIndex))
-                    .into_iter()
-                {
+                for field in struct_def.fields_optional_variant(Some(i as VariantIndex)) {
                     self.add_signature_token(neighbors, idx, field.signature_token())?
                 }
             }

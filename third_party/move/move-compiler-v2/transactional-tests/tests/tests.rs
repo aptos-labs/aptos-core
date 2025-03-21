@@ -158,6 +158,14 @@ const TEST_CONFIGS: &[TestConfig] = &[
         include: &["/access_control/"],
         exclude: &[],
     },
+    TestConfig {
+        name: "no-recursive-check",
+        runner: |p| run(p, get_config_by_name("no-recursive-check")),
+        experiments: &[(Experiment::RECURSIVE_TYPE_CHECK, false)],
+        language_version: LanguageVersion::latest_stable(),
+        include: &["/no-recursive-check/"],
+        exclude: &[],
+    },
 ];
 
 /// Test files which must use separate baselines because their result

@@ -1,0 +1,85 @@
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
+= task 0 'publish'. lines 1-27:
+- Error: error[E01013]: unsupported language construct
+-   ┌─ TEMPFILE:3:5
+-   │
+- 3 │     enum Foo {
+-   │     ^^^^ Move 2 language construct is not enabled: enum types
++ Error: compilation errors:
++  bug: bytecode verification failed with unexpected status code `RECURSIVE_STRUCT_DEFINITION`. This is a compiler bug, consider reporting it.
++ Error message: none
++    ┌─ TEMPFILE:2:1
++    │  
++  2 │ ╭ module 0xc0ffee::m {
++  3 │ │     enum Foo {
++  4 │ │         A(Bar)
++  5 │ │     } has drop;
++    · │
++ 22 │ │     }
++ 23 │ │ }
++    │ ╰─^
+= 
+- error[E01013]: unsupported language construct
+-   ┌─ TEMPFILE:4:10
+-   │
+- 4 │         A(Bar)
+-   │          ^ Move 2 language construct is not enabled: positional fields
+= 
+- error[E01013]: unsupported language construct
+-   ┌─ TEMPFILE:6:5
+-   │
+- 6 │     enum Bar {
+-   │     ^^^^ Move 2 language construct is not enabled: enum types
+= 
+- error[E01013]: unsupported language construct
+-   ┌─ TEMPFILE:7:10
+-   │
+- 7 │         B(Foo)
+-   │          ^ Move 2 language construct is not enabled: positional fields
+- 
+- error[E01013]: unsupported language construct
+-   ┌─ TEMPFILE:9:5
+-   │
+- 9 │     enum Blah {
+-   │     ^^^^ Move 2 language construct is not enabled: enum types
+- 
+- error[E01013]: unsupported language construct
+-    ┌─ TEMPFILE:10:10
+-    │
+- 10 │         A(u64),
+-    │          ^ Move 2 language construct is not enabled: positional fields
+- 
+- error[E01013]: unsupported language construct
+-    ┌─ TEMPFILE:11:10
+-    │
+- 11 │         B(Foo),
+-    │          ^ Move 2 language construct is not enabled: positional fields
+- 
+- error[E01013]: unsupported language construct
+-    ┌─ TEMPFILE:14:9
+-    │
+- 14 │         match (x) {
+-    │         ^^^^^ Move 2 language construct is not enabled: match expression
+- 
+- error[E01002]: unexpected token
+-    ┌─ TEMPFILE:15:20
+-    │
+- 15 │             Blah::A(_) => (),
+-    │                    ^
+-    │                    │
+-    │                    Unexpected '('
+-    │                    Expected '{'
+- 
+- 
+- 
+= task 1 'run'. lines 29-29:
+= Error: Function execution failed with VMError: {
+=     major_status: LINKER_ERROR,
+=     sub_status: None,
+=     location: undefined,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 
