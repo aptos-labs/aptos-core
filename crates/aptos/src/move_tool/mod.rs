@@ -54,7 +54,6 @@ use aptos_types::{
     on_chain_config::aptos_test_feature_flags_genesis,
     transaction::{Transaction, TransactionArgument, TransactionPayload, TransactionStatus},
 };
-use aptos_vm::data_cache::AsMoveResolver;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::Colorize;
@@ -2320,10 +2319,8 @@ impl CliCommand<TransactionSummary> for Replay {
 
         // Materialize into transaction output and check if the outputs match.
         let state_view = debugger.state_view_at_version(self.txn_id);
-        let resolver = state_view.as_move_resolver();
-
         let txn_output = vm_output
-            .try_materialize_into_transaction_output(&resolver)
+            .try_materialize_into_transaction_output(&state_view)
             .map_err(|err| {
                 CliError::UnexpectedError(format!(
                     "Failed to materialize into transaction output: {}",

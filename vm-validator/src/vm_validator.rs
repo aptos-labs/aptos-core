@@ -14,22 +14,28 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountResource,
-    state_store::{state_key::StateKey, MoveResourceExt, StateView},
+    state_store::{
+        state_key::StateKey, state_value::StateValueMetadata, MoveResourceExt, StateView,
+    },
     transaction::{SignedTransaction, VMValidatorResult},
     vm::modules::AptosModuleExtension,
 };
 use aptos_vm::AptosVM;
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
+use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use fail::fail_point;
 use move_binary_format::{
-    errors::{Location, PartialVMError, VMResult},
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    file_format::CompiledScript,
     CompiledModule,
 };
-use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
-use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
+use move_core_types::{identifier::IdentStr, language_storage::ModuleId, vm_status::StatusCode};
+use move_vm_runtime::{Module, RuntimeEnvironment, Script, WithRuntimeEnvironment};
 use move_vm_types::{
-    code::{ModuleCache, ModuleCode, ModuleCodeBuilder, UnsyncModuleCache, WithHash},
+    code::{
+        Code, ModuleCache, ModuleCode, ModuleCodeBuilder, ScriptCache, UnsyncModuleCache, WithHash,
+    },
     module_storage_error, sha3_256,
 };
 use rand::{thread_rng, Rng};
@@ -226,6 +232,52 @@ impl<S: StateView> ModuleCodeBuilder for ValidationState<S> {
         let extension = Arc::new(AptosModuleExtension::new(state_value));
         let module = ModuleCode::from_deserialized(compiled_module, extension);
         Ok(Some(module))
+    }
+}
+
+impl<S: StateView> AptosModuleStorage for ValidationState<S> {
+    fn fetch_state_value_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Option<StateValueMetadata>> {
+        let key = StateKey::module(address, module_name);
+        Ok(self
+            .state_view
+            .get_state_value(&key)
+            .map_err(|err| module_storage_error!(address, module_name, err).to_partial())?
+            .map(|state_value| state_value.into_metadata()))
+    }
+}
+
+// We use no-op script cache for validation.
+impl<S> ScriptCache for ValidationState<S> {
+    type Deserialized = CompiledScript;
+    type Key = [u8; 32];
+    type Verified = Script;
+
+    fn insert_deserialized_script(
+        &self,
+        _key: Self::Key,
+        deserialized_script: Self::Deserialized,
+    ) -> Arc<Self::Deserialized> {
+        Arc::new(deserialized_script)
+    }
+
+    fn insert_verified_script(
+        &self,
+        _key: Self::Key,
+        verified_script: Self::Verified,
+    ) -> Arc<Self::Verified> {
+        Arc::new(verified_script)
+    }
+
+    fn get_script(&self, _key: &Self::Key) -> Option<Code<Self::Deserialized, Self::Verified>> {
+        None
+    }
+
+    fn num_scripts(&self) -> usize {
+        0
     }
 }
 

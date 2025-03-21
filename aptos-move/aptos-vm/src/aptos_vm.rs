@@ -2736,7 +2736,7 @@ impl VMValidator for AptosVM {
         &self,
         transaction: SignedTransaction,
         state_view: &impl StateView,
-        module_storage: &impl ModuleStorage,
+        code_storage: &impl AptosCodeStorage,
     ) -> VMValidatorResult {
         let _timer = TXN_VALIDATION_SECONDS.start_timer();
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
@@ -2827,7 +2827,7 @@ impl VMValidator for AptosVM {
         // Increment the counter for transactions verified.
         let (counter_label, result) = match self.validate_signed_transaction(
             &mut session,
-            module_storage,
+            code_storage,
             &txn,
             &txn_data,
             &log_context,
