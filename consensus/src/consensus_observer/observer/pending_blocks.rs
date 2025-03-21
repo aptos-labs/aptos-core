@@ -199,6 +199,23 @@ impl PendingBlockStore {
         }
     }
 
+    #[cfg(test)]
+    /// Removes the pending block from the pending block store (only used for testing)
+    pub fn remove_pending_block(&mut self, ordered_block: &OrderedBlock) {
+        // Get the epoch, round and hash of the first block
+        let first_block = ordered_block.first_block();
+        let first_block_epoch_round = (first_block.epoch(), first_block.round());
+        let first_block_hash = first_block.id();
+
+        // Remove the block from both stores
+        self.blocks_without_payloads
+            .remove(&first_block_epoch_round)
+            .unwrap();
+        self.blocks_without_payloads_by_hash
+            .remove(&first_block_hash)
+            .unwrap();
+    }
+
     /// Removes and returns the block from the store that is now ready
     /// to be processed (after the new payload has been received).
     // TODO: identify how this will work with execution pool blocks!
@@ -322,7 +339,7 @@ impl PendingBlockStore {
 /// Implement the BlockStorage trait for the PendingBlockStore.
 /// This is required to calculate and fetch the block window.
 impl BlockStorage for PendingBlockStore {
-    fn get_block(&self, block_id: &HashValue) -> Option<Arc<PipelinedBlock>> {
+    fn get_pipelined_block(&self, block_id: &HashValue) -> Option<Arc<PipelinedBlock>> {
         // Lookup the ordered block by hash
         let pending_block_with_metadata = match self.get_pending_block_by_hash(*block_id) {
             Some(pending_block_with_metadata) => pending_block_with_metadata,
@@ -566,6 +583,69 @@ mod test {
                 .get_pending_block_by_hash(pending_block.first_block().id())
                 .is_none());
         }
+    }
+
+    #[test]
+    fn test_get_pipelined_block() {
+        // Create a new pending block store
+        let max_num_pending_blocks = 10;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks: max_num_pending_blocks as u64,
+            ..ConsensusObserverConfig::default()
+        };
+        let pending_block_store = Arc::new(Mutex::new(PendingBlockStore::new(
+            consensus_observer_config,
+        )));
+
+        // Insert the maximum number of blocks into the store
+        let current_epoch = 10;
+        let starting_round = 100;
+        let pending_blocks = create_and_add_pending_blocks(
+            pending_block_store.clone(),
+            max_num_pending_blocks,
+            current_epoch,
+            starting_round,
+            5,
+        );
+
+        // Verify that all blocks can be fetched by hash
+        for pending_block in &pending_blocks {
+            let block_hash = pending_block.first_block().id();
+            let block = pending_block_store
+                .lock()
+                .get_pipelined_block(&block_hash)
+                .unwrap();
+            assert_eq!(block, pending_block.first_block());
+        }
+
+        // Verify that missing block hashes are not in the store
+        let missing_block_hash = HashValue::random();
+        let block = pending_block_store
+            .lock()
+            .get_pipelined_block(&missing_block_hash);
+        assert!(block.is_none());
+
+        // Clear the blocks from the store
+        pending_block_store.lock().clear_missing_blocks();
+
+        // Reinsert the first block into the hash store (manually) using an incorrect hash
+        let first_block = pending_blocks[0].clone();
+        let incorrect_hash = HashValue::random();
+        let pending_block_with_metadata = PendingBlockWithMetadata::new_with_arc(
+            PeerNetworkId::random(),
+            Instant::now(),
+            ObservedOrderedBlock::new_for_testing(first_block.clone()),
+        );
+        pending_block_store
+            .lock()
+            .blocks_without_payloads_by_hash
+            .insert(incorrect_hash, pending_block_with_metadata);
+
+        // Verify the block cannot be found (there is a hash mismatch the entry and pipelined block)
+        let block = pending_block_store
+            .lock()
+            .get_pipelined_block(&incorrect_hash);
+        assert!(block.is_none());
     }
 
     #[test]
