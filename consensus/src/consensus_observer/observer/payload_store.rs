@@ -118,17 +118,6 @@ impl BlockPayloadStore {
         *block_payloads = block_payloads.split_off(&(epoch, split_off_round));
     }
 
-    /// Removes the committed blocks from the payload store
-    pub fn remove_committed_blocks(&self, committed_blocks: &[Arc<PipelinedBlock>]) {
-        // Get the highest epoch and round for the committed blocks
-        let (highest_epoch, highest_round) = committed_blocks
-            .last()
-            .map_or((0, 0), |block| (block.epoch(), block.round()));
-
-        // Remove the blocks
-        self.remove_blocks_for_epoch_round(highest_epoch, highest_round);
-    }
-
     /// Updates the metrics for the payload store
     pub fn update_payload_store_metrics(&self) {
         // Update the number of block payloads
@@ -337,7 +326,7 @@ mod test {
         assert!(block_payload_store.all_payloads_exist(subset_verified_blocks));
 
         // Remove some of the payloads from the block payload store
-        block_payload_store.remove_committed_blocks(subset_verified_blocks);
+        remove_committed_blocks(&mut block_payload_store, subset_verified_blocks);
 
         // Check that the payloads no longer exist in the block payload store
         assert!(!block_payload_store.all_payloads_exist(subset_verified_blocks));
@@ -347,7 +336,7 @@ mod test {
         assert!(block_payload_store.all_payloads_exist(subset_verified_blocks));
 
         // Remove the remaining payloads from the block payload store
-        block_payload_store.remove_committed_blocks(subset_verified_blocks);
+        remove_committed_blocks(&mut block_payload_store, subset_verified_blocks);
 
         // Check that the payloads no longer exist in the block payload store
         assert!(!block_payload_store.all_payloads_exist(subset_verified_blocks));
@@ -716,7 +705,7 @@ mod test {
         );
 
         // Remove the first block from the block payload store
-        block_payload_store.remove_committed_blocks(&verified_blocks[0..1]);
+        remove_committed_blocks(&mut block_payload_store, &verified_blocks[0..1]);
 
         // Check that the block payload store no longer contains the removed block
         let block_payloads = block_payload_store.get_block_payloads();
@@ -729,7 +718,7 @@ mod test {
         check_num_verified_payloads(&block_payload_store, num_blocks_in_store - 1);
 
         // Remove the last 5 blocks from the block payload store
-        block_payload_store.remove_committed_blocks(&verified_blocks[5..10]);
+        remove_committed_blocks(&mut block_payload_store, &verified_blocks[5..10]);
 
         // Check that the block payload store no longer contains the removed blocks
         let block_payloads = block_payload_store.get_block_payloads();
@@ -743,7 +732,10 @@ mod test {
         check_num_verified_payloads(&block_payload_store, num_blocks_in_store - 10);
 
         // Remove all the blocks from the block payload store (including some that don't exist)
-        block_payload_store.remove_committed_blocks(&verified_blocks[0..num_blocks_in_store]);
+        remove_committed_blocks(
+            &mut block_payload_store,
+            &verified_blocks[0..num_blocks_in_store],
+        );
 
         // Check that the block payload store no longer contains any blocks
         let block_payloads = block_payload_store.get_block_payloads();
@@ -762,7 +754,7 @@ mod test {
         );
 
         // Remove the last committed block from the future epoch
-        block_payload_store.remove_committed_blocks(&verified_blocks[99..100]);
+        remove_committed_blocks(&mut block_payload_store, &verified_blocks[99..100]);
 
         // Check that the block payload store is now empty
         check_num_verified_payloads(&block_payload_store, 0);
@@ -791,7 +783,7 @@ mod test {
         );
 
         // Remove the first block from the block payload store
-        block_payload_store.remove_committed_blocks(&unverified_blocks[0..1]);
+        remove_committed_blocks(&mut block_payload_store, &unverified_blocks[0..1]);
 
         // Check that the block payload store no longer contains the removed block
         let removed_block = &unverified_blocks[0];
@@ -804,7 +796,7 @@ mod test {
         check_num_unverified_payloads(&block_payload_store, num_blocks_in_store - 1);
 
         // Remove the last 5 blocks from the block payload store
-        block_payload_store.remove_committed_blocks(&unverified_blocks[5..10]);
+        remove_committed_blocks(&mut block_payload_store, &unverified_blocks[5..10]);
 
         // Check that the block payload store no longer contains the removed blocks
         for verified_block in unverified_blocks.iter().take(10).skip(5) {
@@ -818,7 +810,10 @@ mod test {
         check_num_unverified_payloads(&block_payload_store, num_blocks_in_store - 10);
 
         // Remove all the blocks from the block payload store (including some that don't exist)
-        block_payload_store.remove_committed_blocks(&unverified_blocks[0..num_blocks_in_store]);
+        remove_committed_blocks(
+            &mut block_payload_store,
+            &unverified_blocks[0..num_blocks_in_store],
+        );
 
         // Check that the block payload store no longer contains any blocks
         assert!(block_payload_store.block_payloads.lock().is_empty());
@@ -836,7 +831,7 @@ mod test {
         );
 
         // Remove the last committed block from the future epoch
-        block_payload_store.remove_committed_blocks(&unverified_blocks[99..100]);
+        remove_committed_blocks(&mut block_payload_store, &unverified_blocks[99..100]);
 
         // Check that the block payload store is now empty
         check_num_unverified_payloads(&block_payload_store, 0);
@@ -909,7 +904,7 @@ mod test {
         assert_eq!(verified_rounds, expected_verified_rounds);
 
         // Clear the verified blocks and check the verified blocks are empty
-        block_payload_store.remove_committed_blocks(&unverified_blocks);
+        remove_committed_blocks(&mut block_payload_store, &unverified_blocks);
         assert_eq!(get_num_verified_payloads(&block_payload_store), 0);
 
         // Create an epoch state for the future epoch (with an empty verifier)
@@ -1215,5 +1210,16 @@ mod test {
             block.block_info(),
             BlockTransactionPayload::empty(),
         ));
+    }
+
+    /// Removes the committed blocks from the payload store
+    fn remove_committed_blocks(
+        block_payload_store: &mut BlockPayloadStore,
+        committed_blocks: &[Arc<PipelinedBlock>],
+    ) {
+        for committed_block in committed_blocks {
+            block_payload_store
+                .remove_blocks_for_epoch_round(committed_block.epoch(), committed_block.round());
+        }
     }
 }
