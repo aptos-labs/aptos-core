@@ -913,11 +913,20 @@ mod tests {
         assert_err!(status.finish_execution(6));
         assert_err!(status.finish_abort(6));
 
-        assert_eq!(status.next_incarnation_to_try_abort.load(Ordering::Relaxed), 5);
+        assert_eq!(
+            status.next_incarnation_to_try_abort.load(Ordering::Relaxed),
+            5
+        );
         assert_ok_eq!(status.try_abort(5), true);
-        assert_eq!(status.next_incarnation_to_try_abort.load(Ordering::Relaxed), 6);
+        assert_eq!(
+            status.next_incarnation_to_try_abort.load(Ordering::Relaxed),
+            6
+        );
         assert_ok!(status.finish_abort(5));
-        assert_eq!(status.next_incarnation_to_try_abort.load(Ordering::Relaxed), 6);
+        assert_eq!(
+            status.next_incarnation_to_try_abort.load(Ordering::Relaxed),
+            6
+        );
         assert_eq!(status.inner_status.lock().incarnation(), 5);
         // Not re-scheduled because finish_execution has not happened.
         proxy.assert_execution_queue(&vec![]);
@@ -979,11 +988,13 @@ mod tests {
         rayon::scope(|s| {
             for _ in 0..2 {
                 s.spawn(|_| {
-                    match status.resolve_dependency(if case.load(Ordering::Relaxed) {
-                        DependencyInstruction::Wait
-                    } else {
-                        DependencyInstruction::WaitForExecuting
-                    }) {
+                    match status.resolve_dependency(
+                        if case.load(Ordering::Relaxed) {
+                            DependencyInstruction::Wait
+                        } else {
+                            DependencyInstruction::WaitForExecuting
+                        },
+                    ) {
                         Ok(DependencyResolution::Wait(condvar)) => {
                             let (lock, cvar) = &*condvar;
                             let mut dep_resolved = lock.lock();

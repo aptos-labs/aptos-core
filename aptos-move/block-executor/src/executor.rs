@@ -16,7 +16,7 @@ use crate::{
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
-    scheduler_v2::{SchedulerV2, TaskKind},
+    scheduler_v2::{AbortManager, SchedulerV2, TaskKind},
     scheduler_wrapper::SchedulerWrapper,
     task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
@@ -140,14 +140,14 @@ where
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                 Ok(Some(output))
             },
-            ExecutionStatus::SpeculativeExecutionAbortError(msg) => {
+            ExecutionStatus::SpeculativeExecutionAbortError(_msg) => {
                 // TODO: cleaner to rename or distinguish V2 early abort from DeltaApplicationFailure.
                 read_set.capture_delayed_field_read_error(&PanicOr::Or(
                     MVDelayedFieldsError::DeltaApplicationFailure,
                 ));
                 Ok(None)
             },
-            ExecutionStatus::Abort(err) => Ok(None),
+            ExecutionStatus::Abort(_err) => Ok(None),
             ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
                 Err(code_invariant_error(format!(
                     "[Execution] At txn {}, failed with DelayedFieldsCodeInvariantError: {:?}",
@@ -867,7 +867,7 @@ where
             start_shared_counter,
             shared_counter,
             0, // Incarnation does not matter here (no re-execution & interrupts)
-               // TODO: still, provide the latest incarnation?
+               // TODO: still, provide the latest incarnation (AbortManager?)?
         );
         let latest_view = LatestView::new(
             base_view,
@@ -903,7 +903,7 @@ where
         let resource_writes_to_materialize = resource_writes_to_materialize!(
             resource_write_set,
             last_input_output,
-            versioned_cache.data(),
+            last_input_output,
             txn_idx
         )?;
         let materialized_resource_write_set =
@@ -1184,6 +1184,7 @@ where
 
                     // TODO: proper integration w. execution pooling for performance.
                     let txn = block.get_txn(txn_idx);
+                    let abort_manager = AbortManager::new(txn_idx, incarnation, scheduler);
                     let sync_view = LatestView::new(
                         base_view,
                         shared_sync_params.global_module_cache,
@@ -1205,9 +1206,8 @@ where
                     let mut read_set = sync_view.take_parallel_reads();
                     if read_set.is_incorrect_use() {
                         return Err(PanicOr::from(code_invariant_error(format!(
-			    "Incorrect use detected in CapturedReads after executing txn = {} incarnation = {}",
-			    txn_idx, incarnation
-			))));
+                            "Incorrect use detected in CapturedReads after executing txn = {txn_idx} incarnation = {incarnation}"
+                        ))));
                     }
 
                     let maybe_output =
@@ -1234,6 +1234,8 @@ where
                         Vec::new(), // TODO: proper resource write set arced.
                         Vec::new(), // TODO: proper group_keys_and_tags.
                     );
+
+                    scheduler.finish_execution(abort_manager)?;
 
                     #[cfg(feature = "blockstm-profiling")]
                     sync_view.view_profiler_log_info(incarnation, worker_id as usize);

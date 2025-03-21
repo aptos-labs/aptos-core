@@ -108,6 +108,7 @@ impl TransactionEvent for TestEvent {
     fn get_event_data(&self) -> &[u8] {
         unimplemented!("Unused in the test")
     }
+
     fn set_event_data(&mut self, _event_data: Vec<u8>) {
         unimplemented!("Unused in the test")
     }
@@ -267,12 +268,9 @@ impl ExecutorTask for MockTask {
                 .write_keys
                 .iter()
                 .map(|key| {
-                    (
-                        key.clone(),
-                        TestValue {
-                            txn_idx: txn_idx as usize,
-                        },
-                    )
+                    (key.clone(), TestValue {
+                        txn_idx: txn_idx as usize,
+                    })
                 })
                 .collect(),
         })
