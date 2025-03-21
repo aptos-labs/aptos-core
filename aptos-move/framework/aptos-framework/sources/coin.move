@@ -639,7 +639,7 @@ module aptos_framework::coin {
     public entry fun migrate_coin_store_to_fungible_store<CoinType>(
         accounts: vector<address>
     ) acquires CoinStore, CoinConversionMap, CoinInfo {
-        if (features::new_accounts_default_to_fa_apt_store_enabled()) {
+        if (features::new_accounts_default_to_fa_store_enabled()) {
             std::vector::for_each(accounts, |account| {
                 maybe_convert_to_fungible_store<CoinType>(account);
             });
@@ -705,7 +705,7 @@ module aptos_framework::coin {
     /// Returns `true` is account_addr has frozen the CoinStore or if it's not registered at all
     public fun is_coin_store_frozen<CoinType>(
         account_addr: address
-    ): bool acquires CoinStore, CoinConversionMap {
+    ): bool acquires CoinStore, CoinConversionMap, CoinInfo {
         if (!is_account_registered<CoinType>(account_addr)) {
             return true
         };
@@ -716,15 +716,13 @@ module aptos_framework::coin {
 
     #[view]
     /// Returns `true` if `account_addr` is registered to receive `CoinType`.
-    public fun is_account_registered<CoinType>(account_addr: address): bool acquires CoinConversionMap {
+    public fun is_account_registered<CoinType>(account_addr: address): bool acquires CoinConversionMap, CoinInfo {
         assert!(is_coin_initialized<CoinType>(), error::invalid_argument(ECOIN_INFO_NOT_PUBLISHED));
         if (exists<CoinStore<CoinType>>(account_addr)) {
             true
         } else {
-            let paired_metadata_opt = paired_metadata<CoinType>();
-            (option::is_some(
-                &paired_metadata_opt
-            ) && can_receive_paired_fungible_asset(account_addr, option::destroy_some(paired_metadata_opt)))
+            let paired_metadata = ensure_paired_metadata<CoinType>();
+            can_receive_paired_fungible_asset(account_addr, paired_metadata)
         }
     }
 
@@ -864,11 +862,8 @@ module aptos_framework::coin {
                 );
             merge(&mut coin_store.coin, coin);
         } else {
-            let metadata = paired_metadata<CoinType>();
-            if (option::is_some(&metadata) && can_receive_paired_fungible_asset(
-                account_addr,
-                option::destroy_some(metadata)
-            )) {
+            let metadata = ensure_paired_metadata<CoinType>();
+            if (can_receive_paired_fungible_asset( account_addr, metadata)) {
                 primary_fungible_store::deposit(account_addr, coin_to_fungible_asset(coin));
             } else {
                 abort error::not_found(ECOIN_STORE_NOT_PUBLISHED)
@@ -897,7 +892,7 @@ module aptos_framework::coin {
         account_address: address,
         metadata: Object<Metadata>
     ): bool {
-        (features::new_accounts_default_to_fa_apt_store_enabled() && object::object_address(&metadata) == @0xa) || {
+        features::new_accounts_default_to_fa_store_enabled() || (features::new_accounts_default_to_fa_apt_store_enabled() && object::object_address(&metadata) == @0xa) || {
             let primary_store_address = primary_fungible_store::primary_store_address<Metadata>(
                 account_address,
                 metadata
@@ -916,10 +911,10 @@ module aptos_framework::coin {
             let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
             merge(&mut coin_store.coin, coin);
         } else {
-            let metadata = paired_metadata<CoinType>();
-            if (option::is_some(&metadata) && can_receive_paired_fungible_asset(
+            let metadata = ensure_paired_metadata<CoinType>();
+            if (can_receive_paired_fungible_asset(
                 account_addr,
-                option::destroy_some(metadata)
+                metadata
             )) {
                 let fa = coin_to_fungible_asset(coin);
                 let metadata = fungible_asset::asset_metadata(&fa);
