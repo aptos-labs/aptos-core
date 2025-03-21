@@ -8,12 +8,8 @@ const ZEROS: &str = "00000000000000000000000000000000000000000000000000000000000
 /// https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-40.md#display-format
 #[inline]
 pub fn standardize_address(address: &str) -> String {
-    // Remove "0x" prefix
-    let trimmed = if address.starts_with("0x") {
-        &address[2..]
-    } else {
-        address
-    };
+    // Remove "0x" prefix if it exists
+    let trimmed = address.strip_prefix("0x").unwrap_or(address);
 
     // Check if the address is a special address by seeing if the first 31 bytes are zero and the last byte is smaller than 0b10000
     if let Some(last_char) = trimmed.chars().last() {
