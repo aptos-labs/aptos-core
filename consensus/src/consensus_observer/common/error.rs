@@ -9,6 +9,9 @@ pub enum Error {
     #[error("Invalid message error: {0}")]
     InvalidMessageError(String),
 
+    #[error("Missing block error: {0}")]
+    MissingBlockError(String),
+
     #[error("Network error: {0}")]
     NetworkError(String),
 
@@ -45,6 +48,7 @@ impl Error {
     pub fn get_label(&self) -> &'static str {
         match self {
             Self::InvalidMessageError(_) => "invalid_message_error",
+            Self::MissingBlockError(_) => "missing_block_error",
             Self::NetworkError(_) => "network_error",
             Self::ObserverFallingBehind(_) => "observer_falling_behind",
             Self::ObserverProgressStopped(_) => "observer_progress_stopped",
