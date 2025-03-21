@@ -7,20 +7,21 @@ use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
 };
 use aptos_mvhashmap::types::TxnIndex;
+use aptos_table_natives::TableResolver;
 use aptos_types::{
     error::PanicError,
     fee_statement::FeeStatement,
+    on_chain_config::ConfigStorage,
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
+    vm::resource_groups::ResourceGroupSize,
     write_set::WriteOp,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{
     module_and_script_storage::code_storage::AptosCodeStorage,
     module_write_set::ModuleWrite,
-    resolver::{
-        BlockSynchronizationKillSwitch, ResourceGroupSize, TExecutorView, TResourceGroupView,
-    },
+    resolver::{BlockSynchronizationKillSwitch, TExecutorView},
 };
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
@@ -81,11 +82,9 @@ pub trait ExecutorTask: Sync {
             <Self::Txn as Transaction>::Tag,
             MoveTypeLayout,
             <Self::Txn as Transaction>::Value,
-        > + TResourceGroupView<
-            GroupKey = <Self::Txn as Transaction>::Key,
-            ResourceTag = <Self::Txn as Transaction>::Tag,
-            Layout = MoveTypeLayout,
-        > + AptosCodeStorage
+        > + TableResolver
+              + ConfigStorage
+              + AptosCodeStorage
               + BlockSynchronizationKillSwitch),
         txn: &Self::Txn,
         txn_idx: TxnIndex,

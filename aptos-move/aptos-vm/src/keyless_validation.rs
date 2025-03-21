@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_vm_ext::AptosMoveResolver;
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_types::{
     invalid_signature,
@@ -15,9 +14,9 @@ use aptos_types::{
     transaction::authenticator::{EphemeralPublicKey, EphemeralSignature},
     vm_status::{StatusCode, VMStatus},
 };
+use aptos_vm_types::resolver::ExecutorView;
 use ark_bn254::Bn254;
 use ark_groth16::PreparedVerifyingKey;
-use move_binary_format::errors::Location;
 use move_core_types::{
     account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS,
     move_resource::MoveStructType,
@@ -35,77 +34,82 @@ macro_rules! value_deserialization_error {
 }
 
 fn get_resource_on_chain<T: MoveStructType + for<'a> Deserialize<'a>>(
-    resolver: &impl AptosMoveResolver,
+    executor_view: &impl ExecutorView,
     module_storage: &impl ModuleStorage,
 ) -> anyhow::Result<T, VMStatus> {
-    get_resource_on_chain_at_addr(&CORE_CODE_ADDRESS, resolver, module_storage)
+    get_resource_on_chain_at_addr(&CORE_CODE_ADDRESS, executor_view, module_storage)
 }
 
 fn get_resource_on_chain_at_addr<T: MoveStructType + for<'a> Deserialize<'a>>(
-    addr: &AccountAddress,
-    resolver: &impl AptosMoveResolver,
-    module_storage: &impl ModuleStorage,
+    _addr: &AccountAddress,
+    _executor_view: &impl ExecutorView,
+    _module_storage: &impl ModuleStorage,
 ) -> anyhow::Result<T, VMStatus> {
-    let struct_tag = T::struct_tag();
-    let metadata = module_storage
-        .fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
-        .map_err(|e| e.into_vm_status())?;
-    let bytes = resolver
-        .get_resource_bytes_with_metadata_and_layout(addr, &struct_tag, &metadata, None)
-        .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
-        .0
-        .ok_or_else(|| {
-            value_deserialization_error!(format!(
-                "get_resource failed on {}::{}::{}",
-                addr.to_hex_literal(),
-                T::struct_tag().module,
-                T::struct_tag().name
-            ))
-        })?;
-    let obj = bcs::from_bytes::<T>(&bytes).map_err(|_| {
-        value_deserialization_error!(format!(
-            "could not deserialize {}::{}::{}",
-            addr.to_hex_literal(),
-            T::struct_tag().module,
-            T::struct_tag().name
-        ))
-    })?;
-    Ok(obj)
+    unimplemented!()
+
+    // TODO: this should check if it is a group, and if so, resolve differently. We can fetch
+    //   via session API I think in a still compatible way.
+
+    // let struct_tag = T::struct_tag();
+    // let metadata = module_storage
+    //     .fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
+    //     .map_err(|e| e.into_vm_status())?;
+    // let bytes = executor_view
+    //     .get_resource_bytes_with_metadata_and_layout(addr, &struct_tag, &metadata, None)
+    //     .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
+    //     .0
+    //     .ok_or_else(|| {
+    //         value_deserialization_error!(format!(
+    //             "get_resource failed on {}::{}::{}",
+    //             addr.to_hex_literal(),
+    //             T::struct_tag().module,
+    //             T::struct_tag().name
+    //         ))
+    //     })?;
+    // let obj = bcs::from_bytes::<T>(&bytes).map_err(|_| {
+    //     value_deserialization_error!(format!(
+    //         "could not deserialize {}::{}::{}",
+    //         addr.to_hex_literal(),
+    //         T::struct_tag().module,
+    //         T::struct_tag().name
+    //     ))
+    // })?;
+    // Ok(obj)
 }
 
 fn get_current_time_onchain(
-    resolver: &impl AptosMoveResolver,
+    executor_view: &impl ExecutorView,
 ) -> anyhow::Result<CurrentTimeMicroseconds, VMStatus> {
-    CurrentTimeMicroseconds::fetch_config(resolver).ok_or_else(|| {
+    CurrentTimeMicroseconds::fetch_config(executor_view).ok_or_else(|| {
         value_deserialization_error!("could not fetch CurrentTimeMicroseconds on-chain config")
     })
 }
 
-fn get_jwks_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<PatchedJWKs, VMStatus> {
-    PatchedJWKs::fetch_config(resolver)
+fn get_jwks_onchain(executor_view: &impl ExecutorView) -> anyhow::Result<PatchedJWKs, VMStatus> {
+    PatchedJWKs::fetch_config(executor_view)
         .ok_or_else(|| value_deserialization_error!("could not deserialize PatchedJWKs"))
 }
 
 fn get_federated_jwks_onchain(
-    resolver: &impl AptosMoveResolver,
+    executor_view: &impl ExecutorView,
     jwk_addr: &AccountAddress,
     module_storage: &impl ModuleStorage,
 ) -> anyhow::Result<FederatedJWKs, VMStatus> {
-    get_resource_on_chain_at_addr::<FederatedJWKs>(jwk_addr, resolver, module_storage)
+    get_resource_on_chain_at_addr::<FederatedJWKs>(jwk_addr, executor_view, module_storage)
 }
 
 pub(crate) fn get_groth16_vk_onchain(
-    resolver: &impl AptosMoveResolver,
+    executor_view: &impl ExecutorView,
     module_storage: &impl ModuleStorage,
 ) -> anyhow::Result<Groth16VerificationKey, VMStatus> {
-    get_resource_on_chain::<Groth16VerificationKey>(resolver, module_storage)
+    get_resource_on_chain::<Groth16VerificationKey>(executor_view, module_storage)
 }
 
 fn get_configs_onchain(
-    resolver: &impl AptosMoveResolver,
+    executor_view: &impl ExecutorView,
     module_storage: &impl ModuleStorage,
 ) -> anyhow::Result<Configuration, VMStatus> {
-    get_resource_on_chain::<Configuration>(resolver, module_storage)
+    get_resource_on_chain::<Configuration>(executor_view, module_storage)
 }
 
 // Fetches a JWK from the PatchedJWKs dictionary (which maps each `iss` to its set of JWKs)
@@ -161,7 +165,7 @@ pub(crate) fn validate_authenticators(
     pvk: &Option<PreparedVerifyingKey<Bn254>>,
     authenticators: &Vec<(AnyKeylessPublicKey, KeylessSignature)>,
     features: &Features,
-    resolver: &impl AptosMoveResolver,
+    executor_view: &impl ExecutorView,
     module_storage: &impl ModuleStorage,
 ) -> Result<(), VMStatus> {
     let mut with_zk = false;
@@ -196,13 +200,13 @@ pub(crate) fn validate_authenticators(
         return Err(invalid_signature!("Groth16 VK has not been set on-chain"));
     }
 
-    let config = &get_configs_onchain(resolver, module_storage)?;
+    let config = &get_configs_onchain(executor_view, module_storage)?;
     if authenticators.len() > config.max_signatures_per_txn as usize {
         // println!("[aptos-vm][groth16] Too many keyless authenticators");
         return Err(invalid_signature!("Too many keyless authenticators"));
     }
 
-    let onchain_timestamp_obj = get_current_time_onchain(resolver)?;
+    let onchain_timestamp_obj = get_current_time_onchain(executor_view)?;
     // Check the expiry timestamp on all authenticators first to fail fast
     for (_, sig) in authenticators {
         sig.verify_expiry(onchain_timestamp_obj.microseconds)
@@ -213,7 +217,7 @@ pub(crate) fn validate_authenticators(
             })?;
     }
 
-    let patched_jwks = get_jwks_onchain(resolver)?;
+    let patched_jwks = get_jwks_onchain(executor_view)?;
 
     let training_wheels_pk = match &config.training_wheels_pubkey {
         None => None,
@@ -238,14 +242,17 @@ pub(crate) fn validate_authenticators(
                 match pk {
                     // 2.a: If this is a federated keyless account; look in `jwk_addr` for JWKs
                     AnyKeylessPublicKey::Federated(fed_pk) => {
-                        let federated_jwks =
-                            get_federated_jwks_onchain(resolver, &fed_pk.jwk_addr, module_storage)
-                                .map_err(|_| {
-                                    invalid_signature!(format!(
-                                        "Could not fetch federated PatchedJWKs at {}",
-                                        fed_pk.jwk_addr
-                                    ))
-                                })?;
+                        let federated_jwks = get_federated_jwks_onchain(
+                            executor_view,
+                            &fed_pk.jwk_addr,
+                            module_storage,
+                        )
+                        .map_err(|_| {
+                            invalid_signature!(format!(
+                                "Could not fetch federated PatchedJWKs at {}",
+                                fed_pk.jwk_addr
+                            ))
+                        })?;
                         // 2.a.i If not found in jwk_addr either, then we fail the validation.
                         get_jwk_for_authenticator(&federated_jwks.jwks, pk.inner_keyless_pk(), sig)?
                     },

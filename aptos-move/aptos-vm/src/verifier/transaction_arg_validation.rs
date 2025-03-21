@@ -6,12 +6,14 @@
 //! TODO: we should not only validate the types but also the actual values, e.g.
 //! for strings whether they consist of correct characters.
 
-use crate::{
-    aptos_vm::SerializedSigners,
-    move_vm_ext::{AptosMoveResolver, SessionExt},
-    VMStatus,
+use crate::{aptos_vm::SerializedSigners, data_cache_v2::Session, VMStatus};
+use aptos_table_natives::TableResolver;
+use aptos_vm_types::{
+    module_and_script_storage::{
+        code_storage::AptosCodeStorage, module_storage::AptosModuleStorage,
+    },
+    resolver::ExecutorView,
 };
-use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use move_binary_format::{
     errors::{Location, PartialVMError},
     file_format::FunctionDefinitionIndex,
@@ -106,9 +108,11 @@ pub(crate) fn get_allowed_structs(
 /// 3. check arg types are allowed after signers
 ///
 /// after validation, add senders and non-signer arguments to generate the final args
-pub(crate) fn validate_combine_signer_and_txn_args(
-    session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl AptosModuleStorage,
+pub(crate) fn validate_combine_signer_and_txn_args<
+    C: AptosCodeStorage,
+    T: ExecutorView + TableResolver,
+>(
+    session: &mut Session<'_, C, T>,
     serialized_signers: &SerializedSigners,
     args: Vec<Vec<u8>>,
     func: &LoadedFunction,
@@ -138,13 +142,17 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     }
 
     let allowed_structs = get_allowed_structs(are_struct_constructors_enabled);
-    let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
+    let ty_builder = &session
+        .code_storage()
+        .runtime_environment()
+        .vm_config()
+        .ty_builder;
 
     // Need to keep this here to ensure we return the historic correct error code for replay
     for ty in func.param_tys()[signer_param_cnt..].iter() {
         let subst_res = ty_builder.create_ty_with_subst(ty, func.ty_args());
         let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-        let valid = is_valid_txn_arg(module_storage, &ty, allowed_structs);
+        let valid = is_valid_txn_arg(session.code_storage(), &ty, allowed_structs);
         if !valid {
             return Err(VMStatus::error(
                 StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
@@ -177,7 +185,6 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     // FAILED_TO_DESERIALIZE_ARGUMENT error.
     let args = construct_args(
         session,
-        module_storage,
         &func.param_tys()[signer_param_cnt..],
         args,
         func.ty_args(),
@@ -231,9 +238,8 @@ pub(crate) fn is_valid_txn_arg(
 // Construct arguments. Walk through the arguments and according to the signature
 // construct arguments that require so.
 // TODO: This needs a more solid story and a tighter integration with the VM.
-pub(crate) fn construct_args(
-    session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl AptosModuleStorage,
+pub(crate) fn construct_args<C: AptosCodeStorage, T: ExecutorView + TableResolver>(
+    session: &mut Session<'_, C, T>,
     types: &[Type],
     args: Vec<Vec<u8>>,
     ty_args: &[Type],
@@ -247,19 +253,15 @@ pub(crate) fn construct_args(
         return Err(invalid_signature());
     }
 
-    let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
+    let ty_builder = &session
+        .code_storage()
+        .runtime_environment()
+        .vm_config()
+        .ty_builder;
     for (ty, arg) in types.iter().zip(args) {
         let subst_res = ty_builder.create_ty_with_subst(ty, ty_args);
         let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-        let arg = construct_arg(
-            session,
-            module_storage,
-            &ty,
-            allowed_structs,
-            arg,
-            &mut gas_meter,
-            is_view,
-        )?;
+        let arg = construct_arg(session, &ty, allowed_structs, arg, &mut gas_meter, is_view)?;
         res_args.push(arg);
     }
     Ok(res_args)
@@ -269,9 +271,8 @@ fn invalid_signature() -> VMStatus {
     VMStatus::error(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE, None)
 }
 
-fn construct_arg(
-    session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl AptosModuleStorage,
+fn construct_arg<C: AptosCodeStorage, T: ExecutorView + TableResolver>(
+    session: &mut Session<'_, C, T>,
     ty: &Type,
     allowed_structs: &ConstructorMap,
     arg: Vec<u8>,
@@ -288,7 +289,6 @@ fn construct_arg(
             let mut max_invocations = 10; // Read from config in the future
             recursively_construct_arg(
                 session,
-                module_storage,
                 ty,
                 allowed_structs,
                 &mut cursor,
@@ -325,9 +325,8 @@ fn construct_arg(
 // A Cursor is used to recursively walk the serialized arg manually and correctly. In effect we
 // are parsing the BCS serialized implicit constructor invocation tree, while serializing the
 // constructed types into the output parameter arg.
-pub(crate) fn recursively_construct_arg(
-    session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl AptosModuleStorage,
+pub(crate) fn recursively_construct_arg<C: AptosCodeStorage, T: ExecutorView + TableResolver>(
+    session: &mut Session<'_, C, T>,
     ty: &Type,
     allowed_structs: &ConstructorMap,
     cursor: &mut Cursor<&[u8]>,
@@ -346,7 +345,6 @@ pub(crate) fn recursively_construct_arg(
             while len > 0 {
                 recursively_construct_arg(
                     session,
-                    module_storage,
                     inner,
                     allowed_structs,
                     cursor,
@@ -359,7 +357,8 @@ pub(crate) fn recursively_construct_arg(
             }
         },
         Struct { .. } | StructInstantiation { .. } => {
-            let (module_id, identifier) = module_storage
+            let (module_id, identifier) = session
+                .code_storage()
                 .runtime_environment()
                 .get_struct_name(ty)
                 .map_err(|_| {
@@ -376,7 +375,6 @@ pub(crate) fn recursively_construct_arg(
             // of the argument.
             arg.append(&mut validate_and_construct(
                 session,
-                module_storage,
                 ty,
                 constructor,
                 allowed_structs,
@@ -403,9 +401,8 @@ pub(crate) fn recursively_construct_arg(
 // constructed value. This is the correct data to pass as the argument to a function taking
 // said struct as a parameter. In this function we execute the constructor constructing the
 // value and returning the BCS serialized representation.
-fn validate_and_construct(
-    session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl AptosModuleStorage,
+fn validate_and_construct<C: AptosCodeStorage, T: ExecutorView + TableResolver>(
+    session: &mut Session<'_, C, T>,
     expected_type: &Type,
     constructor: &FunctionId,
     allowed_structs: &ConstructorMap,
@@ -464,13 +461,19 @@ fn validate_and_construct(
         *max_invocations -= 1;
     }
 
-    let function = module_storage.load_function_with_type_arg_inference(
-        &constructor.module_id,
-        constructor.func_name,
-        expected_type,
-    )?;
+    let function = session
+        .code_storage()
+        .load_function_with_type_arg_inference(
+            &constructor.module_id,
+            constructor.func_name,
+            expected_type,
+        )?;
     let mut args = vec![];
-    let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
+    let ty_builder = &session
+        .code_storage()
+        .runtime_environment()
+        .vm_config()
+        .ty_builder;
     for param_ty in function.param_tys() {
         let mut arg = vec![];
         let arg_ty = ty_builder
@@ -479,7 +482,6 @@ fn validate_and_construct(
 
         recursively_construct_arg(
             session,
-            module_storage,
             &arg_ty,
             allowed_structs,
             cursor,
@@ -496,7 +498,6 @@ fn validate_and_construct(
         args,
         gas_meter,
         &mut TraversalContext::new(&storage),
-        module_storage,
     )?;
     let mut ret_vals = serialized_result.return_values;
     // We know ret_vals.len() == 1

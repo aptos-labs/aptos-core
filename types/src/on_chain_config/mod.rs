@@ -7,6 +7,7 @@ use crate::{
     account_config::CORE_CODE_ADDRESS,
     event::{EventHandle, EventKey},
     state_store::{state_key::StateKey, StateView},
+    vm::state_view_adapter::ExecutorViewAdapter,
 };
 use anyhow::{format_err, Result};
 use bytes::Bytes;
@@ -207,6 +208,15 @@ impl<S: StateView> ConfigStorage for S {
         self.get_state_value(state_key)
             .ok()?
             .map(|s| s.bytes().clone())
+    }
+}
+
+impl<'s, S> ConfigStorage for ExecutorViewAdapter<'s, S>
+where
+    S: StateView,
+{
+    fn fetch_config_bytes(&self, state_key: &StateKey) -> Option<Bytes> {
+        self.state_view().fetch_config_bytes(state_key)
     }
 }
 

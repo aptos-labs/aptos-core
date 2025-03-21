@@ -3332,6 +3332,33 @@ impl GlobalValueImpl {
             },
         }
     }
+
+    fn deep_copy(&self) -> PartialVMResult<Self> {
+        let copy_rc_ref_vec_val = |r: &Rc<RefCell<Vec<ValueImpl>>>| {
+            // TODO: this relies on the fact that global value cannot store references so these
+            //       can never be copied and so copy value can be re-used.
+            Ok(Rc::new(RefCell::new(
+                r.borrow()
+                    .iter()
+                    .map(|v| v.copy_value())
+                    .collect::<PartialVMResult<_>>()?,
+            )))
+        };
+
+        Ok(match self {
+            Self::None => Self::None,
+            Self::Fresh { fields } => {
+                let fields = copy_rc_ref_vec_val(fields)?;
+                Self::Fresh { fields }
+            },
+            Self::Cached { fields, status } => {
+                let fields = copy_rc_ref_vec_val(fields)?;
+                let status = Rc::new(RefCell::new(*status.borrow()));
+                Self::Cached { fields, status }
+            },
+            Self::Deleted => Self::Deleted,
+        })
+    }
 }
 
 impl GlobalValue {
@@ -3378,6 +3405,10 @@ impl GlobalValue {
 
     pub fn is_mutated(&self) -> bool {
         self.0.is_mutated()
+    }
+
+    pub fn deep_copy(&self) -> PartialVMResult<Self> {
+        Ok(Self(self.0.deep_copy()?))
     }
 }
 

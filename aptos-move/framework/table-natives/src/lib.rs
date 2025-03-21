@@ -117,6 +117,10 @@ impl<'a> NativeTableContext<'a> {
         }
     }
 
+    pub fn reset_txn_hash(&mut self, txn_hash: [u8; 32]) {
+        self.txn_hash = txn_hash;
+    }
+
     /// Computes the change set from a NativeTableContext.
     pub fn into_change_set(
         self,

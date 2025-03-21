@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aptos_vm::get_system_transaction_output,
+    data_cache_v2::Session,
     errors::expect_only_successful_execution,
-    move_vm_ext::{AptosMoveResolver, SessionId},
+    move_vm_ext::SessionId,
     system_module_names::{FINISH_WITH_DKG_RESULT, RECONFIGURATION_WITH_DKG_MODULE},
     validator_txns::dkg::{
         ExecutionFailure::{Expected, Unexpected},
@@ -14,13 +14,15 @@ use crate::{
 };
 use aptos_types::{
     dkg::{DKGState, DKGTrait, DKGTranscript, DefaultDKG},
+    fee_statement::FeeStatement,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{ConfigurationResource, OnChainConfig},
-    transaction::TransactionStatus,
+    transaction::{ExecutionStatus, TransactionStatus},
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
-    module_and_script_storage::module_storage::AptosModuleStorage, output::VMOutput,
+    module_and_script_storage::code_storage::AptosCodeStorage, module_write_set::ModuleWriteSet,
+    output::VMOutput, resolver::ExecutorView,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -51,14 +53,14 @@ enum ExecutionFailure {
 impl AptosVM {
     pub(crate) fn process_dkg_result(
         &self,
-        resolver: &impl AptosMoveResolver,
-        module_storage: &impl AptosModuleStorage,
+        executor_view: &impl ExecutorView,
+        module_storage: &impl AptosCodeStorage,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
         dkg_transcript: DKGTranscript,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         match self.process_dkg_result_inner(
-            resolver,
+            executor_view,
             module_storage,
             log_context,
             session_id,
@@ -78,15 +80,15 @@ impl AptosVM {
 
     fn process_dkg_result_inner(
         &self,
-        resolver: &impl AptosMoveResolver,
-        module_storage: &impl AptosModuleStorage,
+        executor_view: &impl ExecutorView,
+        module_storage: &impl AptosCodeStorage,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
         dkg_node: DKGTranscript,
     ) -> Result<(VMStatus, VMOutput), ExecutionFailure> {
-        let dkg_state = OnChainConfig::fetch_config(resolver)
+        let dkg_state = OnChainConfig::fetch_config(executor_view)
             .ok_or_else(|| Expected(MissingResourceDKGState))?;
-        let config_resource = ConfigurationResource::fetch_config(resolver)
+        let config_resource = ConfigurationResource::fetch_config(executor_view)
             .ok_or_else(|| Expected(MissingResourceConfiguration))?;
         let DKGState { in_progress, .. } = dkg_state;
         let in_progress_session_state =
@@ -108,8 +110,19 @@ impl AptosVM {
             .map_err(|_| Expected(TranscriptVerificationFailed))?;
 
         // All check passed, invoke VM to publish DKG result on chain.
-        let mut gas_meter = UnmeteredGasMeter;
-        let mut session = self.new_session(resolver, session_id, None);
+
+        let mut session = Session::new(
+            executor_view,
+            module_storage,
+            self.environment(),
+            session_id,
+            None,
+            self.storage_gas_params(log_context)
+                .map_err(Unexpected)?
+                .change_set_configs
+                .clone(),
+        );
+
         let args = vec![
             MoveValue::Signer(AccountAddress::ONE),
             dkg_node.transcript_bytes.as_move_value(),
@@ -122,24 +135,23 @@ impl AptosVM {
                 FINISH_WITH_DKG_RESULT,
                 vec![],
                 serialize_values(&args),
-                &mut gas_meter,
+                &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                module_storage,
             )
             .map_err(|e| {
                 expect_only_successful_execution(e, FINISH_WITH_DKG_RESULT.as_str(), log_context)
             })
             .map_err(|r| Unexpected(r.unwrap_err()))?;
 
-        let output = get_system_transaction_output(
-            session,
-            module_storage,
-            &self
-                .storage_gas_params(log_context)
-                .map_err(Unexpected)?
-                .change_set_configs,
-        )
-        .map_err(Unexpected)?;
+        let change_set = session
+            .finish()
+            .map_err(|err| Unexpected(err.into_vm_status()))?;
+        let output = VMOutput::new(
+            change_set,
+            ModuleWriteSet::empty(),
+            FeeStatement::zero(),
+            TransactionStatus::Keep(ExecutionStatus::Success),
+        );
 
         Ok((VMStatus::Executed, output))
     }

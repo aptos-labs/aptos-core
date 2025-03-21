@@ -3,8 +3,8 @@
 
 use crate::{
     aptos_vm::SerializedSigners,
+    data_cache_v2::Session,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
-    move_vm_ext::{AptosMoveResolver, SessionExt},
     system_module_names::{
         EMIT_FEE_STATEMENT, MULTISIG_ACCOUNT_MODULE, TRANSACTION_FEE_MODULE,
         VALIDATE_MULTISIG_TRANSACTION,
@@ -18,6 +18,9 @@ use aptos_types::{
     move_utils::as_move_value::AsMoveValue, on_chain_config::Features, transaction::Multisig,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
+use aptos_vm_types::{
+    module_and_script_storage::code_storage::AptosCodeStorage, resolver::ExecutorView,
+};
 use fail::fail_point;
 use move_binary_format::errors::VMResult;
 use move_core_types::{
@@ -28,9 +31,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
-use move_vm_runtime::{
-    logging::expect_no_verification_errors, module_traversal::TraversalContext, ModuleStorage,
-};
+use move_vm_runtime::{logging::expect_no_verification_errors, module_traversal::TraversalContext};
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 
@@ -91,9 +92,8 @@ impl TransactionValidation {
     }
 }
 
-pub(crate) fn run_script_prologue(
-    session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl ModuleStorage,
+pub(crate) fn run_script_prologue<C: AptosCodeStorage, T: ExecutorView>(
+    session: &mut Session<'_, C, T>,
     serialized_signers: &SerializedSigners,
     txn_data: &TransactionMetadata,
     features: &Features,
@@ -202,7 +202,6 @@ pub(crate) fn run_script_prologue(
                 serialized_args,
                 &mut gas_meter,
                 traversal_context,
-                module_storage,
             )
             .map(|_return_vals| ())
             .map_err(expect_no_verification_errors)
@@ -331,7 +330,6 @@ pub(crate) fn run_script_prologue(
                 serialize_values(&args),
                 &mut gas_meter,
                 traversal_context,
-                module_storage,
             )
             .map(|_return_vals| ())
             .map_err(expect_no_verification_errors)
@@ -344,9 +342,8 @@ pub(crate) fn run_script_prologue(
 /// 2. It has received enough approvals to meet the signature threshold of the multisig account
 /// 3. If only the payload hash was stored on chain, the provided payload in execution should
 /// match that hash.
-pub(crate) fn run_multisig_prologue(
-    session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl ModuleStorage,
+pub(crate) fn run_multisig_prologue<C: AptosCodeStorage, T: ExecutorView>(
+    session: &mut Session<'_, C, T>,
     txn_data: &TransactionMetadata,
     payload: &Multisig,
     features: &Features,
@@ -377,16 +374,14 @@ pub(crate) fn run_multisig_prologue(
             ]),
             &mut UnmeteredGasMeter,
             traversal_context,
-            module_storage,
         )
         .map(|_return_vals| ())
         .map_err(expect_no_verification_errors)
         .or_else(|err| convert_prologue_error(err, log_context))
 }
 
-fn run_epilogue(
-    session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl ModuleStorage,
+fn run_epilogue<C: AptosCodeStorage, T: ExecutorView>(
+    session: &mut Session<'_, C, T>,
     serialized_signers: &SerializedSigners,
     gas_remaining: Gas,
     fee_statement: FeeStatement,
@@ -425,7 +420,6 @@ fn run_epilogue(
             serialize_args,
             &mut UnmeteredGasMeter,
             traversal_context,
-            module_storage,
         )
     } else {
         // We can unconditionally do this as this condition can only be true if the prologue
@@ -468,7 +462,6 @@ fn run_epilogue(
                 serialize_values(&args),
                 &mut UnmeteredGasMeter,
                 traversal_context,
-                module_storage,
             )
         } else {
             // Regular tx, run the normal epilogue
@@ -504,7 +497,6 @@ fn run_epilogue(
                 serialize_values(&args),
                 &mut UnmeteredGasMeter,
                 traversal_context,
-                module_storage,
             )
         }
     }
@@ -512,7 +504,7 @@ fn run_epilogue(
 
     // Emit the FeeStatement event
     if features.is_emit_fee_statement_enabled() {
-        emit_fee_statement(session, module_storage, fee_statement, traversal_context)?;
+        emit_fee_statement(session, fee_statement, traversal_context)?;
     }
 
     maybe_raise_injected_error(InjectedError::EndOfRunEpilogue)?;
@@ -520,9 +512,8 @@ fn run_epilogue(
     Ok(())
 }
 
-fn emit_fee_statement(
-    session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl ModuleStorage,
+fn emit_fee_statement<C: AptosCodeStorage, T: ExecutorView>(
+    session: &mut Session<'_, C, T>,
     fee_statement: FeeStatement,
     traversal_context: &mut TraversalContext,
 ) -> VMResult<()> {
@@ -533,16 +524,14 @@ fn emit_fee_statement(
         vec![bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")],
         &mut UnmeteredGasMeter,
         traversal_context,
-        module_storage,
     )?;
     Ok(())
 }
 
 /// Run the epilogue of a transaction by calling into `EPILOGUE_NAME` function stored
 /// in the `ACCOUNT_MODULE` on chain.
-pub(crate) fn run_success_epilogue(
-    session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl ModuleStorage,
+pub(crate) fn run_success_epilogue<C: AptosCodeStorage, T: ExecutorView>(
+    session: &mut Session<'_, C, T>,
     serialized_signers: &SerializedSigners,
     gas_remaining: Gas,
     fee_statement: FeeStatement,
@@ -561,7 +550,6 @@ pub(crate) fn run_success_epilogue(
 
     run_epilogue(
         session,
-        module_storage,
         serialized_signers,
         gas_remaining,
         fee_statement,
@@ -575,9 +563,8 @@ pub(crate) fn run_success_epilogue(
 
 /// Run the failure epilogue of a transaction by calling into `USER_EPILOGUE_NAME` function
 /// stored in the `ACCOUNT_MODULE` on chain.
-pub(crate) fn run_failure_epilogue(
-    session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl ModuleStorage,
+pub(crate) fn run_failure_epilogue<C: AptosCodeStorage, T: ExecutorView>(
+    session: &mut Session<'_, C, T>,
     serialized_signers: &SerializedSigners,
     gas_remaining: Gas,
     fee_statement: FeeStatement,
@@ -589,7 +576,6 @@ pub(crate) fn run_failure_epilogue(
 ) -> Result<(), VMStatus> {
     run_epilogue(
         session,
-        module_storage,
         serialized_signers,
         gas_remaining,
         fee_statement,

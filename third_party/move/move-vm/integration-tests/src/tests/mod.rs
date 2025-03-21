@@ -9,7 +9,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
 };
 use move_vm_runtime::{
-    data_cache::TransactionDataCache,
+    data_cache::LegacyTransactionDataCache,
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
@@ -94,7 +94,7 @@ fn execute_function_for_test(
     MoveVM::execute_loaded_function(
         func,
         args,
-        &mut TransactionDataCache::empty(),
+        &mut LegacyTransactionDataCache::empty(),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
         &mut NativeContextExtensions::default(),
@@ -113,7 +113,7 @@ fn execute_script_impl(
     let traversal_storage = TraversalStorage::new();
 
     let function = code_storage.load_script(script, ty_args)?;
-    let mut data_cache = TransactionDataCache::empty();
+    let mut data_cache = LegacyTransactionDataCache::empty();
 
     MoveVM::execute_loaded_function(
         function,

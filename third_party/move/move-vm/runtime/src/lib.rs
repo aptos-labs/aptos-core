@@ -43,7 +43,10 @@ pub use storage::{
         unsync_code_storage::{AsUnsyncCodeStorage, UnsyncCodeStorage},
         unsync_module_storage::{AsUnsyncModuleStorage, BorrowedOrOwned, UnsyncModuleStorage},
     },
-    module_storage::{ambassador_impl_ModuleStorage, AsFunctionValueExtension, ModuleStorage},
+    module_storage::{
+        ambassador_impl_ModuleStorage, AsFunctionValueExtension, FunctionValueExtensionAdapter,
+        ModuleStorage,
+    },
     publishing::{StagingModuleStorage, VerifiedModuleBundle},
     ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
 };

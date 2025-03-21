@@ -60,6 +60,11 @@ impl NativeTransactionContext {
         }
     }
 
+    pub fn reset_txn_and_script_hashes(&mut self, txn_hash: Vec<u8>, script_hash: Vec<u8>) {
+        self.txn_hash = txn_hash;
+        self.script_hash = script_hash;
+    }
+
     pub fn chain_id(&self) -> u8 {
         self.chain_id
     }

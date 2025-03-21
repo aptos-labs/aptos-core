@@ -36,7 +36,7 @@ use move_stdlib::move_stdlib_named_addresses;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::{
     config::VMConfig,
-    data_cache::TransactionDataCache,
+    data_cache::LegacyTransactionDataCache,
     module_traversal::*,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
@@ -348,7 +348,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         };
         match self
             .storage
-            .get_resource_bytes_with_metadata_and_layout(&address, &tag, &[], None)
+            .get_resource_bytes_with_metadata_and_layout(&address, &tag, None)
             .unwrap()
             .0
         {
@@ -383,7 +383,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
         let traversal_storage = TraversalStorage::new();
         let mut extensions = NativeContextExtensions::default();
 
-        let mut data_cache = TransactionDataCache::empty();
+        let mut data_cache = LegacyTransactionDataCache::empty();
         let return_values = MoveVM::execute_loaded_function(
             function,
             args,

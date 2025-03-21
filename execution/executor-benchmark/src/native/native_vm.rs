@@ -58,7 +58,7 @@ use aptos_vm_types::{
     change_set::VMChangeSet,
     module_write_set::ModuleWriteSet,
     output::VMOutput,
-    resolver::{ExecutorView, ResourceGroupView},
+    resolver::ExecutorView,
     resource_group_adapter::group_size_as_sum,
 };
 use bytes::Bytes;
@@ -145,7 +145,7 @@ impl ExecutorTask for NativeVMExecutorTask {
     // execution, or speculatively as a part of a parallel execution.
     fn execute_transaction(
         &self,
-        executor_with_group_view: &(impl ExecutorView + ResourceGroupView),
+        executor_with_group_view: &impl ExecutorView,
         txn: &SignatureVerifiedTransaction,
         _txn_idx: TxnIndex,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
@@ -183,7 +183,7 @@ impl ExecutorTask for NativeVMExecutorTask {
 impl NativeVMExecutorTask {
     fn execute_transaction_impl(
         &self,
-        view: &(impl ExecutorView + ResourceGroupView),
+        view: &impl ExecutorView,
         txn: &SignatureVerifiedTransaction,
         gas_units: u64,
         fa_migration_complete: bool,
@@ -368,7 +368,7 @@ impl NativeVMExecutorTask {
 
     pub fn get_value<T: DeserializeOwned>(
         state_key: &StateKey,
-        view: &(impl ExecutorView + ResourceGroupView),
+        view: &impl ExecutorView,
     ) -> Result<Option<(T, StateValueMetadata)>, ()> {
         view.get_resource_state_value(state_key, None)
             .map_err(hide_error)?
@@ -382,7 +382,7 @@ impl NativeVMExecutorTask {
     pub fn get_value_from_group<T: DeserializeOwned>(
         group_key: &StateKey,
         resource_tag: &StructTag,
-        view: &(impl ExecutorView + ResourceGroupView),
+        view: &impl ExecutorView,
     ) -> Result<Option<T>, ()> {
         Self::get_value_from_group_with_layout(group_key, resource_tag, view, None)
     }
@@ -390,7 +390,7 @@ impl NativeVMExecutorTask {
     pub fn get_value_from_group_with_layout<T: DeserializeOwned>(
         group_key: &StateKey,
         resource_tag: &StructTag,
-        view: &(impl ExecutorView + ResourceGroupView),
+        view: &impl ExecutorView,
         maybe_layout: Option<&MoveTypeLayout>,
     ) -> Result<Option<T>, ()> {
         view.get_resource_from_group(group_key, resource_tag, maybe_layout)
@@ -404,7 +404,7 @@ impl NativeVMExecutorTask {
         &self,
         sender_address: AccountAddress,
         sequence_number: u64,
-        view: &(impl ExecutorView + ResourceGroupView),
+        view: &impl ExecutorView,
         resource_write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
     ) -> Result<(), ()> {
         let sender_account_key = self.db_util.new_state_key_account(&sender_address);
@@ -443,7 +443,7 @@ impl NativeVMExecutorTask {
         address: AccountAddress,
         fail_on_account_existing: bool,
         fail_on_account_missing: bool,
-        view: &(impl ExecutorView + ResourceGroupView),
+        view: &impl ExecutorView,
         resource_write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
     ) -> Result<(), ()> {
         let account_key = self.db_util.new_state_key_account(&address);
@@ -478,7 +478,7 @@ impl NativeVMExecutorTask {
         &self,
         fa_migration_complete: bool,
         gas: u64,
-        view: &(impl ExecutorView + ResourceGroupView),
+        view: &impl ExecutorView,
         resource_write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
         delayed_field_change_set: &mut BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
         aggregator_v1_delta_set: &mut BTreeMap<StateKey, DeltaOp>,
@@ -493,7 +493,7 @@ impl NativeVMExecutorTask {
     fn reduce_fa_apt_supply(
         &self,
         gas: u64,
-        view: &(impl ExecutorView + ResourceGroupView),
+        view: &impl ExecutorView,
         resource_write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
         delayed_field_change_set: &mut BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
     ) -> Result<(), ()> {
@@ -550,7 +550,7 @@ impl NativeVMExecutorTask {
     fn reduce_coin_apt_supply(
         &self,
         gas: u64,
-        view: &(impl ExecutorView + ResourceGroupView),
+        view: &impl ExecutorView,
         aggregator_v1_delta_set: &mut BTreeMap<StateKey, DeltaOp>,
     ) -> Result<(), ()> {
         let (sender_coin_store, _metadata) = Self::get_value::<CoinInfoResource<AptosCoinType>>(
@@ -574,7 +574,7 @@ impl NativeVMExecutorTask {
         fa_migration_complete: bool,
         sender: AccountAddress,
         amount: u64,
-        view: &(impl ExecutorView + ResourceGroupView),
+        view: &impl ExecutorView,
         gas: u64,
         resource_write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
         events: &mut Vec<(ContractEvent, Option<MoveTypeLayout>)>,
@@ -605,7 +605,7 @@ impl NativeVMExecutorTask {
         &self,
         sender_address: AccountAddress,
         transfer_amount: u64,
-        view: &(impl ExecutorView + ResourceGroupView),
+        view: &impl ExecutorView,
         gas: u64,
         resource_write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
         events: &mut Vec<(ContractEvent, Option<MoveTypeLayout>)>,
@@ -655,7 +655,7 @@ impl NativeVMExecutorTask {
         &self,
         sender_address: AccountAddress,
         transfer_amount: u64,
-        view: &(impl ExecutorView + ResourceGroupView),
+        view: &impl ExecutorView,
         gas: u64,
         resource_write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
         events: &mut Vec<(ContractEvent, Option<MoveTypeLayout>)>,
@@ -708,7 +708,7 @@ impl NativeVMExecutorTask {
         fa_migration_complete: bool,
         recipient_address: AccountAddress,
         transfer_amount: u64,
-        view: &(impl ExecutorView + ResourceGroupView),
+        view: &impl ExecutorView,
         resource_write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
         events: &mut Vec<(ContractEvent, Option<MoveTypeLayout>)>,
     ) -> Result<bool, ()> {
@@ -736,7 +736,7 @@ impl NativeVMExecutorTask {
         &self,
         recipient_address: AccountAddress,
         transfer_amount: u64,
-        view: &(impl ExecutorView + ResourceGroupView),
+        view: &impl ExecutorView,
         resource_write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
         events: &mut Vec<(ContractEvent, Option<MoveTypeLayout>)>,
     ) -> Result<bool, ()> {
@@ -800,7 +800,7 @@ impl NativeVMExecutorTask {
         &self,
         recipient_address: AccountAddress,
         transfer_amount: u64,
-        view: &(impl ExecutorView + ResourceGroupView),
+        view: &impl ExecutorView,
         resource_write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
         events: &mut Vec<(ContractEvent, Option<MoveTypeLayout>)>,
     ) -> Result<bool, ()> {
@@ -863,7 +863,7 @@ impl NativeVMExecutorTask {
         value: &T,
         group_key: &StateKey,
         resource_tag: StructTag,
-        view: &(impl ExecutorView + ResourceGroupView),
+        view: &impl ExecutorView,
     ) -> Result<AbstractResourceWriteOp, ()> {
         let metadata = view
             .get_resource_state_value_metadata(group_key)
@@ -886,7 +886,7 @@ impl NativeVMExecutorTask {
     fn create_resource_in_group_creation(
         group_key: &StateKey,
         resources: BTreeMap<StructTag, Vec<u8>>,
-        view: &(impl ExecutorView + ResourceGroupView),
+        view: &impl ExecutorView,
     ) -> Result<AbstractResourceWriteOp, ()> {
         let size = view.resource_group_size(group_key).map_err(hide_error)?;
         assert_eq!(size.get(), 0);

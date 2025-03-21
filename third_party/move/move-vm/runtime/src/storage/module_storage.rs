@@ -447,7 +447,7 @@ where
 /// Avoids the orphan rule to implement external [FunctionValueExtension] for any generic type that
 /// implements [ModuleStorage].
 pub struct FunctionValueExtensionAdapter<'a> {
-    pub(crate) module_storage: &'a dyn ModuleStorage,
+    pub module_storage: &'a dyn ModuleStorage,
 }
 
 pub trait AsFunctionValueExtension {

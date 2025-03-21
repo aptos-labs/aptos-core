@@ -1,10 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::resolver::{ResourceGroupSize, ResourceGroupView, TResourceGroupView, TResourceView};
+use crate::resolver::{ResourceGroupView, TResourceGroupView, TResourceView};
 use aptos_types::{
-    error::code_invariant_error, serde_helper::bcs_utils::bcs_size_of_byte_array,
+    error::code_invariant_error,
+    serde_helper::bcs_utils::bcs_size_of_byte_array,
     state_store::state_key::StateKey,
+    vm::resource_groups::{GroupSizeKind, ResourceGroupSize},
 };
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -15,34 +17,6 @@ use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
 };
-
-/// Corresponding to different gas features, methods for counting the 'size' of a
-/// resource group. None leads to 0, while AsBlob provides the group size as the
-/// size of the serialized blob of the BTreeMap corresponding to the group.
-/// For AsSum, the size is summed for each resource contained in the group (of
-/// the resource blob, and its corresponding tag, when serialized)
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub enum GroupSizeKind {
-    None,
-    AsBlob,
-    AsSum,
-}
-
-impl GroupSizeKind {
-    pub fn from_gas_feature_version(
-        gas_feature_version: u64,
-        resource_groups_split_in_vm_change_set_enabled: bool,
-    ) -> Self {
-        if resource_groups_split_in_vm_change_set_enabled {
-            GroupSizeKind::AsSum
-        } else if gas_feature_version >= 9 {
-            // Keep old caching behavior for replay.
-            GroupSizeKind::AsBlob
-        } else {
-            GroupSizeKind::None
-        }
-    }
-}
 
 pub fn group_tagged_resource_size<T: Serialize + Clone + Debug>(
     tag: &T,
@@ -154,10 +128,6 @@ impl<'r> ResourceGroupAdapter<'r> {
             group_size_kind,
             group_cache: RefCell::new(HashMap::new()),
         }
-    }
-
-    pub fn group_size_kind(&self) -> GroupSizeKind {
-        self.group_size_kind.clone()
     }
 
     // Ensures that the resource group at state_key is cached in self.group_cache. Ok(true)
@@ -376,9 +346,12 @@ pub fn check_size_and_existence_match(
 mod tests {
     use super::*;
     use crate::tests::utils::{mock_tag_0, mock_tag_1, mock_tag_2};
-    use aptos_types::state_store::{
-        errors::StateViewError, state_storage_usage::StateStorageUsage, state_value::StateValue,
-        TStateView,
+    use aptos_types::{
+        state_store::{
+            errors::StateViewError, state_storage_usage::StateStorageUsage,
+            state_value::StateValue, TStateView,
+        },
+        vm::state_view_adapter::ExecutorViewAdapter,
     };
     use claims::{assert_gt, assert_none, assert_ok_eq, assert_some, assert_some_eq};
     use std::cmp::max;
@@ -537,8 +510,8 @@ mod tests {
 
     #[test]
     fn load_to_cache() {
-        let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(None, &state_view, 3, false);
+        let executor_view = ExecutorViewAdapter::owned(MockStateView::new());
+        let adapter = ResourceGroupAdapter::new(None, &executor_view, 3, false);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::None);
 
         let key_1 = StateKey::raw(&[1]);
@@ -551,8 +524,8 @@ mod tests {
 
     #[test]
     fn test_get_resource_by_tag() {
-        let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(None, &state_view, 5, false);
+        let executor_view = ExecutorViewAdapter::owned(MockStateView::new());
+        let adapter = ResourceGroupAdapter::new(None, &executor_view, 5, false);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::None);
 
         let key_0 = StateKey::raw(&[0]);
@@ -579,7 +552,7 @@ mod tests {
             .get_resource_from_group(&key_2, &tag_1, None)
             .unwrap());
 
-        let key_1_blob = &state_view.group.get(&key_1).unwrap().blob;
+        let key_1_blob = &executor_view.state_view().group.get(&key_1).unwrap().blob;
 
         // Release the cache to test contents.
         let cache = adapter.release_group_cache().unwrap();
@@ -612,10 +585,10 @@ mod tests {
         gas_feature_version: u64,
         resource_groups_split_in_vm_change_set_enabled: bool,
     ) {
-        let state_view = MockStateView::new();
+        let executor_view = ExecutorViewAdapter::owned(MockStateView::new());
         let adapter = ResourceGroupAdapter::new(
             None,
-            &state_view,
+            &executor_view,
             gas_feature_version,
             resource_groups_split_in_vm_change_set_enabled,
         );
@@ -625,10 +598,24 @@ mod tests {
         let key_1 = StateKey::raw(&[1]);
         let key_2 = StateKey::raw(&[2]);
 
-        let key_0_blob_len =
-            ResourceGroupSize::Concrete(state_view.group.get(&key_0).unwrap().blob.len() as u64);
-        let key_1_blob_len =
-            ResourceGroupSize::Concrete(state_view.group.get(&key_1).unwrap().blob.len() as u64);
+        let key_0_blob_len = ResourceGroupSize::Concrete(
+            executor_view
+                .state_view()
+                .group
+                .get(&key_0)
+                .unwrap()
+                .blob
+                .len() as u64,
+        );
+        let key_1_blob_len = ResourceGroupSize::Concrete(
+            executor_view
+                .state_view()
+                .group
+                .get(&key_1)
+                .unwrap()
+                .blob
+                .len() as u64,
+        );
 
         assert_ok_eq!(adapter.resource_group_size(&key_1), key_1_blob_len);
 
@@ -654,25 +641,37 @@ mod tests {
     #[test]
     fn set_group_view_forwarding() {
         let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(Some(&state_view), &state_view, 12, true);
+        let executor_view = ExecutorViewAdapter::borrowed(&state_view);
+        let adapter = ResourceGroupAdapter::new(Some(&state_view), &executor_view, 12, true);
         assert_some!(adapter.maybe_resource_group_view);
         let adapter_with_forwarding =
-            ResourceGroupAdapter::new(Some(&adapter), &state_view, 12, true);
+            ResourceGroupAdapter::new(Some(&adapter), &executor_view, 12, true);
         assert_some!(adapter_with_forwarding.maybe_resource_group_view);
     }
 
     #[test]
     fn size_as_sum() {
         let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(Some(&state_view), &state_view, 12, true);
+        let executor_view = ExecutorViewAdapter::borrowed(&state_view);
+        let adapter = ResourceGroupAdapter::new(Some(&state_view), &executor_view, 12, true);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::AsSum);
 
         let key_0 = StateKey::raw(&[0]);
         let key_1 = StateKey::raw(&[1]);
         let key_2 = StateKey::raw(&[2]);
 
-        let key_0_size_as_sum = state_view.group.get(&key_0).unwrap().size_as_sum;
-        let key_1_size_as_sum = state_view.group.get(&key_1).unwrap().size_as_sum;
+        let key_0_size_as_sum = executor_view
+            .state_view()
+            .group
+            .get(&key_0)
+            .unwrap()
+            .size_as_sum;
+        let key_1_size_as_sum = executor_view
+            .state_view()
+            .group
+            .get(&key_1)
+            .unwrap()
+            .size_as_sum;
 
         assert_ok_eq!(adapter.resource_group_size(&key_1), key_1_size_as_sum);
 
@@ -688,7 +687,13 @@ mod tests {
         assert_eq!(adapter.group_cache.borrow().len(), 0);
 
         // Sanity check the size numbers, at the time of writing the test 1587.
-        let key_1_blob_size = state_view.group.get(&key_1).unwrap().blob.len() as u64;
+        let key_1_blob_size = executor_view
+            .state_view()
+            .group
+            .get(&key_1)
+            .unwrap()
+            .blob
+            .len() as u64;
         assert_eq!(
             key_1_size_as_sum.get(),
             key_1_blob_size,
@@ -703,8 +708,8 @@ mod tests {
 
     #[test]
     fn size_as_none() {
-        let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(None, &state_view, 8, false);
+        let executor_view = ExecutorViewAdapter::owned(MockStateView::new());
+        let adapter = ResourceGroupAdapter::new(None, &executor_view, 8, false);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::None);
 
         let key_0 = StateKey::raw(&[0]);
@@ -739,8 +744,8 @@ mod tests {
 
     #[test]
     fn exists_resource_in_group() {
-        let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(None, &state_view, 0, false);
+        let executor_view = ExecutorViewAdapter::owned(MockStateView::new());
+        let adapter = ResourceGroupAdapter::new(None, &executor_view, 0, false);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::None);
 
         let key_0 = StateKey::raw(&[0]);
@@ -770,8 +775,8 @@ mod tests {
 
     #[test]
     fn resource_size_in_group() {
-        let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(None, &state_view, 3, false);
+        let executor_view = ExecutorViewAdapter::owned(MockStateView::new());
+        let adapter = ResourceGroupAdapter::new(None, &executor_view, 3, false);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::None);
 
         let key_0 = StateKey::raw(&[0]);

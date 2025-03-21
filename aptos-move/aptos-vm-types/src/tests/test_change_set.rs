@@ -9,7 +9,6 @@ use crate::{
         VMChangeSet,
     },
     module_write_set::ModuleWriteSet,
-    resolver::ResourceGroupSize,
     tests::utils::{
         as_bytes, as_state_key, mock_add, mock_create, mock_create_with_layout, mock_delete,
         mock_delete_with_layout, mock_modify, mock_modify_with_layout, mock_tag_1, raw_metadata,
@@ -26,6 +25,7 @@ use aptos_types::{
     error::PanicError,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
     transaction::ChangeSet as StorageChangeSet,
+    vm::resource_groups::ResourceGroupSize,
     write_set::{WriteOp, WriteSetMut},
 };
 use bytes::Bytes;

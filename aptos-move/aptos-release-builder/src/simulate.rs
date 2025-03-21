@@ -40,9 +40,10 @@ use aptos_types::{
         StateView, StateViewResult as StateStoreResult, TStateView,
     },
     transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
+    vm::state_view_adapter::ExecutorViewAdapter,
     write_set::{TransactionWrite, WriteSet},
 };
-use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::SessionId, AptosVM};
+use aptos_vm::{data_cache_v2::Session, move_vm_ext::SessionId, AptosVM};
 use aptos_vm_environment::{
     environment::AptosEnvironment, prod_configs::aptos_prod_deserializer_config,
 };
@@ -459,20 +460,22 @@ fn add_script_execution_hash(
  **************************************************************************************************/
 fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<()> {
     let env = AptosEnvironment::new_with_injected_create_signer_for_gov_sim(&state_view);
-    let vm = AptosVM::new(&env, &state_view);
-    let resolver = state_view.as_move_resolver();
+    let executor_view = ExecutorViewAdapter::borrowed(&state_view);
     let module_storage = state_view.as_aptos_code_storage(&env);
 
-    let gas_schedule =
-        GasScheduleV2::fetch_config(&state_view).context("failed to fetch gas schedule v2")?;
-    let gas_feature_version = gas_schedule.feature_version;
-
     let change_set_configs =
-        ChangeSetConfigs::unlimited_at_gas_feature_version(gas_feature_version);
+        ChangeSetConfigs::unlimited_at_gas_feature_version(env.gas_feature_version());
+    let mut session = Session::new(
+        &executor_view,
+        &module_storage,
+        env.clone(),
+        SessionId::void(),
+        None,
+        change_set_configs,
+    );
 
     let traversal_storage = TraversalStorage::new();
-    let mut sess = vm.new_session(&resolver, SessionId::void(), None);
-    sess.execute_function_bypass_visibility(
+    session.execute_function_bypass_visibility(
         &MODULE_ID_APTOS_GOVERNANCE,
         IdentStr::new("force_end_epoch").unwrap(),
         vec![],
@@ -481,11 +484,10 @@ fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<(
             .unwrap()],
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
-        &module_storage,
     )?;
-    let mut change_set = sess.finish(&change_set_configs, &module_storage)?;
+    let mut change_set = session.finish()?;
 
-    change_set.try_materialize_aggregator_v1_delta_set(&resolver)?;
+    change_set.try_materialize_aggregator_v1_delta_set(&executor_view)?;
     let (write_set, _events) = change_set
         .try_combine_into_storage_change_set(ModuleWriteSet::empty())
         .expect("Failed to convert to storage ChangeSet")
@@ -611,9 +613,6 @@ pub async fn simulate_multistep_proposal(
         let vm = AptosVM::new(&env, &state_view);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
-        let resolver = state_view.as_move_resolver();
-        let code_storage = state_view.as_aptos_code_storage(&env);
-
         let txn = account
             .account()
             .transaction()
@@ -627,14 +626,16 @@ pub async fn simulate_multistep_proposal(
             .ttl(u64::MAX)
             .sign();
 
+        let executor_view = ExecutorViewAdapter::borrowed(&state_view);
+        let code_storage = state_view.as_aptos_code_storage(&env);
         let vm_output = if !profile_gas {
             let (_vm_status, vm_output) =
-                vm.execute_user_transaction(&resolver, &code_storage, &txn, &log_context);
+                vm.execute_user_transaction(&executor_view, &code_storage, &txn, &log_context);
             vm_output
         } else {
             let (_vm_status, vm_output, gas_profiler) = vm
                 .execute_user_transaction_with_modified_gas_meter(
-                    &resolver,
+                    &executor_view,
                     &code_storage,
                     &txn,
                     &log_context,
@@ -663,7 +664,7 @@ pub async fn simulate_multistep_proposal(
         );
 
         let txn_output = vm_output
-            .try_materialize_into_transaction_output(&resolver)
+            .try_materialize_into_transaction_output(&executor_view)
             .context("failed to materialize transaction output")?;
 
         let txn_status = txn_output.status();

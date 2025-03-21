@@ -14,6 +14,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
         StateView,
     },
+    vm::state_view_adapter::ExecutorViewAdapter,
     write_set::WriteOp,
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -110,7 +111,7 @@ pub trait AggregatorV1Resolver: TAggregatorV1View<Identifier = StateKey> {}
 
 impl<T> AggregatorV1Resolver for T where T: TAggregatorV1View<Identifier = StateKey> {}
 
-impl<S> TAggregatorV1View for S
+impl<'s, S> TAggregatorV1View for ExecutorViewAdapter<'s, S>
 where
     S: StateView,
 {
@@ -120,7 +121,7 @@ where
         &self,
         state_key: &Self::Identifier,
     ) -> PartialVMResult<Option<StateValue>> {
-        self.get_state_value(state_key).map_err(|e| {
+        self.state_view().get_state_value(state_key).map_err(|e| {
             PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
                 "Aggregator value not found for {:?}: {:?}",
                 state_key, e
@@ -214,7 +215,8 @@ impl<T> DelayedFieldResolver for T where
 {
 }
 
-impl<S> TDelayedFieldView for S
+// Delayed fields are only processed by Block-STM, and the trait should not be used by the adapter.
+impl<'s, S> TDelayedFieldView for ExecutorViewAdapter<'s, S>
 where
     S: StateView,
 {
@@ -226,7 +228,7 @@ where
         &self,
         _id: &Self::Identifier,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
-        unimplemented!("get_delayed_field_value not implemented")
+        unreachable!("Executor view adapter does not handle delayed fields")
     }
 
     fn delayed_field_try_add_delta_outcome(
@@ -236,24 +238,18 @@ where
         _delta: &SignedU128,
         _max_value: u128,
     ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
-        unimplemented!("delayed_field_try_add_delta_outcome not implemented")
+        unreachable!("Executor view adapter does not handle delayed fields")
     }
 
     /// Returns a unique per-block identifier that can be used when creating a
     /// new aggregator V2.
     fn generate_delayed_field_id(&self, _width: u32) -> Self::Identifier {
-        unimplemented!("generate_delayed_field_id not implemented")
+        unreachable!("Executor view adapter does not handle delayed fields")
     }
 
     fn validate_delayed_field_id(&self, _id: &Self::Identifier) -> Result<(), PanicError> {
-        unimplemented!()
+        unreachable!("Executor view adapter does not handle delayed fields")
     }
-
-    // get_reads_needing_exchange is local (looks at in-MVHashMap information only)
-    // and all failures are code invariant failures - so we return PanicError.
-    // get_group_reads_needing_exchange needs to additionally get the metadata of the
-    // whole group, which can additionally fail with speculative / storage errors,
-    // so we return PartialVMResult, to be able to distinguish/propagate those errors.
 
     fn get_reads_needing_exchange(
         &self,
@@ -263,7 +259,7 @@ where
         BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
         PanicError,
     > {
-        unimplemented!("get_reads_needing_exchange not implemented")
+        unreachable!("Executor view adapter does not handle delayed fields")
     }
 
     fn get_group_reads_needing_exchange(
@@ -271,6 +267,6 @@ where
         _delayed_write_set_ids: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
     ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
-        unimplemented!("get_group_reads_needing_exchange not implemented")
+        unreachable!("Executor view adapter does not handle delayed fields")
     }
 }

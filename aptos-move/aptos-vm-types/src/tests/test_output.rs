@@ -9,13 +9,15 @@ use crate::{
     },
 };
 use aptos_aggregator::delta_change_set::serialize;
-use aptos_language_e2e_tests::data_store::FakeDataStore;
 use aptos_types::{
-    state_store::state_key::StateKey, transaction::TransactionOutput, write_set::WriteOp,
+    state_store::{state_key::StateKey, state_value::StateValue, MockStateView},
+    transaction::TransactionOutput,
+    vm::state_view_adapter::ExecutorViewAdapter,
+    write_set::WriteOp,
 };
 use claims::{assert_err, assert_matches, assert_ok};
 use move_core_types::vm_status::{AbortLocation, VMStatus};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 fn assert_eq_outputs(vm_output: &VMOutput, txn_output: TransactionOutput) {
     let vm_output_writes = &vm_output
@@ -39,7 +41,7 @@ fn assert_eq_outputs(vm_output: &VMOutput, txn_output: TransactionOutput) {
 
 #[test]
 fn test_ok_output_equality_no_deltas() {
-    let state_view = FakeDataStore::default();
+    let executor_view = ExecutorViewAdapter::owned(MockStateView::empty());
     let vm_output = build_vm_output(
         vec![mock_create_with_layout("0", 0, None)],
         vec![mock_module_modify("1", 1)],
@@ -54,10 +56,10 @@ fn test_ok_output_equality_no_deltas() {
     //   3. `into_transaction_output_with_materialized_write_set` changes the type and
     //       simply merges writes for materialized deltas & combined groups.
     let mut materialized_vm_output = vm_output.clone();
-    assert_ok!(materialized_vm_output.try_materialize(&state_view));
+    assert_ok!(materialized_vm_output.try_materialize(&executor_view));
     let txn_output_1 = assert_ok!(vm_output
         .clone()
-        .try_materialize_into_transaction_output(&state_view));
+        .try_materialize_into_transaction_output(&executor_view));
     let txn_output_2 = assert_ok!(vm_output
         .clone()
         .into_transaction_output_with_materialized_write_set(vec![], vec![], vec![]));
@@ -72,9 +74,10 @@ fn test_ok_output_equality_no_deltas() {
 #[test]
 fn test_ok_output_equality_with_deltas() {
     let delta_key = "3";
-    let mut state_view = FakeDataStore::default();
-    state_view.set_legacy(as_state_key!(delta_key), serialize(&100));
-
+    let executor_view = ExecutorViewAdapter::owned(MockStateView::new(HashMap::from([(
+        as_state_key!(delta_key),
+        StateValue::new_legacy(serialize(&100).into()),
+    )])));
     let vm_output = build_vm_output(
         vec![mock_create_with_layout("0", 0, None)],
         vec![mock_module_modify("1", 1)],
@@ -84,10 +87,10 @@ fn test_ok_output_equality_with_deltas() {
     );
 
     let mut materialized_vm_output = vm_output.clone();
-    assert_ok!(materialized_vm_output.try_materialize(&state_view));
+    assert_ok!(materialized_vm_output.try_materialize(&executor_view));
     let txn_output_1 = assert_ok!(vm_output
         .clone()
-        .try_materialize_into_transaction_output(&state_view));
+        .try_materialize_into_transaction_output(&executor_view));
     let txn_output_2 = vm_output
         .clone()
         .into_transaction_output_with_materialized_write_set(
@@ -123,15 +126,17 @@ fn test_ok_output_equality_with_deltas() {
 #[test]
 fn test_err_output_equality_with_deltas() {
     let delta_key = "3";
-    let mut state_view = FakeDataStore::default();
-    state_view.set_legacy(as_state_key!(delta_key), serialize(&900));
-
+    let executor_view = ExecutorViewAdapter::owned(MockStateView::new(HashMap::from([(
+        as_state_key!(delta_key),
+        StateValue::new_legacy(serialize(&900).into()),
+    )])));
     let vm_output = build_vm_output(vec![], vec![], vec![], vec![], vec![mock_add(
         delta_key, 300,
     )]);
 
-    let vm_status_1 = assert_err!(vm_output.clone().try_materialize(&state_view));
-    let vm_status_2 = assert_err!(vm_output.try_materialize_into_transaction_output(&state_view));
+    let vm_status_1 = assert_err!(vm_output.clone().try_materialize(&executor_view));
+    let vm_status_2 =
+        assert_err!(vm_output.try_materialize_into_transaction_output(&executor_view));
 
     // Error should be consistent.
     assert_eq!(vm_status_1, vm_status_2);

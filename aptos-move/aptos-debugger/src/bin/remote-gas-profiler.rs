@@ -4,7 +4,7 @@
 use anyhow::{bail, Result};
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_rest_client::Client;
-use aptos_types::transaction::Transaction;
+use aptos_types::{transaction::Transaction, vm::state_view_adapter::ExecutorViewAdapter};
 use aptos_vm::AptosVM;
 use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
@@ -57,8 +57,8 @@ async fn main() -> Result<()> {
     let (_status, output, gas_log) =
         debugger.execute_transaction_at_version_with_gas_profiler(version, txn)?;
 
-    let txn_output =
-        output.try_materialize_into_transaction_output(&debugger.state_view_at_version(version))?;
+    let executor_view = ExecutorViewAdapter::owned(debugger.state_view_at_version(version));
+    let txn_output = output.try_materialize_into_transaction_output(&executor_view)?;
 
     // Show results to the user
     println!("{:#?}", txn_output);

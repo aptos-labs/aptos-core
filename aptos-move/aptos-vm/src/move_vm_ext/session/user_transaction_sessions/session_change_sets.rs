@@ -21,6 +21,7 @@ pub struct UserSessionChangeSet {
 }
 
 impl UserSessionChangeSet {
+    #[allow(dead_code)]
     pub(crate) fn new(
         change_set: VMChangeSet,
         module_write_set: ModuleWriteSet,
@@ -34,6 +35,7 @@ impl UserSessionChangeSet {
         Ok(user_session_change_set)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn unpack(self) -> (VMChangeSet, ModuleWriteSet) {
         (self.change_set, self.module_write_set)
     }
@@ -71,6 +73,7 @@ pub struct SystemSessionChangeSet {
 }
 
 impl SystemSessionChangeSet {
+    #[allow(dead_code)]
     pub(crate) fn new(
         change_set: VMChangeSet,
         change_set_configs: &ChangeSetConfigs,
@@ -80,12 +83,14 @@ impl SystemSessionChangeSet {
         Ok(system_session_change_set)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn empty() -> Self {
         Self {
             change_set: VMChangeSet::empty(),
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn unpack(self) -> VMChangeSet {
         self.change_set
     }

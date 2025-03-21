@@ -12,9 +12,10 @@ use crate::{
 use anyhow::{anyhow, bail};
 use aptos_types::{
     error::{code_invariant_error, PanicError},
+    vm::resource_groups::ResourceGroupSize,
     write_set::{TransactionWrite, WriteOpKind},
 };
-use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
+use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use claims::assert_some;
 use dashmap::DashMap;
 use move_core_types::value::MoveTypeLayout;

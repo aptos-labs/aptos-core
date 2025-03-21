@@ -5,8 +5,8 @@ use crate::common::types::{CliError, CliTypedResult};
 use aptos_crypto::HashValue;
 use aptos_gas_profiling::FrameName;
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
-use aptos_types::transaction::SignedTransaction;
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use aptos_types::{transaction::SignedTransaction, vm::state_view_adapter::ExecutorViewAdapter};
+use aptos_vm::AptosVM;
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
@@ -24,13 +24,13 @@ pub fn run_transaction_using_debugger(
     let state_view = debugger.state_view_at_version(version);
     let env = AptosEnvironment::new(&state_view);
     let vm = AptosVM::new(&env, &state_view);
-    let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
-    let resolver = state_view.as_move_resolver();
+    let executor_view = ExecutorViewAdapter::borrowed(&state_view);
     let code_storage = state_view.as_aptos_code_storage(&env);
 
+    let log_context = AdapterLogSchema::new(executor_view.id(), 0);
     let (vm_status, vm_output) =
-        vm.execute_user_transaction(&resolver, &code_storage, &transaction, &log_context);
+        vm.execute_user_transaction(&executor_view, &code_storage, &transaction, &log_context);
 
     Ok((vm_status, vm_output))
 }
@@ -44,12 +44,13 @@ pub fn benchmark_transaction_using_debugger(
     let state_view = debugger.state_view_at_version(version);
     let env = AptosEnvironment::new(&state_view);
     let vm = AptosVM::new(&env, &state_view);
-    let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
-    let resolver = state_view.as_move_resolver();
+    let executor_view = ExecutorViewAdapter::borrowed(&state_view);
     let code_storage = state_view.as_aptos_code_storage(&env);
+
+    let log_context = AdapterLogSchema::new(executor_view.id(), 0);
     let (vm_status, vm_output) =
-        vm.execute_user_transaction(&resolver, &code_storage, &transaction, &log_context);
+        vm.execute_user_transaction(&executor_view, &code_storage, &transaction, &log_context);
 
     let time_cold = {
         let n = 15;
@@ -60,11 +61,9 @@ pub fn benchmark_transaction_using_debugger(
             // total running time.
             let vm = AptosVM::new(&env, &state_view);
             let code_storage = state_view.as_aptos_code_storage(&env);
-            let log_context = AdapterLogSchema::new(state_view.id(), 0);
-
             let t1 = Instant::now();
             std::hint::black_box(vm.execute_user_transaction(
-                &resolver,
+                &executor_view,
                 &code_storage,
                 &transaction,
                 &log_context,
@@ -87,7 +86,7 @@ pub fn benchmark_transaction_using_debugger(
             // execution time.
             let t1 = Instant::now();
             std::hint::black_box(vm.execute_user_transaction(
-                &resolver,
+                &executor_view,
                 &code_storage,
                 &transaction,
                 &log_context,

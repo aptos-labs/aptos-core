@@ -17,7 +17,6 @@ use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
-    metadata::Metadata,
     value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
@@ -482,7 +481,6 @@ impl ResourceResolver for BogusModuleStorage {
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
-        _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<(Option<Bytes>, usize)> {
         unreachable!()
@@ -500,7 +498,6 @@ impl ResourceResolver for BogusResourceStorage {
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
-        _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<(Option<Bytes>, usize)> {
         Err(PartialVMError::new(self.bad_status_code))

@@ -17,6 +17,7 @@ use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue, StateView},
     transaction::signature_verified_transaction::SignatureVerifiedTransaction,
+    vm::state_view_adapter::ExecutorViewAdapter,
     write_set::TransactionWrite,
 };
 use aptos_vm::AptosVM;
@@ -263,12 +264,13 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                         OverlayedStateView::new_with_overlay(self.base_view, dependencies);
                     let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx);
 
+                    let executor_view = ExecutorViewAdapter::borrowed(&state_view);
                     let code_storage = state_view.as_aptos_code_storage(&env);
                     let vm_output = {
                         let _vm = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_vm"]);
                         vm.execute_single_transaction(
                             &transaction,
-                            &vm.as_move_resolver(&state_view),
+                            &executor_view,
                             &code_storage,
                             &log_context,
                         )

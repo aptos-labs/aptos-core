@@ -28,7 +28,7 @@ use move_core_types::{
 };
 use move_resource_viewer::MoveValueAnnotator;
 use move_vm_runtime::{
-    data_cache::TransactionDataCache,
+    data_cache::LegacyTransactionDataCache,
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
@@ -256,7 +256,7 @@ impl SharedTestingConfig {
         let mut gas_meter = factory.lock().unwrap().new_gas_meter();
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
-        let mut data_cache = TransactionDataCache::empty();
+        let mut data_cache = LegacyTransactionDataCache::empty();
 
         // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
 

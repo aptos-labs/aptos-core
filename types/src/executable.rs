@@ -3,6 +3,7 @@
 
 use crate::state_store::state_key::{inner::StateKeyInner, StateKey};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
+use move_table_extension::TableHandle;
 
 pub trait ModulePath {
     // TODO(loader_v2):
@@ -11,6 +12,10 @@ pub trait ModulePath {
     fn is_module_path(&self) -> bool;
 
     fn from_address_and_module_name(address: &AccountAddress, module_name: &IdentStr) -> Self;
+
+    fn from_table_handle_and_key(handle: &TableHandle, key: &[u8]) -> Self;
+
+    fn from_state_key(key: &StateKey) -> &Self;
 }
 
 impl ModulePath for StateKey {
@@ -20,5 +25,13 @@ impl ModulePath for StateKey {
 
     fn from_address_and_module_name(address: &AccountAddress, module_name: &IdentStr) -> Self {
         Self::module(address, module_name)
+    }
+
+    fn from_table_handle_and_key(handle: &TableHandle, key: &[u8]) -> Self {
+        Self::table_item(&(*handle).into(), key)
+    }
+
+    fn from_state_key(key: &StateKey) -> &Self {
+        key
     }
 }

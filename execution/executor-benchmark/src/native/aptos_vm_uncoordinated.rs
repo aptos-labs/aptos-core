@@ -15,6 +15,7 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         TransactionOutput,
     },
+    vm::state_view_adapter::ExecutorViewAdapter,
     vm_status::VMStatus,
 };
 use aptos_vm::{AptosVM, VMBlockExecutor};
@@ -53,17 +54,13 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
                     let log_context = AdapterLogSchema::new(state_view.id(), txn_idx);
                     let code_storage = state_view.as_aptos_code_storage(&env);
 
-                    vm.execute_single_transaction(
-                        txn,
-                        &vm.as_move_resolver(state_view),
-                        &code_storage,
-                        &log_context,
-                    )
-                    .map(|(_vm_status, vm_output)| {
-                        vm_output
-                            .try_materialize_into_transaction_output(state_view)
-                            .unwrap()
-                    })
+                    let executor_view = ExecutorViewAdapter::borrowed(state_view);
+                    vm.execute_single_transaction(txn, &executor_view, &code_storage, &log_context)
+                        .map(|(_vm_status, vm_output)| {
+                            vm_output
+                                .try_materialize_into_transaction_output(&executor_view)
+                                .unwrap()
+                        })
                 })
                 .collect::<Result<Vec<_>, _>>()
         })?;
