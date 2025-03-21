@@ -15,7 +15,7 @@ use std::{
     cell::RefCell,
     collections::{
         btree_map::Entry::{Occupied, Vacant},
-        {BTreeMap, BTreeSet},
+        BTreeMap, BTreeSet,
     },
     sync::{
         atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering},
@@ -57,9 +57,8 @@ pub(crate) struct AbortManager<'a> {
     invalidations: RefCell<BTreeMap<TxnIndex, Option<Incarnation>>>,
 }
 
-// TODO: test, put in SchedulerWrapper.
 impl<'a> AbortManager<'a> {
-    fn new(
+    pub(crate) fn new(
         owner_txn_idx: TxnIndex,
         owner_incarnation: Incarnation,
         scheduler: &'a SchedulerV2,
@@ -1706,6 +1705,7 @@ mod tests {
                         match scheduler.next_task().unwrap() {
                             TaskKind::Execute(txn_idx, incarnation) => {
                                 if mock_execution_time_us > 0 {
+                                    // TODO: emulate interrupt requested (invalidated).
                                     thread::sleep(Duration::from_micros(mock_execution_time_us));
                                 }
 

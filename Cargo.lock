@@ -2978,6 +2978,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-aggregator",
+ "aptos-infallible",
  "aptos-types",
  "aptos-vm-types",
  "bytes",
