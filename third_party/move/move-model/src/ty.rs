@@ -668,6 +668,11 @@ impl Constraint {
         result
     }
 
+    /// Returns the constraints which need to be satisfied for function parameters.
+    pub fn for_fun_parameter() -> Vec<Constraint> {
+        vec![Constraint::NoPhantom, Constraint::NoTuple]
+    }
+
     /// Returns the constraints which need to be satisfied for a local or
     /// parameter type.
     pub fn for_local() -> Vec<Constraint> {
