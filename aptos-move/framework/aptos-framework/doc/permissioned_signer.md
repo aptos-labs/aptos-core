@@ -610,6 +610,9 @@ Returns true if <code>s</code> is a permissioned signer.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_address_of">address_of</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <b>address</b> {
+    <b>if</b>(!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_permissioned_signer_enabled">features::is_permissioned_signer_enabled</a>()) {
+        <b>return</b> *<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_borrow_address">signer::borrow_address</a>(s);
+    };
     *<a href="permissioned_signer.md#0x1_permissioned_signer_borrow_address">borrow_address</a>(s)
 }
 </code></pre>
