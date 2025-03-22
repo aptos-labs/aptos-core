@@ -147,7 +147,9 @@ where
                 ));
                 Ok(None)
             },
-            ExecutionStatus::Abort(_err) => Ok(None),
+            ExecutionStatus::Abort(_err) => {
+                Ok(None)
+            }
             ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
                 Err(code_invariant_error(format!(
                     "[Execution] At txn {}, failed with DelayedFieldsCodeInvariantError: {:?}",
@@ -273,7 +275,13 @@ where
                     Some(KeyKind::Group(tags)) => tags,
                     Some(KeyKind::Resource) => {
                         return Err(code_invariant_error(format!(
-                            "Group key {:?} recorded as resource KeyKind",
+                            "Group key {:?} recorded as a Resource KeyKind",
+                            group_key,
+                        )));
+                    },
+                    Some(KeyKind::AggregatorV1) => {
+                        return Err(code_invariant_error(format!(
+                            "Group key {:?} recorded as an AggregatorV1 KeyKind",
                             group_key,
                         )));
                     },
@@ -382,7 +390,7 @@ where
         for (k, kind) in prev_modified_keys {
             use KeyKind::*;
             match kind {
-                Resource => versioned_cache.data().remove(&k, idx_to_execute),
+                Resource | AggregatorV1 => versioned_cache.data().remove(&k, idx_to_execute),
                 Group(tags) => {
                     // A change in state observable during speculative execution
                     // (which includes group metadata and size) changes, suffix
@@ -470,7 +478,7 @@ where
             for (k, kind) in keys {
                 use KeyKind::*;
                 match kind {
-                    Resource => versioned_cache.data().mark_estimate(&k, txn_idx),
+                    Resource | AggregatorV1 => versioned_cache.data().mark_estimate(&k, txn_idx),
                     Group(tags) => {
                         // Validation for both group size and metadata is based on values.
                         // Execution may wait for estimates.
@@ -1213,11 +1221,30 @@ where
                     let maybe_output =
                         Self::process_execution_result(&execution_result, &mut read_set, txn_idx)?;
 
-                    // TODO: Proper processing, piece-wise. resources, groups, aggregator V1..
+                    // TODO: BlockSTMv2: use estimates for delayed field reads? (see V1 update on abort).
+                    let mut resource_write_set = Vec::new();
 
-                    // TODO: BlockSTMv2: should we use estimates for delayed field reads?
-                    // (see V1 update on abort).
                     if let Some(output) = maybe_output {
+                        resource_write_set = output.resource_write_set();
+
+                        for (key, value, maybe_layout) in resource_write_set.clone().into_iter() {
+                            remove_from_previous_keys::<T>(
+                                &mut prev_modified_keys,
+                                &key,
+                                KeyKind::Resource,
+                            )?;
+
+                            abort_manager.invalidate_dependencies(
+                                versioned_cache.data().write_v2::<false>(
+                                    key,
+                                    txn_idx,
+                                    incarnation,
+                                    value,
+                                    maybe_layout,
+                                ),
+                            )?;
+                        }
+
                         Self::process_delayed_field_output(
                             output,
                             last_input_output,
@@ -1227,11 +1254,29 @@ where
                         )?;
                     }
 
+                    // Remove entries from previous write/delta set that were not overwritten.
+                    for (k, kind) in prev_modified_keys {
+                        use KeyKind::*;
+                        match kind {
+                            Resource => {
+                                abort_manager.invalidate_dependencies(
+                                    versioned_cache.data().remove_v2::<false>(&k, txn_idx)
+                                )?;
+                            },
+                            AggregatorV1 => {
+                                versioned_cache.data().remove(&k, txn_idx);
+                            },
+                            Group(_tags) => {
+                                // TODO: not implemented.
+                            },
+                        };
+                    }
+
                     last_input_output.record(
                         txn_idx,
                         read_set,
                         execution_result,
-                        Vec::new(), // TODO: proper resource write set arced.
+                        resource_write_set,
                         Vec::new(), // TODO: proper group_keys_and_tags.
                     );
 
@@ -1977,6 +2022,29 @@ where
             })
         } else {
             None
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn execute_block_parallel_test(
+        &self,
+        signature_verified_block: &TP,
+        base_view: &S,
+        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
+    ) -> Result<BlockOutput<E::Output>, ()> {
+        assert!(self.config.local.concurrency_level > 1);
+        if self.config.local.block_stm_v2 {
+            self.execute_transactions_parallel_v2(
+                signature_verified_block,
+                base_view,
+                module_cache_manager_guard,
+            )
+        } else {
+            self.execute_transactions_parallel(
+                signature_verified_block,
+                base_view,
+                module_cache_manager_guard,
+            )
         }
     }
 

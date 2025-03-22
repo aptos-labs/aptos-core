@@ -457,13 +457,14 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
         shared_counter: &'a AtomicU32,
         incarnation: Incarnation,
     ) -> Self {
+        let block_stm_v2 = shared_scheduler.is_v2();
         Self {
             versioned_map: shared_map,
             scheduler: shared_scheduler,
             start_counter: start_shared_counter,
             counter: shared_counter,
             incarnation,
-            captured_reads: RefCell::new(CapturedReads::new()),
+            captured_reads: RefCell::new(CapturedReads::new(block_stm_v2)),
         }
     }
 
@@ -1939,7 +1940,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new());
+        >::new(false));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2084,7 +2085,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new());
+        >::new(false));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2229,7 +2230,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new());
+        >::new(false));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2374,7 +2375,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new());
+        >::new(false));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
