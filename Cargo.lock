@@ -4503,10 +4503,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-utils"
-version = "0.1.0"
-
-[[package]]
 name = "aptos-validator-interface"
 version = "0.1.0"
 dependencies = [
@@ -4580,7 +4576,6 @@ dependencies = [
  "aptos-native-interface",
  "aptos-table-natives",
  "aptos-types",
- "aptos-utils",
  "aptos-vm-environment",
  "aptos-vm-logging",
  "aptos-vm-types",
