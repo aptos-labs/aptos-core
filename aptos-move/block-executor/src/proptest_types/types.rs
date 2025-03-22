@@ -620,21 +620,18 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
     >(
         self,
         universe: &[K],
-        // Are writes and reads module access (same access path).
-        module_access: (bool, bool),
     ) -> MockTransaction<KeyType<K>, E> {
-        let is_module_read = |_| -> bool { module_access.1 };
-        let is_module_write = |_| -> bool { module_access.0 };
+        // TODO(BlockSTMv2): different testing for modules.
+        let is_module_read = |_| -> bool { false };
+        let is_module_write = |_| -> bool { false };
         let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
-        // Module deletion isn't allowed.
-        let allow_deletes = !(module_access.0 || module_access.1);
 
         self.new_mock_write_txn(
             universe,
             &is_module_read,
             &is_module_write,
             &is_delta,
-            allow_deletes,
+            true,
         )
     }
 
@@ -788,36 +785,6 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             &is_module_write,
             &is_delta,
             allow_deletes,
-        )
-    }
-
-    pub(crate) fn materialize_disjoint_module_rw<
-        K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone + TransactionEvent,
-    >(
-        self,
-        universe: &[K],
-        // keys generated with indices from read_threshold to write_threshold will be
-        // treated as module access only in reads. keys generated with indices from
-        // write threshold to universe.len() will be treated as module access only in
-        // writes. This way there will be module accesses but no intersection.
-        read_threshold: usize,
-        write_threshold: usize,
-    ) -> MockTransaction<KeyType<K>, E> {
-        assert!(read_threshold < universe.len());
-        assert!(write_threshold > read_threshold);
-        assert!(write_threshold < universe.len());
-
-        let is_module_read = |i| -> bool { i >= read_threshold && i < write_threshold };
-        let is_module_write = |i| -> bool { i >= write_threshold };
-        let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
-
-        self.new_mock_write_txn(
-            universe,
-            &is_module_read,
-            &is_module_write,
-            &is_delta,
-            false, // Module deletion isn't allowed
         )
     }
 }
