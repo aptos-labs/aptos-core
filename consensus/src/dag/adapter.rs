@@ -100,7 +100,6 @@ pub(super) struct OrderedNotifierAdapter {
     epoch_state: Arc<EpochState>,
     ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
     block_ordered_ts: Arc<RwLock<BTreeMap<Round, Instant>>>,
-    allow_batches_without_pos_in_proposal: bool,
 }
 
 impl OrderedNotifierAdapter {
@@ -110,7 +109,6 @@ impl OrderedNotifierAdapter {
         epoch_state: Arc<EpochState>,
         parent_block_info: BlockInfo,
         ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
-        allow_batches_without_pos_in_proposal: bool,
     ) -> Self {
         Self {
             executor_channel,
@@ -119,7 +117,6 @@ impl OrderedNotifierAdapter {
             epoch_state,
             ledger_info_provider,
             block_ordered_ts: Arc::new(RwLock::new(BTreeMap::new())),
-            allow_batches_without_pos_in_proposal,
         }
     }
 
@@ -149,10 +146,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         let timestamp = anchor.metadata().timestamp();
         let author = *anchor.author();
         let mut validator_txns = vec![];
-        let mut payload = Payload::empty(
-            !anchor.payload().is_direct(),
-            self.allow_batches_without_pos_in_proposal,
-        );
+        let mut payload = Payload::empty(!anchor.payload().is_direct());
         let mut node_digests = vec![];
         for node in &ordered_nodes {
             validator_txns.extend(node.validator_txns().clone());
