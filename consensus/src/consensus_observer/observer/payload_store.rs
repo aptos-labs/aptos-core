@@ -13,7 +13,7 @@ use aptos_config::config::ConsensusObserverConfig;
 use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
 use aptos_infallible::Mutex;
 use aptos_logger::{error, warn};
-use aptos_types::epoch_state::EpochState;
+use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     sync::Arc,
@@ -108,14 +108,42 @@ impl BlockPayloadStore {
             .insert(epoch_and_round, payload_status);
     }
 
-    /// Removes all blocks up to the specified epoch and round (inclusive)
-    pub fn remove_blocks_for_epoch_round(&self, epoch: u64, round: Round) {
+    /// Removes the block payloads for the given commit ledger info. If
+    /// the execution pool window size is None, all payloads up to (and
+    /// including) the epoch and round of the commit will be removed.
+    /// Otherwise, a buffer of payloads preceding the commit will be retained
+    /// (to ensure we have enough payloads to satisfy the execution window).
+    pub fn remove_block_payloads_for_commit(
+        &mut self,
+        commit_ledger_info: &LedgerInfoWithSignatures,
+        execution_pool_window_size: Option<u64>,
+    ) {
+        // Determine the epoch to split off (execution pool doesn't buffer across epochs)
+        let split_off_epoch = commit_ledger_info.ledger_info().epoch();
+
         // Determine the round to split off
-        let split_off_round = round.saturating_add(1);
+        let commit_round = commit_ledger_info.ledger_info().round();
+        let split_off_round = if let Some(window_size) = execution_pool_window_size {
+            let window_buffer_multiplier = self
+                .consensus_observer_config
+                .observer_block_window_buffer_multiplier;
+            let window_buffer_size = window_size * window_buffer_multiplier;
+            if commit_round < window_buffer_size {
+                0 // Clear everything from previous epochs
+            } else {
+                // Retain all payloads in the window buffer
+                commit_round
+                    .saturating_sub(window_buffer_size)
+                    .saturating_add(1)
+            }
+        } else {
+            // Execution pool is disabled. Remove everything up to (and including) the commit round.
+            commit_round.saturating_add(1)
+        };
 
         // Remove the blocks from the payload store
         let mut block_payloads = self.block_payloads.lock();
-        *block_payloads = block_payloads.split_off(&(epoch, split_off_round));
+        *block_payloads = block_payloads.split_off(&(split_off_epoch, split_off_round));
     }
 
     /// Updates the metrics for the payload store
@@ -326,7 +354,13 @@ mod test {
         assert!(block_payload_store.all_payloads_exist(subset_verified_blocks));
 
         // Remove some of the payloads from the block payload store
-        remove_committed_blocks(&mut block_payload_store, subset_verified_blocks);
+        for block in subset_verified_blocks {
+            block_payload_store
+                .block_payloads
+                .lock()
+                .remove(&(block.epoch(), block.round()))
+                .unwrap();
+        }
 
         // Check that the payloads no longer exist in the block payload store
         assert!(!block_payload_store.all_payloads_exist(subset_verified_blocks));
@@ -336,7 +370,13 @@ mod test {
         assert!(block_payload_store.all_payloads_exist(subset_verified_blocks));
 
         // Remove the remaining payloads from the block payload store
-        remove_committed_blocks(&mut block_payload_store, subset_verified_blocks);
+        for block in subset_verified_blocks {
+            block_payload_store
+                .block_payloads
+                .lock()
+                .remove(&(block.epoch(), block.round()))
+                .unwrap();
+        }
 
         // Check that the payloads no longer exist in the block payload store
         assert!(!block_payload_store.all_payloads_exist(subset_verified_blocks));
@@ -556,7 +596,269 @@ mod test {
     }
 
     #[test]
-    fn test_remove_blocks_for_epoch_round_verified() {
+    fn test_remove_payloads_for_commit_execution_pool() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let observer_block_window_buffer_multiplier = 2; // Buffer twice the window
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            observer_block_window_buffer_multiplier,
+            ..ConsensusObserverConfig::default()
+        };
+
+        // Create a new block payload store
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
+
+        // Add some verified blocks to the payload store for the current epoch
+        let current_epoch = 10;
+        let num_blocks_in_store = 50;
+        let verified_blocks = create_and_add_blocks_to_store(
+            &mut block_payload_store,
+            num_blocks_in_store,
+            current_epoch,
+            true,
+        );
+
+        // Process commits for rounds less than the buffer (i.e., < window * 2)
+        let window_size = 7;
+        let buffer_size = window_size * (observer_block_window_buffer_multiplier as usize);
+        for commit_round in 0..buffer_size {
+            // Process a commit for the verified block
+            let verified_block = verified_blocks.get(commit_round).unwrap();
+            let commit_ledger_info = create_ledger_info_for_block(verified_block);
+            block_payload_store
+                .remove_block_payloads_for_commit(&commit_ledger_info, Some(window_size as u64));
+
+            // Verify the block payload was not removed (it's within the window)
+            verify_contains_payload(&block_payload_store, verified_block.clone(), true);
+        }
+
+        // Verify that no payloads were removed
+        check_num_total_payloads(&block_payload_store, num_blocks_in_store);
+
+        // Process a commit for a round one greater than the buffer
+        let commit_round = buffer_size;
+        let verified_block = verified_blocks.get(commit_round).unwrap();
+        let commit_ledger_info = create_ledger_info_for_block(verified_block);
+        block_payload_store
+            .remove_block_payloads_for_commit(&commit_ledger_info, Some(window_size as u64));
+
+        // Verify the first payload was removed (it's outside the window)
+        verify_contains_payload(&block_payload_store, verified_blocks[0].clone(), false);
+        check_num_total_payloads(&block_payload_store, num_blocks_in_store - 1);
+
+        // Process a commit for the last round
+        let commit_round = num_blocks_in_store - 1;
+        let verified_block = verified_blocks.get(commit_round).unwrap();
+        let commit_ledger_info = create_ledger_info_for_block(verified_block);
+        block_payload_store
+            .remove_block_payloads_for_commit(&commit_ledger_info, Some(window_size as u64));
+
+        // Verify that all payloads before the buffer were removed
+        let buffer_start_round = commit_round - buffer_size + 1;
+        for removed_round in 0..buffer_start_round {
+            let verified_block = verified_blocks.get(removed_round).unwrap();
+            verify_contains_payload(&block_payload_store, verified_block.clone(), false);
+        }
+
+        // Verify that all payloads after the buffer start were retained
+        for retained_round in buffer_start_round..num_blocks_in_store {
+            let verified_block = verified_blocks.get(retained_round).unwrap();
+            verify_contains_payload(&block_payload_store, verified_block.clone(), true);
+        }
+
+        // Verify that only the payloads in the buffer were retained
+        check_num_total_payloads(&block_payload_store, buffer_size);
+    }
+
+    #[test]
+    fn test_remove_payloads_for_commit_execution_pool_epoch() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 300;
+        let observer_block_window_buffer_multiplier = 3; // Buffer three times the window
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            observer_block_window_buffer_multiplier,
+            ..ConsensusObserverConfig::default()
+        };
+
+        // Create a new block payload store
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
+
+        // Add some verified blocks to the payload store for the current epoch
+        let current_epoch = 15;
+        let num_verified_blocks = 50;
+        let verified_blocks = create_and_add_blocks_to_store(
+            &mut block_payload_store,
+            num_verified_blocks,
+            current_epoch,
+            true,
+        );
+
+        // Add some unverified blocks to the payload store for the next epoch
+        let next_epoch = current_epoch + 1;
+        let num_unverified_blocks_next_epoch = 60;
+        let unverified_blocks_next_epoch = create_and_add_blocks_to_store(
+            &mut block_payload_store,
+            num_unverified_blocks_next_epoch,
+            next_epoch,
+            false,
+        );
+
+        // Add some unverified blocks to the payload store for a future epoch
+        let future_epoch = next_epoch + 1;
+        let num_unverified_blocks_future_epoch = 70;
+        let unverified_blocks_future_epoch = create_and_add_blocks_to_store(
+            &mut block_payload_store,
+            num_unverified_blocks_future_epoch,
+            future_epoch,
+            false,
+        );
+
+        // Verify the number of payloads (and types)
+        check_num_verified_payloads(&block_payload_store, num_verified_blocks);
+        check_num_unverified_payloads(
+            &block_payload_store,
+            num_unverified_blocks_next_epoch + num_unverified_blocks_future_epoch,
+        );
+
+        // Process commits for rounds less than the buffer in the next epoch (i.e., < window * 3)
+        let window_size = 8;
+        let buffer_size = window_size * (observer_block_window_buffer_multiplier as usize);
+        for commit_round in 0..buffer_size {
+            // Process a commit for the unverified block in the next epoch
+            let unverified_block = unverified_blocks_next_epoch.get(commit_round).unwrap();
+            let commit_ledger_info = create_ledger_info_for_block(unverified_block);
+            block_payload_store
+                .remove_block_payloads_for_commit(&commit_ledger_info, Some(window_size as u64));
+
+            // Verify the block payload was not removed (it's within the window)
+            verify_contains_payload(&block_payload_store, unverified_block.clone(), true);
+        }
+
+        // Verify the verified blocks for the previous epoch were all removed
+        for verified_block in &verified_blocks {
+            verify_contains_payload(&block_payload_store, verified_block.clone(), false);
+        }
+        check_num_verified_payloads(&block_payload_store, 0);
+
+        // Process a commit for the last round in the next epoch
+        let commit_round = num_unverified_blocks_next_epoch - 1;
+        let unverified_block = unverified_blocks_next_epoch.get(commit_round).unwrap();
+        let commit_ledger_info = create_ledger_info_for_block(unverified_block);
+        block_payload_store
+            .remove_block_payloads_for_commit(&commit_ledger_info, Some(window_size as u64));
+
+        // Verify that all payloads before the buffer were removed
+        let buffer_start_round = commit_round - buffer_size + 1;
+        for removed_round in 0..buffer_start_round {
+            let unverified_block = unverified_blocks_next_epoch.get(removed_round).unwrap();
+            verify_contains_payload(&block_payload_store, unverified_block.clone(), false);
+        }
+
+        // Verify that all payloads after the buffer start were retained
+        for retained_round in buffer_start_round..num_unverified_blocks_next_epoch {
+            let unverified_block = unverified_blocks_next_epoch.get(retained_round).unwrap();
+            verify_contains_payload(&block_payload_store, unverified_block.clone(), true);
+        }
+
+        // Verify the number of payloads
+        check_num_total_payloads(
+            &block_payload_store,
+            buffer_size + num_unverified_blocks_future_epoch,
+        );
+
+        // Process a commit for the first round in the future epoch
+        let unverified_block = unverified_blocks_future_epoch.first().unwrap();
+        let commit_ledger_info = create_ledger_info_for_block(unverified_block);
+        block_payload_store
+            .remove_block_payloads_for_commit(&commit_ledger_info, Some(window_size as u64));
+
+        // Verify that all payloads in the next epoch were removed
+        for unverified_block in &unverified_blocks_next_epoch {
+            verify_contains_payload(&block_payload_store, unverified_block.clone(), false);
+        }
+
+        // Verify that all payloads in the future epoch were retained
+        for unverified_block in &unverified_blocks_future_epoch {
+            verify_contains_payload(&block_payload_store, unverified_block.clone(), true);
+        }
+
+        // Verify the number of payloads
+        check_num_total_payloads(&block_payload_store, num_unverified_blocks_future_epoch);
+    }
+
+    #[test]
+    fn test_remove_blocks_for_commit_execution_pool_windows() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let observer_block_window_buffer_multiplier = 1; // Buffer the exact window size
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            observer_block_window_buffer_multiplier,
+            ..ConsensusObserverConfig::default()
+        };
+
+        // Test various window pool sizes
+        for window_size in 1..11 {
+            // Create a new block payload store
+            let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
+
+            // Add some verified blocks to the payload store for the current epoch
+            let current_epoch = 10;
+            let num_payloads_in_store = 50;
+            let verified_blocks = create_and_add_blocks_to_store(
+                &mut block_payload_store,
+                num_payloads_in_store,
+                current_epoch,
+                true,
+            );
+
+            // Process commits for rounds less than the buffer (i.e., < window)
+            for commit_round in 0..window_size {
+                // Process a commit for the verified block
+                let verified_block = verified_blocks.get(commit_round).unwrap();
+                let commit_ledger_info = create_ledger_info_for_block(verified_block);
+                block_payload_store.remove_block_payloads_for_commit(
+                    &commit_ledger_info,
+                    Some(window_size as u64),
+                );
+
+                // Verify the block payload was not removed (it's within the window)
+                verify_contains_payload(&block_payload_store, verified_block.clone(), true);
+            }
+
+            // Verify that no payloads were removed
+            check_num_total_payloads(&block_payload_store, num_payloads_in_store);
+
+            // Process commits for rounds greater than the buffer (i.e., >= window)
+            for commit_round in window_size..num_payloads_in_store {
+                // Process a commit for the verified block
+                let verified_block = verified_blocks.get(commit_round).unwrap();
+                let commit_ledger_info = create_ledger_info_for_block(verified_block);
+                block_payload_store.remove_block_payloads_for_commit(
+                    &commit_ledger_info,
+                    Some(window_size as u64),
+                );
+
+                // Verify that all blocks before the window were removed
+                let window_start_round = commit_round - window_size + 1;
+                for removed_round in 0..window_start_round {
+                    let verified_block = verified_blocks.get(removed_round).unwrap();
+                    verify_contains_payload(&block_payload_store, verified_block.clone(), false);
+                }
+
+                // Verify that all blocks after the window start were retained
+                for retained_round in window_start_round..num_payloads_in_store {
+                    let verified_block = verified_blocks.get(retained_round).unwrap();
+                    verify_contains_payload(&block_payload_store, verified_block.clone(), true);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_remove_payloads_for_commit_verified() {
         // Create a new consensus observer config
         let max_num_pending_blocks = 100;
         let consensus_observer_config = ConsensusObserverConfig {
@@ -577,23 +879,34 @@ mod test {
             true,
         );
 
-        // Remove all the blocks for the given epoch and round
-        block_payload_store.remove_blocks_for_epoch_round(current_epoch, 49);
+        // Create a commit ledger info for the 50th block in the store
+        let commit_block_number = 50;
+        let verified_ordered_block = verified_blocks.get(commit_block_number - 1).unwrap();
+        let commit_ledger_info = create_ledger_info_for_block(verified_ordered_block);
+
+        // Remove the block payloads for the commit (with execution pool disabled)
+        block_payload_store.remove_block_payloads_for_commit(&commit_ledger_info, None);
 
         // Check that the block payload store no longer contains the removed blocks
         let block_payloads = block_payload_store.get_block_payloads();
-        for verified_block in verified_blocks.iter().take(50) {
+        for verified_block in verified_blocks.iter().take(commit_block_number) {
             assert!(!block_payloads
                 .lock()
                 .contains_key(&(verified_block.epoch(), verified_block.round())));
         }
 
         // Verify the number of blocks in the block payload store
-        check_num_verified_payloads(&block_payload_store, num_blocks_in_store - 50);
+        check_num_verified_payloads(
+            &block_payload_store,
+            num_blocks_in_store - commit_block_number,
+        );
 
-        // Remove all the blocks for the given epoch and round
-        block_payload_store
-            .remove_blocks_for_epoch_round(current_epoch, num_blocks_in_store as Round);
+        // Create a commit ledger info for the last block in the store
+        let verified_ordered_block = verified_blocks.get(num_blocks_in_store - 1).unwrap();
+        let commit_ledger_info = create_ledger_info_for_block(verified_ordered_block);
+
+        // Remove the block payloads for the commit (with execution pool disabled)
+        block_payload_store.remove_block_payloads_for_commit(&commit_ledger_info, None);
 
         // Check that the block payload store no longer contains any blocks
         let block_payloads = block_payload_store.get_block_payloads();
@@ -611,16 +924,18 @@ mod test {
             true,
         );
 
-        // Remove all the blocks for the future epoch and round
-        let future_epoch = next_epoch + 1;
-        block_payload_store.remove_blocks_for_epoch_round(future_epoch, 0);
+        // Create a commit ledger info for a future epoch and round
+        let commit_ledger_info = create_empty_ledger_info(next_epoch + 1);
+
+        // Remove the block payloads for the commit (with execution pool disabled)
+        block_payload_store.remove_block_payloads_for_commit(&commit_ledger_info, None);
 
         // Verify the store is now empty
         check_num_verified_payloads(&block_payload_store, 0);
     }
 
     #[test]
-    fn test_remove_blocks_for_epoch_round_unverified() {
+    fn test_remove_payloads_for_commit_unverified() {
         // Create a new consensus observer config
         let max_num_pending_blocks = 100;
         let consensus_observer_config = ConsensusObserverConfig {
@@ -641,11 +956,16 @@ mod test {
             false,
         );
 
-        // Remove all the blocks for the given epoch and round
-        block_payload_store.remove_blocks_for_epoch_round(current_epoch, 49);
+        // Create a commit ledger info for the 50th block in the store
+        let commit_block_number = 50;
+        let unverified_ordered_block = unverified_blocks.get(commit_block_number - 1).unwrap();
+        let commit_ledger_info = create_ledger_info_for_block(unverified_ordered_block);
+
+        // Remove the block payloads for the commit (with execution pool disabled)
+        block_payload_store.remove_block_payloads_for_commit(&commit_ledger_info, None);
 
         // Check that the block payload store no longer contains the removed blocks
-        for unverified_block in unverified_blocks.iter().take(50) {
+        for unverified_block in unverified_blocks.iter().take(commit_block_number) {
             assert!(!block_payload_store
                 .block_payloads
                 .lock()
@@ -653,11 +973,17 @@ mod test {
         }
 
         // Verify the number of blocks in the block payload store
-        check_num_unverified_payloads(&block_payload_store, num_blocks_in_store - 50);
+        check_num_unverified_payloads(
+            &block_payload_store,
+            num_blocks_in_store - commit_block_number,
+        );
 
-        // Remove all the blocks for the given epoch and round
-        block_payload_store
-            .remove_blocks_for_epoch_round(current_epoch, num_blocks_in_store as Round);
+        // Create a commit ledger info for the last block in the store
+        let unverified_ordered_block = unverified_blocks.get(num_blocks_in_store - 1).unwrap();
+        let commit_ledger_info = create_ledger_info_for_block(unverified_ordered_block);
+
+        // Remove the block payloads for the commit (with execution pool disabled)
+        block_payload_store.remove_block_payloads_for_commit(&commit_ledger_info, None);
 
         // Check that the block payload store no longer contains any blocks
         assert!(block_payload_store.block_payloads.lock().is_empty());
@@ -674,166 +1000,13 @@ mod test {
             false,
         );
 
-        // Remove all the blocks for the future epoch and round
-        let future_epoch = next_epoch + 10;
-        block_payload_store.remove_blocks_for_epoch_round(future_epoch, 0);
+        // Create a commit ledger info for a future epoch and round
+        let commit_ledger_info = create_empty_ledger_info(next_epoch + 1);
+
+        // Remove the block payloads for the commit (with execution pool disabled)
+        block_payload_store.remove_block_payloads_for_commit(&commit_ledger_info, None);
 
         // Verify the store is now empty
-        check_num_unverified_payloads(&block_payload_store, 0);
-    }
-
-    #[test]
-    fn test_remove_committed_blocks_verified() {
-        // Create a new consensus observer config
-        let max_num_pending_blocks = 100;
-        let consensus_observer_config = ConsensusObserverConfig {
-            max_num_pending_blocks,
-            ..ConsensusObserverConfig::default()
-        };
-
-        // Create a new block payload store
-        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
-
-        // Add some blocks to the payload store for the current epoch
-        let current_epoch = 0;
-        let num_blocks_in_store = 100;
-        let verified_blocks = create_and_add_blocks_to_store(
-            &mut block_payload_store,
-            num_blocks_in_store,
-            current_epoch,
-            true,
-        );
-
-        // Remove the first block from the block payload store
-        remove_committed_blocks(&mut block_payload_store, &verified_blocks[0..1]);
-
-        // Check that the block payload store no longer contains the removed block
-        let block_payloads = block_payload_store.get_block_payloads();
-        let removed_block = &verified_blocks[0];
-        assert!(!block_payloads
-            .lock()
-            .contains_key(&(removed_block.epoch(), removed_block.round())));
-
-        // Verify the number of blocks in the block payload store
-        check_num_verified_payloads(&block_payload_store, num_blocks_in_store - 1);
-
-        // Remove the last 5 blocks from the block payload store
-        remove_committed_blocks(&mut block_payload_store, &verified_blocks[5..10]);
-
-        // Check that the block payload store no longer contains the removed blocks
-        let block_payloads = block_payload_store.get_block_payloads();
-        for verified_block in verified_blocks.iter().take(10).skip(5) {
-            assert!(!block_payloads
-                .lock()
-                .contains_key(&(verified_block.epoch(), verified_block.round())));
-        }
-
-        // Verify the number of blocks in the block payload store
-        check_num_verified_payloads(&block_payload_store, num_blocks_in_store - 10);
-
-        // Remove all the blocks from the block payload store (including some that don't exist)
-        remove_committed_blocks(
-            &mut block_payload_store,
-            &verified_blocks[0..num_blocks_in_store],
-        );
-
-        // Check that the block payload store no longer contains any blocks
-        let block_payloads = block_payload_store.get_block_payloads();
-        assert!(block_payloads.lock().is_empty());
-
-        // Verify the number of blocks in the block payload store
-        check_num_verified_payloads(&block_payload_store, 0);
-
-        // Add some blocks to the payload store for the next epoch
-        let next_epoch = 1;
-        let verified_blocks = create_and_add_blocks_to_store(
-            &mut block_payload_store,
-            num_blocks_in_store,
-            next_epoch,
-            true,
-        );
-
-        // Remove the last committed block from the future epoch
-        remove_committed_blocks(&mut block_payload_store, &verified_blocks[99..100]);
-
-        // Check that the block payload store is now empty
-        check_num_verified_payloads(&block_payload_store, 0);
-    }
-
-    #[test]
-    fn test_remove_committed_blocks_unverified() {
-        // Create a new consensus observer config
-        let max_num_pending_blocks = 100;
-        let consensus_observer_config = ConsensusObserverConfig {
-            max_num_pending_blocks,
-            ..ConsensusObserverConfig::default()
-        };
-
-        // Create a new block payload store
-        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
-
-        // Add some blocks to the payload store for the current epoch
-        let current_epoch = 10;
-        let num_blocks_in_store = 100;
-        let unverified_blocks = create_and_add_blocks_to_store(
-            &mut block_payload_store,
-            num_blocks_in_store,
-            current_epoch,
-            false,
-        );
-
-        // Remove the first block from the block payload store
-        remove_committed_blocks(&mut block_payload_store, &unverified_blocks[0..1]);
-
-        // Check that the block payload store no longer contains the removed block
-        let removed_block = &unverified_blocks[0];
-        assert!(!block_payload_store
-            .block_payloads
-            .lock()
-            .contains_key(&(removed_block.epoch(), removed_block.round())));
-
-        // Verify the number of blocks in the block payload store
-        check_num_unverified_payloads(&block_payload_store, num_blocks_in_store - 1);
-
-        // Remove the last 5 blocks from the block payload store
-        remove_committed_blocks(&mut block_payload_store, &unverified_blocks[5..10]);
-
-        // Check that the block payload store no longer contains the removed blocks
-        for verified_block in unverified_blocks.iter().take(10).skip(5) {
-            assert!(!block_payload_store
-                .block_payloads
-                .lock()
-                .contains_key(&(verified_block.epoch(), verified_block.round())));
-        }
-
-        // Verify the number of blocks in the block payload store
-        check_num_unverified_payloads(&block_payload_store, num_blocks_in_store - 10);
-
-        // Remove all the blocks from the block payload store (including some that don't exist)
-        remove_committed_blocks(
-            &mut block_payload_store,
-            &unverified_blocks[0..num_blocks_in_store],
-        );
-
-        // Check that the block payload store no longer contains any blocks
-        assert!(block_payload_store.block_payloads.lock().is_empty());
-
-        // Verify the number of blocks in the block payload store
-        check_num_unverified_payloads(&block_payload_store, 0);
-
-        // Add some blocks to the payload store for the next epoch
-        let next_epoch = 11;
-        let unverified_blocks = create_and_add_blocks_to_store(
-            &mut block_payload_store,
-            num_blocks_in_store,
-            next_epoch,
-            false,
-        );
-
-        // Remove the last committed block from the future epoch
-        remove_committed_blocks(&mut block_payload_store, &unverified_blocks[99..100]);
-
-        // Check that the block payload store is now empty
         check_num_unverified_payloads(&block_payload_store, 0);
     }
 
@@ -903,8 +1076,14 @@ mod test {
             .collect::<Vec<_>>();
         assert_eq!(verified_rounds, expected_verified_rounds);
 
-        // Clear the verified blocks and check the verified blocks are empty
-        remove_committed_blocks(&mut block_payload_store, &unverified_blocks);
+        // Create a commit ledger info for the last block in the current epoch
+        let verified_ordered_block = unverified_blocks.last().unwrap();
+        let commit_ledger_info = create_ledger_info_for_block(verified_ordered_block);
+
+        // Remove the block payloads for the commit (with execution pool disabled)
+        block_payload_store.remove_block_payloads_for_commit(&commit_ledger_info, None);
+
+        // Ensure there are no verified payloads in the store
         assert_eq!(get_num_verified_payloads(&block_payload_store), 0);
 
         // Create an epoch state for the future epoch (with an empty verifier)
@@ -1145,6 +1324,28 @@ mod test {
         BlockPayload::new(block_info, BlockTransactionPayload::empty())
     }
 
+    /// Creates and returns a ledger info for the given block
+    fn create_ledger_info_for_block(
+        verified_ordered_block: &Arc<PipelinedBlock>,
+    ) -> LedgerInfoWithSignatures {
+        LedgerInfoWithSignatures::new(
+            LedgerInfo::new(
+                verified_ordered_block.block_info().clone(),
+                HashValue::random(),
+            ),
+            AggregateSignature::empty(),
+        )
+    }
+
+    /// Checks the number of total payloads in the block payload store
+    fn check_num_total_payloads(
+        block_payload_store: &BlockPayloadStore,
+        expected_num_payloads: usize,
+    ) {
+        let num_payloads = block_payload_store.get_block_payloads().lock().len();
+        assert_eq!(num_payloads, expected_num_payloads);
+    }
+
     /// Checks the number of unverified payloads in the block payload store
     fn check_num_unverified_payloads(
         block_payload_store: &BlockPayloadStore,
@@ -1212,14 +1413,16 @@ mod test {
         ));
     }
 
-    /// Removes the committed blocks from the payload store
-    fn remove_committed_blocks(
-        block_payload_store: &mut BlockPayloadStore,
-        committed_blocks: &[Arc<PipelinedBlock>],
+    /// Verifies the presence of the payload in the block payload store
+    fn verify_contains_payload(
+        block_payload_store: &BlockPayloadStore,
+        block: Arc<PipelinedBlock>,
+        expect_contains: bool,
     ) {
-        for committed_block in committed_blocks {
-            block_payload_store
-                .remove_blocks_for_epoch_round(committed_block.epoch(), committed_block.round());
-        }
+        let payload_found = block_payload_store
+            .block_payloads
+            .lock()
+            .contains_key(&(block.epoch(), block.round()));
+        assert_eq!(payload_found, expect_contains);
     }
 }
