@@ -7,7 +7,7 @@ use crate::{
     INDEXER_GRPC_DOCKER_IMAGE_REPO, VALIDATOR_DOCKER_IMAGE_REPO,
 };
 use anyhow::bail;
-use aptos_logger::info;
+use log::info;
 use futures::{future, FutureExt};
 use rand::rngs::StdRng;
 use serde_json::json;

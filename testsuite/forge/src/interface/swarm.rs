@@ -10,7 +10,7 @@ use aptos_config::{
     config::{NodeConfig, OverrideNodeConfig},
     network_id::NetworkId,
 };
-use aptos_logger::info;
+use log::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
 use futures::future::{join_all, try_join_all};

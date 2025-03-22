@@ -29,6 +29,7 @@ base64 = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
+log = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }

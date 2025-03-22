@@ -32,7 +32,7 @@ use aptos_forge::{
     EmitJob, EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest, NodeExt,
     Result, Swarm, SwarmExt, Test, TestReport, TxnEmitter, TxnStats, Version,
 };
-use aptos_logger::info;
+use log::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use async_trait::async_trait;

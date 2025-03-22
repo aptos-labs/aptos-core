@@ -8,7 +8,8 @@ use crate::{
     },
     EmitModeParams,
 };
-use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
+use aptos_logger::{sample, sample::SampleRate};
+use log::{debug, error, info, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,

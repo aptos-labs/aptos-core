@@ -9,7 +9,7 @@ use crate::{emitter::create_private_key_account_generator, EmitJobRequest};
 use anyhow::{anyhow, bail, format_err, Context, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType};
-use aptos_logger::{error, info};
+use log::{error, info};
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, AccountKey, LocalAccount},

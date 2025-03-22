@@ -15,7 +15,7 @@ use aptos_config::{
     },
     network_id::NetworkId,
 };
-use aptos_logger::info;
+use log::info;
 use aptos_sdk::types::PeerId;
 use aptos_short_hex_str::AsShortHexStr;
 use k8s_openapi::{

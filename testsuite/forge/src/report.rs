@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_logger::info;
+use log::info;
 use aptos_transaction_emitter_lib::emitter::stats::TxnStats;
 use serde::Serialize;
 use std::fmt;

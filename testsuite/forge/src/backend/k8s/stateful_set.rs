@@ -4,7 +4,7 @@
 use crate::{create_k8s_client, k8s_wait_nodes_strategy, K8sApi, ReadWrite, Result, KUBECTL_BIN};
 use again::RetryPolicy;
 use anyhow::bail;
-use aptos_logger::info;
+use log::info;
 use json_patch::{Patch as JsonPatch, PatchOperation, ReplaceOperation};
 use k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Pod};
 use kube::{
