@@ -169,6 +169,9 @@ module aptos_framework::permissioned_signer {
     }
 
     public fun address_of(s: &signer): address {
+        if(!features::is_permissioned_signer_enabled()) {
+            return *signer::borrow_address(s);
+        };
         *borrow_address(s)
     }
 
