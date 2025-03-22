@@ -13,6 +13,7 @@ use crate::{
 };
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_infallible::Mutex;
+use aptos_types::ledger_info::LedgerInfoWithSignatures;
 #[cfg(test)]
 use rand::{rngs::OsRng, Rng};
 use std::{ops::Deref, sync::Arc};
@@ -71,6 +72,43 @@ impl ObservedOrderedBlock {
             },
         }
     }
+}
+
+/// Calculates the epoch and round indices to remove for the given commit.
+/// This is expected to be used with the split_off() method on a BTreeMap
+/// indexed by (epoch, round) to remove old blocks and payloads.
+///
+/// The (epoch, round) indices returned by this function are calculated as follows:
+/// - If the execution pool window size is None, all indices up to
+/// (and including) the epoch and round of the commit will be removed.
+/// - Otherwise, a buffer of indices preceding the commit will be retained
+/// (to ensure we have enough entries to satisfy the execution window).
+pub fn calculate_epoch_round_split_for_commit(
+    commit_ledger_info: &LedgerInfoWithSignatures,
+    execution_pool_window_size: Option<u64>,
+    window_buffer_multiplier: u64,
+) -> (u64, u64) {
+    // Determine the epoch to split off (execution pool doesn't buffer across epochs)
+    let split_off_epoch = commit_ledger_info.ledger_info().epoch();
+
+    // Determine the round to split off
+    let commit_round = commit_ledger_info.ledger_info().round();
+    let split_off_round = if let Some(window_size) = execution_pool_window_size {
+        let window_buffer_size = window_size * window_buffer_multiplier;
+        if commit_round < window_buffer_size {
+            0 // Clear everything from previous epochs
+        } else {
+            // Retain all payloads in the window buffer
+            commit_round
+                .saturating_sub(window_buffer_size)
+                .saturating_add(1)
+        }
+    } else {
+        // Execution pool is disabled. Remove everything up to (and including) the commit round.
+        commit_round.saturating_add(1)
+    };
+
+    (split_off_epoch, split_off_round)
 }
 
 /// Returns all pipelined blocks for the given block with window. This
@@ -163,6 +201,64 @@ mod tests {
     };
     use claims::assert_matches;
     use std::time::Instant;
+
+    #[test]
+    fn test_calculate_epoch_round_split_for_commit() {
+        // Verify the epoch and round splits for a window size of None
+        for (epoch, round, expected_epoch_split, expected_round_split) in [
+            (0, 0, 0, 1),
+            (1, 1, 1, 2),
+            (10, 100, 10, 101),
+            (100, 1000, 100, 1001),
+        ] {
+            verify_epoch_round_split(
+                epoch,
+                round,
+                None, // Window size is None
+                1,
+                expected_epoch_split,
+                expected_round_split,
+            );
+        }
+
+        // Verify the epoch and round splits for a buffer size of 10 (window = 10, multiplier = 1)
+        for (epoch, round, expected_epoch_split, expected_round_split) in [
+            (0, 0, 0, 0),
+            (10, 9, 10, 0),
+            (10, 10, 10, 1),
+            (10, 11, 10, 2),
+            (20, 100, 20, 91),
+            (100, 1000, 100, 991),
+        ] {
+            verify_epoch_round_split(
+                epoch,
+                round,
+                Some(10), // Window size is 10
+                1,        // Buffer multiplier is 1
+                expected_epoch_split,
+                expected_round_split,
+            );
+        }
+
+        // Verify the epoch and round splits for a buffer size of 30 (window = 6, multiplier = 5)
+        for (epoch, round, expected_epoch_split, expected_round_split) in [
+            (0, 0, 0, 0),
+            (1, 29, 1, 0),
+            (1, 30, 1, 1),
+            (1, 31, 1, 2),
+            (35, 100, 35, 71),
+            (10, 1000, 10, 971),
+        ] {
+            verify_epoch_round_split(
+                epoch,
+                round,
+                Some(6), // Window size is 6
+                5,       // Buffer multiplier is 5
+                expected_epoch_split,
+                expected_round_split,
+            );
+        }
+    }
 
     #[test]
     fn test_get_all_blocks_for_window_round_zero() {
@@ -605,6 +701,17 @@ mod tests {
             .insert_pending_block(pending_block_with_metadata.clone());
     }
 
+    /// Creates and returns a ledger info for the specified epoch and round
+    fn create_ledger_info_for_epoch_round(epoch: u64, round: u64) -> LedgerInfoWithSignatures {
+        LedgerInfoWithSignatures::new(
+            LedgerInfo::new(
+                BlockInfo::random_with_epoch(epoch, round),
+                HashValue::random(),
+            ),
+            AggregateSignature::empty(),
+        )
+    }
+
     /// Creates and returns an ordered block with the specified maximum number of pipelined blocks
     fn create_ordered_block(
         epoch: u64,
@@ -686,5 +793,29 @@ mod tests {
                 expected_block.first_block().id()
             );
         }
+    }
+
+    /// Verifies the expected epoch and round splits for the given commit epoch and round
+    fn verify_epoch_round_split(
+        commit_epoch: u64,
+        commit_round: u64,
+        execution_pool_window_size: Option<u64>,
+        window_buffer_multiplier: u64,
+        expected_epoch_split: u64,
+        expected_round_split: u64,
+    ) {
+        // Create a ledger info for the commit epoch and round
+        let commit_ledger_info = create_ledger_info_for_epoch_round(commit_epoch, commit_round);
+
+        // Calculate the epoch and round split
+        let (split_off_epoch, split_off_round) = calculate_epoch_round_split_for_commit(
+            &commit_ledger_info,
+            execution_pool_window_size,
+            window_buffer_multiplier,
+        );
+
+        // Verify that all split off indices match the expected values
+        assert_eq!(split_off_epoch, expected_epoch_split);
+        assert_eq!(split_off_round, expected_round_split);
     }
 }
