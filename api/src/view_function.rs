@@ -83,6 +83,16 @@ fn view_request(
     let (ledger_info, requested_version) = context
         .get_latest_ledger_info_and_verify_lookup_version(ledger_version.map(|inner| inner.0))?;
 
+    context
+        .validate_ledger_for_move_code_execution(&ledger_info)
+        .map_err(|message| {
+            BasicErrorWith404::forbidden_with_code(
+                message,
+                AptosErrorCode::InternalError,
+                &ledger_info,
+            )
+        })?;
+
     let state_view = context
         .state_view_at_version(requested_version)
         .map_err(|err| {
