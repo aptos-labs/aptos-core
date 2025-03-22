@@ -1623,6 +1623,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-experimental-bulk-txn-submit"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-global-constants",
+ "aptos-logger",
+ "aptos-sdk",
+ "aptos-transaction-emitter-lib",
+ "aptos-transaction-generator-lib",
+ "bcs 0.1.4",
+ "chrono",
+ "clap 4.5.21",
+ "futures",
+ "itertools 0.13.0",
+ "rand 0.7.3",
+ "reqwest 0.11.23",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-experimental-hexy"
 version = "0.1.0"
 dependencies = [
