@@ -317,23 +317,27 @@ impl ConsensusObserver {
             ))
         );
 
+        // If the new pipeline is enabled, build the pipeline for the ordered blocks
         if self.pipeline_enabled() {
             let block = ordered_block.first_block();
             let mut parent_fut = if let Some(futs) = self.get_parent_pipeline_futs(&block) {
                 Some(futs)
             } else {
                 warn!(
-                            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                                "Parent block's pipeline futures for ordered block is missing! Ignoring: {:?}",
-                                ordered_block.proof_block_info()
-                            ))
-                        );
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "Parent block's pipeline futures for ordered block is missing! Ignoring: {:?}",
+                        ordered_block.proof_block_info()
+                    ))
+                );
                 return;
             };
+
             for block in ordered_block.blocks() {
                 let commit_callback = self.active_observer_state.create_commit_callback(
-                    self.ordered_block_store.clone(),
                     self.block_payload_store.clone(),
+                    self.pending_block_store.clone(),
+                    self.ordered_block_store.clone(),
+                    self.get_execution_pool_window_size(),
                 );
                 self.pipeline_builder().build(
                     block,
@@ -343,12 +347,15 @@ impl ConsensusObserver {
                 parent_fut = Some(block.pipeline_futs().expect("pipeline futures just built"));
             }
         }
+
         // Create the commit callback (to be called after the execution pipeline)
         let commit_callback = self
             .active_observer_state
             .create_commit_callback_deprecated(
-                self.ordered_block_store.clone(),
                 self.block_payload_store.clone(),
+                self.pending_block_store.clone(),
+                self.ordered_block_store.clone(),
+                self.get_execution_pool_window_size(),
             );
 
         // Send the ordered block to the execution pipeline
@@ -630,12 +637,7 @@ impl ConsensusObserver {
             // Update the root and clear the pending blocks (up to the commit).
             self.active_observer_state
                 .update_root(commit_decision.commit_proof().clone());
-            self.block_payload_store
-                .lock()
-                .remove_blocks_for_epoch_round(commit_epoch, commit_round);
-            self.ordered_block_store
-                .lock()
-                .remove_blocks_for_commit(commit_decision.commit_proof());
+            self.update_block_stores_for_commit(&commit_decision);
 
             // Start state syncing to the commit decision
             self.state_sync_manager
@@ -1246,6 +1248,25 @@ impl ConsensusObserver {
                 self.forward_commit_decision(commit_decision.clone());
             }
         }
+    }
+
+    /// Updates all block stores (i.e., payload store, pending block store,
+    /// and the ordered block store) for the given commit decision.
+    fn update_block_stores_for_commit(&mut self, commit_decision: &CommitDecision) {
+        // Get the execution pool window size and commit proof
+        let execution_pool_window_size = self.get_execution_pool_window_size();
+        let commit_proof = commit_decision.commit_proof();
+
+        // Update all block stores up to the commit decision
+        self.block_payload_store
+            .lock()
+            .remove_block_payloads_for_commit(commit_proof, execution_pool_window_size);
+        self.pending_block_store
+            .lock()
+            .remove_blocks_for_commit(commit_proof, execution_pool_window_size);
+        self.ordered_block_store
+            .lock()
+            .remove_blocks_for_commit(commit_proof);
     }
 
     /// Updates the metrics for the processed blocks
