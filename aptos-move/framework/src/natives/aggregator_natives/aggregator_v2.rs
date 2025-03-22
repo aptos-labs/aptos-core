@@ -99,7 +99,7 @@ fn create_string_value(value: Vec<u8>) -> Value {
 }
 
 fn get_context_data<'t, 'b>(
-    context: &'t mut SafeNativeContext<'_, 'b, '_, '_>,
+    context: &'t mut SafeNativeContext<'_, 'b, '_>,
 ) -> Option<(&'b dyn DelayedFieldResolver, RefMut<'t, DelayedFieldData>)> {
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     if aggregator_context.delayed_field_optimization_enabled {

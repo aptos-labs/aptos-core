@@ -31,7 +31,7 @@ pub struct RespawnedSession<'r> {
     resolver: StorageAdapter<'this, ExecutorViewWithChangeSet<'r>>,
     #[borrows(resolver)]
     #[not_covariant]
-    session: Option<SessionExt<'this>>,
+    session: Option<SessionExt<'this, StorageAdapter<'this, ExecutorViewWithChangeSet<'r>>>>,
 }
 
 impl<'r> RespawnedSession<'r> {
@@ -41,7 +41,7 @@ impl<'r> RespawnedSession<'r> {
         base: &'r impl AptosMoveResolver,
         previous_session_change_set: VMChangeSet,
         user_transaction_context_opt: Option<UserTransactionContext>,
-    ) -> Self {
+    ) -> RespawnedSession<'r> {
         let executor_view = ExecutorViewWithChangeSet::new(
             base.as_executor_view(),
             base.as_resource_group_view(),
@@ -58,7 +58,10 @@ impl<'r> RespawnedSession<'r> {
         .build()
     }
 
-    pub fn execute<T>(&mut self, fun: impl FnOnce(&mut SessionExt) -> T) -> T {
+    pub fn execute<T>(
+        &mut self,
+        fun: impl FnOnce(&mut SessionExt<StorageAdapter<'_, ExecutorViewWithChangeSet<'_>>>) -> T,
+    ) -> T {
         self.with_session_mut(|session| {
             fun(session
                 .as_mut()

@@ -29,9 +29,9 @@ pub struct PrologueSession<'r> {
 }
 
 impl<'r> PrologueSession<'r> {
-    pub fn new<'m>(
+    pub fn new(
         vm: &AptosVM,
-        txn_meta: &'m TransactionMetadata,
+        txn_meta: &TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
     ) -> Self {
         let session_id = SessionId::prologue_meta(txn_meta);
@@ -51,13 +51,12 @@ impl<'r> PrologueSession<'r> {
         vm: &AptosVM,
         txn_meta: &TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
-        gas_feature_version: u64,
         change_set_configs: &ChangeSetConfigs,
         module_storage: &impl AptosModuleStorage,
     ) -> Result<(SystemSessionChangeSet, UserSession<'r>), VMStatus> {
         let Self { session } = self;
 
-        if gas_feature_version >= 1 {
+        if vm.gas_feature_version() >= 1 {
             // Create a new session so that the data cache is flushed.
             // This is to ensure we correctly charge for loading certain resources, even if they
             // have been previously cached in the prologue.

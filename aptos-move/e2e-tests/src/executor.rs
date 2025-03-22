@@ -57,7 +57,7 @@ use aptos_vm::{
     block_executor::{AptosTransactionOutput, AptosVMBlockExecutorWrapper},
     data_cache::AsMoveResolver,
     gas::make_prod_gas_meter,
-    move_vm_ext::{MoveVmExt, SessionExt, SessionId},
+    move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionExt, SessionId},
     AptosVM, VMValidator,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
@@ -1313,7 +1313,7 @@ impl FakeExecutor {
 /// Finishes the session, and asserts there has been no modules published (publishing is the
 /// responsibility of the adapter, i.e., [AptosVM]).
 fn finish_session_assert_no_modules(
-    session: SessionExt,
+    session: SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     change_set_configs: &ChangeSetConfigs,
 ) -> (WriteSet, Vec<ContractEvent>) {

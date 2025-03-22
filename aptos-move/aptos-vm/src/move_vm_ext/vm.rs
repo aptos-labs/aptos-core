@@ -84,7 +84,7 @@ impl GenesisMoveVm {
         &self,
         resolver: &'r R,
         genesis_id: HashValue,
-    ) -> SessionExt<'r> {
+    ) -> SessionExt<'r, R> {
         let session_id = SessionId::genesis(genesis_id);
         SessionExt::new(
             session_id,
@@ -122,7 +122,7 @@ impl MoveVmExt {
         resolver: &'r R,
         session_id: SessionId,
         maybe_user_transaction_context: Option<UserTransactionContext>,
-    ) -> SessionExt<'r> {
+    ) -> SessionExt<'r, R> {
         SessionExt::new(
             session_id,
             self.env.chain_id(),
