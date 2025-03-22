@@ -84,7 +84,7 @@ pub struct ConsensusObserver {
     // The ordered block store (containing ordered blocks that are ready for execution)
     ordered_block_store: Arc<Mutex<OrderedBlockStore>>,
 
-    // The pending block store (containing pending blocks that are without payloads)
+    // The pending block store (containing pending blocks not yet committed)
     pending_block_store: Arc<Mutex<PendingBlockStore>>,
 
     // The execution client to the buffer manager
@@ -278,7 +278,7 @@ impl ConsensusObserver {
         self.block_payload_store.lock().clear_all_payloads();
 
         // Clear the pending blocks
-        self.pending_block_store.lock().clear_missing_blocks();
+        self.pending_block_store.lock().clear_pending_blocks();
 
         // Clear the ordered blocks
         self.ordered_block_store.lock().clear_all_ordered_blocks();
@@ -336,8 +336,9 @@ impl ConsensusObserver {
 
             for block in ordered_block.blocks() {
                 let commit_callback = self.active_observer_state.create_commit_callback(
-                    self.ordered_block_store.clone(),
                     self.block_payload_store.clone(),
+                    self.pending_block_store.clone(),
+                    self.ordered_block_store.clone(),
                     self.get_execution_pool_window_size(),
                 );
                 self.pipeline_builder().build(
@@ -353,8 +354,9 @@ impl ConsensusObserver {
         let commit_callback = self
             .active_observer_state
             .create_commit_callback_deprecated(
-                self.ordered_block_store.clone(),
                 self.block_payload_store.clone(),
+                self.pending_block_store.clone(),
+                self.ordered_block_store.clone(),
                 self.get_execution_pool_window_size(),
             );
 
@@ -637,15 +639,7 @@ impl ConsensusObserver {
             // Update the root and clear the pending blocks (up to the commit).
             self.active_observer_state
                 .update_root(commit_decision.commit_proof().clone());
-            self.block_payload_store
-                .lock()
-                .remove_block_payloads_for_commit(
-                    commit_decision.commit_proof(),
-                    self.get_execution_pool_window_size(),
-                );
-            self.ordered_block_store
-                .lock()
-                .remove_blocks_for_commit(commit_decision.commit_proof());
+            self.update_block_stores_for_commit(&commit_decision);
 
             // Start state syncing to the commit decision
             self.state_sync_manager
@@ -1256,6 +1250,25 @@ impl ConsensusObserver {
                 self.forward_commit_decision(commit_decision.clone());
             }
         }
+    }
+
+    /// Updates all block stores (i.e., payload store, pending block store,
+    /// and the ordered block store) for the given commit decision.
+    fn update_block_stores_for_commit(&mut self, commit_decision: &CommitDecision) {
+        // Get the execution pool window size and commit proof
+        let execution_pool_window_size = self.get_execution_pool_window_size();
+        let commit_proof = commit_decision.commit_proof();
+
+        // Update all block stores up to the commit decision
+        self.block_payload_store
+            .lock()
+            .remove_block_payloads_for_commit(commit_proof, execution_pool_window_size);
+        self.pending_block_store
+            .lock()
+            .remove_blocks_for_commit(commit_proof, execution_pool_window_size);
+        self.ordered_block_store
+            .lock()
+            .remove_blocks_for_commit(commit_proof);
     }
 
     /// Updates the metrics for the processed blocks

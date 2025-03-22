@@ -8,6 +8,7 @@ use crate::consensus_observer::{
         metrics,
     },
     network::observer_message::{BlockPayload, OrderedBlock},
+    observer::execution_pool,
 };
 use aptos_config::config::ConsensusObserverConfig;
 use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
@@ -118,28 +119,16 @@ impl BlockPayloadStore {
         commit_ledger_info: &LedgerInfoWithSignatures,
         execution_pool_window_size: Option<u64>,
     ) {
-        // Determine the epoch to split off (execution pool doesn't buffer across epochs)
-        let split_off_epoch = commit_ledger_info.ledger_info().epoch();
-
-        // Determine the round to split off
-        let commit_round = commit_ledger_info.ledger_info().round();
-        let split_off_round = if let Some(window_size) = execution_pool_window_size {
-            let window_buffer_multiplier = self
-                .consensus_observer_config
-                .observer_block_window_buffer_multiplier;
-            let window_buffer_size = window_size * window_buffer_multiplier;
-            if commit_round < window_buffer_size {
-                0 // Clear everything from previous epochs
-            } else {
-                // Retain all payloads in the window buffer
-                commit_round
-                    .saturating_sub(window_buffer_size)
-                    .saturating_add(1)
-            }
-        } else {
-            // Execution pool is disabled. Remove everything up to (and including) the commit round.
-            commit_round.saturating_add(1)
-        };
+        // Determine the epoch and round to split off
+        let window_buffer_multiplier = self
+            .consensus_observer_config
+            .observer_block_window_buffer_multiplier;
+        let (split_off_epoch, split_off_round) =
+            execution_pool::calculate_epoch_round_split_for_commit(
+                commit_ledger_info,
+                execution_pool_window_size,
+                window_buffer_multiplier,
+            );
 
         // Remove the blocks from the payload store
         let mut block_payloads = self.block_payloads.lock();
@@ -789,7 +778,7 @@ mod test {
     }
 
     #[test]
-    fn test_remove_blocks_for_commit_execution_pool_windows() {
+    fn test_remove_payloads_for_commit_execution_pool_windows() {
         // Create a new consensus observer config
         let max_num_pending_blocks = 100;
         let observer_block_window_buffer_multiplier = 1; // Buffer the exact window size
