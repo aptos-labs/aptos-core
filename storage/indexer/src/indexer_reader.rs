@@ -5,7 +5,7 @@ use crate::{db_indexer::DBIndexer, db_v2::IndexerAsyncV2};
 use anyhow::anyhow;
 use aptos_types::{
     account_address::AccountAddress,
-    contract_event::{ContractEventV1, ContractEventV2, EventWithVersion},
+    contract_event::{ContractEvent, ContractEventV1, ContractEventV2, EventWithVersion},
     event::EventKey,
     indexer::indexer_db_reader::{IndexerReader, Order},
     state_store::{
@@ -15,6 +15,7 @@ use aptos_types::{
     },
     transaction::{AccountTransactionsWithProof, Version},
 };
+use move_core_types::language_storage::TypeTag;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -104,6 +105,28 @@ impl IndexerReader for IndexerReaders {
                     start_seq_num,
                     order,
                     limit,
+                    ledger_version,
+                )?);
+            } else {
+                anyhow::bail!("Internal event index is not enabled")
+            }
+        }
+        anyhow::bail!("DB indexer reader is not available")
+    }
+
+    fn get_events_by_type(
+        &self,
+        type_tag: &TypeTag,
+        start_version: Version,
+        max_versions_to_include: usize,
+        ledger_version: Version,
+    ) -> anyhow::Result<Vec<(Version, Vec<ContractEvent>)>> {
+        if let Some(db_indexer_reader) = &self.db_indexer_reader {
+            if db_indexer_reader.indexer_db.event_enabled() {
+                return Ok(db_indexer_reader.get_events_by_type(
+                    type_tag,
+                    start_version,
+                    max_versions_to_include,
                     ledger_version,
                 )?);
             } else {
