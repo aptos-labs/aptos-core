@@ -36,14 +36,19 @@ Once modules are marked as immutable, they cannot be made mutable again.
 
 
 -  [Resource `ManagingRefs`](#0x1_object_code_deployment_ManagingRefs)
+-  [Resource `CodeSignerCapability`](#0x1_object_code_deployment_CodeSignerCapability)
 -  [Struct `Publish`](#0x1_object_code_deployment_Publish)
 -  [Struct `Upgrade`](#0x1_object_code_deployment_Upgrade)
 -  [Struct `Freeze`](#0x1_object_code_deployment_Freeze)
 -  [Constants](#@Constants_0)
+-  [Function `next_code_object_address`](#0x1_object_code_deployment_next_code_object_address)
 -  [Function `publish`](#0x1_object_code_deployment_publish)
 -  [Function `object_seed`](#0x1_object_code_deployment_object_seed)
 -  [Function `upgrade`](#0x1_object_code_deployment_upgrade)
 -  [Function `freeze_code_object`](#0x1_object_code_deployment_freeze_code_object)
+-  [Function `register_signer_capability_proof`](#0x1_object_code_deployment_register_signer_capability_proof)
+-  [Function `generate_signer`](#0x1_object_code_deployment_generate_signer)
+-  [Function `assert_is_code_object`](#0x1_object_code_deployment_assert_is_code_object)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -54,6 +59,7 @@ Once modules are marked as immutable, they cannot be made mutable again.
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info">0x1::type_info</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
 
@@ -82,6 +88,35 @@ Internal struct, attached to the object, that holds Refs we need to manage the c
 </dt>
 <dd>
  We need to keep the extend ref to be able to generate the signer to upgrade existing code.
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_object_code_deployment_CodeSignerCapability"></a>
+
+## Resource `CodeSignerCapability`
+
+Allow access to the code object's signer based on a struct-based registered proof.
+
+
+<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
+<b>struct</b> <a href="object_code_deployment.md#0x1_object_code_deployment_CodeSignerCapability">CodeSignerCapability</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>capability_proof: <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a></code>
+</dt>
+<dd>
+
 </dd>
 </dl>
 
@@ -210,6 +245,16 @@ Not the owner of the <code>code_object</code>
 
 
 
+<a id="0x1_object_code_deployment_ENO_SIGNER_CAPABILITY_CONFIGURED"></a>
+
+No signer capability proof configured for this code object.
+
+
+<pre><code><b>const</b> <a href="object_code_deployment.md#0x1_object_code_deployment_ENO_SIGNER_CAPABILITY_CONFIGURED">ENO_SIGNER_CAPABILITY_CONFIGURED</a>: u64 = 5;
+</code></pre>
+
+
+
 <a id="0x1_object_code_deployment_EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED"></a>
 
 Object code deployment feature not supported.
@@ -228,6 +273,32 @@ Object code deployment feature not supported.
 </code></pre>
 
 
+
+<a id="0x1_object_code_deployment_next_code_object_address"></a>
+
+## Function `next_code_object_address`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_next_code_object_address">next_code_object_address</a>(publisher: <b>address</b>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_next_code_object_address">next_code_object_address</a>(publisher: <b>address</b>): <b>address</b> {
+    <b>let</b> object_seed = <a href="object_code_deployment.md#0x1_object_code_deployment_object_seed">object_seed</a>(publisher);
+    <a href="object.md#0x1_object_create_object_address">object::create_object_address</a>(&publisher, object_seed)
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x1_object_code_deployment_publish"></a>
 
@@ -295,8 +366,8 @@ the code to be published via <code><a href="code.md#0x1_code">code</a></code>. T
 <pre><code>inline <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_object_seed">object_seed</a>(publisher: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <b>let</b> sequence_number = <a href="account.md#0x1_account_get_sequence_number">account::get_sequence_number</a>(publisher) + 1;
     <b>let</b> seeds = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> seeds, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&<a href="object_code_deployment.md#0x1_object_code_deployment_OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR">OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR</a>));
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> seeds, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&sequence_number));
+    seeds.append(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&<a href="object_code_deployment.md#0x1_object_code_deployment_OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR">OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR</a>));
+    seeds.append(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&sequence_number));
     seeds
 }
 </code></pre>
@@ -338,7 +409,7 @@ Requires the publisher to be the owner of the <code>code_object</code>.
     );
 
     <b>let</b> code_object_address = <a href="object.md#0x1_object_object_address">object::object_address</a>(&code_object);
-    <b>assert</b>!(<b>exists</b>&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_ManagingRefs">ManagingRefs</a>&gt;(code_object_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_ECODE_OBJECT_DOES_NOT_EXIST">ECODE_OBJECT_DOES_NOT_EXIST</a>));
+    <a href="object_code_deployment.md#0x1_object_code_deployment_assert_is_code_object">assert_is_code_object</a>(code_object_address);
 
     <b>let</b> extend_ref = &<b>borrow_global</b>&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_ManagingRefs">ManagingRefs</a>&gt;(code_object_address).extend_ref;
     <b>let</b> code_signer = &<a href="object.md#0x1_object_generate_signer_for_extending">object::generate_signer_for_extending</a>(extend_ref);
@@ -374,6 +445,118 @@ Requires the <code>publisher</code> to be the owner of the <code>code_object</co
     <a href="code.md#0x1_code_freeze_code_object">code::freeze_code_object</a>(publisher, code_object);
 
     <a href="event.md#0x1_event_emit">event::emit</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_Freeze">Freeze</a> { object_address: <a href="object.md#0x1_object_object_address">object::object_address</a>(&code_object), });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_code_deployment_register_signer_capability_proof"></a>
+
+## Function `register_signer_capability_proof`
+
+Registers a capability proof for the <code>code_object</code> to allow generating the signer for the <code>code_object</code> later via
+<code><a href="object_code_deployment.md#0x1_object_code_deployment_generate_signer">object_code_deployment::generate_signer</a></code>.
+
+This can only be called by the owner of the <code>code_object</code> or the package itself.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_register_signer_capability_proof">register_signer_capability_proof</a>&lt;ProofType&gt;(owner_or_package: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_register_signer_capability_proof">register_signer_capability_proof</a>&lt;ProofType&gt;(
+    owner_or_package: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+) <b>acquires</b> <a href="object_code_deployment.md#0x1_object_code_deployment_CodeSignerCapability">CodeSignerCapability</a>, <a href="object_code_deployment.md#0x1_object_code_deployment_ManagingRefs">ManagingRefs</a> {
+    <a href="code.md#0x1_code_check_code_publishing_permission">code::check_code_publishing_permission</a>(owner_or_package);
+
+    <b>let</b> proof_type = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;ProofType&gt;();
+    <b>let</b> code_object_address = proof_type.account_address();
+    // Disallow registering a <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> proof for an <a href="object.md#0x1_object">object</a> that is not a <a href="code.md#0x1_code">code</a> <a href="object.md#0x1_object">object</a>.
+    <a href="object_code_deployment.md#0x1_object_code_deployment_assert_is_code_object">assert_is_code_object</a>(code_object_address);
+
+    <b>let</b> caller_addr = <a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(owner_or_package);
+    <b>let</b> is_code_object_owner =
+        <a href="object.md#0x1_object_is_owner">object::is_owner</a>(<a href="object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;PackageRegistry&gt;(code_object_address), caller_addr);
+    <b>let</b> is_package_itself = caller_addr == code_object_address;
+    <b>assert</b>!(
+        is_code_object_owner || is_package_itself,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_ENOT_CODE_OBJECT_OWNER">ENOT_CODE_OBJECT_OWNER</a>),
+    );
+
+    <b>if</b> (!<b>exists</b>&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_CodeSignerCapability">CodeSignerCapability</a>&gt;(code_object_address)) {
+        <b>let</b> code_object_signer = &<a href="object.md#0x1_object_generate_signer_for_extending">object::generate_signer_for_extending</a>(&<a href="object_code_deployment.md#0x1_object_code_deployment_ManagingRefs">ManagingRefs</a>[code_object_address].extend_ref);
+        <b>move_to</b>(code_object_signer, <a href="object_code_deployment.md#0x1_object_code_deployment_CodeSignerCapability">CodeSignerCapability</a> { capability_proof: proof_type });
+    } <b>else</b> {
+        <a href="object_code_deployment.md#0x1_object_code_deployment_CodeSignerCapability">CodeSignerCapability</a>[code_object_address].capability_proof = proof_type;
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_code_deployment_generate_signer"></a>
+
+## Function `generate_signer`
+
+Generates a signer for the <code>code_object</code> if the caller has registered a capability proof for it.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_generate_signer">generate_signer</a>&lt;ProofType&gt;(_proof: &ProofType): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_generate_signer">generate_signer</a>&lt;ProofType&gt;(
+    _proof: &ProofType
+): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="object_code_deployment.md#0x1_object_code_deployment_CodeSignerCapability">CodeSignerCapability</a>, <a href="object_code_deployment.md#0x1_object_code_deployment_ManagingRefs">ManagingRefs</a> {
+    <b>let</b> proof_type = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;ProofType&gt;();
+    <b>let</b> code_object_address = proof_type.account_address();
+    // This is redundant <b>with</b> the check in `register_signer_capability_proof`, but we want <b>to</b> cautious here and also
+    // fail early <b>if</b> the `code_object` is not a <a href="code.md#0x1_code">code</a> <a href="object.md#0x1_object">object</a>.
+    <a href="object_code_deployment.md#0x1_object_code_deployment_assert_is_code_object">assert_is_code_object</a>(code_object_address);
+
+    <b>assert</b>!(<b>exists</b>&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_CodeSignerCapability">CodeSignerCapability</a>&gt;(code_object_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_ENO_SIGNER_CAPABILITY_CONFIGURED">ENO_SIGNER_CAPABILITY_CONFIGURED</a>));
+    <b>let</b> proof_required = <a href="object_code_deployment.md#0x1_object_code_deployment_CodeSignerCapability">CodeSignerCapability</a>[code_object_address].capability_proof;
+    <b>assert</b>!(proof_type == proof_required, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_ENO_CODE_PERMISSION">ENO_CODE_PERMISSION</a>));
+
+    <a href="object.md#0x1_object_generate_signer_for_extending">object::generate_signer_for_extending</a>(&<a href="object_code_deployment.md#0x1_object_code_deployment_ManagingRefs">ManagingRefs</a>[code_object_address].extend_ref)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_code_deployment_assert_is_code_object"></a>
+
+## Function `assert_is_code_object`
+
+
+
+<pre><code><b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_assert_is_code_object">assert_is_code_object</a>(code_object: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_assert_is_code_object">assert_is_code_object</a>(code_object: <b>address</b>) {
+    <b>assert</b>!(<b>exists</b>&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_ManagingRefs">ManagingRefs</a>&gt;(code_object), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_ECODE_OBJECT_DOES_NOT_EXIST">ECODE_OBJECT_DOES_NOT_EXIST</a>));
 }
 </code></pre>
 

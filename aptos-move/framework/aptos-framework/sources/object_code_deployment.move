@@ -32,7 +32,8 @@ module aptos_framework::object_code_deployment {
     use std::bcs;
     use std::error;
     use std::features;
-    use std::vector;
+    use aptos_std::type_info;
+    use aptos_std::type_info::TypeInfo;
     use aptos_framework::account;
     use aptos_framework::code;
     use aptos_framework::code::PackageRegistry;
@@ -49,6 +50,8 @@ module aptos_framework::object_code_deployment {
     const ECODE_OBJECT_DOES_NOT_EXIST: u64 = 3;
     /// Current permissioned signer cannot deploy object code.
     const ENO_CODE_PERMISSION: u64 = 4;
+    /// No signer capability proof configured for this code object.
+    const ENO_SIGNER_CAPABILITY_CONFIGURED: u64 = 5;
 
     const OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR: vector<u8> = b"aptos_framework::object_code_deployment";
 
@@ -57,6 +60,12 @@ module aptos_framework::object_code_deployment {
     struct ManagingRefs has key {
         /// We need to keep the extend ref to be able to generate the signer to upgrade existing code.
         extend_ref: ExtendRef,
+    }
+
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    /// Allow access to the code object's signer based on a struct-based registered proof.
+    struct CodeSignerCapability has key {
+        capability_proof: TypeInfo,
     }
 
     #[event]
@@ -75,6 +84,12 @@ module aptos_framework::object_code_deployment {
     /// Event emitted when code in an existing object is made immutable.
     struct Freeze has drop, store {
         object_address: address,
+    }
+
+    #[view]
+    public fun next_code_object_address(publisher: address): address {
+        let object_seed = object_seed(publisher);
+        object::create_object_address(&publisher, object_seed)
     }
 
     /// Creates a new object with a unique address derived from the publisher address and the object seed.
@@ -108,8 +123,8 @@ module aptos_framework::object_code_deployment {
     inline fun object_seed(publisher: address): vector<u8> {
         let sequence_number = account::get_sequence_number(publisher) + 1;
         let seeds = vector[];
-        vector::append(&mut seeds, bcs::to_bytes(&OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR));
-        vector::append(&mut seeds, bcs::to_bytes(&sequence_number));
+        seeds.append(bcs::to_bytes(&OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR));
+        seeds.append(bcs::to_bytes(&sequence_number));
         seeds
     }
 
@@ -131,7 +146,7 @@ module aptos_framework::object_code_deployment {
         );
 
         let code_object_address = object::object_address(&code_object);
-        assert!(exists<ManagingRefs>(code_object_address), error::not_found(ECODE_OBJECT_DOES_NOT_EXIST));
+        assert_is_code_object(code_object_address);
 
         let extend_ref = &borrow_global<ManagingRefs>(code_object_address).extend_ref;
         let code_signer = &object::generate_signer_for_extending(extend_ref);
@@ -147,5 +162,64 @@ module aptos_framework::object_code_deployment {
         code::freeze_code_object(publisher, code_object);
 
         event::emit(Freeze { object_address: object::object_address(&code_object), });
+    }
+
+    /// Registers a capability proof for the `code_object` to allow generating the signer for the `code_object` later via
+    /// `object_code_deployment::generate_signer`.
+    ///
+    /// This can only be called by the owner of the `code_object` or the package itself.
+    public entry fun register_signer_capability_proof<ProofType>(
+        owner_or_package: &signer
+    ) acquires CodeSignerCapability, ManagingRefs {
+        code::check_code_publishing_permission(owner_or_package);
+
+        let proof_type = type_info::type_of<ProofType>();
+        let code_object_address = proof_type.account_address();
+        // Disallow registering a capability proof for an object that is not a code object.
+        assert_is_code_object(code_object_address);
+
+        let caller_addr = permissioned_signer::address_of(owner_or_package);
+        let is_code_object_owner =
+            object::is_owner(object::address_to_object<PackageRegistry>(code_object_address), caller_addr);
+        let is_package_itself = caller_addr == code_object_address;
+        assert!(
+            is_code_object_owner || is_package_itself,
+            error::permission_denied(ENOT_CODE_OBJECT_OWNER),
+        );
+
+        if (!exists<CodeSignerCapability>(code_object_address)) {
+            let code_object_signer = &object::generate_signer_for_extending(&ManagingRefs[code_object_address].extend_ref);
+            move_to(code_object_signer, CodeSignerCapability { capability_proof: proof_type });
+        } else {
+            CodeSignerCapability[code_object_address].capability_proof = proof_type;
+        };
+    }
+
+    /// Generates a signer for the `code_object` if the caller has registered a capability proof for it.
+    public fun generate_signer<ProofType>(
+        _proof: &ProofType
+    ): signer acquires CodeSignerCapability, ManagingRefs {
+        let proof_type = type_info::type_of<ProofType>();
+        let code_object_address = proof_type.account_address();
+        // This is redundant with the check in `register_signer_capability_proof`, but we want to cautious here and also
+        // fail early if the `code_object` is not a code object.
+        assert_is_code_object(code_object_address);
+
+        assert!(exists<CodeSignerCapability>(code_object_address), error::not_found(ENO_SIGNER_CAPABILITY_CONFIGURED));
+        let proof_required = CodeSignerCapability[code_object_address].capability_proof;
+        assert!(proof_type == proof_required, error::permission_denied(ENO_CODE_PERMISSION));
+
+        object::generate_signer_for_extending(&ManagingRefs[code_object_address].extend_ref)
+    }
+
+    inline fun assert_is_code_object(code_object: address) {
+        assert!(exists<ManagingRefs>(code_object), error::not_found(ECODE_OBJECT_DOES_NOT_EXIST));
+    }
+
+    #[test_only]
+    package fun create_fake_code_object(code_object: address, extend_ref: ExtendRef) {
+        let code_signer = &account::create_signer_for_test(code_object);
+        code::create_empty_package(code_signer);
+        move_to(code_signer, ManagingRefs { extend_ref });
     }
 }

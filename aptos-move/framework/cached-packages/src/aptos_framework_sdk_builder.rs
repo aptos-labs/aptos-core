@@ -863,6 +863,14 @@ pub enum EntryFunctionCall {
         code: Vec<Vec<u8>>,
     },
 
+    /// Registers a capability proof for the `code_object` to allow generating the signer for the `code_object` later via
+    /// `object_code_deployment::generate_signer`.
+    ///
+    /// This can only be called by the owner of the `code_object` or the package itself.
+    ObjectCodeDeploymentRegisterSignerCapabilityProof {
+        proof_type: TypeTag,
+    },
+
     /// Revoke all storable permission handle of the signer immediately.
     PermissionedSignerRevokeAllHandles {},
 
@@ -1705,6 +1713,9 @@ impl EntryFunctionCall {
                 metadata_serialized,
                 code,
             } => object_code_deployment_publish(metadata_serialized, code),
+            ObjectCodeDeploymentRegisterSignerCapabilityProof { proof_type } => {
+                object_code_deployment_register_signer_capability_proof(proof_type)
+            },
             PermissionedSignerRevokeAllHandles {} => permissioned_signer_revoke_all_handles(),
             PermissionedSignerRevokePermissionStorageAddress {
                 permissions_storage_addr,
@@ -4184,6 +4195,27 @@ pub fn object_code_deployment_publish(
     ))
 }
 
+/// Registers a capability proof for the `code_object` to allow generating the signer for the `code_object` later via
+/// `object_code_deployment::generate_signer`.
+///
+/// This can only be called by the owner of the `code_object` or the package itself.
+pub fn object_code_deployment_register_signer_capability_proof(
+    proof_type: TypeTag,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("object_code_deployment").to_owned(),
+        ),
+        ident_str!("register_signer_capability_proof").to_owned(),
+        vec![proof_type],
+        vec![],
+    ))
+}
+
 /// Revoke all storable permission handle of the signer immediately.
 pub fn permissioned_signer_revoke_all_handles() -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
@@ -6612,6 +6644,20 @@ mod decoder {
         }
     }
 
+    pub fn object_code_deployment_register_signer_capability_proof(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::ObjectCodeDeploymentRegisterSignerCapabilityProof {
+                    proof_type: script.ty_args().get(0)?.clone(),
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn permissioned_signer_revoke_all_handles(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -7712,6 +7758,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "object_code_deployment_publish".to_string(),
             Box::new(decoder::object_code_deployment_publish),
+        );
+        map.insert(
+            "object_code_deployment_register_signer_capability_proof".to_string(),
+            Box::new(decoder::object_code_deployment_register_signer_capability_proof),
         );
         map.insert(
             "permissioned_signer_revoke_all_handles".to_string(),
