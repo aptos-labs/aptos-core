@@ -13,7 +13,7 @@ module aptos_std::math_fixed64 {
 
     /// Square root of fixed point number
     public fun sqrt(x: FixedPoint64): FixedPoint64 {
-        let y = fixed_point64::get_raw_value(x);
+        let y = x.get_raw_value();
         let z = (math128::sqrt(y) << 32 as u256);
         z = (z + ((y as u256) << 64) / z) >> 1;
         fixed_point64::create_from_raw_value((z as u128))
@@ -21,34 +21,34 @@ module aptos_std::math_fixed64 {
 
     /// Exponent function with a precission of 9 digits.
     public fun exp(x: FixedPoint64): FixedPoint64 {
-        let raw_value = (fixed_point64::get_raw_value(x) as u256);
+        let raw_value = (x.get_raw_value() as u256);
         fixed_point64::create_from_raw_value((exp_raw(raw_value) as u128))
     }
 
     /// Because log2 is negative for values < 1 we instead return log2(x) + 64 which
     /// is positive for all values of x.
     public fun log2_plus_64(x: FixedPoint64): FixedPoint64 {
-        let raw_value = (fixed_point64::get_raw_value(x) as u128);
+        let raw_value = (x.get_raw_value());
         math128::log2_64(raw_value)
     }
 
     public fun ln_plus_32ln2(x: FixedPoint64): FixedPoint64 {
-        let raw_value = fixed_point64::get_raw_value(x);
-        let x = (fixed_point64::get_raw_value(math128::log2_64(raw_value)) as u256);
+        let raw_value = x.get_raw_value();
+        let x = (math128::log2_64(raw_value).get_raw_value() as u256);
         fixed_point64::create_from_raw_value(((x * LN2) >> 64 as u128))
     }
 
     /// Integer power of a fixed point number
     public fun pow(x: FixedPoint64, n: u64): FixedPoint64 {
-        let raw_value = (fixed_point64::get_raw_value(x) as u256);
+        let raw_value = (x.get_raw_value() as u256);
         fixed_point64::create_from_raw_value((pow_raw(raw_value, (n as u128)) as u128))
     }
 
     /// Specialized function for x * y / z that omits intermediate shifting
     public fun mul_div(x: FixedPoint64, y: FixedPoint64, z: FixedPoint64): FixedPoint64 {
-        let a = fixed_point64::get_raw_value(x);
-        let b = fixed_point64::get_raw_value(y);
-        let c = fixed_point64::get_raw_value(z);
+        let a = x.get_raw_value();
+        let b = y.get_raw_value();
+        let c = z.get_raw_value();
         fixed_point64::create_from_raw_value (math128::mul_div(a, b, c))
     }
 
@@ -69,7 +69,7 @@ module aptos_std::math_fixed64 {
         // 2^(1/580) = roottwo(1 - eps), so the number we seek is roottwo^exponent (1 - eps * exponent)
         let power = pow_raw(roottwo, (exponent as u128));
         let eps_correction = 219071715585908898;
-        power = power - ((power * eps_correction * exponent) >> 128);
+        power -= ((power * eps_correction * exponent) >> 128);
         // x is fixed point number smaller than bigfactor/2^64 < 0.0011 so we need only 5 tayler steps
         // to get the 15 digits of precission
         let taylor1 = (power * x) >> (64 - shift);
@@ -88,7 +88,7 @@ module aptos_std::math_fixed64 {
             if (n & 1 != 0) {
                 res = (res * x) >> 64;
             };
-            n = n >> 1;
+            n >>= 1;
             x = (x * x) >> 64;
         };
         res
@@ -99,10 +99,10 @@ module aptos_std::math_fixed64 {
         // Sqrt is based on math128::sqrt and thus most of the testing is done there.
         let fixed_base = 1 << 64;
         let result = sqrt(fixed_point64::create_from_u128(1));
-        assert!(fixed_point64::get_raw_value(result) == fixed_base, 0);
+        assert!(result.get_raw_value() == fixed_base, 0);
 
         let result = sqrt(fixed_point64::create_from_u128(2));
-        assert_approx_the_same((fixed_point64::get_raw_value(result) as u256), 26087635650665564424, 16);
+        assert_approx_the_same((result.get_raw_value() as u256), 26087635650665564424, 16);
     }
 
     #[test]
