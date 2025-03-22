@@ -37,13 +37,13 @@ pub struct DummyMsg(pub Vec<u8>);
 
 pub fn dummy_network_config() -> NetworkApplicationConfig {
     let direct_send_protocols = vec![TEST_DIRECT_SEND_PROTOCOL];
-    let rpc_protocls = vec![TEST_RPC_PROTOCOL];
+    let rpc_protocols = vec![TEST_RPC_PROTOCOL];
 
     let network_client_config =
-        NetworkClientConfig::new(direct_send_protocols.clone(), rpc_protocls.clone());
+        NetworkClientConfig::new(direct_send_protocols.clone(), rpc_protocols.clone());
     let network_service_config = NetworkServiceConfig::new(
         direct_send_protocols,
-        rpc_protocls,
+        rpc_protocols,
         aptos_channel::Config::new(NETWORK_CHANNEL_SIZE),
     );
     NetworkApplicationConfig::new(network_client_config, network_service_config)
