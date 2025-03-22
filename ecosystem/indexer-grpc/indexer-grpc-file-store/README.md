@@ -40,17 +40,14 @@ indexer-grpc-file-store-testnet/
     metadata.json
 ```
 
-## [TEST ONLY] Run it with a local filestore
+## Bootstrap your file store
 
-For developing and testing locally, it might be easier to use a local filestore.
+You can use `indexer_file_prep.py` to bootstrap your filestore.
 
-Create a local directory to store the filestore: `mkdir test_indexer_grpc_filestore`
+```bash
+# Install dependencies.
+pip install requests hashbase asyncio aiohttp tqdm
 
-Then in your config:
-```yaml
-...
-server_config:
-    file_store_config:
-      file_store_type: LocalFileStore
-      local_file_store_path: test_indexer_grpc_filestore
+# Bootstrap mainnet
+python3 indexer_file_prep.py --network mainnet --target_folder YOUR_GRPC_FILE_FOLDER_PATH
 ```
