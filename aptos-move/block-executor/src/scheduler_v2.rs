@@ -71,6 +71,16 @@ impl<'a> AbortManager<'a> {
         }
     }
 
+    pub(crate) fn invalidate_dependencies(
+        &self,
+        dependencies: BTreeSet<(TxnIndex, Incarnation)>,
+    ) -> Result<(), PanicError> {
+        for (txn_idx, incarnation) in dependencies {
+            self.invalidate(txn_idx, incarnation)?;
+        }
+        Ok(())
+    }
+
     fn invalidate(
         &self,
         invalidated_txn_idx: TxnIndex,

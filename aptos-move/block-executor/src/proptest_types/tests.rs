@@ -20,7 +20,6 @@ use aptos_types::{
     block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
     state_store::MockStateView,
 };
-use claims::{assert_matches, assert_ok};
 use num_cpus;
 use proptest::{
     collection::vec,
@@ -30,7 +29,7 @@ use proptest::{
     test_runner::TestRunner,
 };
 use rand::Rng;
-use std::{cmp::max, fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
+use std::{fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
 use test_case::test_case;
 
 fn run_transactions<K, V, E>(
@@ -39,8 +38,8 @@ fn run_transactions<K, V, E>(
     abort_transactions: Vec<Index>,
     skip_rest_transactions: Vec<Index>,
     num_repeat: usize,
-    module_access: (bool, bool),
     maybe_block_gas_limit: Option<u64>,
+    test_block_stm_v2: bool,
 ) where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
@@ -49,7 +48,7 @@ fn run_transactions<K, V, E>(
 {
     let mut transactions: Vec<_> = transaction_gens
         .into_iter()
-        .map(|txn_gen| txn_gen.materialize(key_universe, module_access))
+        .map(|txn_gen| txn_gen.materialize(key_universe))
         .collect();
 
     let length = transactions.len();
@@ -73,6 +72,11 @@ fn run_transactions<K, V, E>(
     for _ in 0..num_repeat {
         let mut guard = AptosModuleCacheManagerGuard::none();
 
+        let mut config = BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit);
+        if test_block_stm_v2 {
+            config.local.block_stm_v2 = true;
+        }
+
         let output = BlockExecutor::<
             MockTransaction<KeyType<K>, E>,
             MockTask<KeyType<K>, E>,
@@ -80,16 +84,11 @@ fn run_transactions<K, V, E>(
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
             DefaultTxnProvider<MockTransaction<KeyType<K>, E>>,
         >::new(
-            BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
+            config,
             executor_thread_pool.clone(),
             None,
         )
-        .execute_transactions_parallel(&txn_provider, &state_view, &mut guard);
-
-        if module_access.0 && module_access.1 {
-            assert_matches!(output, Err(()));
-            continue;
-        }
+        .execute_block_parallel_test(&txn_provider, &state_view, &mut guard);
 
         BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)
             .assert_parallel_output(&output);
@@ -97,7 +96,11 @@ fn run_transactions<K, V, E>(
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(32))]
+    #![proptest_config(ProptestConfig { 
+        max_shrink_iters: 0,
+        ..ProptestConfig::with_cases(32)
+    })]
+
     #[test]
     fn no_early_termination(
         universe in vec(any::<[u8; 32]>(), 100),
@@ -105,7 +108,17 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, None, false);
+    }
+
+    #[test]
+    fn no_early_termination_v2(
+        universe in vec(any::<[u8; 32]>(), 100),
+        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 4000).no_shrink(),
+        abort_transactions in vec(any::<Index>(), 0),
+        skip_rest_transactions in vec(any::<Index>(), 0),
+    ) {
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, None, true);
     }
 
     #[test]
@@ -115,7 +128,17 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, None, false);
+    }
+
+    #[test]
+    fn abort_only_v2(
+        universe in vec(any::<[u8; 32]>(), 80),
+        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 300).no_shrink(),
+        abort_transactions in vec(any::<Index>(), 5),
+        skip_rest_transactions in vec(any::<Index>(), 0),
+    ) {
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, None, true);
     }
 
     #[test]
@@ -125,7 +148,17 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, None, false);
+    }
+
+    #[test]
+    fn skip_rest_only_v2(
+        universe in vec(any::<[u8; 32]>(), 80),
+        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 300).no_shrink(),
+        abort_transactions in vec(any::<Index>(), 0),
+        skip_rest_transactions in vec(any::<Index>(), 5),
+    ) {
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, None, true);
     }
 
     #[test]
@@ -135,7 +168,17 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, None, false);
+    }
+
+    #[test]
+    fn mixed_transactions_v2(
+        universe in vec(any::<[u8; 32]>(), 100),
+        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 5000).no_shrink(),
+        abort_transactions in vec(any::<Index>(), 5),
+        skip_rest_transactions in vec(any::<Index>(), 5),
+    ) {
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, None, true);
     }
 
     #[test]
@@ -145,11 +188,23 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 3),
         skip_rest_transactions in vec(any::<Index>(), 3),
     ) {
-        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, None, false);
     }
+
+    #[test]
+    fn dynamic_read_writes_mixed_v2(
+        universe in vec(any::<[u8; 32]>(), 100),
+        transaction_gen in vec(any_with::<TransactionGen<[u8;32]>>(TransactionGenParams::new_dynamic()), 3000).no_shrink(),
+        abort_transactions in vec(any::<Index>(), 3),
+        skip_rest_transactions in vec(any::<Index>(), 3),
+    ) {
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, None, true);
+    }
+    
+    
 }
 
-fn dynamic_read_writes_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: Option<u64>) {
+fn dynamic_read_writes_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: Option<u64>, test_block_stm_v2: bool) {
     let mut runner = TestRunner::default();
 
     let universe = vec(any::<[u8; 32]>(), 100)
@@ -170,12 +225,12 @@ fn dynamic_read_writes_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
         vec![],
         vec![],
         100,
-        (false, false),
         maybe_block_gas_limit,
+        test_block_stm_v2,
     );
 }
 
-fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: Option<u64>) {
+fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: Option<u64>, test_block_stm_v2: bool) {
     let mut runner = TestRunner::default();
 
     let universe = vec(any::<[u8; 32]>(), 50)
@@ -211,6 +266,11 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
     for _ in 0..20 {
         let mut guard = AptosModuleCacheManagerGuard::none();
 
+        let mut config = BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit);
+        if test_block_stm_v2 {
+            config.local.block_stm_v2 = true;
+        }
+
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, MockEvent>,
             MockTask<KeyType<[u8; 32]>, MockEvent>,
@@ -218,18 +278,18 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
             DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
         >::new(
-            BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
+            config,            
             executor_thread_pool.clone(),
             None,
         )
-        .execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+        .execute_block_parallel_test(&txn_provider, &data_view, &mut guard);
 
         BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)
             .assert_parallel_output(&output);
     }
 }
 
-fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: Option<u64>) {
+fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: Option<u64>, test_block_stm_v2: bool) {
     let mut runner = TestRunner::default();
 
     let universe = vec(any::<[u8; 32]>(), 50)
@@ -265,6 +325,11 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
     for _ in 0..20 {
         let mut guard = AptosModuleCacheManagerGuard::none();
 
+        let mut config = BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit);
+        if test_block_stm_v2 {
+            config.local.block_stm_v2 = true;
+        }
+
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, MockEvent>,
             MockTask<KeyType<[u8; 32]>, MockEvent>,
@@ -272,11 +337,11 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
             DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
         >::new(
-            BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
+            config,
             executor_thread_pool.clone(),
             None,
         )
-        .execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+        .execute_block_parallel_test(&txn_provider, &data_view, &mut guard);
 
         BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)
             .assert_parallel_output(&output);
@@ -286,6 +351,7 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
 fn dynamic_read_writes_contended_with_block_gas_limit(
     num_txns: usize,
     maybe_block_gas_limit: Option<u64>,
+    test_block_stm_v2: bool,
 ) {
     let mut runner = TestRunner::default();
 
@@ -308,137 +374,9 @@ fn dynamic_read_writes_contended_with_block_gas_limit(
         vec![],
         vec![],
         100,
-        (false, false),
         maybe_block_gas_limit,
+        test_block_stm_v2,
     );
-}
-
-fn publishing_fixed_params_with_block_gas_limit(
-    num_txns: usize,
-    maybe_block_gas_limit: Option<u64>,
-) {
-    let mut runner = TestRunner::default();
-
-    let universe = vec(any::<[u8; 32]>(), 50)
-        .new_tree(&mut runner)
-        .expect("creating a new value should succeed")
-        .current();
-    let transaction_gen = vec(
-        any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
-        num_txns,
-    )
-    .new_tree(&mut runner)
-    .expect("creating a new value should succeed")
-    .current();
-    let indices = vec(any::<Index>(), 4)
-        .new_tree(&mut runner)
-        .expect("creating a new value should succeed")
-        .current();
-
-    // First 12 keys are normal paths, next 14 are module reads, then writes.
-    let mut transactions: Vec<_> = transaction_gen
-        .into_iter()
-        .map(|txn_gen| txn_gen.materialize_disjoint_module_rw(&universe[0..40], 12, 26))
-        .collect();
-
-    // Adjust the writes of txn indices[0] to contain module write to key 42.
-    let w_index = indices[0].index(num_txns);
-    match transactions.get_mut(w_index).unwrap() {
-        MockTransaction::Write {
-            incarnation_counter: _,
-            incarnation_behaviors,
-        } => {
-            incarnation_behaviors.iter_mut().for_each(|behavior| {
-                assert!(!behavior.writes.is_empty());
-                let insert_idx = indices[1].index(behavior.writes.len());
-                let val = behavior.writes[0].1.clone();
-                behavior
-                    .writes
-                    .insert(insert_idx, (KeyType(universe[42], true), val));
-            });
-        },
-        _ => {
-            unreachable!();
-        },
-    };
-
-    let data_view = DeltaDataView::<KeyType<[u8; 32]>> {
-        phantom: PhantomData,
-    };
-
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
-
-    let txn_provider = DefaultTxnProvider::new(transactions.clone());
-    // Confirm still no intersection
-    let mut guard = AptosModuleCacheManagerGuard::none();
-    let output = BlockExecutor::<
-        MockTransaction<KeyType<[u8; 32]>, MockEvent>,
-        MockTask<KeyType<[u8; 32]>, MockEvent>,
-        DeltaDataView<KeyType<[u8; 32]>>,
-        NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
-        DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
-    >::new(
-        BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
-        executor_thread_pool,
-        None,
-    )
-    .execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
-    assert_ok!(output);
-
-    // Adjust the reads of txn indices[2] to contain module read to key 42.
-    let r_index = indices[2].index(num_txns);
-    match transactions.get_mut(r_index).unwrap() {
-        MockTransaction::Write {
-            incarnation_counter: _,
-            incarnation_behaviors,
-        } => {
-            incarnation_behaviors.iter_mut().for_each(|behavior| {
-                assert!(!behavior.reads.is_empty());
-                let insert_idx = indices[3].index(behavior.reads.len());
-                behavior
-                    .reads
-                    .insert(insert_idx, KeyType(universe[42], true));
-            });
-        },
-        _ => {
-            unreachable!();
-        },
-    };
-
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
-
-    let txn_provider = DefaultTxnProvider::new(transactions);
-    for _ in 0..200 {
-        let mut guard = AptosModuleCacheManagerGuard::none();
-
-        let output = BlockExecutor::<
-            MockTransaction<KeyType<[u8; 32]>, MockEvent>,
-            MockTask<KeyType<[u8; 32]>, MockEvent>,
-            DeltaDataView<KeyType<[u8; 32]>>,
-            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
-            DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
-        >::new(
-            BlockExecutorConfig::new_maybe_block_limit(
-                num_cpus::get(),
-                Some(max(w_index, r_index) as u64 * MAX_GAS_PER_TXN + 1),
-            ),
-            executor_thread_pool.clone(),
-            None,
-        ) // Ensure enough gas limit to commit the module txns (4 is maximum gas per txn)
-        .execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
-
-        assert_matches!(output, Err(()));
-    }
 }
 
 #[test_case(1000, 100, 30, 15, 0)]
@@ -517,7 +455,7 @@ fn non_empty_group(
             executor_thread_pool.clone(),
             None,
         )
-        .execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+        .execute_block_parallel_test(&txn_provider, &data_view, &mut guard);
 
         BaselineOutput::generate(txn_provider.get_txns(), None).assert_parallel_output(&output);
     }
@@ -550,40 +488,35 @@ fn non_empty_group(
     }
 }
 
-#[test]
-fn dynamic_read_writes() {
-    dynamic_read_writes_with_block_gas_limit(3000, None);
+#[test_case(true)]
+#[test_case(false)]
+fn dynamic_read_writes(test_block_stm_v2: bool) {
+    dynamic_read_writes_with_block_gas_limit(3000, None, test_block_stm_v2);
 }
 
 #[test]
 fn deltas_writes_mixed() {
-    deltas_writes_mixed_with_block_gas_limit(1000, None);
+    deltas_writes_mixed_with_block_gas_limit(1000, None, false);
 }
 
 #[test]
 fn deltas_resolver() {
-    deltas_resolver_with_block_gas_limit(1000, None);
+    deltas_resolver_with_block_gas_limit(1000, None, false);
 }
 
-#[test]
-fn dynamic_read_writes_contended() {
-    dynamic_read_writes_contended_with_block_gas_limit(1000, None);
-}
-
-// TODO(loader_v2): Fix this test.
-#[test]
-#[ignore]
-// Test a single transaction intersection interleaves with a lot of dependencies and
-// not overlapping module r/w keys.
-fn module_publishing_races() {
-    for _ in 0..5 {
-        publishing_fixed_params_with_block_gas_limit(300, None);
-    }
+#[test_case(true)]
+#[test_case(false)]
+fn dynamic_read_writes_contended(test_block_stm_v2: bool) {
+    dynamic_read_writes_contended_with_block_gas_limit(1000, None, test_block_stm_v2);
 }
 
 // The following set of tests are the same tests as above with per-block gas limit.
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(32))]
+    #![proptest_config(ProptestConfig { 
+        max_shrink_iters: 0,
+        ..ProptestConfig::with_cases(32)
+    })]
+    
     #[test]
     fn no_early_termination_with_block_gas_limit(
         universe in vec(any::<[u8; 32]>(), 100),
@@ -591,7 +524,17 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)));
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)), false);
+    }
+
+    #[test]
+    fn no_early_termination_with_block_gas_limit_v2(
+        universe in vec(any::<[u8; 32]>(), 100),
+        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 5000).no_shrink(),
+        abort_transactions in vec(any::<Index>(), 0),
+        skip_rest_transactions in vec(any::<Index>(), 0),
+    ) {
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)), true);
     }
 
     #[test]
@@ -601,7 +544,17 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 10 * MAX_GAS_PER_TXN / 2)));
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, Some(rand::thread_rng().gen_range(0, 10 * MAX_GAS_PER_TXN / 2)), false);
+    }
+
+    #[test]
+    fn abort_only_with_block_gas_limit_v2(
+        universe in vec(any::<[u8; 32]>(), 100),
+        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 10).no_shrink(),
+        abort_transactions in vec(any::<Index>(), 5),
+        skip_rest_transactions in vec(any::<Index>(), 0),
+    ) {
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, Some(rand::thread_rng().gen_range(0, 10 * MAX_GAS_PER_TXN / 2)), true);
     }
 
     #[test]
@@ -611,7 +564,17 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)));
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)), false);
+    }
+
+    #[test]
+    fn skip_rest_only_with_block_gas_limit_v2(
+        universe in vec(any::<[u8; 32]>(), 100),
+        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 5000).no_shrink(),
+        abort_transactions in vec(any::<Index>(), 0),
+        skip_rest_transactions in vec(any::<Index>(), 5),
+    ) {
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)), true);
     }
 
     #[test]
@@ -621,7 +584,17 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)));
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)), false);
+    }
+
+    #[test]
+    fn mixed_transactions_with_block_gas_limit_v2(
+        universe in vec(any::<[u8; 32]>(), 100),
+        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 5000).no_shrink(),
+        abort_transactions in vec(any::<Index>(), 5),
+        skip_rest_transactions in vec(any::<Index>(), 5),
+    ) {
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)), true);
     }
 
     #[test]
@@ -631,18 +604,30 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 3),
         skip_rest_transactions in vec(any::<Index>(), 3),
     ) {
-        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)));
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)), false);
+    }
+
+    #[test]
+    fn dynamic_read_writes_mixed_with_block_gas_limit_v2(
+        universe in vec(any::<[u8; 32]>(), 100),
+        transaction_gen in vec(any_with::<TransactionGen<[u8;32]>>(TransactionGenParams::new_dynamic()), 5000).no_shrink(),
+        abort_transactions in vec(any::<Index>(), 3),
+        skip_rest_transactions in vec(any::<Index>(), 3),
+    ) {
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)), true);
     }
 }
 
-#[test]
-fn dynamic_read_writes_with_block_gas_limit_test() {
+#[test_case(true)]
+#[test_case(false)]
+fn dynamic_read_writes_with_block_gas_limit_test(test_block_stm_v2: bool) {
     dynamic_read_writes_with_block_gas_limit(
         3000,
         // TODO: here and below, use proptest randomness, not thread_rng.
         Some(rand::thread_rng().gen_range(0, 3000) as u64),
+        test_block_stm_v2,
     );
-    dynamic_read_writes_with_block_gas_limit(3000, Some(0));
+    dynamic_read_writes_with_block_gas_limit(3000, Some(0), test_block_stm_v2);
 }
 
 #[test]
@@ -650,38 +635,28 @@ fn deltas_writes_mixed_with_block_gas_limit_test() {
     deltas_writes_mixed_with_block_gas_limit(
         1000,
         Some(rand::thread_rng().gen_range(0, 1000) as u64),
+        false,
     );
-    deltas_writes_mixed_with_block_gas_limit(1000, Some(0));
+    deltas_writes_mixed_with_block_gas_limit(1000, Some(0), false);
 }
 
 #[test]
 fn deltas_resolver_with_block_gas_limit_test() {
     deltas_resolver_with_block_gas_limit(
         1000,
-        Some(rand::thread_rng().gen_range(0, 1000 * MAX_GAS_PER_TXN / 2)),
+        Some(rand::thread_rng().gen_range(0, 1000 * MAX_GAS_PER_TXN / 2)), false
     );
-    deltas_resolver_with_block_gas_limit(1000, Some(0));
+    deltas_resolver_with_block_gas_limit(1000, Some(0), false);
 }
 
-#[test]
-fn dynamic_read_writes_contended_with_block_gas_limit_test() {
+#[test_case(false)]
+#[test_case(true)]
+fn dynamic_read_writes_contended_with_block_gas_limit_test(test_block_stm_v2: bool) {
     dynamic_read_writes_contended_with_block_gas_limit(
         1000,
         Some(rand::thread_rng().gen_range(0, 1000) as u64),
+        test_block_stm_v2,
     );
-    dynamic_read_writes_contended_with_block_gas_limit(1000, Some(0));
+    dynamic_read_writes_contended_with_block_gas_limit(1000, Some(0), test_block_stm_v2);
 }
 
-// TODO(loader_v2): Fix this test.
-#[test]
-#[ignore]
-// Test a single transaction intersection interleaves with a lot of dependencies and
-// not overlapping module r/w keys.
-fn module_publishing_races_with_block_gas_limit_test() {
-    for _ in 0..5 {
-        publishing_fixed_params_with_block_gas_limit(
-            300,
-            Some(rand::thread_rng().gen_range(0, 300 * MAX_GAS_PER_TXN / 2)),
-        );
-    }
-}

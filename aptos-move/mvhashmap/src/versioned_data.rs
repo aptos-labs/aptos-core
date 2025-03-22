@@ -169,7 +169,7 @@ impl<V: TransactionWrite> VersionedValue<V> {
         // If we have dependencies, validate against the next (lower) entry, if applicable.
         if !dependencies.is_empty() {
             if let Some((idx, next_entry)) = self.versioned_map.range(..=ShiftedTxnIndex::new(txn_idx)).next_back() {
-                assert_ne!(idx.idx().unwrap(), txn_idx, "Entry at txn_idx must be removed before calling handle_removed_dependencies");
+                assert_ne!(idx.idx(), Ok(txn_idx), "Entry at txn_idx must be removed before calling handle_removed_dependencies");
                 
                 if let EntryCell::Write(_, ValueWithLayout::Exchanged(v, l), next_deps) = &next_entry.value {
                     let validation_passed = if ONLY_COMPARE_METADATA {
