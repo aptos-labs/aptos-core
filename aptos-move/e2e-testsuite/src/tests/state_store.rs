@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_language_e2e_tests::{
-    account::AccountData, compile::compile_script, current_function_name,
-    data_store::FakeDataStore, executor::FakeExecutor,
+    account::AccountData, compile::compile_script, current_function_name, executor::FakeExecutor,
 };
+use aptos_transaction_simulation::SimulationStateStore;
 use aptos_types::transaction::{
     ExecutionStatus, SignedTransaction, Transaction, TransactionStatus,
 };
@@ -22,7 +22,7 @@ fn move_from_across_blocks() {
     executor.add_account_data(&sender);
 
     // publish module with add and remove resource
-    let module = add_module(executor.data_store_mut(), &sender);
+    let module = add_module(executor.state_store(), &sender);
 
     // remove resource fails given no resource were published
     let rem_txn = remove_resource_txn(&sender, 11, vec![module.clone()]);
@@ -100,7 +100,7 @@ fn borrow_after_move() {
     executor.add_account_data(&sender);
 
     // publish module with add and remove resource
-    let module = add_module(executor.data_store_mut(), &sender);
+    let module = add_module(executor.state_store(), &sender);
 
     // remove resource fails given no resource were published
     let rem_txn = remove_resource_txn(&sender, 11, vec![module.clone()]);
@@ -150,7 +150,7 @@ fn change_after_move() {
     executor.add_account_data(&sender);
 
     // publish module with add and remove resource
-    let module = add_module(executor.data_store_mut(), &sender);
+    let module = add_module(executor.state_store(), &sender);
 
     // remove resource fails given no resource were published
     let rem_txn = remove_resource_txn(&sender, 11, vec![module.clone()]);
@@ -202,7 +202,7 @@ fn change_after_move() {
     executor.apply_write_set(output.write_set());
 }
 
-fn add_module(data_store: &mut FakeDataStore, sender: &AccountData) -> CompiledModule {
+fn add_module(state_store: &impl SimulationStateStore, sender: &AccountData) -> CompiledModule {
     let code = format!(
         "
         module 0x{}.M {{
@@ -255,7 +255,9 @@ fn add_module(data_store: &mut FakeDataStore, sender: &AccountData) -> CompiledM
         .serialize(&mut module_bytes)
         .expect("Module must serialize");
 
-    data_store.add_module(&module.self_id(), module_bytes);
+    state_store
+        .add_module_blob(&module.self_id(), module_bytes)
+        .expect("should be able to add module");
     module
 }
 

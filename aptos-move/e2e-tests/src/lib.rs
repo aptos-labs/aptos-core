@@ -14,13 +14,11 @@ pub mod account;
 pub mod account_universe;
 pub mod common_transactions;
 pub mod compile;
-pub mod data_store;
 pub mod execution_strategies;
 pub mod executor;
 pub mod gas_costs;
 mod golden_outputs;
 pub mod loader;
-mod proptest_types;
 
 pub fn assert_status_eq(s1: &KeptVMStatus, s2: &KeptVMStatus) -> bool {
     assert_eq!(s1, s2);
