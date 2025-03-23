@@ -7,6 +7,7 @@ use crate::{
         observer::{
             ordered_blocks::OrderedBlockStore,
             payload_store::{BlockPayloadStatus, BlockPayloadStore},
+            pending_blocks::PendingBlockStore,
         },
         publisher::consensus_publisher::ConsensusPublisher,
     },
@@ -104,8 +105,10 @@ impl ActiveObserverState {
     /// root ledger info and remove the blocks from the given stores.
     pub fn create_commit_callback(
         &self,
-        pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
         block_payload_store: Arc<Mutex<BlockPayloadStore>>,
+        pending_block_store: Arc<Mutex<PendingBlockStore>>,
+        pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
+        execution_pool_window_size: Option<u64>,
     ) -> Box<dyn FnOnce(LedgerInfoWithSignatures) + Send + Sync> {
         // Clone the root pointer
         let root = self.root.clone();
@@ -113,8 +116,10 @@ impl ActiveObserverState {
         // Create the commit callback
         Box::new(move |ledger_info: LedgerInfoWithSignatures| {
             handle_committed_blocks(
-                pending_ordered_blocks,
                 block_payload_store,
+                pending_block_store,
+                pending_ordered_blocks,
+                execution_pool_window_size,
                 root,
                 ledger_info,
             );
@@ -124,10 +129,17 @@ impl ActiveObserverState {
     /// Creates and returns the commit callback used by old pipeline.
     pub fn create_commit_callback_deprecated(
         &self,
-        pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
         block_payload_store: Arc<Mutex<BlockPayloadStore>>,
+        pending_block_store: Arc<Mutex<PendingBlockStore>>,
+        pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
+        execution_pool_window_size: Option<u64>,
     ) -> StateComputerCommitCallBackType {
-        let callback = self.create_commit_callback(pending_ordered_blocks, block_payload_store);
+        let callback = self.create_commit_callback(
+            block_payload_store,
+            pending_block_store,
+            pending_ordered_blocks,
+            execution_pool_window_size,
+        );
         Box::new(move |_, ledger_info| callback(ledger_info))
     }
 
@@ -305,16 +317,20 @@ async fn extract_on_chain_configs(
 /// A simple helper function that handles the committed blocks
 /// (as part of the commit callback).
 fn handle_committed_blocks(
-    pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
     block_payload_store: Arc<Mutex<BlockPayloadStore>>,
+    pending_block_store: Arc<Mutex<PendingBlockStore>>,
+    pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
+    execution_pool_window_size: Option<u64>,
     root: Arc<Mutex<LedgerInfoWithSignatures>>,
     ledger_info: LedgerInfoWithSignatures,
 ) {
     // Remove the committed blocks from the payload and pending stores
-    block_payload_store.lock().remove_blocks_for_epoch_round(
-        ledger_info.commit_info().epoch(),
-        ledger_info.commit_info().round(),
-    );
+    block_payload_store
+        .lock()
+        .remove_block_payloads_for_commit(&ledger_info, execution_pool_window_size);
+    pending_block_store
+        .lock()
+        .remove_blocks_for_commit(&ledger_info, execution_pool_window_size);
     pending_ordered_blocks
         .lock()
         .remove_blocks_for_commit(&ledger_info);
@@ -354,9 +370,12 @@ mod test {
     use super::*;
     use crate::consensus_observer::{
         network::observer_message::{BlockPayload, BlockTransactionPayload, OrderedBlock},
-        observer::execution_pool::ObservedOrderedBlock,
+        observer::{
+            execution_pool::ObservedOrderedBlock, pending_blocks::PendingBlockWithMetadata,
+        },
     };
     use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+    use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
     use aptos_consensus_types::{
         block::Block,
         block_data::{BlockData, BlockType},
@@ -369,6 +388,7 @@ mod test {
         aggregate_signature::AggregateSignature, block_info::BlockInfo, ledger_info::LedgerInfo,
         transaction::Version,
     };
+    use std::time::Instant;
 
     #[test]
     fn test_check_root_epoch_and_round() {
@@ -435,18 +455,23 @@ mod test {
         let round = 100;
         let root = Arc::new(Mutex::new(create_ledger_info(epoch, round)));
 
-        // Create the ordered block store and block payload store
-        let ordered_block_store = Arc::new(Mutex::new(OrderedBlockStore::new(
+        // Create the block stores
+        let block_payload_store = Arc::new(Mutex::new(BlockPayloadStore::new(
             node_config.consensus_observer,
         )));
-        let block_payload_store = Arc::new(Mutex::new(BlockPayloadStore::new(
+        let pending_block_store: Arc<Mutex<PendingBlockStore>> = Arc::new(Mutex::new(
+            PendingBlockStore::new(node_config.consensus_observer),
+        ));
+        let ordered_block_store = Arc::new(Mutex::new(OrderedBlockStore::new(
             node_config.consensus_observer,
         )));
 
         // Handle the committed blocks at the wrong epoch and verify the root is not updated
         handle_committed_blocks(
-            ordered_block_store.clone(),
             block_payload_store.clone(),
+            pending_block_store.clone(),
+            ordered_block_store.clone(),
+            None,
             root.clone(),
             create_ledger_info(epoch + 1, round + 1),
         );
@@ -454,8 +479,10 @@ mod test {
 
         // Handle the committed blocks at the wrong round and verify the root is not updated
         handle_committed_blocks(
-            ordered_block_store.clone(),
             block_payload_store.clone(),
+            pending_block_store.clone(),
+            ordered_block_store.clone(),
+            None,
             root.clone(),
             create_ledger_info(epoch, round - 1),
         );
@@ -470,36 +497,120 @@ mod test {
             round,
         );
 
-        // Add block payloads for the ordered blocks
+        // Add blocks and payloads for the ordered blocks
         for ordered_block in &ordered_blocks {
             create_and_add_payloads_for_ordered_block(block_payload_store.clone(), ordered_block);
+            add_pending_block_for_ordered_block(pending_block_store.clone(), ordered_block);
         }
 
         // Create the commit ledger info (for the second to last block)
         let commit_round = round + (num_ordered_blocks as Round) - 2;
         let committed_ledger_info = create_ledger_info(epoch, commit_round);
 
-        // Create the committed blocks and ledger info
-        let mut committed_blocks = vec![];
-        for ordered_block in ordered_blocks.iter().take(num_ordered_blocks - 1) {
-            let pipelined_block = create_pipelined_block(ordered_block.blocks()[0].block_info());
-            committed_blocks.push(pipelined_block);
-        }
-
-        // Handle the committed blocks
+        // Handle the committed blocks (without an execution pool window)
         handle_committed_blocks(
-            ordered_block_store.clone(),
             block_payload_store.clone(),
+            pending_block_store.clone(),
+            ordered_block_store.clone(),
+            None,
             root.clone(),
             committed_ledger_info.clone(),
         );
 
         // Verify the committed blocks are removed from the stores
-        assert_eq!(ordered_block_store.lock().get_all_ordered_blocks().len(), 1);
         assert_eq!(
             block_payload_store.lock().get_block_payloads().lock().len(),
             1
         );
+        assert_eq!(pending_block_store.lock().get_pending_blocks().len(), 1);
+        assert_eq!(ordered_block_store.lock().get_all_ordered_blocks().len(), 1);
+
+        // Verify the root is updated
+        assert_eq!(root.lock().clone(), committed_ledger_info);
+    }
+
+    #[test]
+    fn test_handle_committed_blocks_execution_pool() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let observer_block_window_buffer_multiplier = 2; // Buffer twice the window
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            observer_block_window_buffer_multiplier,
+            ..ConsensusObserverConfig::default()
+        };
+
+        // Create a node config using the observer config
+        let node_config = NodeConfig {
+            consensus_observer: consensus_observer_config,
+            ..NodeConfig::default()
+        };
+
+        // Create the root ledger info
+        let epoch = 10;
+        let round = 500;
+        let root = Arc::new(Mutex::new(create_ledger_info(epoch, round)));
+
+        // Create the block stores
+        let block_payload_store = Arc::new(Mutex::new(BlockPayloadStore::new(
+            node_config.consensus_observer,
+        )));
+        let pending_block_store: Arc<Mutex<PendingBlockStore>> = Arc::new(Mutex::new(
+            PendingBlockStore::new(node_config.consensus_observer),
+        ));
+        let ordered_block_store = Arc::new(Mutex::new(OrderedBlockStore::new(
+            node_config.consensus_observer,
+        )));
+
+        // Add pending ordered blocks
+        let num_ordered_blocks = 50;
+        let ordered_blocks = create_and_add_ordered_blocks(
+            ordered_block_store.clone(),
+            num_ordered_blocks,
+            epoch,
+            round,
+        );
+
+        // Add blocks and payloads for the ordered blocks
+        for ordered_block in &ordered_blocks {
+            create_and_add_payloads_for_ordered_block(block_payload_store.clone(), ordered_block);
+            add_pending_block_for_ordered_block(pending_block_store.clone(), ordered_block);
+        }
+
+        // Create the commit ledger info (for the last block)
+        let commit_round = round + (num_ordered_blocks as Round) - 1;
+        let committed_ledger_info = create_ledger_info(epoch, commit_round);
+
+        // Handle the committed blocks (with an execution pool window)
+        let execution_pool_window_size = 10;
+        handle_committed_blocks(
+            block_payload_store.clone(),
+            pending_block_store.clone(),
+            ordered_block_store.clone(),
+            Some(execution_pool_window_size),
+            root.clone(),
+            committed_ledger_info.clone(),
+        );
+
+        // Verify that the payload store still contains a buffer of payloads
+        let execution_pool_buffer =
+            execution_pool_window_size as usize * observer_block_window_buffer_multiplier as usize;
+        assert_eq!(
+            block_payload_store.lock().get_block_payloads().lock().len(),
+            execution_pool_buffer
+        );
+
+        // Verify that the block store still contains a buffer of blocks
+        assert_eq!(
+            pending_block_store.lock().get_pending_blocks().len(),
+            execution_pool_buffer
+        );
+
+        // Verify that all the committed blocks are removed from the ordered block store
+        assert!(ordered_block_store
+            .lock()
+            .get_all_ordered_blocks()
+            .is_empty());
 
         // Verify the root is updated
         assert_eq!(root.lock().clone(), committed_ledger_info);
@@ -533,6 +644,22 @@ mod test {
         assert_eq!(observer_state.epoch_state(), epoch_state);
         assert_eq!(observer_state.execution_pool_window_size(), Some(1));
         assert!(observer_state.is_quorum_store_enabled());
+    }
+
+    /// Adds a pending block to blocks store for the given ordered block
+    fn add_pending_block_for_ordered_block(
+        pending_block_store: Arc<Mutex<PendingBlockStore>>,
+        ordered_block: &OrderedBlock,
+    ) {
+        let observed_ordered_block = ObservedOrderedBlock::new_for_testing(ordered_block.clone());
+        let pending_block_with_metadata = PendingBlockWithMetadata::new_with_arc(
+            PeerNetworkId::random(),
+            Instant::now(),
+            observed_ordered_block,
+        );
+        pending_block_store
+            .lock()
+            .insert_pending_block(pending_block_with_metadata);
     }
 
     /// Creates and adds the specified number of ordered blocks to the ordered blocks
