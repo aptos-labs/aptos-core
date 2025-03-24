@@ -259,11 +259,15 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     t.resource_write_set()
                         .into_iter()
                         .map(|(k, _, _)| (k, KeyKind::Resource))
-                        .chain(t.aggregator_v1_write_set().into_keys().map(|k| (k, KeyKind::AggregatorV1)))
+                        .chain(
+                            t.aggregator_v1_write_set()
+                                .into_keys()
+                                .map(|k| (k, KeyKind::AggregatorV1)),
+                        )
                         .chain(
                             t.aggregator_v1_delta_set()
                                 .into_iter()
-                                .map(|(k, _)| (k, KeyKind::AggregatorV1))
+                                .map(|(k, _)| (k, KeyKind::AggregatorV1)),
                         )
                         .chain(
                             group_keys_and_tags

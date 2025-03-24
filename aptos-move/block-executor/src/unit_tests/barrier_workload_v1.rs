@@ -33,7 +33,6 @@ use aptos_vm_types::{
 use bytes::Bytes;
 use move_core_types::{identifier::IdentStr, value::MoveTypeLayout};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use num_cpus;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{
     collections::{BTreeMap, HashSet},
@@ -268,7 +267,7 @@ impl ExecutorTask for MockTask {
                 .write_keys
                 .iter()
                 .map(|key| {
-                    (key.clone(), TestValue {
+                    (*key, TestValue {
                         txn_idx: txn_idx as usize,
                     })
                 })
@@ -301,10 +300,7 @@ fn barrier_workload_v1(
         let transactions = (0..num_txns)
             .map(|idx| TestTransaction {
                 write_keys: if idx % barrier_interval == 0 {
-                    (0..num_keys)
-                        .into_iter()
-                        .map(|key| TestKey { key })
-                        .collect()
+                    (0..num_keys).map(|key| TestKey { key }).collect()
                 } else {
                     vec![TestKey {
                         key: r.gen_range(0, num_keys),

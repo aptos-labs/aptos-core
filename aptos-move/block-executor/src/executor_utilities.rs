@@ -17,7 +17,10 @@ use bytes::Bytes;
 use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
 use rand::{thread_rng, Rng};
-use std::{collections::{BTreeMap, HashMap}, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
 // TODO(clean-up): refactor & replace these macros with functions for code clarity. Currently
 // not possible due to type & API mismatch.
@@ -89,13 +92,13 @@ pub(crate) fn remove_from_previous_keys<T: Transaction>(
 ) -> Result<(), PanicError> {
     match (prev_modified_keys.remove(key), expected_kind) {
         (None, _) => Ok(()),
-        (Some(KeyKind::Resource), KeyKind::Resource) |
-        (Some(KeyKind::AggregatorV1), KeyKind::AggregatorV1) |
-        (Some(KeyKind::Group(_)), KeyKind::Group(_)) => Ok(()),
+        (Some(KeyKind::Resource), KeyKind::Resource)
+        | (Some(KeyKind::AggregatorV1), KeyKind::AggregatorV1)
+        | (Some(KeyKind::Group(_)), KeyKind::Group(_)) => Ok(()),
         _ => Err(code_invariant_error(format!(
             "Resource key {:?} recorded as a wrong KeyKind in prior incarnation",
             key,
-        )))
+        ))),
     }
 }
 

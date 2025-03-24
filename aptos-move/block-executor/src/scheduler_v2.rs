@@ -137,7 +137,7 @@ impl<'a> AbortManager<'a> {
         Ok(self
             .scheduler
             .try_abort(txn_idx, incarnation)?
-            .then(|| incarnation))
+            .then_some(incarnation))
     }
 
     // Returns an iterator over invalidated transaction indices, as well as full versions,
@@ -203,7 +203,7 @@ impl AbortedDependencies {
     ) -> Result<(), PanicError> {
         for idx in &self.not_stalled_deps {
             // Assert the invariant in tests.
-            test_assert!(!self.stalled_deps.contains(&idx));
+            test_assert!(!self.stalled_deps.contains(idx));
 
             if statuses[*idx as usize].add_stall()? {
                 // May require recursive add_stalls.
@@ -226,7 +226,7 @@ impl AbortedDependencies {
     ) -> Result<(), PanicError> {
         for idx in &self.stalled_deps {
             // Assert the invariant in tests.
-            test_assert!(!self.not_stalled_deps.contains(&idx));
+            test_assert!(!self.not_stalled_deps.contains(idx));
 
             if statuses[*idx as usize].remove_stall()? {
                 // May require recursive remove_stalls.
@@ -454,7 +454,7 @@ impl SchedulerV2 {
             // (which, inductively, must occur before the transaction is committed). Hence, it
             // must also be safe to commit the current transaction.
 
-            if self.committed_marker[next_to_commit_idx as usize]
+            if self.committed_marker[next_to_commit_idx]
                 .swap(PENDING_COMMIT_HOOK, Ordering::Relaxed)
                 != NOT_COMMITTED
             {
@@ -537,6 +537,7 @@ impl SchedulerV2 {
     // the status w. default dependency instruction, and return Ok(true) if the resolution
     // is SafeToProceed, Ok(false) o.w. (PanicError for invariant violations). Implementation
     // is wait-free, so the caller can simultaneously hold locks on multi-versioned data-structure.
+    #[allow(dead_code)]
     pub(crate) fn resolve_dependency_happy_path(
         &self,
         txn_idx: TxnIndex,
@@ -561,6 +562,7 @@ impl SchedulerV2 {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn resolve_hint(&self, dep_txn_idx: TxnIndex) -> Result<(), PanicError> {
         if let DependencyResolution::Wait(dep_condition) =
             self.txn_status[dep_txn_idx as usize].resolve_dependency(DependencyInstruction::Wait)?
@@ -583,6 +585,7 @@ impl SchedulerV2 {
     // from the committed prefix) that have already executed once (hence, generated the first
     // approximation of their output, which is valuable), and are likely to be aborted (having
     // already aborted due to the same dependency).
+    #[allow(dead_code)]
     pub(crate) fn resolve_dependency(
         &self,
         txn_idx: TxnIndex,
@@ -687,7 +690,7 @@ impl SchedulerV2 {
             // there is no need to record (and stall, etc) the corresponding dependency.
             self.aborted_dependencies[txn_idx as usize]
                 .lock()
-                .record_dependencies(invalidated_set.iter().map(|(txn_idx, _)| *txn_idx));
+                .record_dependencies(invalidated_set.keys().copied());
         }
 
         let mut propagation_queue: BTreeSet<usize> = BTreeSet::new();
@@ -808,6 +811,7 @@ impl SchedulerV2 {
     // Returns the priority of the transaction based on its proximity with the committed prefix.
     // PanicError is returned if txn_idx is already committed.
     // TODO: adjust the threshold, make priority more fine grained.
+    #[allow(dead_code)]
     fn priority(&self, txn_idx: TxnIndex) -> Result<ExecutionPriority, PanicError> {
         // TODO: less occasional updates for more cores.
         let next_to_commit_idx = self.next_to_commit_idx.load(Ordering::Relaxed);
@@ -847,7 +851,6 @@ mod tests {
     use claims::{assert_err, assert_lt, assert_none, assert_ok, assert_ok_eq, assert_some_eq};
     use dashmap::DashMap;
     use fail::FailScenario;
-    use num_cpus;
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use std::{
         cmp::min,
@@ -948,9 +951,8 @@ mod tests {
         proxy
             .execution_queue
             .lock()
-            .append(&mut (2..status_len).into_iter().collect());
-        deps.not_stalled_deps
-            .append(&mut (2..status_len).into_iter().collect());
+            .append(&mut (2..status_len).collect());
+        deps.not_stalled_deps.append(&mut (2..status_len).collect());
         assert_ok!(deps.add_stall(&statuses, &mut propagation_queue));
 
         // Check the results: execution queue, propagation_queue, deps.stalled & not_stalled.
@@ -1057,7 +1059,7 @@ mod tests {
 
         proxy.execution_queue.lock().clear();
         deps.stalled_deps
-            .append(&mut (2..statuses.len() as u32).into_iter().collect());
+            .append(&mut (2..statuses.len() as u32).collect());
         assert_ok!(deps.remove_stall(&statuses, &mut propagation_queue,));
 
         // Check the results: scheduling queue, propagation_queue, deps.stalled & not_stalled.
@@ -1079,6 +1081,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn propagate() {
         let scheduler = SchedulerV2::new(10, 2);
 
@@ -1087,9 +1090,7 @@ mod tests {
             assert!(!scheduler.aborted_dependencies[idx].lock().is_stalled);
             assert!(!scheduler.txn_status[idx].is_stalled());
         }
-        scheduler
-            .propagate(BTreeSet::from(test_indices.clone()))
-            .unwrap();
+        scheduler.propagate(BTreeSet::from(test_indices)).unwrap();
         for idx in test_indices {
             assert!(scheduler.aborted_dependencies[idx].lock().is_stalled);
             // Propagate does not call stall for the status itself, only
@@ -1659,7 +1660,7 @@ mod tests {
             let txn_write_keys: Vec<Vec<usize>> = (0..num_txns)
                 .map(|idx| {
                     if idx % barrier_interval == 0 {
-                        (0..num_keys).into_iter().collect()
+                        (0..num_keys).collect()
                     } else {
                         vec![r.gen_range(0, num_keys)]
                     }
