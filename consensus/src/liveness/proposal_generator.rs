@@ -615,7 +615,7 @@ impl ProposalGenerator {
                     max_txns_from_block_to_execute,
                     block_gas_limit_override,
                 );
-            } else if block_gas_limit_override.is_some() {
+            } else if !payload.is_direct() && block_gas_limit_override.is_some() {
                 payload = payload.transform_to_payload_with_limits(None, block_gas_limit_override);
             }
             (validator_txns, payload, timestamp.as_micros() as u64)

@@ -226,7 +226,7 @@ impl Payload {
     ) -> Self {
         match self {
             Payload::DirectMempool(_) => {
-                panic!("Payload is in direct mempool format");
+                unreachable!("Payload is in direct mempool format");
             },
             Payload::Legacy1 | Payload::Legacy2 => {
                 unreachable!("Payload is in legacy format");
