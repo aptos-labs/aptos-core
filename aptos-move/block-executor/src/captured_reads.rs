@@ -381,6 +381,7 @@ impl<T: Transaction, K, DC, VC, S> Default for CapturedReads<T, K, DC, VC, S> {
 }
 
 impl<T: Transaction, K, DC, VC, S> CapturedReads<T, K, DC, VC, S> {
+    #[allow(deprecated)]
     pub(crate) fn new(block_stm_v2: bool) -> Self {
         Self {
             data_reads: HashMap::new(),
@@ -918,16 +919,14 @@ where
 #[cfg(test)]
 mod test {
     // TODO(BlockSTMv2): test compare_data_reads with true.
-    
+
     use super::*;
     use crate::{
         code_cache_global::GlobalModuleCache,
         proptest_types::types::{raw_metadata, KeyType, MockEvent, ValueType},
     };
     use aptos_mvhashmap::{types::StorageVersion, MVHashMap};
-    use claims::{
-        assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_ok_eq,
-    };
+    use claims::{assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_ok_eq};
     use move_vm_types::{
         code::{
             mock_deserialized_code, mock_verified_code, MockDeserializedCode, MockExtension,
@@ -999,7 +998,11 @@ mod test {
 
     macro_rules! assert_contains {
         ($x:expr, $y:expr) => {{
-            assert!(data_read_equals(&$x.downcast($y.get_kind()).unwrap(), &$y, false));
+            assert!(data_read_equals(
+                &$x.downcast($y.get_kind()).unwrap(),
+                &$y,
+                false
+            ));
             assert_matches!($x.contains(&$y, false), DataReadComparison::Contains);
         }};
     }
@@ -1336,8 +1339,11 @@ mod test {
                     if $mt.is_none() || j != 1 {
                         // Do not request metadata of group member
                         assert!(data_read_equals(
-                            &$x.get_by_kind(&$k, $mt.as_ref(), read_kinds[j].clone()).unwrap(),
-                            &$y[j], false));
+                            &$x.get_by_kind(&$k, $mt.as_ref(), read_kinds[j].clone())
+                                .unwrap(),
+                            &$y[j],
+                            false
+                        ));
                         //assert_some_eq!(
                         //    $x.get_by_kind(&$k, $mt.as_ref(), read_kinds[j].clone()),
                         //    $y[j]

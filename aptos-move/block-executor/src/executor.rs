@@ -147,15 +147,12 @@ where
                 ));
                 Ok(None)
             },
-            ExecutionStatus::Abort(_err) => {
-                Ok(None)
-            }
+            ExecutionStatus::Abort(_err) => Ok(None),
             ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
                 Err(code_invariant_error(format!(
                     "[Execution] At txn {}, failed with DelayedFieldsCodeInvariantError: {:?}",
                     txn_idx, msg
-                ))
-                .into())
+                )))
             },
         }
     }
@@ -382,7 +379,7 @@ where
         };
 
         let resource_write_set = match processed_output {
-            Some(output) => apply_updates(&output)?,
+            Some(output) => apply_updates(output)?,
             None => Vec::new(),
         };
 
@@ -1125,7 +1122,8 @@ where
         &self,
         block: &TP,
         environment: &AptosEnvironment,
-        worker_id: u32,
+        // TODO: use worker id.
+        _worker_id: u32,
         num_workers: u32,
         shared_sync_params: &SharedSyncParams<'_, T, E, S>,
         start_delayed_field_id_counter: u32,
@@ -1260,7 +1258,7 @@ where
                         match kind {
                             Resource => {
                                 abort_manager.invalidate_dependencies(
-                                    versioned_cache.data().remove_v2::<false>(&k, txn_idx)
+                                    versioned_cache.data().remove_v2::<false>(&k, txn_idx),
                                 )?;
                             },
                             AggregatorV1 => {
