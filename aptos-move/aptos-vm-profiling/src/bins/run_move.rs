@@ -13,8 +13,9 @@ use move_core_types::{
 };
 use move_ir_compiler::Compiler;
 use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, native_extensions::NativeContextExtensions,
-    native_functions::NativeFunction, AsUnsyncCodeStorage, RuntimeEnvironment,
+    data_cache::TransactionDataCache, module_traversal::*, move_vm::MoveVM,
+    native_extensions::NativeContextExtensions, native_functions::NativeFunction,
+    AsUnsyncCodeStorage, CodeStorage, ModuleStorage, RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
@@ -184,36 +185,29 @@ fn main() -> Result<()> {
 
     let mut extensions = NativeContextExtensions::default();
     extensions.add(NativeTableContext::new([0; 32], &storage));
-    let mut sess = MoveVM::new_session_with_extensions(&storage, extensions);
 
     let traversal_storage = TraversalStorage::new();
     let code_storage = storage.as_unsync_code_storage();
 
-    let args: Vec<Vec<u8>> = vec![];
-    match entrypoint {
-        Entrypoint::Script(script_blob) => {
-            sess.load_and_execute_script(
-                script_blob,
-                vec![],
-                args,
-                &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
-                &code_storage,
-            )?;
-        },
+    let func = match &entrypoint {
+        Entrypoint::Script(script_blob) => code_storage.load_script(script_blob, &[])?,
         Entrypoint::Module(module_id) => {
-            let res = sess.execute_function_bypass_visibility(
-                &module_id,
-                ident_str!("run"),
-                vec![],
-                args,
-                &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
-                &code_storage,
-            )?;
-            println!("{:?}", res);
+            code_storage.load_function(module_id, ident_str!("run"), &[])?
         },
-    }
+    };
+    let args: Vec<Vec<u8>> = vec![];
+
+    let return_values = MoveVM::execute_loaded_function(
+        func,
+        args,
+        &mut TransactionDataCache::empty(),
+        &mut UnmeteredGasMeter,
+        &mut TraversalContext::new(&traversal_storage),
+        &mut extensions,
+        &code_storage,
+        &storage,
+    )?;
+    println!("{:?}", return_values);
 
     Ok(())
 }
