@@ -1,7 +1,10 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::compiler::{as_module, as_script, compile_units_with_stdlib};
+use crate::{
+    compiler::{as_module, as_script, compile_units_with_stdlib},
+    tests::execute_script_for_test,
+};
 use move_binary_format::file_format::{Bytecode, CompiledModule, CompiledScript, SignatureIndex};
 use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
@@ -10,11 +13,8 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{
-    config::VMConfig, module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage, RuntimeEnvironment,
-};
+use move_vm_runtime::{config::VMConfig, RuntimeEnvironment};
 use move_vm_test_utils::InMemoryStorage;
-use move_vm_types::gas::UnmeteredGasMeter;
 use std::time::Instant;
 
 fn get_nested_struct_type(
@@ -127,7 +127,7 @@ fn script_large_ty() {
     // constructs a type with about 25^3 nodes
     let num_type_args = 25;
     let struct_name = Identifier::new(format!("Struct{}TyArgs", num_type_args)).unwrap();
-    let input_type = get_nested_struct_type(
+    let input_ty = get_nested_struct_type(
         3,
         num_type_args,
         module_address,
@@ -135,19 +135,8 @@ fn script_large_ty() {
         struct_name,
     );
 
-    let mut session = MoveVM::new_session(&storage);
-    let code_storage = storage.as_unsync_code_storage();
-    let traversal_storage = TraversalStorage::new();
-    let res = session
-        .load_and_execute_script(
-            script.as_ref(),
-            vec![input_type],
-            Vec::<Vec<u8>>::new(),
-            &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
-            &code_storage,
-        )
-        .unwrap_err();
-
-    assert_eq!(res.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
+    let status = execute_script_for_test(&storage, &script, &[input_ty], vec![])
+        .unwrap_err()
+        .major_status();
+    assert_eq!(status, StatusCode::TOO_MANY_TYPE_NODES);
 }
