@@ -370,16 +370,13 @@ impl ExecutionStatus {
         let prev_value = self
             .next_incarnation_to_try_abort
             .fetch_max(incarnation + 1, Ordering::Relaxed);
-        if incarnation < prev_value {
-            Ok(false)
-        } else if incarnation == prev_value {
-            Ok(true)
-        } else {
-            assert!(incarnation > prev_value);
-            Err(code_invariant_error(format!(
+        match incarnation.cmp(&prev_value) {
+            std::cmp::Ordering::Less => Ok(false),
+            std::cmp::Ordering::Equal => Ok(true),
+            std::cmp::Ordering::Greater => Err(code_invariant_error(format!(
                 "Try abort incarnation {} > self.next_incarnation_to_try_abort = {}",
                 incarnation, prev_value,
-            )))
+            ))),
         }
     }
 
@@ -800,7 +797,7 @@ mod tests {
             StatusEnum::PendingScheduling
         );
         assert_simple_status_state(
-            &status,
+            status,
             if stall_before_finish { 1 } else { 0 },
             expected_incarnation,
             DEPENDENCY_DEFER_FLAG,
@@ -1336,7 +1333,7 @@ mod tests {
     #[should_panic]
     fn incarnate_check() {
         let status = ExecutionStatus::new(Arc::new(SchedulerProxy::new_for_test(10)), 10);
-        status.incarnate(&mut *status.inner_status.lock(), 0);
+        status.incarnate(&mut status.inner_status.lock(), 0);
     }
 
     #[test]
@@ -1364,7 +1361,7 @@ mod tests {
             assert!(!status.pending_scheduling_and_not_stalled());
             assert_eq!(status.inner_status.lock().incarnation(), 0);
 
-            status.incarnate(&mut *status.inner_status.lock(), 1);
+            status.incarnate(&mut status.inner_status.lock(), 1);
 
             assert_eq!(status.inner_status.lock().incarnation(), 1);
             assert_eq!(
@@ -1413,7 +1410,7 @@ mod tests {
             assert!(!status.pending_scheduling_and_not_stalled());
 
             let new_incarnation = status.next_incarnation_to_try_abort.load(Ordering::Relaxed) + 1;
-            status.incarnate(&mut *status.inner_status.lock(), new_incarnation);
+            status.incarnate(&mut status.inner_status.lock(), new_incarnation);
 
             assert_eq!(status.inner_status.lock().incarnation(), new_incarnation);
             assert_eq!(

@@ -626,13 +626,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         let is_module_write = |_| -> bool { false };
         let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
 
-        self.new_mock_write_txn(
-            universe,
-            &is_module_read,
-            &is_module_write,
-            &is_delta,
-            true,
-        )
+        self.new_mock_write_txn(universe, &is_module_read, &is_module_write, &is_delta, true)
     }
 
     // Generates a mock txn without group reads/writes and converts it to have group
