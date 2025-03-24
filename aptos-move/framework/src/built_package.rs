@@ -48,14 +48,6 @@ use std::{
 pub const METADATA_FILE_NAME: &str = "package-metadata.bcs";
 pub const UPGRADE_POLICY_CUSTOM_FIELD: &str = "upgrade_policy";
 
-pub const APTOS_PACKAGES: [&str; 5] = [
-    "AptosFramework",
-    "MoveStdlib",
-    "AptosStdlib",
-    "AptosToken",
-    "AptosTokenObjects",
-];
-
 /// Represents a set of options for building artifacts from Move.
 #[derive(Debug, Clone, Parser, Serialize, Deserialize)]
 pub struct BuildOptions {
@@ -133,6 +125,15 @@ impl Default for BuildOptions {
         }
     }
 }
+
+pub const APTOS_PACKAGES: [&str; 6] = [
+    "AptosFramework",
+    "MoveStdlib",
+    "AptosStdlib",
+    "AptosToken",
+    "AptosTokenObjects",
+    "AptosExperimental",
+];
 
 impl BuildOptions {
     pub fn move_2() -> Self {

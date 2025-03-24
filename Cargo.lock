@@ -1948,21 +1948,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-framework-experimental"
-version = "0.1.0"
-dependencies = [
- "aptos-framework",
- "aptos-gas-schedule",
- "aptos-types",
- "aptos-vm",
- "move-cli",
- "move-package",
- "move-unit-test",
- "move-vm-runtime",
- "tempfile",
-]
-
-[[package]]
 name = "aptos-gas-algebra"
 version = "0.0.1"
 dependencies = [

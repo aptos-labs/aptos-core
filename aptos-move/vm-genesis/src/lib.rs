@@ -1010,6 +1010,9 @@ fn emit_new_block_and_epoch_event(
 fn verify_genesis_module_write_set(write_set: &WriteSet) {
     for (state_key, write_op) in write_set {
         if state_key.is_module_path() {
+            if !write_op.is_creation() {
+                eprintln!("error is_creation: {:?}", state_key);
+            };
             assert!(write_op.is_creation())
         }
     }
@@ -1170,6 +1173,7 @@ pub fn generate_test_genesis(
     let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
     let validators = &validators_;
 
+    println!("Test framework {framework:?}");
     let genesis = encode_genesis_change_set(
         &GENESIS_KEYPAIR.1,
         validators,
