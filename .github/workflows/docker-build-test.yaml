@@ -23,6 +23,10 @@ name: "Build+Test Docker Images"
 on: # build on main branch OR when a PR is labeled with `CICD:build-images`
   # Allow us to run this specific workflow without a PR
   workflow_dispatch:
+  # Run the whole workflow continuously on main. main should be kept in a good state at all times due to land-blocking tests,
+  # so this is a sanity check of CI in aptos-core as well as any implicit infra dependencies.
+  schedule:
+    - cron: "0 */2 * * *"
   pull_request_target:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   push:
@@ -46,9 +50,9 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
 
 # cancel redundant builds
 concurrency:
-  # for push and workflow_dispatch events we use `github.sha` in the concurrency group and don't really cancel each other out/limit concurrency
+  # for push, schedule, and workflow_dispatch events we use `github.sha` in the concurrency group and don't really cancel each other out/limit concurrency. we use github.event_name to differentiate between the events. For example if there is a push and a schedule event with the same sha, the schedule event will not cancel the push event.
   # for pull_request events newer jobs cancel earlier jobs to save on CI etc.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.sha || github.head_ref || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && format('{0}-{1}', github.event_name, github.sha) || github.head_ref || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -61,8 +65,8 @@ env:
   # TARGET_CACHE_ID is used as part of the docker tag / cache key inside our bake.hcl docker bake files.
   # The goal here is to have a branch or PR-local cache such that consecutive pushes to a shared branch or a specific PR can
   # reuse layers from a previous docker build/commit.
-  # We use `pr-<pr_number>` as cache-id for PRs and simply <branch_name> otherwise.
-  TARGET_CACHE_ID: ${{ github.event.number && format('pr-{0}', github.event.number) || github.ref_name }}
+  # We use `pr-<pr_number>` as cache-id for PRs and simply <event_name>-<branch_name> otherwise.
+  TARGET_CACHE_ID: ${{ github.event.number && format('pr-{0}', github.event.number) || format('{0}-{1}', github.event_name, github.ref_name) }}
 
   # On PRs, only build and push to GCP
   # On push, build and push to all remote registries
@@ -76,7 +80,7 @@ permissions:
 
 # Note on the job-level `if` conditions:
 # This workflow is designed such that:
-# 1. Run ALL jobs when a 'push', 'workflow_dispatch' triggered the workflow or on 'pull_request's which have set auto_merge=true or have the label "CICD:run-e2e-tests".
+# 1. Run ALL jobs when a 'push', 'schedule', 'workflow_dispatch' triggered the workflow or on 'pull_request's which have set auto_merge=true or have the label "CICD:run-e2e-tests".
 # 2. Run ONLY the docker image building jobs on PRs with the "CICD:build[-<PROFILE/FEATURE>]-images" label.
 # 3. Run ONLY the forge-e2e-test job on PRs with the "CICD:run-forge-e2e-perf" label.
 # 4. Run NOTHING when neither 1. or 2. or 3. conditions are satisfied.
@@ -85,6 +89,7 @@ jobs:
     if: |
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
       contains(join(github.event.pull_request.labels.*.name, ','), 'CICD:build-') ||
       contains(join(github.event.pull_request.labels.*.name, ','), 'CICD:run-') ||
       github.event.pull_request.auto_merge != null ||
@@ -155,6 +160,7 @@ jobs:
     if: |
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
       contains(github.event.pull_request.labels.*.name, 'CICD:build-failpoints-images')
     secrets: inherit
     with:
@@ -171,6 +177,7 @@ jobs:
     if: |
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
       contains(github.event.pull_request.labels.*.name, 'CICD:build-performance-images')
     secrets: inherit
     with:
@@ -202,6 +209,7 @@ jobs:
       (
         github.event_name == 'push' ||
         github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'schedule' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
         github.event.pull_request.auto_merge != null) ||
         contains(github.event.pull_request.body, '#e2e'
@@ -219,6 +227,7 @@ jobs:
       (
         github.event_name == 'push' ||
         github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'schedule' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
         github.event.pull_request.auto_merge != null) ||
         contains(github.event.pull_request.body, '#e2e'
@@ -235,6 +244,7 @@ jobs:
       (
         github.event_name == 'push' ||
         github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'schedule' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
         github.event.pull_request.auto_merge != null) ||
         contains(github.event.pull_request.body, '#e2e'
@@ -259,6 +269,7 @@ jobs:
       !failure() && !cancelled() && needs.permission-check.result == 'success' && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
         github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'schedule' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-forge-e2e-perf') ||
         github.event.pull_request.auto_merge != null ||
@@ -278,7 +289,7 @@ jobs:
       FORGE_NAMESPACE: forge-e2e-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
       SEND_RESULTS_TO_TRUNK: true
-  
+
   # This job determines the last released docker image tag, which is used by forge compat test.
   fetch-last-released-docker-image-tag:
     needs:
@@ -288,6 +299,7 @@ jobs:
       !failure() && !cancelled() && needs.permission-check.result == 'success' && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
         github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'schedule' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') ||
         github.event.pull_request.auto_merge != null ||
@@ -300,7 +312,7 @@ jobs:
         with:
           fetch-depth: 1
           ref: ${{ github.ref }}
-      
+
       # actions/get-latest-docker-image-tag requires docker utilities and having authenticated to internal docker image registries
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         id: docker-setup
@@ -319,7 +331,7 @@ jobs:
         with:
           base-branch: ${{ github.base_ref }}
           variants: "failpoints performance"
-      
+
       - name: Add Image Tag to Step Summary
         run: |
           echo "## Image Tag for compat tests" >> $GITHUB_STEP_SUMMARY
@@ -327,10 +339,10 @@ jobs:
           echo "TARGET_BRANCH: ${{ steps.get-docker-image-tag.outputs.TARGET_BRANCH }}" >> $GITHUB_STEP_SUMMARY
     outputs:
       IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
-  
+
   # Run e2e compat test against testnet branch. This is a PR required job.
   forge-compat-test:
-    needs: 
+    needs:
       - permission-check
       - fetch-last-released-docker-image-tag
       - determine-docker-build-metadata
@@ -343,6 +355,7 @@ jobs:
       !failure() && !cancelled() && needs.permission-check.result == 'success' && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
         github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'schedule' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
         github.event.pull_request.auto_merge != null ||
         contains(github.event.pull_request.body, '#e2e')
@@ -358,7 +371,7 @@ jobs:
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
       SEND_RESULTS_TO_TRUNK: true
-  
+
   # Run forge framework upgradability test. This is a PR required job.
   forge-framework-upgrade-test:
     needs:
@@ -374,6 +387,7 @@ jobs:
       !failure() && !cancelled() && needs.permission-check.result == 'success' && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
         github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'schedule' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') ||
         github.event.pull_request.auto_merge != null
       )
