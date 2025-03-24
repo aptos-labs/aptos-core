@@ -207,7 +207,6 @@ impl FeatureFlag {
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
             FeatureFlag::NATIVE_MEMORY_OPERATIONS,
             FeatureFlag::COLLECTION_OWNER,
-            FeatureFlag::PERMISSIONED_SIGNER,
             FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
             FeatureFlag::ACCOUNT_ABSTRACTION,
             FeatureFlag::BULLETPROOFS_BATCH_NATIVES,
@@ -392,7 +391,10 @@ impl Features {
 }
 
 pub fn aptos_test_feature_flags_genesis() -> ChangeSet {
-    let features_value = bcs::to_bytes(&Features::default()).unwrap();
+    let mut features = Features::default();
+    features.enable(FeatureFlag::PERMISSIONED_SIGNER);
+
+    let features_value = bcs::to_bytes(&features).unwrap();
 
     let mut change_set = ChangeSet::new();
     // we need to initialize features to their defaults.
