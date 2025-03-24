@@ -2,18 +2,19 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::compiler::{as_module, compile_units};
+use crate::{
+    compiler::{as_module, compile_units},
+    tests::execute_function_with_single_storage_for_test,
+};
+use claims::assert_ok;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
-    account_address::AccountAddress, gas_algebra::GasQuantity, identifier::Identifier,
+    account_address::AccountAddress, gas_algebra::GasQuantity, ident_str, identifier::Identifier,
     language_storage::ModuleId, vm_status::StatusCode,
 };
-use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction, AsUnsyncModuleStorage,
-    RuntimeEnvironment,
-};
+use move_vm_runtime::{native_functions::NativeFunction, RuntimeEnvironment};
 use move_vm_test_utils::InMemoryStorage;
-use move_vm_types::{gas::UnmeteredGasMeter, natives::function::NativeResult};
+use move_vm_types::natives::function::NativeResult;
 use smallvec::SmallVec;
 use std::sync::Arc;
 
@@ -157,62 +158,44 @@ fn runtime_reentrancy_check() {
 
     compile_and_publish(&mut storage, code_3);
 
-    let fun_name = Identifier::new("foo1").unwrap();
-    let args: Vec<Vec<u8>> = vec![];
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("A").unwrap());
-
-    let mut sess = MoveVM::new_session(&storage);
-    let module_storage = storage.as_unsync_module_storage();
-    let traversal_storage = TraversalStorage::new();
 
     // Call stack look like following:
     // A::foo1 -> B::foo1 -> B::dispatch -> A::foo3, Re-entrancy happens at foo3.
-    assert_eq!(
-        sess.execute_function_bypass_visibility(
-            &module_id,
-            &fun_name,
-            vec![],
-            args.clone(),
-            &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
-            &module_storage,
-        )
-        .unwrap_err()
-        .major_status(),
-        StatusCode::RUNTIME_DISPATCH_ERROR
-    );
+    let status = execute_function_with_single_storage_for_test(
+        &storage,
+        &module_id,
+        ident_str!("foo1"),
+        &[],
+        vec![],
+    )
+    .unwrap_err()
+    .major_status();
+    assert_eq!(status, StatusCode::RUNTIME_DISPATCH_ERROR);
 
     // Call stack look like following:
     // A::foo2 -> B::foo2 -> B::dispatch_c -> C::foo3, No reentrancy, executed successfully.
     //
     // Note that C needs to be loaded into module cache at runtime.
-    let fun_name = Identifier::new("foo2").unwrap();
-    sess.execute_function_bypass_visibility(
+    let result = execute_function_with_single_storage_for_test(
+        &storage,
         &module_id,
-        &fun_name,
+        ident_str!("foo2"),
+        &[],
         vec![],
-        args.clone(),
-        &mut UnmeteredGasMeter,
-        &mut TraversalContext::new(&traversal_storage),
-        &module_storage,
-    )
-    .unwrap();
+    );
+    assert_ok!(result);
 
     // Call stack look like following:
     // A::foo3 -> B::foo3 -> B::dispatch_d -> D::foo3, D doesn't exist, thus an error.
-    let fun_name = Identifier::new("foo3").unwrap();
-    assert_eq!(
-        sess.execute_function_bypass_visibility(
-            &module_id,
-            &fun_name,
-            vec![],
-            args,
-            &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
-            &module_storage,
-        )
-        .unwrap_err()
-        .major_status(),
-        StatusCode::FUNCTION_RESOLUTION_FAILURE
-    );
+    let status = execute_function_with_single_storage_for_test(
+        &storage,
+        &module_id,
+        ident_str!("foo3"),
+        &[],
+        vec![],
+    )
+    .unwrap_err()
+    .major_status();
+    assert_eq!(status, StatusCode::FUNCTION_RESOLUTION_FAILURE);
 }
