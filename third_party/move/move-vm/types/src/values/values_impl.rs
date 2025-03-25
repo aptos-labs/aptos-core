@@ -3936,10 +3936,8 @@ impl<'c, 'l, 'v> serde::Serialize
         if let Some((tag, variant_layouts)) = try_get_variant_field_layouts(self.layout, values) {
             let tag_idx = tag as usize;
             let variant_tag = tag_idx as u32;
-            let variant_names = match value::variant_name_placeholder((tag + 1) as usize) {
-                Ok(names) => names,
-                Err(e) => return Err(serde::ser::Error::custom(format!("{}", e))),
-            };
+            let variant_names = value::variant_name_placeholder((tag + 1) as usize)
+                .map_err(|e| serde::ser::Error::custom(format!("{}", e)))?;
             let variant_name = variant_names[tag_idx];
             values = &values[1..];
             if variant_layouts.len() != values.len() {
@@ -4153,10 +4151,8 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveStructL
                 if variants.len() > (u16::MAX as usize) {
                     return Err(D::Error::custom("variant count out of range"));
                 }
-                let variant_names = match value::variant_name_placeholder(variants.len()) {
-                    Ok(names) => names,
-                    Err(_) => return Err(D::Error::custom("variant count out of range")),
-                };
+                let variant_names = value::variant_name_placeholder(variants.len())
+                    .map_err(|e| D::Error::custom(format!("{}", e)))?;
                 let fields = deserializer.deserialize_enum(
                     value::MOVE_ENUM_NAME,
                     variant_names,

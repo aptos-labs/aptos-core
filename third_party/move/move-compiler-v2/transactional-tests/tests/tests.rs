@@ -38,7 +38,12 @@ const TEST_CONFIGS: &[TestConfig] = &[
         experiments: &[],
         language_version: LanguageVersion::latest_stable(),
         include: &[],
-        exclude: &["/operator_eval/", "/access_control/", "/closures/", "/no-recursive-check/"],
+        exclude: &[
+            "/operator_eval/",
+            "/access_control/",
+            "/closures/",
+            "/no-recursive-check/",
+        ],
     },
     // Test optimize/no-optimize/etc., except for `/access_control/`
     TestConfig {
@@ -50,7 +55,12 @@ const TEST_CONFIGS: &[TestConfig] = &[
         ],
         language_version: LanguageVersion::latest_stable(),
         include: &[], // all tests except those excluded below
-        exclude: &["/operator_eval/", "/access_control/", "/closures/", "/no-recursive-check/"],
+        exclude: &[
+            "/operator_eval/",
+            "/access_control/",
+            "/closures/",
+            "/no-recursive-check/",
+        ],
     },
     TestConfig {
         name: "no-optimize",
@@ -58,7 +68,12 @@ const TEST_CONFIGS: &[TestConfig] = &[
         experiments: &[(Experiment::OPTIMIZE, false)],
         language_version: LanguageVersion::latest_stable(),
         include: &[], // all tests except those excluded below
-        exclude: &["/operator_eval/", "/access_control/", "/closures/", "/no-recursive-check/"],
+        exclude: &[
+            "/operator_eval/",
+            "/access_control/",
+            "/closures/",
+            "/no-recursive-check/",
+        ],
     },
     TestConfig {
         name: "optimize-no-simplify",
@@ -70,7 +85,12 @@ const TEST_CONFIGS: &[TestConfig] = &[
         ],
         language_version: LanguageVersion::latest_stable(),
         include: &[], // all tests except those excluded below
-        exclude: &["/operator_eval/", "/access_control/", "/closures/", "/no-recursive-check/"],
+        exclude: &[
+            "/operator_eval/",
+            "/access_control/",
+            "/closures/",
+            "/no-recursive-check/",
+        ],
     },
     // Test `/operator_eval/` with language version 1 and 2
     TestConfig {
