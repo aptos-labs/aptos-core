@@ -899,7 +899,7 @@ create a property value from generic type data
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
 <b>let</b> <a href="property_map.md#0x3_property_map_MAX_PROPERTY_MAP_SIZE">MAX_PROPERTY_MAP_SIZE</a> = 1000;
-<b>let</b> <a href="property_map.md#0x3_property_map_MAX_PROPERTY_NAME_LENGTH">MAX_PROPERTY_NAME_LENGTH</a>  = 128;
+<b>let</b> <a href="property_map.md#0x3_property_map_MAX_PROPERTY_NAME_LENGTH">MAX_PROPERTY_NAME_LENGTH</a> = 128;
 </code></pre>
 
 
@@ -918,8 +918,8 @@ create a property value from generic type data
 <pre><code><b>pragma</b> aborts_if_is_partial;
 <b>let</b> length = len(keys);
 <b>aborts_if</b> !(<a href="property_map.md#0x3_property_map_length">length</a> &lt;= <a href="property_map.md#0x3_property_map_MAX_PROPERTY_MAP_SIZE">MAX_PROPERTY_MAP_SIZE</a>);
-<b>aborts_if</b> !(length == values.<a href="property_map.md#0x3_property_map_length">length</a>());
-<b>aborts_if</b> !(length == types.<a href="property_map.md#0x3_property_map_length">length</a>());
+<b>aborts_if</b> !(length == len(values));
+<b>aborts_if</b> !(length == len(types));
 </code></pre>
 
 
@@ -936,7 +936,7 @@ create a property value from generic type data
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
-<b>let</b> length = keys.<a href="property_map.md#0x3_property_map_length">length</a>();
+<b>let</b> length = len(keys);
 <b>aborts_if</b> !(<a href="property_map.md#0x3_property_map_length">length</a> &lt;= <a href="property_map.md#0x3_property_map_MAX_PROPERTY_MAP_SIZE">MAX_PROPERTY_MAP_SIZE</a>);
 <b>aborts_if</b> !(length == len(values));
 </code></pre>
@@ -1101,7 +1101,7 @@ to <code>prop.type</code>
 
 
 <pre><code><b>fun</b> <a href="property_map.md#0x3_property_map_spec_utf8">spec_utf8</a>(bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): String {
-   String{bytes}
+   String { bytes }
 }
 </code></pre>
 
