@@ -119,3 +119,31 @@ mainnet:
     # Fungible asset migration
     1680592683: 1680592683_fa_migration_coin_info
     1957950162: 1957950162_fa_migration_v2_store_only
+
+    # Nft Aggregator tradeport
+    2386133936: 2386133936_tradeport_v2_place_offer
+    2298838662: 2298838662_tradeport_v2_fill_offer
+    2386142672: 2386142672_tradeport_v2_cancel_offer
+    2386889884: 2386889884_tradeport_v2_cancel_collection_offer
+    2386021136: 2386021136_tradeport_v2_fill_collection_offer
+    2386891051: 2386891051_tradeport_v2_place_collection_offer
+    2386716658: 2386716658_tradeport_v2_cancel_listing
+    2386809975: 2386809975_tradeport_v2_place_listing
+    2386455218: 2386455218_tradeport_v2_fill_listing
+
+    2296149225: 2296149225_tradeport_v2_accept_token_delist
+    2296098846: 2296098846_tradeport_v2_accept_token_delist2
+    2277018899: 2277018899_tradeport_v2_accept_token_delist_same_token_data_id
+
+    # wapal
+    2381810159: 2381810159_wapal_cancel_offer
+    2313248448: 2313248448_wapal_fill_offer
+    2382313982: 2382313982_wapal_place_offer
+    2382373209: 2382373209_wapal_place_collection_offer
+    2382373978: 2382373978_wapal_cancel_collection_offer
+    2382219668: 2382219668_wapal_fill_collection_offer
+    2382221134: 2382221134_wapal_fill_listing
+    2381742315: 2381742315_wapal_cancel_listing
+    2382251863: 2382251863_wapal_place_listing
+
+    #
