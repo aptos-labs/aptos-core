@@ -56,6 +56,9 @@ static RUST_LOG_FIELD_MAX_LEN: Lazy<usize> = Lazy::new(|| {
         .unwrap_or(TruncatedLogString::DEFAULT_MAX_LEN)
 });
 
+const GIT_HASH_ENV_VAR: &str = "GIT_HASH";
+static GIT_HASH: Lazy<Option<String>> = Lazy::new(|| env::var(GIT_HASH_ENV_VAR).ok());
+
 struct TruncatedLogString(String);
 
 impl TruncatedLogString {
@@ -121,6 +124,7 @@ pub struct LogEntry {
     message: Option<String>,
     peer_id: Option<&'static str>,
     chain_id: Option<u8>,
+    git_hash: Option<String>,
 }
 
 // implement custom serializer for LogEntry since we want to promote the `metadata.level` field into a top-level `level` field
@@ -154,6 +158,9 @@ impl Serialize for LogEntry {
         }
         if let Some(peer_id) = &self.peer_id {
             state.serialize_field("peer_id", peer_id)?;
+        }
+        if let Some(git_hash) = &self.git_hash {
+            state.serialize_field("git_hash", git_hash)?;
         }
         state.end()
     }
@@ -239,6 +246,8 @@ impl LogEntry {
             schema.visit(&mut JsonVisitor(&mut data));
         }
 
+        let git_hash = GIT_HASH.clone();
+
         Self {
             metadata,
             thread_name,
@@ -250,6 +259,7 @@ impl LogEntry {
             message,
             peer_id,
             chain_id,
+            git_hash,
         }
     }
 
@@ -291,6 +301,10 @@ impl LogEntry {
 
     pub fn chain_id(&self) -> Option<u8> {
         self.chain_id
+    }
+
+    pub fn git_hash(&self) -> Option<&str> {
+        self.git_hash.as_deref()
     }
 }
 
