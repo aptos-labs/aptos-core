@@ -409,7 +409,7 @@ impl PrioritizedPeersState {
         &mut self,
         peers_and_metadata: Vec<(PeerNetworkId, Option<&PeerMonitoringMetadata>)>,
         num_mempool_txns_received_since_peers_updated: u64,
-        num_committed_txns_recieved_since_peers_updated: u64,
+        num_committed_txns_received_since_peers_updated: u64,
     ) {
         let peer_monitoring_data: HashMap<PeerNetworkId, Option<&PeerMonitoringMetadata>> =
             peers_and_metadata.clone().into_iter().collect();
@@ -434,7 +434,7 @@ impl PrioritizedPeersState {
         self.update_sender_bucket_for_peers(
             &peer_monitoring_data,
             num_mempool_txns_received_since_peers_updated,
-            num_committed_txns_recieved_since_peers_updated,
+            num_committed_txns_received_since_peers_updated,
         );
 
         // Set the last peer priority update time
