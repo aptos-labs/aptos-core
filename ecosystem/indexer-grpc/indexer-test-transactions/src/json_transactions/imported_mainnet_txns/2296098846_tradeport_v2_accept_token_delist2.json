@@ -1,0 +1,535 @@
+{
+  "timestamp": {
+    "seconds": "1738220719",
+    "nanos": 436414000
+  },
+  "version": "2296098846",
+  "info": {
+    "hash": "XYdEw2WNv2x9ySEALaSioNwidRn55KvGaWaKTzumyrQ=",
+    "stateChangeHash": "Aq1CW+vgW70zrlP0p8b0gBTP6zUDJauZpdD7hZwPz2o=",
+    "eventRootHash": "nW9G3nf6QHoHyddChDPvuomAWvnc9xDSdFpe9EQMGwQ=",
+    "gasUsed": "20",
+    "success": true,
+    "vmStatus": "Executed successfully",
+    "accumulatorRootHash": "VF+NDhTFTYMsj1gOqjTZq/A2XRdlKFYzzif7wZpzfR4=",
+    "changes": [
+      {
+        "type": "TYPE_DELETE_RESOURCE",
+        "deleteResource": {
+          "address": "0x601d63ebac2606de806f319e03eebbc1d72e97d3636e565f6136fa3474e9dc06",
+          "stateKeyHash": "dBuhSGd4DZmV9cnzMysTbPalpiBZW9poQgAkRsyGk1I=",
+          "type": {
+            "address": "0x1",
+            "module": "object",
+            "name": "ObjectGroup"
+          },
+          "typeStr": "0x1::object::ObjectGroup"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x65d8eb0656a9f3c6479671b37e6243cd322a5a4f042ce9e43ac968c2a84197ab",
+          "stateKeyHash": "1Fj8JHwzqA6z6TBA3RpdeSdjaF2YBUW9il+NLLzEIwM=",
+          "type": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "CoinStore",
+            "genericTypeParams": [
+              {
+                "type": "MOVE_TYPES_STRUCT",
+                "struct": {
+                  "address": "0x1",
+                  "module": "aptos_coin",
+                  "name": "AptosCoin"
+                }
+              }
+            ]
+          },
+          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "data": "{\"coin\":{\"value\":\"24268001\"},\"deposit_events\":{\"counter\":\"4\",\"guid\":{\"id\":{\"addr\":\"0x65d8eb0656a9f3c6479671b37e6243cd322a5a4f042ce9e43ac968c2a84197ab\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"7\",\"guid\":{\"id\":{\"addr\":\"0x65d8eb0656a9f3c6479671b37e6243cd322a5a4f042ce9e43ac968c2a84197ab\",\"creation_num\":\"3\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x65d8eb0656a9f3c6479671b37e6243cd322a5a4f042ce9e43ac968c2a84197ab",
+          "stateKeyHash": "sekr1Wz4gFwqIvBIIEI+fklEo7ZEmzIrsGe9cMsSkOY=",
+          "type": {
+            "address": "0x1",
+            "module": "account",
+            "name": "Account"
+          },
+          "typeStr": "0x1::account::Account",
+          "data": "{\"authentication_key\":\"0x65d8eb0656a9f3c6479671b37e6243cd322a5a4f042ce9e43ac968c2a84197ab\",\"coin_register_events\":{\"counter\":\"2\",\"guid\":{\"id\":{\"addr\":\"0x65d8eb0656a9f3c6479671b37e6243cd322a5a4f042ce9e43ac968c2a84197ab\",\"creation_num\":\"0\"}}},\"guid_creation_num\":\"11\",\"key_rotation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x65d8eb0656a9f3c6479671b37e6243cd322a5a4f042ce9e43ac968c2a84197ab\",\"creation_num\":\"1\"}}},\"rotation_capability_offer\":{\"for\":{\"vec\":[]}},\"sequence_number\":\"13\",\"signer_capability_offer\":{\"for\":{\"vec\":[]}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x6a03eb973cd9385d62fc2842d02a4dd6b70e52f5da77a0689e57e48d93fae1b4",
+          "stateKeyHash": "ia5CJAqvJ4lnS7nWhVMNNxhYGforZgoP0qtHcM/2+OM=",
+          "type": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "CoinStore",
+            "genericTypeParams": [
+              {
+                "type": "MOVE_TYPES_STRUCT",
+                "struct": {
+                  "address": "0x1",
+                  "module": "aptos_coin",
+                  "name": "AptosCoin"
+                }
+              }
+            ]
+          },
+          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "data": "{\"coin\":{\"value\":\"10862744439\"},\"deposit_events\":{\"counter\":\"149331\",\"guid\":{\"id\":{\"addr\":\"0x6a03eb973cd9385d62fc2842d02a4dd6b70e52f5da77a0689e57e48d93fae1b4\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"23\",\"guid\":{\"id\":{\"addr\":\"0x6a03eb973cd9385d62fc2842d02a4dd6b70e52f5da77a0689e57e48d93fae1b4\",\"creation_num\":\"3\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0",
+          "stateKeyHash": "HCdN5ItTehT8qEKwjDoHoenlf/7CyjpOBc/oU7is2ak=",
+          "type": {
+            "address": "0x1",
+            "module": "object",
+            "name": "ObjectCore"
+          },
+          "typeStr": "0x1::object::ObjectCore",
+          "data": "{\"allow_ungated_transfer\":true,\"guid_creation_num\":\"1125899906842626\",\"owner\":\"0xd8cc665d62192ecea331471956c854a15a6db7a13ba94b6aa5d75be430af0458\",\"transfer_events\":{\"counter\":\"13\",\"guid\":{\"id\":{\"addr\":\"0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0\",\"creation_num\":\"1125899906842624\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0",
+          "stateKeyHash": "HCdN5ItTehT8qEKwjDoHoenlf/7CyjpOBc/oU7is2ak=",
+          "type": {
+            "address": "0x4",
+            "module": "property_map",
+            "name": "PropertyMap"
+          },
+          "typeStr": "0x4::property_map::PropertyMap",
+          "data": "{\"inner\":{\"data\":[{\"key\":\"elemental\",\"value\":{\"type\":9,\"value\":\"0x0446495245\"}},{\"key\":\"category\",\"value\":{\"type\":9,\"value\":\"0x096170746f6d696e676f\"}},{\"key\":\"grade\",\"value\":{\"type\":9,\"value\":\"0x06436f6d6d6f6e\"}},{\"key\":\"@probability_set\",\"value\":{\"type\":9,\"value\":\"0x0c67616d653a3a6578706f7274\"}}]}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0",
+          "stateKeyHash": "HCdN5ItTehT8qEKwjDoHoenlf/7CyjpOBc/oU7is2ak=",
+          "type": {
+            "address": "0x4",
+            "module": "royalty",
+            "name": "Royalty"
+          },
+          "typeStr": "0x4::royalty::Royalty",
+          "data": "{\"denominator\":\"100\",\"numerator\":\"5\",\"payee_address\":\"0x9d9ae026d65ad917bffcc6984370468e751ec3e9cd7a69f114c8a58c34d408b7\"}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0",
+          "stateKeyHash": "HCdN5ItTehT8qEKwjDoHoenlf/7CyjpOBc/oU7is2ak=",
+          "type": {
+            "address": "0x4",
+            "module": "token",
+            "name": "Token"
+          },
+          "typeStr": "0x4::token::Token",
+          "data": "{\"collection\":{\"inner\":\"0x9d9ae026d65ad917bffcc6984370468e751ec3e9cd7a69f114c8a58c34d408b7\"},\"description\":\"I am a Sidekick, always standing by my Villain. When the bond between a Villain and me deepens, something special could happen!\",\"index\":\"0\",\"mutation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0\",\"creation_num\":\"1125899906842625\"}}},\"name\":\"\",\"uri\":\"https://public.vir.supervlabs.io/virweb/nft/sidekicks/mingo.png\"}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0",
+          "stateKeyHash": "HCdN5ItTehT8qEKwjDoHoenlf/7CyjpOBc/oU7is2ak=",
+          "type": {
+            "address": "0x4",
+            "module": "token",
+            "name": "TokenIdentifiers"
+          },
+          "typeStr": "0x4::token::TokenIdentifiers",
+          "data": "{\"index\":{\"value\":\"291160\"},\"name\":{\"padding\":\"0x0000000000000000\",\"value\":\"Mingo #12541\"}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0",
+          "stateKeyHash": "HCdN5ItTehT8qEKwjDoHoenlf/7CyjpOBc/oU7is2ak=",
+          "type": {
+            "address": "0x9d518b9b84f327eafc5f6632200ea224a818a935ffd6be5d78ada250bbc44a6",
+            "module": "sidekick",
+            "name": "Sidekick"
+          },
+          "typeStr": "0x9d518b9b84f327eafc5f6632200ea224a818a935ffd6be5d78ada250bbc44a6::sidekick::Sidekick",
+          "data": "{\"salt\":\"0\",\"updated_at\":\"1738028896\"}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0",
+          "stateKeyHash": "HCdN5ItTehT8qEKwjDoHoenlf/7CyjpOBc/oU7is2ak=",
+          "type": {
+            "address": "0xfacedd48d64a2ee04cbdf5c17608bd7a5ea9144fa1fe65320c588fffea131de3",
+            "module": "orm_object",
+            "name": "OrmObject"
+          },
+          "typeStr": "0xfacedd48d64a2ee04cbdf5c17608bd7a5ea9144fa1fe65320c588fffea131de3::orm_object::OrmObject",
+          "data": "{\"class\":{\"inner\":\"0x9d9ae026d65ad917bffcc6984370468e751ec3e9cd7a69f114c8a58c34d408b7\"},\"creator\":{\"inner\":\"0x9d518b9b84f327eafc5f6632200ea224a818a935ffd6be5d78ada250bbc44a6\"},\"delete_ref\":{\"vec\":[{\"self\":\"0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0\"}]},\"extend_ref\":{\"vec\":[{\"self\":\"0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0\"}]},\"transfer_ref\":{\"vec\":[{\"self\":\"0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0\"}]}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0",
+          "stateKeyHash": "HCdN5ItTehT8qEKwjDoHoenlf/7CyjpOBc/oU7is2ak=",
+          "type": {
+            "address": "0xfacedd48d64a2ee04cbdf5c17608bd7a5ea9144fa1fe65320c588fffea131de3",
+            "module": "orm_object",
+            "name": "OrmToken"
+          },
+          "typeStr": "0xfacedd48d64a2ee04cbdf5c17608bd7a5ea9144fa1fe65320c588fffea131de3::orm_object::OrmToken",
+          "data": "{\"burn_ref\":{\"vec\":[{\"inner\":{\"vec\":[{\"self\":\"0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0\"}]},\"self\":{\"vec\":[]}}]},\"mutator_ref\":{\"vec\":[{\"self\":\"0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0\"}]},\"property_mutator_ref\":{\"vec\":[{\"self\":\"0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0\"}]},\"royalty_mutator_ref\":{\"vec\":[{\"inner\":{\"self\":\"0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0\"}}]}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x9d9ae026d65ad917bffcc6984370468e751ec3e9cd7a69f114c8a58c34d408b7",
+          "stateKeyHash": "e3BUygmgtbbu9RwYj5qaEWzxrbT3Ynu8up05xX4yDTY=",
+          "type": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "CoinStore",
+            "genericTypeParams": [
+              {
+                "type": "MOVE_TYPES_STRUCT",
+                "struct": {
+                  "address": "0x1",
+                  "module": "aptos_coin",
+                  "name": "AptosCoin"
+                }
+              }
+            ]
+          },
+          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "data": "{\"coin\":{\"value\":\"12367295121\"},\"deposit_events\":{\"counter\":\"26234\",\"guid\":{\"id\":{\"addr\":\"0x9d9ae026d65ad917bffcc6984370468e751ec3e9cd7a69f114c8a58c34d408b7\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"8\",\"guid\":{\"id\":{\"addr\":\"0x9d9ae026d65ad917bffcc6984370468e751ec3e9cd7a69f114c8a58c34d408b7\",\"creation_num\":\"3\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_DELETE_RESOURCE",
+        "deleteResource": {
+          "address": "0xa4877fd357bbb3c4464765537ecd0936403d202002ae0c70f9808f94ecf5200c",
+          "stateKeyHash": "bfeY5/I80k/GA01HWAY8joxArU7SucTeaZ9A/gl2Nwk=",
+          "type": {
+            "address": "0x1",
+            "module": "object",
+            "name": "ObjectGroup"
+          },
+          "typeStr": "0x1::object::ObjectGroup"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26",
+          "stateKeyHash": "YyxEM2ISNprB8ZNNbepmRFb5Yl7G+bHX/jJlJ/MnbD8=",
+          "type": {
+            "address": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26",
+            "module": "biddings_v2",
+            "name": "BidStore"
+          },
+          "typeStr": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26::biddings_v2::BidStore",
+          "data": "{\"accept_collection_bid_events\":{\"counter\":\"30363\",\"guid\":{\"id\":{\"addr\":\"0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26\",\"creation_num\":\"23\"}}},\"accept_token_bid_events\":{\"counter\":\"624\",\"guid\":{\"id\":{\"addr\":\"0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26\",\"creation_num\":\"20\"}}},\"delete_collection_bid_events\":{\"counter\":\"40618\",\"guid\":{\"id\":{\"addr\":\"0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26\",\"creation_num\":\"22\"}}},\"delete_token_bid_events\":{\"counter\":\"3852\",\"guid\":{\"id\":{\"addr\":\"0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26\",\"creation_num\":\"19\"}}},\"insert_collection_bid_events\":{\"counter\":\"113573\",\"guid\":{\"id\":{\"addr\":\"0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26\",\"creation_num\":\"21\"}}},\"insert_token_bid_events\":{\"counter\":\"11661\",\"guid\":{\"id\":{\"addr\":\"0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26\",\"creation_num\":\"18\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26",
+          "stateKeyHash": "GziPDIxPViVKmcTdIO/LNrfAEGOLVL1z45HHLE9Rf8g=",
+          "type": {
+            "address": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26",
+            "module": "listings_v2",
+            "name": "ListingStore"
+          },
+          "typeStr": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26::listings_v2::ListingStore",
+          "data": "{\"buy_events\":{\"counter\":\"60918\",\"guid\":{\"id\":{\"addr\":\"0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26\",\"creation_num\":\"17\"}}},\"delete_listing_events\":{\"counter\":\"45629\",\"guid\":{\"id\":{\"addr\":\"0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26\",\"creation_num\":\"16\"}}},\"insert_listing_events\":{\"counter\":\"133182\",\"guid\":{\"id\":{\"addr\":\"0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26\",\"creation_num\":\"15\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_TABLE_ITEM",
+        "writeTableItem": {
+          "stateKeyHash": "bkso1A+YoQamUWNTCSTA3LQME0nTqpFdEItNbPwd2xk=",
+          "handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+          "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+          "data": {
+            "key": "\"0x619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935\"",
+            "keyType": "address",
+            "value": "\"113819635731724186\"",
+            "valueType": "u128"
+          }
+        }
+      }
+    ]
+  },
+  "epoch": "10140",
+  "blockHeight": "283771098",
+  "type": "TRANSACTION_TYPE_USER",
+  "sizeInfo": {
+    "transactionBytes": 306,
+    "eventSizeInfo": [
+      {
+        "typeTagBytes": 55,
+        "totalBytes": 199
+      },
+      {
+        "typeTagBytes": 65,
+        "totalBytes": 225
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 108
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 108
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 108
+      },
+      {
+        "typeTagBytes": 55,
+        "totalBytes": 199
+      },
+      {
+        "typeTagBytes": 66,
+        "totalBytes": 258
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 103
+      }
+    ],
+    "writeOpSizeInfo": [
+      {
+        "keyBytes": 87
+      },
+      {
+        "keyBytes": 138,
+        "valueBytes": 105
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 147
+      },
+      {
+        "keyBytes": 138,
+        "valueBytes": 105
+      },
+      {
+        "keyBytes": 87,
+        "valueBytes": 1276
+      },
+      {
+        "keyBytes": 138,
+        "valueBytes": 105
+      },
+      {
+        "keyBytes": 87
+      },
+      {
+        "keyBytes": 89,
+        "valueBytes": 288
+      },
+      {
+        "keyBytes": 93,
+        "valueBytes": 144
+      },
+      {
+        "keyBytes": 66,
+        "valueBytes": 16
+      }
+    ]
+  },
+  "user": {
+    "request": {
+      "sender": "0x65d8eb0656a9f3c6479671b37e6243cd322a5a4f042ce9e43ac968c2a84197ab",
+      "sequenceNumber": "12",
+      "maxGasAmount": "40",
+      "gasUnitPrice": "100",
+      "expirationTimestampSecs": {
+        "seconds": "1738220808"
+      },
+      "payload": {
+        "type": "TYPE_ENTRY_FUNCTION_PAYLOAD",
+        "entryFunctionPayload": {
+          "function": {
+            "module": {
+              "address": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26",
+              "name": "biddings_v2"
+            },
+            "name": "unlist_and_accept_token_bid"
+          },
+          "arguments": [
+            "{\"inner\":\"0x601d63ebac2606de806f319e03eebbc1d72e97d3636e565f6136fa3474e9dc06\"}",
+            "{\"inner\":\"0xa4877fd357bbb3c4464765537ecd0936403d202002ae0c70f9808f94ecf5200c\"}"
+          ],
+          "entryFunctionIdStr": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26::biddings_v2::unlist_and_accept_token_bid"
+        }
+      },
+      "signature": {
+        "type": "TYPE_ED25519",
+        "ed25519": {
+          "publicKey": "mrCFAMGwEE717ZUin2MaY1c6M89i+nOZVtW6OSEOglg=",
+          "signature": "YhDHyryOBrQKQd+8kgd1EUQghcNKIWi6yDNL0EE00iEO1En6HGmVLlOs6G+m1dI+QzFza52JfcDWOag7An+MAA=="
+        }
+      }
+    },
+    "events": [
+      {
+        "key": {
+          "creationNumber": "1125899906842624",
+          "accountAddress": "0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0"
+        },
+        "sequenceNumber": "11",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "object",
+            "name": "TransferEvent"
+          }
+        },
+        "typeStr": "0x1::object::TransferEvent",
+        "data": "{\"from\":\"0x601d63ebac2606de806f319e03eebbc1d72e97d3636e565f6136fa3474e9dc06\",\"object\":\"0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0\",\"to\":\"0x65d8eb0656a9f3c6479671b37e6243cd322a5a4f042ce9e43ac968c2a84197ab\"}"
+      },
+      {
+        "key": {
+          "creationNumber": "16",
+          "accountAddress": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26"
+        },
+        "sequenceNumber": "45628",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26",
+            "module": "listings_v2",
+            "name": "DeleteListingEvent"
+          }
+        },
+        "typeStr": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26::listings_v2::DeleteListingEvent",
+        "data": "{\"listing\":{\"inner\":\"0x601d63ebac2606de806f319e03eebbc1d72e97d3636e565f6136fa3474e9dc06\"},\"price\":\"20000000\",\"seller\":\"0x65d8eb0656a9f3c6479671b37e6243cd322a5a4f042ce9e43ac968c2a84197ab\",\"timestamp\":\"1738220719436414\",\"token\":{\"inner\":\"0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0\"}}"
+      },
+      {
+        "key": {
+          "creationNumber": "2",
+          "accountAddress": "0x9d9ae026d65ad917bffcc6984370468e751ec3e9cd7a69f114c8a58c34d408b7"
+        },
+        "sequenceNumber": "26233",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "DepositEvent"
+          }
+        },
+        "typeStr": "0x1::coin::DepositEvent",
+        "data": "{\"amount\":\"100000\"}"
+      },
+      {
+        "key": {
+          "creationNumber": "2",
+          "accountAddress": "0x6a03eb973cd9385d62fc2842d02a4dd6b70e52f5da77a0689e57e48d93fae1b4"
+        },
+        "sequenceNumber": "149330",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "DepositEvent"
+          }
+        },
+        "typeStr": "0x1::coin::DepositEvent",
+        "data": "{\"amount\":\"50000\"}"
+      },
+      {
+        "key": {
+          "creationNumber": "2",
+          "accountAddress": "0x65d8eb0656a9f3c6479671b37e6243cd322a5a4f042ce9e43ac968c2a84197ab"
+        },
+        "sequenceNumber": "3",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "DepositEvent"
+          }
+        },
+        "typeStr": "0x1::coin::DepositEvent",
+        "data": "{\"amount\":\"1850000\"}"
+      },
+      {
+        "key": {
+          "creationNumber": "1125899906842624",
+          "accountAddress": "0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0"
+        },
+        "sequenceNumber": "12",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "object",
+            "name": "TransferEvent"
+          }
+        },
+        "typeStr": "0x1::object::TransferEvent",
+        "data": "{\"from\":\"0x65d8eb0656a9f3c6479671b37e6243cd322a5a4f042ce9e43ac968c2a84197ab\",\"object\":\"0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0\",\"to\":\"0xd8cc665d62192ecea331471956c854a15a6db7a13ba94b6aa5d75be430af0458\"}"
+      },
+      {
+        "key": {
+          "creationNumber": "20",
+          "accountAddress": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26"
+        },
+        "sequenceNumber": "623",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26",
+            "module": "biddings_v2",
+            "name": "AcceptTokenBidEvent"
+          }
+        },
+        "typeStr": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26::biddings_v2::AcceptTokenBidEvent",
+        "data": "{\"bid\":{\"inner\":\"0xa4877fd357bbb3c4464765537ecd0936403d202002ae0c70f9808f94ecf5200c\"},\"bid_buyer\":\"0xd8cc665d62192ecea331471956c854a15a6db7a13ba94b6aa5d75be430af0458\",\"bid_seller\":\"0x65d8eb0656a9f3c6479671b37e6243cd322a5a4f042ce9e43ac968c2a84197ab\",\"price\":\"2000000\",\"timestamp\":\"1738220719436414\",\"token\":{\"inner\":\"0x6bc9d89f72ecc22dbca30025a10bc888cb1c90d6d6ee0d90f2739e6043557bf0\"}}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "transaction_fee",
+            "name": "FeeStatement"
+          }
+        },
+        "typeStr": "0x1::transaction_fee::FeeStatement",
+        "data": "{\"execution_gas_units\":\"8\",\"io_gas_units\":\"13\",\"storage_fee_octas\":\"0\",\"storage_fee_refund_octas\":\"112160\",\"total_charge_gas_units\":\"20\"}"
+      }
+    ]
+  }
+}
