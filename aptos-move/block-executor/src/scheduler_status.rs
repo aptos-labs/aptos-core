@@ -353,7 +353,7 @@ impl ExecutionStatus {
                     Ok(true)
                 },
                 StatusEnum::Aborted => {
-                    self.incarnate(inner_status, finished_incarnation + 1);
+                    self.incarnate(inner_status, finished_incarnation + 1, false);
                     Ok(false)
                 },
                 StatusEnum::PendingScheduling | StatusEnum::Executed => {
@@ -381,7 +381,11 @@ impl ExecutionStatus {
     }
 
     // Must be performed as a follow-up to a successful try_abort.
-    pub(crate) fn finish_abort(&self, aborted_incarnation: Incarnation) -> Result<(), PanicError> {
+    pub(crate) fn finish_abort(
+        &self,
+        aborted_incarnation: Incarnation,
+        caller_reexecuting: bool,
+    ) -> Result<(), PanicError> {
         let new_incarnation = aborted_incarnation + 1;
         if self.next_incarnation_to_try_abort.load(Ordering::Relaxed) != new_incarnation {
             // The caller must have already successfully performed a try_abort, while
@@ -415,7 +419,7 @@ impl ExecutionStatus {
                     );
                 },
                 StatusEnum::Executed => {
-                    self.incarnate(inner_status, new_incarnation);
+                    self.incarnate(inner_status, new_incarnation, caller_reexecuting);
                 },
                 StatusEnum::PendingScheduling | StatusEnum::Aborted => {
                     return Err(code_invariant_error(format!(
@@ -667,7 +671,12 @@ impl ExecutionStatus {
 
     // Utility function updates inner status to RequiredExecution with the new incarnation, only
     // asserting that new incarnation > previously stored abort shortcut.
-    fn incarnate(&self, inner_status: &mut InnerStatus, new_incarnation: Incarnation) {
+    fn incarnate(
+        &self,
+        inner_status: &mut InnerStatus,
+        new_incarnation: Incarnation,
+        caller_reexecuting: bool,
+    ) {
         // Update inner status.
         inner_status.status = StatusEnum::PendingScheduling;
         inner_status.incarnation = new_incarnation;
@@ -676,7 +685,7 @@ impl ExecutionStatus {
         self.dependency_shortcut
             .store(DEPENDENCY_DEFER_FLAG, Ordering::Relaxed);
 
-        if self.num_stalls.load(Ordering::Relaxed) == 0 {
+        if !caller_reexecuting && self.num_stalls.load(Ordering::Relaxed) == 0 {
             // Need to schedule the transaction for re-execution. If num_stalls > 0, then
             // scheduling is deferred to the remove_stall.
             self.scheduler_proxy
@@ -825,7 +834,7 @@ mod tests {
         // Compatible with start (incompatible with abort and finish).
         for i in [0, 2] {
             assert_err!(status.finish_execution(i));
-            assert_err!(status.finish_abort(i));
+            assert_err!(status.finish_abort(i, false));
         }
         assert_some_eq!(status.try_start_executing(), 0);
 
@@ -834,7 +843,7 @@ mod tests {
 
         // Compatible with finish(0) & finish_abort(0) only. Here, we test finish.
         assert_none!(status.try_start_executing());
-        assert_err!(status.finish_abort(1));
+        assert_err!(status.finish_abort(1, false));
         assert_err!(status.finish_execution(1));
         if stall_before_finish {
             assert_ok_eq!(status.add_stall(), true);
@@ -857,11 +866,11 @@ mod tests {
         assert_none!(status.try_start_executing());
         assert_err!(status.finish_execution(0));
         assert_err!(status.finish_execution(1));
-        assert_err!(status.finish_abort(1));
+        assert_err!(status.finish_abort(1, false));
 
         proxy.assert_execution_queue(&vec![]);
         assert_ok_eq!(status.try_abort(0), true);
-        assert_ok!(status.finish_abort(0));
+        assert_ok!(status.finish_abort(0, false));
         if stall_before_finish {
             // Not rescheduled - deferred for remove_stall.
             proxy.assert_execution_queue(&vec![]);
@@ -887,12 +896,12 @@ mod tests {
         for i in 0..5 {
             // Outdated call.
             assert_ok_eq!(status.try_abort(i), false);
-            assert_err!(status.finish_abort(i));
+            assert_err!(status.finish_abort(i, false));
             // Must have been called already to get to incarnation 5.
             assert_err!(status.finish_execution(i));
             // Impossible calls before 5 has even started execution.
             assert_err!(status.finish_execution(5 + i));
-            assert_err!(status.finish_abort(5 + i));
+            assert_err!(status.finish_abort(5 + i, false));
         }
         assert_some_eq!(status.try_start_executing(), 5);
 
@@ -905,10 +914,10 @@ mod tests {
         // Compatible with finish(5) & finish_abort(5) only. Here, we test abort.
         assert_none!(status.try_start_executing());
         assert_ok_eq!(status.try_abort(4), false);
-        assert_err!(status.finish_abort(4));
+        assert_err!(status.finish_abort(4, false));
         assert_err!(status.finish_execution(4));
         assert_err!(status.finish_execution(6));
-        assert_err!(status.finish_abort(6));
+        assert_err!(status.finish_abort(6, false));
 
         assert_eq!(
             status.next_incarnation_to_try_abort.load(Ordering::Relaxed),
@@ -919,7 +928,7 @@ mod tests {
             status.next_incarnation_to_try_abort.load(Ordering::Relaxed),
             6
         );
-        assert_ok!(status.finish_abort(5));
+        assert_ok!(status.finish_abort(5, false));
         assert_eq!(
             status.next_incarnation_to_try_abort.load(Ordering::Relaxed),
             6
@@ -935,17 +944,17 @@ mod tests {
         // Compatible w. finish_execution(5) only.
         assert_none!(status.try_start_executing());
         assert_ok_eq!(status.try_abort(5), false);
-        assert_err!(status.finish_abort(5));
+        assert_err!(status.finish_abort(5, false));
         assert_err!(status.finish_execution(4));
         assert_err!(status.finish_execution(6));
-        assert_err!(status.finish_abort(6));
+        assert_err!(status.finish_abort(6, false));
 
         if stall_before_finish {
             assert_ok_eq!(status.add_stall(), true);
         }
         // Finish execution from aborted, must return Ok(false).
         assert_ok_eq!(status.try_abort(5), false);
-        assert_err!(status.finish_abort(5));
+        assert_err!(status.finish_abort(5, false));
         assert_ok_eq!(status.finish_execution(5), false);
         assert_eq!(status.inner_status.lock().incarnation(), 6);
 
@@ -1013,7 +1022,7 @@ mod tests {
 
             if finish_scenario == 0 {
                 assert_ok_eq!(status.try_abort(5), true);
-                assert_ok!(status.finish_abort(5));
+                assert_ok!(status.finish_abort(5, false));
             }
             assert_eq!(status.waiting_queue.lock().0.len(), 2);
             assert!(!status.waiting_queue.lock().1);
@@ -1333,7 +1342,7 @@ mod tests {
     #[should_panic]
     fn incarnate_check() {
         let status = ExecutionStatus::new(Arc::new(SchedulerProxy::new_for_test(10)), 10);
-        status.incarnate(&mut status.inner_status.lock(), 0);
+        status.incarnate(&mut status.inner_status.lock(), 0, false);
     }
 
     #[test]
@@ -1361,7 +1370,7 @@ mod tests {
             assert!(!status.pending_scheduling_and_not_stalled());
             assert_eq!(status.inner_status.lock().incarnation(), 0);
 
-            status.incarnate(&mut status.inner_status.lock(), 1);
+            status.incarnate(&mut status.inner_status.lock(), 1, false);
 
             assert_eq!(status.inner_status.lock().incarnation(), 1);
             assert_eq!(
@@ -1410,7 +1419,7 @@ mod tests {
             assert!(!status.pending_scheduling_and_not_stalled());
 
             let new_incarnation = status.next_incarnation_to_try_abort.load(Ordering::Relaxed) + 1;
-            status.incarnate(&mut status.inner_status.lock(), new_incarnation);
+            status.incarnate(&mut status.inner_status.lock(), new_incarnation, false);
 
             assert_eq!(status.inner_status.lock().incarnation(), new_incarnation);
             assert_eq!(
