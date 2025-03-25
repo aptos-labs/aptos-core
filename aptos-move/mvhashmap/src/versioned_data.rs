@@ -496,7 +496,12 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         // Assert that the previous entry for txn_idx, if present, had lower incarnation.
         assert!(prev_entry.map_or(true, |entry| -> bool {
             if let EntryCell::Write(i, _, _) = entry.value {
-                i < incarnation
+                if i < incarnation {
+                    true
+                } else {
+                    println!("txn idx {} incarnation {} !> i {}", txn_idx, incarnation, i);
+                    false
+                }
             } else {
                 true
             }

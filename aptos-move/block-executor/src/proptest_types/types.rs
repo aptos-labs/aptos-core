@@ -38,9 +38,7 @@ use aptos_vm_types::{
 };
 use bytes::Bytes;
 use claims::{assert_ge, assert_le, assert_ok};
-use move_core_types::{
-    ident_str, identifier::IdentStr, language_storage::ModuleId, value::MoveTypeLayout,
-};
+use move_core_types::{identifier::IdentStr, value::MoveTypeLayout};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
@@ -132,16 +130,11 @@ where
 pub(crate) struct KeyType<K: Hash + Clone + Debug + PartialOrd + Ord + Eq>(
     /// Wrapping the types used for testing to add ModulePath trait implementation (below).
     pub K,
-    /// The bool field determines for testing purposes, whether the key will be interpreted
-    /// as a module access path. In this case, if a module path is both read and written
-    /// during parallel execution, ModulePathReadWrite must be returned and the
-    /// block execution must fall back to the sequential execution.
-    pub bool,
 );
 
 impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> ModulePath for KeyType<K> {
     fn is_module_path(&self) -> bool {
-        self.1
+        false
     }
 
     fn from_address_and_module_name(_address: &AccountAddress, _module_name: &IdentStr) -> Self {
@@ -325,9 +318,11 @@ pub(crate) struct TransactionGen<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + 
 #[derive(Clone, Debug)]
 pub(crate) struct MockIncarnation<K, E> {
     /// A vector of keys to be read during mock incarnation execution.
-    pub(crate) reads: Vec<K>,
+    /// bool being false means that the read should be considered as an AggregatorV1 read.
+    pub(crate) reads: Vec<(K, bool)>,
     /// A vector of keys and corresponding values to be written during mock incarnation execution.
-    pub(crate) writes: Vec<(K, ValueType)>,
+    /// bool being false means that the write should be considered as an AggregatorV1 write.
+    pub(crate) writes: Vec<(K, ValueType, bool)>,
     pub(crate) group_reads: Vec<(K, u32)>,
     pub(crate) group_writes: Vec<(K, StateValueMetadata, HashMap<u32, ValueType>)>,
     /// Keys to query group size for - false is querying size, true is querying metadata.
@@ -346,8 +341,8 @@ impl<K, E> MockIncarnation<K, E> {
     /// into another one with group_reads / group_writes / group_queries set. Hence, the constructor
     /// here always sets it to an empty vector.
     pub(crate) fn new_with_metadata_seeds(
-        reads: Vec<K>,
-        writes: Vec<(K, ValueType)>,
+        reads: Vec<(K, bool)>,
+        writes: Vec<(K, ValueType, bool)>,
         deltas: Vec<(K, DeltaOp)>,
         events: Vec<E>,
         metadata_seeds: [u64; 3],
@@ -367,8 +362,8 @@ impl<K, E> MockIncarnation<K, E> {
     }
 
     pub(crate) fn new(
-        reads: Vec<K>,
-        writes: Vec<(K, ValueType)>,
+        reads: Vec<(K, bool)>,
+        writes: Vec<(K, ValueType, bool)>,
         deltas: Vec<(K, DeltaOp)>,
         events: Vec<E>,
         gas: u64,
@@ -484,13 +479,14 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         // TODO: disentangle writes and deltas.
         universe: &[K],
         gen: Vec<Vec<(Index, V)>>,
-        module_write_fn: &dyn Fn(usize) -> bool,
         delta_fn: &dyn Fn(usize, &V) -> Option<DeltaOp>,
         allow_deletes: bool,
+        delta_threshold: Option<usize>,
     ) -> Vec<(
-        /* writes = */ Vec<(KeyType<K>, ValueType)>,
+        /* writes = */ Vec<(KeyType<K>, ValueType, bool)>,
         /* deltas = */ Vec<(KeyType<K>, DeltaOp)>,
     )> {
+        let delta_threshold = delta_threshold.unwrap_or(universe.len() + 1);
         let mut ret = vec![];
         for write_gen in gen.into_iter() {
             let mut keys_modified = BTreeSet::new();
@@ -502,7 +498,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 if !keys_modified.contains(&key) {
                     keys_modified.insert(key.clone());
                     match delta_fn(i, &value) {
-                        Some(delta) => incarnation_deltas.push((KeyType(key, false), delta)),
+                        Some(delta) => incarnation_deltas.push((KeyType(key), delta)),
                         None => {
                             // One out of 23 writes will be a deletion
                             let val_u128 = ValueType::from_value(value.clone(), true)
@@ -512,7 +508,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                             let is_deletion = allow_deletes && val_u128 % 23 == 0;
                             let mut value = ValueType::from_value(value.clone(), !is_deletion);
                             value.metadata = raw_metadata((val_u128 >> 64) as u64);
-                            incarnation_writes.push((KeyType(key, module_write_fn(i)), value));
+                            incarnation_writes.push((KeyType(key), value, i < delta_threshold));
                         },
                     }
                 }
@@ -525,15 +521,16 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
     fn reads_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
         universe: &[K],
         gen: Vec<Vec<Index>>,
-        module_read_fn: &dyn Fn(usize) -> bool,
-    ) -> Vec<Vec<KeyType<K>>> {
+        delta_threshold: Option<usize>,
+    ) -> Vec<Vec<(KeyType<K>, bool)>> {
+        let delta_threshold = delta_threshold.unwrap_or(universe.len() + 1);
         let mut ret = vec![];
         for read_gen in gen.into_iter() {
-            let mut incarnation_reads: Vec<KeyType<K>> = vec![];
+            let mut incarnation_reads: Vec<(KeyType<K>, bool)> = vec![];
             for idx in read_gen.into_iter() {
                 let i = idx.index(universe.len());
                 let key = universe[i].clone();
-                incarnation_reads.push(KeyType(key, module_read_fn(i)));
+                incarnation_reads.push((KeyType(key), i < delta_threshold));
             }
             ret.push(incarnation_reads);
         }
@@ -569,20 +566,19 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
     >(
         self,
         universe: &[K],
-        module_read_fn: &dyn Fn(usize) -> bool,
-        module_write_fn: &dyn Fn(usize) -> bool,
         delta_fn: &dyn Fn(usize, &V) -> Option<DeltaOp>,
         allow_deletes: bool,
+        delta_threshold: Option<usize>,
     ) -> MockTransaction<KeyType<K>, E> {
-        let reads = Self::reads_from_gen(universe, self.reads, &module_read_fn);
+        let reads = Self::reads_from_gen(universe, self.reads, delta_threshold);
         let gas = Self::gas_from_gen(self.gas);
 
         let behaviors = Self::writes_and_deltas_from_gen(
             universe,
             self.modifications,
-            &module_write_fn,
             &delta_fn,
             allow_deletes,
+            delta_threshold,
         )
         .into_iter()
         .zip(reads)
@@ -622,11 +618,9 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         universe: &[K],
     ) -> MockTransaction<KeyType<K>, E> {
         // TODO(BlockSTMv2): different testing for modules.
-        let is_module_read = |_| -> bool { false };
-        let is_module_write = |_| -> bool { false };
         let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
 
-        self.new_mock_write_txn(universe, &is_module_read, &is_module_write, &is_delta, true)
+        self.new_mock_write_txn(universe, &is_delta, true, None)
     }
 
     // Generates a mock txn without group reads/writes and converts it to have group
@@ -642,20 +636,12 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         let universe_len = universe.len();
         assert_ge!(universe_len, 3, "Universe must have size >= 3");
 
-        let is_module_read = |_| -> bool { false };
-        let is_module_write = |_| -> bool { false };
         let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
 
         let group_size_query_indicators =
             Self::group_size_indicator_from_gen(self.group_size_indicators.clone());
         let mut behaviors = self
-            .new_mock_write_txn(
-                &universe[0..universe.len() - 3],
-                &is_module_read,
-                &is_module_write,
-                &is_delta,
-                false,
-            )
+            .new_mock_write_txn(&universe[0..universe.len() - 3], &is_delta, false, None)
             .into_behaviors();
 
         let key_to_group = |key: &KeyType<K>| -> Option<(usize, u32)> {
@@ -674,14 +660,13 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             let mut reads = vec![];
             let mut group_reads = vec![];
             for read_key in behavior.reads.clone() {
-                assert!(read_key != KeyType(universe[universe_len - 1].clone(), false));
-                assert!(read_key != KeyType(universe[universe_len - 2].clone(), false));
-                assert!(read_key != KeyType(universe[universe_len - 3].clone(), false));
-                match key_to_group(&read_key) {
-                    Some((idx, tag)) => group_reads.push((
-                        KeyType(universe[universe_len - 1 - idx].clone(), false),
-                        tag,
-                    )),
+                assert!(read_key.0 != KeyType(universe[universe_len - 1].clone()));
+                assert!(read_key.0 != KeyType(universe[universe_len - 2].clone()));
+                assert!(read_key.0 != KeyType(universe[universe_len - 3].clone()));
+                match key_to_group(&read_key.0) {
+                    Some((idx, tag)) => {
+                        group_reads.push((KeyType(universe[universe_len - 1 - idx].clone()), tag))
+                    },
                     None => reads.push(read_key),
                 }
             }
@@ -689,20 +674,20 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             let mut writes = vec![];
             let mut group_writes = vec![];
             let mut inner_ops = vec![HashMap::new(); 3];
-            for (write_key, value) in behavior.writes.clone() {
+            for (write_key, value, _) in behavior.writes.clone() {
                 match key_to_group(&write_key) {
                     Some((key_idx, tag)) => {
                         if tag != RESERVED_TAG || !value.is_deletion() {
                             inner_ops[key_idx].insert(tag, value);
                         }
                     },
-                    None => writes.push((write_key, value)),
+                    None => writes.push((write_key, value, true)),
                 }
             }
             for (idx, inner_ops) in inner_ops.into_iter().enumerate() {
                 if !inner_ops.is_empty() {
                     group_writes.push((
-                        KeyType(universe[universe_len - 1 - idx].clone(), false),
+                        KeyType(universe[universe_len - 1 - idx].clone()),
                         raw_metadata(behavior.metadata_seeds[idx]),
                         inner_ops,
                     ));
@@ -730,7 +715,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                         };
                         (indicator < *size_query_pct).then(|| {
                             (
-                                KeyType(universe[universe_len - 1 - idx].clone(), false),
+                                KeyType(universe[universe_len - 1 - idx].clone()),
                                 // TODO: handle metadata queries more uniformly w. size.
                                 indicator % 2 == 0,
                             )
@@ -753,8 +738,6 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         delta_threshold: usize,
         allow_deletes: bool,
     ) -> MockTransaction<KeyType<K>, E> {
-        let is_module_read = |_| -> bool { false };
-        let is_module_write = |_| -> bool { false };
         let is_delta = |i, v: &V| -> Option<DeltaOp> {
             if i >= delta_threshold {
                 let val = ValueType::from_value(v.clone(), true)
@@ -773,13 +756,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             }
         };
 
-        self.new_mock_write_txn(
-            universe,
-            &is_module_read,
-            &is_module_write,
-            &is_delta,
-            allow_deletes,
-        )
+        self.new_mock_write_txn(universe, &is_delta, allow_deletes, Some(delta_threshold))
     }
 }
 
@@ -836,15 +813,22 @@ where
 
                 // Reads
                 let mut read_results = vec![];
-                for k in behavior.reads.iter() {
+                for (key, not_aggregagor_v1) in behavior.reads.iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
-                    // TODO: test aggregator reads.
-                    if !k.is_module_path() {
-                        // TODO: also prop test modules
-                        match view.get_resource_bytes(k, None) {
-                            Ok(v) => read_results.push(v.map(Into::into)),
-                            Err(_) => read_results.push(None),
-                        }
+                    // TODO: also prop test modules
+
+                    let maybe_bytes = if *not_aggregagor_v1 {
+                        view.get_resource_bytes(key, None)
+                    } else {
+                        view.get_aggregator_v1_state_value(key)
+                            .map(|maybe_state_value| {
+                                maybe_state_value.map(|state_value| state_value.bytes().clone())
+                            })
+                    };
+
+                    match maybe_bytes {
+                        Ok(v) => read_results.push(v.map(Into::into)),
+                        Err(_) => read_results.push(None),
                     }
                 }
                 // Read from groups.
@@ -985,7 +969,18 @@ where
 
                 // generate group_writes.
                 ExecutionStatus::Success(MockOutput {
-                    writes: behavior.writes.clone(),
+                    writes: behavior
+                        .writes
+                        .clone()
+                        .into_iter()
+                        .filter_map(|(k, v, w)| w.then_some((k, v)))
+                        .collect(),
+                    aggregator_v1_writes: behavior
+                        .writes
+                        .clone()
+                        .into_iter()
+                        .filter_map(|(k, v, w)| (!w).then_some((k, v)))
+                        .collect(),
                     group_writes,
                     deltas: behavior.deltas.clone(),
                     events: behavior.events.to_vec(),
@@ -1027,6 +1022,7 @@ pub(crate) enum GroupSizeOrMetadata {
 #[derive(Debug)]
 pub(crate) struct MockOutput<K, E> {
     pub(crate) writes: Vec<(K, ValueType)>,
+    pub(crate) aggregator_v1_writes: Vec<(K, ValueType)>,
     // Key, metadata_op, inner_ops
     pub(crate) group_writes: Vec<(K, ValueType, ResourceGroupSize, HashMap<u32, ValueType>)>,
     pub(crate) deltas: Vec<(K, DeltaOp)>,
@@ -1051,28 +1047,18 @@ where
     fn resource_write_set(&self) -> Vec<(K, Arc<ValueType>, Option<Arc<MoveTypeLayout>>)> {
         self.writes
             .iter()
-            .filter(|(k, _)| !k.is_module_path())
-            .cloned()
-            .map(|(k, v)| (k, Arc::new(v), None))
+            .map(|(key, value)| (key.clone(), Arc::new(value.clone()), None))
             .collect()
     }
 
     fn module_write_set(&self) -> BTreeMap<K, ModuleWrite<ValueType>> {
-        self.writes
-            .iter()
-            .filter(|(k, _)| k.is_module_path())
-            .map(|(k, v)| {
-                let dummy_id = ModuleId::new(AccountAddress::ONE, ident_str!("dummy").to_owned());
-                let write = ModuleWrite::new(dummy_id, v.clone());
-                (k.clone(), write)
-            })
-            .collect()
+        BTreeMap::new()
     }
 
     // Aggregator v1 writes are included in resource_write_set for tests (writes are produced
     // for all keys including ones for v1_aggregators without distinguishing).
     fn aggregator_v1_write_set(&self) -> BTreeMap<K, ValueType> {
-        BTreeMap::new()
+        self.aggregator_v1_writes.clone().into_iter().collect()
     }
 
     fn aggregator_v1_delta_set(&self) -> Vec<(K, DeltaOp)> {
@@ -1134,6 +1120,7 @@ where
     fn skip_output() -> Self {
         Self {
             writes: vec![],
+            aggregator_v1_writes: vec![],
             group_writes: vec![],
             deltas: vec![],
             events: vec![],
@@ -1148,6 +1135,7 @@ where
     fn discard_output(_discard_code: move_core_types::vm_status::StatusCode) -> Self {
         Self {
             writes: vec![],
+            aggregator_v1_writes: vec![],
             group_writes: vec![],
             deltas: vec![],
             events: vec![],

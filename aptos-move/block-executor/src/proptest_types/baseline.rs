@@ -25,7 +25,7 @@ use aptos_types::{
 };
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use bytes::Bytes;
-use claims::{assert_matches, assert_none, assert_some, assert_some_eq};
+use claims::{assert_gt, assert_matches, assert_none, assert_some, assert_some_eq};
 use itertools::izip;
 use std::{collections::HashMap, fmt::Debug, hash::Hash, result::Result, sync::atomic::Ordering};
 
@@ -108,7 +108,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
         let mut resolved_deltas = vec![];
         let mut group_reads = vec![];
 
-        for txn in txns.iter() {
+        for (txn_idx, txn) in txns.iter().enumerate() {
             match txn {
                 MockTransaction::Abort => {
                     status = BaselineStatus::Aborted;
@@ -133,9 +133,14 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                     // Determine the behavior of the latest incarnation of the transaction. The index
                     // is based on the value of the incarnation counter prior to the fetch_add during
                     // the last mock execution, and is >= 1 because there is at least one execution.
-                    let last_incarnation = (incarnation_counter.load(Ordering::SeqCst) - 1)
-                        % incarnation_behaviors.len();
-
+                    let incarnation_counter = incarnation_counter.load(Ordering::SeqCst);
+                    // Mock execute_transaction call always increments the incarnation counter.
+                    assert_gt!(
+                        incarnation_counter,
+                        0,
+                        "Mock execution of txn {txn_idx} never incremented incarnation"
+                    );
+                    let last_incarnation = (incarnation_counter - 1) % incarnation_behaviors.len();
                     match incarnation_behaviors[last_incarnation]
                         .deltas
                         .iter()
@@ -169,7 +174,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                                 .iter()
                                 .map(|k| {
                                     current_world
-                                        .entry(k.clone())
+                                        .entry(k.0.clone())
                                         .or_insert(BaselineValue::Empty)
                                         .clone()
                                 })
@@ -187,7 +192,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
 
                             // We ensure that the latest state is always reflected in exactly one of
                             // the hashmaps, by possibly removing an element from the other Hashmap.
-                            for (k, v) in incarnation_behaviors[last_incarnation].writes.iter() {
+                            for (k, v, _) in incarnation_behaviors[last_incarnation].writes.iter() {
                                 current_world
                                     .insert(k.clone(), BaselineValue::GenericWrite(v.clone()));
                             }

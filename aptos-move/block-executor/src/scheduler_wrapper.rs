@@ -16,6 +16,13 @@ pub(crate) enum SchedulerWrapper<'a> {
 }
 
 impl SchedulerWrapper<'_> {
+    pub(crate) fn as_v2(&self) -> Option<&SchedulerV2> {
+        match self {
+            SchedulerWrapper::V1(_, _) => None,
+            SchedulerWrapper::V2(scheduler) => Some(scheduler),
+        }
+    }
+
     pub(crate) fn is_v2(&self) -> bool {
         matches!(self, SchedulerWrapper::V2(_))
     }
@@ -54,7 +61,7 @@ impl SchedulerWrapper<'_> {
             SchedulerWrapper::V1(_, skip_module_reads_validation) => {
                 // Relaxed suffices as syncronization (reducing validation index) occurs after
                 // setting the module read validation flag.
-                skip_module_reads_validation.store(true, Ordering::Relaxed);
+                skip_module_reads_validation.store(false, Ordering::Relaxed);
             },
             SchedulerWrapper::V2(_) => {},
         }

@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    counters,
     scheduler::{ArmedLock, DependencyCondvar, DependencyStatus},
     scheduler_status::{DependencyInstruction, DependencyResolution, ExecutionStatus},
 };
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::error::{code_invariant_error, PanicError};
+use aptos_vm_logging::clear_speculative_txn_logs;
 use concurrent_queue::{ConcurrentQueue, PopError};
 use crossbeam::utils::CachePadded;
 use fail::fail_point;
@@ -99,14 +101,14 @@ impl<'a> AbortManager<'a> {
         let mut invalidations = self.invalidations.borrow_mut();
         match invalidations.entry(invalidated_txn_idx) {
             Vacant(vacant_entry) => {
-                // For vacant entries, we always need to try abort
+                // For vacant entries, we always need to try abort.
                 let _ = vacant_entry
                     .insert(self.try_abort(invalidated_txn_idx, invalidated_incarnation)?);
             },
             Occupied(mut occupied_entry) => {
                 match occupied_entry.get() {
                     None => {
-                        // Only try abort if we don't have a stored incarnation
+                        // Only try abort if we don't have a stored incarnation.
                         *occupied_entry.get_mut() =
                             self.try_abort(invalidated_txn_idx, invalidated_incarnation)?;
                     },
@@ -636,14 +638,11 @@ impl SchedulerV2 {
                     // is not speculatively aborted (such as here).
                     if incarnation > 0 && matches!(ret, DependencyResolution::None) {
                         // Change the inner status to aborted so finishing execution will make the
-                        // transaction eligible for re-execution. Status was Executing so we keep
-                        // things simple and ignore aborted dependencies / stall propagation.
-                        if self.txn_status[txn_idx as usize].try_abort(incarnation)? {
-                            self.txn_status[txn_idx as usize].finish_abort(incarnation)?;
-                        }
+                        // transaction eligible for re-execution by some other worker.
+                        self.self_abort(txn_idx, incarnation, false)?;
 
                         // The current logic is to just ask caller to speculatively abort.
-                        // TODO: complex handling (e.g. scheduler maintenance), also revisit Wait.
+                        // TODO(BlockSTMv2): complex handling (e.g. scheduler maintenance), revisit Wait.
                         return Ok(false);
                     }
 
@@ -696,7 +695,7 @@ impl SchedulerV2 {
         let mut propagation_queue: BTreeSet<usize> = BTreeSet::new();
         for (txn_idx, maybe_incarnation) in invalidated_set {
             if let Some(incarnation) = maybe_incarnation {
-                self.txn_status[txn_idx as usize].finish_abort(incarnation)?;
+                self.txn_status[txn_idx as usize].finish_abort(incarnation, false)?;
                 propagation_queue.insert(txn_idx as usize);
             }
         }
@@ -739,6 +738,49 @@ impl SchedulerV2 {
 
         self.txn_status[txn_idx as usize].already_try_aborted(incarnation)
     }
+
+    // An interface for a particular transaction to be aborted outside of push invalidation
+    // (e.g. via abort manager's try abort followed by finish_execution's finish abort flow).
+    // This is currently used in two scenarios:
+    // (1) when processing dependencies (if the heuristics determines the txn is better to be
+    // speculatively aborted, e.g. since it is low priority and likely to be invalidated.
+    // Since the status must be Executing, we do not bother with propagating add / remove stall.
+    // (2) when aborting due to aggregator or delayed field invalidation that happens during
+    // the sequential commit hook - in this case, the immediate re-execution is about to follow.
+    // However, we need to distinguish the case to make sure in case (2) an execution task
+    // is not added to the scheduler's execution queue (the caller will re-execute itself).
+    pub(crate) fn self_abort(
+        &self,
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        caller_reexecuting: bool,
+    ) -> Result<bool, PanicError> {
+        if self.txn_status[txn_idx as usize].try_abort(incarnation)? {
+            self.txn_status[txn_idx as usize].finish_abort(incarnation, caller_reexecuting)?;
+            if caller_reexecuting {
+                let executing_incarnation = self.try_start_executing(txn_idx);
+                if Some(incarnation + 1) != executing_incarnation {
+                    return Err(code_invariant_error(format!(
+                        "SchedulerV2: self-abort for {} incarnation {} started executing with wrong incarnation {:?}",
+                        txn_idx,
+                        incarnation,
+                        executing_incarnation,
+                    )));
+                }
+            }
+            return Ok(true);
+        }
+
+        if caller_reexecuting {
+            return Err(code_invariant_error(format!(
+                "SchedulerV2: self-abort with caller reexecuting failed for {} {}",
+                txn_idx,
+                incarnation
+            )));
+        }
+
+        Ok(false)
+    }
 }
 
 /// Private interfaces
@@ -772,7 +814,14 @@ impl SchedulerV2 {
     }
 
     fn try_abort(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> Result<bool, PanicError> {
-        self.txn_status[txn_idx as usize].try_abort(incarnation)
+        let ret = self.txn_status[txn_idx as usize].try_abort(incarnation)?;
+        if ret {
+            // Increment the counter and clear speculative logs (from the aborted execution).
+            counters::SPECULATIVE_ABORT_COUNT.inc();
+            clear_speculative_txn_logs(txn_idx as usize);
+        }
+
+        Ok(ret)
     }
 
     fn try_start_executing(&self, txn_idx: TxnIndex) -> Option<Incarnation> {
@@ -1374,7 +1423,7 @@ mod tests {
         stall_and_add_dependency(&scheduler, 3, 6, 1);
         stall_and_add_dependency(&scheduler, 6, 9, 1);
         assert_ok_eq!(scheduler.txn_status[6].try_abort(0), true);
-        assert_ok!(scheduler.txn_status[6].finish_abort(0));
+        assert_ok!(scheduler.txn_status[6].finish_abort(0, false));
 
         assert_ok!(scheduler.propagate(BTreeSet::from([3])));
 
@@ -1539,7 +1588,7 @@ mod tests {
                                             if assert_ok!(scheduler.try_abort(txn_idx, incarnation))
                                             {
                                                 assert_ok!(scheduler.txn_status[txn_idx as usize]
-                                                    .finish_abort(incarnation));
+                                                    .finish_abort(incarnation, false));
                                             }
                                         };
                                         dep_ok = false;

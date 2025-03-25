@@ -92,7 +92,10 @@ pub(crate) fn remove_from_previous_keys<T: Transaction>(
 ) -> Result<(), PanicError> {
     match (prev_modified_keys.remove(key), expected_kind) {
         (None, _) => Ok(()),
-        (Some(KeyKind::Resource), KeyKind::Resource)
+        // Aggregator deltas and normal writes can occur on the same key.
+        (Some(KeyKind::Resource), KeyKind::AggregatorV1)
+        | (Some(KeyKind::AggregatorV1), KeyKind::Resource)
+        | (Some(KeyKind::Resource), KeyKind::Resource)
         | (Some(KeyKind::AggregatorV1), KeyKind::AggregatorV1)
         | (Some(KeyKind::Group(_)), KeyKind::Group(_)) => Ok(()),
         _ => Err(code_invariant_error(format!(

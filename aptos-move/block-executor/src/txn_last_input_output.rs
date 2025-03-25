@@ -26,7 +26,7 @@ use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
 use move_vm_runtime::Module;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
     fmt::Debug,
     iter::{empty, Iterator},
     sync::Arc,
@@ -279,6 +279,35 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
+    }
+
+    // Must be called during sequential commit hook: expands aggregator write keys with aggregator
+    // keys in the recorded output, and checks that any reads for these keys are also recorded in
+    // aggregator_v1_reads in the input (captured reads). This ensures that the proper interfaces
+    // (that properly record AggregatorV1 reads) are used, as it is required for the correctness
+    // of the commit-time validation.
+    pub(crate) fn process_aggregator_v1_keys(
+        &self,
+        txn_idx: TxnIndex,
+        aggregator_write_keys: &mut BTreeSet<T::Key>,
+    ) {
+        if let Some(write_keys) =
+            self.outputs[txn_idx as usize]
+                .load_full()
+                .and_then(|txn_output| match txn_output.as_ref() {
+                    ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
+                        t.aggregator_v1_write_set()
+                            .into_keys()
+                            .chain(t.aggregator_v1_delta_set().into_iter().map(|(k, _)| k))
+                            .collect::<BTreeSet<_>>(),
+                    ),
+                    ExecutionStatus::Abort(_)
+                    | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                    | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
+                })
+        {
+            aggregator_write_keys.extend(write_keys);
+        }
     }
 
     pub(crate) fn module_write_set(
