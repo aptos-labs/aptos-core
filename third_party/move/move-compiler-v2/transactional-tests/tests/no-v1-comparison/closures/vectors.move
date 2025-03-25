@@ -14,4 +14,4 @@ module 0x42::test {
     }
 }
 
-//# run 0x42::test::eval --verbose --args 2
+//# run 0x42::test::eval --args 2

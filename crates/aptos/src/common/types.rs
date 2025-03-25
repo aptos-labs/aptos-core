@@ -48,9 +48,10 @@ use aptos_types::{
 };
 use aptos_vm_types::output::VMOutput;
 use async_trait::async_trait;
-use clap::{ArgGroup, Parser, ValueEnum};
+use clap::{Parser, ValueEnum};
 use hex::FromHexError;
 use indoc::indoc;
+use move_compiler_v2::Experiment;
 use move_core_types::{
     account_address::AccountAddress, language_storage::TypeTag, vm_status::VMStatus,
 };
@@ -74,8 +75,8 @@ use std::{
 use thiserror::Error;
 
 pub const USER_AGENT: &str = concat!("aptos-cli/", env!("CARGO_PKG_VERSION"));
-const US_IN_SECS: u64 = 1_000_000;
-const ACCEPTED_CLOCK_SKEW_US: u64 = 5 * US_IN_SECS;
+pub const US_IN_SECS: u64 = 1_000_000;
+pub const ACCEPTED_CLOCK_SKEW_US: u64 = 5 * US_IN_SECS;
 pub const DEFAULT_EXPIRATION_SECS: u64 = 30;
 pub const DEFAULT_PROFILE: &str = "default";
 pub const GIT_IGNORE: &str = ".gitignore";
@@ -289,6 +290,8 @@ pub struct ProfileConfig {
 /// ProfileConfig but without the private parts
 #[derive(Debug, Serialize)]
 pub struct ProfileSummary {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network: Option<Network>,
     pub has_private_key: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key: Option<Ed25519PublicKey>,
@@ -303,6 +306,7 @@ pub struct ProfileSummary {
 impl From<&ProfileConfig> for ProfileSummary {
     fn from(config: &ProfileConfig) -> Self {
         ProfileSummary {
+            network: config.network,
             has_private_key: config.private_key.is_some(),
             public_key: config.public_key.clone(),
             account: config.account,
@@ -797,6 +801,10 @@ impl PrivateKeyInputOptions {
         }
     }
 
+    pub fn has_key_or_file(&self) -> bool {
+        self.private_key.is_some() || self.private_key_file.is_some()
+    }
+
     /// Extract public key from CLI args with fallback to config
     /// This will first try to extract public key from private_key from CLI args
     /// With fallback to profile
@@ -833,6 +841,44 @@ impl PrivateKeyInputOptions {
                     let address = account_address_from_public_key(&public_key);
                     Ok((public_key, address))
                 },
+            }
+        } else {
+            Err(CliError::CommandArgumentError(
+                "One of ['--private-key', '--private-key-file'], or ['public_key'] must present in profile".to_string(),
+            ))
+        }
+    }
+
+    /// Extract address
+    pub fn extract_address(
+        &self,
+        encoding: EncodingType,
+        profile: &ProfileOptions,
+        maybe_address: Option<AccountAddress>,
+    ) -> CliTypedResult<AccountAddress> {
+        // Order of operations
+        // 1. CLI inputs
+        // 2. Profile
+        // 3. Derived
+        if let Some(address) = maybe_address {
+            return Ok(address);
+        }
+
+        if let Some(private_key) = self.extract_private_key_cli(encoding)? {
+            // If we use the CLI inputs, then we should derive or use the address from the input
+            let address = account_address_from_public_key(&private_key.public_key());
+            Ok(address)
+        } else if let Some((Some(public_key), maybe_config_address)) = CliConfig::load_profile(
+            profile.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| (p.public_key, p.account))
+        {
+            if let Some(address) = maybe_config_address {
+                Ok(address)
+            } else {
+                let address = account_address_from_public_key(&public_key);
+                Ok(address)
             }
         } else {
             Err(CliError::CommandArgumentError(
@@ -1108,10 +1154,9 @@ impl FromStr for OptimizationLevel {
     }
 }
 
-/// Options for compiling a move package dir
+/// Options for compiling a move package.
 #[derive(Debug, Clone, Parser)]
-#[clap(group = ArgGroup::new("move-version").args(&["move_1", "move_2"]).required(false))]
-pub struct MovePackageDir {
+pub struct MovePackageOptions {
     /// Path to a move package (the folder with a Move.toml file).  Defaults to current directory.
     #[clap(long, value_parser)]
     pub package_dir: Option<PathBuf>,
@@ -1155,11 +1200,9 @@ pub struct MovePackageDir {
     #[clap(long)]
     pub dev: bool,
 
-    /// Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code.
-    /// NOTE: this behavior will become the default in the future.
-    /// See <https://github.com/aptos-labs/aptos-core/issues/10335>
-    #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
-    pub check_test_code: bool,
+    /// Skip extended checks (such as checks for the #[view] attribute) on test code.
+    #[clap(long, default_value = "false")]
+    pub skip_checks_on_test_code: bool,
 
     /// Select optimization level.  Choices are "none", "default", or "extra".
     /// Level "extra" may spend more time on expensive optimizations in the future.
@@ -1174,50 +1217,40 @@ pub struct MovePackageDir {
 
     /// ...or --bytecode BYTECODE_VERSION
     /// Specify the version of the bytecode the compiler is going to emit.
-    /// Defaults to `7`.
+    /// If not provided, it is inferred from the language version.
     #[clap(long, alias = "bytecode", verbatim_doc_comment)]
     pub bytecode_version: Option<u32>,
 
     /// ...or --compiler COMPILER_VERSION
-    /// Specify the version of the compiler.
-    /// Defaults to the latest stable compiler version (at least 2)
-    /// Note: `aptos move prove` does not support v1
+    /// Specify the version of the compiler (must be at least 2).
+    /// Defaults to the latest stable compiler version.
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
            alias = "compiler",
            default_value = LATEST_STABLE_COMPILER_VERSION,
-           default_value_if("move_2", "true", LATEST_STABLE_COMPILER_VERSION),
-           default_value_if("move_1", "true", "1"),
            verbatim_doc_comment)]
     pub compiler_version: Option<CompilerVersion>,
 
     /// ...or --language LANGUAGE_VERSION
     /// Specify the language version to be supported.
-    /// Defaults to the latest stable language version (at least 2)
+    /// Defaults to the latest stable language version.
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
            alias = "language",
            default_value = LATEST_STABLE_LANGUAGE_VERSION,
-           default_value_if("move_2", "true", LATEST_STABLE_LANGUAGE_VERSION),
-           default_value_if("move_1", "true", "1"),
            verbatim_doc_comment)]
     pub language_version: Option<LanguageVersion>,
 
-    /// Select bytecode, language, and compiler versions to support the latest Move 2.
-    #[clap(long, verbatim_doc_comment)]
-    pub move_2: bool,
-
-    /// Select bytecode, language, and compiler versions for Move 1.
-    /// Note: `aptos move prove` does not support v1
-    #[clap(long, verbatim_doc_comment)]
-    pub move_1: bool,
+    /// Fail the compilation if there are any warnings.
+    #[clap(long)]
+    pub fail_on_warning: bool,
 }
 
-impl Default for MovePackageDir {
+impl Default for MovePackageOptions {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl MovePackageDir {
+impl MovePackageOptions {
     pub fn new() -> Self {
         Self {
             dev: false,
@@ -1230,10 +1263,9 @@ impl MovePackageDir {
             compiler_version: Some(CompilerVersion::latest_stable()),
             language_version: Some(LanguageVersion::latest_stable()),
             skip_attribute_checks: false,
-            check_test_code: false,
-            move_2: true,
-            move_1: false,
+            skip_checks_on_test_code: false,
             optimize: None,
+            fail_on_warning: false,
             experiments: vec![],
         }
     }
@@ -1254,6 +1286,30 @@ impl MovePackageDir {
     pub fn add_named_address(&mut self, key: String, value: String) {
         self.named_addresses
             .insert(key, AccountAddressWrapper::from_str(&value).unwrap());
+    }
+
+    /// Compute the experiments to be used for the compiler.
+    pub fn compute_experiments(&self) -> Vec<String> {
+        let mut experiments = self.experiments.clone();
+        let mut set = |k: &str, v: bool| {
+            experiments.push(format!("{}={}", k, if v { "on" } else { "off" }));
+        };
+        match self.optimize {
+            None | Some(OptimizationLevel::Default) => {
+                set(Experiment::OPTIMIZE, true);
+            },
+            Some(OptimizationLevel::None) => {
+                set(Experiment::OPTIMIZE, false);
+            },
+            Some(OptimizationLevel::Extra) => {
+                set(Experiment::OPTIMIZE_EXTRA, true);
+                set(Experiment::OPTIMIZE, true);
+            },
+        }
+        if self.fail_on_warning {
+            set(Experiment::FAIL_ON_WARNING, true);
+        }
+        experiments
     }
 }
 

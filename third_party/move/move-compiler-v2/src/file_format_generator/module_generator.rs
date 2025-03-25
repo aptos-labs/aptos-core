@@ -19,7 +19,10 @@ use move_core_types::{
 };
 use move_ir_types::ast as IR_AST;
 use move_model::{
-    ast::{AccessSpecifier, Address, AddressSpecifier, Attribute, ResourceSpecifier},
+    ast::{
+        AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Attribute,
+        ResourceSpecifier,
+    },
     metadata::{CompilationMetadata, CompilerVersion, LanguageVersion, COMPILATION_METADATA_KEY},
     model::{
         FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, Parameter, QualifiedId,
@@ -124,7 +127,7 @@ impl ModuleGenerator {
         let compiler_version = options
             .compiler_version
             .unwrap_or(CompilerVersion::latest_stable());
-        let gen_access_specifiers = language_version.is_at_least(LanguageVersion::V2_0)
+        let gen_access_specifiers = language_version.is_at_least(LanguageVersion::V2_2)
             && options.experiment_on(Experiment::GEN_ACCESS_SPECIFIERS);
         let gen_function_attributes = language_version.is_at_least(LanguageVersion::V2_2);
         let compilation_metadata = CompilationMetadata::new(compiler_version, language_version);
@@ -517,34 +520,18 @@ impl ModuleGenerator {
             loc,
             fun_env.get_result_type().flatten().into_iter().collect(),
         );
-        let access_specifiers = if self.gen_access_specifiers {
-            fun_env.get_access_specifiers().as_ref().map(|v| {
+        let access_specifiers = fun_env
+            .get_access_specifiers()
+            .as_ref()
+            .map(|v| {
                 v.iter()
-                    .map(|s| self.access_specifier(ctx, fun_env, s))
-                    .collect()
+                    .filter_map(|s| self.access_specifier(ctx, fun_env, s))
+                    .collect_vec()
             })
-        } else {
-            // Report an error if we cannot drop the access specifiers.
-            // TODO(#12623): remove this once the bug is fixed
-            if fun_env
-                .get_access_specifiers()
-                .map(|v| {
-                    v.iter().any(|s| {
-                        s.kind != FF::AccessKind::Acquires
-                            || s.negated
-                            || !matches!(s.resource.1, ResourceSpecifier::Resource(_))
-                            || !matches!(s.address.1, AddressSpecifier::Any)
-                    })
-                })
-                .unwrap_or_default()
-            {
-                ctx.internal_error(
-                    loc,
-                    "cannot strip extended access specifiers to mitigate bug #12623",
-                )
-            }
-            None
-        };
+            .and_then(|specs| if specs.is_empty() { None } else { Some(specs) });
+        if !self.gen_access_specifiers && access_specifiers.is_some() {
+            ctx.error(loc, "access specifiers not enabled");
+        }
         let attributes = if self.gen_function_attributes {
             ctx.function_attributes(fun_env)
         } else {
@@ -581,7 +568,15 @@ impl ModuleGenerator {
         ctx: &ModuleContext,
         fun_env: &FunctionEnv,
         access_specifier: &AccessSpecifier,
-    ) -> FF::AccessSpecifier {
+    ) -> Option<FF::AccessSpecifier> {
+        let kind = match access_specifier.kind {
+            AccessSpecifierKind::Reads => FF::AccessKind::Reads,
+            AccessSpecifierKind::Writes => FF::AccessKind::Writes,
+            AccessSpecifierKind::LegacyAcquires => {
+                // Legacy acquires not represented in file format
+                return None;
+            },
+        };
         let resource = match &access_specifier.resource.1 {
             ResourceSpecifier::Any => FF::ResourceSpecifier::Any,
             ResourceSpecifier::DeclaredAtAddress(addr) => FF::ResourceSpecifier::DeclaredAtAddress(
@@ -639,12 +634,12 @@ impl ModuleGenerator {
                     FF::AddressSpecifier::Parameter(param_index, Some(fun_index))
                 },
             };
-        FF::AccessSpecifier {
-            kind: access_specifier.kind,
+        Some(FF::AccessSpecifier {
+            kind,
             negated: access_specifier.negated,
             resource,
             address,
-        }
+        })
     }
 
     pub fn function_instantiation_index(
@@ -973,10 +968,11 @@ impl ModuleGenerator {
         cons: &Constant,
         ty: &Type,
     ) -> FF::ConstantPoolIndex {
-        if let Some(idx) = self.cons_to_idx.get(&(cons.clone(), ty.clone())) {
+        let canonical_const = cons.to_canonical();
+        if let Some(idx) = self.cons_to_idx.get(&(canonical_const.clone(), ty.clone())) {
             return *idx;
         }
-        let data = cons
+        let data = canonical_const
             .to_move_value()
             .simple_serialize()
             .expect("serialization succeeds");
@@ -991,7 +987,7 @@ impl ModuleGenerator {
             "constant",
         ));
         self.module.constant_pool.push(ff_cons);
-        self.cons_to_idx.insert((cons.clone(), ty.clone()), idx);
+        self.cons_to_idx.insert((canonical_const, ty.clone()), idx);
         idx
     }
 }

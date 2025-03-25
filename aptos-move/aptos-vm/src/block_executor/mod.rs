@@ -94,7 +94,7 @@ impl AptosTransactionOutput {
                 .take()
                 .expect("Output must be set")
                 .into_transaction_output()
-                .expect("Transaction output is not alerady materialized"),
+                .expect("Transaction output is not already materialized"),
         }
     }
 }

@@ -28,6 +28,7 @@ SHARDING_ENABLED = True
 MAX_RETRIES = 5
 RETRY_DELAY = 20  # seconds
 QUERY_DELAY = 5  # seconds
+TEARDOWN_DELAY= 30 * 60 # 30 minutes slack to allow for pod setup and teardown
 
 REPLAY_CONCURRENCY_LEVEL = 1
 
@@ -206,6 +207,8 @@ class WorkerPod:
         pod_manifest["metadata"]["name"] = self.name  # Unique name for each pod
         pod_manifest["metadata"]["labels"]["run"] = self.label
         pod_manifest["spec"]["containers"][0]["image"] = self.image
+        pod_ttl = self.config.timeout_secs + TEARDOWN_DELAY
+        pod_manifest["metadata"]["annotations"]["k8s-ttl-controller.twin.sh/ttl"] = f"{pod_ttl}s"
         pod_manifest["spec"]["volumes"][0]["persistentVolumeClaim"][
             "claimName"
         ] = self.get_claim_name()
@@ -305,6 +308,7 @@ class TaskStats:
         self.end_time: float | None = None
         self.retry_count: int = 0
         self.durations: list[float] = []
+        self.succeeded: bool = False
 
     def set_end_time(self) -> None:
         self.end_time = time.time()
@@ -313,8 +317,11 @@ class TaskStats:
     def increment_retry_count(self) -> None:
         self.retry_count += 1
 
+    def set_succeeded(self):
+        self.succeeded = True
+
     def __str__(self) -> str:
-        return f"Start time: {self.start_time}, End time: {self.end_time}, Duration: {self.durations}, Retry count: {self.retry_count}"
+        return f"Succeeded: {self.succeeded}, Start time: {self.start_time}, End time: {self.end_time}, Duration: {self.durations}, Retry count: {self.retry_count}"
 
 
 class ReplayScheduler:
@@ -365,6 +372,21 @@ class ReplayScheduler:
 
     def get_label(self):
         return f"{self.id}-{self.network}"
+
+    def humio_hash_mismatch_url(self, start_time: float, end_time: float) -> str:
+        query = f'k8s.labels.run = "{self.get_label()}" | "TransactionOutput does not match"'
+
+        params = {
+            "live": "false",
+            "query": query,
+            "start": f"{int(start_time*1000)}",
+            "end": f"{int(end_time*1000)}",
+        }
+
+        encoded_params = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
+        url = f"https://cloud.us.humio.com/k8s/search?{encoded_params}"
+
+        return url
 
     def sorted_ranges_to_skip(self):
         if len(self.ranges_to_skip) == 0:
@@ -422,12 +444,17 @@ class ReplayScheduler:
             if self.network == Network.TESTNET
             else MAINNET_SNAPSHOT_NAME
         )
+        # Because PVCs can be shared among multiple replay-verify runs, a more correct TTL
+        # would be computed from the number of shards and the expected run time of the replay-verify
+        # run. However, for simplicity, we set the TTL to 3 hours.
+        pvc_ttl = 3 * 60 * 60  # 3 hours
         pvcs = create_replay_verify_pvcs_from_snapshot(
             self.id,
             snapshot_name,
             self.namespace,
             self.config.pvc_number,
             self.get_label(),
+            pvc_ttl,
         )
         assert len(pvcs) == self.config.pvc_number, "failed to create all pvcs"
         self.pvcs = pvcs
@@ -524,6 +551,9 @@ class ReplayScheduler:
             else:
                 self.failed_workpod_logs.append(worker_pod.get_humio_log_link())
                 self.current_workers[worker_idx] = None
+        else:
+            self.task_stats[worker_pod.name].set_succeeded()
+
         self.task_stats[worker_pod.name].set_end_time()
 
     def cleanup(self):
@@ -680,13 +710,19 @@ if __name__ == "__main__":
     else:
         scheduler.create_pvc_from_snapshot()
         try:
+            start_time = time.time()
             scheduler.schedule(from_scratch=True)
             (failed_logs, txn_mismatch_logs) = scheduler.collect_all_failed_logs()
             scheduler.print_stats()
             print_logs(failed_logs, txn_mismatch_logs)
             if txn_mismatch_logs:
-                logger.error("Transaction mismatch logs found.")
+                url = scheduler.humio_hash_mismatch_url(start_time, time.time())
+                logger.error(
+                    f"Transaction mismatch logs found. All mismatch logs: {url}"
+                )
+                exit(2)
+            if len(failed_logs) > 0:
+                logger.error("Failed tasks found.")
                 exit(1)
-
         finally:
             scheduler.cleanup()

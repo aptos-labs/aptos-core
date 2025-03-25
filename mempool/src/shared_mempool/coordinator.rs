@@ -145,7 +145,7 @@ fn spawn_commit_notification_handler<NetworkClient, TransactionValidator>(
     let mempool = smp.mempool.clone();
     let mempool_validator = smp.validator.clone();
     let use_case_history = smp.use_case_history.clone();
-    let num_committed_txns_recieved_since_peers_updated = smp
+    let num_committed_txns_received_since_peers_updated = smp
         .network_interface
         .num_committed_txns_received_since_peers_updated
         .clone();
@@ -157,7 +157,7 @@ fn spawn_commit_notification_handler<NetworkClient, TransactionValidator>(
                 &mempool_validator,
                 &use_case_history,
                 commit_notification,
-                &num_committed_txns_recieved_since_peers_updated,
+                &num_committed_txns_received_since_peers_updated,
             );
         }
     });
@@ -232,7 +232,7 @@ fn handle_commit_notification<TransactionValidator>(
     mempool_validator: &Arc<RwLock<TransactionValidator>>,
     use_case_history: &Arc<Mutex<UseCaseHistory>>,
     msg: MempoolCommitNotification,
-    num_committed_txns_recieved_since_peers_updated: &Arc<AtomicU64>,
+    num_committed_txns_received_since_peers_updated: &Arc<AtomicU64>,
 ) where
     TransactionValidator: TransactionValidation,
 {
@@ -248,7 +248,7 @@ fn handle_commit_notification<TransactionValidator>(
         counters::COMMIT_STATE_SYNC_LABEL,
         msg.transactions.len(),
     );
-    num_committed_txns_recieved_since_peers_updated
+    num_committed_txns_received_since_peers_updated
         .fetch_add(msg.transactions.len() as u64, Ordering::Relaxed);
     process_committed_transactions(
         mempool,

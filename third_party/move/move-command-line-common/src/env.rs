@@ -28,37 +28,6 @@ pub fn get_bytecode_version_from_env(from_input: Option<u32>) -> Option<u32> {
     }
 }
 
-/// An environment variable which can be set to force use of the move-compiler-v2
-/// in all contexts where the V1 compiler is currently used.
-const MOVE_COMPILER_V2_ENV_VAR: &str = "MOVE_COMPILER_V2";
-const MVC_V2_ENV_VAR: &str = "MVC_V2";
-
-pub fn get_move_compiler_v2_from_env() -> bool {
-    read_bool_env_var(MOVE_COMPILER_V2_ENV_VAR) || read_bool_env_var(MVC_V2_ENV_VAR)
-}
-
-/// An environment variable which can be set to force use of the move-compiler-v1
-/// in all contexts where the V2 compiler is currently used.
-const MOVE_COMPILER_V1_ENV_VAR: &str = "MOVE_COMPILER_V1";
-const MVC_V1_ENV_VAR: &str = "MVC_V1";
-
-pub fn get_move_compiler_v1_from_env() -> bool {
-    read_bool_env_var(MOVE_COMPILER_V1_ENV_VAR) || read_bool_env_var(MVC_V1_ENV_VAR)
-}
-
-/// An environment variable which can be set to cause a panic if the V1 Move compiler is run (past
-/// parsing and expansion phases, which are currently used by V2) as part of another toolchain or
-/// testing process.  This is useful for debugging whether V2 is being invoked properly.
-const MOVE_COMPILER_BLOCK_V1_ENV_VAR: &str = "MOVE_COMPILER_BLOCK_V1";
-const MVC_BLOCK_V1_ENV_VAR: &str = "MVC_BLOCK_V1";
-
-// Make this debugging option available as a CLI flag
-pub const MOVE_COMPILER_BLOCK_V1_FLAG: &str = "block-compiler-v1";
-
-pub fn get_move_compiler_block_v1_from_env() -> bool {
-    read_bool_env_var(MOVE_COMPILER_BLOCK_V1_ENV_VAR) || read_bool_env_var(MVC_BLOCK_V1_ENV_VAR)
-}
-
 pub fn read_env_var(v: &str) -> String {
     std::env::var(v).unwrap_or_else(|_| String::new())
 }

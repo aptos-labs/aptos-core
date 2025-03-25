@@ -2318,6 +2318,120 @@ impl<'de> serde::Deserialize<'de> for PingDataServiceResponse {
         deserializer.deserialize_struct("aptos.indexer.v1.PingDataServiceResponse", FIELDS, GeneratedVisitor)
     }
 }
+impl serde::Serialize for ProcessedRange {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if self.first_version != 0 {
+            len += 1;
+        }
+        if self.last_version != 0 {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("aptos.indexer.v1.ProcessedRange", len)?;
+        if self.first_version != 0 {
+            struct_ser.serialize_field("firstVersion", ToString::to_string(&self.first_version).as_str())?;
+        }
+        if self.last_version != 0 {
+            struct_ser.serialize_field("lastVersion", ToString::to_string(&self.last_version).as_str())?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for ProcessedRange {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "first_version",
+            "firstVersion",
+            "last_version",
+            "lastVersion",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            FirstVersion,
+            LastVersion,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "firstVersion" | "first_version" => Ok(GeneratedField::FirstVersion),
+                            "lastVersion" | "last_version" => Ok(GeneratedField::LastVersion),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = ProcessedRange;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct aptos.indexer.v1.ProcessedRange")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<ProcessedRange, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                let mut first_version__ = None;
+                let mut last_version__ = None;
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        GeneratedField::FirstVersion => {
+                            if first_version__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("firstVersion"));
+                            }
+                            first_version__ =
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
+                        GeneratedField::LastVersion => {
+                            if last_version__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("lastVersion"));
+                            }
+                            last_version__ =
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
+                    }
+                }
+                Ok(ProcessedRange {
+                    first_version: first_version__.unwrap_or_default(),
+                    last_version: last_version__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("aptos.indexer.v1.ProcessedRange", FIELDS, GeneratedVisitor)
+    }
+}
 impl serde::Serialize for ServiceInfo {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -3023,12 +3137,18 @@ impl serde::Serialize for TransactionsResponse {
         if self.chain_id.is_some() {
             len += 1;
         }
+        if self.processed_range.is_some() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("aptos.indexer.v1.TransactionsResponse", len)?;
         if !self.transactions.is_empty() {
             struct_ser.serialize_field("transactions", &self.transactions)?;
         }
         if let Some(v) = self.chain_id.as_ref() {
             struct_ser.serialize_field("chainId", ToString::to_string(&v).as_str())?;
+        }
+        if let Some(v) = self.processed_range.as_ref() {
+            struct_ser.serialize_field("processedRange", v)?;
         }
         struct_ser.end()
     }
@@ -3043,12 +3163,15 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
             "transactions",
             "chain_id",
             "chainId",
+            "processed_range",
+            "processedRange",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Transactions,
             ChainId,
+            ProcessedRange,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -3072,6 +3195,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
                         match value {
                             "transactions" => Ok(GeneratedField::Transactions),
                             "chainId" | "chain_id" => Ok(GeneratedField::ChainId),
+                            "processedRange" | "processed_range" => Ok(GeneratedField::ProcessedRange),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -3093,6 +3217,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
             {
                 let mut transactions__ = None;
                 let mut chain_id__ = None;
+                let mut processed_range__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Transactions => {
@@ -3109,11 +3234,18 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
+                        GeneratedField::ProcessedRange => {
+                            if processed_range__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("processedRange"));
+                            }
+                            processed_range__ = map.next_value()?;
+                        }
                     }
                 }
                 Ok(TransactionsResponse {
                     transactions: transactions__.unwrap_or_default(),
                     chain_id: chain_id__,
+                    processed_range: processed_range__,
                 })
             }
         }

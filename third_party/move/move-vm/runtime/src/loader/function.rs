@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    loader::{
-        access_specifier_loader::load_access_specifier, LegacyModuleStorageAdapter, Loader, Module,
-        Resolver, Script,
-    },
+    loader::{access_specifier_loader::load_access_specifier, Module, Resolver, Script},
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
     storage::ty_tag_converter::TypeTagConverter,
     LayoutConverter, ModuleStorage, StorageLayoutConverter,
@@ -34,6 +31,7 @@ use move_vm_types::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
     },
+    resolver::ResourceResolver,
     values::{AbstractFunction, SerializedFunctionData},
 };
 use std::{cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc, sync::Arc};
@@ -61,7 +59,7 @@ pub struct Function {
 
 /// For loaded function representation, specifies the owner: a script or a module.
 #[derive(Clone)]
-pub(crate) enum LoadedFunctionOwner {
+pub enum LoadedFunctionOwner {
     Script(Arc<Script>),
     Module(Arc<Module>),
 }
@@ -69,12 +67,18 @@ pub(crate) enum LoadedFunctionOwner {
 /// A loaded runtime function representation along with type arguments used to instantiate it.
 #[derive(Clone)]
 pub struct LoadedFunction {
-    pub(crate) owner: LoadedFunctionOwner,
+    pub owner: LoadedFunctionOwner,
     // A set of verified type arguments provided for this definition. If
     // function is not generic, an empty vector.
-    pub(crate) ty_args: Vec<Type>,
+    pub ty_args: Vec<Type>,
     // Definition of the loaded function.
-    pub(crate) function: Arc<Function>,
+    pub function: Arc<Function>,
+}
+
+impl LoadedFunction {
+    pub fn owner(&self) -> &LoadedFunctionOwner {
+        &self.owner
+    }
 }
 
 /// A lazy loaded function, which can either be unresolved (as resulting
@@ -351,7 +355,7 @@ impl LoadedFunction {
     }
 
     /// Returns true if the loaded function is an entry function.
-    pub(crate) fn is_entry(&self) -> bool {
+    pub fn is_entry(&self) -> bool {
         self.function.is_entry()
     }
 
@@ -415,16 +419,15 @@ impl LoadedFunction {
 
     pub(crate) fn get_resolver<'a>(
         &self,
-        loader: &'a Loader,
-        module_store: &'a LegacyModuleStorageAdapter,
         module_storage: &'a impl ModuleStorage,
+        resource_resolver: &'a impl ResourceResolver,
     ) -> Resolver<'a> {
         match &self.owner {
             LoadedFunctionOwner::Module(module) => {
-                Resolver::for_module(loader, module_store, module_storage, module.clone())
+                Resolver::for_module(module.clone(), module_storage, resource_resolver)
             },
             LoadedFunctionOwner::Script(script) => {
-                Resolver::for_script(loader, module_store, module_storage, script.clone())
+                Resolver::for_script(script.clone(), module_storage, resource_resolver)
             },
         }
     }

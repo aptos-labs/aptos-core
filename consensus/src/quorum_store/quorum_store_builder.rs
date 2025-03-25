@@ -365,6 +365,7 @@ impl InnerBuilder {
                 * self.num_validators,
             self.batch_store.clone().unwrap(),
             self.config.allow_batches_without_pos_in_proposal,
+            self.config.enable_payload_v2,
             self.config.batch_expiry_gap_when_init_usecs,
         );
         spawn_named!(
@@ -447,6 +448,7 @@ impl InnerBuilder {
                 consensus_publisher,
                 self.verifier.get_ordered_account_addresses(),
                 self.verifier.address_to_validator_index().clone(),
+                self.config.enable_payload_v2,
             )),
             Some(self.quorum_store_msg_tx.clone()),
         )

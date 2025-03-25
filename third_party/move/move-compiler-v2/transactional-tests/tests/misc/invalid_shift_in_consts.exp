@@ -1,23 +1,17 @@
-comparison between v1 and v2 failed:
-= processed 1 task
-= 
-= task 0 'publish'. lines 1-9:
-- Error: error[E08001]: cannot compute constant value
-+ Error: compilation errors:
-+  error: Invalid expression in `const`. Operand on the right is too large for `<<`, should be less than `8`
-=   ┌─ TEMPFILE:3:20
-=   │
-= 3 │     const C1: u8 = 0 << 8;
--   │                    ^^^^^^ Invalid expression in 'const'. This expression could not be evaluated to a value
-+   │                    ^^^^^^
-= 
-- error[E08001]: cannot compute constant value
-+ error: Invalid expression in `const`. Operand on the right is too large for `>>`, should be less than `8`
-=   ┌─ TEMPFILE:4:20
-=   │
-= 4 │     const C2: u8 = 0 >> 8;
--   │                    ^^^^^^ Invalid expression in 'const'. This expression could not be evaluated to a value
-+   │                    ^^^^^^
-= 
-= 
-= 
+processed 1 task
+
+task 0 'publish'. lines 1-9:
+Error: compilation errors:
+ error: Invalid expression in `const`. Operand on the right is too large for `<<`, should be less than `8`
+  ┌─ TEMPFILE:3:20
+  │
+3 │     const C1: u8 = 0 << 8;
+  │                    ^^^^^^
+
+error: Invalid expression in `const`. Operand on the right is too large for `>>`, should be less than `8`
+  ┌─ TEMPFILE:4:20
+  │
+4 │     const C2: u8 = 0 >> 8;
+  │                    ^^^^^^
+
+

@@ -181,16 +181,16 @@ pub enum EntryFunctionCall {
 
     AccountAbstractionInitialize {},
 
-    /// Add dispatchable domain-scoped authentication function, that enables account abstraction via this function.
+    /// Add dispatchable derivable authentication function, that enables account abstraction via this function.
     /// This means all accounts within the domain can use it to authenticate, without needing an initialization (unlike non-domain AA).
     /// dispatchable function needs to verify two things:
-    /// - that signing_data.domain_authenticator() is a valid signature of signing_data.digest() (just like regular AA)
-    /// - that signing_data.domain_account_identity() is correct identity representing the authenticator
+    /// - that signing_data.derivable_abstract_signature() is a valid signature of signing_data.digest() (just like regular AA)
+    /// - that signing_data.derivable_abstract_public_key() is correct identity representing the authenticator
     ///   (missing this step would allow impersonation)
     ///
     /// Note: This is  public entry function, as it requires framework signer, and that can
     /// only be obtained as a part of the governance script.
-    AccountAbstractionRegisterDomainWithAuthenticationFunction {
+    AccountAbstractionRegisterDerivableAuthenticationFunction {
         module_address: AccountAddress,
         module_name: Vec<u8>,
         function_name: Vec<u8>,
@@ -1297,11 +1297,11 @@ impl EntryFunctionCall {
                 _function_name,
             ),
             AccountAbstractionInitialize {} => account_abstraction_initialize(),
-            AccountAbstractionRegisterDomainWithAuthenticationFunction {
+            AccountAbstractionRegisterDerivableAuthenticationFunction {
                 module_address,
                 module_name,
                 function_name,
-            } => account_abstraction_register_domain_with_authentication_function(
+            } => account_abstraction_register_derivable_authentication_function(
                 module_address,
                 module_name,
                 function_name,
@@ -2272,16 +2272,16 @@ pub fn account_abstraction_initialize() -> TransactionPayload {
     ))
 }
 
-/// Add dispatchable domain-scoped authentication function, that enables account abstraction via this function.
+/// Add dispatchable derivable authentication function, that enables account abstraction via this function.
 /// This means all accounts within the domain can use it to authenticate, without needing an initialization (unlike non-domain AA).
 /// dispatchable function needs to verify two things:
-/// - that signing_data.domain_authenticator() is a valid signature of signing_data.digest() (just like regular AA)
-/// - that signing_data.domain_account_identity() is correct identity representing the authenticator
+/// - that signing_data.derivable_abstract_signature() is a valid signature of signing_data.digest() (just like regular AA)
+/// - that signing_data.derivable_abstract_public_key() is correct identity representing the authenticator
 ///   (missing this step would allow impersonation)
 ///
 /// Note: This is  public entry function, as it requires framework signer, and that can
 /// only be obtained as a part of the governance script.
-pub fn account_abstraction_register_domain_with_authentication_function(
+pub fn account_abstraction_register_derivable_authentication_function(
     module_address: AccountAddress,
     module_name: Vec<u8>,
     function_name: Vec<u8>,
@@ -2294,7 +2294,7 @@ pub fn account_abstraction_register_domain_with_authentication_function(
             ]),
             ident_str!("account_abstraction").to_owned(),
         ),
-        ident_str!("register_domain_with_authentication_function").to_owned(),
+        ident_str!("register_derivable_authentication_function").to_owned(),
         vec![],
         vec![
             bcs::to_bytes(&module_address).unwrap(),
@@ -5523,12 +5523,12 @@ mod decoder {
         }
     }
 
-    pub fn account_abstraction_register_domain_with_authentication_function(
+    pub fn account_abstraction_register_derivable_authentication_function(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(
-                EntryFunctionCall::AccountAbstractionRegisterDomainWithAuthenticationFunction {
+                EntryFunctionCall::AccountAbstractionRegisterDerivableAuthenticationFunction {
                     module_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                     module_name: bcs::from_bytes(script.args().get(1)?).ok()?,
                     function_name: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -7372,8 +7372,8 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::account_abstraction_initialize),
         );
         map.insert(
-            "account_abstraction_register_domain_with_authentication_function".to_string(),
-            Box::new(decoder::account_abstraction_register_domain_with_authentication_function),
+            "account_abstraction_register_derivable_authentication_function".to_string(),
+            Box::new(decoder::account_abstraction_register_derivable_authentication_function),
         );
         map.insert(
             "account_abstraction_remove_authentication_function".to_string(),
