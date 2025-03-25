@@ -13,6 +13,12 @@ use aptos_types::{
 };
 
 #[derive(Clone, Debug)]
+pub struct HotStateValue {
+    db_update: DbStateUpdate,
+    access_time: u32,
+}
+
+#[derive(Clone, Debug)]
 pub struct DbStateUpdate {
     /// The version where the key got updated (incl. deletion).
     pub version: Version,

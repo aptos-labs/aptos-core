@@ -37,6 +37,7 @@ use std::{collections::HashMap, sync::Arc};
 pub struct State {
     /// The next version. If this is 0, the state is the "pre-genesis" empty state.
     next_version: Version,
+    hot_state: Arc<MapLayer<StateKey, DbStateUpdate>>,
     /// The updates made to the state at the current version.
     ///  N.b. this is not directly iteratable, one needs to make a `StateDelta`
     ///       between this and a `base_version` to list the updates or create a
@@ -49,25 +50,31 @@ pub struct State {
 impl State {
     pub fn new_with_updates(
         version: Option<Version>,
+        hot_state: Arc<MapLayer<StateKey, DbStateUpdate>>,
         shards: Arc<[MapLayer<StateKey, DbStateUpdate>; NUM_STATE_SHARDS]>,
         usage: StateStorageUsage,
     ) -> Self {
+        println!("State::new_with_updates. version: {version:?}. hot_state: {hot_state:?}. shards: {shards:?}.");
         Self {
             next_version: version.map_or(0, |v| v + 1),
+            hot_state,
             shards,
             usage,
         }
     }
 
     pub fn new_at_version(version: Option<Version>, usage: StateStorageUsage) -> Self {
+        println!("State::new_at_version. version: {version:?}.");
         Self::new_with_updates(
             version,
+            Arc::new(MapLayer::new_family("hot_state")),
             Arc::new(arr_macro::arr![MapLayer::new_family("state"); 16]),
             usage,
         )
     }
 
     pub fn new_empty() -> Self {
+        println!("State::new_empty");
         Self::new_at_version(None, StateStorageUsage::zero())
     }
 
@@ -112,6 +119,8 @@ impl State {
         hot_state_refreshes: &mut [Option<&HotStateShardRefreshes>; NUM_STATE_SHARDS],
     ) -> Self {
         let _timer = TIMER.timer_with(&["state__update"]);
+
+        println!("hot_state_refreshes: {:?}", hot_state_refreshes);
 
         // 1. The update batch must begin at self.next_version().
         assert_eq!(self.next_version(), updates.first_version);
@@ -166,7 +175,9 @@ impl State {
         // Consume hot_state_refreshes, so for each chunk it's taken into account only once.
         *hot_state_refreshes = arr![None; 16];
 
-        State::new_with_updates(updates.last_version(), shards, usage)
+        let new_hot_state = Arc::new(MapLayer::new_family("todo"));
+
+        State::new_with_updates(updates.last_version(), new_hot_state, shards, usage)
     }
 
     fn update_usage(&self, usage_delta_per_shard: Vec<(i64, i64)>) -> StateStorageUsage {
