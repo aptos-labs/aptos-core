@@ -13,8 +13,11 @@ use legacy_move_compiler::{
     shared::known_attributes::KnownAttribute,
 };
 use move_binary_format::{
-    access::ModuleAccess, compatibility::Compatibility, errors::VMResult,
-    file_format::CompiledScript, file_format_common, CompiledModule,
+    access::ModuleAccess,
+    compatibility::Compatibility,
+    errors::{Location, VMResult},
+    file_format::CompiledScript,
+    file_format_common, CompiledModule,
 };
 use move_bytecode_verifier::VerifierConfig;
 use move_command_line_common::{
@@ -33,11 +36,12 @@ use move_stdlib::move_stdlib_named_addresses;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::{
     config::VMConfig,
+    data_cache::TransactionDataCache,
     module_traversal::*,
-    move_vm::MoveVM,
-    session::{SerializedReturnValues, Session},
-    AsUnsyncCodeStorage, AsUnsyncModuleStorage, ModuleStorage, RuntimeEnvironment,
-    StagingModuleStorage,
+    move_vm::{MoveVM, SerializedReturnValues},
+    native_extensions::NativeContextExtensions,
+    AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage, LoadedFunction, ModuleStorage,
+    RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
@@ -275,23 +279,16 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .chain(args)
             .collect();
         let verbose = extra_args.verbose;
-        let traversal_storage = TraversalStorage::new();
-        self.perform_session_action(gas_budget, &code_storage, |session, gas_status| {
-            session.load_and_execute_script(
-                script_bytes,
-                type_args,
-                args,
-                gas_status,
-                &mut TraversalContext::new(&traversal_storage),
-                &code_storage,
-            )
-        })
-        .map_err(|vm_error| {
-            anyhow!(
-                "Script execution failed with VMError: {}",
-                vm_error.format_test_output(move_test_debug() || verbose)
-            )
-        })?;
+
+        code_storage
+            .load_script(&script_bytes, &type_args)
+            .and_then(|func| self.execute_loaded_function(func, args, gas_budget, &code_storage))
+            .map_err(|err| {
+                anyhow!(
+                    "Script execution failed with VMError: {}",
+                    err.format_test_output(move_test_debug() || verbose)
+                )
+            })?;
         Ok(None)
     }
 
@@ -323,23 +320,14 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .chain(args)
             .collect();
         let verbose = extra_args.verbose;
-        let traversal_storage = TraversalStorage::new();
-        let serialized_return_values = self
-            .perform_session_action(gas_budget, &module_storage, |session, gas_status| {
-                session.execute_function_bypass_visibility(
-                    module,
-                    function,
-                    type_args,
-                    args,
-                    gas_status,
-                    &mut TraversalContext::new(&traversal_storage),
-                    &module_storage,
-                )
-            })
-            .map_err(|vm_error| {
+
+        let serialized_return_values = module_storage
+            .load_function(module, function, &type_args)
+            .and_then(|func| self.execute_loaded_function(func, args, gas_budget, &module_storage))
+            .map_err(|err| {
                 anyhow!(
                     "Function execution failed with VMError: {}",
-                    vm_error.format_test_output(move_test_debug() || verbose)
+                    err.format_test_output(move_test_debug() || verbose)
                 )
             })?;
         Ok((None, serialized_return_values))
@@ -379,29 +367,39 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
 }
 
 impl<'a> SimpleVMTestAdapter<'a> {
-    fn perform_session_action<Ret>(
+    fn execute_loaded_function(
         &mut self,
+        function: LoadedFunction,
+        args: Vec<Vec<u8>>,
         gas_budget: Option<u64>,
         module_storage: &impl ModuleStorage,
-        f: impl FnOnce(&mut Session, &mut GasStatus) -> VMResult<Ret>,
-    ) -> VMResult<Ret> {
-        let (mut session, mut gas_status) = {
-            let gas_status = get_gas_status(
-                &move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE,
-                gas_budget,
-            )
-            .unwrap();
-            let session = MoveVM::new_session(&self.storage);
-            (session, gas_status)
-        };
+    ) -> VMResult<SerializedReturnValues> {
+        let mut gas_status = get_gas_status(
+            &move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE,
+            gas_budget,
+        )
+        .unwrap();
 
-        // perform op
-        let res = f(&mut session, &mut gas_status)?;
+        let traversal_storage = TraversalStorage::new();
+        let mut extensions = NativeContextExtensions::default();
 
-        // save changeset
-        let changeset = session.finish(module_storage)?;
-        self.storage.apply(changeset).unwrap();
-        Ok(res)
+        let mut data_cache = TransactionDataCache::empty();
+        let return_values = MoveVM::execute_loaded_function(
+            function,
+            args,
+            &mut data_cache,
+            &mut gas_status,
+            &mut TraversalContext::new(&traversal_storage),
+            &mut extensions,
+            module_storage,
+            &self.storage,
+        )?;
+
+        let change_set = data_cache
+            .into_effects(module_storage)
+            .map_err(|err| err.finish(Location::Undefined))?;
+        self.storage.apply(change_set).unwrap();
+        Ok(return_values)
     }
 }
 
