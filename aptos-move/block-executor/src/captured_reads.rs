@@ -32,11 +32,8 @@ use move_vm_types::{
 };
 use std::{
     collections::{
-        hash_map::{
-            Entry,
-            Entry::{Occupied, Vacant},
-        },
-        BTreeMap, HashMap, HashSet,
+        hash_map::Entry::{self, Occupied, Vacant},
+        BTreeMap, BTreeSet, HashMap, HashSet,
     },
     hash::Hash,
     ops::Deref,
@@ -189,6 +186,8 @@ impl<V: TransactionWrite> DataRead<V> {
     pub(crate) fn from_value_with_layout(version: Version, value: ValueWithLayout<V>) -> Self {
         match value {
             // If value was never exchanged, then metadata can be the highest one without full value.
+            // This is because captured read should never be RawFromStorage, and direct validation
+            // reads will be checked if they contain the captured read - so downcasting is okay.
             ValueWithLayout::RawFromStorage(v) => DataRead::Metadata(v.as_state_value_metadata()),
             ValueWithLayout::Exchanged(v, layout) => {
                 DataRead::Versioned(version, v.clone(), layout)
@@ -355,6 +354,7 @@ pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
     data_reads: HashMap<T::Key, DataRead<T::Value>>,
     group_reads: HashMap<T::Key, GroupRead<T>>,
     delayed_field_reads: HashMap<DelayedFieldID, DelayedFieldRead>,
+    pub(crate) aggregator_v1_reads: HashSet<T::Key>,
 
     #[deprecated]
     pub(crate) deprecated_module_reads: Vec<T::Key>,
@@ -387,6 +387,7 @@ impl<T: Transaction, K, DC, VC, S> CapturedReads<T, K, DC, VC, S> {
             data_reads: HashMap::new(),
             group_reads: HashMap::new(),
             delayed_field_reads: HashMap::new(),
+            aggregator_v1_reads: HashSet::new(),
             deprecated_module_reads: Vec::new(),
             module_reads: hashbrown::HashMap::new(),
             delayed_field_speculative_failure: false,
@@ -639,29 +640,28 @@ where
         self.incorrect_use
     }
 
-    pub(crate) fn validate_data_reads(
-        &self,
+    fn validate_data_reads_impl<'a>(
+        &'a self,
+        mut iter: impl Iterator<Item = (&'a T::Key, &'a DataRead<T::Value>)>,
         data_map: &VersionedData<T::Key, T::Value>,
         idx_to_validate: TxnIndex,
     ) -> bool {
-        if self.non_delayed_field_speculative_failure {
-            return false;
-        }
-
         use MVDataError::*;
         use MVDataOutput::*;
-        self.data_reads.iter().all(|(k, r)| {
-            match data_map.fetch_data(k, idx_to_validate) {
-                Ok(Versioned(version, v)) => {
+        iter.all(|(key, read)| {
+            match data_map.fetch_data(key, idx_to_validate) {
+                Ok(Versioned(version, value)) => {
                     matches!(
-                        DataRead::from_value_with_layout(version, v).contains(r, self.block_stm_v2),
+                        DataRead::from_value_with_layout(version, value).contains(read, self.block_stm_v2),
                         DataReadComparison::Contains
                     )
                 },
-                Ok(Resolved(value)) => matches!(
-                    DataRead::Resolved(value).contains(r, self.block_stm_v2),
-                    DataReadComparison::Contains
-                ),
+                Ok(Resolved(value)) => {
+                    matches!(
+                        DataRead::Resolved(value).contains(read, self.block_stm_v2),
+                        DataReadComparison::Contains
+                    )
+                },
                 // Dependency implies a validation failure, and if the original read were to
                 // observe an unresolved delta, it would set the aggregator base value in the
                 // multi-versioned data-structure, resolve, and record the resolved value.
@@ -671,6 +671,59 @@ where
                 | Err(Uninitialized) => false,
             }
         })
+    }
+
+    pub(crate) fn validate_aggregator_v1_reads(
+        &self,
+        data_map: &VersionedData<T::Key, T::Value>,
+        aggregator_write_keys: &BTreeSet<T::Key>,
+        idx_to_validate: TxnIndex,
+    ) -> Result<bool, PanicError> {
+        let mut aggregator_v1_iterable = Vec::with_capacity(self.aggregator_v1_reads.len());
+        for k in &self.aggregator_v1_reads {
+            match self.data_reads.get(k) {
+                Some(data_read) => aggregator_v1_iterable.push((k, data_read)),
+                None => {
+                    return Err(code_invariant_error(format!(
+                        "Aggregator v1 read {:?} not found among captured data reads",
+                        k
+                    )));
+                },
+            }
+        }
+
+        let ret = self.validate_data_reads_impl(
+            aggregator_v1_iterable.into_iter(),
+            data_map,
+            idx_to_validate,
+        );
+
+        if ret {
+            // Additional invariant check (that AggregatorV1 reads are captured for aggregator write keys). 
+            // Moreover no extra work when aggregator_v1_reads is empty, which happens for BlockSTMv1.
+            for k in aggregator_write_keys {
+                if self.data_reads.get(k).is_some() && !self.aggregator_v1_reads.contains(k) {
+                    return Err(code_invariant_error(format!(
+                        "Captured read at aggregator key {:?} not found among AggregatorV1 reads",
+                        k
+                    )));
+                }
+            }
+        }
+
+        Ok(ret)
+    }
+
+    pub(crate) fn validate_data_reads(
+        &self,
+        data_map: &VersionedData<T::Key, T::Value>,
+        idx_to_validate: TxnIndex,
+    ) -> bool {
+        if self.non_delayed_field_speculative_failure {
+            return false;
+        }
+
+        self.validate_data_reads_impl(self.data_reads.iter(), data_map, idx_to_validate)
     }
 
     /// Records the read to global cache that spans across multiple blocks.
@@ -1370,19 +1423,19 @@ mod test {
 
         assert_capture_get!(
             captured_reads,
-            KeyType::<u32>(10, false),
+            KeyType::<u32>(10),
             use_tag.then_some(30),
             legacy_reads
         );
         assert_capture_get!(
             captured_reads,
-            KeyType::<u32>(11, false),
+            KeyType::<u32>(11),
             use_tag.then_some(30),
             deletion_reads
         );
         assert_capture_get!(
             captured_reads,
-            KeyType::<u32>(15, false),
+            KeyType::<u32>(15),
             use_tag.then_some(30),
             with_metadata_reads
         );
@@ -1398,7 +1451,7 @@ mod test {
             MockVerifiedCode,
             MockExtension,
         >::new(false);
-        captured_reads.get_by_kind(&KeyType::<u32>(21, false), Some(&10), ReadKind::Metadata);
+        captured_reads.get_by_kind(&KeyType::<u32>(21), Some(&10), ReadKind::Metadata);
     }
 
     macro_rules! assert_incorrect_use {
@@ -1439,19 +1492,19 @@ mod test {
 
         assert_incorrect_use!(
             captured_reads,
-            KeyType::<u32>(10, false),
+            KeyType::<u32>(10),
             use_tag.then_some(30),
             legacy_reads
         );
         assert_incorrect_use!(
             captured_reads,
-            KeyType::<u32>(11, false),
+            KeyType::<u32>(11),
             use_tag.then_some(30),
             deletion_reads
         );
         assert_incorrect_use!(
             captured_reads,
-            KeyType::<u32>(15, false),
+            KeyType::<u32>(15),
             use_tag.then_some(30),
             with_metadata_reads
         );
@@ -1460,7 +1513,7 @@ mod test {
         assert!(!captured_reads.incorrect_use);
 
         for i in 0..3 {
-            let key = KeyType::<u32>(20 + i, false);
+            let key = KeyType::<u32>(20 + i);
             assert_ok!(captured_reads.capture_read(
                 key,
                 use_tag.then_some(30),
@@ -1503,7 +1556,7 @@ mod test {
 
         assert!(!captured_reads.non_delayed_field_speculative_failure);
         assert!(!captured_reads.delayed_field_speculative_failure);
-        let key = KeyType::<u32>(20, false);
+        let key = KeyType::<u32>(20);
         assert_ok!(captured_reads.capture_read(key, use_tag.then_some(30), exists));
         assert_err!(captured_reads.capture_read(
             key,
@@ -1517,7 +1570,7 @@ mod test {
 
         captured_reads.non_delayed_field_speculative_failure = false;
         captured_reads.delayed_field_speculative_failure = false;
-        let key = KeyType::<u32>(21, false);
+        let key = KeyType::<u32>(21);
         assert_ok!(captured_reads.capture_read(key, use_tag.then_some(30), deletion_metadata));
         assert_err!(captured_reads.capture_read(key, use_tag.then_some(30), resolved));
         assert!(captured_reads.non_delayed_field_speculative_failure);
@@ -1531,7 +1584,7 @@ mod test {
 
         captured_reads.non_delayed_field_speculative_failure = false;
         captured_reads.delayed_field_speculative_failure = false;
-        let key = KeyType::<u32>(22, false);
+        let key = KeyType::<u32>(22);
         assert_ok!(captured_reads.capture_read(key, use_tag.then_some(30), metadata));
         assert_err!(captured_reads.capture_read(key, use_tag.then_some(30), versioned_legacy));
         assert!(captured_reads.non_delayed_field_speculative_failure);
