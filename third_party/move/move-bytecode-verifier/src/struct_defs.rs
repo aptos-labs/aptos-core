@@ -100,7 +100,7 @@ impl<'a> StructDefGraphBuilder<'a> {
                 }
             }
         } else {
-            for field in struct_def.fields().into_iter().flatten() {
+            for field in struct_def.fields_optional_variant(None) {
                 self.add_signature_token(neighbors, idx, field.signature_token(), false)?
             }
         }
