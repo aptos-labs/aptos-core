@@ -497,18 +497,24 @@ module aptos_framework::staking_contract {
         };
     }
 
-    /// Update the lockup period of the stake pool to the new_lockup_secs.
+    /// Extend the lockup period of the stake pool to match a governance proposal's expiration.
     /// Can only be called by the staker.
-    public entry fun update_lockup(staker: &signer, operator: address, new_lockup_secs: u64) acquires Store {
+    public entry fun extend_lockup(staker: &signer, operator: address, proposal_id: u64) acquires Store {
         let staker_address = signer::address_of(staker);
         assert_staking_contract_exists(staker_address, operator);
+        let pool_address = stake_pool_address(staker_address, operator);
 
-        let staking_contract = Store[staker_address].staking_contracts.borrow_mut(&operator);
-        stake::update_lockup_with_cap(&staking_contract.owner_cap, new_lockup_secs);
+        let proposal_expiration = aptos_governance::get_proposal_expiration(proposal_id);
+        let current_lockup = stake::get_lockup_secs(pool_address);
+        // Only extend the lockup if it ends before the proposal expiration.
+        if (current_lockup < proposal_expiration) {
+            let staking_contract = Store[staker_address].staking_contracts.borrow_mut(&operator);
+            stake::update_lockup_with_cap(&staking_contract.owner_cap, proposal_expiration);
+        };
 
         emit(ExtendLockup {
             operator,
-            pool_address: staking_contract.pool_address,
+            pool_address,
             new_lockup_secs
         });
     }
@@ -520,16 +526,11 @@ module aptos_framework::staking_contract {
         proposal_id: u64,
         should_pass: bool
     ) acquires Store {
-        let proposal_expiration = aptos_governance::get_proposal_expiration(proposal_id);
+        // Extend
+        extend_lockup(staker_voter, operator, proposal_id);
+
         let staker_addr = signer::address_of(staker_voter);
         let pool_address = stake_pool_address(staker_addr, operator);
-        let current_lockup = stake::get_lockup_secs(pool_address);
-
-        // Only extend the lockup if it ends before the proposal expiration.
-        if (current_lockup < proposal_expiration) {
-            update_lockup(staker_voter, operator, proposal_expiration);
-        };
-
         aptos_governance::vote(staker_voter, pool_address, proposal_id, should_pass);
     }
 
@@ -1304,7 +1305,7 @@ module aptos_framework::staking_contract {
     }
 
     #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
-    fun test_update_lockup_and_vote(
+    fun test_extend_lockup_and_vote(
         aptos_framework: &signer,
         staker: &signer,
         operator: &signer,
@@ -1327,7 +1328,7 @@ module aptos_framework::staking_contract {
             )],
             vector[]);
         update_voter(staker, operator_address, staker_address);
-        update_lockup(staker, operator_address, timestamp::now_seconds() + aptos_governance::get_voting_duration_secs());
+        extend_lockup(staker, operator_address, proposal_id);
         let proposal_id = aptos_governance::create_proposal_v2_impl(
             staker,
             pool_address,
