@@ -1,12 +1,13 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{errors::FilterError, traits::Filterable};
+use crate::{errors::FilterError, traits::Filterable, utils::standardize_address};
 use anyhow::{anyhow, Error};
 use aptos_protos::transaction::v1::{
     multisig_transaction_payload, transaction::TxnData, transaction_payload, EntryFunctionId,
     EntryFunctionPayload, Transaction, TransactionPayload,
 };
+use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 
 /// We use this for UserTransactions.
@@ -29,11 +30,30 @@ pub struct UserTransactionFilter {
     pub sender: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub payload: Option<UserTransactionPayloadFilter>,
+    #[serde(skip)]
+    #[builder(setter(skip))]
+    standardized_sender: OnceCell<Option<String>>,
+}
+
+impl UserTransactionFilter {
+    fn get_standardized_sender(&self) -> &Option<String> {
+        self.standardized_sender.get_or_init(|| {
+            self.sender
+                .clone()
+                .map(|address| standardize_address(&address))
+        })
+    }
 }
 
 impl From<aptos_protos::indexer::v1::UserTransactionFilter> for UserTransactionFilter {
     fn from(proto_filter: aptos_protos::indexer::v1::UserTransactionFilter) -> Self {
         Self {
+            standardized_sender: OnceCell::with_value(
+                proto_filter
+                    .sender
+                    .as_ref()
+                    .map(|address| standardize_address(address)),
+            ),
             sender: proto_filter.sender,
             payload: proto_filter.payload_filter.map(|f| f.into()),
         }
@@ -71,8 +91,8 @@ impl Filterable<Transaction> for UserTransactionFilter {
             return false;
         };
 
-        if let Some(sender_filter) = &self.sender {
-            if &user_request.sender != sender_filter {
+        if let Some(sender_filter) = self.get_standardized_sender() {
+            if &standardize_address(&user_request.sender) != sender_filter {
                 return false;
             }
         }
@@ -117,11 +137,30 @@ pub struct EntryFunctionFilter {
     pub module: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub function: Option<String>,
+    #[serde(skip)]
+    #[builder(setter(skip))]
+    standardized_address: OnceCell<Option<String>>,
+}
+
+impl EntryFunctionFilter {
+    fn get_standardized_address(&self) -> &Option<String> {
+        self.standardized_address.get_or_init(|| {
+            self.address
+                .clone()
+                .map(|address| standardize_address(&address))
+        })
+    }
 }
 
 impl From<aptos_protos::indexer::v1::EntryFunctionFilter> for EntryFunctionFilter {
     fn from(proto_filter: aptos_protos::indexer::v1::EntryFunctionFilter) -> Self {
         Self {
+            standardized_address: OnceCell::with_value(
+                proto_filter
+                    .address
+                    .as_ref()
+                    .map(|address| standardize_address(address)),
+            ),
             address: proto_filter.address,
             module: proto_filter.module_name,
             function: proto_filter.function,
@@ -156,7 +195,11 @@ impl Filterable<EntryFunctionId> for EntryFunctionFilter {
 
         if self.address.is_some() || self.function.is_some() {
             if let Some(module) = &module_id.module.as_ref() {
-                if !(self.address.matches(&module.address) && self.module.matches(&module.name)) {
+                if !(self
+                    .get_standardized_address()
+                    .matches(&standardize_address(&module.address))
+                    && self.module.matches(&module.name))
+                {
                     return false;
                 }
             } else {

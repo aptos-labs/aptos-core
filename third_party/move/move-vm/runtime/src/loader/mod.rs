@@ -43,6 +43,8 @@ pub(crate) use function::{
 };
 mod modules;
 pub use modules::Module;
+use move_vm_types::resolver::ResourceResolver;
+
 mod script;
 pub use script::Script;
 mod type_loader;
@@ -59,22 +61,33 @@ enum BinaryType {
 pub(crate) struct Resolver<'a> {
     binary: BinaryType,
     module_storage: &'a dyn ModuleStorage,
+    resource_resolver: &'a dyn ResourceResolver,
 }
 
 impl<'a> Resolver<'a> {
-    fn for_module(module_storage: &'a dyn ModuleStorage, module: Arc<Module>) -> Self {
+    fn for_module(
+        module: Arc<Module>,
+        module_storage: &'a dyn ModuleStorage,
+        resource_resolver: &'a dyn ResourceResolver,
+    ) -> Self {
         let binary = BinaryType::Module(module);
         Self {
             binary,
             module_storage,
+            resource_resolver,
         }
     }
 
-    fn for_script(module_storage: &'a dyn ModuleStorage, script: Arc<Script>) -> Self {
+    fn for_script(
+        script: Arc<Script>,
+        module_storage: &'a dyn ModuleStorage,
+        resource_resolver: &'a dyn ResourceResolver,
+    ) -> Self {
         let binary = BinaryType::Script(script);
         Self {
             binary,
             module_storage,
+            resource_resolver,
         }
     }
 
@@ -490,6 +503,10 @@ impl<'a> Resolver<'a> {
 
     pub(crate) fn module_storage(&self) -> &dyn ModuleStorage {
         self.module_storage
+    }
+
+    pub(crate) fn resource_resolver(&self) -> &dyn ResourceResolver {
+        self.resource_resolver
     }
 
     pub(crate) fn vm_config(&self) -> &VMConfig {

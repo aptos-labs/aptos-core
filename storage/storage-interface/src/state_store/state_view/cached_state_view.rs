@@ -243,16 +243,7 @@ impl CachedStateView {
 
     /// Consumes `Self` and returns the state and all the memorized state reads.
     pub fn into_memorized_reads(self) -> ShardedStateCache {
-        let Self {
-            id: _,
-            speculative: _,
-            hot: _,
-            cold: _,
-            memorized,
-            access_time_refresh_interval_secs: _,
-        } = self;
-
-        memorized
+        self.memorized
     }
 
     fn base_version(&self) -> Option<Version> {

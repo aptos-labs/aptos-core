@@ -35,7 +35,7 @@ use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
 use move_model::{metadata::LanguageVersion, model::GlobalEnv};
 use move_symbol_pool::Symbol;
-use move_vm_runtime::session::SerializedReturnValues;
+use move_vm_runtime::move_vm::SerializedReturnValues;
 use move_vm_types::value_serde::ValueSerDeContext;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},

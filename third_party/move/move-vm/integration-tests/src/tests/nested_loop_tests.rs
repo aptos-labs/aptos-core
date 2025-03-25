@@ -1,17 +1,31 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::compiler::{as_module, as_script, compile_units};
+use crate::{
+    compiler::{as_module, as_script, compile_units},
+    tests::execute_script_for_test,
+};
+use claims::{assert_err, assert_ok};
 use move_bytecode_verifier::VerifierConfig;
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::{
-    config::VMConfig, module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage,
-    AsUnsyncModuleStorage, RuntimeEnvironment, StagingModuleStorage,
+    config::VMConfig, AsUnsyncModuleStorage, RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
-use move_vm_types::gas::UnmeteredGasMeter;
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
+
+fn initialize_storage(max_loop_depth: usize) -> InMemoryStorage {
+    let vm_config = VMConfig {
+        verifier_config: VerifierConfig {
+            max_loop_depth: Some(max_loop_depth),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
+    InMemoryStorage::new_with_runtime_environment(runtime_environment)
+}
 
 #[test]
 fn test_publish_module_with_nested_loops() {
@@ -38,33 +52,17 @@ fn test_publish_module_with_nested_loops() {
 
     // Should succeed with max_loop_depth = 2
     {
-        let vm_config = VMConfig {
-            verifier_config: VerifierConfig {
-                max_loop_depth: Some(2),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
-        let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
+        let storage = initialize_storage(2);
 
         let module_storage = storage.as_unsync_module_storage();
         let result =
             StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob.clone().into()]);
-        assert!(result.is_ok());
+        assert_ok!(result);
     }
 
     // Should fail with max_loop_depth = 1
     {
-        let vm_config = VMConfig {
-            verifier_config: VerifierConfig {
-                max_loop_depth: Some(1),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
-        let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
+        let storage = initialize_storage(1);
 
         let module_storage = storage.as_unsync_module_storage();
         let result =
@@ -95,57 +93,18 @@ fn test_run_script_with_nested_loops() {
     let s = as_script(units.pop().unwrap());
     let mut s_blob: Vec<u8> = vec![];
     s.serialize(&mut s_blob).unwrap();
-    let traversal_storage = TraversalStorage::new();
 
     // Should succeed with max_loop_depth = 2
     {
-        let vm_config = VMConfig {
-            verifier_config: VerifierConfig {
-                max_loop_depth: Some(2),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
-        let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
-        let code_storage = storage.as_unsync_code_storage();
-
-        let mut sess = MoveVM::new_session(&storage);
-        let args: Vec<Vec<u8>> = vec![];
-        sess.load_and_execute_script(
-            s_blob.clone(),
-            vec![],
-            args,
-            &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
-            &code_storage,
-        )
-        .unwrap();
+        let storage = initialize_storage(2);
+        let result = execute_script_for_test(&storage, &s_blob, &[], vec![]);
+        assert_ok!(result);
     }
 
     // Should fail with max_loop_depth = 1
     {
-        let vm_config = VMConfig {
-            verifier_config: VerifierConfig {
-                max_loop_depth: Some(1),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
-        let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
-        let code_storage = storage.as_unsync_code_storage();
-
-        let mut sess = MoveVM::new_session(&storage);
-        let args: Vec<Vec<u8>> = vec![];
-        sess.load_and_execute_script(
-            s_blob,
-            vec![],
-            args,
-            &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
-            &code_storage,
-        )
-        .unwrap_err();
+        let storage = initialize_storage(1);
+        let result = execute_script_for_test(&storage, &s_blob, &[], vec![]);
+        assert_err!(result);
     }
 }
