@@ -5,10 +5,10 @@ set -e
 # Build all binaries and framework
 git apply antithesis-cpu.patch
 git apply antithesis.patch
-cargo run --package aptos-framework release --target mainnet
 if [ "$SKIP_NODE_BUILD" -eq 1 ]; then
     echo "Skipping node build"
 else
+    cargo run --package aptos-framework release --target mainnet
     cargo build --release -p aptos-faucet-service
     cargo build --package aptos --profile cli
     RUSTFLAGS=" \
