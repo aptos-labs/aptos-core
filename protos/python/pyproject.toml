@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aptos-protos"
-version = "1.1.2"
+version = "1.1.3"
 description = "Code generated from protobuf definitions for the Aptos tech stack"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 license = "Apache-2.0"
@@ -8,7 +8,7 @@ readme = "README.md"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://github.com/aptos-labs/aptos-core/tree/main/protos/python"
 keywords = ["web3", "aptos", "blockchain", "indexer"]
-packages = [{include = "aptos_protos"}]
+packages = [{ include = "aptos_protos" }]
 
 [tool.poe.tasks]
 generate = "./generate.sh"
@@ -24,6 +24,7 @@ grpcio-tools = "^1.57.0"
 poethepoet = "^0.22.0"
 black = "^23.7.0"
 isort = "^5.12.0"
+multidict = "^6.0.5"
 
 [build-system]
 requires = ["poetry-core>=1.4.2"]
