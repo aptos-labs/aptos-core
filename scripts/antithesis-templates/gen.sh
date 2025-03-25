@@ -6,9 +6,12 @@ set -e
 git apply antithesis-cpu.patch
 git apply antithesis.patch
 cargo run --package aptos-framework release --target mainnet
-cargo build --release -p aptos-faucet-service
-cargo build --package aptos --profile cli
-RUSTFLAGS=" \
+if [ "$SKIP_NODE_BUILD" -eq 1 ]; then
+    echo "Skipping node build"
+else
+    cargo build --release -p aptos-faucet-service
+    cargo build --package aptos --profile cli
+    RUSTFLAGS=" \
     -Ccodegen-units=1 \
     -Cpasses=sancov-module \
     -Cllvm-args=-sanitizer-coverage-level=3 \
@@ -22,12 +25,15 @@ RUSTFLAGS=" \
     -C force-unwind-tables=yes \
     -C target-feature=+sse4.2 \
     " cargo build --release -p aptos-node
+fi
 
 mkdir "$GENESIS_DIR"
-cp mainnet.mrb "$GENESIS_DIR/framework.mrb" 
-cp target/release/aptos-node "$GENESIS_DIR/aptos-node"
-cp target/release/aptos-faucet-service "$GENESIS_DIR/aptos-faucet-service"
-cp target/cli/aptos "$GENESIS_DIR/aptos"
+cp mainnet.mrb "$GENESIS_DIR/framework.mrb"
+if [ "$SKIP_NODE_BUILD" -ne 1 ]; then
+    cp target/release/aptos-node "$GENESIS_DIR/aptos-node"
+    cp target/release/aptos-faucet-service "$GENESIS_DIR/aptos-faucet-service"
+    cp target/cli/aptos "$GENESIS_DIR/aptos"
+fi
 
 # Generate layout file using yq
 yq eval -n "
@@ -35,16 +41,16 @@ yq eval -n "
   .users = [$(for i in $(seq 1 "$NODE_COUNT"); do echo -n "\"validator_$i\","; done | sed 's/,$//')]  |
   .chain_id = $CHAIN_ID |
   .allow_new_validators = false |
-  .epoch_duration_secs = 7200 |
+  .epoch_duration_secs = 120 |
   .is_test = false |
   .min_price_per_gas_unit = 1 |
   .min_stake = 100000000000000 |
   .min_voting_threshold = 100000000000000 |
   .max_stake = 1000000000000000 |
-  .recurring_lockup_duration_secs = 86400 |
+  .recurring_lockup_duration_secs = 14400 |
   .required_proposer_stake = 1000000 |
   .rewards_apy_percentage = 10 |
-  .voting_duration_secs = 43200 |
+  .voting_duration_secs = 7200 |
   .voting_power_increase_limit = 20
 " > "$GENESIS_DIR/$LAYOUT_FILE"
 
@@ -160,6 +166,7 @@ for i in $(seq 1 "$NODE_COUNT"); do
 
 done
 
+mkdir "$GENESIS_DIR/indexer"
 # Indexer configs
 processor=("account_transaction_processor" "events_processor" "fungible_asset_processor" "objects_processor" "token_v2_processor" "transaction_metadata_processor" "user_transaction_processor" "default_processor")
 for i in "${processor[@]}"; do

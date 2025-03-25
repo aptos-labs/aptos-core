@@ -89,6 +89,7 @@ docker build \
     --build-arg CHAIN_ID="$CHAIN_ID" \
     --build-arg GENESIS_DIR=$GENESIS_DIR \
     --build-arg LAYOUT_FILE=$LAYOUT_FILE \
+    --build-arg SKIP_NODE_BUILD="$SKIP_NODE_BUILD" \
     .
 docker create --name genesis_antithesis-builder genesis_antithesis-build
 docker cp genesis_antithesis-builder:/aptos-core/$GENESIS_DIR/. $GENESIS_DIR/
@@ -97,11 +98,11 @@ echo "Genesis blob and waypoint generated in $GENESIS_DIR."
 
 # Fetch docker images (those images need to be available in the antithesis infra, so retag them and push them)
 docker pull postgres:14
-docker pull aptos/aptos-indexer:latest
+docker pull aptoslab/indexer-processor-rust:latest
 docker pull hasura/graphql-engine:v2.36.0
 echo "!!! Please push the following images to the antithesis infra !!!"
 echo "postgres:14"
-echo "aptos/aptos-indexer:latest"
+echo "aptoslab/indexer-processor-rust:latest"
 echo "hasura/graphql-engine:v2.36.0"
 
 # Entrypoint and Dockerfile copy
