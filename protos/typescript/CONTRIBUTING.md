@@ -1,5 +1,16 @@
 # Aptos Protos
 
+## Generate protos 
+Install deps:
+```
+pnpm i
+```
+
+Generate:
+```
+sh ./scripts/build.sh
+```
+
 ## Changelog
 To update the changelog do the following:
 
