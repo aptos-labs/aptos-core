@@ -401,7 +401,7 @@ spec aptos_framework::transaction_validation {
     spec unified_epilogue(
         account: signer,
         gas_payer: signer,
-        storage_fee_refunded: u64,
+        storage_fee_refunded_octa: u64,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
         gas_units_remaining: u64,

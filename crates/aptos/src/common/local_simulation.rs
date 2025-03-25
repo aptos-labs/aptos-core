@@ -18,7 +18,7 @@ use std::{path::Path, time::Instant};
 pub fn run_transaction_using_debugger(
     debugger: &AptosDebugger,
     version: u64,
-    transaction: SignedTransaction,
+    transaction: SignedTransactionWithBlockchainData,
     _hash: HashValue,
 ) -> CliTypedResult<(VMStatus, VMOutput)> {
     let state_view = debugger.state_view_at_version(version);
@@ -38,7 +38,7 @@ pub fn run_transaction_using_debugger(
 pub fn benchmark_transaction_using_debugger(
     debugger: &AptosDebugger,
     version: u64,
-    transaction: SignedTransaction,
+    transaction: SignedTransactionWithBlockchainData,
     _hash: HashValue,
 ) -> CliTypedResult<(VMStatus, VMOutput)> {
     let state_view = debugger.state_view_at_version(version);
@@ -110,7 +110,7 @@ pub fn benchmark_transaction_using_debugger(
 pub fn profile_transaction_using_debugger(
     debugger: &AptosDebugger,
     version: u64,
-    transaction: SignedTransaction,
+    transaction: SignedTransactionWithBlockchainData,
     hash: HashValue,
 ) -> CliTypedResult<(VMStatus, VMOutput)> {
     let (vm_status, vm_output, gas_log) = debugger

@@ -11,7 +11,7 @@ use crate::{
     transaction_metadata::TransactionMetadata,
 };
 #[cfg(any(test, feature = "testing"))]
-use aptos_types::{state_store::StateView, transaction::SignedTransaction};
+use aptos_types::{state_store::StateView, transaction::SignedTransactionWithBlockchainData};
 #[cfg(any(test, feature = "testing"))]
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 #[cfg(any(test, feature = "testing"))]
@@ -73,7 +73,7 @@ impl AptosVM {
     pub fn test_failed_transaction_cleanup(
         &self,
         error_vm_status: VMStatus,
-        txn: &SignedTransaction,
+        txn: &SignedTransactionWithBlockchainData,
         state_view: &impl StateView,
         gas_meter_balance: u64,
     ) -> (VMStatus, VMOutput) {

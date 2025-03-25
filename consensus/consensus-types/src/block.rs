@@ -19,7 +19,7 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
     randomness::Randomness,
-    transaction::{SignedTransaction, Transaction, Version},
+    transaction::{SignedTransaction, SignedTransactionWithBlockchainData, Transaction, Version},
     validator_signer::ValidatorSigner,
     validator_txn::ValidatorTransaction,
     validator_verifier::ValidatorVerifier,
@@ -430,13 +430,18 @@ impl Block {
         txns: Vec<SignedTransaction>,
         metadata: BlockMetadataExt,
     ) -> Vec<Transaction> {
+        let proposer = metadata.proposer();
         once(Transaction::from(metadata))
             .chain(
                 validator_txns
                     .into_iter()
                     .map(Transaction::ValidatorTransaction),
             )
-            .chain(txns.into_iter().map(Transaction::UserTransaction))
+            .chain(
+                txns.into_iter()
+                    .map(|txn| SignedTransactionWithBlockchainData::new(txn, proposer))
+                    .map(Transaction::UserTransactionV2),
+            )
             .collect()
     }
 

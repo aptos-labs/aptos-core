@@ -629,14 +629,14 @@ pub async fn simulate_multistep_proposal(
 
         let vm_output = if !profile_gas {
             let (_vm_status, vm_output) =
-                vm.execute_user_transaction(&resolver, &code_storage, &txn, &log_context);
+                vm.execute_user_transaction(&resolver, &code_storage, &txn.into(), &log_context);
             vm_output
         } else {
             let (_vm_status, vm_output, gas_profiler) = vm
                 .execute_user_transaction_with_modified_gas_meter(
                     &resolver,
                     &code_storage,
-                    &txn,
+                    &txn.into(),
                     &log_context,
                     GasProfiler::new_script,
                 )?;

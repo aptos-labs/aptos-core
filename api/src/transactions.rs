@@ -33,7 +33,8 @@ use aptos_types::{
     mempool_status::MempoolStatusCode,
     transaction::{
         EntryFunction, ExecutionStatus, MultisigTransactionPayload, RawTransaction,
-        RawTransactionWithData, SignedTransaction, TransactionPayload,
+        RawTransactionWithData, SignedTransaction, SignedTransactionWithBlockchainData,
+        TransactionPayload,
     },
     vm_status::StatusCode,
     AptosCoinType, CoinType,
@@ -1390,6 +1391,7 @@ impl TransactionsApi {
 
         // Simulate transaction
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
+        let txn: SignedTransactionWithBlockchainData = txn.into();
         let (vm_status, output) =
             AptosSimulationVM::create_vm_and_simulate_signed_transaction(&txn, &state_view);
         let version = ledger_info.version();
@@ -1430,7 +1432,9 @@ impl TransactionsApi {
 
         // Build up a transaction from the outputs
         // All state hashes are invalid, and will be filled with 0s
-        let txn = aptos_types::transaction::Transaction::UserTransaction(txn);
+        let txn = aptos_types::transaction::Transaction::UserTransaction(
+            txn.signed_transaction().clone(),
+        );
         let zero_hash = aptos_crypto::HashValue::zero();
         let info = aptos_types::transaction::TransactionInfo::new(
             txn.hash(),
@@ -1465,6 +1469,7 @@ impl TransactionsApi {
                 let mut user_transactions = Vec::new();
                 for transaction in transactions.into_iter() {
                     match transaction {
+                        // TODO(grao): Handle V2 here.
                         Transaction::UserTransaction(mut user_txn) => {
                             match &vm_status {
                                 VMStatus::Error {

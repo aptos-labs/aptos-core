@@ -2281,6 +2281,7 @@ impl CliCommand<TransactionSummary> for Replay {
 
         let txn = match txn {
             Transaction::UserTransaction(txn) => txn,
+            Transaction::UserTransactionV2(txn) => txn,
             _ => {
                 return Err(CliError::UnexpectedError(
                     "Unsupported transaction type. Only user transactions are supported."

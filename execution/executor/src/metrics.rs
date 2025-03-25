@@ -348,6 +348,7 @@ pub fn update_counters_for_processed_chunk<T>(
 
         let kind = match txn.get_transaction() {
             Some(Transaction::UserTransaction(_)) => "user_transaction",
+            Some(Transaction::UserTransactionV2(_)) => "user_transaction_v2",
             Some(Transaction::GenesisTransaction(_)) => "genesis",
             Some(Transaction::BlockMetadata(_)) => "block_metadata",
             Some(Transaction::BlockMetadataExt(_)) => "block_metadata_ext",

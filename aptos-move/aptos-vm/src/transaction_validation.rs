@@ -14,8 +14,11 @@ use crate::{
 };
 use aptos_gas_algebra::Gas;
 use aptos_types::{
-    account_config::constants::CORE_CODE_ADDRESS, fee_statement::FeeStatement,
-    move_utils::as_move_value::AsMoveValue, on_chain_config::Features, transaction::Multisig,
+    account_config::constants::CORE_CODE_ADDRESS,
+    fee_statement::FeeStatement,
+    move_utils::as_move_value::AsMoveValue,
+    on_chain_config::Features,
+    transaction::{BlockchainData, Multisig},
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
@@ -54,6 +57,7 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         unified_prologue_name: Identifier::new("unified_prologue").unwrap(),
         unified_prologue_fee_payer_name: Identifier::new("unified_prologue_fee_payer").unwrap(),
         unified_epilogue_name: Identifier::new("unified_epilogue").unwrap(),
+        unified_epilogue_common_name: Identifier::new("unified_epilogue_common").unwrap(),
     });
 
 /// On-chain functions used to validate transactions
@@ -74,6 +78,7 @@ pub struct TransactionValidation {
     pub unified_prologue_name: Identifier,
     pub unified_prologue_fee_payer_name: Identifier,
     pub unified_epilogue_name: Identifier,
+    pub unified_epilogue_common_name: Identifier,
 }
 
 impl TransactionValidation {
@@ -399,34 +404,83 @@ fn run_epilogue(
     let txn_max_gas_units = txn_data.max_gas_amount();
 
     if features.is_account_abstraction_enabled() {
-        let serialize_args = vec![
-            serialized_signers.sender(),
-            serialized_signers
-                .fee_payer()
-                .unwrap_or(serialized_signers.sender()),
-            MoveValue::U64(fee_statement.storage_fee_refund())
-                .simple_serialize()
-                .unwrap(),
-            MoveValue::U64(txn_gas_price.into())
-                .simple_serialize()
-                .unwrap(),
-            MoveValue::U64(txn_max_gas_units.into())
-                .simple_serialize()
-                .unwrap(),
-            MoveValue::U64(gas_remaining.into())
-                .simple_serialize()
-                .unwrap(),
-            MoveValue::Bool(is_simulation).simple_serialize().unwrap(),
-        ];
-        session.execute_function_bypass_visibility(
-            &APTOS_TRANSACTION_VALIDATION.module_id(),
-            &APTOS_TRANSACTION_VALIDATION.unified_epilogue_name,
-            vec![],
-            serialize_args,
-            &mut UnmeteredGasMeter,
-            traversal_context,
-            module_storage,
-        )
+        if features.is_fee_sharing_enabled() {
+            let (fee_sharing_accounts, fee_sharing_percentages) = match &txn_data.blockchain_data {
+                BlockchainData::None => (vec![], vec![]),
+                BlockchainData::V1(v1) => (
+                    vec![MoveValue::Address(v1.proposer)],
+                    vec![MoveValue::U64(100)],
+                ),
+            };
+            let serialize_args = vec![
+                serialized_signers.sender(),
+                serialized_signers
+                    .fee_payer()
+                    .unwrap_or(serialized_signers.sender()),
+                MoveValue::Vector(vec![MoveValue::U64(fee_statement.storage_fee_used())])
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::U64(fee_statement.storage_fee_refund())
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::U64(txn_gas_price.into())
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::U64(txn_max_gas_units.into())
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::U64(gas_remaining.into())
+                    .simple_serialize()
+                    .unwrap(),
+                // TODO(grao): This magic number should be defined somewhere else.
+                MoveValue::U64(99).simple_serialize().unwrap(),
+                MoveValue::Vector(fee_sharing_accounts)
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::Vector(fee_sharing_percentages)
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::Bool(is_simulation).simple_serialize().unwrap(),
+            ];
+            session.execute_function_bypass_visibility(
+                &APTOS_TRANSACTION_VALIDATION.module_id(),
+                &APTOS_TRANSACTION_VALIDATION.unified_epilogue_common_name,
+                vec![],
+                serialize_args,
+                &mut UnmeteredGasMeter,
+                traversal_context,
+                module_storage,
+            )
+        } else {
+            let serialize_args = vec![
+                serialized_signers.sender(),
+                serialized_signers
+                    .fee_payer()
+                    .unwrap_or(serialized_signers.sender()),
+                MoveValue::U64(fee_statement.storage_fee_refund())
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::U64(txn_gas_price.into())
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::U64(txn_max_gas_units.into())
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::U64(gas_remaining.into())
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::Bool(is_simulation).simple_serialize().unwrap(),
+            ];
+            session.execute_function_bypass_visibility(
+                &APTOS_TRANSACTION_VALIDATION.module_id(),
+                &APTOS_TRANSACTION_VALIDATION.unified_epilogue_name,
+                vec![],
+                serialize_args,
+                &mut UnmeteredGasMeter,
+                traversal_context,
+                module_storage,
+            )
+        }
     } else {
         // We can unconditionally do this as this condition can only be true if the prologue
         // accepted it, in which case the gas payer feature is enabled.

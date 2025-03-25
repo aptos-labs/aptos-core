@@ -144,6 +144,8 @@ return true.
 -  [Function `is_domain_account_abstraction_enabled`](#0x1_features_is_domain_account_abstraction_enabled)
 -  [Function `get_new_accounts_default_to_fa_store_feature`](#0x1_features_get_new_accounts_default_to_fa_store_feature)
 -  [Function `new_accounts_default_to_fa_store_enabled`](#0x1_features_new_accounts_default_to_fa_store_enabled)
+-  [Function `get_fee_sharing_feature`](#0x1_features_get_fee_sharing_feature)
+-  [Function `is_fee_sharing_enabled`](#0x1_features_is_fee_sharing_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -602,6 +604,17 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_FEE_PAYER_ENABLED">FEE_PAYER_ENABLED</a>: u64 = 22;
+</code></pre>
+
+
+
+<a id="0x1_features_FEE_SHARING"></a>
+
+Whether transaction fee sharing is enabled.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_FEE_SHARING">FEE_SHARING</a>: u64 = 91;
 </code></pre>
 
 
@@ -3623,6 +3636,52 @@ Deprecated feature
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_new_accounts_default_to_fa_store_enabled">new_accounts_default_to_fa_store_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_STORE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_fee_sharing_feature"></a>
+
+## Function `get_fee_sharing_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_fee_sharing_feature">get_fee_sharing_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_fee_sharing_feature">get_fee_sharing_feature</a>() : u64 { <a href="features.md#0x1_features_FEE_SHARING">FEE_SHARING</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_is_fee_sharing_enabled"></a>
+
+## Function `is_fee_sharing_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_fee_sharing_enabled">is_fee_sharing_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_fee_sharing_enabled">is_fee_sharing_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_FEE_SHARING">FEE_SHARING</a>)
 }
 </code></pre>
 

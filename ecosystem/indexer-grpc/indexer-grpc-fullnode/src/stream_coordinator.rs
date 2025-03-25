@@ -391,6 +391,10 @@ impl IndexerStreamCoordinator {
                             ut.info.block_height = Some(block_height_bcs);
                             ut.info.epoch = Some(epoch_bcs);
                         },
+                        APITransaction::UserTransactionV2(ref mut ut) => {
+                            ut.info.block_height = Some(block_height_bcs);
+                            ut.info.epoch = Some(epoch_bcs);
+                        },
                         APITransaction::GenesisTransaction(ref mut gt) => {
                             gt.info.block_height = Some(block_height_bcs);
                             gt.info.epoch = Some(epoch_bcs);

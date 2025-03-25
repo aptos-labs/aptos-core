@@ -675,6 +675,16 @@ module std::features {
         is_enabled(NEW_ACCOUNTS_DEFAULT_TO_FA_STORE)
     }
 
+    /// Whether transaction fee sharing is enabled.
+    /// Lifetime: transient
+    const FEE_SHARING: u64 = 91;
+
+    public fun get_fee_sharing_feature() : u64 { FEE_SHARING }
+
+    public fun is_fee_sharing_enabled(): bool acquires Features {
+        is_enabled(FEE_SHARING)
+    }
+
 
     // ============================================================================================
     // Feature Flag Implementation
