@@ -146,7 +146,7 @@ members = [
     "execution/executor-types",
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
-    "experimental/storage/hexy",
+    "experimental/storage/hexy", "experimental/storage/layered-lru",
     "experimental/storage/layered-map",
     "keyless/pepper/common",
     "keyless/pepper/example-client-rust",

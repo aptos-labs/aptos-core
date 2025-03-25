@@ -10246,6 +10246,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "layered-lru"
+version = "0.1.0"
+dependencies = [
+ "aptos-drop-helper",
+ "aptos-experimental-layered-map",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
