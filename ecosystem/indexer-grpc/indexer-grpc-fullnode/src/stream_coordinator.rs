@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Supra.
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,7 +8,9 @@ use crate::{
     runtime::{DEFAULT_NUM_RETRIES, RETRY_TIME_MILLIS},
 };
 use aptos_api::context::Context;
-use aptos_api_types::{AsConverter, Transaction as APITransaction, TransactionOnChainData};
+use aptos_api_types::{
+    AsConverter, Transaction as APITransaction, Transaction, TransactionOnChainData,
+};
 use aptos_indexer_grpc_utils::{
     chunk_transactions,
     constants::MESSAGE_SIZE_LIMIT,
@@ -411,6 +414,10 @@ impl IndexerStreamCoordinator {
                             let info = vt.transaction_info_mut();
                             info.block_height = Some(block_height_bcs);
                             info.epoch = Some(epoch_bcs);
+                        },
+                        Transaction::AutomatedTransaction(ref mut at) => {
+                            at.info.block_height = Some(block_height_bcs);
+                            at.info.epoch = Some(epoch_bcs);
                         },
                     };
                     txn

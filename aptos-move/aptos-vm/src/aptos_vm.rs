@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Supra.
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
@@ -37,6 +38,7 @@ use aptos_logger::{enabled, prelude::*, Level};
 use aptos_metrics_core::TimerHelper;
 #[cfg(any(test, feature = "testing"))]
 use aptos_types::state_store::StateViewId;
+use aptos_types::transaction::automation::RegistrationParams;
 use aptos_types::{
     account_config::{self, new_block_event_key, AccountResource},
     block_executor::{
@@ -107,6 +109,7 @@ use std::{
     marker::Sync,
     sync::Arc,
 };
+use crate::automated_transaction_processor::AutomatedTransactionProcessor;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -148,6 +151,8 @@ macro_rules! unwrap_or_discard {
         }
     };
 }
+
+pub(crate) use unwrap_or_discard;
 
 pub(crate) fn get_system_transaction_output(
     session: SessionExt,
@@ -269,7 +274,7 @@ impl AptosVM {
     }
 
     #[inline(always)]
-    fn features(&self) -> &Features {
+    pub(crate) fn features(&self) -> &Features {
         self.move_vm.env.features()
     }
 
@@ -395,7 +400,7 @@ impl AptosVM {
         )
     }
 
-    fn fee_statement_from_gas_meter(
+    pub(crate) fn fee_statement_from_gas_meter(
         txn_data: &TransactionMetadata,
         gas_meter: &impl AptosGasMeter,
         storage_fee_refund: u64,
@@ -486,7 +491,7 @@ impl AptosVM {
         }
     }
 
-    fn inject_abort_info_if_available(&self, status: ExecutionStatus) -> ExecutionStatus {
+    pub(crate) fn inject_abort_info_if_available(&self, status: ExecutionStatus) -> ExecutionStatus {
         match status {
             ExecutionStatus::MoveAbort {
                 location: AbortLocation::Module(module),
@@ -728,6 +733,7 @@ impl AptosVM {
 
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
+            &mut UnmeteredGasMeter,
             senders,
             convert_txn_args(script.args()),
             &func,
@@ -744,7 +750,7 @@ impl AptosVM {
         Ok(())
     }
 
-    fn validate_and_execute_entry_function(
+    pub(crate) fn validate_and_execute_entry_function(
         &self,
         resolver: &impl AptosMoveResolver,
         session: &mut SessionExt,
@@ -761,10 +767,11 @@ impl AptosVM {
             let module_id = traversal_context
                 .referenced_module_ids
                 .alloc(entry_fn.module().clone());
-            session.check_dependencies_and_charge_gas(gas_meter, traversal_context, [(
-                module_id.address(),
-                module_id.name(),
-            )])?;
+            session.check_dependencies_and_charge_gas(
+                gas_meter,
+                traversal_context,
+                [(module_id.address(), module_id.name())],
+            )?;
         }
 
         let function =
@@ -784,6 +791,7 @@ impl AptosVM {
             self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
+            &mut UnmeteredGasMeter,
             senders,
             entry_fn.args().to_vec(),
             &function,
@@ -875,6 +883,150 @@ impl AptosVM {
             traversal_context,
         )
     }
+    fn execute_automation_registration_txn<'a, 'r, 'l>(
+        &'l self,
+        resolver: &'r impl AptosMoveResolver,
+        mut session: UserSession<'r, 'l>,
+        gas_meter: &mut impl AptosGasMeter,
+        traversal_context: &mut TraversalContext<'a>,
+        txn_data: &TransactionMetadata,
+        registration_params: &'a RegistrationParams,
+        log_context: &AdapterLogSchema,
+        new_published_modules_loaded: &mut bool,
+        change_set_configs: &ChangeSetConfigs,
+    ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        fail_point!("aptos_vm::execute_automation_registration_txn", |_| {
+            Err(VMStatus::Error {
+                status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                sub_status: Some(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
+                message: None,
+            })
+        });
+
+        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
+        if txn_data.is_keyless() {
+            gas_meter.charge_keyless()?;
+        }
+
+        session.execute(|session| {
+            self.validate_automated_function(
+                session,
+                gas_meter,
+                txn_data.senders(),
+                registration_params.automated_function(),
+            )
+        })?;
+
+        session.execute(|session| {
+            self.execute_automation_registration(
+                session,
+                gas_meter,
+                traversal_context,
+                txn_data.sender(),
+                registration_params,
+                txn_data
+            )
+        })?;
+
+        session.execute(|session| {
+            self.resolve_pending_code_publish(
+                session,
+                gas_meter,
+                traversal_context,
+                new_published_modules_loaded,
+            )
+        })?;
+
+        let epilogue_session = self.charge_change_set_and_respawn_session(
+            session,
+            resolver,
+            gas_meter,
+            change_set_configs,
+            txn_data,
+        )?;
+
+        self.success_transaction_cleanup(
+            epilogue_session,
+            gas_meter,
+            txn_data,
+            log_context,
+            change_set_configs,
+            traversal_context,
+        )
+    }
+
+    fn execute_automation_registration(
+        &self,
+        session: &mut SessionExt,
+        gas_meter: &mut impl AptosGasMeter,
+        traversal_context: &mut TraversalContext,
+        sender: AccountAddress,
+        registration_params: &RegistrationParams,
+        txn_metadata: &TransactionMetadata,
+    ) -> Result<(), VMStatus> {
+        // Note: Feature gating is needed here because the traversal of the dependencies could
+        //       result in shallow-loading of the modules and therefore subtle changes in
+        //       the error semantics.
+        if self.gas_feature_version >= 15 {
+            let module_id = traversal_context
+                .referenced_module_ids
+                .alloc(registration_params.module_id().clone());
+            session.check_dependencies_and_charge_gas(
+                gas_meter,
+                traversal_context,
+                [(module_id.address(), module_id.name())],
+            )?;
+        }
+        let args = registration_params
+            .serialized_args_with_sender_and_parent_hash(sender, txn_metadata.txn_app_hash.clone());
+
+        session.execute_function_bypass_visibility(
+            registration_params.module_id(),
+            registration_params.function(),
+            registration_params.ty_args(),
+            args,
+            gas_meter,
+            traversal_context,
+        )?;
+        Ok(())
+    }
+
+    /// Checks inner payload/entry function of automation registration transaction to be valid.
+    fn validate_automated_function(
+        &self,
+        session: &mut SessionExt,
+        gas_meter: &mut impl AptosGasMeter,
+        senders: Vec<AccountAddress>,
+        inner_entry_function: &EntryFunction,
+    ) -> Result<(), VMStatus> {
+        let function = session.load_function(
+            inner_entry_function.module(),
+            inner_entry_function.function(),
+            inner_entry_function.ty_args(),
+        )?;
+        let struct_constructors_enabled =
+            self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
+        let actual_args = inner_entry_function.args().to_vec();
+        // By constructing args we are making sure that function execution in scope of automated
+        // task will not fail due to invalid arguments passed
+        verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
+            session,
+            gas_meter,
+            senders,
+            actual_args,
+            &function,
+            struct_constructors_enabled,
+        )
+            .map_err(|e| {
+                VMStatus::error(
+                    StatusCode::INVALID_AUTOMATION_INNER_PAYLOAD,
+                    Some(format!(
+                        "Invalid entry function to be automated in scope of automation registration transaction. Details: {e:?}"
+                    )),
+                )
+            })
+            .map(drop)
+    }
 
     fn charge_change_set(
         &self,
@@ -904,7 +1056,7 @@ impl AptosVM {
         Ok(storage_refund)
     }
 
-    fn charge_change_set_and_respawn_session<'r, 'l>(
+    pub(crate) fn charge_change_set_and_respawn_session<'r, 'l>(
         &'l self,
         user_session: UserSession<'r, 'l>,
         resolver: &'r impl AptosMoveResolver,
@@ -1357,7 +1509,7 @@ impl AptosVM {
     }
 
     /// Resolve a pending code publish request registered via the NativeCodeContext.
-    fn resolve_pending_code_publish(
+    pub(crate) fn resolve_pending_code_publish(
         &self,
         session: &mut SessionExt,
         gas_meter: &mut impl AptosGasMeter,
@@ -1739,6 +1891,18 @@ impl AptosVM {
             TransactionPayload::ModuleBundle(_) => {
                 unwrap_or_discard!(Err(deprecated_module_bundle!()))
             },
+            TransactionPayload::AutomationRegistration(automation_payload) => self
+                .execute_automation_registration_txn(
+                    resolver,
+                    user_session,
+                    gas_meter,
+                    &mut traversal_context,
+                    &txn_data,
+                    automation_payload,
+                    log_context,
+                    &mut new_published_modules_loaded,
+                    change_set_configs,
+                ),
         };
 
         let gas_usage = txn_data
@@ -1761,6 +1925,7 @@ impl AptosVM {
             )
         })
     }
+
 
     /// Main entrypoint for executing a user transaction that also allows the customization of the
     /// gas meter to be used.
@@ -2189,14 +2354,14 @@ impl AptosVM {
         }
     }
 
-    fn gas_used(max_gas_amount: Gas, gas_meter: &impl AptosGasMeter) -> u64 {
+    pub(crate) fn gas_used(max_gas_amount: Gas, gas_meter: &impl AptosGasMeter) -> u64 {
         max_gas_amount
             .checked_sub(gas_meter.balance())
             .expect("Balance should always be less than or equal to max gas amount")
             .into()
     }
 
-    fn execute_view_function_in_vm(
+    pub(crate) fn execute_view_function_in_vm(
         session: &mut SessionExt,
         vm: &AptosVM,
         module_id: ModuleId,
@@ -2255,7 +2420,9 @@ impl AptosVM {
         )?;
 
         match payload {
-            TransactionPayload::Script(_) | TransactionPayload::EntryFunction(_) => {
+            TransactionPayload::Script(_)
+            | TransactionPayload::EntryFunction(_)
+            | TransactionPayload::AutomationRegistration(_) => {
                 transaction_validation::run_script_prologue(
                     session,
                     txn_data,
@@ -2433,7 +2600,22 @@ impl AptosVM {
                     self.process_validator_transaction(resolver, txn.clone(), log_context)?;
                 (vm_status, output)
             },
+            Transaction::AutomatedTransaction(txn) => {
+                AutomatedTransactionProcessor::new(self).execute_transaction(resolver, txn, log_context)
+            },
         })
+    }
+
+    pub(crate) fn gas_params_internal(&self) -> &Result<AptosGasParameters, String> {
+        &self.gas_params
+    }
+
+    pub(crate) fn move_vm(&self) -> &MoveVmExt {
+       &self.move_vm
+    }
+
+    pub(crate) fn gas_feature_version(&self) -> u64 {
+        self.gas_feature_version
     }
 }
 

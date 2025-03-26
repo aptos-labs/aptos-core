@@ -362,15 +362,15 @@ Only called during genesis.
     <a href="staking_config.md#0x1_staking_config_validate_required_stake">validate_required_stake</a>(minimum_stake, maximum_stake);
 
     <b>assert</b>!(
-        recurring_lockup_duration_secs &gt; 0,
+        recurring_lockup_duration_secs != 0,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EZERO_LOCKUP_DURATION">EZERO_LOCKUP_DURATION</a>)
     );
     <b>assert</b>!(
-        rewards_rate_denominator &gt; 0,
+        rewards_rate_denominator != 0,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EZERO_REWARDS_RATE_DENOMINATOR">EZERO_REWARDS_RATE_DENOMINATOR</a>)
     );
     <b>assert</b>!(
-        voting_power_increase_limit &gt; 0 && voting_power_increase_limit &lt;= 50,
+        voting_power_increase_limit != 0 && voting_power_increase_limit &lt;= 50,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EINVALID_VOTING_POWER_INCREASE_LIMIT">EINVALID_VOTING_POWER_INCREASE_LIMIT</a>)
     );
 
@@ -805,7 +805,7 @@ Can only be called as part of the Supra governance proposal process established 
     supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_recurring_lockup_duration_secs: u64
 ) <b>acquires</b> <a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a> {
     <b>assert</b>!(
-        new_recurring_lockup_duration_secs &gt; 0,
+        new_recurring_lockup_duration_secs != 0,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EZERO_LOCKUP_DURATION">EZERO_LOCKUP_DURATION</a>)
     );
     <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(supra_framework);
@@ -848,7 +848,7 @@ Can only be called as part of the Supra governance proposal process established 
     );
     <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(supra_framework);
     <b>assert</b>!(
-        new_rewards_rate_denominator &gt; 0,
+        new_rewards_rate_denominator != 0,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EZERO_REWARDS_RATE_DENOMINATOR">EZERO_REWARDS_RATE_DENOMINATOR</a>)
     );
     // `rewards_rate` which is the numerator is limited <b>to</b> be `&lt;= <a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a>` in order <b>to</b> avoid the arithmetic
@@ -977,7 +977,7 @@ Can only be called as part of the Supra governance proposal process established 
 ) <b>acquires</b> <a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(supra_framework);
     <b>assert</b>!(
-        new_voting_power_increase_limit &gt; 0
+        new_voting_power_increase_limit != 0
             && new_voting_power_increase_limit &lt;= 50,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EINVALID_VOTING_POWER_INCREASE_LIMIT">EINVALID_VOTING_POWER_INCREASE_LIMIT</a>)
     );
@@ -1008,7 +1008,7 @@ Can only be called as part of the Supra governance proposal process established 
 
 <pre><code><b>fun</b> <a href="staking_config.md#0x1_staking_config_validate_required_stake">validate_required_stake</a>(minimum_stake: u64, maximum_stake: u64) {
     <b>assert</b>!(
-        minimum_stake &lt;= maximum_stake && maximum_stake &gt; 0,
+        minimum_stake &lt;= maximum_stake && maximum_stake != 0,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EINVALID_STAKE_RANGE">EINVALID_STAKE_RANGE</a>)
     );
 }
@@ -1056,7 +1056,7 @@ Can only be called as part of the Supra governance proposal process established 
     // This field, rewards_rate_period_in_secs must be greater than 0.
     // TODO: rewards_rate_period_in_secs should be longer than the epoch duration but reading epoch duration causes a circular dependency.
     <b>assert</b>!(
-        rewards_rate_period_in_secs &gt; 0,
+        rewards_rate_period_in_secs != 0,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EINVALID_REWARDS_RATE_PERIOD">EINVALID_REWARDS_RATE_PERIOD</a>)
     );
 }

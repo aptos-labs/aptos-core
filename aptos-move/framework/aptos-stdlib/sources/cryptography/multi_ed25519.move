@@ -29,7 +29,7 @@ module aptos_std::multi_ed25519 {
     // Constants
     //
 
-    /// The identifier of the MultiEd25519 signature scheme, which is used when deriving Aptos authentication keys by hashing
+    /// The identifier of the MultiEd25519 signature scheme, which is used when deriving Supra authentication keys by hashing
     /// it together with an MultiEd25519 public key.
     const SIGNATURE_SCHEME_ID: u8 = 1;
 
@@ -232,7 +232,7 @@ module aptos_std::multi_ed25519 {
         signature_verify_strict_internal(multisignature.bytes, public_key.bytes, bcs::to_bytes(&encoded))
     }
 
-    /// Derives the Aptos-specific authentication key of the given Ed25519 public key.
+    /// Derives the Supra-specific authentication key of the given Ed25519 public key.
     public fun unvalidated_public_key_to_authentication_key(pk: &UnvalidatedPublicKey): vector<u8> {
         public_key_bytes_to_authentication_key(pk.bytes)
     }
@@ -255,7 +255,7 @@ module aptos_std::multi_ed25519 {
         check_and_get_threshold(pk.bytes)
     }
 
-    /// Derives the Aptos-specific authentication key of the given Ed25519 public key.
+    /// Derives the Supra-specific authentication key of the given Ed25519 public key.
     public fun validated_public_key_to_authentication_key(pk: &ValidatedPublicKey): vector<u8> {
         public_key_bytes_to_authentication_key(pk.bytes)
     }
@@ -298,7 +298,7 @@ module aptos_std::multi_ed25519 {
         }
     }
 
-    /// Derives the Aptos-specific authentication key of the given Ed25519 public key.
+    /// Derives the Supra-specific authentication key of the given Ed25519 public key.
     fun public_key_bytes_to_authentication_key(pk_bytes: vector<u8>): vector<u8> {
         vector::push_back(&mut pk_bytes, SIGNATURE_SCHEME_ID);
         std::hash::sha3_256(pk_bytes)

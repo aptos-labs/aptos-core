@@ -20,15 +20,16 @@ fn test_timestamp_time_has_started() {
         "timestamp",
         "set_time_has_started",
         vec![],
-        serialize_values(&vec![MoveValue::Signer(account_address)]),
+        serialize_values(&vec![MoveValue::Signer(account_address), MoveValue::U64(12)]),
     );
+    println!("{:?}", output);
     assert_eq!(output.unwrap_err().move_abort_code(), Some(327683));
 
     executor.exec(
         "timestamp",
         "set_time_has_started",
         vec![],
-        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS), MoveValue::U64(12)]),
     );
 }
 

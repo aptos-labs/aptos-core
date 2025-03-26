@@ -38,8 +38,10 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         fee_payer_prologue_name: Identifier::new("fee_payer_script_prologue").unwrap(),
         script_prologue_name: Identifier::new("script_prologue").unwrap(),
         multi_agent_prologue_name: Identifier::new("multi_agent_script_prologue").unwrap(),
+        automated_txn_prologue_name: Identifier::new("automated_transaction_prologue").unwrap(),
         user_epilogue_name: Identifier::new("epilogue").unwrap(),
         user_epilogue_gas_payer_name: Identifier::new("epilogue_gas_payer").unwrap(),
+        automated_txn_epilogue_name: Identifier::new("automated_transaction_epilogue").unwrap(),
     });
 
 /// On-chain functions used to validate transactions
@@ -50,8 +52,10 @@ pub struct TransactionValidation {
     pub fee_payer_prologue_name: Identifier,
     pub script_prologue_name: Identifier,
     pub multi_agent_prologue_name: Identifier,
+    pub automated_txn_prologue_name: Identifier,
     pub user_epilogue_name: Identifier,
     pub user_epilogue_gas_payer_name: Identifier,
+    pub automated_txn_epilogue_name: Identifier,
 }
 
 impl TransactionValidation {
@@ -191,6 +195,43 @@ pub(crate) fn run_multisig_prologue(
         .or_else(|err| convert_prologue_error(err, log_context))
 }
 
+/// Run the prologue for automated transactions where
+/// 1. sender is checked to have enough funds for transaction execution
+/// 2. automated task expiry time is checked.
+pub(crate) fn run_automated_transaction_prologue(
+    session: &mut SessionExt,
+    txn_data: &TransactionMetadata,
+    log_context: &AdapterLogSchema,
+    traversal_context: &mut TraversalContext,
+) -> Result<(), VMStatus> {
+    let txn_task_id = txn_data.sequence_number();
+    let txn_gas_price = txn_data.gas_unit_price();
+    let txn_max_gas_units = txn_data.max_gas_amount();
+    let txn_expiration_timestamp_secs = txn_data.expiration_timestamp_secs();
+    let chain_id = txn_data.chain_id();
+    let mut gas_meter = UnmeteredGasMeter;
+    let args = vec![
+        MoveValue::Signer(txn_data.sender),
+        MoveValue::U64(txn_task_id),
+        MoveValue::U64(txn_gas_price.into()),
+        MoveValue::U64(txn_max_gas_units.into()),
+        MoveValue::U64(txn_expiration_timestamp_secs),
+        MoveValue::U8(chain_id.id()),
+    ];
+    session
+        .execute_function_bypass_visibility(
+            &APTOS_TRANSACTION_VALIDATION.module_id(),
+            &APTOS_TRANSACTION_VALIDATION.automated_txn_prologue_name,
+            vec![],
+            serialize_values(&args),
+            &mut gas_meter,
+            traversal_context,
+        )
+        .map(|_return_vals| ())
+        .map_err(expect_no_verification_errors)
+        .or_else(|err| convert_prologue_error(err, log_context))
+}
+
 fn run_epilogue(
     session: &mut SessionExt,
     gas_remaining: Gas,
@@ -261,6 +302,49 @@ fn run_epilogue(
     Ok(())
 }
 
+fn run_automated_txn_epilogue(
+    session: &mut SessionExt,
+    gas_remaining: Gas,
+    fee_statement: FeeStatement,
+    txn_data: &TransactionMetadata,
+    features: &Features,
+    traversal_context: &mut TraversalContext,
+) -> VMResult<()> {
+    let txn_gas_price = txn_data.gas_unit_price();
+    let txn_max_gas_units = txn_data.max_gas_amount();
+
+    // We can unconditionally do this as this condition can only be true if the prologue
+    // accepted it, in which case the gas payer feature is enabled.
+    // Regular tx, run the normal epilogue
+    let args = vec![
+        MoveValue::Signer(txn_data.sender),
+        MoveValue::U64(fee_statement.storage_fee_refund()),
+        MoveValue::U64(txn_gas_price.into()),
+        MoveValue::U64(txn_max_gas_units.into()),
+        MoveValue::U64(gas_remaining.into()),
+    ];
+    session
+        .execute_function_bypass_visibility(
+            &APTOS_TRANSACTION_VALIDATION.module_id(),
+            &APTOS_TRANSACTION_VALIDATION.automated_txn_epilogue_name,
+            vec![],
+            serialize_values(&args),
+            &mut UnmeteredGasMeter,
+            traversal_context,
+        )
+        .map(|_return_vals| ())
+        .map_err(expect_no_verification_errors)?;
+
+    // Emit the FeeStatement event
+    if features.is_emit_fee_statement_enabled() {
+        emit_fee_statement(session, fee_statement, traversal_context)?;
+    }
+
+    maybe_raise_injected_error(InjectedError::EndOfRunEpilogue)?;
+
+    Ok(())
+}
+
 fn emit_fee_statement(
     session: &mut SessionExt,
     fee_statement: FeeStatement,
@@ -307,6 +391,35 @@ pub(crate) fn run_success_epilogue(
     .or_else(|err| convert_epilogue_error(err, log_context))
 }
 
+/// Run the epilogue of a transaction by calling into `AUTOMATED_TXN_EPILOGUE_NAME` function stored
+/// in the `TRANSACTION_VALIDATION_MODULE` on chain.
+pub(crate) fn run_automated_txn_success_epilogue(
+    session: &mut SessionExt,
+    gas_remaining: Gas,
+    fee_statement: FeeStatement,
+    features: &Features,
+    txn_data: &TransactionMetadata,
+    log_context: &AdapterLogSchema,
+    traversal_context: &mut TraversalContext,
+) -> Result<(), VMStatus> {
+    fail_point!("move_adapter::run_automated_txn_success_epilogue", |_| {
+        Err(VMStatus::error(
+            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            None,
+        ))
+    });
+
+    run_automated_txn_epilogue(
+        session,
+        gas_remaining,
+        fee_statement,
+        txn_data,
+        features,
+        traversal_context,
+    )
+    .or_else(|err| convert_epilogue_error(err, log_context))
+}
+
 /// Run the failure epilogue of a transaction by calling into `USER_EPILOGUE_NAME` function
 /// stored in the `ACCOUNT_MODULE` on chain.
 pub(crate) fn run_failure_epilogue(
@@ -330,6 +443,36 @@ pub(crate) fn run_failure_epilogue(
         expect_only_successful_execution(
             e,
             APTOS_TRANSACTION_VALIDATION.user_epilogue_name.as_str(),
+            log_context,
+        )
+    })
+}
+
+/// Run the failure epilogue of a transaction by calling into `AUTOMATED_TXN_EPILOGUE_NAME` function
+/// stored in the `TRANSACTION_VALIDATION_MODULE` on chain.
+pub(crate) fn run_automated_txn_failure_epilogue(
+    session: &mut SessionExt,
+    gas_remaining: Gas,
+    fee_statement: FeeStatement,
+    features: &Features,
+    txn_data: &TransactionMetadata,
+    log_context: &AdapterLogSchema,
+    traversal_context: &mut TraversalContext,
+) -> Result<(), VMStatus> {
+    run_automated_txn_epilogue(
+        session,
+        gas_remaining,
+        fee_statement,
+        txn_data,
+        features,
+        traversal_context,
+    )
+    .or_else(|e| {
+        expect_only_successful_execution(
+            e,
+            APTOS_TRANSACTION_VALIDATION
+                .automated_txn_epilogue_name
+                .as_str(),
             log_context,
         )
     })

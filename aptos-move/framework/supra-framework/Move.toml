@@ -14,3 +14,4 @@ vm_reserved = "0x0"
 [dependencies]
 AptosStdlib = { local = "../aptos-stdlib" }
 MoveStdlib = { local = "../move-stdlib" }
+SupraStdlib = { local = "../supra-stdlib" }

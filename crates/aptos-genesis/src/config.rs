@@ -21,6 +21,7 @@ use std::{
     path::Path,
     str::FromStr,
 };
+use aptos_types::on_chain_config::AutomationRegistryConfig;
 
 /// Template for setting up Github for Genesis
 ///
@@ -80,6 +81,8 @@ pub struct Layout {
 
     /// An optional JWK consensus config to use, instead of `default_for_genesis()`.
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
+    /// An optional supra native automation config.
+    pub automation_registry_config: Option<AutomationRegistryConfig>,
 }
 
 impl Layout {
@@ -122,6 +125,7 @@ impl Default for Layout {
             on_chain_consensus_config: OnChainConsensusConfig::default(),
             on_chain_execution_config: OnChainExecutionConfig::default_for_genesis(),
             jwk_consensus_config_override: None,
+            automation_registry_config: Some(AutomationRegistryConfig::default()),
         }
     }
 }

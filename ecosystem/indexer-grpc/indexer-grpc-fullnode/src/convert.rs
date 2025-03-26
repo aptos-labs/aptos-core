@@ -1,6 +1,8 @@
+// Copyright (c) 2024 Supra.
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_api_types::transaction::AutomationRegistrationParams;
 use aptos_api_types::{
     transaction::ValidatorTransaction as ApiValidatorTransactionEnum, AccountSignature,
     DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId, EntryFunctionPayload, Event,
@@ -180,6 +182,14 @@ pub fn convert_transaction_payload(
         // Deprecated.
         TransactionPayload::ModuleBundlePayload(_) => {
             unreachable!("Module bundle payload has been removed")
+        },
+        TransactionPayload::AutomationRegistrationPayload(ap) => transaction::TransactionPayload {
+            r#type: transaction::transaction_payload::Type::AutomationPayload as i32,
+            payload: Some(
+                transaction::transaction_payload::Payload::AutomationPayload(
+                    convert_automation_payload(ap),
+                ),
+            ),
         },
     }
 }
@@ -491,6 +501,20 @@ pub fn convert_multisig_payload(
     }
 }
 
+pub fn convert_automation_payload(
+    auto_payload: &AutomationRegistrationParams,
+) -> transaction::AutomationPayload {
+    let AutomationRegistrationParams::V1(params_v1) = auto_payload;
+    transaction::AutomationPayload {
+        automated_function: Some(convert_entry_function_payload(&params_v1.automated_function)),
+        expiration_timestamp_secs: params_v1.expiration_timestamp_secs,
+        max_gas_amount: params_v1.max_gas_amount,
+        gas_price_cap: params_v1.gas_price_cap,
+        automation_fee_cap: params_v1.automation_fee_cap,
+        aux_data: params_v1.aux_data.clone(),
+    }
+}
+
 pub fn convert_event(event: &Event) -> transaction::Event {
     let event_key: aptos_types::event::EventKey = event.guid.into();
     transaction::Event {
@@ -766,6 +790,9 @@ pub fn convert_transaction(
         Transaction::ValidatorTransaction(_) => {
             transaction::transaction::TransactionType::Validator
         },
+        Transaction::AutomatedTransaction(_) => {
+            transaction::transaction::TransactionType::Automated
+        },
     };
 
     let txn_data = match &transaction {
@@ -834,6 +861,25 @@ pub fn convert_transaction(
         Transaction::PendingTransaction(_) => panic!("PendingTransaction not supported"),
         Transaction::ValidatorTransaction(api_validator_txn) => {
             convert_validator_transaction(api_validator_txn)
+        },
+        Transaction::AutomatedTransaction(at) => {
+            timestamp = Some(convert_timestamp_usecs(at.timestamp.0));
+            let expiration_timestamp_secs = Some(convert_timestamp_secs(std::cmp::min(
+                at.meta.expiration_timestamp_secs.0,
+                chrono::NaiveDateTime::MAX.timestamp() as u64,
+            )));
+            transaction::transaction::TxnData::Automated(transaction::AutomatedTransaction {
+                meta: Some(transaction::AutomatedTaskMeta {
+                    sender: at.meta.sender.to_string(),
+                    index: at.meta.index.0,
+                    max_gas_amount: at.meta.max_gas_amount.0,
+                    gas_unit_price: at.meta.gas_unit_price.0,
+                    expiration_timestamp_secs,
+                    payload: Some(convert_transaction_payload(&at.meta.payload)),
+                    registration_hash: at.meta.registration_hash.0.to_vec(),
+                }),
+                events: convert_events(&at.events),
+            })
         },
     };
 

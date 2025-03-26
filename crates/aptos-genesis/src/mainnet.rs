@@ -17,6 +17,7 @@ use aptos_types::{
     transaction::Transaction,
     waypoint::Waypoint,
 };
+use aptos_types::on_chain_config::AutomationRegistryConfig;
 use aptos_vm::AptosVM;
 use aptos_vm_genesis::{AccountBalance, EmployeePool, ValidatorWithCommissionRate};
 
@@ -69,6 +70,8 @@ pub struct MainnetGenesisInfo {
     randomness_config_override: Option<OnChainRandomnessConfig>,
     /// An optional feature vec to replace `OnChainJWKConsensusConfig::default_for_genesis()`.
     jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
+    /// Supra native automation feature configuration parameters
+    automation_registry_config: Option<AutomationRegistryConfig>,
 }
 
 impl MainnetGenesisInfo {
@@ -113,6 +116,7 @@ impl MainnetGenesisInfo {
             initial_features_override: genesis_config.initial_features_override.clone(),
             randomness_config_override: genesis_config.randomness_config_override.clone(),
             jwk_consensus_config_override: genesis_config.jwk_consensus_config_override.clone(),
+            automation_registry_config: genesis_config.automation_registry_config.clone(),
         })
     }
 
@@ -156,6 +160,7 @@ impl MainnetGenesisInfo {
                 initial_features_override: self.initial_features_override.clone(),
                 randomness_config_override: self.randomness_config_override.clone(),
                 jwk_consensus_config_override: self.jwk_consensus_config_override.clone(),
+                automation_registry_config: self.automation_registry_config.clone(),
             },
             b"test".to_vec(),
         )

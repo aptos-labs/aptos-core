@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Supra.
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
@@ -29,6 +30,7 @@ use aptos_types::{
             AccountAuthenticator, AnyPublicKey, AnySignature, MultiKey, MultiKeyAuthenticator,
             SingleKeyAuthenticator, TransactionAuthenticator, MAX_NUM_OF_SIGS,
         },
+        automated_transaction::AutomatedTransaction as UserAutomatedTransaction,
         webauthn::{PartialAuthenticatorAssertionResponse, MAX_WEBAUTHN_SIGNATURE_BYTES},
         Script, SignedTransaction, TransactionOutput, TransactionWithProof,
     },
@@ -177,6 +179,7 @@ impl
 pub enum Transaction {
     PendingTransaction(PendingTransaction),
     UserTransaction(Box<UserTransaction>),
+    AutomatedTransaction(Box<AutomatedTransaction>),
     GenesisTransaction(GenesisTransaction),
     BlockMetadataTransaction(BlockMetadataTransaction),
     StateCheckpointTransaction(StateCheckpointTransaction),
@@ -194,6 +197,7 @@ impl Transaction {
             Transaction::StateCheckpointTransaction(txn) => txn.timestamp.0,
             Transaction::BlockEpilogueTransaction(txn) => txn.timestamp.0,
             Transaction::ValidatorTransaction(txn) => txn.timestamp().0,
+            Transaction::AutomatedTransaction(txn) => txn.timestamp.0,
         }
     }
 
@@ -206,6 +210,7 @@ impl Transaction {
             Transaction::StateCheckpointTransaction(txn) => Some(txn.info.version.into()),
             Transaction::BlockEpilogueTransaction(txn) => Some(txn.info.version.into()),
             Transaction::ValidatorTransaction(txn) => Some(txn.transaction_info().version.into()),
+            Transaction::AutomatedTransaction(txn) => Some(txn.info.version.into()),
         }
     }
 
@@ -218,6 +223,7 @@ impl Transaction {
             Transaction::StateCheckpointTransaction(txn) => txn.info.success,
             Transaction::BlockEpilogueTransaction(txn) => txn.info.success,
             Transaction::ValidatorTransaction(txn) => txn.transaction_info().success,
+            Transaction::AutomatedTransaction(txn) => txn.info.success,
         }
     }
 
@@ -234,6 +240,7 @@ impl Transaction {
             Transaction::StateCheckpointTransaction(txn) => txn.info.vm_status.clone(),
             Transaction::BlockEpilogueTransaction(txn) => txn.info.vm_status.clone(),
             Transaction::ValidatorTransaction(txn) => txn.transaction_info().vm_status.clone(),
+            Transaction::AutomatedTransaction(txn) => txn.info.vm_status.clone(),
         }
     }
 
@@ -246,6 +253,7 @@ impl Transaction {
             Transaction::StateCheckpointTransaction(_) => "state_checkpoint_transaction",
             Transaction::BlockEpilogueTransaction(_) => "block_epilogue_transaction",
             Transaction::ValidatorTransaction(vt) => vt.type_str(),
+            Transaction::AutomatedTransaction(_) => "automated_transaction",
         }
     }
 
@@ -260,6 +268,7 @@ impl Transaction {
             Transaction::StateCheckpointTransaction(txn) => &txn.info,
             Transaction::BlockEpilogueTransaction(txn) => &txn.info,
             Transaction::ValidatorTransaction(txn) => txn.transaction_info(),
+            Transaction::AutomatedTransaction(txn) => &txn.info,
         })
     }
 }
@@ -295,6 +304,46 @@ impl
         Transaction::UserTransaction(Box::new(UserTransaction {
             info,
             request: (txn, payload).into(),
+            events,
+            timestamp: timestamp.into(),
+        }))
+    }
+}
+
+impl
+    From<(
+        &UserAutomatedTransaction,
+        TransactionInfo,
+        TransactionPayload,
+        Vec<Event>,
+        u64,
+    )> for Transaction
+{
+    fn from(
+        (txn, info, payload, events, timestamp): (
+            &UserAutomatedTransaction,
+            TransactionInfo,
+            TransactionPayload,
+            Vec<Event>,
+            u64,
+        ),
+    ) -> Self {
+        // AutomatedTransaction has reference to the automation-registration-transaction hash which
+        // is the authenticator of the automated-transaction.
+        // Transaction hash calculated by APTOS differs from transaction hash that smr-moonshot(supra)
+        // calculates for transactions.
+        // In current implementation of AutomationRegistration transaction execution in MoveVM
+        // we are using transaction-hash in supra-style to specify parent-hash/authenticator of
+        // the automation task/automated transaction in order for later to use it as Authenticator
+        // in supra-layer.
+        // Here, when creating meta registration transaction hash in Aptos Style should have been specified,
+        // but it is not possible.
+        // Note: In the execution flow AutomationRegistration transaction hash calculation should be
+        // updated to APTOS style if APTOS DB and API flow is going to be utilized to request automation
+        // registration transaction data.
+        Transaction::AutomatedTransaction(Box::new(AutomatedTransaction {
+            meta: (txn.authenticator().into(), txn, payload).into(),
+            info,
             events,
             timestamp: timestamp.into(),
         }))
@@ -357,6 +406,26 @@ impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
     }
 }
 
+impl From<(HashValue, &UserAutomatedTransaction, TransactionPayload)> for AutomatedTaskMeta {
+    fn from(
+        (registration_hash, txn, payload): (
+            HashValue,
+            &UserAutomatedTransaction,
+            TransactionPayload,
+        ),
+    ) -> Self {
+        Self {
+            sender: txn.sender().into(),
+            index: txn.sequence_number().into(),
+            max_gas_amount: txn.max_gas_amount().into(),
+            gas_unit_price: txn.gas_unit_price().into(),
+            expiration_timestamp_secs: txn.expiration_timestamp_secs().into(),
+            registration_hash,
+            payload,
+        }
+    }
+}
+
 /// Information related to how a transaction affected the state of the blockchain
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct TransactionInfo {
@@ -410,6 +479,20 @@ pub struct UserTransaction {
     #[serde(flatten)]
     #[oai(flatten)]
     pub request: UserTransactionRequest,
+    /// Events generated by the transaction
+    pub events: Vec<Event>,
+    pub timestamp: U64,
+}
+
+/// A transaction registered by a user to run periodically in automated manner
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct AutomatedTransaction {
+    #[serde(flatten)]
+    #[oai(flatten)]
+    pub info: TransactionInfo,
+    #[serde(flatten)]
+    #[oai(flatten)]
+    pub meta: AutomatedTaskMeta,
     /// Events generated by the transaction
     pub events: Vec<Event>,
     pub timestamp: U64,
@@ -514,6 +597,17 @@ pub struct UserTransactionRequest {
     pub payload: TransactionPayload,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<TransactionSignature>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct AutomatedTaskMeta {
+    pub sender: Address,
+    pub index: U64,
+    pub max_gas_amount: U64,
+    pub gas_unit_price: U64,
+    pub expiration_timestamp_secs: U64,
+    pub payload: TransactionPayload,
+    pub registration_hash: HashValue,
 }
 
 /// Request to create signing messages
@@ -861,6 +955,7 @@ pub enum TransactionPayload {
     ModuleBundlePayload(DeprecatedModuleBundlePayload),
 
     MultisigPayload(MultisigPayload),
+    AutomationRegistrationPayload(AutomationRegistrationParams),
 }
 
 impl VerifyInput for TransactionPayload {
@@ -874,6 +969,7 @@ impl VerifyInput for TransactionPayload {
             TransactionPayload::ModuleBundlePayload(_) => {
                 bail!("Module bundle payload has been removed")
             },
+            TransactionPayload::AutomationRegistrationPayload(inner) => inner.verify(),
         }
     }
 }
@@ -972,6 +1068,51 @@ impl VerifyInput for MultisigPayload {
             }
         }
 
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
+pub enum  AutomationRegistrationParams {
+    V1(AutomationRegistrationParamsV1)
+}
+
+impl AutomationRegistrationParams {
+    pub fn into_v1(self) -> Option<AutomationRegistrationParamsV1> {
+        let AutomationRegistrationParams::V1(params_v1) = self;
+        Some(params_v1)
+    }
+}
+
+impl From<AutomationRegistrationParamsV1> for AutomationRegistrationParams {
+    fn from(value: AutomationRegistrationParamsV1) -> Self {
+        Self::V1(value)
+    }
+}
+
+impl VerifyInput for AutomationRegistrationParams {
+    fn verify(&self) -> anyhow::Result<()> {
+        let AutomationRegistrationParams::V1(params_v1) = self;
+        params_v1.verify()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct AutomationRegistrationParamsV1 {
+    pub automated_function: EntryFunctionPayload,
+    pub expiration_timestamp_secs: u64,
+    pub max_gas_amount: u64,
+    pub gas_price_cap: u64,
+    pub automation_fee_cap: u64,
+    pub aux_data: Vec<Vec<u8>>,
+}
+
+impl VerifyInput for AutomationRegistrationParamsV1 {
+    fn verify(&self) -> anyhow::Result<()> {
+        self.automated_function.function.verify()?;
+        for type_arg in self.automated_function.type_arguments.iter() {
+            type_arg.verify(0)?;
+        }
         Ok(())
     }
 }

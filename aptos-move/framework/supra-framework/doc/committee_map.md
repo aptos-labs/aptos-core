@@ -970,7 +970,7 @@ Get the committee's node vector and committee type
     <b>let</b> committee = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow">simple_map::borrow</a>(&committee_store.<a href="committee_map.md#0x1_committee_map">committee_map</a>, &id);
     <b>let</b> (addrs, nodes) = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_to_vec_pair">simple_map::to_vec_pair</a>(committee.map);
     <b>let</b> node_data_vec = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;<a href="committee_map.md#0x1_committee_map_NodeData">NodeData</a>&gt;();
-    <b>while</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&addrs) &gt; 0) {
+    <b>while</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&addrs) != 0) {
         <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> addrs);
         <b>let</b> node_info = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> nodes);
         <b>let</b> node_data = <a href="committee_map.md#0x1_committee_map_NodeData">NodeData</a> {
@@ -1289,7 +1289,7 @@ This function is used to add a new committee to the store
     <b>let</b> committee_store = <b>borrow_global_mut</b>&lt;<a href="committee_map.md#0x1_committee_map_CommitteeInfoStore">CommitteeInfoStore</a>&gt;(com_store_addr);
     <b>let</b> node_infos = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;<a href="committee_map.md#0x1_committee_map_NodeInfo">NodeInfo</a>&gt;();
     <b>let</b> node_addresses_for_iteration = node_addresses;
-    <b>while</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&node_addresses_for_iteration) &gt; 0) {
+    <b>while</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&node_addresses_for_iteration) != 0) {
         <b>let</b> ip_public_address = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> ip_public_address);
         <b>let</b> node_public_key = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> node_public_key);
         <b>let</b> network_public_key = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> network_public_key);
@@ -1402,7 +1402,7 @@ Add the committee in bulk
         ids_len == <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&rpc_por_bulkt),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="committee_map.md#0x1_committee_map_INVALID_COMMITTEE_NUMBERS">INVALID_COMMITTEE_NUMBERS</a>)
     );
-    <b>while</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&ids) &gt; 0) {
+    <b>while</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&ids) != 0) {
         <b>let</b> id = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> ids);
         <b>let</b> node_addresses = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> node_addresses_bulk);
         <b>let</b> ip_public_address = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> ip_public_address_bulk);
@@ -1465,7 +1465,7 @@ Remove the committee from the store
     <b>let</b> (id, committee_info) = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_remove">simple_map::remove</a>(&<b>mut</b> committee_store.<a href="committee_map.md#0x1_committee_map">committee_map</a>, &id);
     // Also remove the node_to_committee_map
     <b>let</b> (addrs, _) = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_to_vec_pair">simple_map::to_vec_pair</a>(committee_info.map);
-    <b>while</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&addrs) &gt; 0) {
+    <b>while</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&addrs) != 0) {
         <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> addrs);
         <b>assert</b>!(
             <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(&committee_store.node_to_committee_map, &addr),
@@ -1508,7 +1508,7 @@ Remove the committee in bulk
     com_store_addr: <b>address</b>,
     ids: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
 ) <b>acquires</b> <a href="committee_map.md#0x1_committee_map_CommitteeInfoStore">CommitteeInfoStore</a>, <a href="committee_map.md#0x1_committee_map_SupraCommitteeEventHandler">SupraCommitteeEventHandler</a> {
-    <b>while</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&ids) &gt; 0) {
+    <b>while</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&ids) != 0) {
         <b>let</b> id = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> ids);
         <a href="committee_map.md#0x1_committee_map_remove_committee">remove_committee</a>(owner_signer, com_store_addr, id);
     }
@@ -1644,7 +1644,7 @@ Upsert nodes to the committee
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&ids) == <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&rpc_port),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="committee_map.md#0x1_committee_map_INVALID_COMMITTEE_NUMBERS">INVALID_COMMITTEE_NUMBERS</a>)
     );
-    <b>while</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&ids) &gt; 0) {
+    <b>while</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&ids) != 0) {
         <b>let</b> id = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> ids);
         <b>let</b> node_address = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> node_addresses);
         <b>let</b> ip_public_address = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> ip_public_address);

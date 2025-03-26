@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Supra.
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
@@ -1031,6 +1032,12 @@ impl TransactionsApi {
                         })?;
                 // Verify the signed transaction
                 match signed_transaction.payload() {
+                    TransactionPayload::AutomationRegistration(params) => {
+                        TransactionsApi::validate_entry_function_payload_format(
+                            ledger_info,
+                            params.automated_function(),
+                        )?;
+                    },
                     TransactionPayload::EntryFunction(entry_function) => {
                         TransactionsApi::validate_entry_function_payload_format(
                             ledger_info,
@@ -1380,6 +1387,10 @@ impl TransactionsApi {
                 format!("Script::{}", txn.committed_hash()).to_string()
             },
             TransactionPayload::ModuleBundle(_) => "ModuleBundle::unknown".to_string(),
+            TransactionPayload::AutomationRegistration(auto_payload) => FunctionStats::function_to_key(
+                auto_payload.module_id(),
+                &auto_payload.function().into(),
+            ),
             TransactionPayload::EntryFunction(entry_function) => FunctionStats::function_to_key(
                 entry_function.module(),
                 &entry_function.function().into(),

@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Supra.
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
@@ -857,6 +858,7 @@ pub enum TransactionType {
     StateCheckpoint,
     Validator,
     BlockEpilogue,
+    Automated,
 }
 
 impl Display for TransactionType {
@@ -870,6 +872,7 @@ impl Display for TransactionType {
             StateCheckpoint => "StateCheckpoint",
             Validator => "Validator",
             BlockEpilogue => "BlockEpilogue",
+            Automated => "Automated",
         })
     }
 }
@@ -880,21 +883,49 @@ impl Transaction {
         txn: TransactionOnChainData,
     ) -> ApiResult<Transaction> {
         use aptos_types::transaction::Transaction::*;
-        let (txn_type, maybe_user_txn, txn_info, events) = match &txn.transaction {
-            UserTransaction(user_txn) => {
-                (TransactionType::User, Some(user_txn), txn.info, txn.events)
-            },
-            GenesisTransaction(_) => (TransactionType::Genesis, None, txn.info, txn.events),
-            BlockMetadata(_) => (TransactionType::BlockMetadata, None, txn.info, txn.events),
-            BlockMetadataExt(_) => (
-                TransactionType::BlockMetadataExt,
+        let (txn_type, maybe_user_txn, maybe_automated_txn, txn_info, events) = match &txn
+            .transaction
+        {
+            UserTransaction(user_txn) => (
+                TransactionType::User,
+                Some(user_txn),
                 None,
                 txn.info,
                 txn.events,
             ),
-            StateCheckpoint(_) => (TransactionType::StateCheckpoint, None, txn.info, vec![]),
-            ValidatorTransaction(_) => (TransactionType::Validator, None, txn.info, txn.events),
-            BlockEpilogue(_) => (TransactionType::BlockEpilogue, None, txn.info, vec![]),
+            GenesisTransaction(_) => (TransactionType::Genesis, None, None, txn.info, txn.events),
+            BlockMetadata(_) => (
+                TransactionType::BlockMetadata,
+                None,
+                None,
+                txn.info,
+                txn.events,
+            ),
+            BlockMetadataExt(_) => (
+                TransactionType::BlockMetadataExt,
+                None,
+                None,
+                txn.info,
+                txn.events,
+            ),
+            StateCheckpoint(_) => (
+                TransactionType::StateCheckpoint,
+                None,
+                None,
+                txn.info,
+                vec![],
+            ),
+            ValidatorTransaction(_) => {
+                (TransactionType::Validator, None, None, txn.info, txn.events)
+            },
+            BlockEpilogue(_) => (TransactionType::BlockEpilogue, None, None, txn.info, vec![]),
+            AutomatedTransaction(automated_txn) => (
+                TransactionType::Automated,
+                None,
+                Some(automated_txn),
+                txn.info,
+                txn.events,
+            ),
         };
 
         // Operations must be sequential and operation index must always be in the same order
@@ -910,8 +941,12 @@ impl Transaction {
                     state_key,
                     write_op,
                     &events,
-                    maybe_user_txn.map(|inner| inner.sender()),
-                    maybe_user_txn.map(|inner| inner.payload()),
+                    maybe_user_txn
+                        .map(|inner| inner.sender())
+                        .or(maybe_automated_txn.map(|inner| inner.sender())),
+                    maybe_user_txn
+                        .map(|inner| inner.payload())
+                        .or(maybe_automated_txn.map(|inner| inner.payload())),
                     txn.version,
                     operation_index,
                     &txn.changes,
@@ -936,13 +971,13 @@ impl Transaction {
                 }
             }
         } else {
+            let maybe_sender_payload = maybe_user_txn
+                .map(|txn| (txn.sender(), txn.payload()))
+                .or(maybe_automated_txn.map(|txn| (txn.sender(), txn.payload())));
             // Parse all failed operations from the payload
-            if let Some(user_txn) = maybe_user_txn {
-                let mut ops = parse_failed_operations_from_txn_payload(
-                    operation_index,
-                    user_txn.sender(),
-                    user_txn.payload(),
-                );
+            if let Some((sender, payload)) = maybe_sender_payload {
+                let mut ops =
+                    parse_failed_operations_from_txn_payload(operation_index, sender, payload);
                 operation_index += ops.len() as u64;
                 operations.append(&mut ops);
             }
@@ -956,12 +991,15 @@ impl Transaction {
         }
 
         // Everything committed costs gas
-        if let Some(txn) = maybe_user_txn {
+        let maybe_sender_gas_price = maybe_user_txn
+            .map(|txn| (txn.sender(), txn.gas_unit_price()))
+            .or(maybe_automated_txn.map(|txn| (txn.sender(), txn.gas_unit_price())));
+        if let Some((sender, gas_unit_price)) = maybe_sender_gas_price {
             operations.push(Operation::gas_fee(
                 operation_index,
-                txn.sender(),
+                sender,
                 txn_info.gas_used(),
-                txn.gas_unit_price(),
+                gas_unit_price,
             ));
         }
 

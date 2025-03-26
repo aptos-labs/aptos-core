@@ -2,12 +2,17 @@ name: Run aptos framework checks
 
 on:
   push:
-    branches: 
-        - dev
-  pull_request:
     branches:
-        - dev
+      - dev
+      - "release/**"
+      - "feature/**"
 
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+    branches:
+      - dev
+      - "release/**"
+      - "feature/**"
 env:
   CARGO_TERM_COLOR: always
   CARGO_BIN: ~/.cargo/bin/cargo
@@ -31,10 +36,21 @@ jobs:
     - name: Get changed files
       id: changed-files
       uses: tj-actions/changed-files@v42
- 
-    - name: Run tests
+
+    - name: Run aptos-types-unit-tests
+      run: |
+        ${{ env.CARGO_BIN }} test --release -p aptos-types --lib unit_tests --no-fail-fast
+
+    - name: Run supra-framework
       run: |
         ${{ env.CARGO_BIN }} test --release -p aptos-framework -- --skip prover
+
+    - name: Run e2e-testsuite
+      run: |
+        RUST_MIN_STACK=104857600 ${{ env.CARGO_BIN }} nextest run -p language-e2e-testsuite --no-fail-fast
+
+    - name: Run e2e-move-tests
+      run: |
         RUST_MIN_STACK=104857600 ${{ env.CARGO_BIN }} nextest run -p e2e-move-tests --no-fail-fast
 
     - name: Slack Notification

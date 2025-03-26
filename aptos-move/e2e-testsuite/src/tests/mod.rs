@@ -26,3 +26,6 @@ mod peer_to_peer;
 mod scripts;
 mod transaction_fuzzer;
 mod verify_txn;
+mod automation_registration;
+mod automated_transactions;
+mod vm_viewer;

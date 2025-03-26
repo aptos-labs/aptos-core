@@ -16,6 +16,7 @@ module supra_framework::create_signer {
     friend supra_framework::genesis;
     friend supra_framework::multisig_account;
     friend supra_framework::object;
+    friend supra_framework::automation_registry;
 
     public(friend) native fun create_signer(addr: address): signer;
 }

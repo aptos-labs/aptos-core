@@ -45,6 +45,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+use aptos_types::on_chain_config::AutomationRegistryConfig;
 
 const VALIDATOR_IDENTITY: &str = "validator-identity.yaml";
 const VFN_IDENTITY: &str = "vfn-identity.yaml";
@@ -436,6 +437,7 @@ pub struct GenesisConfiguration {
     pub initial_features_override: Option<Features>,
     pub randomness_config_override: Option<OnChainRandomnessConfig>,
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
+    pub automation_registry_config: Option<AutomationRegistryConfig>,
 }
 
 pub type InitConfigFn = Arc<dyn Fn(usize, &mut NodeConfig, &mut NodeConfig) + Send + Sync>;
@@ -659,6 +661,7 @@ impl Builder {
             initial_features_override: None,
             randomness_config_override: None,
             jwk_consensus_config_override: None,
+            automation_registry_config: Some(AutomationRegistryConfig::default()),
         };
         if let Some(init_genesis_config) = &self.init_genesis_config {
             (init_genesis_config)(&mut genesis_config);

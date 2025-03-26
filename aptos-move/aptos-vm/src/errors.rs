@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Supra.
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
@@ -37,6 +38,9 @@ pub const ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
 pub const EGAS_PAYER_ACCOUNT_MISSING: u64 = 1010;
 // Insufficient balance to cover the required deposit.
 pub const EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT: u64 = 1011;
+
+// Failed to find active automation task by specified id.
+pub const ENO_ACTIVE_AUTOMATION_TASK: u64 = 1012;
 
 // Specified account is not a multisig account.
 const EACCOUNT_NOT_MULTISIG: u64 = 2002;
@@ -133,6 +137,9 @@ pub fn convert_prologue_error(
                 },
                 (INVALID_STATE, EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT) => {
                     StatusCode::INSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT
+                },
+                (INVALID_STATE, ENO_ACTIVE_AUTOMATION_TASK) => {
+                    StatusCode::NO_ACTIVE_AUTOMATED_TASK
                 },
                 (category, reason) => {
                     let err_msg = format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",

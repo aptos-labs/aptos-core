@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Supra.
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
@@ -12,18 +13,21 @@ pub enum EntryFunModuleKey {
     Exempt,
 }
 
+impl From<&ModuleId> for EntryFunModuleKey {
+    fn from(module_id: &ModuleId) -> Self {
+        if module_id.address().is_special() {
+            Self::Exempt
+        } else {
+            Self::Module(module_id.clone())
+        }
+    }
+}
+
 impl ConflictKey<SignedTransaction> for EntryFunModuleKey {
     fn extract_from(txn: &SignedTransaction) -> Self {
         match txn.payload() {
-            TransactionPayload::EntryFunction(entry_fun) => {
-                let module_id = entry_fun.module();
-
-                if module_id.address().is_special() {
-                    Self::Exempt
-                } else {
-                    Self::Module(module_id.clone())
-                }
-            },
+            TransactionPayload::AutomationRegistration(auto_payload) => Self::from(auto_payload.module_id()),
+            TransactionPayload::EntryFunction(entry_fun) => Self::from(entry_fun.module()),
             TransactionPayload::Multisig(..)
             | TransactionPayload::Script(_)
             | TransactionPayload::ModuleBundle(_) => Self::AnyScriptOrMultiSig,

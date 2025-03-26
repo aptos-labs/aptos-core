@@ -1,12 +1,14 @@
+// Copyright (c) 2024 Supra.
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     transaction::{
-        BlockEpilogueTransaction, DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem,
-        DeletedTableData, MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
-        UserTransactionRequestInner, WriteModule, WriteResource, WriteTableItem,
+        BlockEpilogueTransaction, DecodedTableData, DeleteModule,
+        DeleteResource, DeleteTableItem, DeletedTableData, MultisigPayload,
+        MultisigTransactionPayload, StateCheckpointTransaction, UserTransactionRequestInner,
+        WriteModule, WriteResource, WriteTableItem,
     },
     view::{ViewFunction, ViewRequest},
     Address, Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event,
@@ -21,6 +23,7 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::{sample, sample::SampleRate};
 use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_storage_interface::DbReader;
+use aptos_types::transaction::automation::RegistrationParams;
 use aptos_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
@@ -55,6 +58,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use crate::transaction::AutomationRegistrationParamsV1;
 
 const OBJECT_MODULE: &IdentStr = ident_str!("object");
 const OBJECT_STRUCT: &IdentStr = ident_str!("Object");
@@ -177,8 +181,8 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         data: TransactionOnChainData,
     ) -> Result<Transaction> {
         use aptos_types::transaction::Transaction::{
-            BlockEpilogue, BlockMetadata, BlockMetadataExt, GenesisTransaction, StateCheckpoint,
-            UserTransaction,
+            AutomatedTransaction, BlockEpilogue, BlockMetadata, BlockMetadataExt,
+            GenesisTransaction, StateCheckpoint, UserTransaction,
         };
         let aux_data = self
             .db
@@ -234,6 +238,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             aptos_types::transaction::Transaction::ValidatorTransaction(txn) => {
                 Transaction::ValidatorTransaction((txn, info, events, timestamp).into())
             },
+            AutomatedTransaction(automated_txn) => {
+                let payload = self.try_into_transaction_payload(automated_txn.payload().clone())?;
+                (&automated_txn, info, payload, events, timestamp).into()
+            },
         })
     }
 
@@ -274,30 +282,8 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         let ret = match payload {
             Script(s) => TransactionPayload::ScriptPayload(s.try_into()?),
             EntryFunction(fun) => {
-                let (module, function, ty_args, args) = fun.into_inner();
-                let func_args = self
-                    .inner
-                    .view_function_arguments(&module, &function, &ty_args, &args);
-
-                let json_args = match func_args {
-                    Ok(values) => values
-                        .into_iter()
-                        .map(|v| MoveValue::try_from(v)?.json())
-                        .collect::<Result<_>>()?,
-                    Err(_e) => args
-                        .into_iter()
-                        .map(|arg| HexEncodedBytes::from(arg).json())
-                        .collect::<Result<_>>()?,
-                };
-
-                TransactionPayload::EntryFunctionPayload(EntryFunctionPayload {
-                    arguments: json_args,
-                    function: EntryFunctionId {
-                        module: module.into(),
-                        name: function.into(),
-                    },
-                    type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
-                })
+                let entry_function_payload = self.try_into_entry_function_payload(fun)?;
+                TransactionPayload::EntryFunctionPayload(entry_function_payload)
             },
             Multisig(multisig) => {
                 let transaction_payload = if let Some(payload) = multisig.transaction_payload {
@@ -305,33 +291,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                         aptos_types::transaction::MultisigTransactionPayload::EntryFunction(
                             entry_function,
                         ) => {
-                            let (module, function, ty_args, args) = entry_function.into_inner();
-                            let func_args = self
-                                .inner
-                                .view_function_arguments(&module, &function, &ty_args, &args);
-                            let json_args = match func_args {
-                                Ok(values) => values
-                                    .into_iter()
-                                    .map(|v| MoveValue::try_from(v)?.json())
-                                    .collect::<Result<_>>()?,
-                                Err(_e) => args
-                                    .into_iter()
-                                    .map(|arg| HexEncodedBytes::from(arg).json())
-                                    .collect::<Result<_>>()?,
-                            };
-
+                            let entry_function_payload =
+                                self.try_into_entry_function_payload(entry_function)?;
                             Some(MultisigTransactionPayload::EntryFunctionPayload(
-                                EntryFunctionPayload {
-                                    arguments: json_args,
-                                    function: EntryFunctionId {
-                                        module: module.into(),
-                                        name: function.into(),
-                                    },
-                                    type_arguments: ty_args
-                                        .into_iter()
-                                        .map(|arg| arg.into())
-                                        .collect(),
-                                },
+                                entry_function_payload,
                             ))
                         },
                     }
@@ -346,6 +309,23 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
 
             // Deprecated.
             ModuleBundle(_) => bail!("Module bundle payload has been removed"),
+            AutomationRegistration(params) => {
+                let maybe_params_v1 = params.into_v1();
+                let Some(params_v1) = maybe_params_v1 else {
+                    bail!("Unsupported automation registration parameters.");
+                };
+                let (inner_payload, max_gas_amount, gas_price_cap, expiration_timestamp_secs, automation_fee_cap, aux_data) =
+                    params_v1.into_inner();
+                let auto_payload = AutomationRegistrationParamsV1 {
+                    automated_function: self.try_into_entry_function_payload(inner_payload)?,
+                    expiration_timestamp_secs,
+                    max_gas_amount,
+                    gas_price_cap,
+                    automation_fee_cap,
+                    aux_data,
+                };
+                TransactionPayload::AutomationRegistrationPayload(auto_payload.into())
+            },
         };
         Ok(ret)
     }
@@ -651,40 +631,8 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
 
         let ret = match payload {
             TransactionPayload::EntryFunctionPayload(entry_func_payload) => {
-                let EntryFunctionPayload {
-                    function,
-                    type_arguments,
-                    arguments,
-                } = entry_func_payload;
-
-                let module = function.module.clone();
-                let code =
-                    self.inner.view_existing_module(&module.clone().into())? as Arc<dyn Bytecode>;
-                let func = code
-                    .find_entry_function(function.name.0.as_ident_str())
-                    .ok_or_else(|| format_err!("could not find entry function by {}", function))?;
-                ensure!(
-                    func.generic_type_params.len() == type_arguments.len(),
-                    "expect {} type arguments for entry function {}, but got {}",
-                    func.generic_type_params.len(),
-                    function,
-                    type_arguments.len()
-                );
-                let args = self
-                    .try_into_vm_values(func, arguments)?
-                    .iter()
-                    .map(bcs::to_bytes)
-                    .collect::<Result<_, bcs::Error>>()?;
-
-                Target::EntryFunction(EntryFunction::new(
-                    module.into(),
-                    function.name.into(),
-                    type_arguments
-                        .into_iter()
-                        .map(|v| v.try_into())
-                        .collect::<Result<_>>()?,
-                    args,
-                ))
+                let entry_function = self.try_into_supra_core_entry_function(entry_func_payload)?;
+                Target::EntryFunction(entry_function)
             },
             TransactionPayload::ScriptPayload(script) => {
                 let ScriptPayload {
@@ -715,44 +663,11 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 let transaction_payload = if let Some(payload) = multisig.transaction_payload {
                     match payload {
                         MultisigTransactionPayload::EntryFunctionPayload(entry_function) => {
-                            let EntryFunctionPayload {
-                                function,
-                                type_arguments,
-                                arguments,
-                            } = entry_function;
-
-                            let module = function.module.clone();
-                            let code = self.inner.view_existing_module(&module.clone().into())?
-                                as Arc<dyn Bytecode>;
-                            let func = code
-                                .find_entry_function(function.name.0.as_ident_str())
-                                .ok_or_else(|| {
-                                    format_err!("could not find entry function by {}", function)
-                                })?;
-                            ensure!(
-                                func.generic_type_params.len() == type_arguments.len(),
-                                "expect {} type arguments for entry function {}, but got {}",
-                                func.generic_type_params.len(),
-                                function,
-                                type_arguments.len()
-                            );
-
-                            let args = self
-                                .try_into_vm_values(func, arguments)?
-                                .iter()
-                                .map(bcs::to_bytes)
-                                .collect::<Result<_, bcs::Error>>()?;
+                            let entry_function =
+                                self.try_into_supra_core_entry_function(entry_function)?;
                             Some(
                                 aptos_types::transaction::MultisigTransactionPayload::EntryFunction(
-                                    EntryFunction::new(
-                                        module.into(),
-                                        function.name.into(),
-                                        type_arguments
-                                            .into_iter()
-                                            .map(|v| v.try_into())
-                                            .collect::<Result<_>>()?,
-                                        args,
-                                    ),
+                                    entry_function,
                                 ),
                             )
                         },
@@ -769,6 +684,27 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             // Deprecated.
             TransactionPayload::ModuleBundlePayload(_) => {
                 bail!("Module bundle payload has been removed")
+            },
+            TransactionPayload::AutomationRegistrationPayload(payload) => {
+                let Some(params_v1) = payload.into_v1() else {
+                    bail!("Unsupported/Unimplemented automation registration parameters");
+                };
+                let AutomationRegistrationParamsV1 {
+                    automated_function,
+                    expiration_timestamp_secs,
+                    max_gas_amount,
+                    gas_price_cap, automation_fee_cap, aux_data,
+                } = params_v1;
+                let core_automated_function =
+                    self.try_into_supra_core_entry_function(automated_function)?;
+                Target::AutomationRegistration(RegistrationParams::new_v1(
+                    core_automated_function,
+                    expiration_timestamp_secs,
+                    max_gas_amount,
+                    gas_price_cap,
+                    automation_fee_cap,
+                    aux_data,
+                ))
             },
         };
         Ok(ret)
@@ -1076,6 +1012,72 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         let func = code.function_handle_at(FunctionHandleIndex::new(*function));
         let id = code.identifier_at(func.name);
         Ok(id.to_string())
+    }
+
+    fn try_into_entry_function_payload(&self, fun: EntryFunction) -> Result<EntryFunctionPayload> {
+        let (module, function, ty_args, args) = fun.into_inner();
+        let func_args = self
+            .inner
+            .view_function_arguments(&module, &function, &ty_args, &args);
+
+        let json_args = match func_args {
+            Ok(values) => values
+                .into_iter()
+                .map(|v| MoveValue::try_from(v)?.json())
+                .collect::<Result<_>>()?,
+            Err(_e) => args
+                .into_iter()
+                .map(|arg| HexEncodedBytes::from(arg).json())
+                .collect::<Result<_>>()?,
+        };
+
+        Ok(EntryFunctionPayload {
+            arguments: json_args,
+            function: EntryFunctionId {
+                module: module.into(),
+                name: function.into(),
+            },
+            type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
+        })
+    }
+
+    fn try_into_supra_core_entry_function(
+        &self,
+        entry_function: EntryFunctionPayload,
+    ) -> Result<EntryFunction> {
+        let EntryFunctionPayload {
+            function,
+            type_arguments,
+            arguments,
+        } = entry_function;
+
+        let module = function.module.clone();
+        let code = self.inner.view_existing_module(&module.clone().into())? as Arc<dyn Bytecode>;
+        let func = code
+            .find_entry_function(function.name.0.as_ident_str())
+            .ok_or_else(|| format_err!("could not find entry function by {}", function))?;
+        ensure!(
+            func.generic_type_params.len() == type_arguments.len(),
+            "expect {} type arguments for entry function {}, but got {}",
+            func.generic_type_params.len(),
+            function,
+            type_arguments.len()
+        );
+
+        let args = self
+            .try_into_vm_values(func, arguments)?
+            .iter()
+            .map(bcs::to_bytes)
+            .collect::<Result<_, bcs::Error>>()?;
+        Ok(EntryFunction::new(
+            module.into(),
+            function.name.into(),
+            type_arguments
+                .into_iter()
+                .map(|v| v.try_into())
+                .collect::<Result<_>>()?,
+            args,
+        ))
     }
 }
 

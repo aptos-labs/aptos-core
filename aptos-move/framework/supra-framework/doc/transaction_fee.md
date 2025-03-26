@@ -460,7 +460,7 @@ Burns a specified fraction of the coin.
         <b>assume</b> burn_percentage * collected_amount &lt;= MAX_U64;
     };
     <b>let</b> amount_to_burn = (burn_percentage <b>as</b> u64) * collected_amount / 100;
-    <b>if</b> (amount_to_burn &gt; 0) {
+    <b>if</b> (amount_to_burn != 0) {
         <b>let</b> coin_to_burn = <a href="coin.md#0x1_coin_extract">coin::extract</a>(<a href="coin.md#0x1_coin">coin</a>, amount_to_burn);
         <a href="coin.md#0x1_coin_burn">coin::burn</a>(
             coin_to_burn,

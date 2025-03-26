@@ -1,7 +1,51 @@
+// Copyright (c) 2024 Supra.
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use move_core_types::account_address::AccountAddress;
+use std::fmt::Debug;
+
+/// Generic means to describe transaction payload type and reference based on referenced context.
+/// EF describes entry-function type in the particular context of its reference.
+/// MSF describes multisig payload type in the particular context of its reference.
+#[derive(Debug)]
+pub enum PayloadTypeReference<EFP: Debug, MSP: Debug> {
+    /// Indicates a transaction other than user txn with entry-function or multisig or automation payload.
+    Other,
+    /// Indicates user transaction with entry-function payload variant enclosing the payload.
+    UserEntryFunction(EFP),
+    /// Indicates user transaction with multisig payload variant enclosing the multi-sig payload.
+    Multisig(MSP),
+    /// Indicates user transaction with automation payload variant.
+    AutomationRegistration,
+}
+
+
+impl<EFP, MSP> PayloadTypeReference<EFP, MSP>
+where
+    EFP: Clone + Debug,
+    MSP: Clone + Debug,
+{
+    pub fn entry_function_payload(&self) -> Option<EFP> {
+        let PayloadTypeReference::UserEntryFunction(entry_function_payload) = self else {
+            return None;
+        };
+        Some(entry_function_payload.clone())
+    }
+
+    pub fn multisig_payload(&self) -> Option<MSP> {
+        let PayloadTypeReference::Multisig(multisig_payload) = self else {
+            return None;
+        };
+        Some(multisig_payload.clone())
+    }
+
+    pub fn is_automation_registration(&self) -> bool {
+        matches!(self, Self::AutomationRegistration)
+    }
+}
+
+pub type PayloadTypeReferenceContext = PayloadTypeReference<EntryFunctionPayload, MultisigPayload>;
 
 #[derive(Debug)]
 pub struct UserTransactionContext {
@@ -11,8 +55,7 @@ pub struct UserTransactionContext {
     max_gas_amount: u64,
     gas_unit_price: u64,
     chain_id: u8,
-    entry_function_payload: Option<EntryFunctionPayload>,
-    multisig_payload: Option<MultisigPayload>,
+    payload_type_reference: PayloadTypeReferenceContext,
 }
 
 impl UserTransactionContext {
@@ -23,8 +66,7 @@ impl UserTransactionContext {
         max_gas_amount: u64,
         gas_unit_price: u64,
         chain_id: u8,
-        entry_function_payload: Option<EntryFunctionPayload>,
-        multisig_payload: Option<MultisigPayload>,
+        payload_type_reference: PayloadTypeReferenceContext,
     ) -> Self {
         Self {
             sender,
@@ -33,8 +75,7 @@ impl UserTransactionContext {
             max_gas_amount,
             gas_unit_price,
             chain_id,
-            entry_function_payload,
-            multisig_payload,
+            payload_type_reference,
         }
     }
 
@@ -63,11 +104,15 @@ impl UserTransactionContext {
     }
 
     pub fn entry_function_payload(&self) -> Option<EntryFunctionPayload> {
-        self.entry_function_payload.clone()
+        self.payload_type_reference.entry_function_payload()
     }
 
     pub fn multisig_payload(&self) -> Option<MultisigPayload> {
-        self.multisig_payload.clone()
+        self.payload_type_reference.multisig_payload()
+    }
+
+    pub fn is_automation_registration(&self) -> bool {
+        self.payload_type_reference.is_automation_registration()
     }
 }
 

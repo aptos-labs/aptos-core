@@ -12,6 +12,7 @@ This is the reference documentation of the Supra standard library extension.
 ## Index
 
 
+-  [`0x1::enumerable_map`](enumerable_map.md#0x1_enumerable_map)
 -  [`0x1::eth_trie`](eth_trie.md#0x1_eth_trie)
 
 

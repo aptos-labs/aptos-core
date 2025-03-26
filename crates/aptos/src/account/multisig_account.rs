@@ -36,7 +36,7 @@ pub struct Create {
     /// Addresses of additional owners for the new multisig, beside the transaction sender.
     #[clap(long, num_args = 0.., value_parser = crate::common::types::load_account_arg)]
     pub(crate) additional_owners: Vec<AccountAddress>,
-	/// account level timeout_duration in seconds, all created Tx must be approved and 
+	/// account level timeout_duration in seconds, all created Tx must be approved and
 	/// executed before this timeout (from its creation) otherwise the Tx is marked for rejection
 	#[clap(long)]
 	pub(crate) timeout_duration: u64,
@@ -136,7 +136,7 @@ impl SupraCommand for Create {
             metadata_value,
             self.timeout_duration,
         );
-        
+
         Ok(
             SupraCommandArguments {
                 payload,

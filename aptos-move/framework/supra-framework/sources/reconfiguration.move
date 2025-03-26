@@ -6,13 +6,14 @@ module supra_framework::reconfiguration {
     use std::signer;
 
     use supra_framework::account;
+    use supra_framework::automation_registry;
+    use supra_framework::chain_status;
     use supra_framework::event;
+    use supra_framework::reconfiguration_state;
     use supra_framework::stake;
+    use supra_framework::storage_gas;
     use supra_framework::system_addresses;
     use supra_framework::timestamp;
-    use supra_framework::chain_status;
-    use supra_framework::reconfiguration_state;
-    use supra_framework::storage_gas;
     use supra_framework::transaction_fee;
 
     friend supra_framework::supra_governance;
@@ -72,7 +73,10 @@ module supra_framework::reconfiguration {
         system_addresses::assert_supra_framework(supra_framework);
 
         // assert it matches `new_epoch_event_key()`, otherwise the event can't be recognized
-        assert!(account::get_guid_next_creation_num(signer::address_of(supra_framework)) == 2, error::invalid_state(EINVALID_GUID_FOR_EVENT));
+        assert!(
+            account::get_guid_next_creation_num(signer::address_of(supra_framework)) == 2,
+            error::invalid_state(EINVALID_GUID_FOR_EVENT)
+        );
         move_to<Configuration>(
             supra_framework,
             Configuration {
@@ -155,6 +159,7 @@ module supra_framework::reconfiguration {
         spec {
             assume config_ref.epoch + 1 <= MAX_U64;
         };
+        automation_registry::on_new_epoch();
         config_ref.epoch = config_ref.epoch + 1;
 
         if (std::features::module_event_migration_enabled()) {
@@ -188,7 +193,10 @@ module supra_framework::reconfiguration {
     /// reconfiguration event.
     fun emit_genesis_reconfiguration_event() acquires Configuration {
         let config_ref = borrow_global_mut<Configuration>(@supra_framework);
-        assert!(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, error::invalid_state(ECONFIGURATION));
+        assert!(
+            config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0,
+            error::invalid_state(ECONFIGURATION)
+        );
         config_ref.epoch = 1;
         config_ref.last_reconfiguration_time = timestamp::now_microseconds();
 

@@ -24,7 +24,6 @@ This is the reference documentation of the Supra standard library.
 -  [`0x1::crypto_algebra`](crypto_algebra.md#0x1_crypto_algebra)
 -  [`0x1::debug`](debug.md#0x1_debug)
 -  [`0x1::ed25519`](ed25519.md#0x1_ed25519)
--  [`0x1::eth_trie`](eth_trie.md#0x1_eth_trie)
 -  [`0x1::fixed_point64`](fixed_point64.md#0x1_fixed_point64)
 -  [`0x1::from_bcs`](from_bcs.md#0x1_from_bcs)
 -  [`0x1::math128`](math128.md#0x1_math128)

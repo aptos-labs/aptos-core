@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Supra.
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
@@ -113,6 +114,7 @@ impl TransactionAnalysis {
 
         match txn {
             UserTransaction(signed_txn) => signed_txn.raw_txn_bytes_len(),
+            AutomatedTransaction(automated_txn) => automated_txn.raw_txn_bytes_len(),
             GenesisTransaction(_)
             | BlockMetadata(_)
             | BlockMetadataExt(_)

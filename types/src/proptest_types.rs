@@ -1,9 +1,11 @@
+// Copyright (c) 2024 Supra.
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::arc_with_non_send_sync)]
 
+use crate::transaction::automated_transaction::AutomatedTransaction;
 use crate::{
     account_address::{self, AccountAddress},
     account_config::{AccountResource, CoinStoreResource},
@@ -33,6 +35,7 @@ use crate::{
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
+use aptos_crypto::hash::CryptoHash;
 use aptos_crypto::{
     ed25519::{self, Ed25519PrivateKey, Ed25519PublicKey},
     test_utils::KeyPair,
@@ -388,6 +391,15 @@ fn new_raw_transaction(
             expiration_time_secs,
             chain_id,
         ),
+        TransactionPayload::AutomationRegistration(automation) => RawTransaction::new_automation(
+            sender,
+            sequence_number,
+            automation,
+            max_gas_amount,
+            gas_unit_price,
+            expiration_time_secs,
+            chain_id,
+        ),
     }
 }
 
@@ -476,6 +488,21 @@ impl Arbitrary for SignedTransaction {
     fn arbitrary_with(_args: ()) -> Self::Strategy {
         any::<SignatureCheckedTransaction>()
             .prop_map(|txn| txn.into_inner())
+            .boxed()
+    }
+}
+
+/// This `Arbitrary` impl only generates valid automated transactions.
+impl Arbitrary for AutomatedTransaction {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: ()) -> Self::Strategy {
+        any::<RawTransaction>()
+            .prop_map(|txn| {
+                let authenticator = txn.hash();
+                AutomatedTransaction::new(txn, authenticator, 1)
+            })
             .boxed()
     }
 }

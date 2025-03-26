@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Supra.
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
@@ -99,6 +100,12 @@ impl AptosDebugger {
             |gas_meter| {
                 let gas_profiler = match txn.payload() {
                     TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
+                    TransactionPayload::AutomationRegistration(auto_payload) => GasProfiler::new_function(
+                        gas_meter,
+                        auto_payload.module_id().clone(),
+                        auto_payload.function().to_owned(),
+                        auto_payload.ty_args(),
+                    ),
                     TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
                         gas_meter,
                         entry_func.module().clone(),

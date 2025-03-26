@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Supra.
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
@@ -24,10 +25,7 @@ use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
     LoadedFunction,
 };
-use move_vm_types::{
-    gas::{GasMeter, UnmeteredGasMeter},
-    loaded_data::runtime_types::Type,
-};
+use move_vm_types::{gas::GasMeter, loaded_data::runtime_types::Type};
 use once_cell::sync::Lazy;
 use std::{
     collections::BTreeMap,
@@ -41,10 +39,13 @@ pub(crate) struct FunctionId {
 
 type ConstructorMap = Lazy<BTreeMap<String, FunctionId>>;
 static OLD_ALLOWED_STRUCTS: ConstructorMap = Lazy::new(|| {
-    [("0x1::string::String", FunctionId {
-        module_id: ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("string"))),
-        func_name: ident_str!("utf8"),
-    })]
+    [(
+        "0x1::string::String",
+        FunctionId {
+            module_id: ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("string"))),
+            func_name: ident_str!("utf8"),
+        },
+    )]
     .into_iter()
     .map(|(s, validator)| (s.to_string(), validator))
     .collect()
@@ -52,32 +53,56 @@ static OLD_ALLOWED_STRUCTS: ConstructorMap = Lazy::new(|| {
 
 static NEW_ALLOWED_STRUCTS: ConstructorMap = Lazy::new(|| {
     [
-        ("0x1::string::String", FunctionId {
-            module_id: ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("string"))),
-            func_name: ident_str!("utf8"),
-        }),
-        ("0x1::object::Object", FunctionId {
-            module_id: ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("object"))),
-            func_name: ident_str!("address_to_object"),
-        }),
-        ("0x1::option::Option", FunctionId {
-            module_id: ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("option"))),
-            func_name: ident_str!("from_vec"),
-        }),
-        ("0x1::fixed_point32::FixedPoint32", FunctionId {
-            module_id: ModuleId::new(
-                AccountAddress::ONE,
-                Identifier::from(ident_str!("fixed_point32")),
-            ),
-            func_name: ident_str!("create_from_raw_value"),
-        }),
-        ("0x1::fixed_point64::FixedPoint64", FunctionId {
-            module_id: ModuleId::new(
-                AccountAddress::ONE,
-                Identifier::from(ident_str!("fixed_point64")),
-            ),
-            func_name: ident_str!("create_from_raw_value"),
-        }),
+        (
+            "0x1::string::String",
+            FunctionId {
+                module_id: ModuleId::new(
+                    AccountAddress::ONE,
+                    Identifier::from(ident_str!("string")),
+                ),
+                func_name: ident_str!("utf8"),
+            },
+        ),
+        (
+            "0x1::object::Object",
+            FunctionId {
+                module_id: ModuleId::new(
+                    AccountAddress::ONE,
+                    Identifier::from(ident_str!("object")),
+                ),
+                func_name: ident_str!("address_to_object"),
+            },
+        ),
+        (
+            "0x1::option::Option",
+            FunctionId {
+                module_id: ModuleId::new(
+                    AccountAddress::ONE,
+                    Identifier::from(ident_str!("option")),
+                ),
+                func_name: ident_str!("from_vec"),
+            },
+        ),
+        (
+            "0x1::fixed_point32::FixedPoint32",
+            FunctionId {
+                module_id: ModuleId::new(
+                    AccountAddress::ONE,
+                    Identifier::from(ident_str!("fixed_point32")),
+                ),
+                func_name: ident_str!("create_from_raw_value"),
+            },
+        ),
+        (
+            "0x1::fixed_point64::FixedPoint64",
+            FunctionId {
+                module_id: ModuleId::new(
+                    AccountAddress::ONE,
+                    Identifier::from(ident_str!("fixed_point64")),
+                ),
+                func_name: ident_str!("create_from_raw_value"),
+            },
+        ),
     ]
     .into_iter()
     .map(|(s, validator)| (s.to_string(), validator))
@@ -103,6 +128,7 @@ pub(crate) fn get_allowed_structs(
 /// after validation, add senders and non-signer arguments to generate the final args
 pub fn validate_combine_signer_and_txn_args(
     session: &mut SessionExt,
+    gas_meter: &mut impl GasMeter,
     senders: Vec<AccountAddress>,
     args: Vec<Vec<u8>>,
     func: &LoadedFunction,
@@ -173,6 +199,7 @@ pub fn validate_combine_signer_and_txn_args(
     // FAILED_TO_DESERIALIZE_ARGUMENT error.
     let args = construct_args(
         session,
+        gas_meter,
         &func.param_tys()[signer_param_cnt..],
         args,
         func.ty_args(),
@@ -219,14 +246,13 @@ pub(crate) fn is_valid_txn_arg(
 // TODO: This needs a more solid story and a tighter integration with the VM.
 pub(crate) fn construct_args(
     session: &mut SessionExt,
+    gas_meter: &mut impl GasMeter,
     types: &[Type],
     args: Vec<Vec<u8>>,
     ty_args: &[Type],
     allowed_structs: &ConstructorMap,
     is_view: bool,
 ) -> Result<Vec<Vec<u8>>, VMStatus> {
-    // Perhaps in a future we should do proper gas metering here
-    let mut gas_meter = UnmeteredGasMeter;
     let mut res_args = vec![];
     if types.len() != args.len() {
         return Err(invalid_signature());
@@ -241,7 +267,7 @@ pub(crate) fn construct_args(
             subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?
         };
 
-        let arg = construct_arg(session, &ty, allowed_structs, arg, &mut gas_meter, is_view)?;
+        let arg = construct_arg(session, &ty, allowed_structs, arg, gas_meter, is_view)?;
         res_args.push(arg);
     }
     Ok(res_args)

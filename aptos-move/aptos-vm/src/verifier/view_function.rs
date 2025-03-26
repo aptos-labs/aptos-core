@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Supra.
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,6 +10,7 @@ use aptos_framework::RuntimeModuleMetadataV1;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{identifier::IdentStr, vm_status::StatusCode};
 use move_vm_runtime::LoadedFunction;
+use move_vm_types::gas::UnmeteredGasMeter;
 
 /// Based on the function attributes in the module metadata, determine whether a
 /// function is a view function.
@@ -56,6 +58,7 @@ pub(crate) fn validate_view_function(
     let allowed_structs = get_allowed_structs(struct_constructors_feature);
     let args = transaction_arg_validation::construct_args(
         session,
+        &mut UnmeteredGasMeter,
         func.param_tys(),
         args,
         func.ty_args(),

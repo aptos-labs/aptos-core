@@ -1,5 +1,5 @@
-/// Defines feature flags for Aptos. Those are used in Aptos specific implementations of features in
-/// the Move stdlib, the Aptos stdlib, and the Aptos framework.
+/// Defines feature flags for Supra. Those are used in Supra specific implementations of features in
+/// the Move stdlib, the Supra stdlib, and the Supra framework.
 ///
 /// ============================================================================================
 /// Feature Flag Definitions
@@ -580,6 +580,18 @@ module std::features {
 
     public fun abort_if_multisig_payload_mismatch_enabled(): bool acquires Features {
         is_enabled(ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
+    }
+
+    /// Whether Supra native automation is enabled. Once enabled, the native automation feature can be utilized,
+    /// enabling automation task registration, execution and cancellation.
+    ///
+    /// Lifetime: transient
+    const SUPRA_NATIVE_AUTOMATION: u64 = 88;
+
+    public fun get_supra_native_automation_feature(): u64 { SUPRA_NATIVE_AUTOMATION }
+
+    public fun supra_native_automation_enabled(): bool acquires Features {
+        is_enabled(SUPRA_NATIVE_AUTOMATION)
     }
 
     // ============================================================================================

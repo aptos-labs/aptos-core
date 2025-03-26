@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Supra.
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
@@ -53,6 +54,7 @@ message Transaction {
     // values 5-19 skipped for no reason
     TRANSACTION_TYPE_VALIDATOR = 20;
     TRANSACTION_TYPE_BLOCK_EPILOGUE = 21;
+    TRANSACTION_TYPE_AUTOMATED = 22;
   }
 
   TransactionType type = 6;
@@ -66,6 +68,7 @@ message Transaction {
     ValidatorTransaction validator = 21;
     // value 22 is used up below (all Transaction fields have to have different index), so going to 23
     BlockEpilogueTransaction block_epilogue = 23;
+    AutomatedTransaction automated = 24;
   }
 
   TransactionSizeInfo size_info = 22;
@@ -158,6 +161,11 @@ message UserTransaction {
   repeated Event events = 2;
 }
 
+message AutomatedTransaction {
+  AutomatedTaskMeta meta = 1;
+  repeated Event events = 2;
+}
+
 message Event {
   EventKey key = 1;
   uint64 sequence_number = 2 [jstype = JS_STRING];
@@ -191,6 +199,16 @@ message UserTransactionRequest {
   aptos.util.timestamp.Timestamp expiration_timestamp_secs = 5;
   TransactionPayload payload = 6;
   Signature signature = 7;
+}
+
+message AutomatedTaskMeta {
+  string sender = 1;
+  uint64 index = 2 [jstype = JS_STRING];
+  uint64 max_gas_amount = 3 [jstype = JS_STRING];
+  uint64 gas_unit_price = 4 [jstype = JS_STRING];
+  aptos.util.timestamp.Timestamp expiration_timestamp_secs = 5;
+  TransactionPayload payload = 6;
+  bytes registration_hash = 7;
 }
 
 message WriteSet {
@@ -300,6 +318,7 @@ message TransactionPayload {
     TYPE_SCRIPT_PAYLOAD = 2;
     TYPE_WRITE_SET_PAYLOAD = 4;
     TYPE_MULTISIG_PAYLOAD = 5;
+    TYPE_AUTOMATION_PAYLOAD = 6;
     reserved 3;
   }
 
@@ -310,6 +329,7 @@ message TransactionPayload {
     ScriptPayload script_payload = 3;
     WriteSetPayload write_set_payload = 5;
     MultisigPayload multisig_payload = 6;
+    AutomationPayload automation_payload = 7;
   }
   reserved 4;
 }
@@ -348,6 +368,15 @@ message MultisigTransactionPayload {
   oneof payload {
     EntryFunctionPayload entry_function_payload = 2;
   }
+}
+
+message AutomationPayload {
+    EntryFunctionPayload automated_function = 1;
+    uint64 expiration_timestamp_secs = 2;
+    uint64 max_gas_amount = 3;
+    uint64 gas_price_cap = 4;
+    uint64 automation_fee_cap = 5;
+    repeated bytes aux_data = 6;
 }
 
 message MoveModuleBytecode {

@@ -113,7 +113,7 @@ use std::{
     fmt,
     str::FromStr,
 };
-use tiny_keccak::{Hasher, Sha3};
+use tiny_keccak::{Hasher, Sha3, Keccak};
 
 /// A prefix used to begin the salt of every hashable structure. The salt
 /// consists in this global prefix, concatenated with the specified
@@ -182,6 +182,15 @@ impl HashValue {
         HashValue::from_keccak(sha3)
     }
 
+    /// Convenience function that computes a `HashValue` internally equal to
+    /// the keccak_256 of a byte buffer. It will handle hasher creation, data
+    /// feeding and finalization.
+    pub fn keccak_256_of(buffer: &[u8]) -> Self {
+        let mut keccak = Keccak::v256();
+        keccak.update(buffer);
+        HashValue::from_keccak(keccak)
+    }
+
     #[cfg(test)]
     pub fn from_iter_sha3<'a, I>(buffers: I) -> Self
     where
@@ -198,7 +207,7 @@ impl HashValue {
         &mut self.hash[..]
     }
 
-    fn from_keccak(state: Sha3) -> Self {
+    fn from_keccak(state: impl Hasher) -> Self {
         let mut hash = Self::zero();
         state.finalize(hash.as_ref_mut());
         hash

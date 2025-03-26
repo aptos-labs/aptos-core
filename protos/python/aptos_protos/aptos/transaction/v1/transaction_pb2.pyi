@@ -91,6 +91,7 @@ class Transaction(_message.Message):
         "user",
         "validator",
         "block_epilogue",
+        "automated",
         "size_info",
     ]
 
@@ -103,6 +104,7 @@ class Transaction(_message.Message):
         TRANSACTION_TYPE_USER: _ClassVar[Transaction.TransactionType]
         TRANSACTION_TYPE_VALIDATOR: _ClassVar[Transaction.TransactionType]
         TRANSACTION_TYPE_BLOCK_EPILOGUE: _ClassVar[Transaction.TransactionType]
+        TRANSACTION_TYPE_AUTOMATED: _ClassVar[Transaction.TransactionType]
     TRANSACTION_TYPE_UNSPECIFIED: Transaction.TransactionType
     TRANSACTION_TYPE_GENESIS: Transaction.TransactionType
     TRANSACTION_TYPE_BLOCK_METADATA: Transaction.TransactionType
@@ -110,6 +112,7 @@ class Transaction(_message.Message):
     TRANSACTION_TYPE_USER: Transaction.TransactionType
     TRANSACTION_TYPE_VALIDATOR: Transaction.TransactionType
     TRANSACTION_TYPE_BLOCK_EPILOGUE: Transaction.TransactionType
+    TRANSACTION_TYPE_AUTOMATED: Transaction.TransactionType
     TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     VERSION_FIELD_NUMBER: _ClassVar[int]
     INFO_FIELD_NUMBER: _ClassVar[int]
@@ -122,6 +125,7 @@ class Transaction(_message.Message):
     USER_FIELD_NUMBER: _ClassVar[int]
     VALIDATOR_FIELD_NUMBER: _ClassVar[int]
     BLOCK_EPILOGUE_FIELD_NUMBER: _ClassVar[int]
+    AUTOMATED_FIELD_NUMBER: _ClassVar[int]
     SIZE_INFO_FIELD_NUMBER: _ClassVar[int]
     timestamp: _timestamp_pb2.Timestamp
     version: int
@@ -135,6 +139,7 @@ class Transaction(_message.Message):
     user: UserTransaction
     validator: ValidatorTransaction
     block_epilogue: BlockEpilogueTransaction
+    automated: AutomatedTransaction
     size_info: TransactionSizeInfo
     def __init__(
         self,
@@ -150,6 +155,7 @@ class Transaction(_message.Message):
         user: _Optional[_Union[UserTransaction, _Mapping]] = ...,
         validator: _Optional[_Union[ValidatorTransaction, _Mapping]] = ...,
         block_epilogue: _Optional[_Union[BlockEpilogueTransaction, _Mapping]] = ...,
+        automated: _Optional[_Union[AutomatedTransaction, _Mapping]] = ...,
         size_info: _Optional[_Union[TransactionSizeInfo, _Mapping]] = ...,
     ) -> None: ...
 
@@ -413,6 +419,18 @@ class UserTransaction(_message.Message):
         events: _Optional[_Iterable[_Union[Event, _Mapping]]] = ...,
     ) -> None: ...
 
+class AutomatedTransaction(_message.Message):
+    __slots__ = ["meta", "events"]
+    META_FIELD_NUMBER: _ClassVar[int]
+    EVENTS_FIELD_NUMBER: _ClassVar[int]
+    meta: AutomatedTaskMeta
+    events: _containers.RepeatedCompositeFieldContainer[Event]
+    def __init__(
+        self,
+        meta: _Optional[_Union[AutomatedTaskMeta, _Mapping]] = ...,
+        events: _Optional[_Iterable[_Union[Event, _Mapping]]] = ...,
+    ) -> None: ...
+
 class Event(_message.Message):
     __slots__ = ["key", "sequence_number", "type", "type_str", "data"]
     KEY_FIELD_NUMBER: _ClassVar[int]
@@ -524,6 +542,43 @@ class UserTransactionRequest(_message.Message):
         ] = ...,
         payload: _Optional[_Union[TransactionPayload, _Mapping]] = ...,
         signature: _Optional[_Union[Signature, _Mapping]] = ...,
+    ) -> None: ...
+
+class AutomatedTaskMeta(_message.Message):
+    __slots__ = [
+        "sender",
+        "index",
+        "max_gas_amount",
+        "gas_unit_price",
+        "expiration_timestamp_secs",
+        "payload",
+        "registration_hash",
+    ]
+    SENDER_FIELD_NUMBER: _ClassVar[int]
+    INDEX_FIELD_NUMBER: _ClassVar[int]
+    MAX_GAS_AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    GAS_UNIT_PRICE_FIELD_NUMBER: _ClassVar[int]
+    EXPIRATION_TIMESTAMP_SECS_FIELD_NUMBER: _ClassVar[int]
+    PAYLOAD_FIELD_NUMBER: _ClassVar[int]
+    REGISTRATION_HASH_FIELD_NUMBER: _ClassVar[int]
+    sender: str
+    index: int
+    max_gas_amount: int
+    gas_unit_price: int
+    expiration_timestamp_secs: _timestamp_pb2.Timestamp
+    payload: TransactionPayload
+    registration_hash: bytes
+    def __init__(
+        self,
+        sender: _Optional[str] = ...,
+        index: _Optional[int] = ...,
+        max_gas_amount: _Optional[int] = ...,
+        gas_unit_price: _Optional[int] = ...,
+        expiration_timestamp_secs: _Optional[
+            _Union[_timestamp_pb2.Timestamp, _Mapping]
+        ] = ...,
+        payload: _Optional[_Union[TransactionPayload, _Mapping]] = ...,
+        registration_hash: _Optional[bytes] = ...,
     ) -> None: ...
 
 class WriteSet(_message.Message):
@@ -766,6 +821,7 @@ class TransactionPayload(_message.Message):
         "script_payload",
         "write_set_payload",
         "multisig_payload",
+        "automation_payload",
     ]
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
@@ -775,21 +831,25 @@ class TransactionPayload(_message.Message):
         TYPE_SCRIPT_PAYLOAD: _ClassVar[TransactionPayload.Type]
         TYPE_WRITE_SET_PAYLOAD: _ClassVar[TransactionPayload.Type]
         TYPE_MULTISIG_PAYLOAD: _ClassVar[TransactionPayload.Type]
+        TYPE_AUTOMATION_PAYLOAD: _ClassVar[TransactionPayload.Type]
     TYPE_UNSPECIFIED: TransactionPayload.Type
     TYPE_ENTRY_FUNCTION_PAYLOAD: TransactionPayload.Type
     TYPE_SCRIPT_PAYLOAD: TransactionPayload.Type
     TYPE_WRITE_SET_PAYLOAD: TransactionPayload.Type
     TYPE_MULTISIG_PAYLOAD: TransactionPayload.Type
+    TYPE_AUTOMATION_PAYLOAD: TransactionPayload.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     ENTRY_FUNCTION_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     SCRIPT_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     WRITE_SET_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     MULTISIG_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
+    AUTOMATION_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     type: TransactionPayload.Type
     entry_function_payload: EntryFunctionPayload
     script_payload: ScriptPayload
     write_set_payload: WriteSetPayload
     multisig_payload: MultisigPayload
+    automation_payload: AutomationPayload
     def __init__(
         self,
         type: _Optional[_Union[TransactionPayload.Type, str]] = ...,
@@ -797,6 +857,7 @@ class TransactionPayload(_message.Message):
         script_payload: _Optional[_Union[ScriptPayload, _Mapping]] = ...,
         write_set_payload: _Optional[_Union[WriteSetPayload, _Mapping]] = ...,
         multisig_payload: _Optional[_Union[MultisigPayload, _Mapping]] = ...,
+        automation_payload: _Optional[_Union[AutomationPayload, _Mapping]] = ...,
     ) -> None: ...
 
 class EntryFunctionPayload(_message.Message):
@@ -875,6 +936,37 @@ class MultisigTransactionPayload(_message.Message):
         self,
         type: _Optional[_Union[MultisigTransactionPayload.Type, str]] = ...,
         entry_function_payload: _Optional[_Union[EntryFunctionPayload, _Mapping]] = ...,
+    ) -> None: ...
+
+class AutomationPayload(_message.Message):
+    __slots__ = [
+        "automated_function",
+        "expiration_timestamp_secs",
+        "max_gas_amount",
+        "gas_price_cap",
+        "automation_fee_cap",
+        "aux_data",
+    ]
+    AUTOMATED_FUNCTION_FIELD_NUMBER: _ClassVar[int]
+    EXPIRATION_TIMESTAMP_SECS_FIELD_NUMBER: _ClassVar[int]
+    MAX_GAS_AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    GAS_PRICE_CAP_FIELD_NUMBER: _ClassVar[int]
+    AUTOMATION_FEE_CAP_FIELD_NUMBER: _ClassVar[int]
+    AUX_DATA_FIELD_NUMBER: _ClassVar[int]
+    automated_function: EntryFunctionPayload
+    expiration_timestamp_secs: int
+    max_gas_amount: int
+    gas_price_cap: int
+    automation_fee_cap: int
+    aux_data: _containers.RepeatedScalarFieldContainer[bytes]
+    def __init__(
+        self,
+        automated_function: _Optional[_Union[EntryFunctionPayload, _Mapping]] = ...,
+        expiration_timestamp_secs: _Optional[int] = ...,
+        max_gas_amount: _Optional[int] = ...,
+        gas_price_cap: _Optional[int] = ...,
+        automation_fee_cap: _Optional[int] = ...,
+        aux_data: _Optional[_Iterable[bytes]] = ...,
     ) -> None: ...
 
 class MoveModuleBytecode(_message.Message):

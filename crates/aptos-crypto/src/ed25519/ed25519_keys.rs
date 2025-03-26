@@ -142,7 +142,7 @@ impl Ed25519PublicKey {
     pub fn aggregate(_pub_keys: Vec<&Ed25519PublicKey>) -> anyhow::Result<Self> {
         todo!()
     }
-    
+
     /// Derive the actual curve point represented by the public key.
     pub fn to_compressed_edwards_y(&self) -> CompressedEdwardsY {
         let bytes = self.to_bytes();

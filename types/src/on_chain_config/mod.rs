@@ -35,6 +35,7 @@ mod timed_features;
 mod timestamp;
 mod transaction_fee;
 mod validator_set;
+mod automation_registry;
 
 pub use self::{
     approved_execution_hashes::ApprovedExecutionHashes,
@@ -63,6 +64,7 @@ pub use self::{
     timestamp::CurrentTimeMicroseconds,
     transaction_fee::TransactionFeeBurnCap,
     validator_set::{ConsensusScheme, ValidatorSet},
+    automation_registry::{AutomationRegistryConfig, AutomationRegistryConfigV1}
 };
 
 /// To register an on-chain config in Rust:

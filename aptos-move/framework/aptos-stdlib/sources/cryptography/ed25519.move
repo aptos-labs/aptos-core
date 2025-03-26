@@ -21,7 +21,7 @@ module aptos_std::ed25519 {
     // Constants
     //
 
-    /// The identifier of the Ed25519 signature scheme, which is used when deriving Aptos authentication keys by hashing
+    /// The identifier of the Ed25519 signature scheme, which is used when deriving Supra authentication keys by hashing
     /// it together with an Ed25519 public key.
     const SIGNATURE_SCHEME_ID: u8 = 0;
 
@@ -156,17 +156,17 @@ module aptos_std::ed25519 {
         }
     }
 
-    /// Derives the Aptos-specific authentication key of the given Ed25519 public key.
+    /// Derives the Supra-specific authentication key of the given Ed25519 public key.
     public fun unvalidated_public_key_to_authentication_key(pk: &UnvalidatedPublicKey): vector<u8> {
         public_key_bytes_to_authentication_key(pk.bytes)
     }
 
-    /// Derives the Aptos-specific authentication key of the given Ed25519 public key.
+    /// Derives the Supra-specific authentication key of the given Ed25519 public key.
     public fun validated_public_key_to_authentication_key(pk: &ValidatedPublicKey): vector<u8> {
         public_key_bytes_to_authentication_key(pk.bytes)
     }
 
-    /// Derives the Aptos-specific authentication key of the given Ed25519 public key.
+    /// Derives the Supra-specific authentication key of the given Ed25519 public key.
     fun public_key_bytes_to_authentication_key(pk_bytes: vector<u8>): vector<u8> {
         std::vector::push_back(&mut pk_bytes, SIGNATURE_SCHEME_ID);
         std::hash::sha3_256(pk_bytes)

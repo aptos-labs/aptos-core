@@ -58,6 +58,7 @@ use std::{
     collections::BTreeSet,
     hash::{Hash, Hasher},
 };
+use aptos_types::on_chain_config::AutomationRegistryConfig;
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];
@@ -107,6 +108,7 @@ pub struct GenesisConfiguration {
     pub initial_features_override: Option<Features>,
     pub randomness_config_override: Option<OnChainRandomnessConfig>,
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
+    pub automation_registry_config: Option<AutomationRegistryConfig>
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -171,6 +173,7 @@ pub fn encode_supra_mainnet_genesis_transaction(
             .map(Features::into_flag_vec),
     );
     initialize_supra_coin(&mut session);
+    initialize_supra_native_automation(&mut session, genesis_config);
     initialize_on_chain_governance(&mut session, genesis_config);
     create_accounts(&mut session, accounts);
 
@@ -320,6 +323,7 @@ pub fn encode_genesis_change_set_for_testnet(
     } else {
         initialize_supra_coin(&mut session);
     }
+    initialize_supra_native_automation(&mut session, genesis_config);
     initialize_config_buffer(&mut session);
     initialize_dkg(&mut session);
     initialize_reconfiguration_state(&mut session);
@@ -555,6 +559,19 @@ fn initialize_supra_coin(session: &mut SessionExt) {
         "initialize_supra_coin",
         vec![],
         serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_supra_native_automation(session: &mut SessionExt, genesis_config: &GenesisConfiguration) {
+    let Some(config) = &genesis_config.automation_registry_config else {
+        return;
+    };
+    exec_function(
+        session,
+        GENESIS_MODULE_NAME,
+        "initialize_supra_native_automation",
+        vec![],
+        config.serialize_into_move_values_with_signer(CORE_CODE_ADDRESS),
     );
 }
 
@@ -1196,6 +1213,7 @@ pub fn generate_test_genesis(
             initial_features_override: None,
             randomness_config_override: None,
             jwk_consensus_config_override: None,
+            automation_registry_config: Some(AutomationRegistryConfig::default()),
         },
         &OnChainConsensusConfig::default_for_genesis(),
         &OnChainExecutionConfig::default_for_genesis(),
@@ -1261,6 +1279,7 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         initial_features_override: None,
         randomness_config_override: None,
         jwk_consensus_config_override: None,
+        automation_registry_config: Some(AutomationRegistryConfig::default()),
     }
 }
 
