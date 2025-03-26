@@ -47,7 +47,6 @@ members = [
     "aptos-move/script-composer",
     "aptos-move/vm-genesis",
     "aptos-node",
-    "aptos-utils",
     "config",
     "config/global-constants",
     "consensus",
@@ -457,7 +456,6 @@ aptos-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
 aptos-transaction-workloads-lib = { path = "crates/transaction-workloads-lib" }
 aptos-transactional-test-harness = { path = "aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "types" }
-aptos-utils = { path = "aptos-utils" }
 aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
 aptos-validator-transaction-pool = { path = "crates/validator-transaction-pool" }
 aptos-vault-client = { path = "secure/storage/vault" }
