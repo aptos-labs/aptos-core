@@ -1,12 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::extended_checks::ResourceGroupScope;
-use aptos_types::{
+use crate::{
     on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures},
     transaction::AbortInfo,
 };
-use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use lru::LruCache;
 use move_binary_format::{
     access::ModuleAccess,
@@ -23,10 +21,21 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
 };
-use move_model::metadata::{CompilationMetadata, COMPILATION_METADATA_KEY};
+use move_model::{
+    metadata::{CompilationMetadata, COMPILATION_METADATA_KEY},
+    model::StructEnv,
+};
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, collections::BTreeMap, env, sync::Arc};
+use std::{cell::RefCell, collections::BTreeMap, env, str::FromStr, sync::Arc};
 use thiserror::Error;
+
+pub mod prelude {
+    pub use crate::vm::module_metadata::{
+        get_compilation_metadata_from_compiled_module,
+        get_compilation_metadata_from_compiled_script, get_metadata_from_compiled_module,
+        get_metadata_from_compiled_script, RuntimeModuleMetadataV1,
+    };
+}
 
 /// The minimal file format version from which the V1 metadata is supported
 pub const METADATA_V1_MIN_FILE_FORMAT_VERSION: u32 = 6;
@@ -227,30 +236,8 @@ pub fn get_metadata_v0(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> 
     }
 }
 
-/// Extract metadata from the VM, upgrading V0 to V1 representation as needed
-pub fn get_vm_metadata(
-    module_storage: &impl AptosModuleStorage,
-    module_id: &ModuleId,
-) -> Option<Arc<RuntimeModuleMetadataV1>> {
-    let metadata = module_storage
-        .fetch_module_metadata(module_id.address(), module_id.name())
-        .ok()??;
-    get_metadata(&metadata)
-}
-
-/// Extract metadata from the VM, legacy V0 format upgraded to V1
-pub fn get_vm_metadata_v0(
-    module_storage: &impl AptosModuleStorage,
-    module_id: &ModuleId,
-) -> Option<Arc<RuntimeModuleMetadataV1>> {
-    let metadata = module_storage
-        .fetch_module_metadata(module_id.address(), module_id.name())
-        .ok()??;
-    get_metadata_v0(&metadata)
-}
-
 /// Check if the metadata has unknown key/data types
-pub fn check_metadata_format(
+fn check_metadata_format(
     module: &CompiledModule,
     features: &Features,
 ) -> Result<(), MalformedError> {
@@ -738,5 +725,119 @@ pub struct RandomnessAnnotation {
 impl RandomnessAnnotation {
     pub fn new(max_gas: Option<u64>) -> Self {
         Self { max_gas }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum ResourceGroupScope {
+    Global,
+    Address,
+    Module,
+}
+
+impl ResourceGroupScope {
+    pub fn is_less_strict(&self, other: &ResourceGroupScope) -> bool {
+        match self {
+            ResourceGroupScope::Global => other != self,
+            ResourceGroupScope::Address => other == &ResourceGroupScope::Module,
+            ResourceGroupScope::Module => false,
+        }
+    }
+
+    pub fn are_equal_envs(&self, resource: &StructEnv, group: &StructEnv) -> bool {
+        match self {
+            ResourceGroupScope::Global => true,
+            ResourceGroupScope::Address => {
+                resource.module_env.get_name().addr() == group.module_env.get_name().addr()
+            },
+            ResourceGroupScope::Module => {
+                resource.module_env.get_name() == group.module_env.get_name()
+            },
+        }
+    }
+
+    pub fn are_equal_module_ids(&self, resource: &ModuleId, group: &ModuleId) -> bool {
+        match self {
+            ResourceGroupScope::Global => true,
+            ResourceGroupScope::Address => resource.address() == group.address(),
+            ResourceGroupScope::Module => resource == group,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ResourceGroupScope::Global => "global",
+            ResourceGroupScope::Address => "address",
+            ResourceGroupScope::Module => "module_",
+        }
+    }
+}
+
+impl FromStr for ResourceGroupScope {
+    type Err = ResourceGroupScopeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "global" => Ok(ResourceGroupScope::Global),
+            "address" => Ok(ResourceGroupScope::Address),
+            "module_" => Ok(ResourceGroupScope::Module),
+            _ => Err(ResourceGroupScopeError(s.to_string())),
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+#[error("Invalid resource group scope: {0}")]
+pub struct ResourceGroupScopeError(String);
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_is_less_strict() {
+        let less_strict = [
+            (ResourceGroupScope::Global, ResourceGroupScope::Address),
+            (ResourceGroupScope::Global, ResourceGroupScope::Module),
+            (ResourceGroupScope::Address, ResourceGroupScope::Module),
+        ];
+        for (scope, other_scope) in less_strict {
+            assert!(scope.is_less_strict(&other_scope));
+        }
+
+        let more_or_as_strict = [
+            (ResourceGroupScope::Global, ResourceGroupScope::Global),
+            (ResourceGroupScope::Address, ResourceGroupScope::Global),
+            (ResourceGroupScope::Address, ResourceGroupScope::Address),
+            (ResourceGroupScope::Module, ResourceGroupScope::Global),
+            (ResourceGroupScope::Module, ResourceGroupScope::Address),
+            (ResourceGroupScope::Module, ResourceGroupScope::Module),
+        ];
+        for (scope, other_scope) in more_or_as_strict {
+            assert!(!scope.is_less_strict(&other_scope));
+        }
+    }
+
+    #[test]
+    fn test_are_equal_module_ids() {
+        let id = |s: &str| -> ModuleId { ModuleId::from_str(s).unwrap() };
+
+        let global_scope = ResourceGroupScope::Global;
+        assert!(global_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x1::foo")));
+        assert!(global_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x1::bar")));
+        assert!(global_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x2::foo")));
+        assert!(global_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x2::bar")));
+
+        let address_scope = ResourceGroupScope::Address;
+        assert!(address_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x1::foo")));
+        assert!(address_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x1::bar")));
+        assert!(!address_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x2::foo")));
+        assert!(!address_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x2::bar")));
+
+        let module_scope = ResourceGroupScope::Module;
+        assert!(module_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x1::foo")));
+        assert!(!module_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x1::bar")));
+        assert!(!module_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x2::foo")));
+        assert!(!module_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x2::bar")));
     }
 }
