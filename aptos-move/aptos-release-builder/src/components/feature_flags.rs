@@ -141,7 +141,6 @@ pub enum FeatureFlag {
     BulletproofsBatchNatives,
     DomainAccountAbstraction,
     EnableFunctionValues,
-    NewAccountsDefaultToFaStore,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -374,9 +373,6 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::BulletproofsBatchNatives => AptosFeatureFlag::BULLETPROOFS_BATCH_NATIVES,
             FeatureFlag::DomainAccountAbstraction => AptosFeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION,
             FeatureFlag::EnableFunctionValues => AptosFeatureFlag::ENABLE_FUNCTION_VALUES,
-            FeatureFlag::NewAccountsDefaultToFaStore => {
-                AptosFeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE
-            },
         }
     }
 }
@@ -536,9 +532,6 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::BULLETPROOFS_BATCH_NATIVES => FeatureFlag::BulletproofsBatchNatives,
             AptosFeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION => FeatureFlag::DomainAccountAbstraction,
             AptosFeatureFlag::ENABLE_FUNCTION_VALUES => FeatureFlag::EnableFunctionValues,
-            AptosFeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE => {
-                FeatureFlag::NewAccountsDefaultToFaStore
-            },
         }
     }
 }

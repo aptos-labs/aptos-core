@@ -665,16 +665,6 @@ module std::features {
     /// We do not expect use from Move, so for now only for documentation purposes here
     const ENABLE_FUNCTION_VALUES: u64 = 89;
 
-    /// Whether new accounts default to the Fungible Asset store.
-    /// Lifetime: transient
-    const NEW_ACCOUNTS_DEFAULT_TO_FA_STORE: u64 = 90;
-
-    public fun get_new_accounts_default_to_fa_store_feature(): u64 { NEW_ACCOUNTS_DEFAULT_TO_FA_STORE }
-
-    public fun new_accounts_default_to_fa_store_enabled(): bool acquires Features {
-        is_enabled(NEW_ACCOUNTS_DEFAULT_TO_FA_STORE)
-    }
-
 
     // ============================================================================================
     // Feature Flag Implementation
