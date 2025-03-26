@@ -33,7 +33,10 @@ use rand::Rng;
 use std::{fmt::Debug, sync::Arc};
 use test_case::test_case;
 
-pub(crate) fn get_gas_limit_variants(use_gas_limit: bool, transaction_count: usize) -> Vec<Option<u64>> {
+pub(crate) fn get_gas_limit_variants(
+    use_gas_limit: bool,
+    transaction_count: usize,
+) -> Vec<Option<u64>> {
     if use_gas_limit {
         vec![
             Some(rand::thread_rng().gen_range(0, (transaction_count as u64) * MAX_GAS_PER_TXN / 2)),
@@ -120,55 +123,52 @@ fn run_transactions_resources(
     num_random_generations: usize,
 ) {
     let executor_thread_pool = create_executor_thread_pool();
-    let gas_limits = get_gas_limit_variants(use_gas_limit, transaction_count);
-
-    // Create a TestRunner
     let mut runner = TestRunner::default();
 
-    // Run the test cases directly
-    for _ in 0..num_random_generations {
-        // Generate universe and transactions
-        let (universe, transaction_gen) = generate_universe_and_transactions(
-            &mut runner,
-            universe_size,
-            transaction_count,
-            is_dynamic,
-        );
+    let gas_limits = get_gas_limit_variants(use_gas_limit, transaction_count);
+    for maybe_block_gas_limit in gas_limits {
+        // Run the test cases directly
+        for _ in 0..num_random_generations {
+            // Generate universe and transactions
+            let (universe, transaction_gen) = generate_universe_and_transactions(
+                &mut runner,
+                universe_size,
+                transaction_count,
+                is_dynamic,
+            );
 
-        // Generate abort and skip_rest transaction indices
-        let abort_strategy = vec(any::<Index>(), abort_count);
-        let skip_rest_strategy = vec(any::<Index>(), skip_rest_count);
+            // Generate abort and skip_rest transaction indices
+            let abort_strategy = vec(any::<Index>(), abort_count);
+            let skip_rest_strategy = vec(any::<Index>(), skip_rest_count);
 
-        let abort_transactions = abort_strategy
-            .new_tree(&mut runner)
-            .expect("creating abort transactions should succeed")
-            .current();
+            let abort_transactions = abort_strategy
+                .new_tree(&mut runner)
+                .expect("creating abort transactions should succeed")
+                .current();
 
-        let skip_rest_transactions = skip_rest_strategy
-            .new_tree(&mut runner)
-            .expect("creating skip_rest transactions should succeed")
-            .current();
+            let skip_rest_transactions = skip_rest_strategy
+                .new_tree(&mut runner)
+                .expect("creating skip_rest transactions should succeed")
+                .current();
 
-        // Create transactions
-        let mut transactions: Vec<MockTransaction<KeyType<[u8; 32]>, MockEvent>> = transaction_gen
-            .into_iter()
-            .map(|txn_gen| txn_gen.materialize(&universe))
-            .collect();
+            // Create transactions
+            let mut transactions: Vec<MockTransaction<KeyType<[u8; 32]>, MockEvent>> =
+                transaction_gen
+                    .into_iter()
+                    .map(|txn_gen| txn_gen.materialize(&universe))
+                    .collect();
 
-        // Apply modifications to transactions
-        let length = transactions.len();
-        for i in abort_transactions {
-            *transactions.get_mut(i.index(length)).unwrap() = MockTransaction::Abort;
-        }
-        for i in skip_rest_transactions {
-            *transactions.get_mut(i.index(length)).unwrap() = MockTransaction::SkipRest(0);
-        }
+            // Apply modifications to transactions
+            let length = transactions.len();
+            for i in abort_transactions {
+                *transactions.get_mut(i.index(length)).unwrap() = MockTransaction::Abort;
+            }
+            for i in skip_rest_transactions {
+                *transactions.get_mut(i.index(length)).unwrap() = MockTransaction::SkipRest(0);
+            }
 
-        let txn_provider = DefaultTxnProvider::new(transactions);
-        let state_view = MockStateView::empty();
-
-        // Execute transactions with different gas limits
-        for maybe_block_gas_limit in &gas_limits {
+            let txn_provider = DefaultTxnProvider::new(transactions);
+            let state_view = MockStateView::empty();
             for _ in 0..num_executions {
                 let output = execute_block_parallel::<
                     MockTransaction<KeyType<[u8; 32]>, MockEvent>,
@@ -176,13 +176,13 @@ fn run_transactions_resources(
                     DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
                 >(
                     executor_thread_pool.clone(),
-                    *maybe_block_gas_limit,
+                    maybe_block_gas_limit,
                     block_stm_v2,
                     &txn_provider,
                     &state_view,
                 );
 
-                BaselineOutput::generate(txn_provider.get_txns(), *maybe_block_gas_limit)
+                BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)
                     .assert_parallel_output(&output);
             }
         }

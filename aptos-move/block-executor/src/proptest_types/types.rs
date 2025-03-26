@@ -843,34 +843,47 @@ where
                 let read_group_size_or_metadata = behavior
                     .group_queries
                     .iter()
-                    .map(|(group_key, query_metadata)| {
+                    .flat_map(|(group_key, query_metadata)| {
                         let res = if *query_metadata {
                             GroupSizeOrMetadata::Metadata(
-                                view.get_resource_state_value_metadata(group_key)
-                                    .expect("Group must exist and size computation must succeed"),
+                                match view.get_resource_state_value_metadata(group_key) {
+                                    Ok(v) => v,
+                                    Err(_) => return None,
+                                }
                             )
                         } else {
                             GroupSizeOrMetadata::Size(
-                                view.resource_group_size(group_key)
-                                    .expect("Group must exist and size computation must succeed")
-                                    .get(),
+                                match view.resource_group_size(group_key) {
+                                    Ok(v) => v.get(),
+                                    Err(_) => return None,
+                                }
                             )
                         };
 
-                        (group_key.clone(), res)
+                        Some((group_key.clone(), res))
                     })
                     .collect();
 
                 let mut group_writes = vec![];
                 for (key, metadata, inner_ops) in behavior.group_writes.iter() {
                     let mut new_inner_ops = HashMap::new();
-                    let group_size = view.resource_group_size(key).unwrap();
-                    let mut new_group_size = view.resource_group_size(key).unwrap();
+
+                    let mut new_group_size = match view.resource_group_size(key) {
+                        Ok(size) => size,
+                        Err(_) => break,
+                    };
+                    let group_size = new_group_size.clone();
+
+                    let mut speculative_abort = false;
                     for (tag, inner_op) in inner_ops.iter() {
-                        let exists = view
-                            .get_resource_from_group(key, tag, None)
-                            .unwrap()
-                            .is_some();
+                        let exists = match view
+                            .get_resource_from_group(key, tag, None) {
+                                Ok(v) => v.is_some(),
+                                Err(_) => {
+                                    speculative_abort = true;
+                                    break;
+                                }
+                            };
                         assert!(
                             *tag != RESERVED_TAG || exists,
                             "RESERVED_TAG must always be present in groups in tests"
@@ -935,6 +948,10 @@ where
 
                             new_inner_ops.insert(*tag, new_inner_op);
                         }
+                    }
+
+                    if speculative_abort {
+                        break;
                     }
 
                     if !new_inner_ops.is_empty() {

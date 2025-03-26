@@ -34,10 +34,7 @@ use std::{
     collections::{
         hash_map::Entry::{self, Occupied, Vacant},
         BTreeMap, BTreeSet, HashMap, HashSet,
-    },
-    hash::Hash,
-    ops::Deref,
-    sync::Arc,
+    }, hash::Hash, ops::Deref, sync::Arc
 };
 
 /// The enum variants should not be re-ordered, as it defines a relation
@@ -793,7 +790,7 @@ where
         self.group_reads.iter().all(|(key, group)| {
             let mut ret = true;
             if let Some(size) = group.collected_size {
-                ret &= group_map.validate_group_size(key, idx_to_validate, size);
+                ret = group_map.validate_group_size(key, idx_to_validate, size);
             }
 
             ret && group.inner_reads.iter().all(|(tag, r)| {
@@ -815,7 +812,10 @@ where
                             DataReadComparison::Contains
                         )
                     },
-                    Err(Dependency(_)) => false,
+                    Err(Dependency(_)) => {
+                        // panic!("Dependency {}", idx_to_validate);
+                        false
+                    }
                     Err(Uninitialized) => {
                         unreachable!("May not be uninitialized if captured for validation");
                     },
