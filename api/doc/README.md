@@ -36,7 +36,7 @@ Complete OpenAPI specification is available at `/api/v1/spec`
 
 ## Support
 - [GitHub Issues](https://github.com/aptos-labs/aptos-core/issues)
-- [Discord](https://discord.gg/aptoslabs)
+- [Discord](https://discord.gg/aptosnetwork)
 - [Aptos Documentation](https://aptos.dev)
 
 ## Contributing
