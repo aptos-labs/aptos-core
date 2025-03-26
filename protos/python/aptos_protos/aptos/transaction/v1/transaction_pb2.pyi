@@ -13,7 +13,7 @@ from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class MoveTypes(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-    __slots__ = []
+    __slots__ = ()
     MOVE_TYPES_UNSPECIFIED: _ClassVar[MoveTypes]
     MOVE_TYPES_BOOL: _ClassVar[MoveTypes]
     MOVE_TYPES_U8: _ClassVar[MoveTypes]
@@ -31,7 +31,7 @@ class MoveTypes(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     MOVE_TYPES_UNPARSABLE: _ClassVar[MoveTypes]
 
 class MoveAbility(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-    __slots__ = []
+    __slots__ = ()
     MOVE_ABILITY_UNSPECIFIED: _ClassVar[MoveAbility]
     MOVE_ABILITY_COPY: _ClassVar[MoveAbility]
     MOVE_ABILITY_DROP: _ClassVar[MoveAbility]
@@ -60,7 +60,7 @@ MOVE_ABILITY_STORE: MoveAbility
 MOVE_ABILITY_KEY: MoveAbility
 
 class Block(_message.Message):
-    __slots__ = ["timestamp", "height", "transactions", "chain_id"]
+    __slots__ = ("timestamp", "height", "transactions", "chain_id")
     TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     HEIGHT_FIELD_NUMBER: _ClassVar[int]
     TRANSACTIONS_FIELD_NUMBER: _ClassVar[int]
@@ -78,7 +78,7 @@ class Block(_message.Message):
     ) -> None: ...
 
 class Transaction(_message.Message):
-    __slots__ = [
+    __slots__ = (
         "timestamp",
         "version",
         "info",
@@ -92,10 +92,10 @@ class Transaction(_message.Message):
         "validator",
         "block_epilogue",
         "size_info",
-    ]
+    )
 
     class TransactionType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-        __slots__ = []
+        __slots__ = ()
         TRANSACTION_TYPE_UNSPECIFIED: _ClassVar[Transaction.TransactionType]
         TRANSACTION_TYPE_GENESIS: _ClassVar[Transaction.TransactionType]
         TRANSACTION_TYPE_BLOCK_METADATA: _ClassVar[Transaction.TransactionType]
@@ -154,14 +154,14 @@ class Transaction(_message.Message):
     ) -> None: ...
 
 class BlockMetadataTransaction(_message.Message):
-    __slots__ = [
+    __slots__ = (
         "id",
         "round",
         "events",
         "previous_block_votes_bitvec",
         "proposer",
         "failed_proposer_indices",
-    ]
+    )
     ID_FIELD_NUMBER: _ClassVar[int]
     ROUND_FIELD_NUMBER: _ClassVar[int]
     EVENTS_FIELD_NUMBER: _ClassVar[int]
@@ -185,7 +185,7 @@ class BlockMetadataTransaction(_message.Message):
     ) -> None: ...
 
 class GenesisTransaction(_message.Message):
-    __slots__ = ["payload", "events"]
+    __slots__ = ("payload", "events")
     PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     EVENTS_FIELD_NUMBER: _ClassVar[int]
     payload: WriteSet
@@ -197,23 +197,23 @@ class GenesisTransaction(_message.Message):
     ) -> None: ...
 
 class StateCheckpointTransaction(_message.Message):
-    __slots__ = []
+    __slots__ = ()
     def __init__(self) -> None: ...
 
 class ValidatorTransaction(_message.Message):
-    __slots__ = ["observed_jwk_update", "dkg_update", "events"]
+    __slots__ = ("observed_jwk_update", "dkg_update", "events")
 
     class ObservedJwkUpdate(_message.Message):
-        __slots__ = ["quorum_certified_update"]
+        __slots__ = ("quorum_certified_update",)
 
         class ExportedProviderJWKs(_message.Message):
-            __slots__ = ["issuer", "version", "jwks"]
+            __slots__ = ("issuer", "version", "jwks")
 
             class JWK(_message.Message):
-                __slots__ = ["unsupported_jwk", "rsa"]
+                __slots__ = ("unsupported_jwk", "rsa")
 
                 class RSA(_message.Message):
-                    __slots__ = ["kid", "kty", "alg", "e", "n"]
+                    __slots__ = ("kid", "kty", "alg", "e", "n")
                     KID_FIELD_NUMBER: _ClassVar[int]
                     KTY_FIELD_NUMBER: _ClassVar[int]
                     ALG_FIELD_NUMBER: _ClassVar[int]
@@ -234,7 +234,7 @@ class ValidatorTransaction(_message.Message):
                     ) -> None: ...
 
                 class UnsupportedJWK(_message.Message):
-                    __slots__ = ["id", "payload"]
+                    __slots__ = ("id", "payload")
                     ID_FIELD_NUMBER: _ClassVar[int]
                     PAYLOAD_FIELD_NUMBER: _ClassVar[int]
                     id: bytes
@@ -286,7 +286,7 @@ class ValidatorTransaction(_message.Message):
             ) -> None: ...
 
         class ExportedAggregateSignature(_message.Message):
-            __slots__ = ["signer_indices", "sig"]
+            __slots__ = ("signer_indices", "sig")
             SIGNER_INDICES_FIELD_NUMBER: _ClassVar[int]
             SIG_FIELD_NUMBER: _ClassVar[int]
             signer_indices: _containers.RepeatedScalarFieldContainer[int]
@@ -298,7 +298,7 @@ class ValidatorTransaction(_message.Message):
             ) -> None: ...
 
         class QuorumCertifiedUpdate(_message.Message):
-            __slots__ = ["update", "multi_sig"]
+            __slots__ = ("update", "multi_sig")
             UPDATE_FIELD_NUMBER: _ClassVar[int]
             MULTI_SIG_FIELD_NUMBER: _ClassVar[int]
             update: ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs
@@ -331,10 +331,10 @@ class ValidatorTransaction(_message.Message):
         ) -> None: ...
 
     class DkgUpdate(_message.Message):
-        __slots__ = ["dkg_transcript"]
+        __slots__ = ("dkg_transcript",)
 
         class DkgTranscript(_message.Message):
-            __slots__ = ["epoch", "author", "payload"]
+            __slots__ = ("epoch", "author", "payload")
             EPOCH_FIELD_NUMBER: _ClassVar[int]
             AUTHOR_FIELD_NUMBER: _ClassVar[int]
             PAYLOAD_FIELD_NUMBER: _ClassVar[int]
@@ -371,7 +371,7 @@ class ValidatorTransaction(_message.Message):
     ) -> None: ...
 
 class BlockEpilogueTransaction(_message.Message):
-    __slots__ = ["block_end_info"]
+    __slots__ = ("block_end_info",)
     BLOCK_END_INFO_FIELD_NUMBER: _ClassVar[int]
     block_end_info: BlockEndInfo
     def __init__(
@@ -379,12 +379,12 @@ class BlockEpilogueTransaction(_message.Message):
     ) -> None: ...
 
 class BlockEndInfo(_message.Message):
-    __slots__ = [
+    __slots__ = (
         "block_gas_limit_reached",
         "block_output_limit_reached",
         "block_effective_block_gas_units",
         "block_approx_output_size",
-    ]
+    )
     BLOCK_GAS_LIMIT_REACHED_FIELD_NUMBER: _ClassVar[int]
     BLOCK_OUTPUT_LIMIT_REACHED_FIELD_NUMBER: _ClassVar[int]
     BLOCK_EFFECTIVE_BLOCK_GAS_UNITS_FIELD_NUMBER: _ClassVar[int]
@@ -402,7 +402,7 @@ class BlockEndInfo(_message.Message):
     ) -> None: ...
 
 class UserTransaction(_message.Message):
-    __slots__ = ["request", "events"]
+    __slots__ = ("request", "events")
     REQUEST_FIELD_NUMBER: _ClassVar[int]
     EVENTS_FIELD_NUMBER: _ClassVar[int]
     request: UserTransactionRequest
@@ -414,7 +414,7 @@ class UserTransaction(_message.Message):
     ) -> None: ...
 
 class Event(_message.Message):
-    __slots__ = ["key", "sequence_number", "type", "type_str", "data"]
+    __slots__ = ("key", "sequence_number", "type", "type_str", "data")
     KEY_FIELD_NUMBER: _ClassVar[int]
     SEQUENCE_NUMBER_FIELD_NUMBER: _ClassVar[int]
     TYPE_FIELD_NUMBER: _ClassVar[int]
@@ -435,7 +435,7 @@ class Event(_message.Message):
     ) -> None: ...
 
 class TransactionInfo(_message.Message):
-    __slots__ = [
+    __slots__ = (
         "hash",
         "state_change_hash",
         "event_root_hash",
@@ -445,7 +445,7 @@ class TransactionInfo(_message.Message):
         "vm_status",
         "accumulator_root_hash",
         "changes",
-    ]
+    )
     HASH_FIELD_NUMBER: _ClassVar[int]
     STATE_CHANGE_HASH_FIELD_NUMBER: _ClassVar[int]
     EVENT_ROOT_HASH_FIELD_NUMBER: _ClassVar[int]
@@ -478,7 +478,7 @@ class TransactionInfo(_message.Message):
     ) -> None: ...
 
 class EventKey(_message.Message):
-    __slots__ = ["creation_number", "account_address"]
+    __slots__ = ("creation_number", "account_address")
     CREATION_NUMBER_FIELD_NUMBER: _ClassVar[int]
     ACCOUNT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
     creation_number: int
@@ -490,7 +490,7 @@ class EventKey(_message.Message):
     ) -> None: ...
 
 class UserTransactionRequest(_message.Message):
-    __slots__ = [
+    __slots__ = (
         "sender",
         "sequence_number",
         "max_gas_amount",
@@ -498,7 +498,7 @@ class UserTransactionRequest(_message.Message):
         "expiration_timestamp_secs",
         "payload",
         "signature",
-    ]
+    )
     SENDER_FIELD_NUMBER: _ClassVar[int]
     SEQUENCE_NUMBER_FIELD_NUMBER: _ClassVar[int]
     MAX_GAS_AMOUNT_FIELD_NUMBER: _ClassVar[int]
@@ -527,10 +527,10 @@ class UserTransactionRequest(_message.Message):
     ) -> None: ...
 
 class WriteSet(_message.Message):
-    __slots__ = ["write_set_type", "script_write_set", "direct_write_set"]
+    __slots__ = ("write_set_type", "script_write_set", "direct_write_set")
 
     class WriteSetType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-        __slots__ = []
+        __slots__ = ()
         WRITE_SET_TYPE_UNSPECIFIED: _ClassVar[WriteSet.WriteSetType]
         WRITE_SET_TYPE_SCRIPT_WRITE_SET: _ClassVar[WriteSet.WriteSetType]
         WRITE_SET_TYPE_DIRECT_WRITE_SET: _ClassVar[WriteSet.WriteSetType]
@@ -551,7 +551,7 @@ class WriteSet(_message.Message):
     ) -> None: ...
 
 class ScriptWriteSet(_message.Message):
-    __slots__ = ["execute_as", "script"]
+    __slots__ = ("execute_as", "script")
     EXECUTE_AS_FIELD_NUMBER: _ClassVar[int]
     SCRIPT_FIELD_NUMBER: _ClassVar[int]
     execute_as: str
@@ -563,7 +563,7 @@ class ScriptWriteSet(_message.Message):
     ) -> None: ...
 
 class DirectWriteSet(_message.Message):
-    __slots__ = ["write_set_change", "events"]
+    __slots__ = ("write_set_change", "events")
     WRITE_SET_CHANGE_FIELD_NUMBER: _ClassVar[int]
     EVENTS_FIELD_NUMBER: _ClassVar[int]
     write_set_change: _containers.RepeatedCompositeFieldContainer[WriteSetChange]
@@ -575,7 +575,7 @@ class DirectWriteSet(_message.Message):
     ) -> None: ...
 
 class WriteSetChange(_message.Message):
-    __slots__ = [
+    __slots__ = (
         "type",
         "delete_module",
         "delete_resource",
@@ -583,10 +583,10 @@ class WriteSetChange(_message.Message):
         "write_module",
         "write_resource",
         "write_table_item",
-    ]
+    )
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-        __slots__ = []
+        __slots__ = ()
         TYPE_UNSPECIFIED: _ClassVar[WriteSetChange.Type]
         TYPE_DELETE_MODULE: _ClassVar[WriteSetChange.Type]
         TYPE_DELETE_RESOURCE: _ClassVar[WriteSetChange.Type]
@@ -627,7 +627,7 @@ class WriteSetChange(_message.Message):
     ) -> None: ...
 
 class DeleteModule(_message.Message):
-    __slots__ = ["address", "state_key_hash", "module"]
+    __slots__ = ("address", "state_key_hash", "module")
     ADDRESS_FIELD_NUMBER: _ClassVar[int]
     STATE_KEY_HASH_FIELD_NUMBER: _ClassVar[int]
     MODULE_FIELD_NUMBER: _ClassVar[int]
@@ -642,7 +642,7 @@ class DeleteModule(_message.Message):
     ) -> None: ...
 
 class DeleteResource(_message.Message):
-    __slots__ = ["address", "state_key_hash", "type", "type_str"]
+    __slots__ = ("address", "state_key_hash", "type", "type_str")
     ADDRESS_FIELD_NUMBER: _ClassVar[int]
     STATE_KEY_HASH_FIELD_NUMBER: _ClassVar[int]
     TYPE_FIELD_NUMBER: _ClassVar[int]
@@ -660,7 +660,7 @@ class DeleteResource(_message.Message):
     ) -> None: ...
 
 class DeleteTableItem(_message.Message):
-    __slots__ = ["state_key_hash", "handle", "key", "data"]
+    __slots__ = ("state_key_hash", "handle", "key", "data")
     STATE_KEY_HASH_FIELD_NUMBER: _ClassVar[int]
     HANDLE_FIELD_NUMBER: _ClassVar[int]
     KEY_FIELD_NUMBER: _ClassVar[int]
@@ -678,7 +678,7 @@ class DeleteTableItem(_message.Message):
     ) -> None: ...
 
 class DeleteTableData(_message.Message):
-    __slots__ = ["key", "key_type"]
+    __slots__ = ("key", "key_type")
     KEY_FIELD_NUMBER: _ClassVar[int]
     KEY_TYPE_FIELD_NUMBER: _ClassVar[int]
     key: str
@@ -688,7 +688,7 @@ class DeleteTableData(_message.Message):
     ) -> None: ...
 
 class WriteModule(_message.Message):
-    __slots__ = ["address", "state_key_hash", "data"]
+    __slots__ = ("address", "state_key_hash", "data")
     ADDRESS_FIELD_NUMBER: _ClassVar[int]
     STATE_KEY_HASH_FIELD_NUMBER: _ClassVar[int]
     DATA_FIELD_NUMBER: _ClassVar[int]
@@ -703,7 +703,7 @@ class WriteModule(_message.Message):
     ) -> None: ...
 
 class WriteResource(_message.Message):
-    __slots__ = ["address", "state_key_hash", "type", "type_str", "data"]
+    __slots__ = ("address", "state_key_hash", "type", "type_str", "data")
     ADDRESS_FIELD_NUMBER: _ClassVar[int]
     STATE_KEY_HASH_FIELD_NUMBER: _ClassVar[int]
     TYPE_FIELD_NUMBER: _ClassVar[int]
@@ -724,7 +724,7 @@ class WriteResource(_message.Message):
     ) -> None: ...
 
 class WriteTableData(_message.Message):
-    __slots__ = ["key", "key_type", "value", "value_type"]
+    __slots__ = ("key", "key_type", "value", "value_type")
     KEY_FIELD_NUMBER: _ClassVar[int]
     KEY_TYPE_FIELD_NUMBER: _ClassVar[int]
     VALUE_FIELD_NUMBER: _ClassVar[int]
@@ -742,7 +742,7 @@ class WriteTableData(_message.Message):
     ) -> None: ...
 
 class WriteTableItem(_message.Message):
-    __slots__ = ["state_key_hash", "handle", "key", "data"]
+    __slots__ = ("state_key_hash", "handle", "key", "data")
     STATE_KEY_HASH_FIELD_NUMBER: _ClassVar[int]
     HANDLE_FIELD_NUMBER: _ClassVar[int]
     KEY_FIELD_NUMBER: _ClassVar[int]
@@ -760,16 +760,16 @@ class WriteTableItem(_message.Message):
     ) -> None: ...
 
 class TransactionPayload(_message.Message):
-    __slots__ = [
+    __slots__ = (
         "type",
         "entry_function_payload",
         "script_payload",
         "write_set_payload",
         "multisig_payload",
-    ]
+    )
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-        __slots__ = []
+        __slots__ = ()
         TYPE_UNSPECIFIED: _ClassVar[TransactionPayload.Type]
         TYPE_ENTRY_FUNCTION_PAYLOAD: _ClassVar[TransactionPayload.Type]
         TYPE_SCRIPT_PAYLOAD: _ClassVar[TransactionPayload.Type]
@@ -800,7 +800,7 @@ class TransactionPayload(_message.Message):
     ) -> None: ...
 
 class EntryFunctionPayload(_message.Message):
-    __slots__ = ["function", "type_arguments", "arguments", "entry_function_id_str"]
+    __slots__ = ("function", "type_arguments", "arguments", "entry_function_id_str")
     FUNCTION_FIELD_NUMBER: _ClassVar[int]
     TYPE_ARGUMENTS_FIELD_NUMBER: _ClassVar[int]
     ARGUMENTS_FIELD_NUMBER: _ClassVar[int]
@@ -818,7 +818,7 @@ class EntryFunctionPayload(_message.Message):
     ) -> None: ...
 
 class MoveScriptBytecode(_message.Message):
-    __slots__ = ["bytecode", "abi"]
+    __slots__ = ("bytecode", "abi")
     BYTECODE_FIELD_NUMBER: _ClassVar[int]
     ABI_FIELD_NUMBER: _ClassVar[int]
     bytecode: bytes
@@ -830,7 +830,7 @@ class MoveScriptBytecode(_message.Message):
     ) -> None: ...
 
 class ScriptPayload(_message.Message):
-    __slots__ = ["code", "type_arguments", "arguments"]
+    __slots__ = ("code", "type_arguments", "arguments")
     CODE_FIELD_NUMBER: _ClassVar[int]
     TYPE_ARGUMENTS_FIELD_NUMBER: _ClassVar[int]
     ARGUMENTS_FIELD_NUMBER: _ClassVar[int]
@@ -845,7 +845,7 @@ class ScriptPayload(_message.Message):
     ) -> None: ...
 
 class MultisigPayload(_message.Message):
-    __slots__ = ["multisig_address", "transaction_payload"]
+    __slots__ = ("multisig_address", "transaction_payload")
     MULTISIG_ADDRESS_FIELD_NUMBER: _ClassVar[int]
     TRANSACTION_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     multisig_address: str
@@ -859,10 +859,10 @@ class MultisigPayload(_message.Message):
     ) -> None: ...
 
 class MultisigTransactionPayload(_message.Message):
-    __slots__ = ["type", "entry_function_payload"]
+    __slots__ = ("type", "entry_function_payload")
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-        __slots__ = []
+        __slots__ = ()
         TYPE_UNSPECIFIED: _ClassVar[MultisigTransactionPayload.Type]
         TYPE_ENTRY_FUNCTION_PAYLOAD: _ClassVar[MultisigTransactionPayload.Type]
     TYPE_UNSPECIFIED: MultisigTransactionPayload.Type
@@ -878,7 +878,7 @@ class MultisigTransactionPayload(_message.Message):
     ) -> None: ...
 
 class MoveModuleBytecode(_message.Message):
-    __slots__ = ["bytecode", "abi"]
+    __slots__ = ("bytecode", "abi")
     BYTECODE_FIELD_NUMBER: _ClassVar[int]
     ABI_FIELD_NUMBER: _ClassVar[int]
     bytecode: bytes
@@ -890,7 +890,7 @@ class MoveModuleBytecode(_message.Message):
     ) -> None: ...
 
 class MoveModule(_message.Message):
-    __slots__ = ["address", "name", "friends", "exposed_functions", "structs"]
+    __slots__ = ("address", "name", "friends", "exposed_functions", "structs")
     ADDRESS_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     FRIENDS_FIELD_NUMBER: _ClassVar[int]
@@ -911,10 +911,10 @@ class MoveModule(_message.Message):
     ) -> None: ...
 
 class MoveFunction(_message.Message):
-    __slots__ = ["name", "visibility", "is_entry", "generic_type_params", "params"]
+    __slots__ = ("name", "visibility", "is_entry", "generic_type_params", "params")
 
     class Visibility(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-        __slots__ = []
+        __slots__ = ()
         VISIBILITY_UNSPECIFIED: _ClassVar[MoveFunction.Visibility]
         VISIBILITY_PRIVATE: _ClassVar[MoveFunction.Visibility]
         VISIBILITY_PUBLIC: _ClassVar[MoveFunction.Visibility]
@@ -949,14 +949,14 @@ class MoveFunction(_message.Message):
     ) -> None: ...
 
 class MoveStruct(_message.Message):
-    __slots__ = [
+    __slots__ = (
         "name",
         "is_native",
         "is_event",
         "abilities",
         "generic_type_params",
         "fields",
-    ]
+    )
     NAME_FIELD_NUMBER: _ClassVar[int]
     IS_NATIVE_FIELD_NUMBER: _ClassVar[int]
     IS_EVENT_FIELD_NUMBER: _ClassVar[int]
@@ -984,7 +984,7 @@ class MoveStruct(_message.Message):
     ) -> None: ...
 
 class MoveStructGenericTypeParam(_message.Message):
-    __slots__ = ["constraints", "is_phantom"]
+    __slots__ = ("constraints", "is_phantom")
     CONSTRAINTS_FIELD_NUMBER: _ClassVar[int]
     IS_PHANTOM_FIELD_NUMBER: _ClassVar[int]
     constraints: _containers.RepeatedScalarFieldContainer[MoveAbility]
@@ -996,7 +996,7 @@ class MoveStructGenericTypeParam(_message.Message):
     ) -> None: ...
 
 class MoveStructField(_message.Message):
-    __slots__ = ["name", "type"]
+    __slots__ = ("name", "type")
     NAME_FIELD_NUMBER: _ClassVar[int]
     TYPE_FIELD_NUMBER: _ClassVar[int]
     name: str
@@ -1008,7 +1008,7 @@ class MoveStructField(_message.Message):
     ) -> None: ...
 
 class MoveFunctionGenericTypeParam(_message.Message):
-    __slots__ = ["constraints"]
+    __slots__ = ("constraints",)
     CONSTRAINTS_FIELD_NUMBER: _ClassVar[int]
     constraints: _containers.RepeatedScalarFieldContainer[MoveAbility]
     def __init__(
@@ -1016,17 +1016,17 @@ class MoveFunctionGenericTypeParam(_message.Message):
     ) -> None: ...
 
 class MoveType(_message.Message):
-    __slots__ = [
+    __slots__ = (
         "type",
         "vector",
         "struct",
         "generic_type_param_index",
         "reference",
         "unparsable",
-    ]
+    )
 
     class ReferenceType(_message.Message):
-        __slots__ = ["mutable", "to"]
+        __slots__ = ("mutable", "to")
         MUTABLE_FIELD_NUMBER: _ClassVar[int]
         TO_FIELD_NUMBER: _ClassVar[int]
         mutable: bool
@@ -1057,7 +1057,7 @@ class MoveType(_message.Message):
     ) -> None: ...
 
 class WriteSetPayload(_message.Message):
-    __slots__ = ["write_set"]
+    __slots__ = ("write_set",)
     WRITE_SET_FIELD_NUMBER: _ClassVar[int]
     write_set: WriteSet
     def __init__(
@@ -1065,7 +1065,7 @@ class WriteSetPayload(_message.Message):
     ) -> None: ...
 
 class EntryFunctionId(_message.Message):
-    __slots__ = ["module", "name"]
+    __slots__ = ("module", "name")
     MODULE_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     module: MoveModuleId
@@ -1077,7 +1077,7 @@ class EntryFunctionId(_message.Message):
     ) -> None: ...
 
 class MoveModuleId(_message.Message):
-    __slots__ = ["address", "name"]
+    __slots__ = ("address", "name")
     ADDRESS_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     address: str
@@ -1087,7 +1087,7 @@ class MoveModuleId(_message.Message):
     ) -> None: ...
 
 class MoveStructTag(_message.Message):
-    __slots__ = ["address", "module", "name", "generic_type_params"]
+    __slots__ = ("address", "module", "name", "generic_type_params")
     ADDRESS_FIELD_NUMBER: _ClassVar[int]
     MODULE_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
@@ -1105,17 +1105,17 @@ class MoveStructTag(_message.Message):
     ) -> None: ...
 
 class Signature(_message.Message):
-    __slots__ = [
+    __slots__ = (
         "type",
         "ed25519",
         "multi_ed25519",
         "multi_agent",
         "fee_payer",
         "single_sender",
-    ]
+    )
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-        __slots__ = []
+        __slots__ = ()
         TYPE_UNSPECIFIED: _ClassVar[Signature.Type]
         TYPE_ED25519: _ClassVar[Signature.Type]
         TYPE_MULTI_ED25519: _ClassVar[Signature.Type]
@@ -1151,7 +1151,7 @@ class Signature(_message.Message):
     ) -> None: ...
 
 class Ed25519Signature(_message.Message):
-    __slots__ = ["public_key", "signature"]
+    __slots__ = ("public_key", "signature")
     PUBLIC_KEY_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     public_key: bytes
@@ -1161,7 +1161,7 @@ class Ed25519Signature(_message.Message):
     ) -> None: ...
 
 class MultiEd25519Signature(_message.Message):
-    __slots__ = ["public_keys", "signatures", "threshold", "public_key_indices"]
+    __slots__ = ("public_keys", "signatures", "threshold", "public_key_indices")
     PUBLIC_KEYS_FIELD_NUMBER: _ClassVar[int]
     SIGNATURES_FIELD_NUMBER: _ClassVar[int]
     THRESHOLD_FIELD_NUMBER: _ClassVar[int]
@@ -1179,7 +1179,7 @@ class MultiEd25519Signature(_message.Message):
     ) -> None: ...
 
 class MultiAgentSignature(_message.Message):
-    __slots__ = ["sender", "secondary_signer_addresses", "secondary_signers"]
+    __slots__ = ("sender", "secondary_signer_addresses", "secondary_signers")
     SENDER_FIELD_NUMBER: _ClassVar[int]
     SECONDARY_SIGNER_ADDRESSES_FIELD_NUMBER: _ClassVar[int]
     SECONDARY_SIGNERS_FIELD_NUMBER: _ClassVar[int]
@@ -1196,13 +1196,13 @@ class MultiAgentSignature(_message.Message):
     ) -> None: ...
 
 class FeePayerSignature(_message.Message):
-    __slots__ = [
+    __slots__ = (
         "sender",
         "secondary_signer_addresses",
         "secondary_signers",
         "fee_payer_address",
         "fee_payer_signer",
-    ]
+    )
     SENDER_FIELD_NUMBER: _ClassVar[int]
     SECONDARY_SIGNER_ADDRESSES_FIELD_NUMBER: _ClassVar[int]
     SECONDARY_SIGNERS_FIELD_NUMBER: _ClassVar[int]
@@ -1225,10 +1225,10 @@ class FeePayerSignature(_message.Message):
     ) -> None: ...
 
 class AnyPublicKey(_message.Message):
-    __slots__ = ["type", "public_key"]
+    __slots__ = ("type", "public_key")
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-        __slots__ = []
+        __slots__ = ()
         TYPE_UNSPECIFIED: _ClassVar[AnyPublicKey.Type]
         TYPE_ED25519: _ClassVar[AnyPublicKey.Type]
         TYPE_SECP256K1_ECDSA: _ClassVar[AnyPublicKey.Type]
@@ -1252,17 +1252,17 @@ class AnyPublicKey(_message.Message):
     ) -> None: ...
 
 class AnySignature(_message.Message):
-    __slots__ = [
+    __slots__ = (
         "type",
         "signature",
         "ed25519",
         "secp256k1_ecdsa",
         "webauthn",
         "keyless",
-    ]
+    )
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-        __slots__ = []
+        __slots__ = ()
         TYPE_UNSPECIFIED: _ClassVar[AnySignature.Type]
         TYPE_ED25519: _ClassVar[AnySignature.Type]
         TYPE_SECP256K1_ECDSA: _ClassVar[AnySignature.Type]
@@ -1296,31 +1296,31 @@ class AnySignature(_message.Message):
     ) -> None: ...
 
 class Ed25519(_message.Message):
-    __slots__ = ["signature"]
+    __slots__ = ("signature",)
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     signature: bytes
     def __init__(self, signature: _Optional[bytes] = ...) -> None: ...
 
 class Secp256k1Ecdsa(_message.Message):
-    __slots__ = ["signature"]
+    __slots__ = ("signature",)
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     signature: bytes
     def __init__(self, signature: _Optional[bytes] = ...) -> None: ...
 
 class WebAuthn(_message.Message):
-    __slots__ = ["signature"]
+    __slots__ = ("signature",)
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     signature: bytes
     def __init__(self, signature: _Optional[bytes] = ...) -> None: ...
 
 class Keyless(_message.Message):
-    __slots__ = ["signature"]
+    __slots__ = ("signature",)
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     signature: bytes
     def __init__(self, signature: _Optional[bytes] = ...) -> None: ...
 
 class SingleKeySignature(_message.Message):
-    __slots__ = ["public_key", "signature"]
+    __slots__ = ("public_key", "signature")
     PUBLIC_KEY_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     public_key: AnyPublicKey
@@ -1332,7 +1332,7 @@ class SingleKeySignature(_message.Message):
     ) -> None: ...
 
 class IndexedSignature(_message.Message):
-    __slots__ = ["index", "signature"]
+    __slots__ = ("index", "signature")
     INDEX_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     index: int
@@ -1344,7 +1344,7 @@ class IndexedSignature(_message.Message):
     ) -> None: ...
 
 class MultiKeySignature(_message.Message):
-    __slots__ = ["public_keys", "signatures", "signatures_required"]
+    __slots__ = ("public_keys", "signatures", "signatures_required")
     PUBLIC_KEYS_FIELD_NUMBER: _ClassVar[int]
     SIGNATURES_FIELD_NUMBER: _ClassVar[int]
     SIGNATURES_REQUIRED_FIELD_NUMBER: _ClassVar[int]
@@ -1359,7 +1359,7 @@ class MultiKeySignature(_message.Message):
     ) -> None: ...
 
 class AbstractionSignature(_message.Message):
-    __slots__ = ["function_info", "signature"]
+    __slots__ = ("function_info", "signature")
     FUNCTION_INFO_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     function_info: str
@@ -1369,7 +1369,7 @@ class AbstractionSignature(_message.Message):
     ) -> None: ...
 
 class SingleSender(_message.Message):
-    __slots__ = ["sender"]
+    __slots__ = ("sender",)
     SENDER_FIELD_NUMBER: _ClassVar[int]
     sender: AccountSignature
     def __init__(
@@ -1377,17 +1377,17 @@ class SingleSender(_message.Message):
     ) -> None: ...
 
 class AccountSignature(_message.Message):
-    __slots__ = [
+    __slots__ = (
         "type",
         "ed25519",
         "multi_ed25519",
         "single_key_signature",
         "multi_key_signature",
         "abstraction",
-    ]
+    )
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-        __slots__ = []
+        __slots__ = ()
         TYPE_UNSPECIFIED: _ClassVar[AccountSignature.Type]
         TYPE_ED25519: _ClassVar[AccountSignature.Type]
         TYPE_MULTI_ED25519: _ClassVar[AccountSignature.Type]
@@ -1423,7 +1423,7 @@ class AccountSignature(_message.Message):
     ) -> None: ...
 
 class TransactionSizeInfo(_message.Message):
-    __slots__ = ["transaction_bytes", "event_size_info", "write_op_size_info"]
+    __slots__ = ("transaction_bytes", "event_size_info", "write_op_size_info")
     TRANSACTION_BYTES_FIELD_NUMBER: _ClassVar[int]
     EVENT_SIZE_INFO_FIELD_NUMBER: _ClassVar[int]
     WRITE_OP_SIZE_INFO_FIELD_NUMBER: _ClassVar[int]
@@ -1440,7 +1440,7 @@ class TransactionSizeInfo(_message.Message):
     ) -> None: ...
 
 class EventSizeInfo(_message.Message):
-    __slots__ = ["type_tag_bytes", "total_bytes"]
+    __slots__ = ("type_tag_bytes", "total_bytes")
     TYPE_TAG_BYTES_FIELD_NUMBER: _ClassVar[int]
     TOTAL_BYTES_FIELD_NUMBER: _ClassVar[int]
     type_tag_bytes: int
@@ -1450,7 +1450,7 @@ class EventSizeInfo(_message.Message):
     ) -> None: ...
 
 class WriteOpSizeInfo(_message.Message):
-    __slots__ = ["key_bytes", "value_bytes"]
+    __slots__ = ("key_bytes", "value_bytes")
     KEY_BYTES_FIELD_NUMBER: _ClassVar[int]
     VALUE_BYTES_FIELD_NUMBER: _ClassVar[int]
     key_bytes: int

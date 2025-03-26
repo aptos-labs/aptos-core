@@ -14,7 +14,7 @@ from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class TransactionsOutput(_message.Message):
-    __slots__ = ["transactions"]
+    __slots__ = ("transactions",)
     TRANSACTIONS_FIELD_NUMBER: _ClassVar[int]
     transactions: _containers.RepeatedCompositeFieldContainer[
         _transaction_pb2.Transaction
@@ -27,10 +27,10 @@ class TransactionsOutput(_message.Message):
     ) -> None: ...
 
 class StreamStatus(_message.Message):
-    __slots__ = ["type", "start_version", "end_version"]
+    __slots__ = ("type", "start_version", "end_version")
 
     class StatusType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-        __slots__ = []
+        __slots__ = ()
         STATUS_TYPE_UNSPECIFIED: _ClassVar[StreamStatus.StatusType]
         STATUS_TYPE_INIT: _ClassVar[StreamStatus.StatusType]
         STATUS_TYPE_BATCH_END: _ClassVar[StreamStatus.StatusType]
@@ -51,7 +51,7 @@ class StreamStatus(_message.Message):
     ) -> None: ...
 
 class GetTransactionsFromNodeRequest(_message.Message):
-    __slots__ = ["starting_version", "transactions_count"]
+    __slots__ = ("starting_version", "transactions_count")
     STARTING_VERSION_FIELD_NUMBER: _ClassVar[int]
     TRANSACTIONS_COUNT_FIELD_NUMBER: _ClassVar[int]
     starting_version: int
@@ -63,7 +63,7 @@ class GetTransactionsFromNodeRequest(_message.Message):
     ) -> None: ...
 
 class TransactionsFromNodeResponse(_message.Message):
-    __slots__ = ["status", "data", "chain_id"]
+    __slots__ = ("status", "data", "chain_id")
     STATUS_FIELD_NUMBER: _ClassVar[int]
     DATA_FIELD_NUMBER: _ClassVar[int]
     CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
@@ -78,11 +78,11 @@ class TransactionsFromNodeResponse(_message.Message):
     ) -> None: ...
 
 class PingFullnodeRequest(_message.Message):
-    __slots__ = []
+    __slots__ = ()
     def __init__(self) -> None: ...
 
 class PingFullnodeResponse(_message.Message):
-    __slots__ = ["info"]
+    __slots__ = ("info",)
     INFO_FIELD_NUMBER: _ClassVar[int]
     info: _grpc_pb2.FullnodeInfo
     def __init__(
