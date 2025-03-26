@@ -18,7 +18,7 @@ use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
 use rand::{thread_rng, Rng};
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -85,19 +85,21 @@ macro_rules! resource_writes_to_materialize {
 pub(crate) use groups_to_finalize;
 pub(crate) use resource_writes_to_materialize;
 
+// Returns the tags written to (and stored) by the previous incarnation, if the KeyKind is a Group,
+// otherwise None. If the kind does not match, PanicError is returned.
 pub(crate) fn remove_from_previous_keys<T: Transaction>(
     prev_modified_keys: &mut HashMap<T::Key, KeyKind<T::Tag>>,
     key: &T::Key,
     expected_kind: KeyKind<T::Tag>,
-) -> Result<(), PanicError> {
+) -> Result<Option<HashSet<T::Tag>>, PanicError> {
     match (prev_modified_keys.remove(key), expected_kind) {
-        (None, _) => Ok(()),
+        (None, _) => Ok(None),
         // Aggregator deltas and normal writes can occur on the same key.
         (Some(KeyKind::Resource), KeyKind::AggregatorV1)
         | (Some(KeyKind::AggregatorV1), KeyKind::Resource)
         | (Some(KeyKind::Resource), KeyKind::Resource)
-        | (Some(KeyKind::AggregatorV1), KeyKind::AggregatorV1)
-        | (Some(KeyKind::Group(_)), KeyKind::Group(_)) => Ok(()),
+        | (Some(KeyKind::AggregatorV1), KeyKind::AggregatorV1) => Ok(None),
+        (Some(KeyKind::Group(tags)), KeyKind::Group(_)) => Ok(Some(tags)),
         _ => Err(code_invariant_error(format!(
             "Resource key {:?} recorded as a wrong KeyKind in prior incarnation",
             key,
@@ -107,7 +109,8 @@ pub(crate) fn remove_from_previous_keys<T: Transaction>(
 
 pub(crate) fn map_finalized_group<T: Transaction>(
     group_key: T::Key,
-    finalized_group: anyhow::Result<(Vec<(T::Tag, ValueWithLayout<T::Value>)>, ResourceGroupSize)>,
+    finalized_group: Vec<(T::Tag, ValueWithLayout<T::Value>)>,
+    group_size: ResourceGroupSize,
     metadata_op: T::Value,
     is_read_needing_exchange: bool,
 ) -> Result<
@@ -121,29 +124,21 @@ pub(crate) fn map_finalized_group<T: Transaction>(
 > {
     let metadata_is_deletion = metadata_op.is_deletion();
 
-    match finalized_group {
-        Ok((finalized_group, group_size)) => {
-            if is_read_needing_exchange && metadata_is_deletion {
-                // Value needed exchange but was not written / modified during the txn
-                // execution: may not be empty.
-                Err(code_invariant_error(
-                    "Value only read and exchanged, but metadata op is Deletion".to_string(),
-                ))
-            } else if finalized_group.is_empty() != metadata_is_deletion {
-                // finalize_group already applies the deletions.
-                Err(code_invariant_error(format!(
-                    "Group is empty = {} but op is deletion = {} in parallel execution",
-                    finalized_group.is_empty(),
-                    metadata_is_deletion
-                )))
-            } else {
-                Ok((group_key, metadata_op, finalized_group, group_size))
-            }
-        },
-        Err(e) => Err(code_invariant_error(format!(
-            "Error committing resource group {:?}",
-            e
-        ))),
+    if is_read_needing_exchange && metadata_is_deletion {
+        // Value needed exchange but was not written / modified during the txn
+        // execution: may not be empty.
+        Err(code_invariant_error(
+            "Value only read and exchanged, but metadata op is Deletion".to_string(),
+        ))
+    } else if finalized_group.is_empty() != metadata_is_deletion {
+        // finalize_group already applies the deletions.
+        Err(code_invariant_error(format!(
+            "Group is empty = {} but op is deletion = {} in parallel execution",
+            finalized_group.is_empty(),
+            metadata_is_deletion
+        )))
+    } else {
+        Ok((group_key, metadata_op, finalized_group, group_size))
     }
 }
 
@@ -180,9 +175,10 @@ pub(crate) fn serialize_groups<T: Transaction>(
                         if (!btree.is_empty() || group_size.get() != 0)
                             && group_bytes.len() as u64 != group_size.get()
                         {
+                            // TODO(BlockSTMv2): Debug: what changed in size. same in V2.
                             alert!(
                                 "Serialized resource group size mismatch key = {:?} num items {}, \
-				 len {} recorded size {}, op {:?}",
+				                len {} recorded size {}, op {:?}",
                                 group_key,
                                 btree.len(),
                                 group_bytes.len(),

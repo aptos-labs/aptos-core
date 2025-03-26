@@ -482,6 +482,7 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
         &self,
         group_key: &T::Key,
         txn_idx: TxnIndex,
+        incarnation: Incarnation,
     ) -> PartialVMResult<GroupReadResult> {
         use MVGroupError::*;
 
@@ -490,10 +491,15 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
         }
 
         loop {
-            match self
-                .versioned_map
-                .group_data()
-                .get_group_size(group_key, txn_idx)
+            let group_size = if self.scheduler.is_v2() {
+                self.versioned_map
+                    .group_data()
+                    .get_group_size_v2(group_key, txn_idx, incarnation)
+            } else {
+                self.versioned_map.group_data().get_group_size(group_key, txn_idx)
+            };
+
+            match group_size
             {
                 Ok(group_size) => {
                     assert_ok!(
@@ -710,11 +716,15 @@ impl<'a, T: Transaction> ResourceGroupState<T> for ParallelState<'a, T> {
         }
 
         loop {
-            match self.versioned_map.group_data().fetch_tagged_data(
-                group_key,
-                resource_tag,
-                txn_idx,
-            ) {
+            let data = if self.scheduler.is_v2() {
+                self.versioned_map
+                    .group_data()
+                    .fetch_tagged_data_v2(group_key, resource_tag, txn_idx, self.incarnation)
+            } else {
+                self.versioned_map.group_data().fetch_tagged_data(group_key, resource_tag, txn_idx)
+            };
+
+            match data {
                 Ok((version, value_with_layout)) => {
                     // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                     match value_with_layout {
@@ -753,21 +763,28 @@ impl<'a, T: Transaction> ResourceGroupState<T> for ParallelState<'a, T> {
                     return Ok(GroupReadResult::Uninitialized);
                 },
                 Err(TagNotFound) => {
-                    let data_read = DataRead::Versioned(
-                        Err(StorageVersion),
-                        Arc::<T::Value>::new(TransactionWrite::from_state_value(None)),
+                    self.versioned_map.group_data().update_tagged_base_value_with_layout(
+                        group_key.clone(),
+                        resource_tag.clone(),
+                        TransactionWrite::from_state_value(None),
                         None,
                     );
-                    assert_ok!(
-                        self.captured_reads.borrow_mut().capture_read(
-                            group_key.clone(),
-                            Some(resource_tag.clone()),
-                            data_read
-                        ),
-                        "Resource read in group recorded once: may not be inconsistent"
-                    );
+                    continue;
+                    // let data_read = DataRead::Versioned(
+                    //     Err(StorageVersion),
+                    //     Arc::<T::Value>::new(TransactionWrite::from_state_value(None)),
+                    //     None,
+                    // );
+                    // assert_ok!(
+                    //     self.captured_reads.borrow_mut().capture_read(
+                    //         group_key.clone(),
+                    //         Some(resource_tag.clone()),
+                    //         data_read
+                    //     ),
+                    //     "Resource read in group recorded once: may not be inconsistent"
+                    // );
 
-                    return Ok(GroupReadResult::Value(None, None));
+                    // return Ok(GroupReadResult::Value(None, None));
                 },
                 Err(Dependency(dep_idx)) => {
                     if !wait_for_dependency(&self.scheduler, txn_idx, dep_idx)? {
@@ -1295,7 +1312,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
                 }
 
                 match self.get_resource_state_value_metadata(&key)? {
-                    Some(metadata) => match parallel_state.read_group_size(&key, self.txn_idx)? {
+                    Some(metadata) => match parallel_state.read_group_size(&key, self.txn_idx, parallel_state.incarnation)? {
                         GroupReadResult::Size(group_size) => {
                             Ok(Some((key, (metadata, group_size.get()))))
                         },
@@ -1557,7 +1574,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for Lat
         let _view_profiler = self.get_profiler_guard(ViewKind::GroupView);
 
         let mut group_read = match &self.latest_view {
-            ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
+            ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx, state.incarnation)?,
             ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key),
         };
 
@@ -1565,7 +1582,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for Lat
             self.initialize_mvhashmap_base_group_contents(group_key)?;
 
             group_read = match &self.latest_view {
-                ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
+                ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx, state.incarnation)?,
                 ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key),
             }
         };

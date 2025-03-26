@@ -23,15 +23,25 @@ use num_cpus;
 use proptest::{collection::vec, prelude::*, test_runner::TestRunner, strategy::ValueTree};
 use test_case::test_case;
 
-// TODO(BlockSTMv2): Add tests for BlockSTMv2.
 // TODO: Change some tests (e.g. second and fifth) to use gas limit: needs to handle error in mock executor.
-#[test_case(50, 100, None, None, None, false, false, 30, 15 ; "basic group test")]
-#[test_case(50, 1000, None, None, None, false, false, 20, 10 ; "basic group test 2")]
-#[test_case(15, 1000, None, None, None, false, false, 5, 5 ; "small universe group test")]
-#[test_case(20, 1000, Some(30), None, None, false, false, 10, 5 ; "group size pct1=30%")]
-#[test_case(20, 1000, Some(80), None, None, false, false, 10, 5 ; "group size pct1=80%")]
-#[test_case(20, 1000, Some(30), Some(80), None, false, false, 10, 5 ; "group size pct1=30%, pct2=80%")]
-#[test_case(20, 1000, Some(30), Some(50), Some(70), false, false, 10, 5 ; "group size pct1=30%, pct2=50%, pct3=70%")]
+#[test_case(50, 100, None, None, None, false, false, 30, 15 ; "basic group test_v1")]
+#[test_case(50, 1000, None, None, None, false, false, 20, 10 ; "basic group test 2_v1")]
+#[test_case(50, 1000, None, None, None, true, false, 20, 10 ; "basic group test 2 with gas limit_v1")]
+#[test_case(15, 1000, None, None, None, false, false, 5, 5 ; "small universe group test_v1")]
+#[test_case(20, 1000, Some(30), None, None, false, false, 10, 5 ; "group size pct1=30%_v1")]
+#[test_case(20, 1000, Some(80), None, None, false, false, 10, 5 ; "group size pct1=80%_v1")]
+#[test_case(20, 1000, Some(80), None, None, true, false, 10, 5 ; "group size pct1=80% with gas limit_v1")]
+#[test_case(20, 1000, Some(30), Some(80), None, false, false, 10, 5 ; "group size pct1=30%, pct2=80%_v1")]
+#[test_case(20, 1000, Some(30), Some(50), Some(70), false, false, 10, 5 ; "group size pct1=30%, pct2=50%, pct3=70%_v1")]
+#[test_case(50, 100, None, None, None, false, true, 30, 15 ; "basic group test_v2")]
+#[test_case(50, 1000, None, None, None, false, true, 20, 10 ; "basic group test 2_v2")]
+#[test_case(50, 1000, None, None, None, true, true, 20, 10 ; "basic group test 2 with gas limit_v2")]
+#[test_case(15, 1000, None, None, None, false, true, 5, 5 ; "small universe group test_v2")]
+#[test_case(20, 1000, Some(30), None, None, false, true, 10, 5 ; "group size pct1=30%_v2")]
+#[test_case(20, 1000, Some(80), None, None, false, true, 10, 5 ; "group size pct1=80%_v2")]
+#[test_case(20, 1000, Some(80), None, None, true, true, 10, 5 ; "group size pct1=80% with gas limit_v2")]
+#[test_case(20, 1000, Some(30), Some(80), None, false, true, 10, 5 ; "group size pct1=30%, pct2=80%_v2")]
+#[test_case(20, 1000, Some(30), Some(50), Some(70), false, true, 10, 5 ; "group size pct1=30%, pct2=50%, pct3=70%_v2")]
 fn non_empty_group_transaction_tests(
     universe_size: usize,
     transaction_count: usize,
@@ -82,7 +92,6 @@ fn non_empty_group_transaction_tests(
     let executor_thread_pool = create_executor_thread_pool();
 
     let gas_limits = get_gas_limit_variants(use_gas_limit, transaction_count);
-
     for maybe_block_gas_limit in gas_limits {
         for _ in 0..num_executions_parallel {
             let output = execute_block_parallel::<

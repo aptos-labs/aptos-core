@@ -166,7 +166,7 @@ impl<V: TransactionWrite> VersionedValue<V> {
                         false
                     };
                 }
-                affected_deps.extend(new_deps);
+                affected_deps = new_deps;
             }
         }
         (affected_deps, validation_result)
@@ -393,9 +393,10 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         if let EntryCell::Write(_, ValueWithLayout::Exchanged(data, layout), deps) =
             &removed_entry.value
         {
+            let removed_deps = std::mem::take(&mut *deps.lock());
             v.handle_removed_dependencies::<ONLY_COMPARE_METADATA>(
                 txn_idx,
-                deps.lock().clone(),
+                removed_deps,
                 data,
                 layout,
             )
@@ -496,12 +497,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         // Assert that the previous entry for txn_idx, if present, had lower incarnation.
         assert!(prev_entry.map_or(true, |entry| -> bool {
             if let EntryCell::Write(i, _, _) = entry.value {
-                if i < incarnation {
-                    true
-                } else {
-                    println!("txn idx {} incarnation {} !> i {}", txn_idx, incarnation, i);
-                    false
-                }
+                i < incarnation
             } else {
                 true
             }
