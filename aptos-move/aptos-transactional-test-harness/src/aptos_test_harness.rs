@@ -11,8 +11,10 @@ use aptos_crypto::{
     ValidCryptoMaterialStringExt,
 };
 use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
-use aptos_language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD};
 use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
+use aptos_transaction_simulation::{
+    InMemoryStateStore, SimulationStateStore, GENESIS_CHANGE_SET_HEAD,
+};
 use aptos_types::{
     account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
     block_metadata::BlockMetadata,
@@ -55,7 +57,7 @@ use move_transactional_test_runner::{
 use move_vm_runtime::move_vm::SerializedReturnValues;
 use once_cell::sync::Lazy;
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet},
     convert::TryFrom,
     fmt,
     path::Path,
@@ -76,7 +78,7 @@ use tempfile::NamedTempFile;
 ///   - It executes transactions through AptosVM, instead of MoveVM directly
 struct AptosTestAdapter<'a> {
     compiled_state: CompiledState<'a>,
-    storage: FakeDataStore,
+    storage: InMemoryStateStore,
     default_syntax: SyntaxChoice,
     private_key_mapping: BTreeMap<String, Ed25519PrivateKey>,
     run_config: TestRunConfig,
@@ -484,7 +486,7 @@ impl<'a> AptosTestAdapter<'a> {
         let output = outputs.pop().unwrap();
         match output.status() {
             TransactionStatus::Keep(kept_vm_status) => {
-                self.storage.add_write_set(output.write_set());
+                self.storage.apply_write_set(output.write_set())?;
                 match kept_vm_status {
                     ExecutionStatus::Success => Ok(output),
                     _ => {
@@ -589,8 +591,10 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         }
 
         // Genesis modules
-        let mut storage = FakeDataStore::new(HashMap::new());
-        storage.add_write_set(GENESIS_CHANGE_SET_HEAD.write_set());
+        let storage = InMemoryStateStore::new();
+        storage
+            .apply_write_set(GENESIS_CHANGE_SET_HEAD.write_set())
+            .unwrap();
 
         // Builtin private key mapping
         let mut private_key_mapping = BTreeMap::new();
@@ -763,7 +767,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         //  through native context. Implement in a cleaner way, and simply run the bytecode verifier
         //  for now.
         verify_module(&module)?;
-        self.storage.add_module(&module_id, module_blob);
+        self.storage.add_module_blob(&module_id, module_blob)?;
         Ok((None, module))
     }
 

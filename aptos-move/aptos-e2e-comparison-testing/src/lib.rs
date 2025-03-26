@@ -4,7 +4,7 @@
 use aptos_framework::{
     natives::code::PackageMetadata, unzip_metadata_str, BuiltPackage, APTOS_PACKAGES,
 };
-use aptos_language_e2e_tests::data_store::FakeDataStore;
+use aptos_transaction_simulation::InMemoryStateStore;
 use aptos_types::{
     account_address::AccountAddress,
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -14,7 +14,7 @@ use aptos_types::{
 use rocksdb::{DBWithThreadMode, SingleThreaded, DB};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     fmt,
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Read, Write},
@@ -227,9 +227,9 @@ impl DataManager {
         let state_path = self.state_data_dir_path.join(format!("{}_state", version));
         if !state_path.exists() {
             let mut data_state_file = File::create(state_path).unwrap();
-            let state_store = FakeDataStore::new_with_state_value(state.to_owned());
+            let state_store = InMemoryStateStore::new_with_state_values(state.to_owned());
             data_state_file
-                .write_all(&bcs::to_bytes(&state_store).unwrap())
+                .write_all(&bcs::to_bytes(&state_store.to_btree_map()).unwrap())
                 .unwrap();
         }
     }
@@ -265,12 +265,14 @@ impl DataManager {
         }
     }
 
-    pub fn get_state(&self, version: u64) -> FakeDataStore {
+    pub fn get_state(&self, version: u64) -> InMemoryStateStore {
         let state_path = self.state_data_dir_path.join(format!("{}_state", version));
         let mut data_state_file = File::open(state_path).unwrap();
         let mut buffer = Vec::<u8>::new();
         data_state_file.read_to_end(&mut buffer).unwrap();
-        bcs::from_bytes::<FakeDataStore>(&buffer).unwrap()
+        InMemoryStateStore::new_with_state_values(
+            bcs::from_bytes::<BTreeMap<StateKey, StateValue>>(&buffer).unwrap(),
+        )
     }
 }
 
