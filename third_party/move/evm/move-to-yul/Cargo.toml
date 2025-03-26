@@ -17,14 +17,12 @@ ethnum = { workspace = true }
 evm = { workspace = true }
 itertools = { workspace = true }
 maplit = { workspace = true }
-move-command-line-common = { workspace = true }
 move-compiler = { workspace = true }
 move-core-types = { workspace = true }
 move-ethereum-abi = { path = "../move-ethereum-abi" }
 move-model = { workspace = true }
 move-stackless-bytecode = { workspace = true }
 once_cell = { workspace = true }
-primitive-types = { workspace = true }
 regex = { workspace = true }
 serde_json = { workspace = true }
 sha3 = { workspace = true }
@@ -41,6 +39,3 @@ walkdir = { workspace = true }
 [lib]
 doctest = false
 
-[[test]]
-name = "testsuite"
-harness = false
