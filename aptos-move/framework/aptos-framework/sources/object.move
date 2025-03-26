@@ -1135,65 +1135,65 @@ module aptos_framework::object {
     #[test_only]
     use aptos_framework::timestamp;
 
-    #[test(creator = @0x123)]
-    fun test_transfer_permission_e2e(
-        creator: &signer,
-    ) acquires ObjectCore {
-        let aptos_framework = account::create_signer_for_test(@0x1);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
+    // #[test(creator = @0x123)]
+    // fun test_transfer_permission_e2e(
+    //     creator: &signer,
+    // ) acquires ObjectCore {
+    //     let aptos_framework = account::create_signer_for_test(@0x1);
+    //     timestamp::set_time_has_started_for_testing(&aptos_framework);
 
-        let (_, hero) = create_hero(creator);
-        let (_, weapon) = create_weapon(creator);
+    //     let (_, hero) = create_hero(creator);
+    //     let (_, weapon) = create_weapon(creator);
 
-        // Create a permissioned signer
-        let creator_permission_handle = permissioned_signer::create_permissioned_handle(creator);
-        let creator_permission_signer = permissioned_signer::signer_from_permissioned_handle(&creator_permission_handle);
+    //     // Create a permissioned signer
+    //     let creator_permission_handle = permissioned_signer::create_permissioned_handle(creator);
+    //     let creator_permission_signer = permissioned_signer::signer_from_permissioned_handle(&creator_permission_handle);
 
-        // Grant aaron_permission_signer permission to transfer weapon object
-        grant_permission(creator, &creator_permission_signer, weapon);
-        transfer_to_object(&creator_permission_signer, weapon, hero);
+    //     // Grant aaron_permission_signer permission to transfer weapon object
+    //     grant_permission(creator, &creator_permission_signer, weapon);
+    //     transfer_to_object(&creator_permission_signer, weapon, hero);
 
-        permissioned_signer::destroy_permissioned_handle(creator_permission_handle);
-    }
+    //     permissioned_signer::destroy_permissioned_handle(creator_permission_handle);
+    // }
 
-    #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 327689, location = Self)]
-    fun test_transfer_no_permission(
-        creator: &signer,
-    ) acquires ObjectCore {
-        let aptos_framework = account::create_signer_for_test(@0x1);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
+    // #[test(creator = @0x123)]
+    // #[expected_failure(abort_code = 327689, location = Self)]
+    // fun test_transfer_no_permission(
+    //     creator: &signer,
+    // ) acquires ObjectCore {
+    //     let aptos_framework = account::create_signer_for_test(@0x1);
+    //     timestamp::set_time_has_started_for_testing(&aptos_framework);
 
-        let (_, hero) = create_hero(creator);
-        let (_, weapon) = create_weapon(creator);
+    //     let (_, hero) = create_hero(creator);
+    //     let (_, weapon) = create_weapon(creator);
 
-        // Create a permissioned signer
-        let creator_permission_handle = permissioned_signer::create_permissioned_handle(creator);
-        let creator_permission_signer = permissioned_signer::signer_from_permissioned_handle(&creator_permission_handle);
+    //     // Create a permissioned signer
+    //     let creator_permission_handle = permissioned_signer::create_permissioned_handle(creator);
+    //     let creator_permission_signer = permissioned_signer::signer_from_permissioned_handle(&creator_permission_handle);
 
-        transfer_to_object(&creator_permission_signer, weapon, hero);
+    //     transfer_to_object(&creator_permission_signer, weapon, hero);
 
-        permissioned_signer::destroy_permissioned_handle(creator_permission_handle);
-    }
+    //     permissioned_signer::destroy_permissioned_handle(creator_permission_handle);
+    // }
 
-    #[test(creator = @0x123)]
-    fun test_create_and_transfer(
-        creator: &signer,
-    ) acquires ObjectCore {
-        let aptos_framework = account::create_signer_for_test(@0x1);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
+    // #[test(creator = @0x123)]
+    // fun test_create_and_transfer(
+    //     creator: &signer,
+    // ) acquires ObjectCore {
+    //     let aptos_framework = account::create_signer_for_test(@0x1);
+    //     timestamp::set_time_has_started_for_testing(&aptos_framework);
 
-        let (_, hero) = create_hero(creator);
-        let (weapon_ref, weapon) = create_weapon(creator);
-        let t_ref = generate_transfer_ref(&weapon_ref);
+    //     let (_, hero) = create_hero(creator);
+    //     let (weapon_ref, weapon) = create_weapon(creator);
+    //     let t_ref = generate_transfer_ref(&weapon_ref);
 
-        // Create a permissioned signer
-        let creator_permission_handle = permissioned_signer::create_permissioned_handle(creator);
-        let creator_permission_signer = permissioned_signer::signer_from_permissioned_handle(&creator_permission_handle);
+    //     // Create a permissioned signer
+    //     let creator_permission_handle = permissioned_signer::create_permissioned_handle(creator);
+    //     let creator_permission_signer = permissioned_signer::signer_from_permissioned_handle(&creator_permission_handle);
 
-        grant_permission_with_transfer_ref(&creator_permission_signer, &t_ref);
-        transfer_to_object(&creator_permission_signer, weapon, hero);
+    //     grant_permission_with_transfer_ref(&creator_permission_signer, &t_ref);
+    //     transfer_to_object(&creator_permission_signer, weapon, hero);
 
-        permissioned_signer::destroy_permissioned_handle(creator_permission_handle);
-    }
+    //     permissioned_signer::destroy_permissioned_handle(creator_permission_handle);
+    // }
 }

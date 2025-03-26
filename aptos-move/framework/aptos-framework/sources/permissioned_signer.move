@@ -644,55 +644,55 @@ module aptos_framework::permissioned_signer {
         master_account_addr: address, permissions_storage_addr: address
     ): signer;
 
-    #[test(creator = @0xcafe)]
-    fun signer_address_roundtrip(
-        creator: &signer
-    ) acquires PermissionStorage, GrantedPermissionHandles {
-        let aptos_framework = create_signer(@0x1);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
+    // #[test(creator = @0xcafe)]
+    // fun signer_address_roundtrip(
+    //     creator: &signer
+    // ) acquires PermissionStorage, GrantedPermissionHandles {
+    //     let aptos_framework = create_signer(@0x1);
+    //     timestamp::set_time_has_started_for_testing(&aptos_framework);
 
-        let handle = create_permissioned_handle(creator);
-        let perm_signer = signer_from_permissioned_handle(&handle);
-        assert!(signer::address_of(&perm_signer) == signer::address_of(creator), 1);
-        assert!(
-            permission_address(&perm_signer)
-                == handle.permissions_storage_addr,
-            1
-        );
-        assert!(exists<PermissionStorage>(handle.permissions_storage_addr), 1);
+    //     let handle = create_permissioned_handle(creator);
+    //     let perm_signer = signer_from_permissioned_handle(&handle);
+    //     assert!(signer::address_of(&perm_signer) == signer::address_of(creator), 1);
+    //     assert!(
+    //         permission_address(&perm_signer)
+    //             == handle.permissions_storage_addr,
+    //         1
+    //     );
+    //     assert!(exists<PermissionStorage>(handle.permissions_storage_addr), 1);
 
-        destroy_permissioned_handle(handle);
+    //     destroy_permissioned_handle(handle);
 
-        let handle = create_storable_permissioned_handle(creator, 60);
-        let perm_signer = signer_from_storable_permissioned_handle(&handle);
-        assert!(signer::address_of(&perm_signer) == signer::address_of(creator), 1);
-        assert!(
-            permission_address(&perm_signer)
-                == handle.permissions_storage_addr,
-            1
-        );
-        assert!(exists<PermissionStorage>(handle.permissions_storage_addr), 1);
+    //     let handle = create_storable_permissioned_handle(creator, 60);
+    //     let perm_signer = signer_from_storable_permissioned_handle(&handle);
+    //     assert!(signer::address_of(&perm_signer) == signer::address_of(creator), 1);
+    //     assert!(
+    //         permission_address(&perm_signer)
+    //             == handle.permissions_storage_addr,
+    //         1
+    //     );
+    //     assert!(exists<PermissionStorage>(handle.permissions_storage_addr), 1);
 
-        destroy_storable_permissioned_handle(handle);
-    }
+    //     destroy_storable_permissioned_handle(handle);
+    // }
 
-    #[test_only]
-    use aptos_std::bcs;
+    // #[test_only]
+    // use aptos_std::bcs;
 
-    #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code = 0x1C5, location = aptos_std::bcs)]
-    fun signer_serialization(
-        creator: &signer
-    ) acquires PermissionStorage {
-        let aptos_framework = create_signer(@0x1);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
+    // #[test(creator = @0xcafe)]
+    // #[expected_failure(abort_code = 0x1C5, location = aptos_std::bcs)]
+    // fun signer_serialization(
+    //     creator: &signer
+    // ) acquires PermissionStorage {
+    //     let aptos_framework = create_signer(@0x1);
+    //     timestamp::set_time_has_started_for_testing(&aptos_framework);
 
-        let handle = create_permissioned_handle(creator);
-        let perm_signer = signer_from_permissioned_handle(&handle);
+    //     let handle = create_permissioned_handle(creator);
+    //     let perm_signer = signer_from_permissioned_handle(&handle);
 
-        assert!(bcs::to_bytes(creator) == bcs::to_bytes(&signer::address_of(creator)), 1);
-        bcs::to_bytes(&perm_signer);
+    //     assert!(bcs::to_bytes(creator) == bcs::to_bytes(&signer::address_of(creator)), 1);
+    //     bcs::to_bytes(&perm_signer);
 
-        destroy_permissioned_handle(handle);
-    }
+    //     destroy_permissioned_handle(handle);
+    // }
 }

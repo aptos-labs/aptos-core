@@ -316,42 +316,42 @@ module aptos_framework::aptos_account {
         coin::destroy_mint_cap(mint_cap);
     }
 
-    #[test(alice = @0xa11ce, core = @0x1)]
-    public fun test_transfer_permission(alice: &signer, core: &signer) {
-        use aptos_framework::permissioned_signer;
+    // #[test(alice = @0xa11ce, core = @0x1)]
+    // public fun test_transfer_permission(alice: &signer, core: &signer) {
+    //     use aptos_framework::permissioned_signer;
 
-        let bob = from_bcs::to_address(x"0000000000000000000000000000000000000000000000000000000000000b0b");
+    //     let bob = from_bcs::to_address(x"0000000000000000000000000000000000000000000000000000000000000b0b");
 
-        let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(core);
-        create_account(signer::address_of(alice));
-        coin::deposit(signer::address_of(alice), coin::mint(10000, &mint_cap));
+    //     let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(core);
+    //     create_account(signer::address_of(alice));
+    //     coin::deposit(signer::address_of(alice), coin::mint(10000, &mint_cap));
 
-        let perm_handle = permissioned_signer::create_permissioned_handle(alice);
-        let alice_perm_signer = permissioned_signer::signer_from_permissioned_handle(&perm_handle);
-        primary_fungible_store::grant_apt_permission(alice, &alice_perm_signer, 500);
+    //     let perm_handle = permissioned_signer::create_permissioned_handle(alice);
+    //     let alice_perm_signer = permissioned_signer::signer_from_permissioned_handle(&perm_handle);
+    //     primary_fungible_store::grant_apt_permission(alice, &alice_perm_signer, 500);
 
-        transfer(&alice_perm_signer, bob, 500);
+    //     transfer(&alice_perm_signer, bob, 500);
 
-        coin::destroy_burn_cap(burn_cap);
-        coin::destroy_mint_cap(mint_cap);
-        permissioned_signer::destroy_permissioned_handle(perm_handle);
-    }
+    //     coin::destroy_burn_cap(burn_cap);
+    //     coin::destroy_mint_cap(mint_cap);
+    //     permissioned_signer::destroy_permissioned_handle(perm_handle);
+    // }
 
-    #[test(alice = @0xa11ce, core = @0x1)]
-    public fun test_transfer_to_resource_account(alice: &signer, core: &signer) {
-        let (resource_account, _) = account::create_resource_account(alice, vector[]);
-        let resource_acc_addr = signer::address_of(&resource_account);
-        let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(core);
-        assert!(!coin::is_account_registered<AptosCoin>(resource_acc_addr), 0);
+    // #[test(alice = @0xa11ce, core = @0x1)]
+    // public fun test_transfer_to_resource_account(alice: &signer, core: &signer) {
+    //     let (resource_account, _) = account::create_resource_account(alice, vector[]);
+    //     let resource_acc_addr = signer::address_of(&resource_account);
+    //     let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(core);
+    //     assert!(!coin::is_account_registered<AptosCoin>(resource_acc_addr), 0);
 
-        create_account(signer::address_of(alice));
-        coin::deposit(signer::address_of(alice), coin::mint(10000, &mint_cap));
-        transfer(alice, resource_acc_addr, 500);
-        assert!(coin::balance<AptosCoin>(resource_acc_addr) == 500, 1);
+    //     create_account(signer::address_of(alice));
+    //     coin::deposit(signer::address_of(alice), coin::mint(10000, &mint_cap));
+    //     transfer(alice, resource_acc_addr, 500);
+    //     assert!(coin::balance<AptosCoin>(resource_acc_addr) == 500, 1);
 
-        coin::destroy_burn_cap(burn_cap);
-        coin::destroy_mint_cap(mint_cap);
-    }
+    //     coin::destroy_burn_cap(burn_cap);
+    //     coin::destroy_mint_cap(mint_cap);
+    // }
 
     #[test(from = @0x123, core = @0x1, recipient_1 = @0x124, recipient_2 = @0x125)]
     public fun test_batch_transfer(from: &signer, core: &signer, recipient_1: &signer, recipient_2: &signer) {

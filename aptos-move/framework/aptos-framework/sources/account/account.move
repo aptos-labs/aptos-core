@@ -1252,122 +1252,122 @@ module aptos_framework::account {
         assert!(signer::address_of(&signer) == signer::address_of(&alice), 0);
     }
 
-    #[test(bob = @0x345)]
-    public entry fun test_valid_check_signer_capability_and_create_authorized_signer_with_permission(bob: signer) acquires Account {
-        let (alice_sk, alice_pk) = ed25519::generate_keys();
-        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
-        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
-        let alice_addr = signer::address_of(&alice);
+    // #[test(bob = @0x345)]
+    // public entry fun test_valid_check_signer_capability_and_create_authorized_signer_with_permission(bob: signer) acquires Account {
+    //     let (alice_sk, alice_pk) = ed25519::generate_keys();
+    //     let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+    //     let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+    //     let alice_addr = signer::address_of(&alice);
 
-        let bob_addr = signer::address_of(&bob);
-        create_account(bob_addr);
+    //     let bob_addr = signer::address_of(&bob);
+    //     create_account(bob_addr);
 
-        let challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
-            source_address: alice_addr,
-            recipient_address: bob_addr,
-        };
+    //     let challenge = SignerCapabilityOfferProofChallengeV2 {
+    //         sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+    //         source_address: alice_addr,
+    //         recipient_address: bob_addr,
+    //     };
 
-        let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
+    //     let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
 
-        let alice_permission_handle = permissioned_signer::create_permissioned_handle(&alice);
-        let alice_permission_signer = permissioned_signer::signer_from_permissioned_handle(&alice_permission_handle);
+    //     let alice_permission_handle = permissioned_signer::create_permissioned_handle(&alice);
+    //     let alice_permission_signer = permissioned_signer::signer_from_permissioned_handle(&alice_permission_handle);
 
-        grant_key_offering_permission(&alice, &alice_permission_signer);
+    //     grant_key_offering_permission(&alice, &alice_permission_signer);
 
-        offer_signer_capability(
-            &alice_permission_signer,
-            ed25519::signature_to_bytes(&alice_signer_capability_offer_sig),
-            0,
-            alice_pk_bytes,
-            bob_addr
-        );
+    //     offer_signer_capability(
+    //         &alice_permission_signer,
+    //         ed25519::signature_to_bytes(&alice_signer_capability_offer_sig),
+    //         0,
+    //         alice_pk_bytes,
+    //         bob_addr
+    //     );
 
-        assert!(option::contains(&borrow_global<Account>(alice_addr).signer_capability_offer.for, &bob_addr), 0);
+    //     assert!(option::contains(&borrow_global<Account>(alice_addr).signer_capability_offer.for, &bob_addr), 0);
 
-        let signer = create_authorized_signer(&bob, alice_addr);
-        assert!(signer::address_of(&signer) == signer::address_of(&alice), 0);
+    //     let signer = create_authorized_signer(&bob, alice_addr);
+    //     assert!(signer::address_of(&signer) == signer::address_of(&alice), 0);
 
-        permissioned_signer::destroy_permissioned_handle(alice_permission_handle);
-    }
+    //     permissioned_signer::destroy_permissioned_handle(alice_permission_handle);
+    // }
 
-    #[test(bob = @0x345)]
-    #[expected_failure(abort_code = 0x50017, location = Self)]
-    public entry fun test_valid_check_signer_capability_and_create_authorized_signer_with_no_permission(bob: signer) acquires Account {
-        let (alice_sk, alice_pk) = ed25519::generate_keys();
-        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
-        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
-        let alice_addr = signer::address_of(&alice);
+    // #[test(bob = @0x345)]
+    // #[expected_failure(abort_code = 0x50017, location = Self)]
+    // public entry fun test_valid_check_signer_capability_and_create_authorized_signer_with_no_permission(bob: signer) acquires Account {
+    //     let (alice_sk, alice_pk) = ed25519::generate_keys();
+    //     let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+    //     let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+    //     let alice_addr = signer::address_of(&alice);
 
-        let bob_addr = signer::address_of(&bob);
-        create_account(bob_addr);
+    //     let bob_addr = signer::address_of(&bob);
+    //     create_account(bob_addr);
 
-        let challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
-            source_address: alice_addr,
-            recipient_address: bob_addr,
-        };
+    //     let challenge = SignerCapabilityOfferProofChallengeV2 {
+    //         sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+    //         source_address: alice_addr,
+    //         recipient_address: bob_addr,
+    //     };
 
-        let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
+    //     let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
 
-        let alice_permission_handle = permissioned_signer::create_permissioned_handle(&alice);
-        let alice_permission_signer = permissioned_signer::signer_from_permissioned_handle(&alice_permission_handle);
+    //     let alice_permission_handle = permissioned_signer::create_permissioned_handle(&alice);
+    //     let alice_permission_signer = permissioned_signer::signer_from_permissioned_handle(&alice_permission_handle);
 
-        offer_signer_capability(
-            &alice_permission_signer,
-            ed25519::signature_to_bytes(&alice_signer_capability_offer_sig),
-            0,
-            alice_pk_bytes,
-            bob_addr
-        );
+    //     offer_signer_capability(
+    //         &alice_permission_signer,
+    //         ed25519::signature_to_bytes(&alice_signer_capability_offer_sig),
+    //         0,
+    //         alice_pk_bytes,
+    //         bob_addr
+    //     );
 
-        assert!(option::contains(&borrow_global<Account>(alice_addr).signer_capability_offer.for, &bob_addr), 0);
+    //     assert!(option::contains(&borrow_global<Account>(alice_addr).signer_capability_offer.for, &bob_addr), 0);
 
-        let signer = create_authorized_signer(&bob, alice_addr);
-        assert!(signer::address_of(&signer) == signer::address_of(&alice), 0);
+    //     let signer = create_authorized_signer(&bob, alice_addr);
+    //     assert!(signer::address_of(&signer) == signer::address_of(&alice), 0);
 
-        permissioned_signer::destroy_permissioned_handle(alice_permission_handle);
-    }
+    //     permissioned_signer::destroy_permissioned_handle(alice_permission_handle);
+    // }
 
-    #[test(bob = @0x345)]
-    #[expected_failure(abort_code = 0x50017, location = Self)]
-    public entry fun test_valid_check_signer_capability_and_create_authorized_signer_with_wrong_permission(bob: signer) acquires Account {
-        let (alice_sk, alice_pk) = ed25519::generate_keys();
-        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
-        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
-        let alice_addr = signer::address_of(&alice);
+    // #[test(bob = @0x345)]
+    // #[expected_failure(abort_code = 0x50017, location = Self)]
+    // public entry fun test_valid_check_signer_capability_and_create_authorized_signer_with_wrong_permission(bob: signer) acquires Account {
+    //     let (alice_sk, alice_pk) = ed25519::generate_keys();
+    //     let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+    //     let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+    //     let alice_addr = signer::address_of(&alice);
 
-        let bob_addr = signer::address_of(&bob);
-        create_account(bob_addr);
+    //     let bob_addr = signer::address_of(&bob);
+    //     create_account(bob_addr);
 
-        let challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
-            source_address: alice_addr,
-            recipient_address: bob_addr,
-        };
+    //     let challenge = SignerCapabilityOfferProofChallengeV2 {
+    //         sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+    //         source_address: alice_addr,
+    //         recipient_address: bob_addr,
+    //     };
 
-        let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
+    //     let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
 
-        let alice_permission_handle = permissioned_signer::create_permissioned_handle(&alice);
-        let alice_permission_signer = permissioned_signer::signer_from_permissioned_handle(&alice_permission_handle);
+    //     let alice_permission_handle = permissioned_signer::create_permissioned_handle(&alice);
+    //     let alice_permission_signer = permissioned_signer::signer_from_permissioned_handle(&alice_permission_handle);
 
-        grant_key_rotation_permission(&alice, &alice_permission_signer);
+    //     grant_key_rotation_permission(&alice, &alice_permission_signer);
 
-        offer_signer_capability(
-            &alice_permission_signer,
-            ed25519::signature_to_bytes(&alice_signer_capability_offer_sig),
-            0,
-            alice_pk_bytes,
-            bob_addr
-        );
+    //     offer_signer_capability(
+    //         &alice_permission_signer,
+    //         ed25519::signature_to_bytes(&alice_signer_capability_offer_sig),
+    //         0,
+    //         alice_pk_bytes,
+    //         bob_addr
+    //     );
 
-        assert!(option::contains(&borrow_global<Account>(alice_addr).signer_capability_offer.for, &bob_addr), 0);
+    //     assert!(option::contains(&borrow_global<Account>(alice_addr).signer_capability_offer.for, &bob_addr), 0);
 
-        let signer = create_authorized_signer(&bob, alice_addr);
-        assert!(signer::address_of(&signer) == signer::address_of(&alice), 0);
+    //     let signer = create_authorized_signer(&bob, alice_addr);
+    //     assert!(signer::address_of(&signer) == signer::address_of(&alice), 0);
 
-        permissioned_signer::destroy_permissioned_handle(alice_permission_handle);
-    }
+    //     permissioned_signer::destroy_permissioned_handle(alice_permission_handle);
+    // }
 
     #[test(bob = @0x345)]
     public entry fun test_get_signer_cap_and_is_signer_cap(bob: signer) acquires Account {

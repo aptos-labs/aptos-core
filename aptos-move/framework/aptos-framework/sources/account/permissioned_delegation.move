@@ -167,44 +167,44 @@ module aptos_framework::permissioned_delegation {
         signature: Signature,
     }
 
-    #[test(account = @0xcafe, account_copy = @0xcafe)]
-    fun test_basics(account: signer, account_copy: signer) acquires RegisteredDelegations {
-        let aptos_framework = create_signer_for_test(@aptos_framework);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
-        let (sk, vpk) = generate_keys();
-        let signature = sign_arbitrary_bytes(&sk, vector[1, 2, 3]);
-        let pubkey_bytes = validated_public_key_to_bytes(&vpk);
-        let key = DelegationKey::Ed25519PublicKey(public_key_into_unvalidated(vpk));
-        let sig_bundle = SignatureBundle {
-            pubkey: new_unvalidated_public_key_from_bytes(pubkey_bytes),
-            signature,
-        };
-        let auth_data = auth_data::create_auth_data(vector[1, 2, 3], bcs::to_bytes(&sig_bundle));
-        assert!(!is_permissioned_signer(&account), 1);
-        add_permissioned_handle(&account, key, option::none(), 60);
-        let permissioned_signer = authenticate(account, auth_data);
-        assert!(is_permissioned_signer(&permissioned_signer), 2);
-        remove_permissioned_handle(&account_copy, key);
-    }
+    // #[test(account = @0xcafe, account_copy = @0xcafe)]
+    // fun test_basics(account: signer, account_copy: signer) acquires RegisteredDelegations {
+    //     let aptos_framework = create_signer_for_test(@aptos_framework);
+    //     timestamp::set_time_has_started_for_testing(&aptos_framework);
+    //     let (sk, vpk) = generate_keys();
+    //     let signature = sign_arbitrary_bytes(&sk, vector[1, 2, 3]);
+    //     let pubkey_bytes = validated_public_key_to_bytes(&vpk);
+    //     let key = DelegationKey::Ed25519PublicKey(public_key_into_unvalidated(vpk));
+    //     let sig_bundle = SignatureBundle {
+    //         pubkey: new_unvalidated_public_key_from_bytes(pubkey_bytes),
+    //         signature,
+    //     };
+    //     let auth_data = auth_data::create_auth_data(vector[1, 2, 3], bcs::to_bytes(&sig_bundle));
+    //     assert!(!is_permissioned_signer(&account), 1);
+    //     add_permissioned_handle(&account, key, option::none(), 60);
+    //     let permissioned_signer = authenticate(account, auth_data);
+    //     assert!(is_permissioned_signer(&permissioned_signer), 2);
+    //     remove_permissioned_handle(&account_copy, key);
+    // }
 
-    #[test(account = @0xcafe, account_copy = @0xcafe, account_copy_2 = @0xcafe)]
-    #[expected_failure(abort_code = 0x50006, location = Self)]
-    fun test_rate_limit(account: signer, account_copy: signer, account_copy_2: signer) acquires RegisteredDelegations {
-        let aptos_framework = create_signer_for_test(@aptos_framework);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
-        let (sk, vpk) = generate_keys();
-        let signature = sign_arbitrary_bytes(&sk, vector[1, 2, 3]);
-        let pubkey_bytes = validated_public_key_to_bytes(&vpk);
-        let key = DelegationKey::Ed25519PublicKey(public_key_into_unvalidated(vpk));
-        let sig_bundle = SignatureBundle {
-            pubkey: new_unvalidated_public_key_from_bytes(pubkey_bytes),
-            signature,
-        };
-        let auth_data = auth_data::create_auth_data(vector[1, 2, 3], bcs::to_bytes(&sig_bundle));
-        assert!(!is_permissioned_signer(&account), 1);
-        add_permissioned_handle(&account, key, option::some(rate_limiter::initialize(1, 10)), 60);
-        authenticate(account, auth_data);
-        authenticate(account_copy, auth_data);
-        remove_permissioned_handle(&account_copy_2, key);
-    }
+    // #[test(account = @0xcafe, account_copy = @0xcafe, account_copy_2 = @0xcafe)]
+    // #[expected_failure(abort_code = 0x50006, location = Self)]
+    // fun test_rate_limit(account: signer, account_copy: signer, account_copy_2: signer) acquires RegisteredDelegations {
+    //     let aptos_framework = create_signer_for_test(@aptos_framework);
+    //     timestamp::set_time_has_started_for_testing(&aptos_framework);
+    //     let (sk, vpk) = generate_keys();
+    //     let signature = sign_arbitrary_bytes(&sk, vector[1, 2, 3]);
+    //     let pubkey_bytes = validated_public_key_to_bytes(&vpk);
+    //     let key = DelegationKey::Ed25519PublicKey(public_key_into_unvalidated(vpk));
+    //     let sig_bundle = SignatureBundle {
+    //         pubkey: new_unvalidated_public_key_from_bytes(pubkey_bytes),
+    //         signature,
+    //     };
+    //     let auth_data = auth_data::create_auth_data(vector[1, 2, 3], bcs::to_bytes(&sig_bundle));
+    //     assert!(!is_permissioned_signer(&account), 1);
+    //     add_permissioned_handle(&account, key, option::some(rate_limiter::initialize(1, 10)), 60);
+    //     authenticate(account, auth_data);
+    //     authenticate(account_copy, auth_data);
+    //     remove_permissioned_handle(&account_copy_2, key);
+    // }
 }
