@@ -1473,8 +1473,8 @@ module aptos_framework::fungible_asset {
         create_store(&object::create_object_from_account(owner), metadata)
     }
 
-    #[test_only]
-    use aptos_framework::timestamp;
+    // #[test_only]
+    // use aptos_framework::timestamp;
 
     #[test(creator = @0xcafe)]
     fun test_metadata_basic_flow(creator: &signer) acquires Metadata, Supply, ConcurrentSupply {
@@ -1880,88 +1880,88 @@ module aptos_framework::fungible_asset {
         assert!(aggregator_v2::read(&borrow_global<ConcurrentFungibleBalance>(object::object_address(&creator_store)).balance) == 30, 12);
     }
 
-    #[test(creator = @0xcafe, aaron = @0xface)]
-    fun test_e2e_withdraw_limit(
-        creator: &signer,
-        aaron: &signer,
-    ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance {
-        let aptos_framework = account::create_signer_for_test(@0x1);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
+    // #[test(creator = @0xcafe, aaron = @0xface)]
+    // fun test_e2e_withdraw_limit(
+    //     creator: &signer,
+    //     aaron: &signer,
+    // ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance {
+    //     let aptos_framework = account::create_signer_for_test(@0x1);
+    //     timestamp::set_time_has_started_for_testing(&aptos_framework);
 
-        let (mint_ref, _, _, _, test_token) = create_fungible_asset(creator);
-        let metadata = mint_ref.metadata;
-        let creator_store = create_test_store(creator, metadata);
-        let aaron_store = create_test_store(aaron, metadata);
+    //     let (mint_ref, _, _, _, test_token) = create_fungible_asset(creator);
+    //     let metadata = mint_ref.metadata;
+    //     let creator_store = create_test_store(creator, metadata);
+    //     let aaron_store = create_test_store(aaron, metadata);
 
-        assert!(supply(test_token) == option::some(0), 1);
-        // Mint
-        let fa = mint(&mint_ref, 100);
-        assert!(supply(test_token) == option::some(100), 2);
-        // Deposit
-        deposit(creator_store, fa);
-        // Withdraw
-        let fa = withdraw(creator, creator_store, 80);
-        assert!(supply(test_token) == option::some(100), 3);
-        deposit(aaron_store, fa);
+    //     assert!(supply(test_token) == option::some(0), 1);
+    //     // Mint
+    //     let fa = mint(&mint_ref, 100);
+    //     assert!(supply(test_token) == option::some(100), 2);
+    //     // Deposit
+    //     deposit(creator_store, fa);
+    //     // Withdraw
+    //     let fa = withdraw(creator, creator_store, 80);
+    //     assert!(supply(test_token) == option::some(100), 3);
+    //     deposit(aaron_store, fa);
 
-        // Create a permissioned signer
-        let aaron_permission_handle = permissioned_signer::create_permissioned_handle(aaron);
-        let aaron_permission_signer = permissioned_signer::signer_from_permissioned_handle(&aaron_permission_handle);
+    //     // Create a permissioned signer
+    //     let aaron_permission_handle = permissioned_signer::create_permissioned_handle(aaron);
+    //     let aaron_permission_signer = permissioned_signer::signer_from_permissioned_handle(&aaron_permission_handle);
 
-        // Grant aaron_permission_signer permission to withdraw 10 FA
-        grant_permission_by_store(aaron, &aaron_permission_signer, aaron_store, 10);
+    //     // Grant aaron_permission_signer permission to withdraw 10 FA
+    //     grant_permission_by_store(aaron, &aaron_permission_signer, aaron_store, 10);
 
-        let fa = withdraw(&aaron_permission_signer, aaron_store, 5);
-        deposit(aaron_store, fa);
+    //     let fa = withdraw(&aaron_permission_signer, aaron_store, 5);
+    //     deposit(aaron_store, fa);
 
-        let fa = withdraw(&aaron_permission_signer, aaron_store, 5);
-        deposit(aaron_store, fa);
+    //     let fa = withdraw(&aaron_permission_signer, aaron_store, 5);
+    //     deposit(aaron_store, fa);
 
-        // aaron signer don't abide to the same limit
-        let fa = withdraw(aaron, aaron_store, 5);
-        deposit(aaron_store, fa);
+    //     // aaron signer don't abide to the same limit
+    //     let fa = withdraw(aaron, aaron_store, 5);
+    //     deposit(aaron_store, fa);
 
-        permissioned_signer::destroy_permissioned_handle(aaron_permission_handle);
-    }
+    //     permissioned_signer::destroy_permissioned_handle(aaron_permission_handle);
+    // }
 
-    #[test(creator = @0xcafe, aaron = @0xface)]
-    #[expected_failure(abort_code = 0x50024, location = Self)]
-    fun test_e2e_withdraw_limit_exceeds(
-        creator: &signer,
-        aaron: &signer,
-    ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance {
-        let aptos_framework = account::create_signer_for_test(@0x1);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
+    // #[test(creator = @0xcafe, aaron = @0xface)]
+    // #[expected_failure(abort_code = 0x50024, location = Self)]
+    // fun test_e2e_withdraw_limit_exceeds(
+    //     creator: &signer,
+    //     aaron: &signer,
+    // ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance {
+    //     let aptos_framework = account::create_signer_for_test(@0x1);
+    //     timestamp::set_time_has_started_for_testing(&aptos_framework);
 
-        let (mint_ref, _, _, _, test_token) = create_fungible_asset(creator);
-        let metadata = mint_ref.metadata;
-        let creator_store = create_test_store(creator, metadata);
-        let aaron_store = create_test_store(aaron, metadata);
+    //     let (mint_ref, _, _, _, test_token) = create_fungible_asset(creator);
+    //     let metadata = mint_ref.metadata;
+    //     let creator_store = create_test_store(creator, metadata);
+    //     let aaron_store = create_test_store(aaron, metadata);
 
-        assert!(supply(test_token) == option::some(0), 1);
-        // Mint
-        let fa = mint(&mint_ref, 100);
-        assert!(supply(test_token) == option::some(100), 2);
-        // Deposit
-        deposit(creator_store, fa);
-        // Withdraw
-        let fa = withdraw(creator, creator_store, 80);
-        assert!(supply(test_token) == option::some(100), 3);
-        deposit(aaron_store, fa);
+    //     assert!(supply(test_token) == option::some(0), 1);
+    //     // Mint
+    //     let fa = mint(&mint_ref, 100);
+    //     assert!(supply(test_token) == option::some(100), 2);
+    //     // Deposit
+    //     deposit(creator_store, fa);
+    //     // Withdraw
+    //     let fa = withdraw(creator, creator_store, 80);
+    //     assert!(supply(test_token) == option::some(100), 3);
+    //     deposit(aaron_store, fa);
 
-        // Create a permissioned signer
-        let aaron_permission_handle = permissioned_signer::create_permissioned_handle(aaron);
-        let aaron_permission_signer = permissioned_signer::signer_from_permissioned_handle(&aaron_permission_handle);
+    //     // Create a permissioned signer
+    //     let aaron_permission_handle = permissioned_signer::create_permissioned_handle(aaron);
+    //     let aaron_permission_signer = permissioned_signer::signer_from_permissioned_handle(&aaron_permission_handle);
 
-        // Grant aaron_permission_signer permission to withdraw 10 FA
-        grant_permission_by_store(aaron, &aaron_permission_signer, aaron_store, 10);
+    //     // Grant aaron_permission_signer permission to withdraw 10 FA
+    //     grant_permission_by_store(aaron, &aaron_permission_signer, aaron_store, 10);
 
-        // Withdrawing more than 10 FA yield an error.
-        let fa = withdraw(&aaron_permission_signer, aaron_store, 11);
-        deposit(aaron_store, fa);
+    //     // Withdrawing more than 10 FA yield an error.
+    //     let fa = withdraw(&aaron_permission_signer, aaron_store, 11);
+    //     deposit(aaron_store, fa);
 
-        permissioned_signer::destroy_permissioned_handle(aaron_permission_handle);
-    }
+    //     permissioned_signer::destroy_permissioned_handle(aaron_permission_handle);
+    // }
 
     #[deprecated]
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]

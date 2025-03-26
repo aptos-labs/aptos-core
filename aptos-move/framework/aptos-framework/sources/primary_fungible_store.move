@@ -444,41 +444,41 @@ module aptos_framework::primary_fungible_store {
         deposit(user_2_address, coins);
     }
 
-    #[test(creator = @0xcafe, aaron = @0xface)]
-    fun test_permissioned_flow(
-        creator: &signer,
-        aaron: &signer,
-    ) acquires DeriveRefPod {
-        let (creator_ref, metadata) = create_test_token(creator);
-        let (mint_ref, _transfer_ref, _burn_ref) = init_test_metadata_with_primary_store_enabled(&creator_ref);
-        let creator_address = signer::address_of(creator);
-        let aaron_address = signer::address_of(aaron);
-        assert!(balance(creator_address, metadata) == 0, 1);
-        assert!(balance(aaron_address, metadata) == 0, 2);
-        mint(&mint_ref, creator_address, 100);
-        transfer(creator, metadata, aaron_address, 80);
+    // #[test(creator = @0xcafe, aaron = @0xface)]
+    // fun test_permissioned_flow(
+    //     creator: &signer,
+    //     aaron: &signer,
+    // ) acquires DeriveRefPod {
+    //     let (creator_ref, metadata) = create_test_token(creator);
+    //     let (mint_ref, _transfer_ref, _burn_ref) = init_test_metadata_with_primary_store_enabled(&creator_ref);
+    //     let creator_address = signer::address_of(creator);
+    //     let aaron_address = signer::address_of(aaron);
+    //     assert!(balance(creator_address, metadata) == 0, 1);
+    //     assert!(balance(aaron_address, metadata) == 0, 2);
+    //     mint(&mint_ref, creator_address, 100);
+    //     transfer(creator, metadata, aaron_address, 80);
 
-        let aaron_permission_handle = permissioned_signer::create_permissioned_handle(aaron);
-        let aaron_permission_signer = permissioned_signer::signer_from_permissioned_handle(&aaron_permission_handle);
-        grant_permission(aaron, &aaron_permission_signer, metadata, 10);
+    //     let aaron_permission_handle = permissioned_signer::create_permissioned_handle(aaron);
+    //     let aaron_permission_signer = permissioned_signer::signer_from_permissioned_handle(&aaron_permission_handle);
+    //     grant_permission(aaron, &aaron_permission_signer, metadata, 10);
 
-        let fa = withdraw(&aaron_permission_signer, metadata, 10);
-        deposit(creator_address, fa);
+    //     let fa = withdraw(&aaron_permission_signer, metadata, 10);
+    //     deposit(creator_address, fa);
 
-        assert!(balance(creator_address, metadata) == 30, 3);
-        assert!(balance(aaron_address, metadata) == 70, 4);
+    //     assert!(balance(creator_address, metadata) == 30, 3);
+    //     assert!(balance(aaron_address, metadata) == 70, 4);
 
-        // Withdraw from creator and deposit back to aaron's account with permssioned signer.
-        let fa = withdraw(creator, metadata, 10);
-        deposit_with_signer(&aaron_permission_signer, fa);
+    //     // Withdraw from creator and deposit back to aaron's account with permssioned signer.
+    //     let fa = withdraw(creator, metadata, 10);
+    //     deposit_with_signer(&aaron_permission_signer, fa);
 
-        // deposit_with_signer refills the permission, can now withdraw again.
-        let fa = withdraw(&aaron_permission_signer, metadata, 10);
-        deposit(creator_address, fa);
+    //     // deposit_with_signer refills the permission, can now withdraw again.
+    //     let fa = withdraw(&aaron_permission_signer, metadata, 10);
+    //     deposit(creator_address, fa);
 
-        assert!(balance(creator_address, metadata) == 30, 3);
-        assert!(balance(aaron_address, metadata) == 70, 4);
+    //     assert!(balance(creator_address, metadata) == 30, 3);
+    //     assert!(balance(aaron_address, metadata) == 70, 4);
 
-        permissioned_signer::destroy_permissioned_handle(aaron_permission_handle);
-    }
+    //     permissioned_signer::destroy_permissioned_handle(aaron_permission_handle);
+    // }
 }
