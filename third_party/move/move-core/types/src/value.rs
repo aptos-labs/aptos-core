@@ -804,10 +804,8 @@ impl serde::Serialize for MoveStruct {
                 // Variants need to be serialized as sequences, as the size is not statically known.
                 let tag_idx = *tag as usize;
                 let variant_tag = tag_idx as u32;
-                let variant_names = match variant_name_placeholder((tag + 1) as usize) {
-                    Ok(names) => names,
-                    Err(e) => return Err(serde::ser::Error::custom(format!("{}", e))),
-                };
+                let variant_names = variant_name_placeholder((tag + 1) as usize)
+                    .map_err(|e| serde::ser::Error::custom(format!("{}", e)))?;
                 let variant_name = variant_names[tag_idx];
                 match values.len() {
                     0 => {
