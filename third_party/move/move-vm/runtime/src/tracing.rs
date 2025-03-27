@@ -5,10 +5,7 @@
 #[cfg(any(debug_assertions, feature = "debugging"))]
 use crate::debug::DebugContext;
 #[cfg(any(debug_assertions, feature = "debugging"))]
-use crate::{
-    interpreter::InterpreterDebugInterface,
-    loader::{LoadedFunction, Resolver},
-};
+use crate::{interpreter::InterpreterDebugInterface, loader::LoadedFunction, RuntimeEnvironment};
 #[cfg(any(debug_assertions, feature = "debugging"))]
 use ::{
     move_binary_format::file_format::Bytecode,
@@ -71,7 +68,7 @@ pub(crate) fn trace(
     locals: &Locals,
     pc: u16,
     instr: &Bytecode,
-    resolver: &Resolver,
+    runtime_environment: &RuntimeEnvironment,
     interpreter: &dyn InterpreterDebugInterface,
 ) {
     if *TRACING_ENABLED {
@@ -93,7 +90,7 @@ pub(crate) fn trace(
             locals,
             pc,
             instr,
-            resolver,
+            runtime_environment,
             interpreter,
         );
     }

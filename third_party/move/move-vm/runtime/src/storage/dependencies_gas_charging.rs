@@ -80,7 +80,7 @@ pub fn check_type_tag_dependencies_and_charge_gas(
 /// `ModuleId`, a.k.a. heap allocations, as much as possible, which is critical for
 /// performance.
 pub fn check_dependencies_and_charge_gas<'a, I>(
-    module_storage: &dyn ModuleStorage,
+    module_storage: &impl ModuleStorage,
     gas_meter: &mut impl GasMeter,
     traversal_context: &mut TraversalContext<'a>,
     ids: I,
