@@ -93,6 +93,17 @@ impl NetworkTest for FrameworkUpgrade {
             ctx.swarm.read().await.fork_check(epoch_duration).await?;
         }
 
+        // Upgrade the rest
+        let second_half = &all_validators[all_validators.len() / 2..];
+        let msg = format!("Upgrade the remaining nodes to version: {}", new_version);
+        info!("{}", msg);
+        ctx.report.report_text(msg);
+        batch_update(ctx, second_half, &new_version).await?;
+
+        {
+            ctx.swarm.read().await.fork_check(epoch_duration).await?;
+        }
+
         // Apply the framework release bundle.
         let root_key_path = TempPath::new();
         root_key_path.create_as_file()?;
@@ -197,13 +208,6 @@ impl NetworkTest for FrameworkUpgrade {
             "Compatibility test for {} ==> {} passed",
             old_version, new_version
         ));
-
-        // Upgrade the rest
-        let second_half = &all_validators[all_validators.len() / 2..];
-        let msg = format!("Upgrade the remaining nodes to version: {}", new_version);
-        info!("{}", msg);
-        ctx.report.report_text(msg);
-        batch_update(ctx, second_half, &new_version).await?;
 
         let duration = Duration::from_secs(30);
         let txn_stat = generate_traffic(ctx, &all_validators, duration).await?;
