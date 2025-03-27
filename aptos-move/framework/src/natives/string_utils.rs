@@ -18,6 +18,7 @@ use move_core_types::{
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
+    value_serde::FunctionValueExtension,
     values::{Closure, Reference, Struct, Value, Vector, VectorRef},
 };
 use smallvec::{smallvec, SmallVec};

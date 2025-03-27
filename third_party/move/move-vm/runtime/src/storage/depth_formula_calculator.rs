@@ -14,13 +14,16 @@ use move_vm_types::loaded_data::{
 use std::collections::{BTreeMap, HashMap};
 
 /// Calculates [DepthFormula] for struct types. Stores a cache of visited formulas.
-pub(crate) struct DepthFormulaCalculator<'a> {
-    module_storage: &'a dyn ModuleStorage,
+pub(crate) struct DepthFormulaCalculator<'a, M> {
+    module_storage: &'a M,
     visited_formulas: HashMap<StructNameIndex, DepthFormula>,
 }
 
-impl<'a> DepthFormulaCalculator<'a> {
-    pub(crate) fn new(module_storage: &'a dyn ModuleStorage) -> Self {
+impl<'a, M> DepthFormulaCalculator<'a, M>
+where
+    M: ModuleStorage,
+{
+    pub(crate) fn new(module_storage: &'a M) -> Self {
         Self {
             module_storage,
             visited_formulas: HashMap::new(),

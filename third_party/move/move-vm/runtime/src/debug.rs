@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{interpreter::InterpreterDebugInterface, loader::Resolver, LoadedFunction};
+use crate::{interpreter::InterpreterDebugInterface, LoadedFunction, RuntimeEnvironment};
 use move_binary_format::file_format::Bytecode;
 use move_vm_types::values::{self, Locals};
 use std::{
@@ -101,7 +101,7 @@ impl DebugContext {
         locals: &Locals,
         pc: u16,
         instr: &Bytecode,
-        resolver: &Resolver,
+        runtime_environment: &RuntimeEnvironment,
         interpreter: &dyn InterpreterDebugInterface,
     ) {
         let instr_string = format!("{:?}", instr);
@@ -160,7 +160,7 @@ impl DebugContext {
                             DebugCommand::PrintStack => {
                                 let mut s = String::new();
                                 interpreter
-                                    .debug_print_stack_trace(&mut s, resolver)
+                                    .debug_print_stack_trace(&mut s, runtime_environment)
                                     .unwrap();
                                 println!("{}", s);
                                 println!("Current frame: {}\n", function_string);
