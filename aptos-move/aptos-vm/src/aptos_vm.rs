@@ -23,7 +23,7 @@ use crate::{
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     transaction_validation,
-    verifier::{self, randomness::get_randomness_annotation},
+    verifier::{self},
     VMBlockExecutor, VMValidator,
 };
 use anyhow::anyhow;
@@ -75,9 +75,8 @@ use aptos_types::{
         ViewFunctionOutput, WriteSetPayload,
     },
     vm::module_metadata::{
-        get_compilation_metadata_from_compiled_module,
-        get_compilation_metadata_from_compiled_script, get_metadata, verify_module_metadata,
-        RuntimeModuleMetadataV1,
+        get_compilation_metadata, get_metadata, get_randomness_annotation_for_entry_function,
+        verify_module_metadata_for_module_publish, RuntimeModuleMetadataV1,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
@@ -881,11 +880,15 @@ impl AptosVM {
             );
         }
 
-        // The `has_randomness_attribute()` should have been feature-gated in 1.11...
-        if function.is_friend_or_private()
-            && get_randomness_annotation(module_storage, entry_fn)?.is_some()
-        {
-            session.mark_unbiasable();
+        // The check below should have been feature-gated in 1.11...
+        if function.is_friend_or_private() {
+            let metadata = module_storage.fetch_existing_module_metadata(
+                entry_fn.module().address(),
+                entry_fn.module().name(),
+            )?;
+            if get_randomness_annotation_for_entry_function(entry_fn, &metadata).is_some() {
+                session.mark_unbiasable();
+            }
         }
 
         let struct_constructors_enabled =
@@ -1490,7 +1493,7 @@ impl AptosVM {
                     }
                 }
             }
-            verify_module_metadata(m, self.features())
+            verify_module_metadata_for_module_publish(m, self.features())
                 .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
         }
 
@@ -1514,7 +1517,7 @@ impl AptosVM {
     fn reject_unstable_bytecode(&self, modules: &[CompiledModule]) -> VMResult<()> {
         if self.chain_id().is_mainnet() {
             for module in modules {
-                if let Some(metadata) = get_compilation_metadata_from_compiled_module(module) {
+                if let Some(metadata) = get_compilation_metadata(module) {
                     if metadata.unstable {
                         return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
                             .with_message(
@@ -1531,7 +1534,7 @@ impl AptosVM {
     /// Check whether the script can be run on mainnet based on the unstable tag in the metadata
     pub fn reject_unstable_bytecode_for_script(&self, script: &CompiledScript) -> VMResult<()> {
         if self.chain_id().is_mainnet() {
-            if let Some(metadata) = get_compilation_metadata_from_compiled_script(script) {
+            if let Some(metadata) = get_compilation_metadata(script) {
                 if metadata.unstable {
                     return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
                         .with_message("script marked unstable cannot be run on mainnet".to_string())
