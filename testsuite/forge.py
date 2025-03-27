@@ -1192,6 +1192,14 @@ def create_forge_command(
     Forge Cli args get passed to forge before the test command (i.e. test suite)
     Test args get passed to the test subcommand (i.e. image tag)
     """
+
+    # Override only the framework upgrade and compat test
+    # This is dumb because we specify upgrade image instead of specifying base image
+    # So the meaning of the "image_tag" field is either base or just regular image... 
+    # Not consistently the image we are testing, this interface is a little confusing
+    if "framework-upgrade" in forge_namespace or "compat" in forge_namespace:
+        image_tag = "runtian-rocks" # Your tag here
+
     if forge_runner_mode == "local":
         forge_args = [
             "cargo",
