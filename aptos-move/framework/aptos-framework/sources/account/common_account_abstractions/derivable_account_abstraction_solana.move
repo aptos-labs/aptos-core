@@ -132,9 +132,11 @@ module aptos_framework::derivable_account_abstraction_ed25519_hex {
             entry_function_name.append(
                 bcs::to_bytes(&transaction_context::account_address(entry_function_payload))
             );
+            entry_function_name.append(b"::");
             entry_function_name.append(
                 *transaction_context::module_name(entry_function_payload).bytes()
             );
+            entry_function_name.append(b"::");
             entry_function_name.append(
                 *transaction_context::function_name(entry_function_payload).bytes()
             );
