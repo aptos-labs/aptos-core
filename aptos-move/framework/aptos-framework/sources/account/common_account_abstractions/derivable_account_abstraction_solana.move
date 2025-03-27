@@ -1,0 +1,251 @@
+/// Domain account abstraction using ed25519 hex for signing.
+///
+/// Authentication takes digest, converts to hex (prefixed with 0x, with lowercase letters),
+/// and then expects that to be signed.
+/// authenticator is expected to be signature: vector<u8>
+/// account_identity is raw public_key.
+module aptos_framework::derivable_account_abstraction_ed25519_hex {
+    use aptos_framework::auth_data::AbstractionAuthData;
+    use aptos_std::ed25519::{
+        Self,
+        new_signature_from_bytes,
+        new_unvalidated_public_key_from_bytes,
+    };
+    use std::bcs;
+    use std::chain_id;
+    use std::error;
+    use std::transaction_context;
+
+    const EINVALID_SIGNATURE: u64 = 1;
+    const EINVALID_BASE_58_PUBLIC_KEY: u64 = 2;
+    const EUNSUPPORTED_CHAIN_ID: u64 = 3;
+    const EMISSING_ENTRY_FUNCTION_PAYLOAD: u64 = 4;
+
+    const BASE_58_ALPHABET: vector<u8> = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    const HEX_ALPHABET: vector<u8> = b"0123456789abcdef";
+
+    fun split_abstract_public_key(abstract_public_key: &vector<u8>): (vector<u8>, vector<u8>) {
+        // First 44 bytes are the base58 utf8 encoded public key
+        let base58_public_key = abstract_public_key.slice(0, 44);
+        let domain = abstract_public_key.slice(44, abstract_public_key.length());
+        (base58_public_key, domain)
+    }
+
+    fun network_name(): vector<u8> {
+        let chain_id = chain_id::get();
+        if (chain_id == 1) {
+            b"mainnet"
+        } else if (chain_id == 2) {
+            b"testnet"
+        } else {
+            abort(EUNSUPPORTED_CHAIN_ID)
+        }
+    }
+
+    fun construct_message(
+        base58_public_key: &vector<u8>,
+        domain: &vector<u8>,
+        entry_function_name: &vector<u8>,
+        digest: &vector<u8>,
+    ): vector<u8> {
+        let message = &mut vector[];
+        message.append(*domain);
+        message.append(b" wants you to sign in with your Solana account:\n");
+        message.append(*base58_public_key);
+        message.append(b"\n\nTo execute transaction ");
+        message.append(*entry_function_name);
+        message.append(b" on Aptos blockchain (");
+        message.append(network_name());
+        message.append(b").");
+        message.append(b"\n\nNonce: 0x");
+        message.append(*digest);
+        *message
+    }
+
+    fun to_public_key_bytes(base58_public_key: &vector<u8>): vector<u8> {
+        let bytes = vector[0u8];
+        let base = 58u16;  // Using u16 to handle multiplication without overflow
+
+        let i = 0;
+        while (i < vector::length(base58_public_key)) {
+            let char = *vector::borrow(base58_public_key, i);
+            let (found, char_index) = vector::index_of(&BASE_58_ALPHABET, &char);
+            assert!(found, error::invalid_argument(EINVALID_BASE_58_PUBLIC_KEY));
+
+            let mut_bytes = &mut bytes;
+            let j = 0;
+            let carry = (char_index as u16);
+
+            // For each existing byte, multiply by 58 and add carry
+            while (j < vector::length(mut_bytes)) {
+                let current = (*vector::borrow(mut_bytes, j) as u16);
+                let new_carry = current * base + carry;
+                *vector::borrow_mut(mut_bytes, j) = ((new_carry & 0xff) as u8);
+                carry = new_carry >> 8;
+                j = j + 1;
+            };
+
+            // Add any remaining carry as new bytes
+            while (carry > 0) {
+                vector::push_back(mut_bytes, ((carry & 0xff) as u8));
+                carry = carry >> 8;
+            };
+
+            i = i + 1;
+        };
+
+        // Handle leading zeros (1's in Base58)
+        let i = 0;
+        while (i < vector::length(base58_public_key) && *vector::borrow(base58_public_key, i) == 49) { // '1' is 49 in ASCII
+            vector::push_back(&mut bytes, 0);
+            i = i + 1;
+        };
+
+        vector::reverse(&mut bytes);
+        bytes
+    }
+
+    fun byte_to_hex_string(byte: u8): (u8, u8) {
+        let high = *vector::borrow(&HEX_ALPHABET, ((byte >> 4) & 0xf) as u64);
+        let low = *vector::borrow(&HEX_ALPHABET, (byte & 0xf) as u64);
+        (high, low)
+    }
+
+    fun bytes_to_hex_string(bytes: &vector<u8>): vector<u8> {
+        let hex_utf8 = vector[];
+        let i = 0;
+        while (i < vector::length(bytes)) {
+            let byte = *vector::borrow(bytes, i);
+            let (high, low) = byte_to_hex_string(byte);
+            vector::push_back(&mut hex_utf8, high);
+            vector::push_back(&mut hex_utf8, low);
+            i = i + 1;
+        };
+        hex_utf8
+    }
+
+    fun entry_function_name(): vector<u8> {
+        let maybe_entry_function_payload = transaction_context::entry_function_payload();
+        if (maybe_entry_function_payload.is_some()) {
+            let entry_function_payload = &maybe_entry_function_payload.destroy_some();
+            let entry_function_name = &mut vector[];
+            entry_function_name.append(
+                bcs::to_bytes(&transaction_context::account_address(entry_function_payload))
+            );
+            entry_function_name.append(
+                *transaction_context::module_name(entry_function_payload).bytes()
+            );
+            entry_function_name.append(
+                *transaction_context::function_name(entry_function_payload).bytes()
+            );
+            *entry_function_name
+        } else {
+            abort(EMISSING_ENTRY_FUNCTION_PAYLOAD)
+        }
+    }
+
+    fun authenticate_auth_data(
+        aa_auth_data: AbstractionAuthData,
+        entry_function_name: &vector<u8>
+    ) {
+        let abstract_public_key = aa_auth_data.derivable_abstract_public_key();
+        let (base58_public_key, domain) = split_abstract_public_key(abstract_public_key);
+        let hex_digest = bytes_to_hex_string(aa_auth_data.digest());
+        let message = construct_message(&base58_public_key, &domain, entry_function_name, &hex_digest);
+
+        let public_key_bytes = to_public_key_bytes(&base58_public_key);
+        let public_key = new_unvalidated_public_key_from_bytes(public_key_bytes);
+        let signature = new_signature_from_bytes(*aa_auth_data.derivable_abstract_signature());
+        assert!(
+            ed25519::signature_verify_strict(
+                &signature,
+                &public_key,
+                message,
+            ),
+            error::permission_denied(EINVALID_SIGNATURE)
+        );
+    }
+
+    /// Authorization function for domain account abstraction.
+    public fun authenticate(account: signer, aa_auth_data: AbstractionAuthData): signer {
+        authenticate_auth_data(aa_auth_data, &entry_function_name());
+        account
+    }
+
+    #[test_only]
+    use std::vector;
+    #[test_only]
+    use aptos_framework::auth_data::{create_derivable_auth_data};
+
+    #[test]
+    fun test_split_abstract_public_key() {
+        let abstract_public_key = b"G56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmVaptos-labs.github.io";
+        let (public_key, domain) = split_abstract_public_key(&abstract_public_key);
+        assert!(public_key == b"G56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV");
+        assert!(domain == b"aptos-labs.github.io");
+    }
+
+    #[test(framework = @0x1)]
+    fun test_construct_message(framework: &signer) {
+        chain_id::initialize_for_test(framework, 2);
+
+        let base58_public_key = b"G56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV";
+        let domain = b"localhost:3000";
+        let entry_function_name = b"0x1::coin::transfer";
+        let digest = b"9509edc861070b2848d8161c9453159139f867745dc87d32864a71e796c7d279";
+        let message = construct_message(&base58_public_key, &domain, &entry_function_name, &digest);
+        assert!(message == b"localhost:3000 wants you to sign in with your Solana account:\nG56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV\n\nTo execute transaction 0x1::coin::transfer on Aptos blockchain (testnet).\n\nNonce: 0x9509edc861070b2848d8161c9453159139f867745dc87d32864a71e796c7d279");
+    }
+
+    #[test]
+    fun test_to_public_key_bytes() {
+        let base58_public_key = b"G56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV";
+        let base64_public_key = to_public_key_bytes(&base58_public_key);
+
+        assert!(base64_public_key == vector[223, 236, 102, 141, 171, 166, 118,
+        40, 172, 65, 89, 139, 197, 164, 172, 50, 133, 204, 100, 93, 136, 195,
+        58, 158, 31, 22, 219, 93, 60, 40, 175, 12]);
+    }
+
+    #[test]
+    fun test_bytes_to_hex_string() {
+        let bytes = x"691400a6ef0afaa0bae35ad583e35336f747d7ab4fdf1446600451712b723fc7";
+        let hex_string = bytes_to_hex_string(&bytes);
+        assert!(hex_string == b"691400a6ef0afaa0bae35ad583e35336f747d7ab4fdf1446600451712b723fc7");
+    }
+
+    #[test(framework = @0x1)]
+    fun test_network_name_mainnet(framework: &signer) {
+        chain_id::initialize_for_test(framework, 1);
+        assert!(network_name() == b"mainnet");
+    }
+
+    #[test(framework = @0x1)]
+    fun test_network_name_testnet(framework: &signer) {
+        chain_id::initialize_for_test(framework, 2);
+        assert!(network_name() == b"testnet");
+    }
+
+    #[test(framework = @0x1)]
+    #[expected_failure(abort_code = EUNSUPPORTED_CHAIN_ID)]
+    fun test_network_name_unsupported(framework: &signer) {
+        chain_id::initialize_for_test(framework, 99);
+        network_name();
+    }
+
+    #[test(framework = @0x1)]
+    fun test_authenticate_auth_data(framework: &signer) {
+        chain_id::initialize_for_test(framework, 2);
+
+        let digest = x"026a4f93c2010cbafbac45639e995410d0902d11a3c4f0fcd1c64a1d193f4866";
+        let abstract_signature = vector[129, 0, 6, 135, 53, 153, 88, 201, 243,
+        227, 13, 232, 192, 42, 167, 94, 3, 120, 49, 80, 102, 193, 61, 211, 189,
+        83, 37, 121, 5, 216, 30, 25, 243, 207, 172, 248, 94, 201, 123, 66, 237,
+        66, 122, 201, 171, 215, 162, 187, 218, 188, 24, 165, 52, 147, 210, 39,
+        128, 78, 62, 81, 73, 167, 235, 1];
+        let abstract_public_key = b"G56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmVlocalhost:3000";
+        let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
+        let entry_function_name = b"0x1::coin::transfer";
+        authenticate_auth_data(auth_data, &entry_function_name);
+    }
+}
