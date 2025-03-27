@@ -11,10 +11,10 @@ module aptos_framework::derivable_account_abstraction_ed25519_hex {
         new_signature_from_bytes,
         new_unvalidated_public_key_from_bytes,
     };
-    use std::bcs;
     use std::chain_id;
     use std::error;
-    use std::transaction_context;
+    use std::string_utils;
+    use std::transaction_context::{Self, EntryFunctionPayload};
 
     const EINVALID_SIGNATURE: u64 = 1;
     const EINVALID_BASE_58_PUBLIC_KEY: u64 = 2;
@@ -46,7 +46,7 @@ module aptos_framework::derivable_account_abstraction_ed25519_hex {
         base58_public_key: &vector<u8>,
         domain: &vector<u8>,
         entry_function_name: &vector<u8>,
-        digest: &vector<u8>,
+        digest_utf8: &vector<u8>,
     ): vector<u8> {
         let message = &mut vector[];
         message.append(*domain);
@@ -57,8 +57,8 @@ module aptos_framework::derivable_account_abstraction_ed25519_hex {
         message.append(b" on Aptos blockchain (");
         message.append(network_name());
         message.append(b").");
-        message.append(b"\n\nNonce: 0x");
-        message.append(*digest);
+        message.append(b"\n\nNonce: ");
+        message.append(*digest_utf8);
         *message
     }
 
@@ -105,45 +105,22 @@ module aptos_framework::derivable_account_abstraction_ed25519_hex {
         bytes
     }
 
-    fun byte_to_hex_string(byte: u8): (u8, u8) {
-        let high = *vector::borrow(&HEX_ALPHABET, ((byte >> 4) & 0xf) as u64);
-        let low = *vector::borrow(&HEX_ALPHABET, (byte & 0xf) as u64);
-        (high, low)
-    }
-
-    fun bytes_to_hex_string(bytes: &vector<u8>): vector<u8> {
-        let hex_utf8 = vector[];
-        let i = 0;
-        while (i < vector::length(bytes)) {
-            let byte = *vector::borrow(bytes, i);
-            let (high, low) = byte_to_hex_string(byte);
-            vector::push_back(&mut hex_utf8, high);
-            vector::push_back(&mut hex_utf8, low);
-            i = i + 1;
-        };
-        hex_utf8
-    }
-
-    fun entry_function_name(): vector<u8> {
-        let maybe_entry_function_payload = transaction_context::entry_function_payload();
-        if (maybe_entry_function_payload.is_some()) {
-            let entry_function_payload = &maybe_entry_function_payload.destroy_some();
-            let entry_function_name = &mut vector[];
-            entry_function_name.append(
-                bcs::to_bytes(&transaction_context::account_address(entry_function_payload))
-            );
-            entry_function_name.append(b"::");
-            entry_function_name.append(
-                *transaction_context::module_name(entry_function_payload).bytes()
-            );
-            entry_function_name.append(b"::");
-            entry_function_name.append(
-                *transaction_context::function_name(entry_function_payload).bytes()
-            );
-            *entry_function_name
-        } else {
-            abort(EMISSING_ENTRY_FUNCTION_PAYLOAD)
-        }
+    fun entry_function_name(entry_function_payload: &EntryFunctionPayload): vector<u8> {
+        let entry_function_name = &mut vector[];
+        let addr_str = string_utils::to_string(
+            &transaction_context::account_address(entry_function_payload)
+        ).bytes();
+        // .slice(1) to remove the leading '@' char
+        entry_function_name.append(addr_str.slice(1, addr_str.length()));
+        entry_function_name.append(b"::");
+        entry_function_name.append(
+            *transaction_context::module_name(entry_function_payload).bytes()
+        );
+        entry_function_name.append(b"::");
+        entry_function_name.append(
+            *transaction_context::function_name(entry_function_payload).bytes()
+        );
+        *entry_function_name
     }
 
     fun authenticate_auth_data(
@@ -152,8 +129,8 @@ module aptos_framework::derivable_account_abstraction_ed25519_hex {
     ) {
         let abstract_public_key = aa_auth_data.derivable_abstract_public_key();
         let (base58_public_key, domain) = split_abstract_public_key(abstract_public_key);
-        let hex_digest = bytes_to_hex_string(aa_auth_data.digest());
-        let message = construct_message(&base58_public_key, &domain, entry_function_name, &hex_digest);
+        let digest_utf8 = string_utils::to_string(aa_auth_data.digest()).bytes();
+        let message = construct_message(&base58_public_key, &domain, entry_function_name, digest_utf8);
 
         let public_key_bytes = to_public_key_bytes(&base58_public_key);
         let public_key = new_unvalidated_public_key_from_bytes(public_key_bytes);
@@ -170,10 +147,19 @@ module aptos_framework::derivable_account_abstraction_ed25519_hex {
 
     /// Authorization function for domain account abstraction.
     public fun authenticate(account: signer, aa_auth_data: AbstractionAuthData): signer {
-        authenticate_auth_data(aa_auth_data, &entry_function_name());
-        account
+        let maybe_entry_function_payload = transaction_context::entry_function_payload();
+        if (maybe_entry_function_payload.is_some()) {
+            let entry_function_payload = maybe_entry_function_payload.destroy_some();
+            let entry_function_name = entry_function_name(&entry_function_payload);
+            authenticate_auth_data(aa_auth_data, &entry_function_name);
+            account
+        } else {
+            abort(EMISSING_ENTRY_FUNCTION_PAYLOAD)
+        }
     }
 
+    #[test_only]
+    use std::string::{utf8};
     #[test_only]
     use std::vector;
     #[test_only]
@@ -194,8 +180,8 @@ module aptos_framework::derivable_account_abstraction_ed25519_hex {
         let base58_public_key = b"G56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV";
         let domain = b"localhost:3000";
         let entry_function_name = b"0x1::coin::transfer";
-        let digest = b"9509edc861070b2848d8161c9453159139f867745dc87d32864a71e796c7d279";
-        let message = construct_message(&base58_public_key, &domain, &entry_function_name, &digest);
+        let digest_utf8 = b"0x9509edc861070b2848d8161c9453159139f867745dc87d32864a71e796c7d279";
+        let message = construct_message(&base58_public_key, &domain, &entry_function_name, &digest_utf8);
         assert!(message == b"localhost:3000 wants you to sign in with your Solana account:\nG56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV\n\nTo execute transaction 0x1::coin::transfer on Aptos blockchain (testnet).\n\nNonce: 0x9509edc861070b2848d8161c9453159139f867745dc87d32864a71e796c7d279");
     }
 
@@ -207,13 +193,6 @@ module aptos_framework::derivable_account_abstraction_ed25519_hex {
         assert!(base64_public_key == vector[223, 236, 102, 141, 171, 166, 118,
         40, 172, 65, 89, 139, 197, 164, 172, 50, 133, 204, 100, 93, 136, 195,
         58, 158, 31, 22, 219, 93, 60, 40, 175, 12]);
-    }
-
-    #[test]
-    fun test_bytes_to_hex_string() {
-        let bytes = x"691400a6ef0afaa0bae35ad583e35336f747d7ab4fdf1446600451712b723fc7";
-        let hex_string = bytes_to_hex_string(&bytes);
-        assert!(hex_string == b"691400a6ef0afaa0bae35ad583e35336f747d7ab4fdf1446600451712b723fc7");
     }
 
     #[test(framework = @0x1)]
@@ -233,6 +212,19 @@ module aptos_framework::derivable_account_abstraction_ed25519_hex {
     fun test_network_name_unsupported(framework: &signer) {
         chain_id::initialize_for_test(framework, 99);
         network_name();
+    }
+
+    #[test(framework = @0x1)]
+    fun test_entry_function_name() {
+        let entry_function_payload = transaction_context::new_entry_function_apyload(
+            @0x1,
+            utf8(b"coin"),
+            utf8(b"transfer"),
+            vector[],
+            vector[]
+        );
+        let entry_function_name = entry_function_name(&entry_function_payload);
+        assert!(entry_function_name == b"0x1::coin::transfer");
     }
 
     #[test(framework = @0x1)]
