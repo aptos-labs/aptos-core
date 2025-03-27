@@ -311,7 +311,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::DELEGATION_POOL_ALLOWLISTING
             },
             FeatureFlag::ModuleEventMigration => AptosFeatureFlag::MODULE_EVENT_MIGRATION,
-            FeatureFlag::RejectUnstableBytecode => AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE,
+            FeatureFlag::RejectUnstableBytecode => AptosFeatureFlag::_REJECT_UNSTABLE_BYTECODE,
             FeatureFlag::TransactionContextExtension => {
                 AptosFeatureFlag::TRANSACTION_CONTEXT_EXTENSION
             },
@@ -338,7 +338,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::DefaultToConcurrentFungibleBalance => {
                 AptosFeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE
             },
-            FeatureFlag::LimitVMTypeSize => AptosFeatureFlag::LIMIT_VM_TYPE_SIZE,
+            FeatureFlag::LimitVMTypeSize => AptosFeatureFlag::_LIMIT_VM_TYPE_SIZE,
             FeatureFlag::AbortIfMultisigPayloadMismatch => {
                 AptosFeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH
             },
@@ -354,7 +354,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL
             },
             FeatureFlag::RejectUnstableBytecodeForScript => {
-                AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT
+                AptosFeatureFlag::_REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT
             },
             FeatureFlag::FederatedKeyless => AptosFeatureFlag::FEDERATED_KEYLESS,
             FeatureFlag::TransactionSimulationEnhancement => {
@@ -473,7 +473,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::DelegationPoolAllowlisting
             },
             AptosFeatureFlag::MODULE_EVENT_MIGRATION => FeatureFlag::ModuleEventMigration,
-            AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE => FeatureFlag::RejectUnstableBytecode,
+            AptosFeatureFlag::_REJECT_UNSTABLE_BYTECODE => FeatureFlag::RejectUnstableBytecode,
             AptosFeatureFlag::TRANSACTION_CONTEXT_EXTENSION => {
                 FeatureFlag::TransactionContextExtension
             },
@@ -500,7 +500,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE => {
                 FeatureFlag::DefaultToConcurrentFungibleBalance
             },
-            AptosFeatureFlag::LIMIT_VM_TYPE_SIZE => FeatureFlag::LimitVMTypeSize,
+            AptosFeatureFlag::_LIMIT_VM_TYPE_SIZE => FeatureFlag::LimitVMTypeSize,
             AptosFeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH => {
                 FeatureFlag::AbortIfMultisigPayloadMismatch
             },
@@ -515,7 +515,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL => {
                 FeatureFlag::EnableResourceAccessControl
             },
-            AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT => {
+            AptosFeatureFlag::_REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT => {
                 FeatureFlag::RejectUnstableBytecodeForScript
             },
             AptosFeatureFlag::FEDERATED_KEYLESS => FeatureFlag::FederatedKeyless,

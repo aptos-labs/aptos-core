@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures},
-    transaction::AbortInfo,
-};
+use crate::{on_chain_config::Features, transaction::AbortInfo};
 use lru::LruCache;
 use move_binary_format::{
     access::ModuleAccess,
@@ -237,10 +234,7 @@ pub fn get_metadata_v0(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> 
 }
 
 /// Check if the metadata has unknown key/data types
-fn check_metadata_format(
-    module: &CompiledModule,
-    features: &Features,
-) -> Result<(), MalformedError> {
+fn check_metadata_format(module: &CompiledModule) -> Result<(), MalformedError> {
     let mut exist = false;
     let mut compilation_key_exist = false;
     for data in module.metadata.iter() {
@@ -257,9 +251,7 @@ fn check_metadata_format(
                 bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value)
                     .map_err(|e| MalformedError::DeserializedError(data.key.clone(), e))?;
             }
-        } else if features.is_enabled(FeatureFlag::REJECT_UNSTABLE_BYTECODE)
-            && data.key == *COMPILATION_METADATA_KEY
-        {
+        } else if data.key == *COMPILATION_METADATA_KEY {
             if compilation_key_exist {
                 return Err(MalformedError::DuplicateKey);
             }
@@ -478,17 +470,9 @@ pub fn is_valid_resource_group_member(
 pub fn verify_module_metadata(
     module: &CompiledModule,
     features: &Features,
-    timed_features: &TimedFeatures,
 ) -> Result<(), MetaDataValidationError> {
-    if features.is_enabled(FeatureFlag::SAFER_METADATA)
-        && timed_features.is_enabled(TimedFeatureFlag::ModuleComplexityCheck)
-    {
-        check_module_complexity(module)?;
-    }
-
-    if features.are_resource_groups_enabled() {
-        check_metadata_format(module, features)?;
-    }
+    check_module_complexity(module)?;
+    check_metadata_format(module)?;
     let metadata = if let Some(metadata) = get_metadata_from_compiled_module(module) {
         metadata
     } else {
@@ -533,16 +517,13 @@ pub fn verify_module_metadata(
 
     for (struct_, attrs) in &metadata.struct_attributes {
         for attr in attrs {
-            if features.are_resource_groups_enabled() {
-                if attr.is_resource_group() && attr.get_resource_group().is_some() {
-                    is_valid_resource_group(&structs, struct_)?;
-                    continue;
-                } else if attr.is_resource_group_member()
-                    && attr.get_resource_group_member().is_some()
-                {
-                    is_valid_resource_group_member(&structs, struct_)?;
-                    continue;
-                }
+            if attr.is_resource_group() && attr.get_resource_group().is_some() {
+                is_valid_resource_group(&structs, struct_)?;
+                continue;
+            } else if attr.is_resource_group_member() && attr.get_resource_group_member().is_some()
+            {
+                is_valid_resource_group_member(&structs, struct_)?;
+                continue;
             }
             if features.is_module_event_enabled() && attr.is_event() {
                 continue;

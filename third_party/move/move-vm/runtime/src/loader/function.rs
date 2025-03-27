@@ -206,14 +206,9 @@ impl LazyLoadedFunction {
         mask: ClosureMask,
         captured_layouts: &[MoveTypeLayout],
     ) -> PartialVMResult<Rc<LoadedFunction>> {
-        let (module, function) = module_storage
-            .fetch_function_definition(module_id.address(), module_id.name(), fun_id)
+        let function = module_storage
+            .load_function(module_id, fun_id, ty_args)
             .map_err(|err| err.to_partial())?;
-        let ty_args = ty_args
-            .iter()
-            .map(|t| module_storage.fetch_ty(t))
-            .collect::<PartialVMResult<Vec<_>>>()?;
-        Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)?;
 
         // Verify that the function argument types match the layouts used for deserialization.
         // This is only done in paranoid mode. Since integrity of storage
@@ -247,11 +242,7 @@ impl LazyLoadedFunction {
                 }
             }
         }
-        Ok(Rc::new(LoadedFunction {
-            owner: LoadedFunctionOwner::Module(module),
-            ty_args,
-            function,
-        }))
+        Ok(Rc::new(function))
     }
 }
 

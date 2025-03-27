@@ -64,7 +64,8 @@ pub enum FeatureFlag {
     _DEPRECATED_RECONFIGURE_WITH_DKG = 45,
     KEYLESS_ACCOUNTS = 46,
     KEYLESS_BUT_ZKLESS_ACCOUNTS = 47,
-    _DEPRECATED_REMOVE_DETAILED_ERROR_FROM_HASH = 48, // This feature is not used
+    /// This feature was never used.
+    _DEPRECATED_REMOVE_DETAILED_ERROR_FROM_HASH = 48,
     JWK_CONSENSUS = 49,
     CONCURRENT_FUNGIBLE_ASSETS = 50,
     REFUNDABLE_BYTES = 51,
@@ -74,7 +75,8 @@ pub enum FeatureFlag {
     MULTISIG_V2_ENHANCEMENT = 55,
     DELEGATION_POOL_ALLOWLISTING = 56,
     MODULE_EVENT_MIGRATION = 57,
-    REJECT_UNSTABLE_BYTECODE = 58,
+    /// Enabled on mainnet and cannot be disabled.
+    _REJECT_UNSTABLE_BYTECODE = 58,
     TRANSACTION_CONTEXT_EXTENSION = 59,
     COIN_TO_FUNGIBLE_ASSET_MIGRATION = 60,
     PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS = 61,
@@ -85,14 +87,16 @@ pub enum FeatureFlag {
     AGGREGATOR_V2_IS_AT_LEAST_API = 66,
     CONCURRENT_FUNGIBLE_BALANCE = 67,
     DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE = 68,
-    LIMIT_VM_TYPE_SIZE = 69,
+    /// Enabled on mainnet and cannot be disabled.
+    _LIMIT_VM_TYPE_SIZE = 69,
     ABORT_IF_MULTISIG_PAYLOAD_MISMATCH = 70,
     DISALLOW_USER_NATIVES = 71,
     ALLOW_SERIALIZED_SCRIPT_ARGS = 72,
     USE_COMPATIBILITY_CHECKER_V2 = 73,
     ENABLE_ENUM_TYPES = 74,
     ENABLE_RESOURCE_ACCESS_CONTROL = 75,
-    REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT = 76,
+    /// Enabled on mainnet and cannot be disabled.
+    _REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT = 76,
     FEDERATED_KEYLESS = 77,
     TRANSACTION_SIMULATION_ENHANCEMENT = 78,
     COLLECTION_OWNER = 79,
@@ -189,7 +193,7 @@ impl FeatureFlag {
             FeatureFlag::MULTISIG_V2_ENHANCEMENT,
             FeatureFlag::DELEGATION_POOL_ALLOWLISTING,
             FeatureFlag::MODULE_EVENT_MIGRATION,
-            FeatureFlag::REJECT_UNSTABLE_BYTECODE,
+            FeatureFlag::_REJECT_UNSTABLE_BYTECODE,
             FeatureFlag::TRANSACTION_CONTEXT_EXTENSION,
             FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
             FeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS,
@@ -197,16 +201,18 @@ impl FeatureFlag {
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
             FeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API,
             FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
-            FeatureFlag::LIMIT_VM_TYPE_SIZE,
+            FeatureFlag::_LIMIT_VM_TYPE_SIZE,
             FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH,
             FeatureFlag::DISALLOW_USER_NATIVES,
             FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS,
             FeatureFlag::USE_COMPATIBILITY_CHECKER_V2,
             FeatureFlag::ENABLE_ENUM_TYPES,
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
-            FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
+            FeatureFlag::_REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
             FeatureFlag::NATIVE_MEMORY_OPERATIONS,
+            FeatureFlag::_ENABLE_LOADER_V2,
+            FeatureFlag::_DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES,
             FeatureFlag::COLLECTION_OWNER,
             FeatureFlag::PERMISSIONED_SIGNER,
             FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
@@ -280,10 +286,6 @@ impl Features {
         let byte_index = (val / 8) as usize;
         let bit_mask = 1 << (val % 8);
         byte_index < self.features.len() && (self.features[byte_index] & bit_mask != 0)
-    }
-
-    pub fn are_resource_groups_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::RESOURCE_GROUPS)
     }
 
     pub fn is_storage_slot_metadata_enabled(&self) -> bool {
