@@ -15,7 +15,7 @@ module aptos_framework::account_abstraction {
     use aptos_framework::object;
     use aptos_framework::auth_data::AbstractionAuthData;
     use aptos_framework::system_addresses;
-    use aptos_framework::permissioned_signer::is_permissioned_signer;
+    use aptos_framework::permissioned_signer::{Self, is_permissioned_signer};
     #[test_only]
     use aptos_framework::account::create_account_for_test;
     #[test_only]
@@ -286,7 +286,7 @@ module aptos_framework::account_abstraction {
         let returned_signer = dispatchable_authenticate(account, signing_data, &func_info);
         // Returned signer MUST represent the same account address. Otherwise, it may break the invariant of Aptos blockchain!
         assert!(
-            master_signer_addr == signer::address_of(&returned_signer),
+            master_signer_addr == permissioned_signer::address_of(&returned_signer),
             error::invalid_state(EINCONSISTENT_SIGNER_ADDRESS)
         );
         returned_signer
