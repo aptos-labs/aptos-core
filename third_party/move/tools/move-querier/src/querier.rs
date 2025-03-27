@@ -5,11 +5,11 @@
 use anyhow::{anyhow, Result};
 use clap::Args;
 use move_binary_format::{
-    access::ScriptAccess, binary_views::BinaryIndexedView, file_format::{Bytecode, CodeUnit, CompiledScript, FunctionDefinitionIndex, FunctionHandle, FunctionHandleIndex, IdentifierIndex, SignatureToken, TableIndex}, CompiledModule
+    binary_views::BinaryIndexedView, file_format::{Bytecode, CodeUnit, CompiledScript, FunctionDefinitionIndex, FunctionHandleIndex, SignatureToken, TableIndex, Visibility}, CompiledModule
 };
 use petgraph::dot::{Dot, Config};
 use petgraph::graph::{DiGraph, NodeIndex};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
 //Constants for result file extension
@@ -20,12 +20,16 @@ const UNKNOWN_EXTENSION: &str = "mv.unknown";
 //Constants for bytecode type
 const SCRIPT_CODE: &str = "script";
 const MODULE_CODE: &str = "module";
-const UNKNOWN_CODE: &str = "unknown";
+const _UNKNOWN_CODE: &str = "unknown";
 
 //Constants for function signatures
 const MAIN_FUNCTION: &str = "main";
-const SCRIPT_MODULE: &str = "self";
-const ENTRY_MODIFIER: &str = "entry";
+const SCRIPT_NAME: &str = "script";
+const ENTRY_MODIFIER: &str = "entry ";
+const NATIVE_MODIFIER: &str = "native ";
+const PUBLIC_FUNCTION: &str = "public ";
+const FRIEND_FUNCTION: &str = "public(friend) ";
+const PRIVATE_FUNCTION: &str = "";
 const EMPTY: &str = "";
 
 /// Holds the commands that we support while querying the bytecode.
@@ -41,7 +45,7 @@ pub struct QuerierOptions {
 }
 
 impl QuerierOptions {
-    // check if any query command is provided
+    // check if a valid query command is provided
     pub fn has_any_true(&self) -> bool {
         self.dump_call_graph || self.check_bytecode_type
     }
@@ -76,6 +80,7 @@ impl Querier {
     pub fn query(&self) -> Result<String> {
         let module: CompiledModule;
         let script: CompiledScript;
+
         //Get a binary view of the bytecode
         let bytecode = if let Ok(bytecode) = CompiledScript::deserialize(&self.bytecode_bytes) {
             script = bytecode;
@@ -100,7 +105,6 @@ impl Querier {
         }
 
         unreachable!("Not supported");
-
     }
 
 }
@@ -110,7 +114,6 @@ pub struct BytecodeTypeChecker<'view> {
 }
 
 impl<'view> BytecodeTypeChecker<'view>{
-
     pub fn new(bytecode: BinaryIndexedView<'view>) ->Self {
         Self {
             bytecode,
@@ -124,9 +127,6 @@ impl<'view> BytecodeTypeChecker<'view>{
             }
             BinaryIndexedView::Module(_) => {
                 Ok(String::from(MODULE_CODE))
-            }
-            _ => {
-                Ok(String::from(UNKNOWN_CODE))
             }
         }
     }
@@ -182,11 +182,178 @@ impl<'view> CGBuilder<'view>{
             bytecode,
         }
     }
-    fn format_function_sig(&self, entry_modifier: &str,
-        native_modifier: &str, visibility_modifier: &str,
-        module_name: &str, func_name: &str, ty_params: &str, params: &str,
-        ret_type: &str) -> String {
-            format!("{entry_modifier} {native_modifier} {visibility_modifier} {module_name}::{func_name}{ty_params}({params}){ret_type}")
+
+    fn dump_call_graph(&self) -> Result<String> {
+        let call_graph: QueryGraph<CGNode> = match &self.bytecode {
+             BinaryIndexedView::Script(script) => {
+                 self.dump_script_call_graph(*script)?
+             }
+             BinaryIndexedView::Module(module) => {
+                 self.dump_module_call_graph(*module)?
+             }
+         };
+
+         let dot = Dot::with_attr_getters(
+            &call_graph.graph,
+            &[Config::EdgeNoLabel],
+             &|_graph, _| "".to_string(),
+             &|_graph, (_, node)| format!("label=\"{}\"", node.func_sig),
+        );
+         Ok(format!("{:?}", dot))
+     }
+
+     fn dump_script_call_graph(&self, script: &CompiledScript) -> Result<QueryGraph<CGNode>> {
+        let mut call_graph = QueryGraph::<CGNode>::new();
+        let mut func_sig_map = HashMap::<FunctionHandleIndex, String>::new();
+
+        // add the entry function node
+        let script_entry_node = CGNode{
+            func_sig: self.format_function_sig(None, None, Some(script), &mut func_sig_map)?
+        };
+        call_graph.add_node(script_entry_node.clone());
+
+        // add child function nodes and edges accordingly
+        let child_funcs = self.get_child_functions(Some(&script.code));
+        for func in child_funcs.into_iter(){
+            let child_node = CGNode{
+                func_sig: self.format_function_sig(Some(&func), None, Some(script), &mut func_sig_map)?
+            };
+            call_graph.add_node(child_node.clone());
+            call_graph.add_edge(script_entry_node.clone(), child_node.clone());
+        }
+        Ok(call_graph)
+    }
+
+    fn dump_module_call_graph(&self, module: &CompiledModule) -> Result<QueryGraph<CGNode>> {
+        let mut call_graph = QueryGraph::<CGNode>::new();
+        let mut func_sig_map = HashMap::<FunctionHandleIndex, String>::new();
+
+        // collect all the functions with definitions and save them as nodes
+        for func_idx in (0..module.function_defs.len()).into_iter(){
+                let function_definition_index = FunctionDefinitionIndex(func_idx as TableIndex);
+                let function_definition  = self.bytecode.function_def_at(function_definition_index)?;
+                let function_handle_idx = function_definition.function;
+
+                let node_with_def = CGNode{
+                    func_sig: self.format_function_sig(Some(&function_handle_idx), Some(&function_definition_index), None, &mut func_sig_map)?
+                };
+
+                call_graph.add_node(node_with_def.clone());
+        };
+
+        // process children of functions with definitions;
+        // Warning: never merge this loop with the loop above, as merging will mess up the signature of the functions
+        for func_idx in (0..module.function_defs.len()).into_iter(){
+            let function_definition_index = FunctionDefinitionIndex(func_idx as TableIndex);
+            let function_definition  = self.bytecode.function_def_at(function_definition_index)?;
+            let function_handle_idx = function_definition.function;
+
+            let node_with_def = CGNode{
+                func_sig: self.format_function_sig(Some(&function_handle_idx), Some(&function_definition_index), None, &mut func_sig_map)?
+            };
+
+            let child_funcs = self.get_child_functions(function_definition.code.as_ref());
+            for func in child_funcs.into_iter(){
+                let child_node = CGNode{
+                    func_sig: self.format_function_sig(Some(&func), None, None, &mut func_sig_map)?
+                };
+                call_graph.add_node(child_node.clone());
+                call_graph.add_edge(node_with_def.clone(), child_node.clone());
+            }
+        };
+        Ok(call_graph)
+    }
+
+    fn get_child_functions(&self, code: Option<&CodeUnit>) -> HashSet<FunctionHandleIndex>{
+        match code {
+            Some(code) => {
+                code.code
+                .iter()
+                .filter_map(|inst| self.disassemble_instruction(inst)) // returns Option<FunctionHandleIndex>
+                .collect::<HashSet<FunctionHandleIndex>>()
+            },
+            None => HashSet::<FunctionHandleIndex>::new(),
+        }
+    }
+
+    fn disassemble_instruction(&self,  instruction: &Bytecode) -> Option<FunctionHandleIndex> {
+        match instruction {
+            Bytecode::Call(method_idx) => Some(*method_idx),
+            _ => None,
+        }
+    }
+
+    // Create a signature for a given function
+    //  Script Entry Function: No Function Handle, No Function Definition, Only Script
+    //  Script Non-Entry Function: Yes Function Handle, No Function Definition, No Script
+    //  Module Internal Function: Yes Function Handle, Yes Function Definition, No Script
+    //  Module External/Native/Imported Function: Yes Function Handle, No Function Definition, No Script
+    fn format_function_sig(&self, fh: Option<&FunctionHandleIndex>, fd: Option<&FunctionDefinitionIndex>, s: Option<&CompiledScript>, func_sig_map: &mut HashMap<FunctionHandleIndex, String>) -> Result<String> {
+
+        // Function handler is given; No need to worry about script entry function anymore
+        if let Some(function_handle_idx) = fh {
+            //Cache the function sig; not just for efficiency, but also for avoiding creating different func sigs for the same function (defined by function handle index)
+            if func_sig_map.contains_key(function_handle_idx){
+                return Ok(func_sig_map.get(function_handle_idx).unwrap().clone());
+            }
+
+            let function_handle = self.bytecode.function_handle_at(*function_handle_idx);
+
+            let (entry_modifier, native_modifier, visibility_modifier) = match fd{
+                Some(function_def_index) => {
+                    let function_def = self.bytecode.function_def_at(*function_def_index)?;
+
+                    let entry = if function_def.is_entry{
+                        ENTRY_MODIFIER
+                    }else{
+                        EMPTY
+                    };
+                    let native = if function_def.is_native(){
+                        NATIVE_MODIFIER
+                    }else{
+                        EMPTY
+                    };
+                    let visibility = match function_def.visibility{
+                        Visibility::Private => PRIVATE_FUNCTION,
+                        Visibility::Friend => FRIEND_FUNCTION,
+                        Visibility::Public => PUBLIC_FUNCTION
+                    };
+
+                    (entry, native, visibility)
+                }
+                 _ => {
+                    (EMPTY, EMPTY, EMPTY)
+                 }
+            };
+
+            let module_handle = self.bytecode.module_handle_at(function_handle.module);
+            let module_id = self.bytecode.module_id_for_handle(module_handle);
+            let module_name = module_id.name.as_str();
+            let function_name = self.bytecode.identifier_at(function_handle.name).as_str();
+            let ty_params: &str = EMPTY;
+            let params: Vec<String>= self.bytecode.signature_at(function_handle.parameters).0.iter().map(|token|self.format_sig_token(token)).collect();
+            let ret_type: Vec<String>= self.bytecode.signature_at(function_handle.return_).0.iter().map(|token|self.format_sig_token(token)).collect();
+
+            let res = format!("{}{}{}{}::{}<{}>({}){}", entry_modifier, native_modifier, visibility_modifier, module_name, function_name, ty_params, params.join(", "), ret_type.join(", "));
+            func_sig_map.insert(*function_handle_idx, res.clone());
+            return Ok(res);
+        }
+
+        // If we get to this point, the function must be the script entry function
+        // We never need to worry about caching the function sig
+        if let Some(_) = s {
+            let entry_modifier = ENTRY_MODIFIER;
+            let native_modifier: &str = EMPTY;
+            let visibility_modifier = EMPTY;
+            let module_name = SCRIPT_NAME;
+            let function_name = MAIN_FUNCTION;
+            let ty_params = EMPTY;
+            let params =  EMPTY; //Vec<String>= self.bytecode.signature_at(script.parameters).0.iter().map(|token|self.format_sig_token(token)).collect();
+            let ret_type = EMPTY;
+            return Ok(format!("{}{}{}{}::{}<{}>({}){}", entry_modifier, native_modifier, visibility_modifier, module_name, function_name, ty_params, params, ret_type));
+        }
+
+        Ok(String::from(""))
     }
 
     // code mostly copied from the move disassembler code
@@ -216,90 +383,4 @@ impl<'view> CGBuilder<'view>{
         }
     }
 
-    fn disassemble_instruction(&self,  instruction: &Bytecode) -> Option<FunctionHandleIndex> {
-        match instruction {
-            Bytecode::Call(method_idx) => Some(*method_idx),
-            _ => None,
-        }
-    }
-
-    fn get_child_functions(&self, code: Option<&CodeUnit>) -> Vec<FunctionHandleIndex>{
-        match code {
-            Some(code) => {
-                code.code
-                .iter()
-                .filter_map(|inst| self.disassemble_instruction(inst)) // returns Option<FunctionHandleIndex>
-                .collect::<Vec<FunctionHandleIndex>>()
-            },
-            None => Vec::<FunctionHandleIndex>::new(),
-        }
-    }
-
-    fn dump_script_call_graph(&self, script: &CompiledScript) -> Result<QueryGraph<CGNode>> {
-        let mut call_graph = QueryGraph::<CGNode>::new();
-
-        // add the entry function node
-        let entry_modifier = ENTRY_MODIFIER;
-        let native_modifier: &str = EMPTY;
-        let visibility_modifier = EMPTY;
-        let module_name = SCRIPT_MODULE;
-        let func_name = MAIN_FUNCTION;
-        let ty_params = EMPTY;
-        let params : Vec<String>= self.bytecode.signature_at(script.parameters).0.iter().map(|token|self.format_sig_token(token)).collect();
-        let ret_type = EMPTY;
-        let script_entry_node = CGNode{func_sig :
-            self.format_function_sig(entry_modifier, native_modifier, visibility_modifier, module_name, func_name, ty_params, params.join(" ").as_str(), ret_type)};
-
-        call_graph.add_node(script_entry_node.clone());
-
-        let child_funcs = self.get_child_functions(Some(&script.code));
-
-        child_funcs.iter()
-        .for_each(|func_idx| {
-            let function_handle = script.function_handle_at(*func_idx);
-            let module_handle = script.module_handle_at(function_handle.module);
-
-            let entry_modifier = EMPTY;
-            let native_modifier: &str = EMPTY;
-            let visibility_modifier = EMPTY;
-            let module_id = script.module_id_for_handle(module_handle);
-            let module_name = module_id.name.as_str();
-            let func_name = script.identifier_at(function_handle.name).as_str();
-            let ty_params = EMPTY;
-            let params: Vec<String>= self.bytecode.signature_at(function_handle.parameters).0.iter().map(|token|self.format_sig_token(token)).collect();
-            let ret_type: Vec<String>= self.bytecode.signature_at(function_handle.return_).0.iter().map(|token|self.format_sig_token(token)).collect();
-            let child_node = CGNode{func_sig :
-                self.format_function_sig(entry_modifier, native_modifier, visibility_modifier, module_name, func_name, ty_params, params.join(" ").as_str(), ret_type.join(" ").as_str())};
-            call_graph.add_node(child_node.clone());
-            call_graph.add_edge(script_entry_node.clone(), child_node.clone());
-        });
-
-        Ok(call_graph)
-    }
-
-    fn dump_module_call_graph(&self) -> QueryGraph<CGNode> {
-        let call_graph = QueryGraph::<CGNode>::new();
-
-        call_graph
-    }
-
-    fn dump_call_graph(&self) -> Result<String> {
-       let call_graph: QueryGraph<CGNode> = match &self.bytecode {
-            BinaryIndexedView::Script(script) => {
-                self.dump_script_call_graph(*script)?
-            }
-            BinaryIndexedView::Module(_) => {
-                self.dump_module_call_graph()
-            }
-        };
-
-    let dot = Dot::with_attr_getters(
-        &call_graph.graph,
-        &[Config::EdgeNoLabel],
-        &|_graph, _| "".to_string(),
-        &|_graph, (_, node)| format!("label=\"{}\"", node.func_sig),
-    );
-
-        Ok(format!("{:?}", dot))
-    }
 }
