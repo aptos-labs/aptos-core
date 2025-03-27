@@ -74,13 +74,6 @@ impl NetworkTest for FrameworkUpgrade {
         info!("{}", msg);
         ctx.report.report_text(msg);
 
-        // Update half the validators to latest version.
-        let first_half = &all_validators[..all_validators.len() / 2];
-        let msg = format!("Upgrade the nodes to version: {}", new_version);
-        info!("{}", msg);
-        ctx.report.report_text(msg);
-        batch_update(ctx, first_half, &new_version).await?;
-
         // Generate some traffic
         let duration = Duration::from_secs(30);
         let txn_stat = generate_traffic(ctx, &all_validators, duration).await?;
@@ -198,6 +191,20 @@ impl NetworkTest for FrameworkUpgrade {
             old_version, new_version
         ));
 
+        let duration = Duration::from_secs(30);
+        let txn_stat = generate_traffic(ctx, &all_validators, duration).await?;
+        ctx.report.report_txn_stats(
+            format!("{}::full-framework-upgrade", self.name()),
+            &txn_stat,
+        );
+
+        // Update half the validators to latest version.
+        let first_half = &all_validators[..all_validators.len() / 2];
+        let msg = format!("Upgrade the nodes to version: {}", new_version);
+        info!("{}", msg);
+        ctx.report.report_text(msg);
+        batch_update(ctx, first_half, &new_version).await?;
+
         // Upgrade the rest
         let second_half = &all_validators[all_validators.len() / 2..];
         let msg = format!("Upgrade the remaining nodes to version: {}", new_version);
@@ -205,12 +212,9 @@ impl NetworkTest for FrameworkUpgrade {
         ctx.report.report_text(msg);
         batch_update(ctx, second_half, &new_version).await?;
 
-        let duration = Duration::from_secs(30);
-        let txn_stat = generate_traffic(ctx, &all_validators, duration).await?;
-        ctx.report.report_txn_stats(
-            format!("{}::full-framework-upgrade", self.name()),
-            &txn_stat,
-        );
+        {
+            ctx.swarm.read().await.fork_check(epoch_duration).await?;
+        }
 
         {
             ctx.swarm.read().await.fork_check(epoch_duration).await?;
