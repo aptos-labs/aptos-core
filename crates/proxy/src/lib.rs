@@ -73,7 +73,7 @@ impl Proxy {
 }
 
 impl NoProxy {
-    /// Returns a new no proxy configration if the no_proxy/NO_PROXY environment variable is set.
+    /// Returns a new no proxy configuration if the no_proxy/NO_PROXY environment variable is set.
     /// Returns None otherwise
     fn new() -> Option<Self> {
         let raw = env::var("no_proxy")

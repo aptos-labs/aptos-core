@@ -299,7 +299,7 @@ pub fn get_app_name() -> Result<String, AptosLedgerError> {
 ///
 /// # Arguments
 ///
-/// * `index_range` - start(inclusive) - end(exclusive) acounts, that you want to fetch, if None default to 0-10
+/// * `index_range` - start(inclusive) - end(exclusive) accounts, that you want to fetch, if None default to 0-10
 pub fn fetch_batch_accounts(
     index_range: Option<Range<u32>>,
 ) -> Result<BTreeMap<String, AccountAddress>, AptosLedgerError> {
