@@ -37,6 +37,10 @@ module aptos_framework::derivable_account_abstraction_ed25519_hex {
             b"mainnet"
         } else if (chain_id == 2) {
             b"testnet"
+        } else if chain_id == 3 {
+            b"devnet"
+        } else if chain_id == 4 {
+            b"localnet"
         } else {
             abort(EUNSUPPORTED_CHAIN_ID)
         }
