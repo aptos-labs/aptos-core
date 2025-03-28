@@ -102,9 +102,8 @@ module aptos_framework::transaction_validation {
     // TODO: can be removed after features have been rolled out.
     inline fun allow_missing_txn_authentication_key(transaction_sender: address): bool {
         // aa verifies authentication itself
-        features::is_account_abstraction_enabled() &&
-        (features::is_domain_account_abstraction_enabled()
-            || account_abstraction::using_dispatchable_authenticator(transaction_sender))
+        features::is_derivable_account_abstraction_enabled()
+            || (features::is_account_abstraction_enabled() && account_abstraction::using_dispatchable_authenticator(transaction_sender))
     }
 
     fun prologue_common(
