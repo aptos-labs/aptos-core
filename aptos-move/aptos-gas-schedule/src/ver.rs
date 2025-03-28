@@ -8,6 +8,9 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V23
+///   - Introduced eth_trie_proof* gas-schedule parameters utilized in native crypto function
+///     referenced from `0x1::supra_std::eth_trie`
 /// - V22
 ///   - Increased governance transaction execution limit from 4B to 5B to enable framework upgrades without changing
 ///     the gas schedule.
@@ -70,7 +73,7 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_16_SUPRA_V1_5_1;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_16_SUPRA_V1_6_0;
 
 pub mod gas_feature_versions {
     pub const RELEASE_V1_8: u64 = 11;
@@ -84,4 +87,5 @@ pub mod gas_feature_versions {
     pub const RELEASE_V1_15: u64 = 20;
     pub const RELEASE_V1_16: u64 = 21;
     pub const RELEASE_V1_16_SUPRA_V1_5_1: u64 = 22;
+    pub const RELEASE_V1_16_SUPRA_V1_6_0: u64 = 23;
 }
