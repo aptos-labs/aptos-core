@@ -310,6 +310,7 @@ dependencies = [
  "aptos-global-constants",
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
+ "aptos-indexer-processor-sdk",
  "aptos-keygen",
  "aptos-ledger",
  "aptos-localnet",

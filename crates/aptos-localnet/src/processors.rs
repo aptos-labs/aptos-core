@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Result};
-use processor::processors::{
-    objects_processor::ObjectsProcessorConfig, stake_processor::StakeProcessorConfig,
-    token_v2_processor::TokenV2ProcessorConfig, ProcessorConfig, ProcessorName,
-};
+use processor::config::processor_config::{ProcessorConfig, ProcessorName};
 
 pub fn get_processor_config(processor_name: &ProcessorName) -> Result<ProcessorConfig> {
     Ok(match processor_name {
