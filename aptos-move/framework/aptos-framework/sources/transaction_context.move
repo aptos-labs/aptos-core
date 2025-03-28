@@ -183,7 +183,7 @@ module aptos_framework::transaction_context {
     }
 
     #[test_only]
-    public fun new_entry_function_apyload(
+    public fun new_entry_function_payload(
         account_address: address,
         module_name: String,
         function_name: String,
