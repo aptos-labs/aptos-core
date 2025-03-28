@@ -3,6 +3,7 @@
 
 pub mod active_state;
 pub mod consensus_observer;
+pub mod execution_pool;
 pub mod fallback_manager;
 pub mod ordered_blocks;
 pub mod payload_store;

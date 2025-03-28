@@ -570,7 +570,6 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
- "aptos-framework",
  "aptos-logger",
  "aptos-openapi",
  "aptos-resource-viewer",
@@ -697,10 +696,10 @@ dependencies = [
  "aptos-aggregator",
  "aptos-drop-helper",
  "aptos-infallible",
- "aptos-language-e2e-tests",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-mvhashmap",
+ "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm-environment",
  "aptos-vm-logging",
@@ -834,6 +833,7 @@ dependencies = [
  "aptos-framework",
  "aptos-language-e2e-tests",
  "aptos-rest-client",
+ "aptos-transaction-simulation",
  "aptos-types",
  "aptos-validator-interface",
  "aptos-vm",
@@ -1555,6 +1555,7 @@ dependencies = [
  "aptos-block-partitioner",
  "aptos-config",
  "aptos-infallible",
+ "aptos-keygen",
  "aptos-language-e2e-tests",
  "aptos-logger",
  "aptos-metrics-core",
@@ -1562,6 +1563,7 @@ dependencies = [
  "aptos-push-metrics",
  "aptos-secure-net",
  "aptos-storage-interface",
+ "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm",
  "bcs 0.1.4",
@@ -1911,7 +1913,6 @@ dependencies = [
  "legacy-move-compiler",
  "libsecp256k1",
  "log",
- "lru 0.7.8",
  "merlin",
  "move-binary-format",
  "move-cli",
@@ -1942,7 +1943,6 @@ dependencies = [
  "siphasher",
  "smallvec",
  "tempfile",
- "thiserror",
  "tiny-keccak",
  "toml 0.7.8",
 ]
@@ -2698,8 +2698,11 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-keygen",
  "aptos-proptest-helpers",
+ "aptos-rest-client",
  "aptos-temppath",
+ "aptos-transaction-simulation",
  "aptos-types",
+ "aptos-validator-interface",
  "aptos-vm",
  "aptos-vm-environment",
  "aptos-vm-genesis",
@@ -3544,6 +3547,7 @@ dependencies = [
  "aptos-move-debugger",
  "aptos-rest-client",
  "aptos-temppath",
+ "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-environment",
@@ -3562,7 +3566,6 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-types",
  "once_cell",
- "parking_lot 0.12.1",
  "reqwest 0.11.23",
  "serde",
  "serde_json",
@@ -4267,6 +4270,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-node-resource-metrics",
  "aptos-push-metrics",
+ "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-logging",
@@ -4360,6 +4364,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-transaction-simulation"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-keygen",
+ "aptos-types",
+ "aptos-vm-genesis",
+ "bcs 0.1.4",
+ "bytes",
+ "move-binary-format",
+ "move-core-types",
+ "once_cell",
+ "parking_lot 0.12.1",
+ "proptest",
+ "serde",
+]
+
+[[package]]
 name = "aptos-transaction-workloads-lib"
 version = "0.0.0"
 dependencies = [
@@ -4386,9 +4409,9 @@ dependencies = [
  "aptos-crypto",
  "aptos-framework",
  "aptos-gas-schedule",
- "aptos-language-e2e-tests",
  "aptos-resource-viewer",
  "aptos-storage-interface",
+ "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-environment",
@@ -4450,8 +4473,10 @@ dependencies = [
  "hex",
  "itertools 0.13.0",
  "jsonwebtoken 8.3.0",
+ "lru 0.7.8",
  "move-binary-format",
  "move-core-types",
+ "move-model",
  "move-table-extension",
  "move-vm-types",
  "num-bigint 0.3.3",
@@ -4486,10 +4511,6 @@ dependencies = [
  "tracing",
  "url",
 ]
-
-[[package]]
-name = "aptos-utils"
-version = "0.1.0"
 
 [[package]]
 name = "aptos-validator-interface"
@@ -4557,6 +4578,7 @@ dependencies = [
  "aptos-gas-meter",
  "aptos-gas-schedule",
  "aptos-infallible",
+ "aptos-keygen",
  "aptos-language-e2e-tests",
  "aptos-logger",
  "aptos-memory-usage-tracker",
@@ -4564,8 +4586,8 @@ dependencies = [
  "aptos-mvhashmap",
  "aptos-native-interface",
  "aptos-table-natives",
+ "aptos-transaction-simulation",
  "aptos-types",
- "aptos-utils",
  "aptos-vm-environment",
  "aptos-vm-logging",
  "aptos-vm-types",
@@ -4681,10 +4703,10 @@ dependencies = [
  "aptos-block-executor",
  "aptos-cached-packages",
  "aptos-gas-schedule",
- "aptos-language-e2e-tests",
  "aptos-move-stdlib",
  "aptos-native-interface",
  "aptos-table-natives",
+ "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm",
  "bcs 0.1.4",
@@ -4709,7 +4731,7 @@ dependencies = [
  "aptos-aggregator",
  "aptos-gas-algebra",
  "aptos-gas-schedule",
- "aptos-language-e2e-tests",
+ "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm",
  "bcs 0.1.4",
@@ -8464,6 +8486,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-framework",
  "aptos-language-e2e-tests",
+ "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm",
  "arbitrary",
@@ -10218,6 +10241,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-language-e2e-tests",
  "aptos-logger",
+ "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",

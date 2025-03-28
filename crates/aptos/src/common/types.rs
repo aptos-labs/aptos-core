@@ -7,10 +7,11 @@ use crate::{
         init::Network,
         local_simulation,
         utils::{
-            check_if_file_exists, create_dir_if_not_exist, deserialize_private_key_with_prefix,
-            dir_default_to_current, get_account_with_state, get_auth_key, get_sequence_number,
-            parse_json_file, prompt_yes_with_override, read_from_file, start_logger,
-            to_common_result, to_common_success_result, write_to_file, write_to_file_with_opts,
+            check_if_file_exists, create_dir_if_not_exist, deserialize_address_str,
+            deserialize_material_with_prefix, dir_default_to_current, get_account_with_state,
+            get_auth_key, get_sequence_number, parse_json_file, prompt_yes_with_override,
+            read_from_file, serialize_material_with_prefix, start_logger, to_common_result,
+            to_common_success_result, write_to_file, write_to_file_with_opts,
             write_to_user_only_file,
         },
     },
@@ -267,14 +268,22 @@ pub struct ProfileConfig {
     #[serde(
         skip_serializing_if = "Option::is_none",
         default,
-        deserialize_with = "deserialize_private_key_with_prefix"
+        serialize_with = "serialize_material_with_prefix",
+        deserialize_with = "deserialize_material_with_prefix"
     )]
     pub private_key: Option<Ed25519PrivateKey>,
     /// Public key for commands
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_material_with_prefix",
+        deserialize_with = "deserialize_material_with_prefix"
+    )]
     pub public_key: Option<Ed25519PublicKey>,
     /// Account for commands
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_address_str"
+    )]
     pub account: Option<AccountAddress>,
     /// URL for the Aptos rest endpoint
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -293,9 +302,16 @@ pub struct ProfileSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub network: Option<Network>,
     pub has_private_key: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_material_with_prefix",
+        deserialize_with = "deserialize_material_with_prefix"
+    )]
     pub public_key: Option<Ed25519PublicKey>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_address_str"
+    )]
     pub account: Option<AccountAddress>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rest_url: Option<String>,
