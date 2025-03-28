@@ -372,7 +372,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::PermissionedSigner => AptosFeatureFlag::PERMISSIONED_SIGNER,
             FeatureFlag::AccountAbstraction => AptosFeatureFlag::ACCOUNT_ABSTRACTION,
             FeatureFlag::BulletproofsBatchNatives => AptosFeatureFlag::BULLETPROOFS_BATCH_NATIVES,
-            FeatureFlag::DomainAccountAbstraction => AptosFeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION,
+            FeatureFlag::DomainAccountAbstraction => {
+                AptosFeatureFlag::DERIVABLE_ACCOUNT_ABSTRACTION
+            },
             FeatureFlag::EnableFunctionValues => AptosFeatureFlag::ENABLE_FUNCTION_VALUES,
             FeatureFlag::NewAccountsDefaultToFaStore => {
                 AptosFeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE
@@ -534,7 +536,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::PERMISSIONED_SIGNER => FeatureFlag::PermissionedSigner,
             AptosFeatureFlag::ACCOUNT_ABSTRACTION => FeatureFlag::AccountAbstraction,
             AptosFeatureFlag::BULLETPROOFS_BATCH_NATIVES => FeatureFlag::BulletproofsBatchNatives,
-            AptosFeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION => FeatureFlag::DomainAccountAbstraction,
+            AptosFeatureFlag::DERIVABLE_ACCOUNT_ABSTRACTION => {
+                FeatureFlag::DomainAccountAbstraction
+            },
             AptosFeatureFlag::ENABLE_FUNCTION_VALUES => FeatureFlag::EnableFunctionValues,
             AptosFeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE => {
                 FeatureFlag::NewAccountsDefaultToFaStore
