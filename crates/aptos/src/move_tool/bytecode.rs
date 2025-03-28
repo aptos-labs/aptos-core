@@ -234,25 +234,23 @@ impl BytecodeCommand {
         let metadata = if self.is_script {
             let script = CompiledScript::deserialize(&bytecode_bytes)
                 .context("Script blob can't be deserialized")?;
-            if let Some(data) = get_compilation_metadata_from_compiled_script(&script) {
+            if let Some(data) = get_compilation_metadata(&script) {
                 serde_json::to_string_pretty(&data).expect("expect compilation metadata")
             } else {
                 serde_json::to_string_pretty(&v1_metadata).expect("expect compilation metadata")
             };
             BytecodeMetadata {
-                aptos_metadata: get_metadata_from_compiled_script(&script),
+                aptos_metadata: get_metadata_from_compiled_code(&script),
                 bytecode_version: script.version,
-                compilation_metadata: get_compilation_metadata_from_compiled_script(&script)
-                    .unwrap_or(v1_metadata),
+                compilation_metadata: get_compilation_metadata(&script).unwrap_or(v1_metadata),
             }
         } else {
             let module = CompiledModule::deserialize(&bytecode_bytes)
                 .context("Module blob can't be deserialized")?;
             BytecodeMetadata {
-                aptos_metadata: get_metadata_from_compiled_module(&module),
+                aptos_metadata: get_metadata_from_compiled_code(&module),
                 bytecode_version: module.version,
-                compilation_metadata: get_compilation_metadata_from_compiled_module(&module)
-                    .unwrap_or(v1_metadata),
+                compilation_metadata: get_compilation_metadata(&module).unwrap_or(v1_metadata),
             }
         };
         println!(
