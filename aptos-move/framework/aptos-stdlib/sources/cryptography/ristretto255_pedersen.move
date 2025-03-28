@@ -31,9 +31,9 @@ module aptos_std::ristretto255_pedersen {
     /// Creates a new public key from a serialized Ristretto255 point.
     public fun new_commitment_from_bytes(bytes: vector<u8>): Option<Commitment> {
         let point = ristretto255::new_point_from_bytes(bytes);
-        if (std::option::is_some(&mut point)) {
+        if (point.is_some()) {
             let comm = Commitment {
-                point: std::option::extract(&mut point)
+                point: point.extract()
             };
             std::option::some(comm)
         } else {
@@ -78,7 +78,7 @@ module aptos_std::ristretto255_pedersen {
     /// base used in the Bulletproofs library (i.e., `BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE`).
     public fun new_commitment_for_bulletproof(v: &Scalar, r: &Scalar): Commitment {
         let rand_base = ristretto255::new_point_from_bytes(BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE);
-        let rand_base = std::option::extract(&mut rand_base);
+        let rand_base = rand_base.extract();
 
         Commitment {
             point: ristretto255::basepoint_double_mul(r, &rand_base, v)
@@ -153,6 +153,6 @@ module aptos_std::ristretto255_pedersen {
     /// Bulletproof has a default choice for `g` and `h` and this function returns the default `h` as used in the
     /// Bulletproofs Move module.
     public fun randomness_base_for_bulletproof(): RistrettoPoint {
-        std::option::extract(&mut ristretto255::new_point_from_bytes(BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE))
+        ristretto255::new_point_from_bytes(BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE).extract()
     }
 }

@@ -127,6 +127,7 @@ pub enum FeatureFlag {
     DOMAIN_ACCOUNT_ABSTRACTION = 88,
     /// Whether function values are enabled.
     ENABLE_FUNCTION_VALUES = 89,
+    NEW_ACCOUNTS_DEFAULT_TO_FA_STORE = 90,
 }
 
 impl FeatureFlag {

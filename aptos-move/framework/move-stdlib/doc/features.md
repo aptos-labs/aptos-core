@@ -142,6 +142,8 @@ return true.
 -  [Function `get_bulletproofs_batch_feature`](#0x1_features_get_bulletproofs_batch_feature)
 -  [Function `bulletproofs_batch_enabled`](#0x1_features_bulletproofs_batch_enabled)
 -  [Function `is_domain_account_abstraction_enabled`](#0x1_features_is_domain_account_abstraction_enabled)
+-  [Function `get_new_accounts_default_to_fa_store_feature`](#0x1_features_get_new_accounts_default_to_fa_store_feature)
+-  [Function `new_accounts_default_to_fa_store_enabled`](#0x1_features_new_accounts_default_to_fa_store_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -742,6 +744,17 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE</a>: u64 = 64;
+</code></pre>
+
+
+
+<a id="0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_STORE"></a>
+
+Whether new accounts default to the Fungible Asset store.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_STORE</a>: u64 = 90;
 </code></pre>
 
 
@@ -3571,6 +3584,52 @@ Deprecated feature
 
 </details>
 
+<a id="0x1_features_get_new_accounts_default_to_fa_store_feature"></a>
+
+## Function `get_new_accounts_default_to_fa_store_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_new_accounts_default_to_fa_store_feature">get_new_accounts_default_to_fa_store_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_new_accounts_default_to_fa_store_feature">get_new_accounts_default_to_fa_store_feature</a>(): u64 { <a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_STORE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_new_accounts_default_to_fa_store_enabled"></a>
+
+## Function `new_accounts_default_to_fa_store_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_new_accounts_default_to_fa_store_enabled">new_accounts_default_to_fa_store_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_new_accounts_default_to_fa_store_enabled">new_accounts_default_to_fa_store_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_STORE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_features_change_feature_flags"></a>
 
 ## Function `change_feature_flags`
@@ -3998,6 +4057,17 @@ Helper to check whether a feature flag is enabled.
 
 <pre><code><b>fun</b> <a href="features.md#0x1_features_spec_new_accounts_default_to_fa_apt_store_enabled">spec_new_accounts_default_to_fa_apt_store_enabled</a>(): bool {
    <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE</a>)
+}
+</code></pre>
+
+
+
+
+<a id="0x1_features_spec_new_accounts_default_to_fa_store_enabled"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_new_accounts_default_to_fa_store_enabled">spec_new_accounts_default_to_fa_store_enabled</a>(): bool {
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_STORE</a>)
 }
 </code></pre>
 
