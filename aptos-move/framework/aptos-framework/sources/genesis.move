@@ -197,7 +197,7 @@ module aptos_framework::genesis {
             account::create_account(account_address)
         };
 
-        if (!coin::is_account_registered<AptosCoin>(account_address)) {
+        if (coin::balance<AptosCoin>(account_address) == 0) {
             coin::register<AptosCoin>(&account);
             aptos_coin::mint(aptos_framework, account_address, balance);
         };

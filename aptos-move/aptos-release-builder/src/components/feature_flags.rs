@@ -143,7 +143,7 @@ pub enum FeatureFlag {
     EnableFunctionValues,
     NewAccountsDefaultToFaStore,
     DefaultAccountResource,
-};
+}
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
     emitln!(writer, "vector[");

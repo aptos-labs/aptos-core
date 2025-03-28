@@ -118,7 +118,7 @@ spec aptos_framework::account {
     }
 
     /// Ensure that the account exists at the end of the call.
-    spec create_account_resource_if_does_not_exist(account_address: address) {
+    spec create_account_if_does_not_exist(account_address: address) {
         let authentication_key = bcs::to_bytes(account_address);
         modifies global<Account>(account_address);
         aborts_if !exists<Account>(account_address) && (
@@ -130,8 +130,6 @@ spec aptos_framework::account {
         ensures exists<Account>(account_address);
     }
 
-
-    spec create_account_resource_if_does_not_exist(account_address: address) { }
 
     /// Check if the bytes of the new address is 32.
     /// The Account does not exist under the new address before creating the account.
