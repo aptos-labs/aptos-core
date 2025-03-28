@@ -237,12 +237,6 @@ module aptos_framework::account {
     }
 
     public fun create_account_if_does_not_exist(account_address: address) {
-        if (!exists_at(account_address)) {
-            create_account(account_address);
-        }
-    }
-
-    public(friend) fun create_account_resource_if_does_not_exist(account_address: address) {
         if (!resource_exists_at(account_address)) {
             assert!(
                 account_address != @vm_reserved && account_address != @aptos_framework && account_address != @aptos_token,
@@ -303,6 +297,7 @@ module aptos_framework::account {
         new_account
     }
 
+    #[view]
     /// Returns whether an account exists at `addr`.
     ///
     /// When the `default_account_resource` feature flag is enabled:
@@ -313,7 +308,6 @@ module aptos_framework::account {
     /// When the feature flag is disabled:
     /// - Returns true only if an Account resource exists at `addr`
     /// - This is the legacy behavior where accounts must be explicitly created
-    #[view]
     public fun exists_at(addr: address): bool {
         features::is_default_account_resource_enabled() || exists<Account>(addr)
     }
@@ -329,6 +323,7 @@ module aptos_framework::account {
         exists<Account>(addr)
     }
 
+    #[view]
     /// Returns the next GUID creation number for `addr`.
     ///
     /// When the `default_account_resource` feature flag is enabled:
@@ -338,7 +333,6 @@ module aptos_framework::account {
     ///
     /// When the feature flag is disabled:
     /// - Aborts if no Account resource exists at `addr`
-    #[view]
     public fun get_guid_next_creation_num(addr: address): u64 acquires Account {
         if (resource_exists_at(addr)) {
             Account[addr].guid_creation_num
@@ -372,7 +366,7 @@ module aptos_framework::account {
 
     inline fun ensure_resource_exists(addr: address) acquires Account{
         if (features::is_default_account_resource_enabled()) {
-            create_account_resource_if_does_not_exist(addr);
+            create_account_if_does_not_exist(addr);
         } else {
             assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
         }
@@ -707,7 +701,7 @@ module aptos_framework::account {
     /// Revoke any rotation capability offer in the specified account.
     public entry fun revoke_any_rotation_capability(account: &signer) acquires Account {
         check_rotation_permission(account);
-        let offerer_addr = permissioned_signer::address_of(account);
+        let offerer_addr = signer::address_of(account);
         assert_account_resource_with_error(offerer_addr, ENO_SUCH_ROTATION_CAPABILITY_OFFER);
         let account_resource = &mut Account[signer::address_of(account)];
         account_resource.rotation_capability_offer.for.extract();

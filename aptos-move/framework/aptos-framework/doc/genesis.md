@@ -509,7 +509,7 @@ If it exists, it just returns the signer.
         <a href="account.md#0x1_account_create_account">account::create_account</a>(account_address)
     };
 
-    <b>if</b> (!<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;AptosCoin&gt;(account_address)) {
+    <b>if</b> (<a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;AptosCoin&gt;(account_address) == 0) {
         <a href="coin.md#0x1_coin_register">coin::register</a>&lt;AptosCoin&gt;(&<a href="account.md#0x1_account">account</a>);
         <a href="aptos_coin.md#0x1_aptos_coin_mint">aptos_coin::mint</a>(aptos_framework, account_address, balance);
     };
