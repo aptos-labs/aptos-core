@@ -4,7 +4,7 @@
 use crate::{
     on_chain_config::{FeatureFlag, Features},
     transaction::{AbortInfo, EntryFunction},
-    vm::code::CompiledCode,
+    vm::code::CompiledCodeMetadata,
 };
 use lru::LruCache;
 use move_binary_format::{
@@ -197,7 +197,7 @@ thread_local! {
 
 /// Extract metadata from the VM, upgrading V0 to V1 representation as needed
 pub fn get_metadata(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> {
-    if let Some(data) = md.iter().find(|md| md.key == APTOS_METADATA_KEY_V1) {
+    if let Some(data) = find_metadata(md, APTOS_METADATA_KEY_V1) {
         V1_METADATA_CACHE.with(|ref_cell| {
             let mut cache = ref_cell.borrow_mut();
             if let Some(meta) = cache.get(&data.value) {
@@ -210,7 +210,7 @@ pub fn get_metadata(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> {
                 meta
             }
         })
-    } else if let Some(data) = md.iter().find(|md| md.key == APTOS_METADATA_KEY) {
+    } else if let Some(data) = find_metadata(md, APTOS_METADATA_KEY) {
         V0_METADATA_CACHE.with(|ref_cell| {
             let mut cache = ref_cell.borrow_mut();
             if let Some(meta) = cache.get(&data.value) {
@@ -285,7 +285,7 @@ fn check_metadata_format(module: &CompiledModule) -> Result<(), MalformedError> 
 /// Extract metadata from a compiled module or a script, upgrading V0 to V1 representation as
 /// needed.
 pub fn get_metadata_from_compiled_code(
-    code: &impl CompiledCode,
+    code: &impl CompiledCodeMetadata,
 ) -> Option<RuntimeModuleMetadataV1> {
     if let Some(data) = find_metadata(code.metadata(), APTOS_METADATA_KEY_V1) {
         let mut metadata = bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value).ok();
@@ -308,7 +308,7 @@ pub fn get_metadata_from_compiled_code(
 }
 
 /// Extract compilation metadata from a compiled module or script.
-pub fn get_compilation_metadata(code: &impl CompiledCode) -> Option<CompilationMetadata> {
+pub fn get_compilation_metadata(code: &impl CompiledCodeMetadata) -> Option<CompilationMetadata> {
     if let Some(data) = find_metadata(code.metadata(), COMPILATION_METADATA_KEY) {
         bcs::from_bytes::<CompilationMetadata>(&data.value).ok()
     } else {
@@ -517,7 +517,7 @@ pub fn verify_module_metadata_for_module_publish(
     Ok(())
 }
 
-pub fn find_metadata<'a>(metadata: &'a [Metadata], key: &[u8]) -> Option<&'a Metadata> {
+fn find_metadata<'a>(metadata: &'a [Metadata], key: &[u8]) -> Option<&'a Metadata> {
     metadata.iter().find(|md| md.key == key)
 }
 

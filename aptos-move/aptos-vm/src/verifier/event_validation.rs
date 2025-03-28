@@ -38,12 +38,10 @@ pub(crate) fn validate_module_events(
     modules: &[CompiledModule],
 ) -> VMResult<()> {
     for module in modules {
-        let mut new_event_structs = if let Some(metadata) = get_metadata_from_compiled_code(module)
-        {
-            extract_event_metadata(&metadata)?
-        } else {
-            HashSet::new()
-        };
+        let mut new_event_structs = get_metadata_from_compiled_code(module).map_or_else(
+            || Ok(HashSet::new()),
+            |metadata| extract_event_metadata(&metadata),
+        )?;
 
         // Check all the emit calls have the correct struct with event attribute.
         validate_emit_calls(&new_event_structs, module)?;
