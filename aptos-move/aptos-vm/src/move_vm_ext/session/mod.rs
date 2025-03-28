@@ -42,7 +42,8 @@ use move_vm_runtime::{
     module_traversal::TraversalContext,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
-    AsFunctionValueExtension, LoadedFunction, ModuleStorage, VerifiedModuleBundle,
+    AsFunctionValueExtension, LoadedFunction, Loader, ModuleStorage, RuntimeEnvironment,
+    VerifiedModuleBundle,
 };
 use move_vm_types::{gas::GasMeter, value_serde::ValueSerDeContext, values::Value};
 use std::{borrow::Borrow, collections::BTreeMap, sync::Arc};
@@ -123,8 +124,8 @@ where
         func: LoadedFunction,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        module_storage: &impl ModuleStorage,
+        runtime_environment: &RuntimeEnvironment,
+        loader: &mut impl Loader,
     ) -> VMResult<()> {
         if !func.is_entry() {
             let module_id = func
@@ -147,35 +148,37 @@ where
             args,
             &mut self.data_cache,
             gas_meter,
-            traversal_context,
             &mut self.extensions,
-            module_storage,
             self.resolver,
+            runtime_environment,
+            loader,
         )?;
         Ok(())
     }
 
     pub fn execute_function_bypass_visibility(
         &mut self,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
-        ty_args: Vec<TypeTag>,
-        args: Vec<impl Borrow<[u8]>>,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        module_storage: &impl ModuleStorage,
+        _module_id: &ModuleId,
+        _function_name: &IdentStr,
+        _ty_args: Vec<TypeTag>,
+        _args: Vec<impl Borrow<[u8]>>,
+        _gas_meter: &mut impl GasMeter,
+        _traversal_context: &mut TraversalContext,
+        _module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
-        let func = module_storage.load_function(module_id, function_name, &ty_args)?;
-        MoveVM::execute_loaded_function(
-            func,
-            args,
-            &mut self.data_cache,
-            gas_meter,
-            traversal_context,
-            &mut self.extensions,
-            module_storage,
-            self.resolver,
-        )
+        // TODO(lazy): fix this
+        unimplemented!()
+        // let func = module_storage.load_function(module_id, function_name, &ty_args)?;
+        // MoveVM::execute_loaded_function(
+        //     func,
+        //     args,
+        //     &mut self.data_cache,
+        //     gas_meter,
+        //     traversal_context,
+        //     &mut self.extensions,
+        //     module_storage,
+        //     self.resolver,
+        // )
     }
 
     pub fn execute_loaded_function(
@@ -183,18 +186,18 @@ where
         func: LoadedFunction,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        module_storage: &impl ModuleStorage,
+        runtime_environment: &RuntimeEnvironment,
+        loader: &mut impl Loader,
     ) -> VMResult<SerializedReturnValues> {
         MoveVM::execute_loaded_function(
             func,
             args,
             &mut self.data_cache,
             gas_meter,
-            traversal_context,
             &mut self.extensions,
-            module_storage,
             self.resolver,
+            runtime_environment,
+            loader,
         )
     }
 

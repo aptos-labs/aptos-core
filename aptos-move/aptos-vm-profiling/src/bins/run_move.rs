@@ -15,7 +15,7 @@ use move_ir_compiler::Compiler;
 use move_vm_runtime::{
     data_cache::TransactionDataCache, module_traversal::*, move_vm::MoveVM,
     native_extensions::NativeContextExtensions, native_functions::NativeFunction,
-    AsUnsyncCodeStorage, CodeStorage, ModuleStorage, RuntimeEnvironment,
+    AsUnsyncCodeStorage, EagerLoader, Loader, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
@@ -188,11 +188,16 @@ fn main() -> Result<()> {
 
     let traversal_storage = TraversalStorage::new();
     let code_storage = storage.as_unsync_code_storage();
+    let runtime_environment = code_storage.runtime_environment();
+    let mut loader = EagerLoader::new(&traversal_storage, &code_storage);
+    let mut gas_meter = UnmeteredGasMeter;
 
     let func = match &entrypoint {
-        Entrypoint::Script(script_blob) => code_storage.load_script(script_blob, &[])?,
+        Entrypoint::Script(script_blob) => {
+            loader.load_script_entrypoint(&mut gas_meter, script_blob, &[])?
+        },
         Entrypoint::Module(module_id) => {
-            code_storage.load_function(module_id, ident_str!("run"), &[])?
+            loader.load_function(&mut gas_meter, module_id, ident_str!("run"), vec![])?
         },
     };
     let args: Vec<Vec<u8>> = vec![];
@@ -202,10 +207,10 @@ fn main() -> Result<()> {
         args,
         &mut TransactionDataCache::empty(),
         &mut UnmeteredGasMeter,
-        &mut TraversalContext::new(&traversal_storage),
         &mut extensions,
-        &code_storage,
         &storage,
+        runtime_environment,
+        &mut loader,
     )?;
     println!("{:?}", return_values);
 

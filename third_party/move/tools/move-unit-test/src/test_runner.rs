@@ -28,12 +28,10 @@ use move_core_types::{
 };
 use move_resource_viewer::MoveValueAnnotator;
 use move_vm_runtime::{
-    data_cache::TransactionDataCache,
-    module_traversal::{TraversalContext, TraversalStorage},
-    move_vm::MoveVM,
-    native_extensions::NativeContextExtensions,
-    native_functions::NativeFunctionTable,
-    AsFunctionValueExtension, AsUnsyncModuleStorage, ModuleStorage, RuntimeEnvironment,
+    data_cache::TransactionDataCache, module_traversal::TraversalStorage, move_vm::MoveVM,
+    native_extensions::NativeContextExtensions, native_functions::NativeFunctionTable,
+    AsFunctionValueExtension, AsUnsyncCodeStorage, AsUnsyncModuleStorage, EagerLoader, Loader,
+    RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use rayon::prelude::*;
@@ -250,23 +248,26 @@ impl SharedTestingConfig {
         VMResult<Vec<Vec<u8>>>,
         TestRunInfo,
     ) {
-        let module_storage = self.starting_storage_state.as_unsync_module_storage();
-
-        let mut extensions = extensions::new_extensions();
-        let mut gas_meter = factory.lock().unwrap().new_gas_meter();
         let traversal_storage = TraversalStorage::new();
-        let mut traversal_context = TraversalContext::new(&traversal_storage);
+        let code_storage = self.starting_storage_state.as_unsync_code_storage();
+        let runtime_environment = code_storage.runtime_environment();
+        let mut loader = EagerLoader::new(&traversal_storage, &code_storage);
+
+        let mut gas_meter = factory.lock().unwrap().new_gas_meter();
+
         let mut data_cache = TransactionDataCache::empty();
+        let mut extensions = extensions::new_extensions();
 
         // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
 
         let now = Instant::now();
-        let result = module_storage
+        let result = loader
             .load_function(
+                &mut gas_meter,
                 &test_plan.module_id,
                 IdentStr::new(function_name).unwrap(),
                 // No type args for now.
-                &[],
+                vec![],
             )
             .and_then(|function| {
                 let args = serialize_values(test_info.arguments.iter());
@@ -275,10 +276,10 @@ impl SharedTestingConfig {
                     args,
                     &mut data_cache,
                     &mut gas_meter,
-                    &mut traversal_context,
                     &mut extensions,
-                    &module_storage,
                     &self.starting_storage_state,
+                    runtime_environment,
+                    &mut loader,
                 )
             });
 
@@ -297,7 +298,7 @@ impl SharedTestingConfig {
         let test_run_info = TestRunInfo::new(function_name.to_string(), now.elapsed());
 
         let result = data_cache
-            .into_effects(&module_storage)
+            .into_effects(&code_storage)
             .map_err(|err| err.finish(Location::Undefined));
         match result {
             Ok(change_set) => {

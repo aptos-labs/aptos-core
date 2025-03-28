@@ -40,11 +40,11 @@ use move_vm_runtime::{
     module_traversal::*,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
-    AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage, LoadedFunction, ModuleStorage,
+    AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage, EagerLoader, Loader,
     RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_test_utils::{
-    gas_schedule::{CostTable, Gas, GasStatus},
+    gas_schedule::{Gas, GasStatus},
     InMemoryStorage,
 };
 use move_vm_types::resolver::ResourceResolver;
@@ -138,8 +138,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             named_address_mapping.insert(name, addr);
         }
 
-        let vm_config = vm_config();
-        let runtime_environment = create_runtime_environment(vm_config);
+        let runtime_environment = create_runtime_environment();
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
 
         let mut adapter = Self {
@@ -278,15 +277,15 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .map(|a| MoveValue::Signer(*a).simple_serialize().unwrap())
             .chain(args)
             .collect();
-        let verbose = extra_args.verbose;
 
-        code_storage
-            .load_script(&script_bytes, &type_args)
-            .and_then(|func| self.execute_loaded_function(func, args, gas_budget, &code_storage))
+        let entrypoint = Entrypoint::Script {
+            serialized_script: &script_bytes,
+        };
+        self.execute_loaded_function(entrypoint, &type_args, args, gas_budget, &code_storage)
             .map_err(|err| {
                 anyhow!(
                     "Script execution failed with VMError: {}",
-                    err.format_test_output(move_test_debug() || verbose)
+                    err.format_test_output(move_test_debug() || extra_args.verbose)
                 )
             })?;
         Ok(None)
@@ -294,15 +293,15 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
 
     fn call_function(
         &mut self,
-        module: &ModuleId,
-        function: &IdentStr,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
         type_args: Vec<TypeTag>,
         signers: Vec<ParsedAddress>,
         txn_args: Vec<MoveValue>,
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
     ) -> Result<(Option<String>, SerializedReturnValues)> {
-        let module_storage = self.storage.clone().into_unsync_module_storage();
+        let code_storage = self.storage.clone().into_unsync_code_storage();
 
         let signers: Vec<_> = signers
             .into_iter()
@@ -321,9 +320,12 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
         let verbose = extra_args.verbose;
 
-        let serialized_return_values = module_storage
-            .load_function(module, function, &type_args)
-            .and_then(|func| self.execute_loaded_function(func, args, gas_budget, &module_storage))
+        let entrypoint = Entrypoint::Module {
+            module_id,
+            function_name,
+        };
+        let serialized_return_values = self
+            .execute_loaded_function(entrypoint, &type_args, args, gas_budget, &code_storage)
             .map_err(|err| {
                 anyhow!(
                     "Function execution failed with VMError: {}",
@@ -366,52 +368,74 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
     }
 }
 
+enum Entrypoint<'a> {
+    Module {
+        module_id: &'a ModuleId,
+        function_name: &'a IdentStr,
+    },
+    Script {
+        serialized_script: &'a [u8],
+    },
+}
+
 impl<'a> SimpleVMTestAdapter<'a> {
     fn execute_loaded_function(
         &mut self,
-        function: LoadedFunction,
+        entrypoint: Entrypoint,
+        ty_args: &[TypeTag],
         args: Vec<Vec<u8>>,
         gas_budget: Option<u64>,
-        module_storage: &impl ModuleStorage,
+        code_storage: &impl CodeStorage,
     ) -> VMResult<SerializedReturnValues> {
-        let mut gas_status = get_gas_status(
-            &move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE,
-            gas_budget,
-        )
-        .unwrap();
+        let mut gas_meter = get_gas_status(gas_budget).unwrap();
 
         let traversal_storage = TraversalStorage::new();
-        let mut extensions = NativeContextExtensions::default();
+        let mut loader = EagerLoader::new(&traversal_storage, code_storage);
+        let runtime_environment = code_storage.runtime_environment();
 
+        let function = match entrypoint {
+            Entrypoint::Module {
+                module_id,
+                function_name,
+            } => loader.load_function_entrypoint(
+                &mut gas_meter,
+                module_id,
+                function_name,
+                ty_args,
+            )?,
+            Entrypoint::Script { serialized_script } => {
+                loader.load_script_entrypoint(&mut gas_meter, serialized_script, ty_args)?
+            },
+        };
+
+        let mut extensions = NativeContextExtensions::default();
         let mut data_cache = TransactionDataCache::empty();
+
         let return_values = MoveVM::execute_loaded_function(
             function,
             args,
             &mut data_cache,
-            &mut gas_status,
-            &mut TraversalContext::new(&traversal_storage),
+            &mut gas_meter,
             &mut extensions,
-            module_storage,
             &self.storage,
+            runtime_environment,
+            &mut loader,
         )?;
 
         let change_set = data_cache
-            .into_effects(module_storage)
+            .into_effects(code_storage)
             .map_err(|err| err.finish(Location::Undefined))?;
         self.storage.apply(change_set).unwrap();
         Ok(return_values)
     }
 }
 
-fn vm_config() -> VMConfig {
-    VMConfig {
+fn create_runtime_environment() -> RuntimeEnvironment {
+    let vm_config = VMConfig {
         verifier_config: VerifierConfig::production(),
         paranoid_type_checks: true,
         ..VMConfig::default()
-    }
-}
-
-fn create_runtime_environment(vm_config: VMConfig) -> RuntimeEnvironment {
+    };
     RuntimeEnvironment::new_with_config(
         move_stdlib::natives::all_natives(
             STD_ADDR,
@@ -422,14 +446,15 @@ fn create_runtime_environment(vm_config: VMConfig) -> RuntimeEnvironment {
     )
 }
 
-fn get_gas_status(cost_table: &CostTable, gas_budget: Option<u64>) -> Result<GasStatus> {
+fn get_gas_status(gas_budget: Option<u64>) -> Result<GasStatus> {
     let gas_status = if let Some(gas_budget) = gas_budget {
         // TODO(Gas): This should not be hardcoded.
         let max_gas_budget = u64::MAX.checked_div(1000).unwrap();
         if gas_budget >= max_gas_budget {
             bail!("Gas budget set too high; maximum is {}", max_gas_budget)
         }
-        GasStatus::new(cost_table.clone(), Gas::new(gas_budget))
+        let cost_table = move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE.clone();
+        GasStatus::new(cost_table, Gas::new(gas_budget))
     } else {
         // no budget specified. Disable gas metering
         GasStatus::new_unmetered()

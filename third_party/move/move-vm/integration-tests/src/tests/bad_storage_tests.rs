@@ -21,7 +21,7 @@ use move_core_types::{
     value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
-use move_vm_runtime::{AsUnsyncModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment};
+use move_vm_runtime::{AsUnsyncCodeStorage, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{code::ModuleBytesStorage, resolver::ResourceResolver};
 
@@ -526,11 +526,11 @@ fn test_storage_returns_bogus_error_when_loading_module() {
             runtime_environment: RuntimeEnvironment::new(vec![]),
             bad_status_code: *error_code,
         };
-        let module_storage = data_storage.as_unsync_module_storage();
+        let code_storage = data_storage.as_unsync_code_storage();
 
         let err = execute_function_for_test(
             &data_storage,
-            &module_storage,
+            &code_storage,
             &module_id,
             ident_str!("bar"),
             &[],
@@ -611,15 +611,15 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
             module_storage,
             bad_status_code: *error_code,
         };
-        let module_storage = storage.module_storage.as_unsync_module_storage();
+        let code_storage = storage.module_storage.as_unsync_code_storage();
 
         let result =
-            execute_function_for_test(&storage, &module_storage, &m_id, &foo_name, &[], vec![]);
+            execute_function_for_test(&storage, &code_storage, &m_id, &foo_name, &[], vec![]);
         assert_ok!(result);
 
         let err = execute_function_for_test(
             &storage,
-            &module_storage,
+            &code_storage,
             &m_id,
             &bar_name,
             &[],

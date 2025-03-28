@@ -5,8 +5,7 @@
 use crate::{
     data_cache::TransactionDataCache, interpreter::InterpreterDebugInterface, loader::Function,
     module_traversal::TraversalContext, native_extensions::NativeContextExtensions,
-    storage::module_storage::FunctionValueExtensionAdapter, LayoutConverter, ModuleStorage,
-    StorageLayoutConverter,
+    storage::module_storage::FunctionValueExtensionAdapter, RuntimeEnvironment,
 };
 use move_binary_format::errors::{
     ExecutionState, Location, PartialVMError, PartialVMResult, VMResult,
@@ -99,10 +98,9 @@ pub struct NativeContext<'a, 'b> {
     interpreter: &'a mut dyn InterpreterDebugInterface,
     data_store: &'a mut TransactionDataCache,
     resource_resolver: &'a dyn ResourceResolver,
-    module_storage: &'a dyn ModuleStorage,
+    runtime_environment: &'a RuntimeEnvironment,
     extensions: &'a mut NativeContextExtensions<'b>,
     gas_balance: InternalGas,
-    traversal_context: &'a TraversalContext<'a>,
 
     /// Counter used to record the (conceptual) heap memory usage by a native functions,
     /// measured in abstract memory unit.
@@ -117,19 +115,17 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         interpreter: &'a mut dyn InterpreterDebugInterface,
         data_store: &'a mut TransactionDataCache,
         resource_resolver: &'a dyn ResourceResolver,
-        module_storage: &'a dyn ModuleStorage,
+        runtime_environment: &'a RuntimeEnvironment,
         extensions: &'a mut NativeContextExtensions<'b>,
         gas_balance: InternalGas,
-        traversal_context: &'a TraversalContext<'a>,
     ) -> Self {
         Self {
             interpreter,
             data_store,
             resource_resolver,
-            module_storage,
+            runtime_environment,
             extensions,
             gas_balance,
-            traversal_context,
 
             heap_memory_usage: 0,
         }
@@ -139,7 +135,7 @@ impl<'a, 'b> NativeContext<'a, 'b> {
 impl<'a, 'b> NativeContext<'a, 'b> {
     pub fn print_stack_trace(&self, buf: &mut String) -> PartialVMResult<()> {
         self.interpreter
-            .debug_print_stack_trace(buf, self.module_storage.runtime_environment())
+            .debug_print_stack_trace(buf, self.runtime_environment)
     }
 
     pub fn exists_at(
@@ -150,34 +146,56 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         // TODO(Rati, George): propagate exists call the way to resolver, because we
         //                     can implement the check more efficiently, without the
         //                     need to actually load bytes.
-        let (value, num_bytes) = self
-            .data_store
-            .load_resource(self.module_storage, self.resource_resolver, address, ty)
-            .map_err(|err| err.finish(Location::Undefined))?;
-        let exists = value
-            .exists()
-            .map_err(|err| err.finish(Location::Undefined))?;
-        Ok((exists, num_bytes))
+        Ok(match self.data_store.get_resource_if_loaded(&address, ty) {
+            Some(value) => {
+                let exists = value
+                    .exists()
+                    .map_err(|err| err.finish(Location::Undefined))?;
+                (exists, None)
+            },
+            None => {
+                let (layout, contains_delayed_fields, value, size) =
+                    TransactionDataCache::load_resource_native(
+                        self.resource_resolver,
+                        &address,
+                        ty,
+                    )
+                    .map_err(|err| err.finish(Location::Undefined))?;
+                let exists = value
+                    .exists()
+                    .map_err(|err| err.finish(Location::Undefined))?;
+                self.data_store
+                    .insert_resource(address, ty.clone(), value, layout, contains_delayed_fields)
+                    .map_err(|err| err.finish(Location::Undefined))?;
+                (exists, Some(size))
+            },
+        })
     }
 
     pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
-        self.module_storage.runtime_environment().ty_to_ty_tag(ty)
+        self.runtime_environment.ty_to_ty_tag(ty)
     }
 
-    pub fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
-        StorageLayoutConverter::new(self.module_storage).type_to_type_layout(ty)
+    pub fn type_to_type_layout(&self, _ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+        // TODO(lazy): implement native loader to be able to work with layouts here.
+        unimplemented!()
+        // StorageLayoutConverter::new(self.module_storage).type_to_type_layout(ty)
     }
 
     pub fn type_to_type_layout_with_identifier_mappings(
         &self,
-        ty: &Type,
+        _ty: &Type,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        StorageLayoutConverter::new(self.module_storage)
-            .type_to_type_layout_with_identifier_mappings(ty)
+        // TODO(lazy): implement native loader to be able to work with layouts here.
+        unimplemented!()
+        // StorageLayoutConverter::new(self.module_storage)
+        //     .type_to_type_layout_with_identifier_mappings(ty)
     }
 
-    pub fn type_to_fully_annotated_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
-        StorageLayoutConverter::new(self.module_storage).type_to_fully_annotated_layout(ty)
+    pub fn type_to_fully_annotated_layout(&self, _ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+        // TODO(lazy): implement native loader to be able to work with layouts here.
+        unimplemented!()
+        // StorageLayoutConverter::new(self.module_storage).type_to_fully_annotated_layout(ty)
     }
 
     pub fn extensions(&self) -> &NativeContextExtensions<'b> {
@@ -207,25 +225,30 @@ impl<'a, 'b> NativeContext<'a, 'b> {
     }
 
     pub fn traversal_context(&self) -> &TraversalContext {
-        self.traversal_context
+        // TODO(lazy): implement native loader to be able to access traversal_context.
+        unimplemented!()
     }
 
     pub fn function_value_extension(&self) -> FunctionValueExtensionAdapter {
-        FunctionValueExtensionAdapter {
-            module_storage: self.module_storage,
-        }
+        // TODO(lazy): implement native loader to be able to (de)serialize function values.
+        unimplemented!()
+        // FunctionValueExtensionAdapter {
+        //     module_storage: self.module_storage,
+        // }
     }
 
     pub fn load_function(
         &mut self,
-        module_id: &ModuleId,
-        function_name: &Identifier,
+        _module_id: &ModuleId,
+        _function_name: &Identifier,
     ) -> VMResult<Arc<Function>> {
-        let (_, function) = self.module_storage.fetch_function_definition(
-            module_id.address(),
-            module_id.name(),
-            function_name,
-        )?;
-        Ok(function)
+        // TODO(lazy): implement native loader to be able to load function directly here.
+        unimplemented!()
+        // let (_, function) = self.module_storage.fetch_function_definition(
+        //     module_id.address(),
+        //     module_id.name(),
+        //     function_name,
+        // )?;
+        // Ok(function)
     }
 }

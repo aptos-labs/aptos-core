@@ -7,16 +7,14 @@ use crate::{
 };
 use aptos_types::validator_txn::ValidatorTransaction;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::{
-    module_and_script_storage::module_storage::AptosModuleStorage, output::VMOutput,
-};
+use aptos_vm_types::{module_and_script_storage::code_storage::AptosCodeStorage, output::VMOutput};
 use move_core_types::vm_status::VMStatus;
 
 impl AptosVM {
     pub(crate) fn process_validator_transaction(
         &self,
         resolver: &impl AptosMoveResolver,
-        module_storage: &impl AptosModuleStorage,
+        module_storage: &impl AptosCodeStorage,
         txn: ValidatorTransaction,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {

@@ -19,9 +19,7 @@ use aptos_types::{
     transaction::TransactionStatus,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::{
-    module_and_script_storage::module_storage::AptosModuleStorage, output::VMOutput,
-};
+use aptos_vm_types::{module_and_script_storage::code_storage::AptosCodeStorage, output::VMOutput};
 use move_core_types::{
     account_address::AccountAddress,
     value::{serialize_values, MoveValue},
@@ -52,14 +50,14 @@ impl AptosVM {
     pub(crate) fn process_dkg_result(
         &self,
         resolver: &impl AptosMoveResolver,
-        module_storage: &impl AptosModuleStorage,
+        code_storage: &impl AptosCodeStorage,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
         dkg_transcript: DKGTranscript,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         match self.process_dkg_result_inner(
             resolver,
-            module_storage,
+            code_storage,
             log_context,
             session_id,
             dkg_transcript,
@@ -79,7 +77,7 @@ impl AptosVM {
     fn process_dkg_result_inner(
         &self,
         resolver: &impl AptosMoveResolver,
-        module_storage: &impl AptosModuleStorage,
+        code_storage: &impl AptosCodeStorage,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
         dkg_node: DKGTranscript,
@@ -124,7 +122,7 @@ impl AptosVM {
                 serialize_values(&args),
                 &mut gas_meter,
                 &mut TraversalContext::new(&traversal_storage),
-                module_storage,
+                code_storage,
             )
             .map_err(|e| {
                 expect_only_successful_execution(e, FINISH_WITH_DKG_RESULT.as_str(), log_context)
@@ -133,7 +131,7 @@ impl AptosVM {
 
         let output = get_system_transaction_output(
             session,
-            module_storage,
+            code_storage,
             &self
                 .storage_gas_params(log_context)
                 .map_err(Unexpected)?
