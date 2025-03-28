@@ -510,10 +510,6 @@ Only called during genesis to initialize system resources for this module.
         };
     };
 
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_default_account_resource_enabled">features::is_default_account_resource_enabled</a>()) {
-        <a href="account.md#0x1_account_create_account_resource_if_does_not_exist">account::create_account_resource_if_does_not_exist</a>(transaction_sender);
-    };
-
     <b>let</b> max_transaction_fee = txn_gas_price * txn_max_gas_units;
 
     <b>if</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_simulation_enhancement_enabled">features::transaction_simulation_enhancement_enabled</a>() || !<a href="transaction_validation.md#0x1_transaction_validation_skip_gas_payment">skip_gas_payment</a>(
