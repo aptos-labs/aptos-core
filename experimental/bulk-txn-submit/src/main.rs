@@ -4,8 +4,8 @@
 use anyhow::{Context, Result};
 use aptos_experimental_bulk_txn_submit::{
     coordinator::{
-        create_sample_addresses, execute_return_worker_funds, execute_submit, CleanAddresses,
-        CreateSampleAddresses, SubmitArgs,
+        create_sample_addresses, execute_return_worker_funds, execute_submit,
+        CreateSampleAddresses, SanitizeAddresses, SubmitArgs,
     },
     workloads::{
         create_account_addresses_work, CreateAndTransferAptSignedTransactionBuilder,
@@ -27,9 +27,13 @@ struct Args {
 
 #[derive(Subcommand, Debug)]
 enum DemoCommand {
+    /// Submits set of transactions.
     Submit(Submit),
+    /// Create a file with sample addresses, for testing.
     CreateSampleAddresses(CreateSampleAddresses),
-    CleanAddresses(CleanAddresses),
+    /// Sanitizes the addresses file
+    /// Removes all duplicates, and shuffles the result.
+    SanitizeAddresses(SanitizeAddresses),
 }
 
 #[derive(Parser, Debug)]
@@ -42,9 +46,21 @@ pub struct Submit {
 
 #[derive(Subcommand, Debug)]
 pub enum WorkTypeSubcommand {
-    TransferApt(DestinationsArg),
-    CreateAndTransferApt(DestinationsArg),
+    /// Executes coin::transfer<AptosCoin> with given file providing list of destinations
+    TransferApt(TransferArg),
+    /// Executes aptos_account::transfer with given file providing list of destinations
+    CreateAndTransferApt(TransferArg),
+    /// Returns all leftover funds on the workers to the main source account
     ReturnWorkerFunds,
+}
+
+#[derive(Parser, Debug)]
+pub struct TransferArg {
+    #[clap(long, default_value_t = 1)]
+    amount_to_send: u64,
+
+    #[clap(long)]
+    destinations_file: String,
 }
 
 #[derive(Parser, Debug)]
@@ -62,7 +78,7 @@ pub async fn main() -> Result<()> {
     match args.command {
         DemoCommand::Submit(args) => create_work_and_execute(args).await,
         DemoCommand::CreateSampleAddresses(args) => create_sample_addresses(args),
-        DemoCommand::CleanAddresses(args) => clean_addresses(args),
+        DemoCommand::SanitizeAddresses(args) => sanitize_addresses(args),
     }
 }
 
@@ -75,24 +91,28 @@ async fn create_work_and_execute(args: Submit) -> Result<()> {
         .await?;
 
     match &args.work_args {
-        WorkTypeSubcommand::TransferApt(destinations) => {
-            let work = create_account_addresses_work(&destinations.destinations_file, false)?;
+        WorkTypeSubcommand::TransferApt(transfer_args) => {
+            let work = create_account_addresses_work(&transfer_args.destinations_file, false)?;
             execute_submit(
                 work,
                 args.submit_args,
-                TransferAptSignedTransactionBuilder,
+                TransferAptSignedTransactionBuilder {
+                    amount_to_send: transfer_args.amount_to_send,
+                },
                 cluster,
                 coin_source_account,
                 false,
             )
             .await
         },
-        WorkTypeSubcommand::CreateAndTransferApt(destinations) => {
-            let work = create_account_addresses_work(&destinations.destinations_file, false)?;
+        WorkTypeSubcommand::CreateAndTransferApt(transfer_args) => {
+            let work = create_account_addresses_work(&transfer_args.destinations_file, false)?;
             execute_submit(
                 work,
                 args.submit_args,
-                CreateAndTransferAptSignedTransactionBuilder,
+                CreateAndTransferAptSignedTransactionBuilder {
+                    amount_to_send: transfer_args.amount_to_send,
+                },
                 cluster,
                 coin_source_account,
                 false,
@@ -111,16 +131,16 @@ async fn create_work_and_execute(args: Submit) -> Result<()> {
     }
 }
 
-fn clean_addresses(args: CleanAddresses) -> Result<()> {
+fn sanitize_addresses(args: SanitizeAddresses) -> Result<()> {
     let work = create_account_addresses_work(&args.destinations_file, false)?;
-    println!("Input: {}", work.len());
+    println!("Sanitizing addresses, {} in input.", work.len());
     let mut unique = work
         .into_iter()
         .collect::<HashSet<_>>()
         .into_iter()
         .collect::<Vec<_>>();
     unique.shuffle(&mut thread_rng());
-    println!("Output: {}", unique.len());
+    println!("Sanitized addresses, {} left in the output", unique.len());
     std::fs::write(
         args.output_file,
         unique

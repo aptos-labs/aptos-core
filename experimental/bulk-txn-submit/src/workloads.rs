@@ -24,7 +24,13 @@ pub trait SignedTransactionBuilder<T> {
         txn_factory: &TransactionFactory,
     ) -> SignedTransaction;
 
-    fn success_output(&self, data: &T, txn_out: &Option<TransactionOnChainData>) -> String;
+    fn success_output(&self, _data: &T, txn_out: &Option<TransactionOnChainData>) -> String {
+        match txn_out {
+            Some(_txn_out) => "success",
+            None => "failure",
+        }
+        .to_string()
+    }
 }
 
 pub fn create_account_addresses_work(
@@ -96,18 +102,6 @@ impl SignedTransactionBuilder<TransactionPayload> for PayloadSignedTransactionBu
     ) -> SignedTransaction {
         account.sign_with_transaction_builder(txn_factory.payload(data.clone()))
     }
-
-    fn success_output(
-        &self,
-        _data: &TransactionPayload,
-        txn_out: &Option<TransactionOnChainData>,
-    ) -> String {
-        match txn_out {
-            Some(_txn_out) => "success",
-            None => "failure",
-        }
-        .to_string()
-    }
 }
 
 pub struct FixedPayloadSignedTransactionBuilder {
@@ -129,17 +123,11 @@ impl SignedTransactionBuilder<()> for FixedPayloadSignedTransactionBuilder {
     ) -> SignedTransaction {
         account.sign_with_transaction_builder(txn_factory.payload(self.payload.clone()))
     }
-
-    fn success_output(&self, _data: &(), txn_out: &Option<TransactionOnChainData>) -> String {
-        match txn_out {
-            Some(_txn_out) => "success",
-            None => "failure",
-        }
-        .to_string()
-    }
 }
 
-pub struct TransferAptSignedTransactionBuilder;
+pub struct TransferAptSignedTransactionBuilder {
+    pub amount_to_send: u64,
+}
 
 impl SignedTransactionBuilder<AccountAddress> for TransferAptSignedTransactionBuilder {
     fn build(
@@ -148,9 +136,9 @@ impl SignedTransactionBuilder<AccountAddress> for TransferAptSignedTransactionBu
         account: &LocalAccount,
         txn_factory: &TransactionFactory,
     ) -> SignedTransaction {
-        account.sign_with_transaction_builder(
-            txn_factory.payload(aptos_stdlib::aptos_coin_transfer(*data, 1)),
-        )
+        account.sign_with_transaction_builder(txn_factory.payload(
+            aptos_stdlib::aptos_coin_transfer(*data, self.amount_to_send),
+        ))
     }
 
     fn success_output(
@@ -172,7 +160,9 @@ impl SignedTransactionBuilder<AccountAddress> for TransferAptSignedTransactionBu
     }
 }
 
-pub struct CreateAndTransferAptSignedTransactionBuilder;
+pub struct CreateAndTransferAptSignedTransactionBuilder {
+    pub amount_to_send: u64,
+}
 
 impl SignedTransactionBuilder<AccountAddress> for CreateAndTransferAptSignedTransactionBuilder {
     fn build(
@@ -181,9 +171,9 @@ impl SignedTransactionBuilder<AccountAddress> for CreateAndTransferAptSignedTran
         account: &LocalAccount,
         txn_factory: &TransactionFactory,
     ) -> SignedTransaction {
-        account.sign_with_transaction_builder(
-            txn_factory.payload(aptos_stdlib::aptos_account_transfer(*data, 1)),
-        )
+        account.sign_with_transaction_builder(txn_factory.payload(
+            aptos_stdlib::aptos_account_transfer(*data, self.amount_to_send),
+        ))
     }
 
     fn success_output(

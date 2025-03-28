@@ -1630,8 +1630,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "aptos-config",
- "aptos-crypto",
- "aptos-global-constants",
  "aptos-logger",
  "aptos-sdk",
  "aptos-transaction-emitter-lib",
@@ -1640,7 +1638,6 @@ dependencies = [
  "chrono",
  "clap 4.5.21",
  "futures",
- "itertools 0.13.0",
  "rand 0.7.3",
  "reqwest 0.11.23",
  "serde",

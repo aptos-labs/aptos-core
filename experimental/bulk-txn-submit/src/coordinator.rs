@@ -126,7 +126,7 @@ pub struct CreateSampleAddresses {
 }
 
 #[derive(Parser, Debug)]
-pub struct CleanAddresses {
+pub struct SanitizeAddresses {
     #[clap(long)]
     pub destinations_file: String,
 
@@ -234,28 +234,25 @@ pub async fn execute_return_worker_funds(
     let counter_ref = &counter;
     let txn_factory_ref = &txn_factory;
     let _ = futures::stream::iter(accounts.iter().map(|account| async move {
-        loop {
-            if let Ok(balance) = txn_executor_ref
-                .get_account_balance(account.address())
-                .await
+        while let Ok(balance) = txn_executor_ref
+            .get_account_balance(account.address())
+            .await
+        {
+            if balance > txn_factory_ref.get_max_gas_amount() * txn_factory_ref.get_gas_unit_price()
             {
-                if balance > txn_factory_ref.get_max_gas_amount() * txn_factory_ref.get_gas_unit_price() {
-                    let txn = account.sign_with_transaction_builder(txn_factory_ref.payload(
-                        aptos_stdlib::aptos_coin_transfer(
-                            coin_source_account.address(),
-                            balance
-                                - txn_factory_ref.get_max_gas_amount()
-                                    * txn_factory_ref.get_gas_unit_price(),
-                        ),
-                    ));
-                    if txn_executor_ref
-                        .execute_transactions_with_counter(&[txn], counter_ref)
-                        .await
-                        .is_ok()
-                    {
-                        break;
-                    }
-                } else {
+                let txn = account.sign_with_transaction_builder(txn_factory_ref.payload(
+                    aptos_stdlib::aptos_coin_transfer(
+                        coin_source_account.address(),
+                        balance
+                            - txn_factory_ref.get_max_gas_amount()
+                                * txn_factory_ref.get_gas_unit_price(),
+                    ),
+                ));
+                if txn_executor_ref
+                    .execute_transactions_with_counter(&[txn], counter_ref)
+                    .await
+                    .is_ok()
+                {
                     break;
                 }
             } else {
@@ -517,12 +514,12 @@ impl Default for BackoffConfig {
 async fn submit_work_txns<T, B: SignedTransactionBuilder<T>>(
     account: &LocalAccount,
     initial_seq_num: u64,
-    work: &Vec<T>,
+    work: &[T],
     single_request_api_batch_size: usize,
     parallel_requests_outstanding: usize,
     builder: &B,
     txn_factory: &TransactionFactory,
-    clients: &Vec<Client>,
+    clients: &[Client],
     poll_interval: Duration,
     tracking: &Tracking,
     indexer_delay_ref: &AtomicI64,
@@ -699,7 +696,10 @@ async fn submit_work_txns<T, B: SignedTransactionBuilder<T>>(
         }
     }
     if indexer_backoffs > 0 || blockchain_backoffs > 0 {
-        warn!("Applied {} blockchain and {} indexer backoffs", blockchain_backoffs, indexer_backoffs);
+        warn!(
+            "Applied {} blockchain and {} indexer backoffs",
+            blockchain_backoffs, indexer_backoffs
+        );
     }
 }
 
@@ -707,7 +707,7 @@ async fn fetch_work_txn_output<T: Clone>(
     account: &LocalAccount,
     initial_seq_num: u64,
     work: &[T],
-    clients: &Vec<Client>,
+    clients: &[Client],
     progress: &AtomicUsize,
 ) -> Vec<(T, Option<TransactionOnChainData>)> {
     tokio::time::sleep(start_sleep_duration()).await;
@@ -785,6 +785,6 @@ pub fn create_sample_addresses(args: CreateSampleAddresses) -> Result<()> {
     Ok(())
 }
 
-pub fn pick_client(clients: &Vec<Client>) -> &Client {
+pub fn pick_client(clients: &[Client]) -> &Client {
     clients.choose(&mut rand::thread_rng()).unwrap()
 }
