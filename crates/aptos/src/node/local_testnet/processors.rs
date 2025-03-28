@@ -5,7 +5,7 @@ use super::{health_checker::HealthChecker, traits::ServiceManager, RunLocalnet};
 use anyhow::{bail, Context, Result};
 use aptos_indexer_processor_sdk::{
     aptos_indexer_transaction_stream::TransactionStreamConfig,
-    postgres::utils::database::run_pending_migrations,
+    postgres::utils::database::run_pending_migrations, server_framework::RunnableConfig,
 };
 pub use aptos_localnet::processors::get_processor_config;
 use async_trait::async_trait;
@@ -14,11 +14,15 @@ use diesel::Connection;
 use diesel_async::{async_connection_wrapper::AsyncConnectionWrapper, pg::AsyncPgConnection};
 use maplit::hashset;
 use processor::{
-    config::{indexer_processor_config::IndexerProcessorConfig, processor_config::ProcessorName},
+    config::{
+        db_config::{DbConfig, PostgresConfig},
+        indexer_processor_config::IndexerProcessorConfig,
+        processor_config::ProcessorName,
+        processor_mode::{BootStrapConfig, ProcessorMode},
+    },
     MIGRATIONS,
 };
 use reqwest::Url;
-use server_framework::RunnableConfig;
 use std::collections::HashSet;
 use tokio::sync::OnceCell;
 use tracing::info;
@@ -43,7 +47,6 @@ pub struct ProcessorArgs {
             ProcessorName::ObjectsProcessor,
             ProcessorName::StakeProcessor,
             ProcessorName::TokenV2Processor,
-            ProcessorName::TransactionMetadataProcessor,
             ProcessorName::UserTransactionProcessor,
         ],
         requires = "with_indexer_api"
@@ -80,13 +83,13 @@ impl ProcessorManager {
                 indexer_grpc_response_item_timeout_secs: Default::default(),
                 transaction_filter: Default::default(),
             },
-            db_config: DbConfig::PostgresConfig {
+            db_config: DbConfig::PostgresConfig(PostgresConfig {
                 connection_string: postgres_connection_string,
                 db_pool_size: 8,
-            },
-            processor_mode: ProcessorMode::Default {
+            }),
+            processor_mode: ProcessorMode::Default(BootStrapConfig {
                 initial_starting_version: 0,
-            },
+            }),
         };
         let manager = Self {
             config,
@@ -119,7 +122,12 @@ impl ProcessorManager {
 
     /// Create the necessary tables in the DB for the processors to work.
     async fn run_migrations(&self) -> Result<()> {
-        let connection_string = self.config.postgres_connection_string.clone();
+        let connection_string = match &self.config.db_config {
+            DbConfig::PostgresConfig(postgres_config) => postgres_config.connection_string.clone(),
+            DbConfig::ParquetConfig(_) => {
+                bail!("Parquet is not supported in the localnet");
+            },
+        };
 
         tokio::task::spawn_blocking(move || {
             // This lets us use the connection like a normal diesel connection. See more:
@@ -143,8 +151,14 @@ impl ServiceManager for ProcessorManager {
     }
 
     fn get_health_checkers(&self) -> HashSet<HealthChecker> {
+        let connection_string = match &self.config.db_config {
+            DbConfig::PostgresConfig(postgres_config) => postgres_config.connection_string.clone(),
+            DbConfig::ParquetConfig(_) => {
+                panic!("Parquet is not supported in the localnet");
+            },
+        };
         hashset! {HealthChecker::Processor(
-            self.config.postgres_connection_string.to_string(),
+            connection_string,
             self.config.processor_config.name().to_string(),
         ) }
     }
