@@ -1,5 +1,7 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 // Copyright (c) The Aptos Labs
-// Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Result};
@@ -228,34 +230,39 @@ impl<'view> CGBuilder<'view>{
         let mut call_graph = QueryGraph::<CGNode>::new();
         let mut func_sig_map = HashMap::<FunctionHandleIndex, String>::new();
 
-        // collect all the functions with definitions and save them as nodes
+        // collect all the functions with definitions and save their signatures
+        // Why: the function signature for a defined function and a non-defined function is NOT identicail
         for func_idx in (0..module.function_defs.len()).into_iter(){
                 let function_definition_index = FunctionDefinitionIndex(func_idx as TableIndex);
                 let function_definition  = self.bytecode.function_def_at(function_definition_index)?;
                 let function_handle_idx = function_definition.function;
 
-                let node_with_def = CGNode{
-                    func_sig: self.format_function_sig(Some(&function_handle_idx), Some(&function_definition_index), None, &mut func_sig_map)?
-                };
-
-                call_graph.add_node(node_with_def.clone());
+                // This function cache the func sig inside func_sig_map
+                self.format_function_sig(Some(&function_handle_idx), Some(&function_definition_index), None, &mut func_sig_map)?;
         };
 
         // process children of functions with definitions;
-        // Warning: never merge this loop with the loop above, as merging will mess up the signature of the functions
+        // Warning: never merge this loop with the loop above, as merging will mess up the signature of functions
         for func_idx in (0..module.function_defs.len()).into_iter(){
             let function_definition_index = FunctionDefinitionIndex(func_idx as TableIndex);
             let function_definition  = self.bytecode.function_def_at(function_definition_index)?;
             let function_handle_idx = function_definition.function;
 
+            //create a node for the current function
             let node_with_def = CGNode{
-                func_sig: self.format_function_sig(Some(&function_handle_idx), Some(&function_definition_index), None, &mut func_sig_map)?
+                func_sig: func_sig_map.get(&function_handle_idx).unwrap().clone(),
             };
+            call_graph.add_node(node_with_def.clone());
 
             let child_funcs = self.get_child_functions(function_definition.code.as_ref());
             for func in child_funcs.into_iter(){
                 let child_node = CGNode{
-                    func_sig: self.format_function_sig(Some(&func), None, None, &mut func_sig_map)?
+                    // Signature has been created
+                    func_sig: if func_sig_map.contains_key(&func){
+                        func_sig_map.get(&function_handle_idx).unwrap().clone()
+                    }else{
+                        self.format_function_sig(Some(&func), None, None, &mut func_sig_map)?
+                    }
                 };
                 call_graph.add_node(child_node.clone());
                 call_graph.add_edge(node_with_def.clone(), child_node.clone());
@@ -288,9 +295,9 @@ impl<'view> CGBuilder<'view>{
     //  Script Non-Entry Function: Yes Function Handle, No Function Definition, No Script
     //  Module Internal Function: Yes Function Handle, Yes Function Definition, No Script
     //  Module External/Native/Imported Function: Yes Function Handle, No Function Definition, No Script
-    fn format_function_sig(&self, fh: Option<&FunctionHandleIndex>, fd: Option<&FunctionDefinitionIndex>, s: Option<&CompiledScript>, func_sig_map: &mut HashMap<FunctionHandleIndex, String>) -> Result<String> {
-
-        // Function handler is given; No need to worry about script entry function anymore
+    fn format_function_sig(&self, fh: Option<&FunctionHandleIndex>, fd: Option<&FunctionDefinitionIndex>,
+        s: Option<&CompiledScript>, func_sig_map: &mut HashMap<FunctionHandleIndex, String>) -> Result<String> {
+        // Function handler is given
         if let Some(function_handle_idx) = fh {
             //Cache the function sig; not just for efficiency, but also for avoiding creating different func sigs for the same function (defined by function handle index)
             if func_sig_map.contains_key(function_handle_idx){
@@ -300,30 +307,20 @@ impl<'view> CGBuilder<'view>{
             let function_handle = self.bytecode.function_handle_at(*function_handle_idx);
 
             let (entry_modifier, native_modifier, visibility_modifier) = match fd{
+                // function definition avaialble
                 Some(function_def_index) => {
                     let function_def = self.bytecode.function_def_at(*function_def_index)?;
-
-                    let entry = if function_def.is_entry{
-                        ENTRY_MODIFIER
-                    }else{
-                        EMPTY
-                    };
-                    let native = if function_def.is_native(){
-                        NATIVE_MODIFIER
-                    }else{
-                        EMPTY
-                    };
+                    let entry = if function_def.is_entry{ ENTRY_MODIFIER } else { EMPTY };
+                    let native = if function_def.is_native(){ NATIVE_MODIFIER } else { EMPTY };
                     let visibility = match function_def.visibility{
                         Visibility::Private => PRIVATE_FUNCTION,
                         Visibility::Friend => FRIEND_FUNCTION,
                         Visibility::Public => PUBLIC_FUNCTION
                     };
-
                     (entry, native, visibility)
                 }
-                 _ => {
-                    (EMPTY, EMPTY, EMPTY)
-                 }
+                // function definition not avaialble
+                 _ => { (EMPTY, EMPTY, EMPTY) }
             };
 
             let module_handle = self.bytecode.module_handle_at(function_handle.module);
@@ -334,25 +331,20 @@ impl<'view> CGBuilder<'view>{
             let params: Vec<String>= self.bytecode.signature_at(function_handle.parameters).0.iter().map(|token|self.format_sig_token(token)).collect();
             let ret_type: Vec<String>= self.bytecode.signature_at(function_handle.return_).0.iter().map(|token|self.format_sig_token(token)).collect();
 
-            let res = format!("{}{}{}{}::{}<{}>({}){}", entry_modifier, native_modifier, visibility_modifier, module_name, function_name, ty_params, params.join(", "), ret_type.join(", "));
+            let res = format!("{}{}{}{}::{}{}{}{}", entry_modifier, native_modifier, visibility_modifier, module_name, function_name, ty_params, params.join(", "), ret_type.join(", "));
             func_sig_map.insert(*function_handle_idx, res.clone());
             return Ok(res);
         }
 
         // If we get to this point, the function must be the script entry function
         // We never need to worry about caching the function sig
-        if let Some(_) = s {
+        if let Some(script) = s {
             let entry_modifier = ENTRY_MODIFIER;
-            let native_modifier: &str = EMPTY;
-            let visibility_modifier = EMPTY;
             let module_name = SCRIPT_NAME;
             let function_name = MAIN_FUNCTION;
-            let ty_params = EMPTY;
-            let params =  EMPTY; //Vec<String>= self.bytecode.signature_at(script.parameters).0.iter().map(|token|self.format_sig_token(token)).collect();
-            let ret_type = EMPTY;
-            return Ok(format!("{}{}{}{}::{}<{}>({}){}", entry_modifier, native_modifier, visibility_modifier, module_name, function_name, ty_params, params, ret_type));
+            let params: Vec<String> = self.bytecode.signature_at(script.parameters).0.iter().map(|token|self.format_sig_token(token)).collect();
+            return Ok(format!("{}{}::{}({})", entry_modifier, module_name, function_name, params.join(", ")));
         }
-
         Ok(String::from(""))
     }
 
