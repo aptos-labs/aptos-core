@@ -4,15 +4,15 @@
 use move_binary_format::{file_format::CompiledScript, CompiledModule};
 use move_core_types::metadata::Metadata;
 
-/// Trait to unify accesses to [CompiledModule] and [CompiledScript].
-pub trait CompiledCode {
+/// Trait to unify accesses to [CompiledModule] and [CompiledScript] for extracting metadata.
+pub trait CompiledCodeMetadata {
     /// Returns the binary version.
     fn version(&self) -> u32;
     /// Returns the [Metadata] stored in this module or script.
     fn metadata(&self) -> &[Metadata];
 }
 
-impl CompiledCode for CompiledModule {
+impl CompiledCodeMetadata for CompiledModule {
     fn version(&self) -> u32 {
         self.version
     }
@@ -22,7 +22,7 @@ impl CompiledCode for CompiledModule {
     }
 }
 
-impl CompiledCode for CompiledScript {
+impl CompiledCodeMetadata for CompiledScript {
     fn version(&self) -> u32 {
         self.version
     }

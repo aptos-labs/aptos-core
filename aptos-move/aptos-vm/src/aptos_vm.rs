@@ -23,7 +23,10 @@ use crate::{
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     transaction_validation,
-    verifier::{self},
+    verifier::{
+        event_validation, native_validation, resource_groups, transaction_arg_validation,
+        view_function,
+    },
     VMBlockExecutor, VMValidator,
 };
 use anyhow::anyhow;
@@ -812,9 +815,9 @@ impl AptosVM {
 
         // Check that unstable bytecode cannot be executed on mainnet and verify events.
         self.reject_unstable_bytecode_for_script(script)?;
-        verifier::event_validation::verify_no_event_emission_in_compiled_script(script)?;
+        event_validation::verify_no_event_emission_in_compiled_script(script)?;
 
-        let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
+        let args = transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
             code_storage,
             serialized_signers,
@@ -889,7 +892,7 @@ impl AptosVM {
 
         let struct_constructors_enabled =
             self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
-        let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
+        let args = transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
             module_storage,
             serialized_signers,
@@ -1464,7 +1467,7 @@ impl AptosVM {
         allowed_deps: Option<BTreeMap<AccountAddress, BTreeSet<String>>>,
     ) -> VMResult<()> {
         self.reject_unstable_bytecode(modules)?;
-        verifier::native_validation::validate_module_natives(modules)?;
+        native_validation::validate_module_natives(modules)?;
 
         for m in modules {
             if !expected_modules.remove(m.self_id().name().as_str()) {
@@ -1493,13 +1496,13 @@ impl AptosVM {
                 .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
         }
 
-        verifier::resource_groups::validate_resource_groups(
+        resource_groups::validate_resource_groups(
             module_storage,
             modules,
             self.features()
                 .is_enabled(FeatureFlag::SAFER_RESOURCE_GROUPS),
         )?;
-        verifier::event_validation::validate_module_events(module_storage, modules)?;
+        event_validation::validate_module_events(module_storage, modules)?;
 
         if !expected_modules.is_empty() {
             return Err(Self::metadata_validation_error(
@@ -2330,7 +2333,7 @@ impl AptosVM {
     ) -> anyhow::Result<Vec<Vec<u8>>> {
         let func = module_storage.load_function(&module_id, &func_name, &type_args)?;
         let metadata = vm.extract_module_metadata(module_storage, &module_id);
-        let arguments = verifier::view_function::validate_view_function(
+        let arguments = view_function::validate_view_function(
             session,
             module_storage,
             arguments,
