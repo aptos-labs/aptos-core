@@ -73,14 +73,15 @@ impl ProcessorManager {
             transaction_stream_config: TransactionStreamConfig {
                 indexer_grpc_data_service_address: data_service_url,
                 auth_token: "notused".to_string(),
-                starting_version: None,
+                starting_version: Some(0),
                 request_ending_version: None,
                 request_name_header: "notused".to_string(),
                 additional_headers: Default::default(),
                 indexer_grpc_http2_ping_interval_secs: Default::default(),
                 indexer_grpc_http2_ping_timeout_secs: Default::default(),
-                indexer_grpc_reconnection_timeout_secs: Default::default(),
-                indexer_grpc_response_item_timeout_secs: Default::default(),
+                indexer_grpc_reconnection_timeout_secs: 60,
+                indexer_grpc_response_item_timeout_secs: 60,
+                reconnection_max_retries: 1000,
                 transaction_filter: Default::default(),
             },
             db_config: DbConfig::PostgresConfig(PostgresConfig {
