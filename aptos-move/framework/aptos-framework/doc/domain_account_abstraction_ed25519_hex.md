@@ -1,7 +1,7 @@
 
-<a id="0x1_domain_account_abstraction_ed25519_hex"></a>
+<a id="0x1_DERIVABLE_ACCOUNT_ABSTRACTION_ed25519_hex"></a>
 
-# Module `0x1::domain_account_abstraction_ed25519_hex`
+# Module `0x1::DERIVABLE_ACCOUNT_ABSTRACTION_ed25519_hex`
 
 Domain account abstraction using ed25519 hex for signing.
 
@@ -12,7 +12,7 @@ account_identity is raw public_key.
 
 
 -  [Constants](#@Constants_0)
--  [Function `authenticate`](#0x1_domain_account_abstraction_ed25519_hex_authenticate)
+-  [Function `authenticate`](#0x1_DERIVABLE_ACCOUNT_ABSTRACTION_ed25519_hex_authenticate)
 
 
 <pre><code><b>use</b> <a href="auth_data.md#0x1_auth_data">0x1::auth_data</a>;
@@ -29,23 +29,23 @@ account_identity is raw public_key.
 ## Constants
 
 
-<a id="0x1_domain_account_abstraction_ed25519_hex_EINVALID_SIGNATURE"></a>
+<a id="0x1_DERIVABLE_ACCOUNT_ABSTRACTION_ed25519_hex_EINVALID_SIGNATURE"></a>
 
 
 
-<pre><code><b>const</b> <a href="domain_account_abstraction_ed25519_hex.md#0x1_domain_account_abstraction_ed25519_hex_EINVALID_SIGNATURE">EINVALID_SIGNATURE</a>: u64 = 1;
+<pre><code><b>const</b> <a href="DERIVABLE_ACCOUNT_ABSTRACTION_ed25519_hex.md#0x1_DERIVABLE_ACCOUNT_ABSTRACTION_ed25519_hex_EINVALID_SIGNATURE">EINVALID_SIGNATURE</a>: u64 = 1;
 </code></pre>
 
 
 
-<a id="0x1_domain_account_abstraction_ed25519_hex_authenticate"></a>
+<a id="0x1_DERIVABLE_ACCOUNT_ABSTRACTION_ed25519_hex_authenticate"></a>
 
 ## Function `authenticate`
 
 Authorization function for domain account abstraction.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="domain_account_abstraction_ed25519_hex.md#0x1_domain_account_abstraction_ed25519_hex_authenticate">authenticate</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+<pre><code><b>public</b> <b>fun</b> <a href="DERIVABLE_ACCOUNT_ABSTRACTION_ed25519_hex.md#0x1_DERIVABLE_ACCOUNT_ABSTRACTION_ed25519_hex_authenticate">authenticate</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
 </code></pre>
 
 
@@ -54,7 +54,7 @@ Authorization function for domain account abstraction.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="domain_account_abstraction_ed25519_hex.md#0x1_domain_account_abstraction_ed25519_hex_authenticate">authenticate</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, aa_auth_data: AbstractionAuthData): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="DERIVABLE_ACCOUNT_ABSTRACTION_ed25519_hex.md#0x1_DERIVABLE_ACCOUNT_ABSTRACTION_ed25519_hex_authenticate">authenticate</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, aa_auth_data: AbstractionAuthData): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
     <b>let</b> hex_digest = <a href="../../aptos-stdlib/doc/string_utils.md#0x1_string_utils_to_string">string_utils::to_string</a>(aa_auth_data.digest());
 
     <b>let</b> public_key = new_unvalidated_public_key_from_bytes(*aa_auth_data.domain_account_identity());
@@ -65,7 +65,7 @@ Authorization function for domain account abstraction.
             &public_key,
             *hex_digest.bytes(),
         ),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="domain_account_abstraction_ed25519_hex.md#0x1_domain_account_abstraction_ed25519_hex_EINVALID_SIGNATURE">EINVALID_SIGNATURE</a>)
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="DERIVABLE_ACCOUNT_ABSTRACTION_ed25519_hex.md#0x1_DERIVABLE_ACCOUNT_ABSTRACTION_ed25519_hex_EINVALID_SIGNATURE">EINVALID_SIGNATURE</a>)
     );
 
     <a href="account.md#0x1_account">account</a>
