@@ -15,6 +15,7 @@ module aptos_framework::derivable_account_abstraction_ed25519_hex {
     use std::error;
     use std::string_utils;
     use std::transaction_context::{Self, EntryFunctionPayload};
+    use std::vector;
 
     const EINVALID_SIGNATURE: u64 = 1;
     const EINVALID_BASE_58_PUBLIC_KEY: u64 = 2;
@@ -37,9 +38,9 @@ module aptos_framework::derivable_account_abstraction_ed25519_hex {
             b"mainnet"
         } else if (chain_id == 2) {
             b"testnet"
-        } else if chain_id == 3 {
+        } else if (chain_id == 3) {
             b"devnet"
-        } else if chain_id == 4 {
+        } else if (chain_id == 4) {
             b"local"
         } else {
             abort(EUNSUPPORTED_CHAIN_ID)
@@ -165,8 +166,6 @@ module aptos_framework::derivable_account_abstraction_ed25519_hex {
     #[test_only]
     use std::string::{utf8};
     #[test_only]
-    use std::vector;
-    #[test_only]
     use aptos_framework::auth_data::{create_derivable_auth_data};
 
     #[test]
@@ -220,7 +219,7 @@ module aptos_framework::derivable_account_abstraction_ed25519_hex {
 
     #[test(framework = @0x1)]
     fun test_entry_function_name() {
-        let entry_function_payload = transaction_context::new_entry_function_apyload(
+        let entry_function_payload = transaction_context::new_entry_function_payload(
             @0x1,
             utf8(b"coin"),
             utf8(b"transfer"),
