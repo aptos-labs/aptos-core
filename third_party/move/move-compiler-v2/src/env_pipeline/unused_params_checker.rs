@@ -17,16 +17,17 @@ pub fn unused_params_checker(env: &GlobalEnv) {
     for module in env.get_modules() {
         if module.is_target() {
             for struct_env in module.get_structs() {
-                if !struct_env.is_ghost_memory() {
-                    check_unused_params(&struct_env);
-                }
+                check_unused_params(&struct_env);
             }
         }
     }
 }
 
-/// Checks for unused type parameters for the given struct, and reports errors if found.
+/// Checks for unused type parameters for the given struct, and reports warnings if found.
 fn check_unused_params(struct_env: &StructEnv) {
+    if struct_env.is_native() || struct_env.is_ghost_memory() {
+        return;
+    }
     let env = struct_env.module_env.env;
     let used_params_in_fields = used_type_parameters_in_fields(struct_env);
     for (i, TypeParameter(name, kind, loc)) in struct_env.get_type_parameters().iter().enumerate() {
