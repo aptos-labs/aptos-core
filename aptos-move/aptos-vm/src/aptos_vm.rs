@@ -76,8 +76,8 @@ use aptos_types::{
     },
     vm::module_metadata::{
         get_compilation_metadata_from_compiled_module,
-        get_compilation_metadata_from_compiled_script, get_metadata, get_metadata_v0,
-        verify_module_metadata, RuntimeModuleMetadataV1,
+        get_compilation_metadata_from_compiled_script, get_metadata, verify_module_metadata,
+        RuntimeModuleMetadataV1,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
@@ -815,15 +815,8 @@ impl AptosVM {
             },
         };
 
-        // Check that unstable bytecode cannot be executed on mainnet
-        if self
-            .features()
-            .is_enabled(FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT)
-        {
-            self.reject_unstable_bytecode_for_script(script)?;
-        }
-
-        // TODO(Gerardo): consolidate the extended validation to verifier.
+        // Check that unstable bytecode cannot be executed on mainnet and verify events.
+        self.reject_unstable_bytecode_for_script(script)?;
         verifier::event_validation::verify_no_event_emission_in_compiled_script(script)?;
 
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
@@ -877,11 +870,7 @@ impl AptosVM {
         )?;
 
         // Native entry function is forbidden.
-        if self
-            .features()
-            .is_enabled(FeatureFlag::DISALLOW_USER_NATIVES)
-            && function.is_native()
-        {
+        if function.is_native() {
             return Err(
                 PartialVMError::new(StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED)
                     .with_message(
@@ -1433,16 +1422,11 @@ impl AptosVM {
             // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
         }
 
-        if self
-            .timed_features()
-            .is_enabled(TimedFeatureFlag::ModuleComplexityCheck)
-        {
-            for (module, blob) in modules.iter().zip(bundle.iter()) {
-                // TODO(Gas): Make budget configurable.
-                let budget = 2048 + blob.code().len() as u64 * 20;
-                move_binary_format::check_complexity::check_module_complexity(module, budget)
-                    .map_err(|err| err.finish(Location::Undefined))?;
-            }
+        for (module, blob) in modules.iter().zip(bundle.iter()) {
+            // TODO(Gas): Make budget configurable.
+            let budget = 2048 + blob.code().len() as u64 * 20;
+            move_binary_format::check_complexity::check_module_complexity(module, budget)
+                .map_err(|err| err.finish(Location::Undefined))?;
         }
 
         self.validate_publish_request(module_storage, modules, expected_modules, allowed_deps)?;
@@ -1480,19 +1464,8 @@ impl AptosVM {
         mut expected_modules: BTreeSet<String>,
         allowed_deps: Option<BTreeMap<AccountAddress, BTreeSet<String>>>,
     ) -> VMResult<()> {
-        if self
-            .features()
-            .is_enabled(FeatureFlag::REJECT_UNSTABLE_BYTECODE)
-        {
-            self.reject_unstable_bytecode(modules)?;
-        }
-
-        if self
-            .features()
-            .is_enabled(FeatureFlag::DISALLOW_USER_NATIVES)
-        {
-            verifier::native_validation::validate_module_natives(modules)?;
-        }
+        self.reject_unstable_bytecode(modules)?;
+        verifier::native_validation::validate_module_natives(modules)?;
 
         for m in modules {
             if !expected_modules.remove(m.self_id().name().as_str()) {
@@ -1517,7 +1490,7 @@ impl AptosVM {
                     }
                 }
             }
-            verify_module_metadata(m, self.features(), self.timed_features())
+            verify_module_metadata(m, self.features())
                 .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
         }
 
@@ -1556,9 +1529,9 @@ impl AptosVM {
     }
 
     /// Check whether the script can be run on mainnet based on the unstable tag in the metadata
-    pub fn reject_unstable_bytecode_for_script(&self, module: &CompiledScript) -> VMResult<()> {
+    pub fn reject_unstable_bytecode_for_script(&self, script: &CompiledScript) -> VMResult<()> {
         if self.chain_id().is_mainnet() {
-            if let Some(metadata) = get_compilation_metadata_from_compiled_script(module) {
+            if let Some(metadata) = get_compilation_metadata_from_compiled_script(script) {
                 if metadata.unstable {
                     return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
                         .with_message("script marked unstable cannot be run on mainnet".to_string())
@@ -2277,11 +2250,7 @@ impl AptosVM {
         let metadata = module_storage
             .fetch_module_metadata(module_id.address(), module_id.name())
             .ok()??;
-        if self.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
-            get_metadata(&metadata)
-        } else {
-            get_metadata_v0(&metadata)
-        }
+        get_metadata(&metadata)
     }
 
     pub fn execute_view_function(

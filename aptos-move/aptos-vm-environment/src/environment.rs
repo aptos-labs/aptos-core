@@ -329,8 +329,8 @@ pub mod tests {
         non_default_configuration.set_last_reconfiguration_time_for_test(1);
 
         let mut non_default_features = Features::default();
-        assert!(non_default_features.is_enabled(FeatureFlag::LIMIT_VM_TYPE_SIZE));
-        non_default_features.disable(FeatureFlag::LIMIT_VM_TYPE_SIZE);
+        assert!(non_default_features.is_enabled(FeatureFlag::EMIT_FEE_STATEMENT));
+        non_default_features.disable(FeatureFlag::EMIT_FEE_STATEMENT);
 
         let state_views = [
             MockStateView::empty(),
