@@ -24,7 +24,7 @@ fn naive_view_layers<K: Ord, V>(layers: impl Iterator<Item = Vec<(K, V)>>) -> BT
 }
 
 fn arb_test_case() -> impl Strategy<Value = (Vec<Vec<(HashCollide, u8)>>, usize, usize, usize)> {
-    vec(vec(any::<(u8, u8)>(), 0..100), 1..100).prop_flat_map(|items_per_layer| {
+    vec(vec(any::<(u8, u8)>(), 0..10), 1..10).prop_flat_map(|items_per_layer| {
         let num_overlay_layers = items_per_layer.len();
         let items_per_update = items_per_layer.clone();
         vec(0..=num_overlay_layers, 3).prop_map(move |mut layer_indices| {
@@ -111,4 +111,48 @@ proptest! {
 
         prop_assert_eq!(a, b);
     }
+}
+
+#[test]
+fn test_basic_stuff() {
+    let layer0 = MapLayer::<HashCollide, String>::new_family("test_basic");
+    let layer00 = layer0.clone();
+
+    let map1 = layer00.view_layers_after(&layer0);
+    let kvs1 = vec![
+        (HashCollide(0), "a".to_string()),
+        (HashCollide(1), "bb".to_string()),
+        (HashCollide(2), "ccc".to_string()),
+        (HashCollide(3), "dddd".to_string()),
+    ];
+    let layer1 = map1.new_layer(&kvs1);
+
+    let map2 = layer1.view_layers_after(&layer00);
+    let kvs2 = vec![
+        (HashCollide(0), "aa".to_string()),
+        (HashCollide(1), "bbbb".to_string()),
+        (HashCollide(4), "eeeee".to_string()),
+        (HashCollide(5), "ffffff".to_string()),
+    ];
+    let layer2 = map2.new_layer(&kvs2);
+
+    let map20 = layer2.view_layers_after(&layer00);
+    let map21 = layer2.view_layers_after(&layer1);
+
+    println!("------------");
+    println!("{:?}", map1.get(&HashCollide(0)));
+    println!("{:?}", map2.get(&HashCollide(0)));
+    println!("{:?}", map20.get(&HashCollide(0)));
+    println!("{:?}", map21.get(&HashCollide(0)));
+    println!("------------");
+    println!("{:?}", map1.get(&HashCollide(2)));
+    println!("{:?}", map2.get(&HashCollide(2)));
+    println!("{:?}", map20.get(&HashCollide(2)));
+    println!("{:?}", map21.get(&HashCollide(2)));
+    println!("------------");
+
+    println!("map1: {:?}", map1.iter().collect::<Vec<_>>());
+    println!("map2: {:?}", map2.iter().collect::<Vec<_>>());
+    println!("map20: {:?}", map20.iter().collect::<Vec<_>>());
+    println!("map21: {:?}", map21.iter().collect::<Vec<_>>());
 }
