@@ -1,9 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{code_cache_global::GlobalModuleCache, types::InputOutputKey, view::LatestView};
+use crate::{
+    code_cache_global::GlobalModuleCache,
+    types::InputOutputKey,
+    view::{GroupReadResult, LatestView, ReadResult},
+};
 use anyhow::bail;
 use aptos_aggregator::{
+    delta_change_set::serialize,
     delta_math::DeltaHistory,
     types::{DelayedFieldValue, DelayedFieldsSpeculativeError, ReadPosition},
 };
@@ -21,10 +26,12 @@ use aptos_types::{
     executable::ModulePath,
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
+    vm_status::StatusCode,
     write_set::TransactionWrite,
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
 use derivative::Derivative;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::value::MoveTypeLayout;
 use move_vm_types::{
     code::{ModuleCode, SyncModuleCache, WithAddress, WithName, WithSize},
@@ -43,12 +50,12 @@ use std::{
     sync::Arc,
 };
 
-/// The enum variants should not be re-ordered, as it defines a relation
-/// Existence < Metadata < Value.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ReadKind {
     Exists,
     Metadata,
+    ResourceSize,
+    MetadataAndResourceSize,
     Value,
 }
 
@@ -69,7 +76,13 @@ pub(crate) enum DataRead<V> {
         #[derivative(PartialEq = "ignore", Debug = "ignore")] Arc<V>,
         #[derivative(PartialEq = "ignore", Debug = "ignore")] Option<Arc<MoveTypeLayout>>,
     ),
+    // Metadata and ResourceSize are insufficient to determine each other, but both
+    // can be determined from Versioned. When both are available, the information
+    // is stored in the MetadataAndResourceSize variant.
+    MetadataAndResourceSize(Option<StateValueMetadata>, Option<u64>),
     Metadata(Option<StateValueMetadata>),
+    ResourceSize(Option<u64>),
+    // Exists is a lower tier, can be determined both from Metadata and ResourceSize.
     Exists(bool),
     /// Read resolved an aggregatorV1 delta to a value.
     /// TODO[agg_v1](cleanup): deprecate.
@@ -91,6 +104,22 @@ enum DataReadComparison {
 }
 
 impl<V: TransactionWrite> DataRead<V> {
+    fn merge_metadata_and_size(&mut self, other: &DataRead<V>) -> bool {
+        if let DataRead::ResourceSize(size) = other {
+            if let DataRead::Metadata(ref mut metadata) = self {
+                *self = DataRead::MetadataAndResourceSize(std::mem::take(metadata), *size);
+                return true;
+            }
+        }
+        if let DataRead::Metadata(metadata) = other {
+            if let DataRead::ResourceSize(ref mut size) = self {
+                *self = DataRead::MetadataAndResourceSize(metadata.clone(), std::mem::take(size));
+                return true;
+            }
+        }
+        false
+    }
+
     // Assigns highest rank to Versioned / Resolved, then Metadata, then Exists.
     // (e.g. versioned read implies metadata and existence information, and
     // metadata information implies existence information).
@@ -98,7 +127,9 @@ impl<V: TransactionWrite> DataRead<V> {
         use DataRead::*;
         match self {
             Versioned(_, _, _) | Resolved(_) => ReadKind::Value,
+            MetadataAndResourceSize(_, _) => ReadKind::MetadataAndResourceSize,
             Metadata(_) => ReadKind::Metadata,
+            ResourceSize(_) => ReadKind::ResourceSize,
             Exists(_) => ReadKind::Exists,
         }
     }
@@ -110,55 +141,149 @@ impl<V: TransactionWrite> DataRead<V> {
         let self_kind = self.get_kind();
         let other_kind = other.get_kind();
 
-        if self_kind < other_kind {
-            DataReadComparison::Insufficient
-        } else {
-            let downcast_eq = if self_kind == other_kind {
-                // Optimization to avoid unnecessary clones (e.g. during validation).
-                self == other
-            } else {
-                self.downcast(other_kind)
-                    .expect("Downcast to lower kind must succeed")
-                    == *other
-            };
-
-            if downcast_eq {
+        if self_kind == other_kind {
+            // Optimization to avoid unnecessary clone in convert_to. Has been optimized
+            // because contains is called during validation.
+            if self == other {
                 DataReadComparison::Contains
             } else {
                 DataReadComparison::Inconsistent
             }
+        } else {
+            match self.convert_to(&other_kind) {
+                Some(value) => {
+                    if value == *other {
+                        DataReadComparison::Contains
+                    } else {
+                        DataReadComparison::Inconsistent
+                    }
+                },
+                None => DataReadComparison::Insufficient,
+            }
         }
     }
 
+    fn v_size(v: &Arc<V>) -> Option<u64> {
+        v.bytes().map(|bytes| bytes.len() as u64)
+    }
+
+    /// Convert to a different kind of DataRead.
+    ///
     /// If the reads contains sufficient information, extract this information and generate
     /// a new DataRead of the desired kind (e.g. Metadata kind from Value).
-    pub(crate) fn downcast(&self, kind: ReadKind) -> Option<DataRead<V>> {
-        let self_kind = self.get_kind();
-        if self_kind == kind {
-            return Some(self.clone());
+    ///
+    /// Note that metadata or size do not contain sufficient information to determine
+    /// MetadataAndResourceSize variant, but it is possible to convert in the other direction.
+    pub(crate) fn convert_to(&self, kind: &ReadKind) -> Option<DataRead<V>> {
+        match self {
+            DataRead::Versioned(version, v, layout) => {
+                Self::versioned_convert_to(version, v, layout, kind)
+            },
+            DataRead::Resolved(v) => Self::resolved_convert_to(*v, kind),
+            DataRead::MetadataAndResourceSize(metadata, size) => {
+                Self::metadata_and_size_convert_to(metadata, *size, kind)
+            },
+            DataRead::Metadata(metadata) => Self::metadata_convert_to(metadata, kind),
+            DataRead::ResourceSize(size) => Self::resource_size_convert_to(*size, kind),
+            DataRead::Exists(exists) => Self::exists_convert_to(*exists, kind),
         }
+    }
 
-        (self_kind > kind).then(|| match (self, &kind) {
-            (DataRead::Versioned(_, v, _), ReadKind::Metadata) => {
-                // For deletion, as_state_value_metadata returns None, also asserted by tests.
-                DataRead::Metadata(v.as_state_value_metadata())
+    fn versioned_convert_to(
+        version: &Version,
+        v: &Arc<V>,
+        layout: &Option<Arc<MoveTypeLayout>>,
+        kind: &ReadKind,
+    ) -> Option<DataRead<V>> {
+        match kind {
+            ReadKind::Value => Some(DataRead::Versioned(
+                version.clone(),
+                v.clone(),
+                layout.clone(),
+            )),
+            ReadKind::MetadataAndResourceSize => Some(DataRead::MetadataAndResourceSize(
+                v.as_state_value_metadata(),
+                Self::v_size(v),
+            )),
+            ReadKind::Metadata => Some(DataRead::Metadata(v.as_state_value_metadata())),
+            ReadKind::ResourceSize => Some(DataRead::ResourceSize(Self::v_size(v))),
+            ReadKind::Exists => Some(DataRead::Exists(!v.is_deletion())),
+        }
+    }
+
+    fn resolved_convert_to(v: u128, kind: &ReadKind) -> Option<DataRead<V>> {
+        match kind {
+            ReadKind::Value => Some(DataRead::Resolved(v)),
+            ReadKind::MetadataAndResourceSize => Some(DataRead::MetadataAndResourceSize(
+                Some(StateValueMetadata::none()),
+                Some(serialize(&v).len() as u64),
+            )),
+            ReadKind::Metadata => Some(DataRead::Metadata(Some(StateValueMetadata::none()))),
+            ReadKind::ResourceSize => {
+                Some(DataRead::ResourceSize(Some(serialize(&v).len() as u64)))
             },
-            (DataRead::Versioned(_, v, _), ReadKind::Exists) => DataRead::Exists(!v.is_deletion()),
-            (DataRead::Resolved(_), ReadKind::Metadata) => {
-                DataRead::Metadata(Some(StateValueMetadata::none()))
-            },
-            (DataRead::Resolved(_), ReadKind::Exists) => DataRead::Exists(true),
-            (DataRead::Metadata(maybe_metadata), ReadKind::Exists) => {
-                DataRead::Exists(maybe_metadata.is_some())
-            },
-            (_, _) => unreachable!("{:?}, {:?} must be covered", self_kind, kind),
-        })
+            ReadKind::Exists => Some(DataRead::Exists(true)),
+        }
+    }
+
+    fn metadata_and_size_convert_to(
+        maybe_metadata: &Option<StateValueMetadata>,
+        maybe_size: Option<u64>,
+        kind: &ReadKind,
+    ) -> Option<DataRead<V>> {
+        match kind {
+            ReadKind::Value => None,
+            ReadKind::MetadataAndResourceSize => Some(DataRead::MetadataAndResourceSize(
+                maybe_metadata.clone(),
+                maybe_size,
+            )),
+            ReadKind::Metadata => Some(DataRead::Metadata(maybe_metadata.clone())),
+            ReadKind::ResourceSize => Some(DataRead::ResourceSize(maybe_size)),
+            ReadKind::Exists => Some(DataRead::Exists(maybe_metadata.is_some())),
+        }
+    }
+
+    fn metadata_convert_to(
+        maybe_metadata: &Option<StateValueMetadata>,
+        kind: &ReadKind,
+    ) -> Option<DataRead<V>> {
+        match kind {
+            ReadKind::Value => None,
+            ReadKind::MetadataAndResourceSize => None,
+            ReadKind::Metadata => Some(DataRead::Metadata(maybe_metadata.clone())),
+            ReadKind::ResourceSize => None,
+            ReadKind::Exists => Some(DataRead::Exists(maybe_metadata.is_some())),
+        }
+    }
+
+    fn resource_size_convert_to(maybe_size: Option<u64>, kind: &ReadKind) -> Option<DataRead<V>> {
+        match kind {
+            ReadKind::Value => None,
+            ReadKind::MetadataAndResourceSize => None,
+            ReadKind::Metadata => None,
+            ReadKind::ResourceSize => Some(DataRead::ResourceSize(maybe_size)),
+            ReadKind::Exists => Some(DataRead::Exists(maybe_size.is_some())),
+        }
+    }
+
+    fn exists_convert_to(exists: bool, kind: &ReadKind) -> Option<DataRead<V>> {
+        match kind {
+            ReadKind::Value => None,
+            ReadKind::MetadataAndResourceSize => None,
+            ReadKind::Metadata => None,
+            ReadKind::ResourceSize => None,
+            ReadKind::Exists => Some(DataRead::Exists(exists)),
+        }
     }
 
     pub(crate) fn from_value_with_layout(version: Version, value: ValueWithLayout<V>) -> Self {
         match value {
-            // If value was never exchanged, then metadata can be the highest one without full value.
-            ValueWithLayout::RawFromStorage(v) => DataRead::Metadata(v.as_state_value_metadata()),
+            // If value was never exchanged, then value shouldn't be used, and so we construct
+            // a MetadataAndResourceSize variant that implies everything non-value. This also
+            // ensures that RawFromStorage can't be consistent with any other value read.
+            ValueWithLayout::RawFromStorage(v) => {
+                DataRead::MetadataAndResourceSize(v.as_state_value_metadata(), Self::v_size(&v))
+            },
             ValueWithLayout::Exchanged(v, layout) => {
                 DataRead::Versioned(version, v.clone(), layout)
             },
@@ -316,10 +441,10 @@ pub enum CacheRead<T> {
 /// Serves as a "read-set" of a transaction execution, and provides APIs for capturing reads,
 /// resolving new reads based on already captured reads when possible, and for validation.
 ///
-/// The intended use is that all reads should be attempted to be resolved from CapturedReads.
-/// If not possible, then after proper resolution from MVHashMap/storage, they should be
-/// captured. This enforces an invariant that 'capture_read' will never be called with a
-/// read that has a kind <= already captured read (for that key / tag).
+/// All reads must first be resolved from CapturedReads. If not possible, then the proper
+/// resolution from MVHashMap/storage should be captured. This enforces an invariant that
+/// 'capture_read' will never be called with a read that can be resolved from the already
+/// captured variant (e.g. Size, Metadata, or exists if SizeAndMetadata is already captured).
 #[derive(Derivative)]
 #[derivative(Default(bound = "", new = "true"))]
 pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
@@ -348,7 +473,9 @@ enum UpdateResult {
     Inserted,
     Updated,
     IncorrectUse(String),
-    Inconsistency(String),
+    // Inconsistency makes it to VMError, and while it should not get committed,
+    // we still do not include read-specific error information.
+    Inconsistency,
 }
 
 impl<T, K, DC, VC, S> CapturedReads<T, K, DC, VC, S>
@@ -397,6 +524,10 @@ where
 
     // Given a hashmap entry for a key, incorporate a new DataRead. This checks
     // consistency and ensures that the most comprehensive read is recorded.
+    //
+    // Required usage pattern: if existing entry contains enough information to
+    // deduce the read, update_entry should not be called by the caller (i.e.
+    // the need to cache the read must already be established).
     fn update_entry<Q, V: TransactionWrite>(
         entry: Entry<Q, DataRead<V>>,
         read: DataRead<V>,
@@ -408,26 +539,31 @@ where
             },
             Occupied(mut e) => {
                 let existing_read = e.get_mut();
-                if read.get_kind() <= existing_read.get_kind() {
-                    UpdateResult::IncorrectUse(format!(
-                        "Incorrect use CaptureReads, read {:?}, existing {:?}",
+
+                if existing_read.merge_metadata_and_size(&read) {
+                    // First, try to combine metadata and size information.
+                    return UpdateResult::Updated;
+                }
+
+                if read.get_kind() == existing_read.get_kind() {
+                    // Incorrect use takes precedence over any inconsistency.
+                    return UpdateResult::IncorrectUse(format!(
+                        "Read {:?} must be resolved from a stored read {:?} of same kind",
                         read, existing_read
-                    ))
-                } else {
-                    match read.contains(existing_read) {
-                        DataReadComparison::Contains => {
-                            *existing_read = read;
-                            UpdateResult::Updated
-                        },
-                        DataReadComparison::Inconsistent => UpdateResult::Inconsistency(format!(
-                            "Read {:?} must be consistent with the already stored read {:?}",
-                            read, existing_read
-                        )),
-                        DataReadComparison::Insufficient => unreachable!(
-                            "{:?} Insufficient for {:?}, but has higher kind",
-                            read, existing_read
-                        ),
-                    }
+                    ));
+                }
+
+                // In all other cases, new read must have more information.
+                match read.contains(existing_read) {
+                    DataReadComparison::Contains => {
+                        *existing_read = read;
+                        UpdateResult::Updated
+                    },
+                    DataReadComparison::Inconsistent => UpdateResult::Inconsistency,
+                    DataReadComparison::Insufficient => UpdateResult::IncorrectUse(format!(
+                        "Read {:?} must be resolved from stored read {:?} of higher kind",
+                        read, existing_read
+                    )),
                 }
             },
         }
@@ -456,14 +592,74 @@ where
             .and_then(|group| group.collected_size)
     }
 
-    // Error means there was a inconsistency in information read (must be due to the
-    // speculative nature of reads).
-    pub(crate) fn capture_read(
+    // Note: capture_group_read converts inconsistencies to PartialVMError, while
+    // capture_data_read below uses Ok(ReadResult::HaltSpeculativeExecution), which
+    // is mapped in view.rs. TODO: we may want to unify the interfaces / handling.
+    pub(crate) fn capture_group_read(
+        &mut self,
+        group_key: T::Key,
+        tag: T::Tag,
+        data_read: DataRead<T::Value>,
+        target_kind: &ReadKind,
+    ) -> PartialVMResult<GroupReadResult> {
+        // Unpatched RawFromStorage should not be used for values, and should fail below:
+        // from_value_with_layout will return MetadataAndResourceSize (because value is
+        // unsafe) and then the downcast to the Value kind will return None.
+        let data_read = data_read.convert_to(target_kind).ok_or_else(|| {
+            code_invariant_error("Couldn't convert a value from versioned group map")
+        })?;
+
+        match self.capture_read(group_key, Some(tag), data_read.clone()) {
+            Ok(_) => Ok(GroupReadResult::from_data_read(data_read)),
+            Err(PanicOr::CodeInvariantError(e)) => Err(code_invariant_error(e).into()),
+            Err(PanicOr::Or(_)) => Err(PartialVMError::new(
+                StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+            )
+            .with_message(
+                "Inconsistency in group data reads (must be due to speculation)".to_string(),
+            )),
+        }
+    }
+
+    pub(crate) fn capture_data_read(
+        &mut self,
+        group_key: T::Key,
+        data_read: DataRead<T::Value>,
+        target_kind: &ReadKind,
+    ) -> Result<ReadResult, PanicError> {
+        // Unpatched RawFromStorage should not be used for values, and should fail below:
+        // from_value_with_layout will return MetadataAndResourceSize (because value is
+        // unsafe) and then the downcast to the Value kind will return None.
+        let data_read = match data_read.convert_to(target_kind) {
+            Some(data_read) => data_read,
+            None => {
+                self.incorrect_use = true;
+                // This may not happen due to concurrency, so we return PanicError
+                // which internally logs an error.
+                return Err(code_invariant_error(
+                    "Couldn't downcast a value from versioned data map",
+                ));
+            },
+        };
+
+        match self.capture_read(group_key, None, data_read.clone()) {
+            Ok(_) => Ok(ReadResult::from_data_read(data_read)),
+            Err(PanicOr::CodeInvariantError(e)) => Err(code_invariant_error(e)),
+            Err(PanicOr::Or(())) => Ok(ReadResult::HaltSpeculativeExecution(
+                "Inconsistency in data reads (must be due to speculation)".to_string(),
+            )),
+        }
+    }
+
+    // () in PanicOr<()> corresponds to delayed_field_speculative_failure, and gets
+    // translated to HaltSpeculativeExecution (for ReadResult or GroupReadResult).
+    // Incorrect use is handled by setting incorrect_use and returning PanicError.
+    fn capture_read(
         &mut self,
         state_key: T::Key,
         maybe_tag: Option<T::Tag>,
         read: DataRead<T::Value>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), PanicOr<()>> {
         let ret = match maybe_tag {
             Some(tag) => {
                 let group = self.group_reads.entry(state_key).or_default();
@@ -475,14 +671,13 @@ where
         match ret {
             UpdateResult::IncorrectUse(m) => {
                 self.incorrect_use = true;
-                bail!(m);
+                Err(code_invariant_error(m).into())
             },
-            UpdateResult::Inconsistency(m) => {
-                // Record speculative failure.
+            UpdateResult::Inconsistency => {
                 self.non_delayed_field_speculative_failure = true;
-                bail!(m);
+                Err(PanicOr::Or(()))
             },
-            UpdateResult::Updated | UpdateResult::Inserted => Ok(()),
+            UpdateResult::Inserted | UpdateResult::Updated => Ok(()),
         }
     }
 
@@ -502,11 +697,11 @@ where
             Some(tag) => self
                 .group_reads
                 .get(state_key)
-                .and_then(|group| group.inner_reads.get(tag).and_then(|r| r.downcast(kind))),
+                .and_then(|group| group.inner_reads.get(tag).and_then(|r| r.convert_to(&kind))),
             None => self
                 .data_reads
                 .get(state_key)
-                .and_then(|r| r.downcast(kind)),
+                .and_then(|r| r.convert_to(&kind)),
         }
     }
 
@@ -527,7 +722,7 @@ where
                 let existing_kind = existing_read.get_kind();
                 if read_kind < existing_kind || (!update && read_kind == existing_kind) {
                     UpdateResult::IncorrectUse(format!(
-                        "Incorrect use CaptureReads, read {:?}, existing {:?}",
+                        "Incorrect use capture_delayed_field_read, read {:?}, existing {:?}",
                         read, existing_read
                     ))
                 } else {
@@ -536,14 +731,12 @@ where
                             *existing_read = read;
                             UpdateResult::Updated
                         },
-                        DataReadComparison::Inconsistent => UpdateResult::Inconsistency(format!(
-                            "Read {:?} must be consistent with the already stored read {:?}",
+                        // Handled immediately below.
+                        DataReadComparison::Inconsistent => UpdateResult::Inconsistency,
+                        DataReadComparison::Insufficient => UpdateResult::IncorrectUse(format!(
+                            "Incorrect use capture_delayed_field_read, {:?} insufficient for {:?}",
                             read, existing_read
                         )),
-                        DataReadComparison::Insufficient => unreachable!(
-                            "{:?} Insufficient for {:?}, but has higher kind",
-                            read, existing_read
-                        ),
                     }
                 }
             },
@@ -554,7 +747,7 @@ where
                 self.incorrect_use = true;
                 Err(code_invariant_error(m).into())
             },
-            UpdateResult::Inconsistency(_) => {
+            UpdateResult::Inconsistency => {
                 // Record speculative failure.
                 self.delayed_field_speculative_failure = true;
                 Err(PanicOr::Or(DelayedFieldsSpeculativeError::InconsistentRead))
@@ -823,6 +1016,7 @@ pub(crate) struct UnsyncReadSet<T: Transaction, K> {
     pub(crate) group_reads: HashMap<T::Key, HashSet<T::Tag>>,
     pub(crate) delayed_field_reads: HashSet<DelayedFieldID>,
     module_reads: HashSet<K>,
+    pub(crate) incorrect_use: bool,
 }
 
 impl<T, K> UnsyncReadSet<T, K>
@@ -869,7 +1063,7 @@ mod test {
     };
     use aptos_mvhashmap::{types::StorageVersion, MVHashMap};
     use claims::{
-        assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_ok_eq, assert_some_eq,
+        assert_err, assert_matches, assert_none, assert_ok, assert_ok_eq, assert_some_eq,
     };
     use move_vm_types::{
         code::{
@@ -880,14 +1074,93 @@ mod test {
     };
     use test_case::test_case;
 
+    #[test_case(false)]
+    #[test_case(true)]
+    fn test_metadata_size_merge_success(direction: bool) {
+        let metadata = Some(raw_metadata(1));
+        let size = Some(42u64);
+        // Test Metadata + ResourceSize -> MetadataAndResourceSize
+        let metadata_read = DataRead::Metadata::<ValueType>(metadata.clone());
+        let size_read = DataRead::ResourceSize::<ValueType>(size);
+
+        // Merge should succeed.
+        let ret = if direction {
+            let mut ret = metadata_read.clone();
+            assert!(ret.merge_metadata_and_size(&size_read));
+            ret
+        } else {
+            let mut ret = size_read.clone();
+            assert!(ret.merge_metadata_and_size(&metadata_read));
+            ret
+        };
+
+        // Check that metadata_read is now MetadataAndResourceSize
+        if let DataRead::MetadataAndResourceSize(merged_metadata, merged_size) = ret {
+            assert_eq!(merged_metadata, metadata);
+            assert_eq!(merged_size, size);
+        } else {
+            panic!("Expected MetadataAndResourceSize after merge");
+        }
+    }
+
+    #[test]
+    fn merge_metadata_and_size() {
+        // Create test data
+        let metadata = Some(raw_metadata(1));
+        let size = Some(42u64);
+        let exists_value = true;
+
+        // Test case 3: self is Metadata, other is not ResourceSize - merge should fail
+        let mut metadata_read = DataRead::Metadata::<ValueType>(metadata.clone());
+        let mut size_read = DataRead::ResourceSize::<ValueType>(size);
+        let mut exists_read = DataRead::Exists::<ValueType>(exists_value);
+        let versioned_read = DataRead::Versioned::<ValueType>(
+            Err(StorageVersion),
+            Arc::new(ValueType::with_len_and_metadata(
+                1,
+                StateValueMetadata::none(),
+            )),
+            None,
+        );
+        let mut metadata_and_size_read =
+            DataRead::MetadataAndResourceSize::<ValueType>(metadata.clone(), size);
+
+        // Merge should fail
+        assert!(!metadata_read.merge_metadata_and_size(&exists_read));
+        assert!(!size_read.merge_metadata_and_size(&exists_read));
+        assert!(!metadata_read.merge_metadata_and_size(&versioned_read));
+        assert!(!size_read.merge_metadata_and_size(&versioned_read));
+        assert!(!metadata_read.merge_metadata_and_size(&metadata_and_size_read));
+        assert!(!size_read.merge_metadata_and_size(&metadata_and_size_read));
+
+        // metadata_read should remain unchanged
+        if let DataRead::Metadata(unchanged_metadata) = &metadata_read {
+            assert_eq!(*unchanged_metadata, metadata);
+        } else {
+            panic!("Expected Metadata to remain unchanged");
+        }
+        // size_read should remain unchanged
+        if let DataRead::ResourceSize(unchanged_size) = &size_read {
+            assert_eq!(*unchanged_size, size);
+        } else {
+            panic!("Expected ResourceSize to remain unchanged");
+        }
+
+        // Merge should fail exists_read should remain unchanged.
+        assert!(!exists_read.merge_metadata_and_size(&versioned_read));
+        if let DataRead::Exists(unchanged_exists) = exists_read {
+            assert_eq!(unchanged_exists, exists_value);
+        } else {
+            panic!("Expected Exists to remain unchanged");
+        }
+
+        assert!(!metadata_and_size_read.merge_metadata_and_size(&size_read));
+        assert!(!metadata_and_size_read.merge_metadata_and_size(&metadata_read));
+    }
+
     #[test]
     fn data_read_kind() {
-        // Test the strict ordering of enum variants for the read kinds.
-        assert_gt!(ReadKind::Value, ReadKind::Metadata);
-        assert_gt!(ReadKind::Metadata, ReadKind::Exists);
-
         // Test that get_kind returns the proper kind for data read instances.
-
         assert_eq!(
             DataRead::Versioned(
                 Err(StorageVersion),
@@ -942,14 +1215,14 @@ mod test {
 
     macro_rules! assert_contains {
         ($x:expr, $y:expr) => {{
-            assert_some_eq!($x.downcast($y.get_kind()), $y);
+            assert_some_eq!($x.convert_to(&$y.get_kind()), $y);
             assert_matches!($x.contains(&$y), DataReadComparison::Contains);
         }};
     }
 
     macro_rules! assert_insufficient {
         ($x:expr, $y:expr) => {{
-            assert_none!($x.downcast($y.get_kind()));
+            assert_none!($x.convert_to(&$y.get_kind()));
             assert_matches!($x.contains(&$y), DataReadComparison::Insufficient);
         }};
     }
@@ -1064,9 +1337,50 @@ mod test {
         }
     }
 
-    macro_rules! assert_update_incorrect_use {
+    macro_rules! assert_update_incorrect {
         ($m:expr, $x:expr, $y:expr) => {{
             let original = $m.get(&$x).cloned().unwrap();
+            match CapturedReads::<
+                TestTransactionType,
+                u32,
+                MockDeserializedCode,
+                MockVerifiedCode,
+                MockExtension,
+            >::update_entry($m.entry($x), $y.clone())
+            {
+                UpdateResult::IncorrectUse(m) => {
+                    assert!(m.contains("of same kind"));
+                },
+                _ => unreachable!("asserting incorrect use"),
+            };
+            assert_some_eq!($m.get(&$x), &original);
+        }};
+    }
+
+    macro_rules! assert_update_insufficient {
+        ($m:expr, $x:expr, $y:expr) => {{
+            let original = $m.get(&$x).cloned().unwrap();
+            match CapturedReads::<
+                TestTransactionType,
+                u32,
+                MockDeserializedCode,
+                MockVerifiedCode,
+                MockExtension,
+            >::update_entry($m.entry($x), $y.clone())
+            {
+                UpdateResult::IncorrectUse(m) => {
+                    assert!(m.contains("of higher kind"));
+                },
+                _ => unreachable!("asserting insufficient case"),
+            };
+            assert_some_eq!($m.get(&$x), &original);
+        }};
+    }
+
+    macro_rules! assert_update_inconsistent {
+        ($m:expr, $x:expr, $y:expr) => {{
+            let original = $m.get(&$x).cloned().unwrap();
+
             assert_matches!(
                 CapturedReads::<
                     TestTransactionType,
@@ -1075,15 +1389,14 @@ mod test {
                     MockVerifiedCode,
                     MockExtension,
                 >::update_entry($m.entry($x), $y.clone()),
-                UpdateResult::IncorrectUse(_)
+                UpdateResult::Inconsistency
             );
             assert_some_eq!($m.get(&$x), &original);
         }};
     }
 
-    macro_rules! assert_update_inconsistency {
+    macro_rules! assert_insert {
         ($m:expr, $x:expr, $y:expr) => {{
-            let original = $m.get(&$x).cloned().unwrap();
             assert_matches!(
                 CapturedReads::<
                     TestTransactionType,
@@ -1092,9 +1405,9 @@ mod test {
                     MockVerifiedCode,
                     MockExtension,
                 >::update_entry($m.entry($x), $y.clone()),
-                UpdateResult::Inconsistency(_)
+                UpdateResult::Inserted
             );
-            assert_some_eq!($m.get(&$x), &original);
+            assert_some_eq!($m.get(&$x), &$y);
         }};
     }
 
@@ -1114,20 +1427,72 @@ mod test {
         }};
     }
 
-    macro_rules! assert_insert {
-        ($m:expr, $x:expr, $y:expr) => {{
-            assert_matches!(
-                CapturedReads::<
-                    TestTransactionType,
-                    u32,
-                    MockDeserializedCode,
-                    MockVerifiedCode,
-                    MockExtension,
-                >::update_entry($m.entry($x), $y.clone()),
-                UpdateResult::Inserted
-            );
-            assert_some_eq!($m.get(&$x), &$y);
-        }};
+    #[test_case(false)]
+    #[test_case(true)]
+    fn test_update_entry_metadata_and_size(incorrect_metadata_or_size: bool) {
+        let mut map: HashMap<u32, DataRead<ValueType>> = HashMap::new();
+        assert_none!(map.get(&0));
+
+        let metadata = DataRead::Metadata(Some(raw_metadata(1)));
+        let size = DataRead::ResourceSize(Some(42));
+        let metadata_and_size = DataRead::MetadataAndResourceSize(Some(raw_metadata(1)), Some(42));
+        let exists = DataRead::Exists(true);
+        let not_exists = DataRead::Exists(false);
+
+        assert_insert!(map, 0, metadata);
+        assert_matches!(
+            CapturedReads::<
+                TestTransactionType,
+                u32,
+                MockDeserializedCode,
+                MockVerifiedCode,
+                MockExtension,
+            >::update_entry(map.entry(0), size.clone()),
+            UpdateResult::Updated
+        );
+        assert_some_eq!(map.get(&0), &metadata_and_size);
+        assert_update_insufficient!(map, 0, metadata);
+        assert_update_insufficient!(map, 0, size);
+        assert_update_incorrect!(map, 0, metadata_and_size);
+        assert_update_insufficient!(map, 0, exists);
+
+        let correct_versioned = DataRead::Versioned(
+            Ok((7, 0)),
+            Arc::new(ValueType::with_len_and_metadata(42, raw_metadata(1))),
+            None,
+        );
+        assert_update!(map, 0, correct_versioned);
+
+        assert_insert!(map, 1, size);
+        assert_matches!(
+            CapturedReads::<
+                TestTransactionType,
+                u32,
+                MockDeserializedCode,
+                MockVerifiedCode,
+                MockExtension,
+            >::update_entry(map.entry(1), metadata.clone()),
+            UpdateResult::Updated
+        );
+        assert_some_eq!(map.get(&1), &metadata_and_size);
+        assert_update_insufficient!(map, 1, metadata);
+        assert_update_insufficient!(map, 1, size);
+        assert_update_incorrect!(map, 1, metadata_and_size);
+        assert_update_insufficient!(map, 1, not_exists);
+
+        let incorrect_versioned = DataRead::Versioned(
+            Ok((7, 0)),
+            Arc::new(ValueType::with_len_and_metadata(
+                if incorrect_metadata_or_size { 42 } else { 2 },
+                if incorrect_metadata_or_size {
+                    raw_metadata(2)
+                } else {
+                    raw_metadata(1)
+                },
+            )),
+            None,
+        );
+        assert_update_inconsistent!(map, 1, incorrect_versioned);
     }
 
     #[test]
@@ -1167,59 +1532,61 @@ mod test {
         // Populate the empty entry.
         assert_insert!(map, 0, not_exists);
         // Update to the same data is not correct use.
-        assert_update_incorrect_use!(map, 0, not_exists);
+        assert_update_incorrect!(map, 0, not_exists);
         // Incorrect use (<= kind provided than already captured) takes precedence
         // over inconsistency.
-        assert_update_incorrect_use!(map, 0, exists);
+        assert_update_incorrect!(map, 0, exists);
 
         // Update to a consistent higher kind.
         assert_update!(map, 0, deletion_metadata);
-        // Update w. consistent lower kind is not correct use.
-        assert_update_incorrect_use!(map, 0, not_exists);
+        // Update w. consistent lower kind is insufficient.
+        assert_update_insufficient!(map, 0, not_exists);
 
         // More of the above behavior, with different kinds.
-        assert_update_incorrect_use!(map, 0, deletion_metadata);
+        assert_update_incorrect!(map, 0, deletion_metadata);
 
-        assert_update_incorrect_use!(map, 0, exists);
-        assert_update_inconsistency!(map, 0, resolved);
-        assert_update_incorrect_use!(map, 0, exists);
-        assert_update_inconsistency!(map, 0, versioned_with_metadata);
+        assert_update_insufficient!(map, 0, exists);
+        assert_update_inconsistent!(map, 0, resolved);
+        assert_update_insufficient!(map, 0, exists);
+        assert_update_inconsistent!(map, 0, versioned_with_metadata);
         // Updated key 0 for the last time.
         assert_update!(map, 0, versioned_deletion);
-        assert_update_incorrect_use!(map, 0, not_exists);
-        assert_update_incorrect_use!(map, 0, legacy_metadata);
-        assert_update_incorrect_use!(map, 0, metadata);
-        assert_update_incorrect_use!(map, 0, deletion_metadata);
-        assert_update_incorrect_use!(map, 0, versioned_legacy);
+        assert_update_insufficient!(map, 0, not_exists);
+        assert_update_insufficient!(map, 0, legacy_metadata);
+        assert_update_insufficient!(map, 0, metadata);
+        assert_update_insufficient!(map, 0, deletion_metadata);
+        assert_update_incorrect!(map, 0, versioned_legacy);
 
         assert_none!(map.get(&1));
         assert_insert!(map, 1, metadata);
-        assert_update_incorrect_use!(map, 1, legacy_metadata);
-        assert_update_inconsistency!(map, 1, versioned_legacy);
-        assert_update_incorrect_use!(map, 1, exists);
-        assert_update_inconsistency!(map, 1, versioned_deletion);
-        assert_update_incorrect_use!(map, 1, not_exists);
-        assert_update_incorrect_use!(map, 1, metadata);
-        assert_update_inconsistency!(map, 1, resolved);
+        assert_update_incorrect!(map, 1, legacy_metadata);
+        assert_update_inconsistent!(map, 1, versioned_legacy);
+        assert_update_insufficient!(map, 1, exists);
+        assert_update_inconsistent!(map, 1, versioned_deletion);
+        assert_update_insufficient!(map, 1, not_exists);
+        assert_update_incorrect!(map, 1, metadata);
+        assert_update_inconsistent!(map, 1, resolved);
         assert_update!(map, 1, versioned_with_metadata);
-        assert_update_incorrect_use!(map, 1, metadata);
-        assert_update_incorrect_use!(map, 1, not_exists);
-        assert_update_incorrect_use!(map, 1, exists);
-        assert_update_incorrect_use!(map, 1, legacy_metadata);
-        assert_update_incorrect_use!(map, 1, versioned_deletion);
+        assert_update_insufficient!(map, 1, metadata);
+        assert_update_insufficient!(map, 1, not_exists);
+        assert_update_insufficient!(map, 1, exists);
+        assert_update_insufficient!(map, 1, legacy_metadata);
+        assert_update_incorrect!(map, 1, versioned_deletion);
 
         assert_none!(map.get(&2));
         assert_insert!(map, 2, legacy_metadata);
         assert_update!(map, 2, resolved);
-        assert_update_incorrect_use!(map, 2, versioned_legacy);
-        assert_update_incorrect_use!(map, 2, legacy_metadata);
-        assert_update_incorrect_use!(map, 2, versioned_deletion);
-        assert_update_incorrect_use!(map, 2, not_exists);
-        assert_update_incorrect_use!(map, 2, metadata);
-        assert_update_incorrect_use!(map, 2, exists);
-        assert_update_incorrect_use!(map, 2, versioned_with_metadata);
-        assert_update_incorrect_use!(map, 2, deletion_metadata);
-        assert_update_incorrect_use!(map, 2, resolved);
+        // Resolved also has Value ReadKind, and it is incorrect to call
+        // with the same ReadKind,
+        assert_update_incorrect!(map, 2, versioned_legacy);
+        assert_update_insufficient!(map, 2, legacy_metadata);
+        assert_update_incorrect!(map, 2, versioned_deletion);
+        assert_update_insufficient!(map, 2, not_exists);
+        assert_update_insufficient!(map, 2, metadata);
+        assert_update_insufficient!(map, 2, exists);
+        assert_update_incorrect!(map, 2, versioned_with_metadata);
+        assert_update_insufficient!(map, 2, deletion_metadata);
+        assert_update_incorrect!(map, 2, resolved);
     }
 
     fn legacy_reads_by_kind() -> Vec<DataRead<ValueType>> {
@@ -1448,6 +1815,7 @@ mod test {
 
         let mvhashmap = MVHashMap::<KeyType<u32>, u32, ValueType, DelayedFieldID>::new();
 
+        captured_reads.incorrect_use = false;
         captured_reads.non_delayed_field_speculative_failure = false;
         captured_reads.delayed_field_speculative_failure = false;
         let key = KeyType::<u32>(21, false);
