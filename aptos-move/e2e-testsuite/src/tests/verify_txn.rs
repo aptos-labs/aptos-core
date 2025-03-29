@@ -274,9 +274,10 @@ fn verify_simple_payment() {
         .script(Script::new(empty_script.clone(), vec![], vec![]))
         .sequence_number(0)
         .sign();
-    assert_prologue_disparity!(
-        executor.validate_transaction(txn.clone()).status() => None,
-        executor.execute_transaction(txn).status() => TransactionStatus::Keep(ExecutionStatus::Success)
+    assert_prologue_parity!(
+        executor.validate_transaction(txn.clone()).status(),
+        executor.execute_transaction(txn).status(),
+        StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE
     );
 
     // The next couple tests test transaction size, and bounds on gas price and the number of

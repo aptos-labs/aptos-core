@@ -281,6 +281,7 @@ impl Account {
             AccountData {
                 sequence_number: 0u64.into(),
                 authentication_key: self.address.inner().to_vec().into(),
+                state_exists: false,
             }
         };
 

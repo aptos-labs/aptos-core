@@ -1245,12 +1245,14 @@ module aptos_framework::account {
 
     #[test_only]
     public fun set_signer_capability_offer(offerer: address, receiver: address) acquires Account {
+        ensure_resource_exists(offerer);
         let account_resource = &mut Account[offerer];
         account_resource.signer_capability_offer.for.swap_or_fill(receiver);
     }
 
     #[test_only]
     public fun set_rotation_capability_offer(offerer: address, receiver: address) acquires Account {
+        ensure_resource_exists(offerer);
         let account_resource = &mut Account[offerer];
         account_resource.rotation_capability_offer.for.swap_or_fill(receiver);
     }
