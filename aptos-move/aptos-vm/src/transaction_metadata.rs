@@ -9,7 +9,8 @@ use aptos_types::{
     chain_id::ChainId,
     transaction::{
         authenticator::AuthenticationProof, user_transaction_context::UserTransactionContext,
-        EntryFunction, Multisig, SignedTransaction, TransactionPayload,
+        BlockchainData, EntryFunction, Multisig, SignedTransactionWithBlockchainData,
+        TransactionPayload,
     },
 };
 
@@ -33,10 +34,11 @@ pub struct TransactionMetadata {
     pub is_keyless: bool,
     pub entry_function_payload: Option<EntryFunction>,
     pub multisig_payload: Option<Multisig>,
+    pub blockchain_data: BlockchainData,
 }
 
 impl TransactionMetadata {
-    pub fn new(txn: &SignedTransaction) -> Self {
+    pub fn new(txn: &SignedTransactionWithBlockchainData) -> Self {
         Self {
             sender: txn.sender(),
             authentication_proof: txn.authenticator().sender().authentication_proof(),
@@ -82,6 +84,7 @@ impl TransactionMetadata {
                 TransactionPayload::Multisig(m) => Some(m.clone()),
                 _ => None,
             },
+            blockchain_data: txn.blockchain_data().clone(),
         }
     }
 

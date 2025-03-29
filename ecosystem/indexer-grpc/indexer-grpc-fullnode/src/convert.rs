@@ -778,7 +778,9 @@ pub fn convert_transaction(
     let mut timestamp: Option<timestamp::Timestamp> = None;
 
     let txn_type = match transaction {
-        Transaction::UserTransaction(_) => transaction::transaction::TransactionType::User,
+        Transaction::UserTransaction(_) | Transaction::UserTransactionV2(_) => {
+            transaction::transaction::TransactionType::User
+        },
         Transaction::GenesisTransaction(_) => transaction::transaction::TransactionType::Genesis,
         Transaction::BlockMetadataTransaction(_) => {
             transaction::transaction::TransactionType::BlockMetadata
@@ -796,6 +798,8 @@ pub fn convert_transaction(
     };
 
     let txn_data = match &transaction {
+        Transaction::UserTransactionV2(_) => todo!(),
+
         Transaction::UserTransaction(ut) => {
             timestamp = Some(convert_timestamp_usecs(ut.timestamp.0));
             let expiration_timestamp_secs = Some(convert_timestamp_secs(

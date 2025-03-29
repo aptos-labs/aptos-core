@@ -196,12 +196,15 @@ pub enum Transaction {
     StateCheckpointTransaction(StateCheckpointTransaction),
     BlockEpilogueTransaction(BlockEpilogueTransaction),
     ValidatorTransaction(ValidatorTransaction),
+    // TODO(grao): Have an API type for UserTransactionV2.
+    UserTransactionV2(UserTransaction),
 }
 
 impl Transaction {
     pub fn timestamp(&self) -> u64 {
         match self {
             Transaction::UserTransaction(txn) => txn.timestamp.0,
+            Transaction::UserTransactionV2(txn) => txn.timestamp.0,
             Transaction::BlockMetadataTransaction(txn) => txn.timestamp.0,
             Transaction::PendingTransaction(_) => 0,
             Transaction::GenesisTransaction(_) => 0,
@@ -214,6 +217,7 @@ impl Transaction {
     pub fn version(&self) -> Option<u64> {
         match self {
             Transaction::UserTransaction(txn) => Some(txn.info.version.into()),
+            Transaction::UserTransactionV2(txn) => Some(txn.info.version.into()),
             Transaction::BlockMetadataTransaction(txn) => Some(txn.info.version.into()),
             Transaction::PendingTransaction(_) => None,
             Transaction::GenesisTransaction(txn) => Some(txn.info.version.into()),
@@ -226,6 +230,7 @@ impl Transaction {
     pub fn success(&self) -> bool {
         match self {
             Transaction::UserTransaction(txn) => txn.info.success,
+            Transaction::UserTransactionV2(txn) => txn.info.success,
             Transaction::BlockMetadataTransaction(txn) => txn.info.success,
             Transaction::PendingTransaction(_txn) => false,
             Transaction::GenesisTransaction(txn) => txn.info.success,
@@ -242,6 +247,7 @@ impl Transaction {
     pub fn vm_status(&self) -> String {
         match self {
             Transaction::UserTransaction(txn) => txn.info.vm_status.clone(),
+            Transaction::UserTransactionV2(txn) => txn.info.vm_status.clone(),
             Transaction::BlockMetadataTransaction(txn) => txn.info.vm_status.clone(),
             Transaction::PendingTransaction(_txn) => "pending".to_owned(),
             Transaction::GenesisTransaction(txn) => txn.info.vm_status.clone(),
@@ -255,6 +261,7 @@ impl Transaction {
         match self {
             Transaction::PendingTransaction(_) => "pending_transaction",
             Transaction::UserTransaction(_) => "user_transaction",
+            Transaction::UserTransactionV2(_) => "user_transaction_v2",
             Transaction::GenesisTransaction(_) => "genesis_transaction",
             Transaction::BlockMetadataTransaction(_) => "block_metadata_transaction",
             Transaction::StateCheckpointTransaction(_) => "state_checkpoint_transaction",
@@ -266,6 +273,7 @@ impl Transaction {
     pub fn transaction_info(&self) -> anyhow::Result<&TransactionInfo> {
         Ok(match self {
             Transaction::UserTransaction(txn) => &txn.info,
+            Transaction::UserTransactionV2(txn) => &txn.info,
             Transaction::BlockMetadataTransaction(txn) => &txn.info,
             Transaction::PendingTransaction(_txn) => {
                 bail!("pending transaction does not have TransactionInfo")

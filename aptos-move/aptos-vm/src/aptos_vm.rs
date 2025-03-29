@@ -70,9 +70,9 @@ use aptos_types::{
         authenticator::{AbstractionAuthData, AnySignature, AuthenticationProof},
         signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        MultisigTransactionPayload, Script, SignedTransaction, Transaction, TransactionArgument,
-        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
-        ViewFunctionOutput, WriteSetPayload,
+        MultisigTransactionPayload, Script, SignedTransaction, SignedTransactionWithBlockchainData,
+        Transaction, TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
+        VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
     vm::module_metadata::{
         get_compilation_metadata_from_compiled_module,
@@ -855,10 +855,12 @@ impl AptosVM {
             let module_id = traversal_context
                 .referenced_module_ids
                 .alloc(entry_fn.module().clone());
-            check_dependencies_and_charge_gas(module_storage, gas_meter, traversal_context, [(
-                module_id.address(),
-                module_id.name(),
-            )])?;
+            check_dependencies_and_charge_gas(
+                module_storage,
+                gas_meter,
+                traversal_context,
+                [(module_id.address(), module_id.name())],
+            )?;
         }
 
         if self.gas_feature_version() >= RELEASE_V1_27 {
@@ -1743,7 +1745,7 @@ impl AptosVM {
         &self,
         resolver: &impl AptosMoveResolver,
         code_storage: &impl AptosCodeStorage,
-        txn: &SignedTransaction,
+        txn: &SignedTransactionWithBlockchainData,
         txn_data: TransactionMetadata,
         is_approved_gov_script: bool,
         log_context: &AdapterLogSchema,
@@ -1880,7 +1882,7 @@ impl AptosVM {
         &self,
         resolver: &'a impl AptosMoveResolver,
         code_storage: &'a C,
-        txn: &SignedTransaction,
+        txn: &SignedTransactionWithBlockchainData,
         log_context: &AdapterLogSchema,
         make_gas_meter: F,
     ) -> Result<(VMStatus, VMOutput, G), VMStatus>
@@ -1932,7 +1934,7 @@ impl AptosVM {
         &self,
         resolver: &'a impl AptosMoveResolver,
         code_storage: &'a (impl AptosCodeStorage + BlockSynchronizationKillSwitch),
-        txn: &SignedTransaction,
+        txn: &SignedTransactionWithBlockchainData,
         log_context: &AdapterLogSchema,
         modify_gas_meter: F,
     ) -> Result<(VMStatus, VMOutput, G), VMStatus>
@@ -1968,7 +1970,7 @@ impl AptosVM {
         &self,
         resolver: &impl AptosMoveResolver,
         code_storage: &(impl AptosCodeStorage + BlockSynchronizationKillSwitch),
-        txn: &SignedTransaction,
+        txn: &SignedTransactionWithBlockchainData,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
         match self.execute_user_transaction_with_custom_gas_meter(
@@ -2515,7 +2517,7 @@ impl AptosVM {
                 )?;
                 (vm_status, output)
             },
-            Transaction::UserTransaction(txn) => {
+            Transaction::UserTransactionV2(txn) => {
                 fail_point!("aptos_vm::execution::user_transaction");
                 let _timer = TXN_TOTAL_SECONDS.start_timer();
                 let (vm_status, output) =
@@ -2608,6 +2610,9 @@ impl AptosVM {
                     log_context,
                 )?;
                 (vm_status, output)
+            },
+            Transaction::UserTransaction(_) => {
+                unreachable!("Only expect V2 for UserTransaction.")
             },
         })
     }
@@ -2783,7 +2788,7 @@ impl VMValidator for AptosVM {
         }
 
         let txn = match transaction.check_signature() {
-            Ok(t) => t,
+            Ok(t) => t.into_inner().into(),
             _ => {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             },
@@ -2865,7 +2870,7 @@ impl AptosSimulationVM {
     /// signature verification) on a newly created VM instance.
     /// *Precondition:* the transaction must **not** have a valid signature.
     pub fn create_vm_and_simulate_signed_transaction(
-        transaction: &SignedTransaction,
+        transaction: &SignedTransactionWithBlockchainData,
         state_view: &impl StateView,
     ) -> (VMStatus, TransactionOutput) {
         assert_err!(

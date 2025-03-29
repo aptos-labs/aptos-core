@@ -36,7 +36,7 @@ fn failed_transaction_cleanup_charges_gas(status_code: StatusCode) {
     let output = vm
         .test_failed_transaction_cleanup(
             VMStatus::error(status_code, None),
-            &txn,
+            &txn.into(),
             state_view,
             balance,
         )

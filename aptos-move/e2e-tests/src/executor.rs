@@ -859,7 +859,9 @@ impl FakeExecutor {
     ) -> anyhow::Result<(TransactionOutput, TransactionGasLog)> {
         let txn = txn
             .check_signature()
-            .expect("invalid signature for transaction");
+            .expect("invalid signature for transaction")
+            .into_inner()
+            .into();
 
         let log_context = AdapterLogSchema::new(self.state_store.id(), 0);
 

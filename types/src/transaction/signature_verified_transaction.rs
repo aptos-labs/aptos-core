@@ -92,8 +92,11 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
 
     fn user_txn_bytes_len(&self) -> usize {
         match self {
-            SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)) => {
+            SignatureVerifiedTransaction::Valid(Transaction::UserTransactionV2(txn)) => {
                 txn.txn_bytes_len()
+            },
+            SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(_)) => {
+                unreachable!("Only expect V2 for UserTransaction.")
             },
             _ => 0,
         }
@@ -104,8 +107,18 @@ impl From<Transaction> for SignatureVerifiedTransaction {
     fn from(txn: Transaction) -> Self {
         match txn {
             Transaction::UserTransaction(txn) => match txn.verify_signature() {
-                Ok(_) => SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)),
-                Err(_) => SignatureVerifiedTransaction::Invalid(Transaction::UserTransaction(txn)),
+                Ok(_) => {
+                    SignatureVerifiedTransaction::Valid(Transaction::UserTransactionV2(txn.into()))
+                },
+                Err(_) => SignatureVerifiedTransaction::Invalid(Transaction::UserTransactionV2(
+                    txn.into(),
+                )),
+            },
+            Transaction::UserTransactionV2(txn) => match txn.verify_signature() {
+                Ok(_) => SignatureVerifiedTransaction::Valid(Transaction::UserTransactionV2(txn)),
+                Err(_) => {
+                    SignatureVerifiedTransaction::Invalid(Transaction::UserTransactionV2(txn))
+                },
             },
             _ => SignatureVerifiedTransaction::Valid(txn),
         }

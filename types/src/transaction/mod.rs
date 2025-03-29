@@ -2055,6 +2055,70 @@ pub enum Transaction {
     /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
     /// Replaces StateCheckpoint, with optionally having more data.
     BlockEpilogue(BlockEpiloguePayload),
+
+    UserTransactionV2(SignedTransactionWithBlockchainData),
+}
+
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+pub enum SignedTransactionEnum {
+    V1(SignedTransaction),
+}
+
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+pub enum BlockchainData {
+    None,
+    V1(BlockchainDataV1),
+}
+
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+pub struct BlockchainDataV1 {
+    pub proposer: AccountAddress,
+}
+
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+pub struct SignedTransactionWithBlockchainData {
+    signed_transaction: SignedTransactionEnum,
+    blockchain_data: BlockchainData,
+}
+
+impl Deref for SignedTransactionWithBlockchainData {
+    type Target = SignedTransaction;
+
+    fn deref(&self) -> &Self::Target {
+        match &self.signed_transaction {
+            SignedTransactionEnum::V1(signed_txn) => signed_txn,
+        }
+    }
+}
+
+impl From<SignedTransaction> for SignedTransactionWithBlockchainData {
+    fn from(signed_txn: SignedTransaction) -> Self {
+        Self {
+            signed_transaction: SignedTransactionEnum::V1(signed_txn),
+            blockchain_data: BlockchainData::None,
+        }
+    }
+}
+
+impl SignedTransactionWithBlockchainData {
+    pub fn new(signed_txn: SignedTransaction, proposer: AccountAddress) -> Self {
+        Self {
+            signed_transaction: SignedTransactionEnum::V1(signed_txn),
+            blockchain_data: BlockchainData::V1(BlockchainDataV1 { proposer }),
+        }
+    }
+
+    pub fn blockchain_data(&self) -> &BlockchainData {
+        &self.blockchain_data
+    }
+
+    pub fn signed_transaction(&self) -> &SignedTransaction {
+        self.deref()
+    }
 }
 
 impl From<BlockMetadataExt> for Transaction {
@@ -2104,7 +2168,9 @@ impl Transaction {
 
     pub fn type_name(&self) -> &'static str {
         match self {
-            Transaction::UserTransaction(_) => "user_transaction",
+            Transaction::UserTransaction(_) | Transaction::UserTransactionV2(_) => {
+                "user_transaction"
+            },
             Transaction::GenesisTransaction(_) => "genesis_transaction",
             Transaction::BlockMetadata(_) => "block_metadata",
             Transaction::StateCheckpoint(_) => "state_checkpoint",
@@ -2126,7 +2192,8 @@ impl Transaction {
             | Transaction::GenesisTransaction(_)
             | Transaction::BlockMetadata(_)
             | Transaction::BlockMetadataExt(_)
-            | Transaction::ValidatorTransaction(_) => false,
+            | Transaction::ValidatorTransaction(_)
+            | Transaction::UserTransactionV2(_) => false,
         }
     }
 
@@ -2137,7 +2204,8 @@ impl Transaction {
             | Transaction::BlockEpilogue(_)
             | Transaction::UserTransaction(_)
             | Transaction::GenesisTransaction(_)
-            | Transaction::ValidatorTransaction(_) => false,
+            | Transaction::ValidatorTransaction(_)
+            | Transaction::UserTransactionV2(_) => false,
         }
     }
 }

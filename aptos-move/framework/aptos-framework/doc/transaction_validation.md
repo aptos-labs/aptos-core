@@ -29,6 +29,7 @@
 -  [Function `unified_prologue`](#0x1_transaction_validation_unified_prologue)
 -  [Function `unified_prologue_fee_payer`](#0x1_transaction_validation_unified_prologue_fee_payer)
 -  [Function `unified_epilogue`](#0x1_transaction_validation_unified_epilogue)
+-  [Function `unified_epilogue_common`](#0x1_transaction_validation_unified_epilogue_common)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
@@ -1289,7 +1290,7 @@ If there is no fee_payer, fee_payer = sender
 
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_unified_epilogue">unified_epilogue</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_payer: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64, is_simulation: bool)
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_unified_epilogue">unified_epilogue</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_payer: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, storage_fee_refunded_octa: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64, is_simulation: bool)
 </code></pre>
 
 
@@ -1301,12 +1302,49 @@ If there is no fee_payer, fee_payer = sender
 <pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_unified_epilogue">unified_epilogue</a>(
     <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     gas_payer: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    storage_fee_refunded: u64,
+    storage_fee_refunded_octa: u64,
     txn_gas_price: u64,
     txn_max_gas_units: u64,
     gas_units_remaining: u64,
     is_simulation: bool,
 ) {
+    <a href="transaction_validation.md#0x1_transaction_validation_unified_epilogue_common">unified_epilogue_common</a>(<a href="account.md#0x1_account">account</a>, gas_payer, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), storage_fee_refunded_octa, txn_gas_price, txn_max_gas_units, gas_units_remaining, txn_gas_price, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(), is_simulation);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_validation_unified_epilogue_common"></a>
+
+## Function `unified_epilogue_common`
+
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_unified_epilogue_common">unified_epilogue_common</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_payer: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, storage_fee_octa: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, storage_fee_refunded_octa: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64, txn_gas_burn_price: u64, fee_sharing_accounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, fee_sharing_percentage: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, is_simulation: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_unified_epilogue_common">unified_epilogue_common</a>(
+    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    gas_payer: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    storage_fee_octa: Option&lt;u64&gt;,
+    storage_fee_refunded_octa: u64,
+    txn_gas_price: u64,
+    txn_max_gas_units: u64,
+    gas_units_remaining: u64,
+    txn_gas_burn_price: u64,
+    fee_sharing_accounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
+    fee_sharing_percentage: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    is_simulation: bool,
+) {
+    <b>assert</b>!(txn_gas_price &gt;= txn_gas_burn_price, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>));
     <b>assert</b>!(txn_max_gas_units &gt;= gas_units_remaining, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>));
     <b>let</b> gas_used = txn_max_gas_units - gas_units_remaining;
 
@@ -1314,8 +1352,8 @@ If there is no fee_payer, fee_payer = sender
         (txn_gas_price <b>as</b> u128) * (gas_used <b>as</b> u128) &lt;= <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>)
     );
-    <b>let</b> transaction_fee_amount = txn_gas_price * gas_used;
 
+    <b>let</b> transaction_fee_amount = txn_gas_price * gas_used;
     <b>let</b> gas_payer_address = <a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(&gas_payer);
     // it's important <b>to</b> maintain the <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> <a href="code.md#0x1_code">code</a> consistent <b>with</b> vm
     // <b>to</b> do failed transaction cleanup.
@@ -1335,16 +1373,16 @@ If there is no fee_payer, fee_payer = sender
             );
         };
 
-        <b>if</b> (transaction_fee_amount &gt; storage_fee_refunded) {
-            <b>let</b> burn_amount = transaction_fee_amount - storage_fee_refunded;
+        <b>if</b> (transaction_fee_amount &gt; storage_fee_refunded_octa) {
+            <b>let</b> burn_amount = transaction_fee_amount - storage_fee_refunded_octa;
             <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer_address, burn_amount);
             <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_consume">permissioned_signer::check_permission_consume</a>(
                 &gas_payer,
                 (burn_amount <b>as</b> u256),
                 <a href="transaction_validation.md#0x1_transaction_validation_GasPermission">GasPermission</a> {}
             );
-        } <b>else</b> <b>if</b> (transaction_fee_amount &lt; storage_fee_refunded) {
-            <b>let</b> mint_amount = storage_fee_refunded - transaction_fee_amount;
+        } <b>else</b> <b>if</b> (transaction_fee_amount &lt; storage_fee_refunded_octa) {
+            <b>let</b> mint_amount = storage_fee_refunded_octa - transaction_fee_amount;
             <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(gas_payer_address, mint_amount);
             <a href="permissioned_signer.md#0x1_permissioned_signer_increase_limit">permissioned_signer::increase_limit</a>(
                 &gas_payer,
@@ -1352,6 +1390,32 @@ If there is no fee_payer, fee_payer = sender
                 <a href="transaction_validation.md#0x1_transaction_validation_GasPermission">GasPermission</a> {}
             );
         };
+
+        <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_fee_sharing_enabled">features::is_fee_sharing_enabled</a>()) {
+            <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&storage_fee_octa), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>));
+            <b>assert</b>!(fee_sharing_percentage.length() == fee_sharing_accounts.length(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>));
+
+            <b>let</b> total_percentage = 0;
+            fee_sharing_percentage.for_each_ref(|percentage| {
+                total_percentage += *percentage;
+            });
+
+            <b>assert</b>!(total_percentage &lt;= 100, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>));
+
+            <b>let</b> total_addresses_to_share = fee_sharing_accounts.length();
+
+            <b>let</b> gas_fee_amount = transaction_fee_amount - storage_fee_octa.extract();
+            <b>let</b> gas_unit_available_to_share = gas_fee_amount / txn_gas_price;
+            <b>let</b> gas_price_available_to_share = txn_gas_price - txn_gas_burn_price;
+            <b>let</b> gas_fee_octa_available_to_share = gas_unit_available_to_share * gas_price_available_to_share;
+
+            <b>let</b> i = 0;
+            <b>while</b> (i &lt; total_addresses_to_share) {
+                <b>let</b> mint_amount = gas_fee_octa_available_to_share * fee_sharing_percentage[i] / 100;
+                <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(fee_sharing_accounts[i], mint_amount);
+                i += 1;
+            }
+        }
     };
 
     // Increment sequence number
@@ -1773,7 +1837,7 @@ Skip transaction_fee::burn_fee verification.
 ### Function `unified_epilogue`
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_unified_epilogue">unified_epilogue</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_payer: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64, is_simulation: bool)
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_unified_epilogue">unified_epilogue</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_payer: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, storage_fee_refunded_octa: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64, is_simulation: bool)
 </code></pre>
 
 
