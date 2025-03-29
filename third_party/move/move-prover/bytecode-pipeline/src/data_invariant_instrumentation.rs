@@ -172,7 +172,7 @@ impl<'a> Instrumenter<'a> {
                 "data invariant {}",
                 loc.display(self.builder.global_env())
             ));
-            if kind == PropKind::Assert {
+            if matches!(kind, PropKind::Assert) {
                 self.builder
                     .set_loc_and_vc_info(loc, INVARIANT_FAILS_MESSAGE);
             }
