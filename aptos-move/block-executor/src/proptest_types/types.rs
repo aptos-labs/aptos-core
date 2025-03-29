@@ -30,7 +30,7 @@ use aptos_vm_types::{
     module_and_script_storage::code_storage::AptosCodeStorage,
     module_write_set::ModuleWrite,
     resolver::{
-        BlockSynchronizationKillSwitch, ResourceGroupSize, TExecutorView, TResourceGroupView,
+        BlockSynchronizationKillSwitch, ResourceGroupSize, TExecutorView, TResourceGroupView, UnknownOrLayout,
     },
     resource_group_adapter::{
         decrement_size_for_remove_tag, group_tagged_resource_size, increment_size_for_add_tag,
@@ -880,7 +880,7 @@ where
                     // TODO: test aggregator reads.
                     if !k.is_module_path() {
                         // TODO: also prop test modules
-                        match view.get_resource_bytes(k, None) {
+                        match view.get_resource_bytes(k, UnknownOrLayout::Known(None)) {
                             Ok(v) => read_results.push(v.map(Into::into)),
                             Err(_) => read_results.push(None),
                         }
@@ -889,7 +889,7 @@ where
                 // Read from groups.
                 // TODO: also read group sizes (if there are any group reads).
                 for (group_key, resource_tag) in behavior.group_reads.iter() {
-                    match view.get_resource_from_group(group_key, resource_tag, None) {
+                    match view.get_resource_from_group(group_key, resource_tag, UnknownOrLayout::Unknown) {
                         Ok(v) => read_results.push(v.map(Into::into)),
                         Err(_) => read_results.push(None),
                     }
@@ -923,7 +923,7 @@ where
                     let mut new_group_size = view.resource_group_size(key).unwrap();
                     for (tag, inner_op) in inner_ops.iter() {
                         let exists = view
-                            .get_resource_from_group(key, tag, None)
+                            .get_resource_from_group(key, tag, UnknownOrLayout::Known(None))
                             .unwrap()
                             .is_some();
                         assert!(

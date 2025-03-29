@@ -49,7 +49,7 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
 use aptos_vm_types::{
     change_set::randomly_check_layout_matches, module_write_set::ModuleWrite,
-    resolver::ResourceGroupSize,
+    resolver::{ResourceGroupSize, UnknownOrLayout},
 };
 use bytes::Bytes;
 use claims::assert_none;

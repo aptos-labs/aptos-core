@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::resolver::{ResourceGroupSize, ResourceGroupView, TResourceGroupView, TResourceView};
+use crate::resolver::{
+    ResourceGroupSize, ResourceGroupView, TResourceGroupView, TResourceView, UnknownOrLayout,
+};
 use aptos_types::{
     error::code_invariant_error, serde_helper::bcs_utils::bcs_size_of_byte_array,
     state_store::state_key::StateKey,
@@ -168,7 +170,12 @@ impl<'r> ResourceGroupAdapter<'r> {
             return Ok(true);
         }
 
-        let group_data = self.resource_view.get_resource_bytes(group_key, None)?;
+        // We provide Known(None) (as opposed to Unknown), to explicitly indicate that there
+        // is no need for an exchange on the value. This is because of the outer layer of group
+        // serialization that does not require an exchange.
+        let group_data = self
+            .resource_view
+            .get_resource_bytes(group_key, UnknownOrLayout::Known(None))?;
         let (group_data, blob_len): (BTreeMap<StructTag, Bytes>, u64) = group_data.map_or_else(
             || Ok::<_, PartialVMError>((BTreeMap::new(), 0)),
             |group_data_blob| {
@@ -235,7 +242,7 @@ impl TResourceGroupView for ResourceGroupAdapter<'_> {
         &self,
         group_key: &Self::GroupKey,
         resource_tag: &Self::ResourceTag,
-        maybe_layout: Option<&MoveTypeLayout>,
+        maybe_layout: UnknownOrLayout<&MoveTypeLayout>,
     ) -> PartialVMResult<Option<Bytes>> {
         if let Some(group_view) = self.maybe_resource_group_view {
             return group_view.get_resource_from_group(group_key, resource_tag, maybe_layout);
@@ -479,7 +486,7 @@ mod tests {
             &self,
             group_key: &Self::GroupKey,
             resource_tag: &Self::ResourceTag,
-            _maybe_layout: Option<&Self::Layout>,
+            _maybe_layout: UnknownOrLayout<&Self::Layout>,
         ) -> PartialVMResult<Option<Bytes>> {
             Ok(self
                 .group
@@ -545,7 +552,7 @@ mod tests {
         let tag_0 = mock_tag_0();
 
         assert_ok_eq!(adapter.load_to_cache(&key_1), false);
-        let _ = adapter.get_resource_from_group(&key_1, &tag_0, None);
+        let _ = adapter.get_resource_from_group(&key_1, &tag_0, UnknownOrLayout::Known(None));
         assert_ok_eq!(adapter.load_to_cache(&key_1), true);
     }
 
@@ -564,19 +571,19 @@ mod tests {
 
         // key_0 / tag_0 does not exist.
         assert_none!(adapter
-            .get_resource_from_group(&key_0, &tag_0, None)
+            .get_resource_from_group(&key_0, &tag_0, UnknownOrLayout::Known(None))
             .unwrap());
 
         assert_some_eq!(
             adapter
-                .get_resource_from_group(&key_1, &tag_0, None)
+                .get_resource_from_group(&key_1, &tag_0, UnknownOrLayout::Known(None))
                 .unwrap(),
             vec![0; 1000]
         );
 
         // key_2 / tag_1 does not exist.
         assert_none!(adapter
-            .get_resource_from_group(&key_2, &tag_1, None)
+            .get_resource_from_group(&key_2, &tag_1, UnknownOrLayout::Known(None))
             .unwrap());
 
         let key_1_blob = &state_view.group.get(&key_1).unwrap().blob;
@@ -591,13 +598,13 @@ mod tests {
 
         assert_some_eq!(
             adapter
-                .get_resource_from_group(&key_1, &tag_1, None)
+                .get_resource_from_group(&key_1, &tag_1, UnknownOrLayout::Known(None))
                 .unwrap(),
             vec![1; 500]
         );
 
         assert_none!(adapter
-            .get_resource_from_group(&key_1, &tag_2, None)
+            .get_resource_from_group(&key_1, &tag_2, UnknownOrLayout::Known(None))
             .unwrap());
 
         let cache = adapter.release_group_cache().unwrap();
@@ -782,12 +789,12 @@ mod tests {
         let tag_2 = mock_tag_2();
 
         let key_1_tag_0_len = adapter
-            .get_resource_from_group(&key_1, &tag_0, None)
+            .get_resource_from_group(&key_1, &tag_0, UnknownOrLayout::Known(None))
             .unwrap()
             .unwrap()
             .len();
         let key_1_tag_1_len = adapter
-            .get_resource_from_group(&key_1, &tag_1, None)
+            .get_resource_from_group(&key_1, &tag_1, UnknownOrLayout::Known(None))
             .unwrap()
             .unwrap()
             .len();

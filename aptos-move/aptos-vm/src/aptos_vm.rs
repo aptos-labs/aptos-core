@@ -96,7 +96,7 @@ use aptos_vm_types::{
     output::VMOutput,
     resolver::{
         BlockSynchronizationKillSwitch, ExecutorView, NoopBlockSynchronizationKillSwitch,
-        ResourceGroupView,
+        ResourceGroupView, UnknownOrLayout,
     },
     storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
 };
@@ -2069,13 +2069,13 @@ impl AptosVM {
                 .map_err(|e| e.to_partial())?;
         }
         for (state_key, write_op) in change_set.resource_write_set().iter() {
-            executor_view.get_resource_state_value(state_key, None)?;
+            executor_view.get_resource_state_value(state_key, UnknownOrLayout::Known(None))?;
             if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write_op {
                 for (tag, (_, maybe_layout)) in group_write.inner_ops() {
                     resource_group_view.get_resource_from_group(
                         state_key,
                         tag,
-                        maybe_layout.as_deref(),
+                        UnknownOrLayout::Known(maybe_layout.as_deref()),
                     )?;
                 }
             }
