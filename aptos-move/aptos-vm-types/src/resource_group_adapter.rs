@@ -195,6 +195,26 @@ impl<'r> ResourceGroupAdapter<'r> {
             .insert(group_key.clone(), (group_data, group_size));
         Ok(false)
     }
+
+    // Provides an API without the unnecessary layout parameter.
+    fn get_resource_from_group_impl(
+        &self,
+        group_key: &StateKey,
+        resource_tag: &StructTag,
+    ) -> PartialVMResult<Option<Bytes>> {
+        // Should only be called when APIs are not forwarded to a GroupView.
+        assert!(self.maybe_resource_group_view.is_none());
+
+        self.load_to_cache(group_key)?;
+        Ok(self
+            .group_cache
+            .borrow()
+            .get(group_key)
+            .expect("Must be cached")
+            .0 // btreemap
+            .get(resource_tag)
+            .cloned())
+    }
 }
 
 // TODO: Once R-before-W semantics is relaxed in the Move-VM, implement by forwarding
@@ -239,15 +259,31 @@ impl TResourceGroupView for ResourceGroupAdapter<'_> {
         if let Some(group_view) = self.maybe_resource_group_view {
             return group_view.get_resource_from_group(group_key, resource_tag, maybe_layout);
         }
-        self.load_to_cache(group_key)?;
-        Ok(self
-            .group_cache
-            .borrow()
-            .get(group_key)
-            .expect("Must be cached")
-            .0 // btreemap
-            .get(resource_tag)
-            .cloned())
+        self.get_resource_from_group_impl(group_key, resource_tag)
+    }
+
+    fn resource_size_in_group(
+        &self,
+        group_key: &Self::GroupKey,
+        resource_tag: &Self::ResourceTag,
+    ) -> PartialVMResult<usize> {
+        if let Some(group_view) = self.maybe_resource_group_view {
+            return group_view.resource_size_in_group(group_key, resource_tag);
+        }
+        self.get_resource_from_group_impl(group_key, resource_tag)
+            .map(|maybe_bytes| maybe_bytes.map_or(0, |bytes| bytes.len()))
+    }
+
+    fn resource_exists_in_group(
+        &self,
+        group_key: &Self::GroupKey,
+        resource_tag: &Self::ResourceTag,
+    ) -> PartialVMResult<bool> {
+        if let Some(group_view) = self.maybe_resource_group_view {
+            return group_view.resource_exists_in_group(group_key, resource_tag);
+        }
+        self.get_resource_from_group_impl(group_key, resource_tag)
+            .map(|maybe_bytes| maybe_bytes.is_some())
     }
 
     fn release_group_cache(
