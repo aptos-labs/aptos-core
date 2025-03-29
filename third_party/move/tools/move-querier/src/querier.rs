@@ -1,14 +1,12 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// Copyright (c) The Aptos Labs
-// SPDX-License-Identifier: Apache-2.0
-
 use anyhow::{anyhow, Result};
 use clap::Args;
 use move_binary_format::{
     binary_views::BinaryIndexedView, file_format::{Bytecode, CodeUnit, CompiledScript, FunctionDefinitionIndex, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex, SignatureToken, TableIndex, Visibility}, CompiledModule
 };
+use move_core_types::ability::{AbilitySet, Ability};
 use petgraph::dot::{Dot, Config};
 use petgraph::graph::{DiGraph, NodeIndex};
 use std::collections::{HashMap, HashSet};
@@ -225,30 +223,7 @@ impl<'view> CGBuilder<'view>{
         // add child function nodes and edges accordingly
         let child_funcs = self.get_child_functions(Some(&script.code));
         for child in child_funcs.into_iter(){
-
-            let mut edge_note = String::from(EMPTY);
-
-            let child_sig = match child{
-                ChildFuncType::Function(func_idx) => {
-                    self.format_function_sig(Some(&func_idx), None, Some(script), &mut func_sig_map)?
-                }
-                ChildFuncType::Closure(closure_idx) => {
-                    let closure_sig = self.bytecode.signature_at(closure_idx);
-                    let type_str = if closure_sig.len() != 1 {
-                        "<error: invalid closure signature>".to_string()
-                    } else {
-                        self.format_sig_token(&closure_sig.0[0])?
-                    };
-                    format!("CallClosure({})", type_str)
-                }
-                ChildFuncType::GenericFunction(func_init_idx) => {
-                    let func_init = self.bytecode.function_instantiation_at(func_init_idx);
-                    let func_handle_idx = func_init.handle;
-                    edge_note = self.format_func_params(func_init.type_parameters)?;
-                    self.format_function_sig(Some(&func_handle_idx), None, Some(script), &mut func_sig_map)?
-                }
-            };
-
+            let (child_sig, edge_note) = self.format_child_function_sig(child, &mut func_sig_map)?;
             let child_node = CGNode{
                 func_sig: child_sig,
             };
@@ -268,7 +243,6 @@ impl<'view> CGBuilder<'view>{
                 let function_definition_index = FunctionDefinitionIndex(func_idx as TableIndex);
                 let function_definition  = self.bytecode.function_def_at(function_definition_index)?;
                 let function_handle_idx = function_definition.function;
-
                 // This function cache the func sig inside func_sig_map
                 self.format_function_sig(Some(&function_handle_idx), Some(&function_definition_index), None, &mut func_sig_map)?;
         };
@@ -289,46 +263,48 @@ impl<'view> CGBuilder<'view>{
             //process all its child functions
             let children = self.get_child_functions(function_definition.code.as_ref());
             for child in children.into_iter(){
-                let mut edge_note = String::from(EMPTY);
-
-                //call a regular function
-                let child_sig = match child{
-                    ChildFuncType::Function(func_idx) => {
-                        if func_sig_map.contains_key(&func_idx){
-                            func_sig_map.get(&func_idx).unwrap().clone()
-                        }else{
-                            self.format_function_sig(Some(&func_idx), None, None, &mut func_sig_map)?
-                        }
-                    }
-                    // call a closure
-                    ChildFuncType::Closure(closure_idx) => {
-                        let closure_sig = self.bytecode.signature_at(closure_idx);
-                        let type_str = if closure_sig.len() != 1 {
-                            "<error: invalid closure signature>".to_string()
-                        } else {
-                            self.format_sig_token(&closure_sig.0[0])?
-                        };
-                        format!("CallClosure({})", type_str)
-                    }
-
-                    //call a generic function
-                    ChildFuncType::GenericFunction(func_init_idx) => {
-                        let func_init = self.bytecode.function_instantiation_at(func_init_idx);
-                        let func_handle_idx = func_init.handle;
-                        edge_note = self.format_func_params(func_init.type_parameters)?;
-                        if func_sig_map.contains_key(&func_handle_idx){
-                            func_sig_map.get(&func_handle_idx).unwrap().clone()
-                        }else{
-                            self.format_function_sig(Some(&func_handle_idx), None, None, &mut func_sig_map)?
-                        }
-                    }
-                };
+                let (child_sig, edge_note) = self.format_child_function_sig(child, &mut func_sig_map)?;
                 let child_node = CGNode{ func_sig: child_sig};
                 call_graph.add_node(child_node.clone());
                 call_graph.add_edge(node_with_def.clone(), child_node.clone(), edge_note);
             }
         };
         Ok(call_graph)
+    }
+
+    fn format_child_function_sig(&self, child: ChildFuncType, func_sig_map: &mut HashMap<FunctionHandleIndex, String>) -> Result<(String, String)> {
+        let mut edge_note = String::from(EMPTY);
+        let child_sig = match child{
+                ChildFuncType::Function(func_idx) => {
+                    if func_sig_map.contains_key(&func_idx){
+                        func_sig_map.get(&func_idx).unwrap().clone()
+                    }else{
+                        self.format_function_sig(Some(&func_idx), None, None, func_sig_map)?
+                    }
+                }
+                // call a closure
+                ChildFuncType::Closure(closure_idx) => {
+                    let closure_sig = self.bytecode.signature_at(closure_idx);
+                    let type_str = if closure_sig.len() != 1 {
+                        "<error: invalid closure signature>".to_string()
+                    } else {
+                        self.format_sig_token(&closure_sig.0[0])?
+                    };
+                    format!("CallClosure({})", type_str)
+                }
+                //call a generic function
+                ChildFuncType::GenericFunction(func_init_idx) => {
+                    let func_init = self.bytecode.function_instantiation_at(func_init_idx);
+                    let func_handle_idx = func_init.handle;
+                    edge_note = self.format_func_params(func_init.type_parameters)?;
+                    if func_sig_map.contains_key(&func_handle_idx){
+                        func_sig_map.get(&func_handle_idx).unwrap().clone()
+                    }else{
+                        self.format_function_sig(Some(&func_handle_idx), None, None, func_sig_map)?
+                    }
+                }
+        };
+        Ok((child_sig, edge_note))
     }
 
     fn get_child_functions(&self, code: Option<&CodeUnit>) -> HashSet<ChildFuncType>{
@@ -388,10 +364,9 @@ impl<'view> CGBuilder<'view>{
             let module_id = self.bytecode.module_id_for_handle(module_handle);
             let module_name: &str = module_id.name.as_str();
             let function_name: &str = self.bytecode.identifier_at(function_handle.name).as_str();
-            let ty_params: &str = EMPTY; //function_handle.type_parameters;
+            let ty_params: String = self.format_type_params(&function_handle.type_parameters)?;
             let params: String = self.format_func_params(function_handle.parameters)?;
             let ret_type: String = self.format_func_rets(function_handle.return_)?;
-
             let res = format!("{}{}{}{}::{}{}{}{}", entry_modifier, native_modifier, visibility_modifier, module_name, function_name, ty_params, params, ret_type);
             func_sig_map.insert(*function_handle_idx, res.clone());
             return Ok(res);
@@ -403,13 +378,41 @@ impl<'view> CGBuilder<'view>{
             let entry_modifier = ENTRY_MODIFIER;
             let module_name = SCRIPT_NAME;
             let function_name = MAIN_FUNCTION;
-            let ty_params: &str = EMPTY; // script.type_parameters;
+            let ty_params: String = self.format_type_params(&script.type_parameters)?; // script.type_parameters;
             let params: String = self.format_func_params(script.parameters)?;
-            return Ok(format!("{}{}::{}{}", entry_modifier, module_name, function_name, params));
+            return Ok(format!("{}{}::{}{}{}", entry_modifier, module_name, function_name, ty_params, params));
         }
         Ok(String::from(""))
     }
 
+    fn format_type_params(&self, ablities: &[AbilitySet]) -> Result<String>{
+        let format_ability = |a: Ability| {
+            match a {
+                Ability::Copy => "copy",
+                Ability::Drop => "drop",
+                Ability::Store => "store",
+                Ability::Key => "key",
+            }
+            .to_string()
+        };
+
+        if ablities.is_empty() {
+            Ok(String::from(EMPTY))
+        } else {
+            let generic_strs: Vec<String> = ablities.iter().enumerate()
+            .map(|(index, ability)|{
+
+                let ability_strs = if *ability == AbilitySet::EMPTY{
+                    String::from("")
+                }else{
+                    let one_ability_str: Vec<String> = ability.into_iter().map(format_ability).collect();
+                    format!(": {}", one_ability_str.join(" + "))
+                };
+                format!("T{}{}", index, ability_strs)
+            }).collect();
+            Ok(format!("<{}>", generic_strs.join(", ")))
+        }
+    }
 
     fn format_func_params(&self, para_sig_idx: SignatureIndex) -> Result<String>{
         let params: Vec<String> = self.bytecode.signature_at(para_sig_idx).0.iter().map(|token|self.format_sig_token(token)).collect::<Result<Vec<String>>>()?;

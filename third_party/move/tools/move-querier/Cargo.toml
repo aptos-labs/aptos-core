@@ -12,8 +12,8 @@ anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 move-binary-format = { workspace = true }
 move-bytecode-source-map = { workspace = true }
+move-core-types = { workspace = true }
 petgraph = { workspace = true }
-thiserror = { workspace = true }
 
 [features]
 default = []
