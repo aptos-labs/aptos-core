@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    captured_reads::CapturedReads,
+    captured_reads::{CapturedReads, DataRead, ReadKind},
     errors::ParallelBlockExecutionError,
     explicit_sync_wrapper::ExplicitSyncWrapper,
     task::{ExecutionStatus, TransactionOutput},
@@ -26,7 +26,7 @@ use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
 use move_vm_runtime::Module;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
     fmt::Debug,
     iter::{empty, Iterator},
     sync::Arc,
@@ -52,6 +52,7 @@ pub(crate) enum KeyKind<T> {
     Resource,
     // Contains the set of tags for the given group key.
     Group(HashSet<T>),
+    AggregatorV1,
 }
 
 pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug> {
@@ -103,6 +104,31 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         self.outputs[txn_idx as usize].store(Some(Arc::new(output)));
     }
 
+    pub fn fetch_exchanged_data(
+        &self,
+        key: &T::Key,
+        txn_idx: TxnIndex,
+    ) -> Result<(Arc<T::Value>, Arc<MoveTypeLayout>), PanicError> {
+        self.inputs[txn_idx as usize].load().as_ref().map_or_else(
+            || {
+                Err(code_invariant_error(
+                    "Read must be recorded before fetching exchanged data".to_string(),
+                ))
+            },
+            |input| {
+                let data_read = input.get_by_kind(key, None, ReadKind::Value);
+                if let Some(DataRead::Versioned(_, value, Some(layout))) = data_read {
+                    Ok((value, layout))
+                } else {
+                    Err(code_invariant_error(format!(
+                        "Read value needing exchange {:?} not in Exchanged format",
+                        data_read
+                    )))
+                }
+            },
+        )
+    }
+
     pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<TxnInput<T>>> {
         self.inputs[txn_idx as usize].load_full()
     }
@@ -111,12 +137,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn fee_statement(&self, txn_idx: TxnIndex) -> Option<FeeStatement> {
         match self.outputs[txn_idx as usize]
             .load_full()
-	    .unwrap_or_else(|| panic!("[BlockSTM]: Execution output for txn {txn_idx} must be recorded after execution"))
+            .unwrap_or_else(|| panic!("[BlockSTM]: Execution output for txn {txn_idx} must be recorded after execution"))
             .as_ref()
         {
-            ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
-                Some(output.fee_statement())
-            },
+       	    ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => Some(output.fee_statement()),
             _ => None,
         }
     }
@@ -234,15 +258,17 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
                     t.resource_write_set()
                         .into_iter()
-                        .map(|(k, _, _)| k)
-                        .chain(t.aggregator_v1_write_set().into_keys())
+                        .map(|(k, _, _)| (k, KeyKind::Resource))
+                        .chain(
+                            t.aggregator_v1_write_set()
+                                .into_keys()
+                                .map(|k| (k, KeyKind::AggregatorV1)),
+                        )
                         .chain(
                             t.aggregator_v1_delta_set()
                                 .into_iter()
-                                .map(|(k, _)| k)
-                                .collect::<Vec<_>>(),
+                                .map(|(k, _)| (k, KeyKind::AggregatorV1)),
                         )
-                        .map(|k| (k, KeyKind::Resource))
                         .chain(
                             group_keys_and_tags
                                 .into_iter()
@@ -253,6 +279,35 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
+    }
+
+    // Must be called during sequential commit hook: expands aggregator write keys with aggregator
+    // keys in the recorded output, and checks that any reads for these keys are also recorded in
+    // aggregator_v1_reads in the input (captured reads). This ensures that the proper interfaces
+    // (that properly record AggregatorV1 reads) are used, as it is required for the correctness
+    // of the commit-time validation.
+    pub(crate) fn process_aggregator_v1_keys(
+        &self,
+        txn_idx: TxnIndex,
+        aggregator_write_keys: &mut BTreeSet<T::Key>,
+    ) {
+        if let Some(write_keys) =
+            self.outputs[txn_idx as usize]
+                .load_full()
+                .and_then(|txn_output| match txn_output.as_ref() {
+                    ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
+                        t.aggregator_v1_write_set()
+                            .into_keys()
+                            .chain(t.aggregator_v1_delta_set().into_iter().map(|(k, _)| k))
+                            .collect::<BTreeSet<_>>(),
+                    ),
+                    ExecutionStatus::Abort(_)
+                    | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                    | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
+                })
+        {
+            aggregator_write_keys.extend(write_keys);
+        }
     }
 
     pub(crate) fn module_write_set(

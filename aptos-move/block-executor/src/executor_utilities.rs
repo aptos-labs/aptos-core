@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{errors::*, view::LatestView};
+use crate::{errors::*, txn_last_input_output::KeyKind, view::LatestView};
 use aptos_logger::error;
 use aptos_mvhashmap::types::ValueWithLayout;
 use aptos_types::{
@@ -17,7 +17,10 @@ use bytes::Bytes;
 use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
 use rand::{thread_rng, Rng};
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    sync::Arc,
+};
 
 // TODO(clean-up): refactor & replace these macros with functions for code clarity. Currently
 // not possible due to type & API mismatch.
@@ -46,47 +49,68 @@ macro_rules! groups_to_finalize {
 // logic in value_exchange.rs, it is guaranteed that no returned values is a deletion.
 macro_rules! resource_writes_to_materialize {
     ($writes:expr, $outputs:expr, $data_source:expr, $($txn_idx:expr),*) => {{
-	$outputs
+        $outputs
             .reads_needing_delayed_field_exchange($($txn_idx),*)
             .into_iter()
-	    .map(|(key, metadata, layout)| {
-		match $data_source.fetch_exchanged_data(&key, $($txn_idx),*) {
-		    Some((value, existing_layout)) => {
-			randomly_check_layout_matches(
-			    Some(&existing_layout),
-			    Some(layout.as_ref()),
-			)?;
-			let new_value = Arc::new(TransactionWrite::from_state_value(Some(
-			    StateValue::new_with_metadata(
-				value.bytes().cloned().unwrap_or_else(Bytes::new), metadata)
-			    )));
-			Ok((key, new_value, layout))
-		    },
-		    None => {
-			Err(code_invariant_error(
-			    "Read value needing exchange not in Exchanged format".to_string()
-			))
-		    }
-		}}).chain(
-		$writes.into_iter().filter_map(|(key, value, maybe_layout)| {
-		    // layout is Some(_) if it contains a delayed field
-		    if let Some(layout) = maybe_layout {
-			// No need to exchange anything if a resource with delayed field is deleted.
-			if !value.is_deletion() {
-			    return Some(Ok((key, value, layout)))
-			}
-		    }
-		    None
-		})).collect::<std::result::Result<Vec<_>, _>>()
+            .map(|(key, metadata, layout)| {
+                match $data_source.fetch_exchanged_data(&key, $($txn_idx),*) {
+                    Ok((value, existing_layout)) => {
+                        randomly_check_layout_matches(
+                            Some(&existing_layout),
+                            Some(layout.as_ref()),
+                        )?;
+                        let new_value = Arc::new(TransactionWrite::from_state_value(Some(
+                            StateValue::new_with_metadata(
+                                value.bytes().cloned().unwrap_or_else(Bytes::new), metadata)
+                        )));
+                        Ok((key, new_value, layout))
+                    },
+                    Err(e) => Err(e),
+                }
+            }).chain(
+                $writes.into_iter().filter_map(|(key, value, maybe_layout)| {
+                    // layout is Some(_) if it contains a delayed field
+                    if let Some(layout) = maybe_layout {
+                        // No need to exchange anything if a resource with delayed field is deleted.
+                        if !value.is_deletion() {
+                            return Some(Ok((key, value, layout)))
+                        }
+                    }
+                    None
+                })
+            ).collect::<std::result::Result<Vec<_>, _>>()
     }};
 }
 
 pub(crate) use groups_to_finalize;
 pub(crate) use resource_writes_to_materialize;
 
+// Returns the tags written to (and stored) by the previous incarnation, if the KeyKind is a Group,
+// otherwise None. If the kind does not match, PanicError is returned.
+pub(crate) fn remove_from_previous_keys<T: Transaction>(
+    prev_modified_keys: &mut HashMap<T::Key, KeyKind<T::Tag>>,
+    key: &T::Key,
+    expected_kind: KeyKind<T::Tag>,
+) -> Result<Option<HashSet<T::Tag>>, PanicError> {
+    match (prev_modified_keys.remove(key), expected_kind) {
+        (None, _) => Ok(None),
+        // Aggregator deltas and normal writes can occur on the same key.
+        (Some(KeyKind::Resource), KeyKind::AggregatorV1)
+        | (Some(KeyKind::AggregatorV1), KeyKind::Resource)
+        | (Some(KeyKind::Resource), KeyKind::Resource)
+        | (Some(KeyKind::AggregatorV1), KeyKind::AggregatorV1) => Ok(None),
+        (Some(KeyKind::Group(tags)), KeyKind::Group(_)) => Ok(Some(tags)),
+        _ => Err(code_invariant_error(format!(
+            "Resource key {:?} recorded as a wrong KeyKind in prior incarnation",
+            key,
+        ))),
+    }
+}
+
 pub(crate) fn map_finalized_group<T: Transaction>(
     group_key: T::Key,
-    finalized_group: anyhow::Result<(Vec<(T::Tag, ValueWithLayout<T::Value>)>, ResourceGroupSize)>,
+    finalized_group: Vec<(T::Tag, ValueWithLayout<T::Value>)>,
+    group_size: ResourceGroupSize,
     metadata_op: T::Value,
     is_read_needing_exchange: bool,
 ) -> Result<
@@ -100,29 +124,21 @@ pub(crate) fn map_finalized_group<T: Transaction>(
 > {
     let metadata_is_deletion = metadata_op.is_deletion();
 
-    match finalized_group {
-        Ok((finalized_group, group_size)) => {
-            if is_read_needing_exchange && metadata_is_deletion {
-                // Value needed exchange but was not written / modified during the txn
-                // execution: may not be empty.
-                Err(code_invariant_error(
-                    "Value only read and exchanged, but metadata op is Deletion".to_string(),
-                ))
-            } else if finalized_group.is_empty() != metadata_is_deletion {
-                // finalize_group already applies the deletions.
-                Err(code_invariant_error(format!(
-                    "Group is empty = {} but op is deletion = {} in parallel execution",
-                    finalized_group.is_empty(),
-                    metadata_is_deletion
-                )))
-            } else {
-                Ok((group_key, metadata_op, finalized_group, group_size))
-            }
-        },
-        Err(e) => Err(code_invariant_error(format!(
-            "Error committing resource group {:?}",
-            e
-        ))),
+    if is_read_needing_exchange && metadata_is_deletion {
+        // Value needed exchange but was not written / modified during the txn
+        // execution: may not be empty.
+        Err(code_invariant_error(
+            "Value only read and exchanged, but metadata op is Deletion".to_string(),
+        ))
+    } else if finalized_group.is_empty() != metadata_is_deletion {
+        // finalize_group already applies the deletions.
+        Err(code_invariant_error(format!(
+            "Group is empty = {} but op is deletion = {} in parallel execution",
+            finalized_group.is_empty(),
+            metadata_is_deletion
+        )))
+    } else {
+        Ok((group_key, metadata_op, finalized_group, group_size))
     }
 }
 
@@ -159,9 +175,10 @@ pub(crate) fn serialize_groups<T: Transaction>(
                         if (!btree.is_empty() || group_size.get() != 0)
                             && group_bytes.len() as u64 != group_size.get()
                         {
+                            // TODO(BlockSTMv2): Debug: what changed in size. same in V2.
                             alert!(
                                 "Serialized resource group size mismatch key = {:?} num items {}, \
-				 len {} recorded size {}, op {:?}",
+				                len {} recorded size {}, op {:?}",
                                 group_key,
                                 btree.len(),
                                 group_bytes.len(),
