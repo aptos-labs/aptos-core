@@ -25,9 +25,7 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::{
-    module_and_script_storage::module_storage::AptosModuleStorage, output::VMOutput,
-};
+use aptos_vm_types::{module_and_script_storage::code_storage::AptosCodeStorage, output::VMOutput};
 use move_core_types::{
     account_address::AccountAddress,
     value::{serialize_values, MoveValue},
@@ -58,19 +56,14 @@ impl AptosVM {
     pub(crate) fn process_jwk_update(
         &self,
         resolver: &impl AptosMoveResolver,
-        module_storage: &impl AptosModuleStorage,
+        code_storage: &impl AptosCodeStorage,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
         update: jwks::QuorumCertifiedUpdate,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         debug!("Processing jwk transaction");
-        match self.process_jwk_update_inner(
-            resolver,
-            module_storage,
-            log_context,
-            session_id,
-            update,
-        ) {
+        match self.process_jwk_update_inner(resolver, code_storage, log_context, session_id, update)
+        {
             Ok((vm_status, vm_output)) => {
                 debug!("Processing jwk transaction ok.");
                 Ok((vm_status, vm_output))
@@ -96,7 +89,7 @@ impl AptosVM {
     fn process_jwk_update_inner(
         &self,
         resolver: &impl AptosMoveResolver,
-        module_storage: &impl AptosModuleStorage,
+        code_storage: &impl AptosCodeStorage,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
         update: jwks::QuorumCertifiedUpdate,
@@ -154,7 +147,7 @@ impl AptosVM {
                 serialize_values(&args),
                 &mut gas_meter,
                 &mut TraversalContext::new(&traversal_storage),
-                module_storage,
+                code_storage,
             )
             .map_err(|e| {
                 expect_only_successful_execution(e, UPSERT_INTO_OBSERVED_JWKS.as_str(), log_context)
@@ -163,7 +156,7 @@ impl AptosVM {
 
         let output = get_system_transaction_output(
             session,
-            module_storage,
+            code_storage,
             &self
                 .storage_gas_params(log_context)
                 .map_err(Unexpected)?

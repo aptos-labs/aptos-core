@@ -10,10 +10,10 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     data_cache::TransactionDataCache,
-    module_traversal::{TraversalContext, TraversalStorage},
+    module_traversal::TraversalStorage,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
-    AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage, ModuleStorage,
+    AsUnsyncCodeStorage, CodeStorage, EagerLoader, Loader, WithRuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, resolver::ResourceResolver};
@@ -69,10 +69,10 @@ fn execute_function_with_single_storage_for_test(
     ty_args: &[TypeTag],
     args: Vec<Vec<u8>>,
 ) -> VMResult<SerializedReturnValues> {
-    let module_storage = storage.as_unsync_module_storage();
+    let code_storage = storage.as_unsync_code_storage();
     execute_function_for_test(
         storage,
-        &module_storage,
+        &code_storage,
         module_id,
         function_name,
         ty_args,
@@ -82,24 +82,29 @@ fn execute_function_with_single_storage_for_test(
 
 fn execute_function_for_test(
     data_storage: &impl ResourceResolver,
-    module_storage: &impl ModuleStorage,
+    code_storage: &impl CodeStorage,
     module_id: &ModuleId,
     function_name: &IdentStr,
     ty_args: &[TypeTag],
     args: Vec<Vec<u8>>,
 ) -> VMResult<SerializedReturnValues> {
     let traversal_storage = TraversalStorage::new();
+    let runtime_environment = code_storage.runtime_environment();
+    let mut loader = EagerLoader::new(&traversal_storage, code_storage);
 
-    let func = module_storage.load_function(module_id, function_name, ty_args)?;
+    let mut gas_meter = UnmeteredGasMeter;
+    let func =
+        loader.load_function_entrypoint(&mut gas_meter, module_id, function_name, ty_args)?;
+
     MoveVM::execute_loaded_function(
         func,
         args,
         &mut TransactionDataCache::empty(),
-        &mut UnmeteredGasMeter,
-        &mut TraversalContext::new(&traversal_storage),
+        &mut gas_meter,
         &mut NativeContextExtensions::default(),
-        module_storage,
         data_storage,
+        runtime_environment,
+        &mut loader,
     )
 }
 
@@ -109,21 +114,24 @@ fn execute_script_impl(
     ty_args: &[TypeTag],
     args: Vec<Vec<u8>>,
 ) -> VMResult<ChangeSet> {
-    let code_storage = storage.as_unsync_code_storage();
     let traversal_storage = TraversalStorage::new();
+    let code_storage = storage.as_unsync_code_storage();
+    let runtime_environment = code_storage.runtime_environment();
+    let mut loader = EagerLoader::new(&traversal_storage, &code_storage);
 
-    let function = code_storage.load_script(script, ty_args)?;
+    let mut gas_meter = UnmeteredGasMeter;
+    let function = loader.load_script_entrypoint(&mut gas_meter, script, ty_args)?;
+
     let mut data_cache = TransactionDataCache::empty();
-
     MoveVM::execute_loaded_function(
         function,
         args,
         &mut data_cache,
-        &mut UnmeteredGasMeter,
-        &mut TraversalContext::new(&traversal_storage),
+        &mut gas_meter,
         &mut NativeContextExtensions::default(),
-        &code_storage,
         storage,
+        runtime_environment,
+        &mut loader,
     )?;
     let change_set = data_cache
         .into_effects(&code_storage)

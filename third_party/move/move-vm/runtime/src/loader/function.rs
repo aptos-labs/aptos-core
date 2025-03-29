@@ -5,8 +5,7 @@
 use crate::{
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
-    storage::ty_tag_converter::TypeTagConverter,
-    LayoutConverter, ModuleStorage, StorageLayoutConverter,
+    Loader, RuntimeEnvironment,
 };
 use better_any::{Tid, TidAble, TidExt};
 use move_binary_format::{
@@ -27,6 +26,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
+    gas::GasMeter,
     loaded_data::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
@@ -112,14 +112,14 @@ impl LazyLoadedFunction {
     }
 
     pub(crate) fn new_resolved(
-        converter: &TypeTagConverter,
+        runtime_environment: &RuntimeEnvironment,
         fun: Rc<LoadedFunction>,
         mask: ClosureMask,
     ) -> PartialVMResult<Self> {
         let ty_args = fun
             .ty_args
             .iter()
-            .map(|t| converter.ty_to_ty_tag(t))
+            .map(|t| runtime_environment.ty_to_ty_tag(t))
             .collect::<PartialVMResult<Vec<_>>>()?;
         Ok(Self(Rc::new(RefCell::new(
             LazyLoadedFunctionState::Resolved { fun, ty_args, mask },
@@ -162,10 +162,11 @@ impl LazyLoadedFunction {
 
     /// Executed an action with the resolved loaded function. If the function hasn't been
     /// loaded yet, it will be loaded now.
-    #[allow(unused)]
+    // TODO(lazy): Move this to loader?
     pub(crate) fn with_resolved_function<T>(
         &self,
-        storage: &dyn ModuleStorage,
+        loader: &mut impl Loader,
+        gas_meter: &mut impl GasMeter,
         action: impl FnOnce(Rc<LoadedFunction>) -> PartialVMResult<T>,
     ) -> PartialVMResult<T> {
         let mut state = self.0.borrow_mut();
@@ -182,8 +183,15 @@ impl LazyLoadedFunction {
                         captured_layouts,
                     },
             } => {
-                let fun =
-                    Self::resolve(storage, module_id, fun_id, ty_args, *mask, captured_layouts)?;
+                let fun = Self::resolve(
+                    loader,
+                    gas_meter,
+                    module_id,
+                    fun_id,
+                    ty_args,
+                    *mask,
+                    captured_layouts,
+                )?;
                 let result = action(fun.clone());
                 *state = LazyLoadedFunctionState::Resolved {
                     fun,
@@ -198,28 +206,25 @@ impl LazyLoadedFunction {
     /// Resolves a function into a loaded function. This verifies existence of the named
     /// function as well as whether it has the type used for deserializing the captured values.
     fn resolve(
-        module_storage: &dyn ModuleStorage,
+        loader: &mut impl Loader,
+        gas_meter: &mut impl GasMeter,
         module_id: &ModuleId,
         fun_id: &IdentStr,
         ty_args: &[TypeTag],
         mask: ClosureMask,
         captured_layouts: &[MoveTypeLayout],
     ) -> PartialVMResult<Rc<LoadedFunction>> {
-        let function = module_storage
-            .load_function(module_id, fun_id, ty_args)
+        let function = loader
+            .load_function_entrypoint(gas_meter, module_id, fun_id, ty_args)
             .map_err(|err| err.to_partial())?;
 
         // Verify that the function argument types match the layouts used for deserialization.
         // This is only done in paranoid mode. Since integrity of storage
         // and guarantee of public function, this should not able to fail.
-        if module_storage
-            .runtime_environment()
-            .vm_config()
-            .paranoid_type_checks
-        {
+        if loader.vm_config().paranoid_type_checks {
             // TODO(#15664): Determine whether we need to charge gas here.
+            // TODO(lazy): We do!?
             let captured_arg_types = mask.extract(function.param_tys(), true);
-            let converter = StorageLayoutConverter::new(module_storage);
             if captured_arg_types.len() != captured_layouts.len() {
                 return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                     .with_message(
@@ -231,7 +236,8 @@ impl LazyLoadedFunction {
             {
                 // Note that the below call returns a runtime layout, so we can directly
                 // compare it without desugaring.
-                let actual_arg_layout = converter.type_to_type_layout(actual_arg_ty)?;
+                let (actual_arg_layout, _) =
+                    loader.load_layout_with_delayed_fields_check(gas_meter, actual_arg_ty)?;
                 if !serialized_layout.is_compatible_with(&actual_arg_layout) {
                     return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                         .with_message(

@@ -6,10 +6,9 @@ use crate::{
     verifier::{transaction_arg_validation, transaction_arg_validation::get_allowed_structs},
 };
 use aptos_types::vm::module_metadata::RuntimeModuleMetadataV1;
-use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{identifier::IdentStr, vm_status::StatusCode};
-use move_vm_runtime::LoadedFunction;
+use move_vm_runtime::{LoadedFunction, Loader, RuntimeEnvironment};
 
 /// Based on the function attributes in the module metadata, determine whether a
 /// function is a view function.
@@ -31,7 +30,8 @@ pub fn determine_is_view(
 /// function, and validates the arguments.
 pub(crate) fn validate_view_function(
     session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl AptosModuleStorage,
+    runtime_environment: &RuntimeEnvironment,
+    loader: &mut impl Loader,
     args: Vec<Vec<u8>>,
     fun_name: &IdentStr,
     func: &LoadedFunction,
@@ -58,7 +58,8 @@ pub(crate) fn validate_view_function(
     let allowed_structs = get_allowed_structs(struct_constructors_feature);
     let args = transaction_arg_validation::construct_args(
         session,
-        module_storage,
+        runtime_environment,
+        loader,
         func.param_tys(),
         args,
         func.ty_args(),

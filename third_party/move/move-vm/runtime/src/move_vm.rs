@@ -3,9 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache, interpreter::Interpreter, module_traversal::TraversalContext,
-    native_extensions::NativeContextExtensions, AsFunctionValueExtension, LayoutConverter,
-    LoadedFunction, ModuleStorage, StorageLayoutConverter,
+    data_cache::TransactionDataCache, interpreter::Interpreter,
+    native_extensions::NativeContextExtensions, LoadedFunction, Loader, RuntimeEnvironment,
 };
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
@@ -53,12 +52,12 @@ impl MoveVM {
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_cache: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
-        module_storage: &impl ModuleStorage,
         resource_resolver: &impl ResourceResolver,
+        runtime_environment: &RuntimeEnvironment,
+        loader: &mut impl Loader,
     ) -> VMResult<SerializedReturnValues> {
-        let vm_config = module_storage.runtime_environment().vm_config();
+        let vm_config = runtime_environment.vm_config();
         let ty_builder = &vm_config.ty_builder;
 
         let create_ty_with_subst = |tys: &[Type]| -> VMResult<Vec<Type>> {
@@ -69,9 +68,14 @@ impl MoveVM {
         };
 
         let param_tys = create_ty_with_subst(function.param_tys())?;
-        let (mut dummy_locals, deserialized_args) =
-            deserialize_args(module_storage, &param_tys, serialized_args)
-                .map_err(|e| e.finish(Location::Undefined))?;
+        let (mut dummy_locals, deserialized_args) = deserialize_args(
+            loader,
+            gas_meter,
+            &param_tys,
+            serialized_args,
+            vm_config.check_invariant_in_swap_loc,
+        )
+        .map_err(|e| e.finish(Location::Undefined))?;
 
         let return_tys = create_ty_with_subst(function.return_tys())?;
 
@@ -81,15 +85,15 @@ impl MoveVM {
                 function,
                 deserialized_args,
                 data_cache,
-                module_storage,
+                runtime_environment,
+                loader,
                 resource_resolver,
                 gas_meter,
-                traversal_context,
                 extensions,
             )?
         };
 
-        let return_values = serialize_return_values(module_storage, &return_tys, return_values)
+        let return_values = serialize_return_values(loader, gas_meter, &return_tys, return_values)
             .map_err(|e| e.finish(Location::Undefined))?;
         let mutable_reference_outputs = param_tys
             .iter()
@@ -102,7 +106,7 @@ impl MoveVM {
                 // serialize return values first in the case that a value points into this local
                 let local_val =
                     dummy_locals.move_loc(idx, vm_config.check_invariant_in_swap_loc)?;
-                let (bytes, layout) = serialize_return_value(module_storage, ty, local_val)?;
+                let (bytes, layout) = serialize_return_value(loader, gas_meter, ty, local_val)?;
                 Ok((idx as LocalIndex, bytes, layout))
             })
             .collect::<PartialVMResult<_>>()
@@ -119,12 +123,13 @@ impl MoveVM {
 }
 
 fn deserialize_arg(
-    module_storage: &impl ModuleStorage,
+    loader: &mut impl Loader,
+    gas_meter: &mut impl GasMeter,
     ty: &Type,
     arg: impl Borrow<[u8]>,
 ) -> PartialVMResult<Value> {
-    let (layout, has_identifier_mappings) = StorageLayoutConverter::new(module_storage)
-        .type_to_type_layout_with_identifier_mappings(ty)
+    let (layout, contains_delayed_fields) = loader
+        .load_layout_with_delayed_fields_check(gas_meter, ty)
         .map_err(|_| {
             PartialVMError::new(StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION)
                 .with_message("[VM] failed to get layout from type".to_string())
@@ -135,24 +140,27 @@ fn deserialize_arg(
             .with_message("[VM] failed to deserialize argument".to_string())
     };
 
-    // Make sure we do not construct values which might have identifiers
-    // inside. This should be guaranteed by transaction argument validation
-    // but because it does not use layouts we double-check here.
-    if has_identifier_mappings {
+    // Make sure we do not construct values which might have delayed fields inside. This should be
+    // guaranteed by transaction argument validation but because it does not use layouts we also
+    // double-check here.
+    if contains_delayed_fields {
         return Err(deserialization_error());
     }
 
-    let function_value_extension = module_storage.as_function_value_extension();
+    // TODO(lazy): fix deserialization of args with function values
+    // let function_value_extension = module_storage.as_function_value_extension();
     ValueSerDeContext::new()
-        .with_func_args_deserialization(&function_value_extension)
+        // .with_func_args_deserialization(&function_value_extension)
         .deserialize(arg.borrow(), &layout)
         .ok_or_else(deserialization_error)
 }
 
 fn deserialize_args(
-    module_storage: &impl ModuleStorage,
+    loader: &mut impl Loader,
+    gas_meter: &mut impl GasMeter,
     param_tys: &[Type],
     serialized_args: Vec<impl Borrow<[u8]>>,
+    check_invariant_in_swap_loc: bool,
 ) -> PartialVMResult<(Locals, Vec<Value>)> {
     if param_tys.len() != serialized_args.len() {
         return Err(
@@ -169,7 +177,6 @@ fn deserialize_args(
     let mut dummy_locals = Locals::new(param_tys.len());
 
     // Arguments for the invoked function. These can be owned values or references
-    let vm_config = module_storage.runtime_environment().vm_config();
     let deserialized_args = param_tys
         .iter()
         .zip(serialized_args)
@@ -178,19 +185,20 @@ fn deserialize_args(
             Some(inner_ty) => {
                 dummy_locals.store_loc(
                     idx,
-                    deserialize_arg(module_storage, inner_ty, arg_bytes)?,
-                    vm_config.check_invariant_in_swap_loc,
+                    deserialize_arg(loader, gas_meter, inner_ty, arg_bytes)?,
+                    check_invariant_in_swap_loc,
                 )?;
                 dummy_locals.borrow_loc(idx)
             },
-            None => deserialize_arg(module_storage, ty, arg_bytes),
+            None => deserialize_arg(loader, gas_meter, ty, arg_bytes),
         })
         .collect::<PartialVMResult<Vec<_>>>()?;
     Ok((dummy_locals, deserialized_args))
 }
 
 fn serialize_return_value(
-    module_storage: &impl ModuleStorage,
+    loader: &mut impl Loader,
+    gas_meter: &mut impl GasMeter,
     ty: &Type,
     value: Value,
 ) -> PartialVMResult<(Vec<u8>, MoveTypeLayout)> {
@@ -203,8 +211,8 @@ fn serialize_return_value(
         None => (ty, value),
     };
 
-    let (layout, has_identifier_mappings) = StorageLayoutConverter::new(module_storage)
-        .type_to_type_layout_with_identifier_mappings(ty)
+    let (layout, contains_delayed_fields) = loader
+        .load_layout_with_delayed_fields_check(gas_meter, ty)
         .map_err(|_err| {
             // TODO: Should we use `err` instead of mapping?
             PartialVMError::new(StatusCode::VERIFICATION_ERROR).with_message(
@@ -217,21 +225,23 @@ fn serialize_return_value(
             .with_message("failed to serialize return values".to_string())
     };
 
-    // Disallow native values to escape through return values of a function.
-    if has_identifier_mappings {
+    // Disallow delayed fields to escape through return values of a function.
+    if contains_delayed_fields {
         return Err(serialization_error());
     }
 
-    let function_value_extension = module_storage.as_function_value_extension();
+    // TODO(lazy): fix deserialization of args with function values
+    // let function_value_extension = module_storage.as_function_value_extension();
     let bytes = ValueSerDeContext::new()
-        .with_func_args_deserialization(&function_value_extension)
+        // .with_func_args_deserialization(&function_value_extension)
         .serialize(&value, &layout)?
         .ok_or_else(serialization_error)?;
     Ok((bytes, layout))
 }
 
 fn serialize_return_values(
-    module_storage: &impl ModuleStorage,
+    loader: &mut impl Loader,
+    gas_meter: &mut impl GasMeter,
     return_tys: &[Type],
     return_values: Vec<Value>,
 ) -> PartialVMResult<Vec<(Vec<u8>, MoveTypeLayout)>> {
@@ -250,6 +260,6 @@ fn serialize_return_values(
     return_tys
         .iter()
         .zip(return_values)
-        .map(|(ty, value)| serialize_return_value(module_storage, ty, value))
+        .map(|(ty, value)| serialize_return_value(loader, gas_meter, ty, value))
         .collect()
 }
