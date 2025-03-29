@@ -182,6 +182,23 @@ module aptos_framework::transaction_context {
         payload.entry_function_payload
     }
 
+    #[test_only]
+    public fun new_entry_function_payload(
+        account_address: address,
+        module_name: String,
+        function_name: String,
+        ty_args_names: vector<String>,
+        args: vector<vector<u8>>,
+    ): EntryFunctionPayload {
+        EntryFunctionPayload {
+            account_address,
+            module_name,
+            function_name,
+            ty_args_names,
+            args,
+        }
+    }
+
     #[test()]
     fun test_auid_uniquess() {
         use std::vector;
