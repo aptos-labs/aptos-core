@@ -54,12 +54,13 @@ use std::{
 pub const METADATA_FILE_NAME: &str = "package-metadata.bcs";
 pub const UPGRADE_POLICY_CUSTOM_FIELD: &str = "upgrade_policy";
 
-pub const APTOS_PACKAGES: [&str; 5] = [
+pub const APTOS_PACKAGES: [&str; 6] = [
     "AptosFramework",
     "MoveStdlib",
     "AptosStdlib",
     "AptosToken",
     "AptosTokenObjects",
+    "AptosExperimental",
 ];
 
 /// Represents a set of options for building artifacts from Move.
