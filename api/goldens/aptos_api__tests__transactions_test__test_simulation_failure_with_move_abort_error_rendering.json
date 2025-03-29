@@ -5,7 +5,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "11",
+    "gas_used": "12",
     "success": false,
     "vm_status": "Move abort in 0x1::coin: EINSUFFICIENT_BALANCE(0x10006): Not enough coins to complete transaction",
     "accumulator_root_hash": "",
@@ -84,7 +84,7 @@
           "io_gas_units": "6",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "11"
+          "total_charge_gas_units": "12"
         }
       }
     ],
