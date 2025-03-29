@@ -2082,10 +2082,10 @@ impl TransactionOptions {
             gas_unit_price: Some(gas_unit_price),
             pending: None,
             sender: Some(sender_address),
-            sequence_number: None, // The transaction is not comitted so there is no new sequence number.
+            sequence_number: None, // The transaction is not committed so there is no new sequence number.
             success,
             timestamp_us: None,
-            version: Some(version), // The transaction is not comitted so there is no new version.
+            version: Some(version), // The transaction is not committed so there is no new version.
             vm_status: Some(vm_status.to_string()),
         };
 
