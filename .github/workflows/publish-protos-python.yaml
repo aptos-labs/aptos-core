@@ -1,0 +1,65 @@
+# This defines a workflow to build and release a new version of the
+# aptos-protos package to pypi. In order to trigger it go to the Actions tab of
+# the repo, click "Publish aptos-protos for Python" and then "Run Workflow".
+
+name: "Publish aptos-protos for Python"
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_git_ref_override:
+        type: string
+        required: false
+        description: "Use this to override the git SHA1, branch name or tag to build the binaries from. Defaults to the workflow git rev, but can be different than that:"
+
+jobs:
+  publish-crate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.source_git_ref_override }}
+
+      - uses: ./.github/actions/python-setup
+        with:
+          pyproject_directory: protos/python
+
+      # Get the version of the package on pypi
+      - name: Get current version
+        id: get_current_version
+        run: |
+          echo "::set-output name=current_version::$(curl -s https://pypi.org/pypi/aptos-protos/json | jq -r .info.version)"
+
+      # Get the version of the package in the repo
+      - name: Get repo version
+        id: get_repo_version
+        run: |
+          echo "::set-output name=repo_version::$(grep -oP '(?<=version = ").*(?=")' protos/python/pyproject.toml)"
+
+      # Exit if the version in the repo matches the one on pypi
+      - name: Exit if versions match
+        if: ${{ steps.get_current_version.outputs.current_version == steps.get_repo_version.outputs.repo_version }}
+        run: echo "Version of package in repo matches version on pypi, exiting..." && exit 1
+
+      - name: Generate code from the protos to check they match
+        run: poetry run poe generate
+        with:
+          working-directory: protos/python
+
+      # Ensure the generated code matches the protos.
+      - name: Check generated code matches protos
+        run: git diff --ignore-space-at-eol --ignore-blank-lines
+        with:
+          working-directory: protos/python
+
+      # Configure poetry with the pypi credentials.
+      - name: Configure poetry with pypi credentials
+        run: poetry config pypi-token.pypi $PYPI_TOKEN
+        env:
+          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+
+      # Publish the package.
+      - name: Publish package
+        run: poetry publish --build --dry-run
+        with:
+          working-directory: python/aptos-protos
