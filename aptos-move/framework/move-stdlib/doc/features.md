@@ -141,7 +141,7 @@ return true.
 -  [Function `is_account_abstraction_enabled`](#0x1_features_is_account_abstraction_enabled)
 -  [Function `get_bulletproofs_batch_feature`](#0x1_features_get_bulletproofs_batch_feature)
 -  [Function `bulletproofs_batch_enabled`](#0x1_features_bulletproofs_batch_enabled)
--  [Function `is_domain_account_abstraction_enabled`](#0x1_features_is_domain_account_abstraction_enabled)
+-  [Function `is_derivable_account_abstraction_enabled`](#0x1_features_is_derivable_account_abstraction_enabled)
 -  [Function `get_new_accounts_default_to_fa_store_feature`](#0x1_features_get_new_accounts_default_to_fa_store_feature)
 -  [Function `new_accounts_default_to_fa_store_enabled`](#0x1_features_new_accounts_default_to_fa_store_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
@@ -500,6 +500,18 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_DERIVABLE_ACCOUNT_ABSTRACTION"></a>
+
+Whether the account abstraction is enabled.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_DERIVABLE_ACCOUNT_ABSTRACTION">DERIVABLE_ACCOUNT_ABSTRACTION</a>: u64 = 88;
+</code></pre>
+
+
+
 <a id="0x1_features_DISPATCHABLE_FUNGIBLE_ASSET"></a>
 
 Whether the dispatchable fungible asset standard feature is enabled.
@@ -508,18 +520,6 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_DISPATCHABLE_FUNGIBLE_ASSET">DISPATCHABLE_FUNGIBLE_ASSET</a>: u64 = 63;
-</code></pre>
-
-
-
-<a id="0x1_features_DOMAIN_ACCOUNT_ABSTRACTION"></a>
-
-Whether the account abstraction is enabled.
-
-Lifetime: transient
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_DOMAIN_ACCOUNT_ABSTRACTION">DOMAIN_ACCOUNT_ABSTRACTION</a>: u64 = 88;
 </code></pre>
 
 
@@ -3560,13 +3560,13 @@ Deprecated feature
 
 </details>
 
-<a id="0x1_features_is_domain_account_abstraction_enabled"></a>
+<a id="0x1_features_is_derivable_account_abstraction_enabled"></a>
 
-## Function `is_domain_account_abstraction_enabled`
+## Function `is_derivable_account_abstraction_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_domain_account_abstraction_enabled">is_domain_account_abstraction_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_derivable_account_abstraction_enabled">is_derivable_account_abstraction_enabled</a>(): bool
 </code></pre>
 
 
@@ -3575,8 +3575,8 @@ Deprecated feature
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_domain_account_abstraction_enabled">is_domain_account_abstraction_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DOMAIN_ACCOUNT_ABSTRACTION">DOMAIN_ACCOUNT_ABSTRACTION</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_derivable_account_abstraction_enabled">is_derivable_account_abstraction_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DERIVABLE_ACCOUNT_ABSTRACTION">DERIVABLE_ACCOUNT_ABSTRACTION</a>)
 }
 </code></pre>
 

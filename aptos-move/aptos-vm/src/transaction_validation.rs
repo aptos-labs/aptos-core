@@ -109,7 +109,9 @@ pub(crate) fn run_script_prologue(
     let chain_id = txn_data.chain_id();
     let mut gas_meter = UnmeteredGasMeter;
     // Use the new prologues that takes signer from both sender and optional gas payer
-    if features.is_account_abstraction_enabled() {
+    if features.is_account_abstraction_enabled()
+        || features.is_derivable_account_abstraction_enabled()
+    {
         let secondary_auth_keys: Vec<MoveValue> = txn_data
             .secondary_authentication_proofs
             .iter()
@@ -398,7 +400,9 @@ fn run_epilogue(
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
 
-    if features.is_account_abstraction_enabled() {
+    if features.is_account_abstraction_enabled()
+        || features.is_derivable_account_abstraction_enabled()
+    {
         let serialize_args = vec![
             serialized_signers.sender(),
             serialized_signers

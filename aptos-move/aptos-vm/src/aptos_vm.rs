@@ -1624,7 +1624,7 @@ impl AptosVM {
                             self.features().is_account_abstraction_enabled()
                         },
                         AbstractionAuthData::DerivableV1 { .. } => {
-                            self.features().is_domain_account_abstraction_enabled()
+                            self.features().is_derivable_account_abstraction_enabled()
                         },
                     };
                     if enabled {
@@ -1664,7 +1664,7 @@ impl AptosVM {
                             self.features().is_account_abstraction_enabled()
                         },
                         AbstractionAuthData::DerivableV1 { .. } => {
-                            self.features().is_domain_account_abstraction_enabled()
+                            self.features().is_derivable_account_abstraction_enabled()
                         },
                     };
                     if enabled {
@@ -1770,7 +1770,9 @@ impl AptosVM {
             )
         }));
 
-        if self.features().is_account_abstraction_enabled() {
+        if self.features().is_account_abstraction_enabled()
+            || self.features().is_derivable_account_abstraction_enabled()
+        {
             let max_aa_gas = unwrap_or_discard!(self.gas_params(log_context))
                 .vm
                 .txn
@@ -1895,7 +1897,9 @@ impl AptosVM {
 
         let vm_params = self.gas_params(log_context)?.vm.clone();
 
-        let initial_balance = if self.features().is_account_abstraction_enabled() {
+        let initial_balance = if self.features().is_account_abstraction_enabled()
+            || self.features().is_derivable_account_abstraction_enabled()
+        {
             vm_params.txn.max_aa_gas.min(txn.max_gas_amount().into())
         } else {
             txn.max_gas_amount().into()
@@ -2812,7 +2816,9 @@ impl VMValidator for AptosVM {
             },
         };
 
-        let initial_balance = if self.features().is_account_abstraction_enabled() {
+        let initial_balance = if self.features().is_account_abstraction_enabled()
+            || self.features().is_derivable_account_abstraction_enabled()
+        {
             vm_params.txn.max_aa_gas.min(txn_data.max_gas_amount())
         } else {
             txn_data.max_gas_amount()
