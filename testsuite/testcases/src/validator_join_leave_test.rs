@@ -8,10 +8,10 @@ use aptos_forge::{
     SwarmExt, Test, TestReport, FORGE_KEY_SEED,
 };
 use aptos_keygen::KeyGen;
-use aptos_logger::info;
 use aptos_sdk::crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use aptos_types::{account_address::AccountAddress, transaction::authenticator::AuthenticationKey};
 use async_trait::async_trait;
+use log::info;
 use std::{sync::Arc, time::Duration};
 
 const MAX_NODE_LAG_SECS: u64 = 360;

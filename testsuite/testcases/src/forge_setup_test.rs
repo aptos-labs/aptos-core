@@ -5,8 +5,8 @@ use crate::generate_traffic;
 use anyhow::Context;
 use aptos_config::config::OverrideNodeConfig;
 use aptos_forge::{NetworkContextSynchronizer, NetworkTest, Result, Test};
-use aptos_logger::info;
 use async_trait::async_trait;
+use log::info;
 use rand::{
     rngs::{OsRng, StdRng},
     seq::IteratorRandom,

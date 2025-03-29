@@ -7,12 +7,12 @@ use crate::{
     publishing::{entry_point_trait::PreBuiltPackages, publish_util::PackageHandler},
     RootAccountHandle, TransactionGenerator, TransactionGeneratorCreator,
 };
-use aptos_logger::{error, info};
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use async_trait::async_trait;
+use log::{error, info};
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 use std::{borrow::Borrow, sync::Arc};
 
