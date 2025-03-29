@@ -784,6 +784,20 @@ module aptos_framework::object {
     }
 
     #[test_only]
+    public fun create_test_object_at(owner: address, object: address): ConstructorRef {
+        move_to(
+            &create_signer(object),
+            ObjectCore {
+                guid_creation_num: INIT_GUID_CREATION_NUM,
+                owner,
+                allow_ungated_transfer: true,
+                transfer_events: event::new_event_handle(guid::create_guid_for_test(owner, INIT_GUID_CREATION_NUM)),
+            },
+        );
+        ConstructorRef { self: object, can_delete: true }
+    }
+
+    #[test_only]
     struct HeroEquipEvent has drop, store {
         weapon_id: Option<Object<Weapon>>,
     }

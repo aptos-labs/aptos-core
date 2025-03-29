@@ -387,4 +387,9 @@ module aptos_framework::code {
         bundle: vector<vector<u8>>,
         policy: u8
     );
+
+    #[test_only]
+    public fun create_empty_package(package_signer: &signer) {
+        move_to(package_signer, PackageRegistry { packages: vector[] });
+    }
 }
