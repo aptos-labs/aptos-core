@@ -11424,6 +11424,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap 4.5.21",
+ "move-binary-format",
+ "move-bytecode-source-map",
+ "move-core-types",
+ "petgraph 0.6.5",
 ]
 
 [[package]]
