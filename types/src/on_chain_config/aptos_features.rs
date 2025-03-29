@@ -128,6 +128,7 @@ pub enum FeatureFlag {
     /// Whether function values are enabled.
     ENABLE_FUNCTION_VALUES = 89,
     NEW_ACCOUNTS_DEFAULT_TO_FA_STORE = 90,
+    DEFAULT_ACCOUNT_RESOURCE = 91,
 }
 
 impl FeatureFlag {
@@ -215,6 +216,7 @@ impl FeatureFlag {
             FeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION,
             FeatureFlag::VM_BINARY_FORMAT_V8,
             FeatureFlag::ENABLE_FUNCTION_VALUES,
+            //FeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
         ]
     }
 }
