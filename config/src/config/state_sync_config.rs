@@ -94,7 +94,7 @@ impl ContinuousSyncingMode {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StateSyncDriverConfig {
-    /// The mode by which to bootstrap
+    /// The mode by which to bootstrap the node
     pub bootstrapping_mode: BootstrappingMode,
     /// The maximum time taken to process a commit notification
     pub commit_notification_timeout_ms: u64,
