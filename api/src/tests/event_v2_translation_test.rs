@@ -12,6 +12,7 @@ use serde_json::{json, Value};
 use std::path::PathBuf;
 
 static MODULE_EVENT_MIGRATION: u64 = 57;
+static NEW_ACCOUNTS_DEFAULT_TO_FA_STORE: u64 = 90;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_feature_enable_disable() {
@@ -45,6 +46,9 @@ async fn test_event_v2_translation_coin_deposit_event() {
 
     // Start with the MODULE_EVENT_MIGRATION feature disabled
     context.disable_feature(MODULE_EVENT_MIGRATION).await;
+    context
+        .disable_feature(NEW_ACCOUNTS_DEFAULT_TO_FA_STORE)
+        .await;
 
     // Create two accounts
     let account1 = &mut context.api_create_account().await;
@@ -57,6 +61,9 @@ async fn test_event_v2_translation_coin_deposit_event() {
 
     // Enable the MODULE_EVENT_MIGRATION feature
     context.enable_feature(MODULE_EVENT_MIGRATION).await;
+    context
+        .disable_feature(NEW_ACCOUNTS_DEFAULT_TO_FA_STORE)
+        .await;
 
     // Check the simulation API outputs the translated V1 event rather than the V2 event as it is
     let payload = json!({
@@ -157,6 +164,9 @@ async fn test_event_v2_translation_coin_withdraw_event() {
 
     // Start with the MODULE_EVENT_MIGRATION feature disabled
     context.disable_feature(MODULE_EVENT_MIGRATION).await;
+    context
+        .disable_feature(NEW_ACCOUNTS_DEFAULT_TO_FA_STORE)
+        .await;
 
     // Create two accounts
     let account1 = &mut context.api_create_account().await;
@@ -268,6 +278,9 @@ async fn test_event_v2_translation_account_coin_register_event() {
 
     // Make sure that the MODULE_EVENT_MIGRATION feature is enabled
     context.enable_feature(MODULE_EVENT_MIGRATION).await;
+    context
+        .disable_feature(NEW_ACCOUNTS_DEFAULT_TO_FA_STORE)
+        .await;
 
     // Create two accounts
     let account1 = &mut context.api_create_account().await;
