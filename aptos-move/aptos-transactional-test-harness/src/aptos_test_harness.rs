@@ -378,18 +378,25 @@ impl<'a> AptosTestAdapter<'a> {
 
     /// Obtain a Rust representation of the account resource from storage, which is used to derive
     /// a few default transaction parameters.
-    fn fetch_account_resource(&self, signer_addr: &AccountAddress) -> Result<AccountResource> {
-        let account_blob = self
-            .storage
-            .get_state_value_bytes(&StateKey::resource_typed::<AccountResource>(signer_addr)?)
-            .unwrap()
-            .ok_or_else(|| {
-                format_err!(
-                "Failed to fetch account resource under address {}. Has the account been created?",
-                signer_addr
+    fn fetch_account_resource(&self, signer_addr: &AccountAddress) -> AccountResource {
+        self.storage
+            .get_state_value_bytes(
+                &StateKey::resource_typed::<AccountResource>(signer_addr).unwrap(),
             )
-            })?;
-        Ok(bcs::from_bytes(&account_blob).unwrap())
+            .unwrap()
+            .map(|bytes| bcs::from_bytes(&bytes).unwrap())
+            .unwrap_or(AccountResource::new(
+                0,
+                signer_addr.to_vec(),
+                aptos_types::event::EventHandle::new(
+                    aptos_types::event::EventKey::new(0, *signer_addr),
+                    0,
+                ),
+                aptos_types::event::EventHandle::new(
+                    aptos_types::event::EventKey::new(1, *signer_addr),
+                    0,
+                ),
+            ))
     }
 
     /// Obtain the AptosCoin amount under address `signer_addr`
@@ -443,7 +450,7 @@ impl<'a> AptosTestAdapter<'a> {
         gas_unit_price: Option<u64>,
         max_gas_amount: Option<u64>,
     ) -> Result<TransactionParameters> {
-        let account_resource = self.fetch_account_resource(signer_addr)?;
+        let account_resource = self.fetch_account_resource(signer_addr);
 
         let sequence_number = sequence_number.unwrap_or_else(|| account_resource.sequence_number());
         let max_number_of_gas_units =

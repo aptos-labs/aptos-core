@@ -266,8 +266,8 @@ impl Account {
         // Retrieve the Account resource and convert it accordingly
         let state_value_opt = self.get_account_resource()?;
 
-        let account_data: AccountData = if let Some(state_value) = state_value_opt {
-            let account_resource: AccountResource = bcs::from_bytes(&state_value)
+        let account_resource = if let Some(state_value) = &state_value_opt {
+            let account_resource: AccountResource = bcs::from_bytes(state_value)
                 .context("Internal error deserializing response from DB")
                 .map_err(|err| {
                     BasicErrorWith404::internal_with_code(
@@ -276,29 +276,20 @@ impl Account {
                         &self.latest_ledger_info,
                     )
                 })?;
-            account_resource.into()
+            account_resource
         } else {
-            AccountData {
-                sequence_number: 0u64.into(),
-                authentication_key: self.address.inner().to_vec().into(),
-            }
+            AccountResource::new_stateless(*self.address.inner())
         };
 
         // Convert the AccountResource into the summary object AccountData
         match accept_type {
             AcceptType::Json => BasicResponse::try_from_json((
-                account_data,
+                account_resource.into(),
                 &self.latest_ledger_info,
                 BasicResponseStatus::Ok,
             )),
             AcceptType::Bcs => BasicResponse::try_from_encoded((
-                bcs::to_bytes(&account_data).map_err(|e| {
-                    BasicErrorWith404::internal_with_code(
-                        e,
-                        AptosErrorCode::InternalError,
-                        &self.latest_ledger_info,
-                    )
-                })?,
+                state_value_opt.unwrap_or_else(|| bcs::to_bytes(&account_resource).unwrap()),
                 &self.latest_ledger_info,
                 BasicResponseStatus::Ok,
             )),

@@ -253,7 +253,7 @@ async fn test_txn_emmitter_with_high_pending_latency() {
 #[tokio::test]
 async fn test_txn_emmitter_low_funds() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
-    let account_1 = create_and_fund_account(&mut swarm, 5705100).await;
+    let account_1 = create_and_fund_account(&mut swarm, 9705100).await;
 
     let transaction_type = TransactionType::CallCustomModules {
         entry_point: Box::new(EntryPoints::Nop),

@@ -353,22 +353,20 @@ script {{
         0,
     );
 
-    // If the account does not exist, create it.
-    if info.account_exists(local_account.address()).await.is_err() {
-        info!(
-            "{} account does not exist. Creating...",
-            local_account.address().to_hex_literal()
-        );
-        info.sync_root_account_sequence_number().await;
-        info.create_user_account_with_any_key(&AnyPublicKey::FederatedKeyless {
-            public_key: federated_keyless_public_key,
-        })
+    info!(
+        "{} account does not exist. Creating...",
+        local_account.address().to_hex_literal()
+    );
+    info.sync_root_account_sequence_number().await;
+    info.create_user_account_with_any_key(&AnyPublicKey::FederatedKeyless {
+        public_key: federated_keyless_public_key,
+    })
+    .await
+    .unwrap();
+    info.sync_root_account_sequence_number().await;
+    info.mint(local_account.address(), 10_000_000_000)
         .await
         .unwrap();
-        info.mint(local_account.address(), 10_000_000_000)
-            .await
-            .unwrap();
-    }
     info.sync_root_account_sequence_number().await;
     let recipient = info
         .create_and_fund_user_account(20_000_000_000)

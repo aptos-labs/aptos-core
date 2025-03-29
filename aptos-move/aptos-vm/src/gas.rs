@@ -184,13 +184,14 @@ pub(crate) fn check_gas(
     // If this is for a potentially new account, ensure there's enough gas to cover storage, execution, and IO costs.
     // TODO: This isn't the cleaning code, thus we localize it just here and will remove it
     // once accountv2 is available and we no longer need to create accounts.
+    let gas_unit_price: u64 = txn_metadata.gas_unit_price().into();
     if crate::aptos_vm::should_create_account_resource(
         txn_metadata,
         features,
         resolver,
         module_storage,
-    )? {
-        let gas_unit_price: u64 = txn_metadata.gas_unit_price().into();
+    )? && (gas_unit_price != 0 || !features.is_default_account_resource_enabled())
+    {
         let max_gas_amount: u64 = txn_metadata.max_gas_amount().into();
         let pricing = DiskSpacePricing::new(gas_feature_version, features);
         let storage_fee_per_account_create: u64 = pricing

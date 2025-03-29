@@ -381,6 +381,10 @@ impl Features {
         self.is_enabled(FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE)
     }
 
+    pub fn is_default_account_resource_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::DEFAULT_ACCOUNT_RESOURCE)
+    }
+
     pub fn get_max_identifier_size(&self) -> u64 {
         if self.is_enabled(FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH) {
             IDENTIFIER_SIZE_MAX
