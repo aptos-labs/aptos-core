@@ -4117,10 +4117,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     } else {
                         self.error(
                             &ty_loc,
-                            &format!(
-                                "expected variant of enum type but found type `{}`",
-                                self.env().display(&inferred_struct_id)
-                            ),
+                            &format!("expected variant of enum type but found type `{}`", ty,),
                         )
                     }
                 } else {
