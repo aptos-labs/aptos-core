@@ -1,6 +1,6 @@
 /// Derivable account abstraction that verifies a message signed by
 /// SIWS from a Phantom wallet.
-module aptos_framework::daa_siws_phantom {
+module aptos_experimental::daa_siws_phantom {
     use aptos_framework::auth_data::AbstractionAuthData;
     use aptos_std::ed25519::{
         Self,
