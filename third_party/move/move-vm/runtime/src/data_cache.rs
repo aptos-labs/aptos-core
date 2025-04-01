@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    storage::{module_storage::FunctionValueExtensionAdapter, ty_tag_converter::TypeTagConverter},
-    LayoutConverter, ModuleStorage, StorageLayoutConverter,
+    storage::module_storage::FunctionValueExtensionAdapter, LayoutConverter, ModuleStorage,
+    StorageLayoutConverter,
 };
 use bytes::Bytes;
 use move_binary_format::errors::*;
@@ -96,9 +96,7 @@ impl TransactionDataCache {
             let mut resources = BTreeMap::new();
             for (ty, (layout, gv, has_aggregator_lifting)) in account_data_cache.data_map {
                 if let Some(op) = gv.into_effect_with_layout(layout) {
-                    let ty_tag_builder =
-                        TypeTagConverter::new(module_storage.runtime_environment());
-                    let struct_tag = match ty_tag_builder.ty_to_ty_tag(&ty)? {
+                    let struct_tag = match module_storage.runtime_environment().ty_to_ty_tag(&ty)? {
                         TypeTag::Struct(struct_tag) => *struct_tag,
                         _ => return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)),
                     };
@@ -148,8 +146,7 @@ impl TransactionDataCache {
 
         let mut load_res = None;
         if !account_cache.data_map.contains_key(ty) {
-            let ty_tag_builder = TypeTagConverter::new(module_storage.runtime_environment());
-            let ty_tag = match ty_tag_builder.ty_to_ty_tag(ty)? {
+            let ty_tag = match module_storage.runtime_environment().ty_to_ty_tag(ty)? {
                 TypeTag::Struct(s_tag) => s_tag,
                 _ =>
                 // non-struct top-level value; can't happen

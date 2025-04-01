@@ -15,10 +15,12 @@ use crate::{
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
     reentrancy_checker::{CallType, ReentrancyChecker},
-    runtime_type_checks::{FullRuntimeTypeCheck, NoRuntimeTypeCheck, RuntimeTypeCheck},
+    runtime_type_checks::{
+        verify_pack_closure, FullRuntimeTypeCheck, NoRuntimeTypeCheck, RuntimeTypeCheck,
+    },
     storage::{
         dependencies_gas_charging::check_dependencies_and_charge_gas,
-        depth_formula_calculator::DepthFormulaCalculator, ty_tag_converter::TypeTagConverter,
+        depth_formula_calculator::DepthFormulaCalculator,
     },
     trace, LoadedFunction, LoadedFunctionOwner, ModuleStorage, RuntimeEnvironment,
 };
@@ -195,15 +197,22 @@ impl InterpreterImpl<'_> {
     fn load_generic_function(
         &mut self,
         module_storage: &impl ModuleStorage,
-        current_frame: &Frame,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        current_frame: &Frame,
         idx: FunctionInstantiationIndex,
     ) -> VMResult<LoadedFunction> {
         let ty_args = current_frame
             .instantiate_generic_function(Some(gas_meter), idx)
             .map_err(|e| set_err_info!(current_frame, e))?;
         let function = current_frame
-            .build_loaded_function_from_instantiation_and_ty_args(module_storage, idx, ty_args)
+            .build_loaded_function_from_instantiation_and_ty_args(
+                module_storage,
+                gas_meter,
+                traversal_context,
+                idx,
+                ty_args,
+            )
             .map_err(|e| self.set_location(e))?;
 
         if self.vm_config.paranoid_type_checks {
@@ -216,11 +225,19 @@ impl InterpreterImpl<'_> {
     fn load_function(
         &mut self,
         module_storage: &impl ModuleStorage,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         current_frame: &Frame,
         fh_idx: FunctionHandleIndex,
     ) -> VMResult<LoadedFunction> {
         let function = current_frame
-            .build_loaded_function_from_handle_and_ty_args(module_storage, fh_idx, vec![])
+            .build_loaded_function_from_handle_and_ty_args(
+                module_storage,
+                gas_meter,
+                traversal_context,
+                fh_idx,
+                vec![],
+            )
             .map_err(|e| self.set_location(e))?;
 
         if self.vm_config.paranoid_type_checks {
@@ -323,6 +340,7 @@ impl InterpreterImpl<'_> {
                     resource_resolver,
                     module_storage,
                     gas_meter,
+                    traversal_context,
                 )
                 .map_err(|err| self.attach_state_if_invariant_violation(err, &current_frame))?;
 
@@ -381,6 +399,8 @@ impl InterpreterImpl<'_> {
                                 btree_map::Entry::Vacant(entry) => {
                                     let function = Rc::new(self.load_function(
                                         module_storage,
+                                        gas_meter,
+                                        traversal_context,
                                         &current_frame,
                                         fh_idx,
                                     )?);
@@ -401,6 +421,8 @@ impl InterpreterImpl<'_> {
                     } else {
                         let function = Rc::<LoadedFunction>::new(self.load_function(
                             module_storage,
+                            gas_meter,
+                            traversal_context,
                             &current_frame,
                             fh_idx,
                         )?);
@@ -477,8 +499,9 @@ impl InterpreterImpl<'_> {
                                     let function =
                                         Rc::<LoadedFunction>::new(self.load_generic_function(
                                             module_storage,
-                                            &current_frame,
                                             gas_meter,
+                                            traversal_context,
+                                            &current_frame,
                                             idx,
                                         )?);
                                     let frame_cache =
@@ -498,8 +521,9 @@ impl InterpreterImpl<'_> {
                     } else {
                         let function = Rc::<LoadedFunction>::new(self.load_generic_function(
                             module_storage,
-                            &current_frame,
                             gas_meter,
+                            traversal_context,
+                            &current_frame,
                             idx,
                         )?);
                         let frame_cache = FrameTypeCache::make_rc();
@@ -984,6 +1008,8 @@ impl InterpreterImpl<'_> {
 
                 let target_func = current_frame.build_loaded_function_from_name_and_ty_args(
                     module_storage,
+                    gas_meter,
+                    traversal_context,
                     &module_name,
                     &func_name,
                     ty_args,
@@ -1148,6 +1174,7 @@ impl InterpreterImpl<'_> {
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
+        _traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<&'c mut GlobalValue> {
@@ -1179,6 +1206,7 @@ impl InterpreterImpl<'_> {
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
@@ -1187,6 +1215,7 @@ impl InterpreterImpl<'_> {
             resource_resolver,
             module_storage,
             gas_meter,
+            traversal_context,
             addr,
             ty,
         )?
@@ -1257,6 +1286,7 @@ impl InterpreterImpl<'_> {
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
@@ -1265,6 +1295,7 @@ impl InterpreterImpl<'_> {
             resource_resolver,
             module_storage,
             gas_meter,
+            traversal_context,
             addr,
             ty,
         )?;
@@ -1290,6 +1321,7 @@ impl InterpreterImpl<'_> {
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
@@ -1298,6 +1330,7 @@ impl InterpreterImpl<'_> {
             resource_resolver,
             module_storage,
             gas_meter,
+            traversal_context,
             addr,
             ty,
         )?
@@ -1340,6 +1373,7 @@ impl InterpreterImpl<'_> {
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
         resource: Value,
@@ -1349,6 +1383,7 @@ impl InterpreterImpl<'_> {
             resource_resolver,
             module_storage,
             gas_meter,
+            traversal_context,
             addr,
             ty,
         )?;
@@ -1735,7 +1770,12 @@ impl CallStack {
     }
 }
 
-fn check_depth_of_type(module_storage: &impl ModuleStorage, ty: &Type) -> PartialVMResult<()> {
+fn check_depth_of_type(
+    module_storage: &impl ModuleStorage,
+    gas_meter: &mut impl GasMeter,
+    traversal_context: &mut TraversalContext,
+    ty: &Type,
+) -> PartialVMResult<()> {
     let _timer = VM_TIMER.timer_with_label("Interpreter::check_depth_of_type");
 
     // Start at 1 since we always call this right before we add a new node to the value's depth.
@@ -1747,12 +1787,21 @@ fn check_depth_of_type(module_storage: &impl ModuleStorage, ty: &Type) -> Partia
         Some(max_depth) => max_depth,
         None => return Ok(()),
     };
-    check_depth_of_type_impl(module_storage, ty, max_depth, 1)?;
+    check_depth_of_type_impl(
+        module_storage,
+        gas_meter,
+        traversal_context,
+        ty,
+        max_depth,
+        1,
+    )?;
     Ok(())
 }
 
 fn check_depth_of_type_impl(
     module_storage: &impl ModuleStorage,
+    gas_meter: &mut impl GasMeter,
+    traversal_context: &mut TraversalContext,
     ty: &Type,
     max_depth: u64,
     depth: u64,
@@ -1769,62 +1818,82 @@ fn check_depth_of_type_impl(
     }
 
     // Calculate depth of the type itself
-    let ty_depth = match ty {
-        Type::Bool
-        | Type::U8
-        | Type::U16
-        | Type::U32
-        | Type::U64
-        | Type::U128
-        | Type::U256
-        | Type::Address
-        | Type::Signer => check_depth!(0),
-        // Even though this is recursive this is OK since the depth of this recursion is
-        // bounded by the depth of the type arguments, which we have already checked.
-        Type::Reference(ty) | Type::MutableReference(ty) => {
-            check_depth_of_type_impl(module_storage, ty, max_depth, check_depth!(1))?
-        },
-        Type::Vector(ty) => {
-            check_depth_of_type_impl(module_storage, ty, max_depth, check_depth!(1))?
-        },
-        Type::Struct { idx, .. } => {
-            let formula =
-                DepthFormulaCalculator::new(module_storage).calculate_depth_of_struct(idx)?;
-            check_depth!(formula.solve(&[]))
-        },
-        // NB: substitution must be performed before calling this function
-        Type::StructInstantiation { idx, ty_args, .. } => {
-            // Calculate depth of all type arguments, and make sure they themselves are not too deep.
-            let ty_arg_depths = ty_args
-                .iter()
-                .map(|ty| {
-                    // Ty args should be fully resolved and not need any type arguments
-                    check_depth_of_type_impl(module_storage, ty, max_depth, check_depth!(0))
-                })
-                .collect::<PartialVMResult<Vec<_>>>()?;
-            let formula =
-                DepthFormulaCalculator::new(module_storage).calculate_depth_of_struct(idx)?;
-            check_depth!(formula.solve(&ty_arg_depths))
-        },
-        Type::Function { args, results, .. } => {
-            let mut ty_max_depth = depth;
-            for ty in args.iter().chain(results) {
-                ty_max_depth = ty_max_depth.max(check_depth_of_type_impl(
-                    module_storage,
-                    ty,
-                    max_depth,
-                    check_depth!(1),
-                )?);
-            }
-            ty_max_depth
-        },
-        Type::TyParam(_) => {
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Type parameter should be fully resolved".to_string()),
-            )
-        },
-    };
+    let ty_depth =
+        match ty {
+            Type::Bool
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128
+            | Type::U256
+            | Type::Address
+            | Type::Signer => check_depth!(0),
+            // Even though this is recursive this is OK since the depth of this recursion is
+            // bounded by the depth of the type arguments, which we have already checked.
+            Type::Reference(ty) | Type::MutableReference(ty) => check_depth_of_type_impl(
+                module_storage,
+                gas_meter,
+                traversal_context,
+                ty,
+                max_depth,
+                check_depth!(1),
+            )?,
+            Type::Vector(ty) => check_depth_of_type_impl(
+                module_storage,
+                gas_meter,
+                traversal_context,
+                ty,
+                max_depth,
+                check_depth!(1),
+            )?,
+            Type::Struct { idx, .. } => {
+                let formula = DepthFormulaCalculator::new(module_storage)
+                    .calculate_depth_of_struct(gas_meter, traversal_context, idx)?;
+                check_depth!(formula.solve(&[]))
+            },
+            // NB: substitution must be performed before calling this function
+            Type::StructInstantiation { idx, ty_args, .. } => {
+                // Calculate depth of all type arguments, and make sure they themselves are not too deep.
+                let ty_arg_depths = ty_args
+                    .iter()
+                    .map(|ty| {
+                        // Ty args should be fully resolved and not need any type arguments
+                        check_depth_of_type_impl(
+                            module_storage,
+                            gas_meter,
+                            traversal_context,
+                            ty,
+                            max_depth,
+                            check_depth!(0),
+                        )
+                    })
+                    .collect::<PartialVMResult<Vec<_>>>()?;
+                let formula = DepthFormulaCalculator::new(module_storage)
+                    .calculate_depth_of_struct(gas_meter, traversal_context, idx)?;
+                check_depth!(formula.solve(&ty_arg_depths))
+            },
+            Type::Function { args, results, .. } => {
+                let mut ty_max_depth = depth;
+                for ty in args.iter().chain(results) {
+                    ty_max_depth = ty_max_depth.max(check_depth_of_type_impl(
+                        module_storage,
+                        gas_meter,
+                        traversal_context,
+                        ty,
+                        max_depth,
+                        check_depth!(1),
+                    )?);
+                }
+                ty_max_depth
+            },
+            Type::TyParam(_) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message("Type parameter should be fully resolved".to_string()),
+                )
+            },
+        };
 
     Ok(ty_depth)
 }
@@ -1874,6 +1943,7 @@ impl Frame {
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
     ) -> VMResult<ExitCode> {
         self.execute_code_impl::<RTTCheck, RTCaches>(
             interpreter,
@@ -1881,6 +1951,7 @@ impl Frame {
             resource_resolver,
             module_storage,
             gas_meter,
+            traversal_context,
         )
         .map_err(|e| {
             let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
@@ -1899,6 +1970,7 @@ impl Frame {
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
     ) -> PartialVMResult<ExitCode> {
         use SimpleInstruction as S;
 
@@ -1944,7 +2016,6 @@ impl Frame {
                 RTTCheck::check_operand_stack_balance(&interpreter.operand_stack)?;
                 RTTCheck::pre_execution_type_stack_transition(
                     self,
-                    module_storage,
                     &mut interpreter.operand_stack,
                     frame_cache,
                     instruction,
@@ -2169,11 +2240,16 @@ impl Frame {
                         interpreter.operand_stack.push(field_ref)?;
                     },
                     Bytecode::Pack(sd_idx) => {
-                        let get_field_count_charge_gas_and_check_depth =
+                        let mut get_field_count_charge_gas_and_check_depth =
                             || -> PartialVMResult<u16> {
                                 let field_count = self.field_count(*sd_idx);
                                 let struct_type = self.get_struct_ty(*sd_idx);
-                                check_depth_of_type(module_storage, &struct_type)?;
+                                check_depth_of_type(
+                                    module_storage,
+                                    gas_meter,
+                                    traversal_context,
+                                    &struct_type,
+                                )?;
                                 Ok(field_count)
                             };
 
@@ -2204,7 +2280,12 @@ impl Frame {
                     Bytecode::PackVariant(idx) => {
                         let info = self.get_struct_variant_at(*idx);
                         let struct_type = self.create_struct_ty(&info.definition_struct_type);
-                        check_depth_of_type(module_storage, &struct_type)?;
+                        check_depth_of_type(
+                            module_storage,
+                            gas_meter,
+                            traversal_context,
+                            &struct_type,
+                        )?;
                         gas_meter.charge_pack_variant(
                             false,
                             interpreter
@@ -2234,7 +2315,12 @@ impl Frame {
 
                                 let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                                 gas_meter.charge_create_ty(ty_count)?;
-                                check_depth_of_type(module_storage, ty)?;
+                                check_depth_of_type(
+                                    module_storage,
+                                    gas_meter,
+                                    traversal_context,
+                                    ty,
+                                )?;
                                 Ok(self.field_instantiation_count(*si_idx))
                             };
 
@@ -2276,7 +2362,7 @@ impl Frame {
 
                         let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        check_depth_of_type(module_storage, ty)?;
+                        check_depth_of_type(module_storage, gas_meter, traversal_context, ty)?;
 
                         let info = self.get_struct_variant_instantiation_at(*si_idx);
                         gas_meter.charge_pack_variant(
@@ -2326,7 +2412,7 @@ impl Frame {
                         let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
 
-                        check_depth_of_type(module_storage, ty)?;
+                        check_depth_of_type(module_storage, gas_meter, traversal_context, ty)?;
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
 
@@ -2349,7 +2435,7 @@ impl Frame {
                         let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
 
-                        check_depth_of_type(module_storage, ty)?;
+                        check_depth_of_type(module_storage, gas_meter, traversal_context, ty)?;
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
 
@@ -2388,38 +2474,64 @@ impl Frame {
                             .push(reference.test_variant(info.variant)?)?;
                     },
                     Bytecode::PackClosure(fh_idx, mask) => {
-                        let function = self.build_loaded_function_from_handle_and_ty_args(
-                            module_storage,
-                            *fh_idx,
-                            vec![],
-                        )?;
+                        let function = self
+                            .build_loaded_function_from_handle_and_ty_args(
+                                module_storage,
+                                gas_meter,
+                                traversal_context,
+                                *fh_idx,
+                                vec![],
+                            )
+                            .map(Rc::new)?;
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
-                            &TypeTagConverter::new(module_storage.runtime_environment()),
-                            Rc::new(function),
+                            module_storage,
+                            function.clone(),
                             *mask,
                         )?;
                         interpreter
                             .operand_stack
-                            .push(Value::closure(Box::new(lazy_function), captured))?
+                            .push(Value::closure(Box::new(lazy_function), captured))?;
+
+                        if RTTCheck::should_perform_checks() {
+                            verify_pack_closure(
+                                &self.ty_builder,
+                                &mut interpreter.operand_stack,
+                                &function,
+                                *mask,
+                            )?;
+                        }
                     },
                     Bytecode::PackClosureGeneric(fi_idx, mask) => {
                         let ty_args =
                             self.instantiate_generic_function(Some(gas_meter), *fi_idx)?;
-                        let function = self.build_loaded_function_from_instantiation_and_ty_args(
-                            module_storage,
-                            *fi_idx,
-                            ty_args,
-                        )?;
+                        let function = self
+                            .build_loaded_function_from_instantiation_and_ty_args(
+                                module_storage,
+                                gas_meter,
+                                traversal_context,
+                                *fi_idx,
+                                ty_args,
+                            )
+                            .map(Rc::new)?;
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
-                            &TypeTagConverter::new(module_storage.runtime_environment()),
-                            Rc::new(function),
+                            module_storage,
+                            function.clone(),
                             *mask,
                         )?;
                         interpreter
                             .operand_stack
-                            .push(Value::closure(Box::new(lazy_function), captured))?
+                            .push(Value::closure(Box::new(lazy_function), captured))?;
+
+                        if RTTCheck::should_perform_checks() {
+                            verify_pack_closure(
+                                &self.ty_builder,
+                                &mut interpreter.operand_stack,
+                                &function,
+                                *mask,
+                            )?;
+                        }
                     },
                     Bytecode::ReadRef => {
                         let reference = interpreter.operand_stack.pop_as::<Reference>()?;
@@ -2587,6 +2699,7 @@ impl Frame {
                             resource_resolver,
                             module_storage,
                             gas_meter,
+                            traversal_context,
                             addr,
                             &ty,
                         )?;
@@ -2604,6 +2717,7 @@ impl Frame {
                             resource_resolver,
                             module_storage,
                             gas_meter,
+                            traversal_context,
                             addr,
                             ty,
                         )?;
@@ -2617,6 +2731,7 @@ impl Frame {
                             resource_resolver,
                             module_storage,
                             gas_meter,
+                            traversal_context,
                             addr,
                             &ty,
                         )?;
@@ -2631,6 +2746,7 @@ impl Frame {
                             resource_resolver,
                             module_storage,
                             gas_meter,
+                            traversal_context,
                             addr,
                             ty,
                         )?;
@@ -2644,6 +2760,7 @@ impl Frame {
                             resource_resolver,
                             module_storage,
                             gas_meter,
+                            traversal_context,
                             addr,
                             &ty,
                         )?;
@@ -2658,6 +2775,7 @@ impl Frame {
                             resource_resolver,
                             module_storage,
                             gas_meter,
+                            traversal_context,
                             addr,
                             ty,
                         )?;
@@ -2677,6 +2795,7 @@ impl Frame {
                             resource_resolver,
                             module_storage,
                             gas_meter,
+                            traversal_context,
                             addr,
                             &ty,
                             resource,
@@ -2698,6 +2817,7 @@ impl Frame {
                             resource_resolver,
                             module_storage,
                             gas_meter,
+                            traversal_context,
                             addr,
                             ty,
                             resource,
@@ -2719,7 +2839,7 @@ impl Frame {
                     Bytecode::VecPack(si, num) => {
                         let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        check_depth_of_type(module_storage, ty)?;
+                        check_depth_of_type(module_storage, gas_meter, traversal_context, ty)?;
                         gas_meter.charge_vec_pack(
                             make_ty!(ty),
                             interpreter.operand_stack.last_n(*num as usize)?,
@@ -2732,10 +2852,7 @@ impl Frame {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
                         let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        gas_meter.charge_vec_len(TypeWithRuntimeEnvironment {
-                            ty,
-                            runtime_environment: module_storage.runtime_environment(),
-                        })?;
+                        gas_meter.charge_vec_len(make_ty!(ty))?;
                         let value = vec_ref.len(ty)?;
                         interpreter.operand_stack.push(value)?;
                     },
@@ -2800,7 +2917,6 @@ impl Frame {
 
                 RTTCheck::post_execution_type_stack_transition(
                     self,
-                    module_storage,
                     &mut interpreter.operand_stack,
                     frame_cache,
                     instruction,
@@ -3137,6 +3253,8 @@ macro_rules! build_loaded_function {
         pub(crate) fn $function_name(
             &self,
             module_storage: &impl ModuleStorage,
+            gas_meter: &mut impl GasMeter,
+            traversal_context: &mut TraversalContext,
             idx: $idx_ty,
             verified_ty_args: Vec<Type>,
         ) -> PartialVMResult<LoadedFunction> {
@@ -3154,6 +3272,8 @@ macro_rules! build_loaded_function {
                         FunctionHandle::Remote { module, name } => self
                             .build_loaded_function_from_name_and_ty_args(
                                 module_storage,
+                                gas_meter,
+                                traversal_context,
                                 module,
                                 name,
                                 verified_ty_args,
@@ -3170,6 +3290,8 @@ macro_rules! build_loaded_function {
                         FunctionHandle::Remote { module, name } => self
                             .build_loaded_function_from_name_and_ty_args(
                                 module_storage,
+                                gas_meter,
+                                traversal_context,
                                 module,
                                 name,
                                 verified_ty_args,
@@ -3197,6 +3319,8 @@ impl Frame {
     pub(crate) fn build_loaded_function_from_name_and_ty_args(
         &self,
         module_storage: &impl ModuleStorage,
+        _gas_meter: &mut impl GasMeter,
+        _traversal_context: &mut TraversalContext,
         module_id: &ModuleId,
         function_name: &IdentStr,
         verified_ty_args: Vec<Type>,

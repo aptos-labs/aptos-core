@@ -69,9 +69,14 @@ impl MoveVM {
         };
 
         let param_tys = create_ty_with_subst(function.param_tys())?;
-        let (mut dummy_locals, deserialized_args) =
-            deserialize_args(module_storage, &param_tys, serialized_args)
-                .map_err(|e| e.finish(Location::Undefined))?;
+        let (mut dummy_locals, deserialized_args) = deserialize_args(
+            module_storage,
+            gas_meter,
+            traversal_context,
+            &param_tys,
+            serialized_args,
+        )
+        .map_err(|e| e.finish(Location::Undefined))?;
 
         let return_tys = create_ty_with_subst(function.return_tys())?;
 
@@ -89,8 +94,14 @@ impl MoveVM {
             )?
         };
 
-        let return_values = serialize_return_values(module_storage, &return_tys, return_values)
-            .map_err(|e| e.finish(Location::Undefined))?;
+        let return_values = serialize_return_values(
+            module_storage,
+            gas_meter,
+            traversal_context,
+            &return_tys,
+            return_values,
+        )
+        .map_err(|e| e.finish(Location::Undefined))?;
         let mutable_reference_outputs = param_tys
             .iter()
             .enumerate()
@@ -102,7 +113,13 @@ impl MoveVM {
                 // serialize return values first in the case that a value points into this local
                 let local_val =
                     dummy_locals.move_loc(idx, vm_config.check_invariant_in_swap_loc)?;
-                let (bytes, layout) = serialize_return_value(module_storage, ty, local_val)?;
+                let (bytes, layout) = serialize_return_value(
+                    module_storage,
+                    gas_meter,
+                    traversal_context,
+                    ty,
+                    local_val,
+                )?;
                 Ok((idx as LocalIndex, bytes, layout))
             })
             .collect::<PartialVMResult<_>>()
@@ -120,6 +137,8 @@ impl MoveVM {
 
 fn deserialize_arg(
     module_storage: &impl ModuleStorage,
+    _gas_meter: &mut impl GasMeter,
+    _traversal_context: &mut TraversalContext,
     ty: &Type,
     arg: impl Borrow<[u8]>,
 ) -> PartialVMResult<Value> {
@@ -151,6 +170,8 @@ fn deserialize_arg(
 
 fn deserialize_args(
     module_storage: &impl ModuleStorage,
+    gas_meter: &mut impl GasMeter,
+    traversal_context: &mut TraversalContext,
     param_tys: &[Type],
     serialized_args: Vec<impl Borrow<[u8]>>,
 ) -> PartialVMResult<(Locals, Vec<Value>)> {
@@ -178,12 +199,18 @@ fn deserialize_args(
             Some(inner_ty) => {
                 dummy_locals.store_loc(
                     idx,
-                    deserialize_arg(module_storage, inner_ty, arg_bytes)?,
+                    deserialize_arg(
+                        module_storage,
+                        gas_meter,
+                        traversal_context,
+                        inner_ty,
+                        arg_bytes,
+                    )?,
                     vm_config.check_invariant_in_swap_loc,
                 )?;
                 dummy_locals.borrow_loc(idx)
             },
-            None => deserialize_arg(module_storage, ty, arg_bytes),
+            None => deserialize_arg(module_storage, gas_meter, traversal_context, ty, arg_bytes),
         })
         .collect::<PartialVMResult<Vec<_>>>()?;
     Ok((dummy_locals, deserialized_args))
@@ -191,6 +218,8 @@ fn deserialize_args(
 
 fn serialize_return_value(
     module_storage: &impl ModuleStorage,
+    _gas_meter: &mut impl GasMeter,
+    _traversal_context: &mut TraversalContext,
     ty: &Type,
     value: Value,
 ) -> PartialVMResult<(Vec<u8>, MoveTypeLayout)> {
@@ -232,6 +261,8 @@ fn serialize_return_value(
 
 fn serialize_return_values(
     module_storage: &impl ModuleStorage,
+    gas_meter: &mut impl GasMeter,
+    traversal_context: &mut TraversalContext,
     return_tys: &[Type],
     return_values: Vec<Value>,
 ) -> PartialVMResult<Vec<(Vec<u8>, MoveTypeLayout)>> {
@@ -250,6 +281,8 @@ fn serialize_return_values(
     return_tys
         .iter()
         .zip(return_values)
-        .map(|(ty, value)| serialize_return_value(module_storage, ty, value))
+        .map(|(ty, value)| {
+            serialize_return_value(module_storage, gas_meter, traversal_context, ty, value)
+        })
         .collect()
 }

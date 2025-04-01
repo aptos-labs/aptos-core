@@ -5,7 +5,6 @@
 use crate::{
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
-    storage::ty_tag_converter::TypeTagConverter,
     LayoutConverter, ModuleStorage, StorageLayoutConverter,
 };
 use better_any::{Tid, TidAble, TidExt};
@@ -112,14 +111,14 @@ impl LazyLoadedFunction {
     }
 
     pub(crate) fn new_resolved(
-        converter: &TypeTagConverter,
+        module_storage: &impl ModuleStorage,
         fun: Rc<LoadedFunction>,
         mask: ClosureMask,
     ) -> PartialVMResult<Self> {
         let ty_args = fun
             .ty_args
             .iter()
-            .map(|t| converter.ty_to_ty_tag(t))
+            .map(|t| module_storage.runtime_environment().ty_to_ty_tag(t))
             .collect::<PartialVMResult<Vec<_>>>()?;
         Ok(Self(Rc::new(RefCell::new(
             LazyLoadedFunctionState::Resolved { fun, ty_args, mask },
@@ -162,7 +161,6 @@ impl LazyLoadedFunction {
 
     /// Executed an action with the resolved loaded function. If the function hasn't been
     /// loaded yet, it will be loaded now.
-    #[allow(unused)]
     pub(crate) fn with_resolved_function<T>(
         &self,
         storage: &dyn ModuleStorage,
