@@ -54,6 +54,8 @@ impl<SK: Reconstructable<ThresholdConfig>> Reconstructable<WeightedConfig> for S
 }
 
 impl<T: Transcript> ValidCryptoMaterial for GenericWeighting<T> {
+    const AIP_80_PREFIX: &'static str = "";
+
     fn to_bytes(&self) -> Vec<u8> {
         self.trx.to_bytes()
     }
