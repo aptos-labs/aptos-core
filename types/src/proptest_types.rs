@@ -18,6 +18,7 @@ use crate::{
     dkg::{DKGTranscript, DKGTranscriptMetadata},
     epoch_state::EpochState,
     event::{EventHandle, EventKey},
+    indexer::indexer_db_reader::IndexedTransactionSummary,
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ValidatorSet,
     proof::TransactionInfoListWithProof,
@@ -62,6 +63,29 @@ use std::{
     iter::Iterator,
     sync::Arc,
 };
+
+impl Arbitrary for IndexedTransactionSummary {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        (
+            any::<AccountAddress>(),
+            any::<ReplayProtector>(),
+            any::<Version>(),
+            any::<HashValue>(),
+        )
+            .prop_map(|(sender, replay_protector, version, transaction_hash)| {
+                IndexedTransactionSummary {
+                    sender,
+                    replay_protector,
+                    version,
+                    transaction_hash,
+                }
+            })
+            .boxed()
+    }
+}
 
 impl WriteOp {
     pub fn value_strategy() -> impl Strategy<Value = Self> {
