@@ -6,7 +6,11 @@
 //! TODO: we should not only validate the types but also the actual values, e.g.
 //! for strings whether they consist of correct characters.
 
-use crate::{aptos_vm::SerializedSigners, move_vm_ext::SessionExt, VMStatus};
+use crate::{
+    aptos_vm::SerializedSigners,
+    move_vm_ext::{AptosMoveResolver, SessionExt},
+    VMStatus,
+};
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use move_binary_format::{
     errors::{Location, PartialVMError},
@@ -103,7 +107,7 @@ pub(crate) fn get_allowed_structs(
 ///
 /// after validation, add senders and non-signer arguments to generate the final args
 pub(crate) fn validate_combine_signer_and_txn_args(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     serialized_signers: &SerializedSigners,
     args: Vec<Vec<u8>>,
@@ -228,7 +232,7 @@ pub(crate) fn is_valid_txn_arg(
 // construct arguments that require so.
 // TODO: This needs a more solid story and a tighter integration with the VM.
 pub(crate) fn construct_args(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     types: &[Type],
     args: Vec<Vec<u8>>,
@@ -266,7 +270,7 @@ fn invalid_signature() -> VMStatus {
 }
 
 fn construct_arg(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     ty: &Type,
     allowed_structs: &ConstructorMap,
@@ -322,7 +326,7 @@ fn construct_arg(
 // are parsing the BCS serialized implicit constructor invocation tree, while serializing the
 // constructed types into the output parameter arg.
 pub(crate) fn recursively_construct_arg(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     ty: &Type,
     allowed_structs: &ConstructorMap,
@@ -400,7 +404,7 @@ pub(crate) fn recursively_construct_arg(
 // said struct as a parameter. In this function we execute the constructor constructing the
 // value and returning the BCS serialized representation.
 fn validate_and_construct(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     expected_type: &Type,
     constructor: &FunctionId,

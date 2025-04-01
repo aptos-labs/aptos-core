@@ -171,6 +171,8 @@ impl traits::Signature for Signature {
 }
 
 impl ValidCryptoMaterial for Signature {
+    const AIP_80_PREFIX: &'static str = "bls12381-sig-";
+
     fn to_bytes(&self) -> Vec<u8> {
         self.to_bytes().to_vec()
     }

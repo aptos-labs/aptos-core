@@ -19,10 +19,10 @@ error: abort not covered by any of the `aborts_if` clauses
    =     at tests/sources/functional/script_provider.move:8: register
    =         account = <redacted>
    =     at tests/sources/functional/script_provider.move:9: register
-   =     at ../move-stdlib/sources/signer.move:27: address_of
+   =     at ../move-stdlib/sources/signer.move:26: address_of
    =         s = <redacted>
-   =     at ../move-stdlib/sources/signer.move:28: address_of
+   =     at ../move-stdlib/sources/signer.move:27: address_of
    =         result = <redacted>
-   =     at ../move-stdlib/sources/signer.move:29: address_of
+   =     at ../move-stdlib/sources/signer.move:28: address_of
    =     at tests/sources/functional/script_provider.move:10: register
    =         ABORTED

@@ -8,11 +8,11 @@ error: post-condition does not hold
    =     at tests/sources/functional/resources.move:32: create_resource_incorrect
    =         account = <redacted>
    =     at tests/sources/functional/resources.move:33: create_resource_incorrect
-   =     at ../move-stdlib/sources/signer.move:27: address_of
+   =     at ../move-stdlib/sources/signer.move:26: address_of
    =         s = <redacted>
-   =     at ../move-stdlib/sources/signer.move:28: address_of
+   =     at ../move-stdlib/sources/signer.move:27: address_of
    =         result = <redacted>
-   =     at ../move-stdlib/sources/signer.move:29: address_of
+   =     at ../move-stdlib/sources/signer.move:28: address_of
    =     at tests/sources/functional/resources.move:36: create_resource_incorrect
    =     at tests/sources/functional/resources.move:38: create_resource_incorrect (spec)
    =     at tests/sources/functional/resources.move:39: create_resource_incorrect (spec)

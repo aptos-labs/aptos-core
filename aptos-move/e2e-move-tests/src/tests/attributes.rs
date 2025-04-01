@@ -5,7 +5,11 @@ use crate::{assert_success, assert_vm_status, build_package, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::BuildOptions;
 use aptos_package_builder::PackageBuilder;
-use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag};
+use aptos_types::{
+    account_address::AccountAddress,
+    on_chain_config::FeatureFlag,
+    vm::module_metadata::{KnownAttribute, RuntimeModuleMetadataV1, APTOS_METADATA_KEY_V1},
+};
 use move_binary_format::CompiledModule;
 use move_core_types::{metadata::Metadata, vm_status::StatusCode};
 use serde::Serialize;
@@ -154,7 +158,7 @@ fn test_bad_fun_attribute_in_compiled_module() {
     assert!(code.len() == 1);
     let mut compiled_module = CompiledModule::deserialize(&code[0]).unwrap();
 
-    let mut value = aptos_framework::RuntimeModuleMetadataV1 {
+    let mut value = RuntimeModuleMetadataV1 {
         error_map: BTreeMap::new(),
         struct_attributes: BTreeMap::new(),
         fun_attributes: BTreeMap::new(),
@@ -164,14 +168,13 @@ fn test_bad_fun_attribute_in_compiled_module() {
         args: vec![],
     })
     .unwrap();
-    let known_attribute =
-        bcs::from_bytes::<aptos_framework::KnownAttribute>(&fake_attribute).unwrap();
+    let known_attribute = bcs::from_bytes::<KnownAttribute>(&fake_attribute).unwrap();
     value
         .fun_attributes
         .insert("view".to_string(), vec![known_attribute]);
 
     let metadata = Metadata {
-        key: aptos_framework::APTOS_METADATA_KEY_V1.to_vec(),
+        key: APTOS_METADATA_KEY_V1.to_vec(),
         value: bcs::to_bytes(&value).unwrap(),
     };
 
@@ -302,7 +305,7 @@ fn build_package_and_insert_attribute(
     // There should only be one module
     assert!(code.len() == 1);
     let mut compiled_module = CompiledModule::deserialize(&code[0]).unwrap();
-    let mut value = aptos_framework::RuntimeModuleMetadataV1 {
+    let mut value = RuntimeModuleMetadataV1 {
         error_map: BTreeMap::new(),
         struct_attributes: BTreeMap::new(),
         fun_attributes: BTreeMap::new(),
@@ -324,7 +327,7 @@ fn build_package_and_insert_attribute(
     }
 
     let metadata = Metadata {
-        key: aptos_framework::APTOS_METADATA_KEY_V1.to_vec(),
+        key: APTOS_METADATA_KEY_V1.to_vec(),
         value: bcs::to_bytes(&value).unwrap(),
     };
 

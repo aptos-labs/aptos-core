@@ -71,6 +71,7 @@ impl ReleaseTarget {
                 "aptos-token-objects",
                 Some("cached-packages/src/aptos_token_objects_sdk_builder.rs"),
             ),
+            ("aptos-experimental", None),
         ];
         // Currently we don't have experimental packages only included in particular targets.
         result
@@ -171,6 +172,7 @@ static NAMED_ADDRESSES: Lazy<BTreeMap<String, NumericalAddress>> = Lazy::new(|| 
     let one = NumericalAddress::parse_str("0x1").unwrap();
     let three = NumericalAddress::parse_str("0x3").unwrap();
     let four = NumericalAddress::parse_str("0x4").unwrap();
+    let seven = NumericalAddress::parse_str("0x7").unwrap();
     let ten = NumericalAddress::parse_str("0xA").unwrap();
     let resources = NumericalAddress::parse_str("0xA550C18").unwrap();
     result.insert("std".to_owned(), one);
@@ -178,6 +180,7 @@ static NAMED_ADDRESSES: Lazy<BTreeMap<String, NumericalAddress>> = Lazy::new(|| 
     result.insert("aptos_framework".to_owned(), one);
     result.insert("aptos_token".to_owned(), three);
     result.insert("aptos_token_objects".to_owned(), four);
+    result.insert("aptos_experimental".to_owned(), seven);
     result.insert("aptos_fungible_asset".to_owned(), ten);
     result.insert("core_resources".to_owned(), resources);
     result.insert("vm".to_owned(), zero);
