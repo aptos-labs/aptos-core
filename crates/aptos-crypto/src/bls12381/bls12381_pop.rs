@@ -107,6 +107,8 @@ impl ProofOfPossession {
 //////////////////////////////
 
 impl ValidCryptoMaterial for ProofOfPossession {
+    const AIP_80_PREFIX: &'static str = "bls12381-pop-";
+
     fn to_bytes(&self) -> Vec<u8> {
         self.to_bytes().to_vec()
     }

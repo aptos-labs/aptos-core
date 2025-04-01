@@ -23,6 +23,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
         StateView, StateViewId,
     },
+    vm::module_metadata::get_metadata,
 };
 use aptos_vm_environment::gas::get_gas_feature_version;
 use aptos_vm_types::{
@@ -51,7 +52,7 @@ pub fn get_resource_group_member_from_metadata(
     struct_tag: &StructTag,
     metadata: &[Metadata],
 ) -> Option<StructTag> {
-    let metadata = aptos_framework::get_metadata(metadata)?;
+    let metadata = get_metadata(metadata)?;
     metadata
         .struct_attributes
         .get(struct_tag.name.as_ident_str().as_str())?
