@@ -43,8 +43,8 @@ a batch of transactions.
 ### Code structure
 
 The state sync code structure matches the architecture outlined above:
-- **Driver:** [https://github.com/aptos-labs/aptos-core/tree/main/state-sync/state-sync-v2/state-sync-driver](https://github.com/aptos-labs/aptos-core/tree/main/state-sync/state-sync-v2/state-sync-driver)
-- **Data Streaming Service:** [https://github.com/aptos-labs/aptos-core/tree/main/state-sync/state-sync-v2/data-streaming-service](https://github.com/aptos-labs/aptos-core/tree/main/state-sync/state-sync-v2/data-streaming-service)
+- **Driver:** [https://github.com/aptos-labs/aptos-core/tree/main/state-sync/state-sync-driver](https://github.com/aptos-labs/aptos-core/tree/main/state-sync/state-sync-driver)
+- **Data Streaming Service:** [https://github.com/aptos-labs/aptos-core/tree/main/state-sync/data-streaming-service](https://github.com/aptos-labs/aptos-core/tree/main/state-sync/data-streaming-service)
 - **Aptos Data Client**: [https://github.com/aptos-labs/aptos-core/tree/main/state-sync/aptos-data-client](https://github.com/aptos-labs/aptos-core/tree/main/state-sync/aptos-data-client)
 - **Storage Service:** [https://github.com/aptos-labs/aptos-core/tree/main/state-sync/storage-service](https://github.com/aptos-labs/aptos-core/tree/main/state-sync/storage-service)
 

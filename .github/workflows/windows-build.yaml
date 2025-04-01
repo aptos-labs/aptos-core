@@ -34,7 +34,7 @@ jobs:
 
       # Ensure that long paths work
       - name: Ensure long paths work
-        run: git config --system core.longpaths true
+        run: git config --global core.longpaths true
         shell: bash
 
       # This action will cache ~/.cargo and ./target (or the equivalent on Windows in

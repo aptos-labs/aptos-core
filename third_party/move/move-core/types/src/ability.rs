@@ -84,7 +84,7 @@ impl fmt::Display for Ability {
 /// A set of `Ability`s
 #[derive(Clone, Eq, Copy, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(
-    feature = "fuzzing",
+    any(test, feature = "fuzzing"),
     derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
 )]
 pub struct AbilitySet(u8);
@@ -102,8 +102,6 @@ impl AbilitySet {
     pub const EMPTY: Self = Self(0);
     /// Minimal abilities for all `Functions`
     pub const FUNCTIONS: AbilitySet = Self(Ability::Drop as u8);
-    /// Maximal abilities for all `Functions`.  This is used for identity when unifying function types.
-    pub const MAXIMAL_FUNCTIONS: AbilitySet = Self::PUBLIC_FUNCTIONS;
     /// Abilities for `Bool`, `U8`, `U64`, `U128`, and `Address`
     pub const PRIMITIVES: AbilitySet =
         Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));

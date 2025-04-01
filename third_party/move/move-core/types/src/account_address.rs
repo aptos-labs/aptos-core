@@ -21,12 +21,13 @@ impl AccountAddress {
     /// Hex address: 0x4
     pub const FOUR: Self = Self::get_hex_address_four();
     /// The number of bytes in an address.
-    /// Default to 16 bytes, can be set to 20 bytes with address20 feature.
     pub const LENGTH: usize = 32;
     /// Max address: 0xff....
     pub const MAX_ADDRESS: Self = Self([0xFF; Self::LENGTH]);
     /// Hex address: 0x1
     pub const ONE: Self = Self::get_hex_address_one();
+    /// Hex address: 0x7
+    pub const SEVEN: Self = Self::get_hex_address_seven();
     /// Hex address: 0xA
     pub const TEN: Self = Self::get_hex_address_ten();
     /// Hex address: 0x3
@@ -67,6 +68,12 @@ impl AccountAddress {
     const fn get_hex_address_four() -> Self {
         let mut addr = [0u8; AccountAddress::LENGTH];
         addr[AccountAddress::LENGTH - 1] = 4u8;
+        Self(addr)
+    }
+
+    const fn get_hex_address_seven() -> Self {
+        let mut addr = [0u8; AccountAddress::LENGTH];
+        addr[AccountAddress::LENGTH - 1] = 7u8;
         Self(addr)
     }
 

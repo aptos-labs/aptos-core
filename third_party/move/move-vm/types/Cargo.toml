@@ -12,6 +12,7 @@ edition = "2021"
 [dependencies]
 ambassador = { workspace = true }
 bcs = { workspace = true }
+better_any = { workspace = true }
 bytes = { workspace = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
@@ -30,6 +31,7 @@ triomphe = { workspace = true }
 
 [dev-dependencies]
 claims = { workspace = true }
+mockall = { workspace = true }
 move-binary-format = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
 rand = { workspace = true }

@@ -1,6 +1,19 @@
 module aptos_framework::auth_data {
+    use std::error;
+
+    const ENOT_REGULAR_AUTH_DATA: u64 = 1;
+    const ENOT_DERIVABLE_AUTH_DATA: u64 = 2;
+
     enum AbstractionAuthData has copy, drop {
-        V1 { digest: vector<u8>, authenticator: vector<u8> },
+        V1 {
+            digest: vector<u8>,
+            authenticator: vector<u8>
+        },
+        DerivableV1 {
+            digest: vector<u8>,
+            abstract_signature: vector<u8>,
+            abstract_public_key: vector<u8>,
+        },
     }
 
     #[test_only]
@@ -8,11 +21,29 @@ module aptos_framework::auth_data {
         AbstractionAuthData::V1 { digest, authenticator }
     }
 
-    public fun digest(signing_data: &AbstractionAuthData): &vector<u8> {
-        &signing_data.digest
+    public fun digest(self: &AbstractionAuthData): &vector<u8> {
+        &self.digest
     }
 
-    public fun authenticator(signing_data: &AbstractionAuthData): &vector<u8> {
-        &signing_data.authenticator
+    // separate authenticator and derivable_authenticator - to not allow accidental mixing
+    // in user authentication code
+
+    public fun authenticator(self: &AbstractionAuthData): &vector<u8> {
+        assert!(self is V1, error::invalid_argument(ENOT_REGULAR_AUTH_DATA));
+        &self.authenticator
+    }
+
+    public fun is_derivable(self: &AbstractionAuthData): bool {
+        self is DerivableV1
+    }
+
+    public fun derivable_abstract_signature(self: &AbstractionAuthData): &vector<u8> {
+        assert!(self is DerivableV1, error::invalid_argument(ENOT_REGULAR_AUTH_DATA));
+        &self.abstract_signature
+    }
+
+    public fun derivable_abstract_public_key(self: &AbstractionAuthData): &vector<u8> {
+        assert!(self is DerivableV1, error::invalid_argument(ENOT_DERIVABLE_AUTH_DATA));
+        &self.abstract_public_key
     }
 }

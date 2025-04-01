@@ -117,6 +117,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::authenticator::AnySignature>(&samples)?;
     tracer.trace_type::<transaction::webauthn::AssertionSignature>(&samples)?;
     tracer.trace_type::<aptos_types::keyless::EphemeralCertificate>(&samples)?;
+    tracer.trace_type::<transaction::authenticator::AbstractionAuthData>(&samples)?;
 
     // events
     tracer.trace_type::<WithdrawEvent>(&samples)?;

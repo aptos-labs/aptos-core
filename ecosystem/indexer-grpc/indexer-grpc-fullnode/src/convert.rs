@@ -241,6 +241,7 @@ pub fn convert_move_type(move_type: &MoveType) -> transaction::MoveType {
         MoveType::Struct(_) => transaction::MoveTypes::Struct,
         MoveType::GenericTypeParam { .. } => transaction::MoveTypes::GenericTypeParam,
         MoveType::Reference { .. } => transaction::MoveTypes::Reference,
+        MoveType::Function { .. } => transaction::MoveTypes::Unparsable,
         MoveType::Unparsable(_) => transaction::MoveTypes::Unparsable,
     };
     let content = match move_type {
@@ -267,6 +268,9 @@ pub fn convert_move_type(move_type: &MoveType) -> transaction::MoveType {
                 mutable: *mutable,
                 to: Some(Box::new(convert_move_type(to))),
             }),
+        )),
+        MoveType::Function { .. } => Some(transaction::move_type::Content::Unparsable(
+            "function".to_string(),
         )),
         MoveType::Unparsable(string) => {
             Some(transaction::move_type::Content::Unparsable(string.clone()))
@@ -794,11 +798,9 @@ pub fn convert_transaction(
     let txn_data = match &transaction {
         Transaction::UserTransaction(ut) => {
             timestamp = Some(convert_timestamp_usecs(ut.timestamp.0));
-            #[allow(deprecated)]
-            let expiration_timestamp_secs = Some(convert_timestamp_secs(std::cmp::min(
+            let expiration_timestamp_secs = Some(convert_timestamp_secs(
                 ut.request.expiration_timestamp_secs.0,
-                chrono::NaiveDateTime::MAX.timestamp() as u64,
-            )));
+            ));
             transaction::transaction::TxnData::User(transaction::UserTransaction {
                 request: Some(transaction::UserTransactionRequest {
                     sender: ut.request.sender.to_string(),
