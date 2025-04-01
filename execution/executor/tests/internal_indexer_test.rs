@@ -165,7 +165,7 @@ fn test_db_indexer_data() {
     );
 
     let txn_iter = internal_indexer_db
-        .get_account_transaction_version_iter(core_account.address(), 0, 1000, total_version)
+        .get_account_ordered_transactions_iter(core_account.address(), 0, 1000, total_version)
         .unwrap();
     let res: Vec<_> = txn_iter.collect();
 

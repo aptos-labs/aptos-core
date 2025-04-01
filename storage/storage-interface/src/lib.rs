@@ -12,6 +12,7 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     event::EventKey,
+    indexer::indexer_db_reader::IndexedTransactionSummary,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
         AccumulatorConsistencyProof, SparseMerkleProof, SparseMerkleProofExt,
@@ -297,8 +298,8 @@ pub trait DbReader: Send + Sync {
             next_version: Version,
         ) -> Result<Option<(Version, HashValue)>>;
 
-        /// Returns a transaction that is the `seq_num`-th one associated with the given account. If
-        /// the transaction with given `seq_num` doesn't exist, returns `None`.
+        /// Returns a transaction that is the `sequence_number`-th one associated with the given account. If
+        /// the transaction with given `sequence_number` doesn't exist, returns `None`.
         fn get_account_ordered_transaction(
             &self,
             address: AccountAddress,
@@ -307,7 +308,8 @@ pub trait DbReader: Send + Sync {
             ledger_version: Version,
         ) -> Result<Option<TransactionWithProof>>;
 
-        /// Returns the list of transactions sent by an account with `address` starting
+        /// Returns the list of ordered transactions (transactions that include a sequence number)
+        /// sent by an account with `address` starting
         /// at sequence number `seq_num`. Will return no more than `limit` transactions.
         /// Will ignore transactions with `txn.version > ledger_version`. Optionally
         /// fetch events for each transaction when `fetch_events` is `true`.
@@ -319,6 +321,15 @@ pub trait DbReader: Send + Sync {
             include_events: bool,
             ledger_version: Version,
         ) -> Result<AccountOrderedTransactionsWithProof>;
+
+        fn get_account_all_transaction_summaries(
+            &self,
+            address: AccountAddress,
+            start_version: Option<u64>,
+            end_version: Option<u64>,
+            limit: u64,
+            ledger_version: Version,
+        ) -> Result<Vec<IndexedTransactionSummary>>;
 
         /// Returns proof of new state for a given ledger info with signatures relative to version known
         /// to client

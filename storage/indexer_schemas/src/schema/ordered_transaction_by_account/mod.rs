@@ -11,7 +11,7 @@
 //! | address | seq_num | txn_ver |
 //! ```
 
-use crate::{schema::TRANSACTION_BY_ACCOUNT_CF_NAME, utils::ensure_slice_len_eq};
+use crate::{schema::ORDERED_TRANSACTION_BY_ACCOUNT_CF_NAME, utils::ensure_slice_len_eq};
 use anyhow::Result;
 use aptos_schemadb::{
     define_pub_schema,
@@ -22,16 +22,16 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::{convert::TryFrom, mem::size_of};
 
 define_pub_schema!(
-    TransactionByAccountSchema,
+    OrderedTransactionByAccountSchema,
     Key,
     Version,
-    TRANSACTION_BY_ACCOUNT_CF_NAME
+    ORDERED_TRANSACTION_BY_ACCOUNT_CF_NAME
 );
 
 type SeqNum = u64;
 type Key = (AccountAddress, SeqNum);
 
-impl KeyCodec<TransactionByAccountSchema> for Key {
+impl KeyCodec<OrderedTransactionByAccountSchema> for Key {
     fn encode_key(&self) -> Result<Vec<u8>> {
         let (ref account_address, seq_num) = *self;
 
@@ -51,7 +51,7 @@ impl KeyCodec<TransactionByAccountSchema> for Key {
     }
 }
 
-impl ValueCodec<TransactionByAccountSchema> for Version {
+impl ValueCodec<OrderedTransactionByAccountSchema> for Version {
     fn encode_value(&self) -> Result<Vec<u8>> {
         Ok(self.to_be_bytes().to_vec())
     }
