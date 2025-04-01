@@ -1,10 +1,6 @@
-/// Domain account abstraction using ed25519 hex for signing.
-///
-/// Authentication takes digest, converts to hex (prefixed with 0x, with lowercase letters),
-/// and then expects that to be signed.
-/// authenticator is expected to be signature: vector<u8>
-/// account_identity is raw public_key.
-module aptos_framework::derivable_account_abstraction_ed25519_hex {
+/// Derivable account abstraction that verifies a message signed by
+/// SIWS from a Phantom wallet.
+module aptos_framework::daa_siws_phantom {
     use aptos_framework::auth_data::AbstractionAuthData;
     use aptos_std::ed25519::{
         Self,
