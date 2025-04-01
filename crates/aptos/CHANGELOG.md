@@ -7,6 +7,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 ## [7.1.0]
 - Add CLI outputs and on-disk storage to be stored in AIP-80 format.  Will allow for legacy formats to be taken in as well
 - Changes config output for Address to include leading 0x
+- Add `aptos key extract-public-key` which generates a public key or a proof of possession for the given key.
 
 ## [7.0.0]
 - Compiler v1 is now deprecated. It is now removed from the Aptos CLI.

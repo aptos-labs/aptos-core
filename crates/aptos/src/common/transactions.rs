@@ -5,7 +5,7 @@ use crate::common::{
     local_simulation,
     types::{
         AccountType, CliConfig, CliError, CliTypedResult, ConfigSearchMode, EncodingOptions,
-        ExtractPublicKey, GasOptions, PrivateKeyInputOptions, ProfileOptions, PromptOptions,
+        ExtractEd25519PublicKey, GasOptions, PrivateKeyInputOptions, ProfileOptions, PromptOptions,
         RestOptions, TransactionSummary, ACCEPTED_CLOCK_SKEW_US, US_IN_SECS,
     },
     utils::{get_account_with_state, get_sequence_number},
@@ -105,11 +105,12 @@ impl TxnOptions {
     }
 
     pub fn get_public_key_and_address(&self) -> CliTypedResult<(Ed25519PublicKey, AccountAddress)> {
-        self.private_key_options.extract_public_key_and_address(
-            self.encoding_options.encoding,
-            &self.profile_options,
-            self.sender_account,
-        )
+        self.private_key_options
+            .extract_ed25519_public_key_and_address(
+                self.encoding_options.encoding,
+                &self.profile_options,
+                self.sender_account,
+            )
     }
 
     pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
