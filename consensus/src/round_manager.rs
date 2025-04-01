@@ -1224,7 +1224,7 @@ impl RoundManager {
             });
 
             let order_vote = order_vote_msg.order_vote();
-            debug!(
+            trace!(
                 self.new_log(LogEvent::ReceiveOrderVote)
                     .remote_peer(order_vote.author()),
                 epoch = order_vote.ledger_info().epoch(),
@@ -1394,7 +1394,7 @@ impl RoundManager {
                 is_timeout = vote.is_timeout(),
             );
         } else {
-            debug!(
+            trace!(
                 self.new_log(LogEvent::ReceiveVote)
                     .remote_peer(vote.author()),
                 epoch = vote.vote_data().proposed().epoch(),

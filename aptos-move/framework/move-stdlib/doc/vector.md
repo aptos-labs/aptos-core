@@ -1827,7 +1827,7 @@ when used in the context of destroying a vector.
 
     <b>let</b> vec = <a href="vector.md#0x1_vector">vector</a>[];
     <b>while</b> (start &lt; end) {
-        vec.<a href="vector.md#0x1_vector_push_back">push_back</a>(*self.<a href="vector.md#0x1_vector_borrow">borrow</a>(start));
+        vec.<a href="vector.md#0x1_vector_push_back">push_back</a>(self[start]);
         start += 1;
     };
     vec
