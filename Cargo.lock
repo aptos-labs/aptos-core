@@ -290,7 +290,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "7.0.0"
+version = "7.1.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -1625,6 +1625,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-experimental-bulk-txn-submit"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-logger",
+ "aptos-sdk",
+ "aptos-transaction-emitter-lib",
+ "aptos-transaction-generator-lib",
+ "bcs 0.1.4",
+ "chrono",
+ "clap 4.5.21",
+ "futures",
+ "rand 0.7.3",
+ "reqwest 0.11.23",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-experimental-hexy"
 version = "0.1.0"
 dependencies = [
@@ -1945,21 +1966,6 @@ dependencies = [
  "tempfile",
  "tiny-keccak",
  "toml 0.7.8",
-]
-
-[[package]]
-name = "aptos-framework-experimental"
-version = "0.1.0"
-dependencies = [
- "aptos-framework",
- "aptos-gas-schedule",
- "aptos-types",
- "aptos-vm",
- "move-cli",
- "move-package",
- "move-unit-test",
- "move-vm-runtime",
- "tempfile",
 ]
 
 [[package]]

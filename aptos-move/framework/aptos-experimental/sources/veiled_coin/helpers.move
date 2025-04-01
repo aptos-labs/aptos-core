@@ -1,4 +1,4 @@
-module framework_experimental::helpers {
+module aptos_experimental::helpers {
     use std::vector;
     use std::error;
 
@@ -15,10 +15,10 @@ module framework_experimental::helpers {
         let res = vector::empty();
         assert!(len >= cut_len, error::out_of_range(EVECTOR_CUT_TOO_LARGE));
         while (cut_len > 0) {
-            vector::push_back(&mut res, vector::pop_back(vec));
-            cut_len = cut_len - 1;
+            res.push_back(vector::pop_back(vec));
+            cut_len -= 1;
         };
-        vector::reverse(&mut res);
+        res.reverse();
         res
     }
 
