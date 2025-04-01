@@ -17,9 +17,13 @@ module aptos_framework::derivable_account_abstraction_ed25519_hex {
     use std::transaction_context::{Self, EntryFunctionPayload};
     use std::vector;
 
+    /// Signature failed to verify.
     const EINVALID_SIGNATURE: u64 = 1;
+    /// Non base58 character found in public key.
     const EINVALID_BASE_58_PUBLIC_KEY: u64 = 2;
+    /// Unsupported chain id.
     const EUNSUPPORTED_CHAIN_ID: u64 = 3;
+    /// Entry function payload is missing.
     const EMISSING_ENTRY_FUNCTION_PAYLOAD: u64 = 4;
 
     const BASE_58_ALPHABET: vector<u8> = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
