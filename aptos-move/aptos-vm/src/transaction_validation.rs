@@ -4,7 +4,7 @@
 use crate::{
     aptos_vm::SerializedSigners,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
-    move_vm_ext::SessionExt,
+    move_vm_ext::{AptosMoveResolver, SessionExt},
     system_module_names::{
         EMIT_FEE_STATEMENT, MULTISIG_ACCOUNT_MODULE, TRANSACTION_FEE_MODULE,
         VALIDATE_MULTISIG_TRANSACTION,
@@ -92,7 +92,7 @@ impl TransactionValidation {
 }
 
 pub(crate) fn run_script_prologue(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     serialized_signers: &SerializedSigners,
     txn_data: &TransactionMetadata,
@@ -345,7 +345,7 @@ pub(crate) fn run_script_prologue(
 /// 3. If only the payload hash was stored on chain, the provided payload in execution should
 /// match that hash.
 pub(crate) fn run_multisig_prologue(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     txn_data: &TransactionMetadata,
     payload: &Multisig,
@@ -385,7 +385,7 @@ pub(crate) fn run_multisig_prologue(
 }
 
 fn run_epilogue(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     serialized_signers: &SerializedSigners,
     gas_remaining: Gas,
@@ -508,7 +508,6 @@ fn run_epilogue(
             )
         }
     }
-    .map(|_return_vals| ())
     .map_err(expect_no_verification_errors)?;
 
     // Emit the FeeStatement event
@@ -522,28 +521,27 @@ fn run_epilogue(
 }
 
 fn emit_fee_statement(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     fee_statement: FeeStatement,
     traversal_context: &mut TraversalContext,
 ) -> VMResult<()> {
-    session
-        .execute_function_bypass_visibility(
-            &TRANSACTION_FEE_MODULE,
-            EMIT_FEE_STATEMENT,
-            vec![],
-            vec![bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")],
-            &mut UnmeteredGasMeter,
-            traversal_context,
-            module_storage,
-        )
-        .map(|_return_vals| ())
+    session.execute_function_bypass_visibility(
+        &TRANSACTION_FEE_MODULE,
+        EMIT_FEE_STATEMENT,
+        vec![],
+        vec![bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")],
+        &mut UnmeteredGasMeter,
+        traversal_context,
+        module_storage,
+    )?;
+    Ok(())
 }
 
 /// Run the epilogue of a transaction by calling into `EPILOGUE_NAME` function stored
 /// in the `ACCOUNT_MODULE` on chain.
 pub(crate) fn run_success_epilogue(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     serialized_signers: &SerializedSigners,
     gas_remaining: Gas,
@@ -578,7 +576,7 @@ pub(crate) fn run_success_epilogue(
 /// Run the failure epilogue of a transaction by calling into `USER_EPILOGUE_NAME` function
 /// stored in the `ACCOUNT_MODULE` on chain.
 pub(crate) fn run_failure_epilogue(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     serialized_signers: &SerializedSigners,
     gas_remaining: Gas,
@@ -600,9 +598,9 @@ pub(crate) fn run_failure_epilogue(
         traversal_context,
         is_simulation,
     )
-    .or_else(|e| {
+    .or_else(|err| {
         expect_only_successful_execution(
-            e,
+            err,
             APTOS_TRANSACTION_VALIDATION.user_epilogue_name.as_str(),
             log_context,
         )

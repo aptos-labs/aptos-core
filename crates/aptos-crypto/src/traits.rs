@@ -62,11 +62,14 @@ pub trait ValidCryptoMaterial:
     // The for<'a> exactly matches the assumption "deserializable from any lifetime".
     for<'a> TryFrom<&'a [u8], Error=CryptoMaterialError> + Serialize + DeserializeOwned
 {
+    /// Prefix for AIP-80 e.g. ed25519-priv
+    const AIP_80_PREFIX: &'static str;
+
     /// Convert the valid crypto material to bytes.
     fn to_bytes(&self) -> Vec<u8>;
 }
 
-/// An extension to to/from Strings for [`ValidCryptoMaterial`].
+/// An extension to/from Strings for [`ValidCryptoMaterial`].
 ///
 /// Relies on [`hex`] for string encoding / decoding.
 /// No required fields, provides a default implementation.
@@ -74,10 +77,14 @@ pub trait ValidCryptoMaterialStringExt: ValidCryptoMaterial {
     /// When trying to convert from bytes, we simply decode the string into
     /// bytes before checking if we can convert.
     fn from_encoded_string(encoded_str: &str) -> std::result::Result<Self, CryptoMaterialError> {
-        // Strip 0x at beginning if there is one
-        let encoded_str = encoded_str.strip_prefix("0x").unwrap_or(encoded_str);
+        let mut str = encoded_str;
+        // First strip the AIP-80 prefix
+        str = str.strip_prefix(Self::AIP_80_PREFIX).unwrap_or(str);
 
-        let bytes_out = ::hex::decode(encoded_str);
+        // Strip 0x at beginning if there is one
+        str = str.strip_prefix("0x").unwrap_or(str);
+
+        let bytes_out = ::hex::decode(str);
         // We defer to `try_from` to make sure we only produce valid crypto materials.
         bytes_out
             // We reinterpret a failure to serialize: key is mangled someway.
@@ -88,6 +95,12 @@ pub trait ValidCryptoMaterialStringExt: ValidCryptoMaterial {
     /// A function to encode into hex-string after serializing.
     fn to_encoded_string(&self) -> Result<String> {
         Ok(format!("0x{}", ::hex::encode(self.to_bytes())))
+    }
+
+    /// Creates an AIP-80 formatted string for the crypto material
+    fn to_aip_80_string(&self) -> Result<String> {
+        let bytes = self.to_encoded_string()?;
+        Ok(format!("{}{}", Self::AIP_80_PREFIX, bytes))
     }
 }
 

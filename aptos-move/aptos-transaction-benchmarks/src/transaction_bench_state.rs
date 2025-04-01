@@ -8,11 +8,10 @@ use aptos_block_partitioner::{
     v2::config::PartitionerV2Config, BlockPartitioner, PartitionerConfig,
 };
 use aptos_crypto::HashValue;
-use aptos_language_e2e_tests::{
-    account_universe::{AUTransactionGen, AccountPickStyle, AccountUniverse, AccountUniverseGen},
-    data_store::FakeDataStore,
-    executor::FakeExecutor,
+use aptos_language_e2e_tests::account_universe::{
+    AUTransactionGen, AccountPickStyle, AccountUniverse, AccountUniverseGen,
 };
+use aptos_transaction_simulation::InMemoryStateStore;
 use aptos_types::{
     block_executor::{
         config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain},
@@ -31,7 +30,6 @@ use aptos_types::{
 };
 use aptos_vm::{
     aptos_vm::AptosVMBlockExecutor,
-    data_cache::AsMoveResolver,
     sharded_block_executor::{
         local_executor_shard::{LocalExecutorClient, LocalExecutorService},
         ShardedBlockExecutor,
@@ -45,11 +43,12 @@ pub struct TransactionBenchState<S> {
     num_transactions: usize,
     strategy: S,
     account_universe: AccountUniverse,
-    sharded_block_executor:
-        Option<Arc<ShardedBlockExecutor<FakeDataStore, LocalExecutorClient<FakeDataStore>>>>,
+    sharded_block_executor: Option<
+        Arc<ShardedBlockExecutor<InMemoryStateStore, LocalExecutorClient<InMemoryStateStore>>>,
+    >,
     block_partitioner: Option<Box<dyn BlockPartitioner>>,
     validator_set: ValidatorSet,
-    state_view: Arc<FakeDataStore>,
+    state_view: Arc<InMemoryStateStore>,
 }
 
 impl<S> TransactionBenchState<S>
@@ -91,13 +90,13 @@ where
             .expect("creating a new value should succeed")
             .current();
 
-        let mut executor = FakeExecutor::from_head_genesis();
+        let state_store = InMemoryStateStore::from_head_genesis();
         // Run in gas-cost-stability mode for now -- this ensures that new accounts are ignored.
         // XXX We may want to include new accounts in case they have interesting performance
         // characteristics.
-        let universe = universe_gen.setup_gas_cost_stability(&mut executor);
+        let universe = universe_gen.setup_gas_cost_stability(&state_store);
 
-        let state_view = Arc::new(executor.get_state_view().clone());
+        let state_view = Arc::new(state_store.clone());
         let (parallel_block_executor, block_partitioner) = if num_executor_shards == 1 {
             (None, None)
         } else {
@@ -116,12 +115,8 @@ where
             )
         };
 
-        let validator_set = ValidatorSet::fetch_config(
-            &FakeExecutor::from_head_genesis()
-                .get_state_view()
-                .as_move_resolver(),
-        )
-        .expect("Unable to retrieve the validator set from storage");
+        let validator_set = ValidatorSet::fetch_config(&InMemoryStateStore::from_head_genesis())
+            .expect("Unable to retrieve the validator set from storage");
 
         Self {
             num_transactions,

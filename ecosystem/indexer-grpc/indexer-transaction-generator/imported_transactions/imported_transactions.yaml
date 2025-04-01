@@ -113,6 +113,7 @@ mainnet:
 
     # events processor
     554229017: 554229017_events_with_no_event_size_info
+    2448304257: 2448304257_coinstore_deletion_event
 
     # Fungible asset migration
     1680592683: 1680592683_fa_migration_coin_info

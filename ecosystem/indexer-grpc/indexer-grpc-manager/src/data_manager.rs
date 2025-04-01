@@ -255,7 +255,7 @@ impl DataManager {
                 if self.lagging(cache_next_version) {
                     debug!("GrpcManager is lagging, getting data from FN, requested_version: {start_version}, cache_next_version: {cache_next_version}.");
                     let request = GetTransactionsFromNodeRequest {
-                        starting_version: Some(cache_next_version),
+                        starting_version: Some(start_version),
                         transactions_count: Some(5000),
                     };
 

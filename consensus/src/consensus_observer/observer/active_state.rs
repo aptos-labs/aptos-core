@@ -352,14 +352,15 @@ fn handle_committed_blocks(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::consensus_observer::network::observer_message::{
-        BlockPayload, BlockTransactionPayload, OrderedBlock,
+    use crate::consensus_observer::{
+        network::observer_message::{BlockPayload, BlockTransactionPayload, OrderedBlock},
+        observer::execution_pool::ObservedOrderedBlock,
     };
     use aptos_channels::{aptos_channel, message_queues::QueueStyle};
     use aptos_consensus_types::{
         block::Block,
         block_data::{BlockData, BlockType},
-        pipelined_block::PipelinedBlock,
+        pipelined_block::{OrderedBlockWindow, PipelinedBlock},
         quorum_cert::QuorumCert,
     };
     use aptos_crypto::HashValue;
@@ -564,7 +565,10 @@ mod test {
                 BlockType::Genesis,
             );
             let block = Block::new_for_testing(block_info.id(), block_data, None);
-            let pipelined_block = Arc::new(PipelinedBlock::new_ordered(block));
+            let pipelined_block = Arc::new(PipelinedBlock::new_ordered(
+                block,
+                OrderedBlockWindow::empty(),
+            ));
 
             // Create an ordered block
             let blocks = vec![pipelined_block];
@@ -572,10 +576,14 @@ mod test {
                 create_ledger_info(epoch, i as aptos_consensus_types::common::Round);
             let ordered_block = OrderedBlock::new(blocks, ordered_proof);
 
+            // Create an observed ordered block
+            let observed_ordered_block =
+                ObservedOrderedBlock::new_for_testing(ordered_block.clone());
+
             // Insert the block into the ordered block store
             ordered_block_store
                 .lock()
-                .insert_ordered_block(ordered_block.clone());
+                .insert_ordered_block(observed_ordered_block.clone());
 
             // Add the block to the ordered blocks
             ordered_blocks.push(ordered_block);
@@ -622,7 +630,10 @@ mod test {
             BlockType::Genesis,
         );
         let block = Block::new_for_testing(block_info.id(), block_data, None);
-        Arc::new(PipelinedBlock::new_ordered(block))
+        Arc::new(PipelinedBlock::new_ordered(
+            block,
+            OrderedBlockWindow::empty(),
+        ))
     }
 
     /// Creates and returns a reconfig notifier and listener

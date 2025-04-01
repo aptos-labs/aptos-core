@@ -6,7 +6,11 @@
 //! TODO: we should not only validate the types but also the actual values, e.g.
 //! for strings whether they consist of correct characters.
 
-use crate::{aptos_vm::SerializedSigners, move_vm_ext::SessionExt, VMStatus};
+use crate::{
+    aptos_vm::SerializedSigners,
+    move_vm_ext::{AptosMoveResolver, SessionExt},
+    VMStatus,
+};
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use move_binary_format::{
     errors::{Location, PartialVMError},
@@ -103,7 +107,7 @@ pub(crate) fn get_allowed_structs(
 ///
 /// after validation, add senders and non-signer arguments to generate the final args
 pub(crate) fn validate_combine_signer_and_txn_args(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     serialized_signers: &SerializedSigners,
     args: Vec<Vec<u8>>,
@@ -140,7 +144,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     for ty in func.param_tys()[signer_param_cnt..].iter() {
         let subst_res = ty_builder.create_ty_with_subst(ty, func.ty_args());
         let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-        let valid = is_valid_txn_arg(session, module_storage, &ty, allowed_structs);
+        let valid = is_valid_txn_arg(module_storage, &ty, allowed_structs);
         if !valid {
             return Err(VMStatus::error(
                 StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
@@ -195,7 +199,6 @@ pub(crate) fn validate_combine_signer_and_txn_args(
 /// references) returns false. An error is returned in cases when a struct type is encountered and
 /// its name cannot be queried for some reason.
 pub(crate) fn is_valid_txn_arg(
-    session: &SessionExt,
     module_storage: &impl AptosModuleStorage,
     ty: &Type,
     allowed_structs: &ConstructorMap,
@@ -204,12 +207,13 @@ pub(crate) fn is_valid_txn_arg(
 
     match ty {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
-        Vector(inner) => is_valid_txn_arg(session, module_storage, inner, allowed_structs),
+        Vector(inner) => is_valid_txn_arg(module_storage, inner, allowed_structs),
         Struct { .. } | StructInstantiation { .. } => {
             // Note: Original behavior was to return false even if the module loading fails (e.g.,
             //       if struct does not exist. This preserves it.
-            session
-                .get_struct_name(ty, module_storage)
+            module_storage
+                .runtime_environment()
+                .get_struct_name(ty)
                 .ok()
                 .flatten()
                 .is_some_and(|(module_id, identifier)| {
@@ -228,7 +232,7 @@ pub(crate) fn is_valid_txn_arg(
 // construct arguments that require so.
 // TODO: This needs a more solid story and a tighter integration with the VM.
 pub(crate) fn construct_args(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     types: &[Type],
     args: Vec<Vec<u8>>,
@@ -266,7 +270,7 @@ fn invalid_signature() -> VMStatus {
 }
 
 fn construct_arg(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     ty: &Type,
     allowed_structs: &ConstructorMap,
@@ -322,7 +326,7 @@ fn construct_arg(
 // are parsing the BCS serialized implicit constructor invocation tree, while serializing the
 // constructed types into the output parameter arg.
 pub(crate) fn recursively_construct_arg(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     ty: &Type,
     allowed_structs: &ConstructorMap,
@@ -355,8 +359,9 @@ pub(crate) fn recursively_construct_arg(
             }
         },
         Struct { .. } | StructInstantiation { .. } => {
-            let (module_id, identifier) = session
-                .get_struct_name(ty, module_storage)
+            let (module_id, identifier) = module_storage
+                .runtime_environment()
+                .get_struct_name(ty)
                 .map_err(|_| {
                     // Note: The original behaviour was to map all errors to an invalid signature
                     //       error, here we want to preserve it for now.
@@ -399,7 +404,7 @@ pub(crate) fn recursively_construct_arg(
 // said struct as a parameter. In this function we execute the constructor constructing the
 // value and returning the BCS serialized representation.
 fn validate_and_construct(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     expected_type: &Type,
     constructor: &FunctionId,

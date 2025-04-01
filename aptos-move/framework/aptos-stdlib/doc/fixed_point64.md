@@ -181,8 +181,8 @@ Returns self - y. self must be not less than y.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_sub">sub</a>(self: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>, y: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a> {
-    <b>let</b> x_raw = <a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">get_raw_value</a>(self);
-    <b>let</b> y_raw = <a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">get_raw_value</a>(y);
+    <b>let</b> x_raw = self.<a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">get_raw_value</a>();
+    <b>let</b> y_raw = y.<a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">get_raw_value</a>();
     <b>assert</b>!(x_raw &gt;= y_raw, <a href="fixed_point64.md#0x1_fixed_point64_ENEGATIVE_RESULT">ENEGATIVE_RESULT</a>);
     <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">create_from_raw_value</a>(x_raw - y_raw)
 }
@@ -209,8 +209,8 @@ Returns self + y. The result cannot be greater than MAX_U128.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_add">add</a>(self: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>, y: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a> {
-    <b>let</b> x_raw = <a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">get_raw_value</a>(self);
-    <b>let</b> y_raw = <a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">get_raw_value</a>(y);
+    <b>let</b> x_raw = self.<a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">get_raw_value</a>();
+    <b>let</b> y_raw = y.<a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">get_raw_value</a>();
     <b>let</b> result = (x_raw <b>as</b> u256) + (y_raw <b>as</b> u256);
     <b>assert</b>!(result &lt;= <a href="fixed_point64.md#0x1_fixed_point64_MAX_U128">MAX_U128</a>, <a href="fixed_point64.md#0x1_fixed_point64_ERATIO_OUT_OF_RANGE">ERATIO_OUT_OF_RANGE</a>);
     <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">create_from_raw_value</a>((result <b>as</b> u128))
@@ -696,7 +696,7 @@ Rounds up the given FixedPoint64 to the next largest integer.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_ceil">ceil</a>(self: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): u128 {
-    <b>let</b> floored_num = <a href="fixed_point64.md#0x1_fixed_point64_floor">floor</a>(self) &lt;&lt; 64;
+    <b>let</b> floored_num = self.<a href="fixed_point64.md#0x1_fixed_point64_floor">floor</a>() &lt;&lt; 64;
     <b>if</b> (self.value == floored_num) {
         <b>return</b> floored_num &gt;&gt; 64
     };
@@ -726,12 +726,12 @@ Returns the value of a FixedPoint64 to the nearest integer.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_round">round</a>(self: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): u128 {
-    <b>let</b> floored_num = <a href="fixed_point64.md#0x1_fixed_point64_floor">floor</a>(self) &lt;&lt; 64;
+    <b>let</b> floored_num = self.<a href="fixed_point64.md#0x1_fixed_point64_floor">floor</a>() &lt;&lt; 64;
     <b>let</b> boundary = floored_num + ((1 &lt;&lt; 64) / 2);
     <b>if</b> (self.value &lt; boundary) {
         floored_num &gt;&gt; 64
     } <b>else</b> {
-        <a href="fixed_point64.md#0x1_fixed_point64_ceil">ceil</a>(self)
+        self.<a href="fixed_point64.md#0x1_fixed_point64_ceil">ceil</a>()
     }
 }
 </code></pre>
