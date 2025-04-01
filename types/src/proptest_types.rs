@@ -23,12 +23,12 @@ use crate::{
     proof::TransactionInfoListWithProof,
     state_store::state_key::StateKey,
     transaction::{
-        block_epilogue::BlockEndInfo, ChangeSet, EntryFunction, ExecutionStatus, Module, Multisig,
-        MultisigTransactionPayload, RawTransaction, ReplayProtector, Script,
-        SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
-        TransactionAuxiliaryData, TransactionExecutable, TransactionExtraConfig, TransactionInfo,
-        TransactionListWithProof, TransactionPayload, TransactionPayloadInner, TransactionStatus,
-        TransactionToCommit, Version, WriteSetPayload,
+        block_epilogue::BlockEndInfo, ChangeSet, EntryFunction, ExecutionStatus,
+        IndexedTransactionSummary, Module, Multisig, MultisigTransactionPayload, RawTransaction,
+        ReplayProtector, Script, SignatureCheckedTransaction, SignedTransaction, Transaction,
+        TransactionArgument, TransactionAuxiliaryData, TransactionExecutable,
+        TransactionExtraConfig, TransactionInfo, TransactionListWithProof, TransactionPayload,
+        TransactionPayloadInner, TransactionStatus, TransactionToCommit, Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -62,6 +62,29 @@ use std::{
     iter::Iterator,
     sync::Arc,
 };
+
+impl Arbitrary for IndexedTransactionSummary {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        (
+            any::<AccountAddress>(),
+            any::<ReplayProtector>(),
+            any::<Version>(),
+            any::<HashValue>(),
+        )
+            .prop_map(|(sender, replay_protector, version, transaction_hash)| {
+                IndexedTransactionSummary::V1 {
+                    sender,
+                    replay_protector,
+                    version,
+                    transaction_hash,
+                }
+            })
+            .boxed()
+    }
+}
 
 impl WriteOp {
     pub fn value_strategy() -> impl Strategy<Value = Self> {
