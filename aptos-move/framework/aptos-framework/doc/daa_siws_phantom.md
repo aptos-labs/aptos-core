@@ -69,17 +69,7 @@ Signature failed to verify.
 Entry function payload is missing.
 
 
-<pre><code><b>const</b> <a href="daa_siws_phantom.md#0x1_daa_siws_phantom_EMISSING_ENTRY_FUNCTION_PAYLOAD">EMISSING_ENTRY_FUNCTION_PAYLOAD</a>: u64 = 4;
-</code></pre>
-
-
-
-<a id="0x1_daa_siws_phantom_EUNSUPPORTED_CHAIN_ID"></a>
-
-Unsupported chain id.
-
-
-<pre><code><b>const</b> <a href="daa_siws_phantom.md#0x1_daa_siws_phantom_EUNSUPPORTED_CHAIN_ID">EUNSUPPORTED_CHAIN_ID</a>: u64 = 3;
+<pre><code><b>const</b> <a href="daa_siws_phantom.md#0x1_daa_siws_phantom_EMISSING_ENTRY_FUNCTION_PAYLOAD">EMISSING_ENTRY_FUNCTION_PAYLOAD</a>: u64 = 3;
 </code></pre>
 
 
@@ -126,7 +116,7 @@ Unsupported chain id.
 
 
 
-<pre><code><b>fun</b> <a href="daa_siws_phantom.md#0x1_daa_siws_phantom_network_name">network_name</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>fun</b> <a href="daa_siws_phantom.md#0x1_daa_siws_phantom_network_name">network_name</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
 </code></pre>
 
 
@@ -135,18 +125,16 @@ Unsupported chain id.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="daa_siws_phantom.md#0x1_daa_siws_phantom_network_name">network_name</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+<pre><code><b>fun</b> <a href="daa_siws_phantom.md#0x1_daa_siws_phantom_network_name">network_name</a>(): Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt; {
     <b>let</b> <a href="chain_id.md#0x1_chain_id">chain_id</a> = <a href="chain_id.md#0x1_chain_id_get">chain_id::get</a>();
     <b>if</b> (<a href="chain_id.md#0x1_chain_id">chain_id</a> == 1) {
-        b"mainnet"
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(b"mainnet")
     } <b>else</b> <b>if</b> (<a href="chain_id.md#0x1_chain_id">chain_id</a> == 2) {
-        b"testnet"
-    } <b>else</b> <b>if</b> (<a href="chain_id.md#0x1_chain_id">chain_id</a> == 3) {
-        b"devnet"
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(b"testnet")
     } <b>else</b> <b>if</b> (<a href="chain_id.md#0x1_chain_id">chain_id</a> == 4) {
-        b"<b>local</b>"
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(b"<b>local</b>")
     } <b>else</b> {
-        <b>abort</b>(<a href="daa_siws_phantom.md#0x1_daa_siws_phantom_EUNSUPPORTED_CHAIN_ID">EUNSUPPORTED_CHAIN_ID</a>)
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     }
 }
 </code></pre>
@@ -182,9 +170,14 @@ Unsupported chain id.
     message.append(*base58_public_key);
     message.append(b"\n\nTo execute transaction ");
     message.append(*entry_function_name);
-    message.append(b" on Aptos blockchain (");
-    message.append(<a href="daa_siws_phantom.md#0x1_daa_siws_phantom_network_name">network_name</a>());
-    message.append(b").");
+    message.append(b" on Aptos blockchain");
+    <b>let</b> maybe_network_name = <a href="daa_siws_phantom.md#0x1_daa_siws_phantom_network_name">network_name</a>();
+    <b>if</b> (maybe_network_name.is_some()) {
+        message.append(b" (");
+        message.append(maybe_network_name.destroy_some());
+        message.append(b")");
+    };
+    message.append(b".");
     message.append(b"\n\nNonce: ");
     message.append(*digest_utf8);
     *message
