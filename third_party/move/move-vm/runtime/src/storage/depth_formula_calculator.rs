@@ -6,13 +6,14 @@ use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::TypeParameterIndex,
 };
-use move_core_types::vm_status::StatusCode;
+use move_core_types::{gas_algebra::NumBytes, vm_status::StatusCode};
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::{
         runtime_types::{DepthFormula, StructLayout, Type},
         struct_name_indexing::StructNameIndex,
     },
+    module_linker_error,
 };
 use std::collections::{BTreeMap, HashMap};
 
@@ -43,9 +44,44 @@ where
             return Ok(depth_formula.clone());
         }
 
-        let struct_type = self
+        let struct_name = self
             .module_storage
-            .fetch_struct_ty_by_idx(struct_name_idx)?;
+            .runtime_environment()
+            .struct_name_index_map()
+            .idx_to_struct_name_ref(*struct_name_idx)?;
+
+        if self
+            .module_storage
+            .runtime_environment()
+            .vm_config()
+            .use_lazy_loading
+        {
+            let id = traversal_context
+                .referenced_module_ids
+                .alloc(struct_name.module.clone());
+            let addr = id.address();
+            let name = id.name();
+
+            if !addr.is_special() && traversal_context.visited.insert((addr, name), ()).is_none() {
+                let size = self
+                    .module_storage
+                    .fetch_module_size_in_bytes(addr, name)
+                    .map_err(|err| err.to_partial())?
+                    .ok_or_else(|| module_linker_error!(addr, name).to_partial())?;
+                gas_meter.charge_dependency(
+                    false,
+                    id.address(),
+                    id.name(),
+                    NumBytes::new(size as u64),
+                )?;
+            }
+        }
+        let struct_type = self.module_storage.fetch_struct_ty(
+            struct_name.module.address(),
+            struct_name.module.name(),
+            struct_name.name.as_ident_str(),
+        )?;
+
         let formulas = match &struct_type.layout {
             StructLayout::Single(fields) => fields
                 .iter()
