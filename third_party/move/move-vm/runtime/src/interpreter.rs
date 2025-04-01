@@ -51,6 +51,7 @@ use move_vm_types::{
         runtime_access_specifier::{AccessInstance, AccessSpecifierEnv, AddressSpecifierFunction},
         runtime_types::{AbilityInfo, StructType, Type, TypeBuilder},
     },
+    module_linker_error,
     natives::function::NativeResult,
     resolver::ResourceResolver,
     values::{
@@ -1043,20 +1044,23 @@ impl InterpreterImpl<'_> {
                 .map_err(|err| err.to_partial())
             },
             NativeResult::LoadModule { module_name } => {
-                let arena_id = traversal_context
-                    .referenced_module_ids
-                    .alloc(module_name.clone());
-                check_dependencies_and_charge_gas(
+                // With lazy loading, gas will only be charged when loading a function.
+                if !self.vm_config.use_lazy_loading {
+                    let arena_id = traversal_context
+                        .referenced_module_ids
+                        .alloc(module_name.clone());
+                    check_dependencies_and_charge_gas(
                         module_storage,
                         gas_meter,
                         traversal_context,
                         [(arena_id.address(), arena_id.name())],
                     )
-                    .map_err(|err| err
-                        .to_partial()
-                        .append_message_with_separator('.',
-                            format!("Failed to charge transitive dependency for {}. Does this module exists?", module_name)
-                        ))?;
+                        .map_err(|err| err
+                            .to_partial()
+                            .append_message_with_separator('.',
+                                                           format!("Failed to charge transitive dependency for {}. Does this module exists?", module_name)
+                            ))?;
+                }
 
                 current_frame.pc += 1; // advance past the Call instruction in the caller
                 Ok(())
@@ -3216,7 +3220,7 @@ impl Frame {
 
 macro_rules! build_loaded_function {
     ($function_name:ident, $idx_ty:ty, $get_function_handle:ident) => {
-        pub(crate) fn $function_name(
+        fn $function_name(
             &self,
             module_storage: &impl ModuleStorage,
             gas_meter: &mut impl GasMeter,
@@ -3282,15 +3286,40 @@ impl Frame {
         function_instantiation_handle_at
     );
 
-    pub(crate) fn build_loaded_function_from_name_and_ty_args(
+    fn build_loaded_function_from_name_and_ty_args(
         &self,
         module_storage: &impl ModuleStorage,
-        _gas_meter: &mut impl GasMeter,
-        _traversal_context: &mut TraversalContext,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         module_id: &ModuleId,
         function_name: &IdentStr,
         verified_ty_args: Vec<Type>,
     ) -> PartialVMResult<LoadedFunction> {
+        if module_storage
+            .runtime_environment()
+            .vm_config()
+            .use_lazy_loading
+        {
+            let id = traversal_context
+                .referenced_module_ids
+                .alloc(module_id.clone());
+            let addr = id.address();
+            let name = id.name();
+
+            if !addr.is_special() && traversal_context.visited.insert((addr, name), ()).is_none() {
+                let size = module_storage
+                    .fetch_module_size_in_bytes(addr, name)
+                    .map_err(|err| err.to_partial())?
+                    .ok_or_else(|| module_linker_error!(addr, name).to_partial())?;
+                gas_meter.charge_dependency(
+                    false,
+                    id.address(),
+                    id.name(),
+                    NumBytes::new(size as u64),
+                )?;
+            }
+        }
+
         let (module, function) = module_storage
             .fetch_function_definition(module_id.address(), module_id.name(), function_name)
             .map_err(|_| {

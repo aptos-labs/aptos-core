@@ -14,7 +14,7 @@ use better_any::{Tid, TidAble, TidExt};
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
-    errors::{PartialVMError, PartialVMResult},
+    errors::{Location, PartialVMError, PartialVMResult},
     file_format::{
         Bytecode, CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility,
     },
@@ -22,6 +22,7 @@ use move_binary_format::{
 use move_core_types::{
     ability::{Ability, AbilitySet},
     function::ClosureMask,
+    gas_algebra::NumBytes,
     identifier::{IdentStr, Identifier},
     language_storage,
     language_storage::{ModuleId, TypeTag},
@@ -34,6 +35,7 @@ use move_vm_types::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
     },
+    module_linker_error,
     values::{AbstractFunction, SerializedFunctionData},
 };
 use std::{cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc, sync::Arc};
@@ -170,38 +172,42 @@ impl LazyLoadedFunction {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
     ) -> PartialVMResult<(Rc<LoadedFunction>, ModuleId)> {
-        // Step 1: charge gas.
         let module_id = self.with_name_and_ty_args(|module_opt, _func_name, ty_arg_tags| {
-            let Some(module_id) = module_opt else {
+            let module_id = module_opt.ok_or_else(|| {
                 // TODO(#15664): currently we need the module id for gas charging
                 //   of calls, so we can't proceed here without one. But we want
                 //   to be able to let scripts use closures.
-                let err = PartialVMError::new_invariant_violation(format!(
+                PartialVMError::new_invariant_violation(format!(
                     "module id required to charge gas for function `{}`",
                     self.to_stable_string()
-                ));
-                return Err(err);
-            };
+                ))
+            })?;
 
-            // Charge gas for function code loading.
-            let arena_id = traversal_context
-                .referenced_module_ids
-                .alloc(module_id.clone());
-            check_dependencies_and_charge_gas(module_storage, gas_meter, traversal_context, [(
-                arena_id.address(),
-                arena_id.name(),
-            )])
-            .map_err(|err| err.to_partial())?;
+            // Step 1: charge gas (only if non-lazy loading is used). For lazy loading, we will be
+            // charging gas at load time.
+            if !module_storage
+                .runtime_environment()
+                .vm_config()
+                .use_lazy_loading
+            {
+                // Charge gas for function code loading.
+                let arena_id = traversal_context
+                    .referenced_module_ids
+                    .alloc(module_id.clone());
+                check_dependencies_and_charge_gas(module_storage, gas_meter, traversal_context, [
+                    (arena_id.address(), arena_id.name()),
+                ])
+                .map_err(|err| err.to_partial())?;
 
-            // Charge gas for code loading of modules used by type arguments.
-            check_type_tag_dependencies_and_charge_gas(
-                module_storage,
-                gas_meter,
-                traversal_context,
-                ty_arg_tags,
-            )
-            .map_err(|err| err.to_partial())?;
-
+                // Charge gas for code loading of modules used by type arguments.
+                check_type_tag_dependencies_and_charge_gas(
+                    module_storage,
+                    gas_meter,
+                    traversal_context,
+                    ty_arg_tags,
+                )
+                .map_err(|err| err.to_partial())?;
+            }
             Ok(module_id.clone())
         })?;
 
@@ -245,17 +251,93 @@ impl LazyLoadedFunction {
     /// function as well as whether it has the type used for deserializing the captured values.
     fn resolve<RTCheck: RuntimeTypeCheck>(
         module_storage: &impl ModuleStorage,
-        _gas_meter: &mut impl GasMeter,
-        _traversal_context: &mut TraversalContext,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         module_id: &ModuleId,
         fun_id: &IdentStr,
         ty_args: &[TypeTag],
         mask: ClosureMask,
         captured_layouts: &[MoveTypeLayout],
     ) -> PartialVMResult<Rc<LoadedFunction>> {
-        let function = module_storage
-            .load_function(module_id, fun_id, ty_args)
-            .map_err(|err| err.to_partial())?;
+        let function = if module_storage
+            .runtime_environment()
+            .vm_config()
+            .use_lazy_loading
+        {
+            let id = traversal_context
+                .referenced_module_ids
+                .alloc(module_id.clone());
+            let addr = id.address();
+            let name = id.name();
+
+            if !addr.is_special() && traversal_context.visited.insert((addr, name), ()).is_none() {
+                let size = module_storage
+                    .fetch_module_size_in_bytes(addr, name)
+                    .map_err(|err| err.to_partial())?
+                    .ok_or_else(|| module_linker_error!(addr, name).to_partial())?;
+                gas_meter.charge_dependency(
+                    false,
+                    id.address(),
+                    id.name(),
+                    NumBytes::new(size as u64),
+                )?;
+            }
+
+            let (module, function) = module_storage
+                .fetch_function_definition(module_id.address(), module_id.name(), fun_id)
+                .map_err(|err| err.to_partial())?;
+
+            let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
+            let ty_args = ty_args
+                .iter()
+                .map(|ty_arg| {
+                    ty_builder
+                        .create_ty(ty_arg, |st| {
+                            let id = traversal_context
+                                .referenced_module_ids
+                                .alloc(st.module_id());
+                            let addr = id.address();
+                            let name = id.name();
+
+                            if !addr.is_special()
+                                && traversal_context.visited.insert((addr, name), ()).is_none()
+                            {
+                                let size = module_storage
+                                    .fetch_module_size_in_bytes(addr, name)?
+                                    .ok_or_else(|| module_linker_error!(addr, name))?;
+                                gas_meter
+                                    .charge_dependency(
+                                        false,
+                                        id.address(),
+                                        id.name(),
+                                        NumBytes::new(size as u64),
+                                    )
+                                    .map_err(|err| err.finish(Location::Undefined))?;
+                            }
+
+                            module_storage
+                                .fetch_struct_ty(
+                                    &st.address,
+                                    st.module.as_ident_str(),
+                                    st.name.as_ident_str(),
+                                )
+                                .map_err(|err| err.finish(Location::Undefined))
+                        })
+                        .map_err(|err| err.to_partial())
+                })
+                .collect::<PartialVMResult<Vec<_>>>()?;
+
+            Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)?;
+            LoadedFunction {
+                owner: LoadedFunctionOwner::Module(module),
+                ty_args,
+                function,
+            }
+        } else {
+            module_storage
+                .load_function(module_id, fun_id, ty_args)
+                .map_err(|err| err.to_partial())?
+        };
 
         // In paranoid mode, we need to verify that the function argument types match the layouts
         // used for deserialization. While this is only done in paranoid mode, gas still need to be
