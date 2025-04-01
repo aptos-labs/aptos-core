@@ -14,7 +14,6 @@
 
 mod account_universe;
 mod create_account;
-mod data_store;
 mod execution_strategies;
 mod genesis;
 mod genesis_initializations;
@@ -24,5 +23,6 @@ mod mint;
 mod on_chain_configs;
 mod peer_to_peer;
 mod scripts;
+mod state_store;
 mod transaction_fuzzer;
 mod verify_txn;

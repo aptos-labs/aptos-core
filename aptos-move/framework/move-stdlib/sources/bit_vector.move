@@ -65,7 +65,7 @@ module std::bit_vector {
     spec schema SetAbortsIf {
         self: BitVector;
         bit_index: u64;
-        aborts_if bit_index >= length(self) with EINDEX;
+        aborts_if bit_index >= self.length() with EINDEX;
     }
 
     /// Unset the bit at `bit_index` in the `self` regardless of its previous state.
@@ -80,7 +80,7 @@ module std::bit_vector {
     spec schema UnsetAbortsIf {
         self: BitVector;
         bit_index: u64;
-        aborts_if bit_index >= length(self) with EINDEX;
+        aborts_if bit_index >= self.length() with EINDEX;
     }
 
     /// Shift the `self` left by `amount`. If `amount` is greater than the
@@ -125,10 +125,10 @@ module std::bit_vector {
     spec schema IsIndexSetAbortsIf {
         self: BitVector;
         bit_index: u64;
-        aborts_if bit_index >= length(self) with EINDEX;
+        aborts_if bit_index >= self.length() with EINDEX;
     }
     spec fun spec_is_index_set(self: BitVector, bit_index: u64): bool {
-        if (bit_index >= length(self)) {
+        if (bit_index >= self.length()) {
             false
         } else {
             self.bit_field[bit_index]
@@ -151,9 +151,9 @@ module std::bit_vector {
         while ({
             spec {
                 invariant index >= start_index;
-                invariant index == start_index || is_index_set(self, index - 1);
+                invariant index == start_index || self.is_index_set(index - 1);
                 invariant index == start_index || index - 1 < len(self.bit_field);
-                invariant forall j in start_index..index: is_index_set(self, j);
+                invariant forall j in start_index..index: self.is_index_set(j);
                 invariant forall j in start_index..index: j < len(self.bit_field);
             };
             index < self.length
@@ -167,7 +167,7 @@ module std::bit_vector {
 
     spec longest_set_sequence_starting_at(self: &BitVector, start_index: u64): u64 {
         aborts_if start_index >= self.length;
-        ensures forall i in start_index..result: is_index_set(self, i);
+        ensures forall i in start_index..result: self.is_index_set(i);
     }
 
     #[test_only]

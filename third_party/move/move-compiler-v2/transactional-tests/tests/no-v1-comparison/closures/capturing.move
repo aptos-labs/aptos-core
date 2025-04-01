@@ -24,8 +24,8 @@ module 0x42::test {
     }
 }
 
-//# run 0x42::test::one_captured --verbose --args 3
+//# run 0x42::test::one_captured --args 3
 
-//# run 0x42::test::two_captured --verbose --args 3 2u8
+//# run 0x42::test::two_captured --args 3 2u8
 
-//# run 0x42::test::struct_captured --verbose --args 3
+//# run 0x42::test::struct_captured --args 3

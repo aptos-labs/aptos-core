@@ -98,15 +98,6 @@ fn test_resource_account_common(pkg: &str) {
 }
 
 #[test]
-fn test_veiled_coin() {
-    let named_address = BTreeMap::from([(
-        String::from("veiled_coin"),
-        AccountAddress::from_hex_literal("0x1").unwrap(),
-    )]);
-    run_tests_for_pkg("veiled_coin", named_address);
-}
-
-#[test]
 fn test_vector_pushback() {
     let named_address = BTreeMap::new();
     run_tests_for_pkg("vector_pushback", named_address);
@@ -161,6 +152,11 @@ fn test_marketplace() {
 #[test]
 fn test_message_board() {
     test_common("message_board");
+}
+
+#[test]
+fn test_dispatching() {
+    test_common("dispatching");
 }
 
 #[test]

@@ -20,10 +20,10 @@ smallvec = { workspace = true }
 aptos-block-executor = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-gas-schedule = { workspace = true }
-aptos-language-e2e-tests = { workspace = true }
 aptos-move-stdlib = { workspace = true }
 aptos-native-interface = { workspace = true }
 aptos-table-natives = { workspace = true }
+aptos-transaction-simulation = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 

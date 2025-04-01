@@ -43,8 +43,13 @@ pub trait TStateView {
     /// Gets the state value for a given state key.
     fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<Option<StateValue>>;
 
-    /// Get state storage usage info at epoch ending.
+    /// Gets state storage usage info at epoch ending.
     fn get_usage(&self) -> StateViewResult<StateStorageUsage>;
+
+    /// Checks if a state keyed by the given state key exists.
+    fn contains_state_value(&self, state_key: &Self::Key) -> StateViewResult<bool> {
+        self.get_state_value(state_key).map(|opt| opt.is_some())
+    }
 }
 
 pub trait StateView: TStateView<Key = StateKey> {}
