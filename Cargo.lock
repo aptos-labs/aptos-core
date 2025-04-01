@@ -290,7 +290,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "7.0.0"
+version = "7.1.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -1622,6 +1622,27 @@ dependencies = [
  "rayon",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "aptos-experimental-bulk-txn-submit"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-logger",
+ "aptos-sdk",
+ "aptos-transaction-emitter-lib",
+ "aptos-transaction-generator-lib",
+ "bcs 0.1.4",
+ "chrono",
+ "clap 4.5.21",
+ "futures",
+ "rand 0.7.3",
+ "reqwest 0.11.23",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

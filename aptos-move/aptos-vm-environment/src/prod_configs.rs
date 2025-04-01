@@ -131,9 +131,6 @@ pub fn aptos_prod_vm_config(
     let use_compatibility_checker_v2 = verifier_config.enable_enum_types
         || features.is_enabled(FeatureFlag::USE_COMPATIBILITY_CHECKER_V2);
 
-    let abort_on_move_to_with_permissioned_signer =
-        features.is_enabled(FeatureFlag::PERMISSIONED_SIGNER);
-
     VMConfig {
         verifier_config,
         deserializer_config,
@@ -151,7 +148,6 @@ pub fn aptos_prod_vm_config(
         use_compatibility_checker_v2,
         use_call_tree_and_instruction_cache: features
             .is_call_tree_and_instruction_vm_cache_enabled(),
-        abort_on_move_to_with_permissioned_signer,
     }
 }
 
