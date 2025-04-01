@@ -1,18 +1,25 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{config::VMConfig, storage::ty_tag_converter::TypeTagConverter, ModuleStorage};
+use crate::{
+    config::VMConfig, module_traversal::TraversalContext,
+    storage::ty_tag_converter::TypeTagConverter, ModuleStorage,
+};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     function::MoveFunctionLayout,
+    gas_algebra::NumBytes,
     language_storage::StructTag,
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
 use move_vm_metrics::{Timer, VM_TIMER};
-use move_vm_types::loaded_data::{
-    runtime_types::{StructLayout, StructType, Type},
-    struct_name_indexing::{StructNameIndex, StructNameIndexMap},
+use move_vm_types::{
+    gas::GasMeter,
+    loaded_data::{
+        runtime_types::{StructLayout, StructType, Type},
+        struct_name_indexing::{StructNameIndex, StructNameIndexMap},
+    },
 };
 use std::sync::Arc;
 
@@ -25,9 +32,9 @@ const VALUE_DEPTH_MAX: u64 = 128;
 
 /// A trait allowing to convert runtime types into other types used throughout the stack.
 #[allow(private_bounds)]
-pub trait LayoutConverter: LayoutConverterBase {
+pub(crate) trait LayoutConverter: LayoutConverterBase {
     /// Converts a runtime type to a type layout.
-    fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+    fn type_to_type_layout(&mut self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
         let _timer = VM_TIMER.timer_with_label("Loader::type_to_type_layout");
 
         let mut count = 0;
@@ -37,7 +44,7 @@ pub trait LayoutConverter: LayoutConverterBase {
 
     /// Converts a runtime type to a type layout.
     fn type_to_type_layout_with_identifier_mappings(
-        &self,
+        &mut self,
         ty: &Type,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         let _timer = VM_TIMER.timer_with_label("Loader::type_to_type_layout");
@@ -48,7 +55,7 @@ pub trait LayoutConverter: LayoutConverterBase {
 
     /// Converts a runtime type to a fully annotated type layout, containing information about
     /// field names.
-    fn type_to_fully_annotated_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+    fn type_to_fully_annotated_layout(&mut self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
         let _timer = VM_TIMER.timer_with_label("Loader::type_to_type_layout");
 
         let mut count = 0;
@@ -60,7 +67,7 @@ pub trait LayoutConverter: LayoutConverterBase {
 // into this crate trait.
 pub(crate) trait LayoutConverterBase {
     fn vm_config(&self) -> &VMConfig;
-    fn fetch_struct_ty_by_idx(&self, idx: StructNameIndex) -> PartialVMResult<Arc<StructType>>;
+    fn fetch_struct_ty_by_idx(&mut self, idx: StructNameIndex) -> PartialVMResult<Arc<StructType>>;
     fn struct_name_index_map(&self) -> &StructNameIndexMap;
 
     /// Required for annotated layout.
@@ -94,7 +101,7 @@ pub(crate) trait LayoutConverterBase {
     }
 
     fn type_to_type_layout_impl(
-        &self,
+        &mut self,
         ty: &Type,
         count: &mut u64,
         depth: u64,
@@ -193,7 +200,7 @@ pub(crate) trait LayoutConverterBase {
     }
 
     fn struct_name_to_type_layout(
-        &self,
+        &mut self,
         struct_name_idx: StructNameIndex,
         ty_args: &[Type],
         count: &mut u64,
@@ -293,7 +300,7 @@ pub(crate) trait LayoutConverterBase {
     // Decorated Layout
 
     fn type_to_fully_annotated_layout_impl(
-        &self,
+        &mut self,
         ty: &Type,
         count: &mut u64,
         depth: u64,
@@ -359,7 +366,7 @@ pub(crate) trait LayoutConverterBase {
     }
 
     fn struct_name_to_fully_annotated_layout(
-        &self,
+        &mut self,
         struct_name_idx: StructNameIndex,
         ty_args: &[Type],
         count: &mut u64,
@@ -399,23 +406,33 @@ pub(crate) trait LayoutConverterBase {
 // --------------------------------------------------------------------------------------------
 // Layout converter based on ModuleStorage
 
-pub struct StorageLayoutConverter<'a> {
+pub(crate) struct UnmeteredLayoutConverter<'a> {
     storage: &'a dyn ModuleStorage,
 }
 
-impl<'a> StorageLayoutConverter<'a> {
+impl<'a> UnmeteredLayoutConverter<'a> {
     pub fn new(storage: &'a dyn ModuleStorage) -> Self {
         Self { storage }
     }
 }
 
-impl<'a> LayoutConverterBase for StorageLayoutConverter<'a> {
+impl<'a> LayoutConverterBase for UnmeteredLayoutConverter<'a> {
     fn vm_config(&self) -> &VMConfig {
         self.storage.runtime_environment().vm_config()
     }
 
-    fn fetch_struct_ty_by_idx(&self, idx: StructNameIndex) -> PartialVMResult<Arc<StructType>> {
-        self.storage.fetch_struct_ty_by_idx(&idx)
+    fn fetch_struct_ty_by_idx(&mut self, idx: StructNameIndex) -> PartialVMResult<Arc<StructType>> {
+        let struct_name = self
+            .storage
+            .runtime_environment()
+            .struct_name_index_map()
+            .idx_to_struct_name_ref(idx)?;
+
+        self.storage.unmetered_get_struct_definition(
+            struct_name.module.address(),
+            struct_name.module.name(),
+            struct_name.name.as_ident_str(),
+        )
     }
 
     fn struct_name_index_map(&self) -> &StructNameIndexMap {
@@ -432,4 +449,179 @@ impl<'a> LayoutConverterBase for StorageLayoutConverter<'a> {
     }
 }
 
-impl<'a> LayoutConverter for StorageLayoutConverter<'a> {}
+impl<'a> LayoutConverter for UnmeteredLayoutConverter<'a> {}
+
+pub(crate) struct MetredLazyLayoutConverter<'a, 'b, G, T> {
+    gas_meter: &'a mut G,
+    traversal_context: &'a mut TraversalContext<'b>,
+    code_storage: &'a T,
+}
+
+impl<'a, 'b, G, T> MetredLazyLayoutConverter<'a, 'b, G, T>
+where
+    G: GasMeter,
+    T: ModuleStorage,
+{
+    pub fn new(
+        gas_meter: &'a mut G,
+        traversal_context: &'a mut TraversalContext<'b>,
+        code_storage: &'a T,
+    ) -> Self {
+        debug_assert!(
+            code_storage
+                .runtime_environment()
+                .vm_config()
+                .use_lazy_loading
+        );
+        Self {
+            gas_meter,
+            traversal_context,
+            code_storage,
+        }
+    }
+}
+
+impl<'a, 'b, G, T> LayoutConverterBase for MetredLazyLayoutConverter<'a, 'b, G, T>
+where
+    G: GasMeter,
+    T: ModuleStorage,
+{
+    fn vm_config(&self) -> &VMConfig {
+        self.code_storage.runtime_environment().vm_config()
+    }
+
+    fn fetch_struct_ty_by_idx(&mut self, idx: StructNameIndex) -> PartialVMResult<Arc<StructType>> {
+        let struct_name = self
+            .code_storage
+            .runtime_environment()
+            .struct_name_index_map()
+            .idx_to_struct_name_ref(idx)?;
+
+        let module_id = self
+            .traversal_context
+            .referenced_module_ids
+            .alloc(struct_name.module.clone());
+        let addr = module_id.address();
+        let name = module_id.name();
+
+        if !addr.is_special()
+            && self
+                .traversal_context
+                .visited
+                .insert((addr, name), ())
+                .is_none()
+        {
+            let size = self
+                .code_storage
+                .unmetered_get_existing_module_size(addr, name)
+                .map_err(|err| err.to_partial())?;
+            self.gas_meter
+                .charge_dependency(false, addr, name, NumBytes::new(size as u64))?;
+        }
+
+        self.code_storage.unmetered_get_struct_definition(
+            struct_name.module.address(),
+            struct_name.module.name(),
+            struct_name.name.as_ident_str(),
+        )
+    }
+
+    fn struct_name_index_map(&self) -> &StructNameIndexMap {
+        self.code_storage
+            .runtime_environment()
+            .struct_name_index_map()
+    }
+
+    fn struct_name_idx_to_struct_tag(
+        &self,
+        idx: StructNameIndex,
+        ty_args: &[Type],
+    ) -> PartialVMResult<StructTag> {
+        let ty_tag_builder = TypeTagConverter::new(self.code_storage.runtime_environment());
+        ty_tag_builder.struct_name_idx_to_struct_tag(&idx, ty_args)
+    }
+}
+
+impl<'a, 'b, G, T> LayoutConverter for MetredLazyLayoutConverter<'a, 'b, G, T>
+where
+    G: GasMeter,
+    T: ModuleStorage,
+{
+}
+
+pub(crate) struct MetredLazyNativeLayoutConverter<'a, 'b> {
+    traversal_context: &'a mut TraversalContext<'b>,
+    code_storage: &'a dyn ModuleStorage,
+}
+
+impl<'a, 'b> MetredLazyNativeLayoutConverter<'a, 'b> {
+    pub fn new(
+        traversal_context: &'a mut TraversalContext<'b>,
+        code_storage: &'a dyn ModuleStorage,
+    ) -> Self {
+        Self {
+            traversal_context,
+            code_storage,
+        }
+    }
+}
+
+impl<'a, 'b> LayoutConverterBase for MetredLazyNativeLayoutConverter<'a, 'b> {
+    fn vm_config(&self) -> &VMConfig {
+        self.code_storage.runtime_environment().vm_config()
+    }
+
+    fn fetch_struct_ty_by_idx(&mut self, idx: StructNameIndex) -> PartialVMResult<Arc<StructType>> {
+        let struct_name = self
+            .code_storage
+            .runtime_environment()
+            .struct_name_index_map()
+            .idx_to_struct_name_ref(idx)?;
+
+        let module_id = self
+            .traversal_context
+            .referenced_module_ids
+            .alloc(struct_name.module.clone());
+        let addr = module_id.address();
+        let name = module_id.name();
+
+        if !addr.is_special()
+            && self
+                .traversal_context
+                .visited
+                .insert((addr, name), ())
+                .is_none()
+        {
+            let _size = self
+                .code_storage
+                .unmetered_get_existing_module_size(addr, name)
+                .map_err(|err| err.to_partial())?;
+            unimplemented!()
+            // self.gas_meter
+            //     .charge_dependency(false, addr, name, NumBytes::new(size as u64))?;
+        }
+
+        self.code_storage.unmetered_get_struct_definition(
+            struct_name.module.address(),
+            struct_name.module.name(),
+            struct_name.name.as_ident_str(),
+        )
+    }
+
+    fn struct_name_index_map(&self) -> &StructNameIndexMap {
+        self.code_storage
+            .runtime_environment()
+            .struct_name_index_map()
+    }
+
+    fn struct_name_idx_to_struct_tag(
+        &self,
+        idx: StructNameIndex,
+        ty_args: &[Type],
+    ) -> PartialVMResult<StructTag> {
+        let ty_tag_builder = TypeTagConverter::new(self.code_storage.runtime_environment());
+        ty_tag_builder.struct_name_idx_to_struct_tag(&idx, ty_args)
+    }
+}
+
+impl<'a, 'b> LayoutConverter for MetredLazyNativeLayoutConverter<'a, 'b> {}

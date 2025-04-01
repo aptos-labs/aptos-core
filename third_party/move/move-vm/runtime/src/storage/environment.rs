@@ -184,6 +184,20 @@ impl RuntimeEnvironment {
         result.map_err(|e| e.finish(Location::Undefined))
     }
 
+    /// Creates a verified module but skips dependency verification.
+    pub fn build_verified_module_without_linking_checks(
+        &self,
+        locally_verified_module: LocallyVerifiedModule,
+    ) -> VMResult<Module> {
+        Module::new(
+            &self.natives,
+            locally_verified_module.1,
+            locally_verified_module.0,
+            self.struct_name_index_map(),
+        )
+        .map_err(|err| err.finish(Location::Undefined))
+    }
+
     /// Deserializes bytes into a compiled module.
     pub fn deserialize_into_compiled_module(&self, bytes: &Bytes) -> VMResult<CompiledModule> {
         CompiledModule::deserialize_with_config(bytes, &self.vm_config().deserializer_config)

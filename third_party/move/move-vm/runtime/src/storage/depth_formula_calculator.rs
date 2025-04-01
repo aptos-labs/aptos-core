@@ -13,7 +13,6 @@ use move_vm_types::{
         runtime_types::{DepthFormula, StructLayout, Type},
         struct_name_indexing::StructNameIndex,
     },
-    module_linker_error,
 };
 use std::collections::{BTreeMap, HashMap};
 
@@ -50,33 +49,28 @@ where
             .struct_name_index_map()
             .idx_to_struct_name_ref(*struct_name_idx)?;
 
+        // TODO(lazy-loading): consider moving this upwards, to avoid many switches in the impl.
         if self
             .module_storage
             .runtime_environment()
             .vm_config()
             .use_lazy_loading
         {
-            let id = traversal_context
+            let module_id = traversal_context
                 .referenced_module_ids
                 .alloc(struct_name.module.clone());
-            let addr = id.address();
-            let name = id.name();
+            let addr = module_id.address();
+            let name = module_id.name();
 
             if !addr.is_special() && traversal_context.visited.insert((addr, name), ()).is_none() {
                 let size = self
                     .module_storage
-                    .fetch_module_size_in_bytes(addr, name)
-                    .map_err(|err| err.to_partial())?
-                    .ok_or_else(|| module_linker_error!(addr, name).to_partial())?;
-                gas_meter.charge_dependency(
-                    false,
-                    id.address(),
-                    id.name(),
-                    NumBytes::new(size as u64),
-                )?;
+                    .unmetered_get_existing_module_size(addr, name)
+                    .map_err(|err| err.to_partial())?;
+                gas_meter.charge_dependency(false, addr, name, NumBytes::new(size as u64))?;
             }
         }
-        let struct_type = self.module_storage.fetch_struct_ty(
+        let struct_type = self.module_storage.unmetered_get_struct_definition(
             struct_name.module.address(),
             struct_name.module.name(),
             struct_name.name.as_ident_str(),

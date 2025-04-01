@@ -3,8 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    storage::module_storage::FunctionValueExtensionAdapter, LayoutConverter, ModuleStorage,
-    StorageLayoutConverter,
+    module_traversal::TraversalContext,
+    storage::{
+        module_storage::FunctionValueExtensionAdapter,
+        ty_layout_converter::{
+            LayoutConverter, MetredLazyLayoutConverter, UnmeteredLayoutConverter,
+        },
+    },
+    ModuleStorage,
 };
 use bytes::Bytes;
 use move_binary_format::errors::*;
@@ -12,30 +18,24 @@ use move_core_types::{
     account_address::AccountAddress,
     effects::{AccountChanges, ChangeSet, Changes},
     gas_algebra::NumBytes,
-    language_storage::TypeTag,
+    language_storage::{StructTag, TypeTag},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
+    gas::GasMeter,
     loaded_data::runtime_types::Type,
     resolver::ResourceResolver,
     value_serde::ValueSerDeContext,
     values::{GlobalValue, Value},
 };
-use std::collections::btree_map::BTreeMap;
+use std::collections::btree_map::{BTreeMap, Entry};
 
-pub struct AccountDataCache {
-    // The bool flag in the `data_map` indicates whether the resource contains
-    // an aggregator or snapshot.
-    data_map: BTreeMap<Type, (MoveTypeLayout, GlobalValue, bool)>,
-}
-
-impl AccountDataCache {
-    fn new() -> Self {
-        Self {
-            data_map: BTreeMap::new(),
-        }
-    }
+pub(crate) struct DataCacheEntry {
+    struct_tag: StructTag,
+    layout: MoveTypeLayout,
+    contains_delayed_fields: bool,
+    pub(crate) value: GlobalValue,
 }
 
 /// Transaction data cache. Keep updates within a transaction so they can all be published at
@@ -52,7 +52,7 @@ impl AccountDataCache {
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
 pub struct TransactionDataCache {
-    account_map: BTreeMap<AccountAddress, AccountDataCache>,
+    account_map: BTreeMap<AccountAddress, BTreeMap<Type, DataCacheEntry>>,
 }
 
 impl TransactionDataCache {
@@ -81,7 +81,7 @@ impl TransactionDataCache {
                             .with_message(format!("Error when serializing resource {}.", value))
                     })
             };
-        self.into_custom_effects(&resource_converter, module_storage)
+        self.into_custom_effects(&resource_converter)
     }
 
     /// Same like `into_effects`, but also allows clients to select the format of
@@ -89,21 +89,22 @@ impl TransactionDataCache {
     pub fn into_custom_effects<Resource>(
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
-        module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<Changes<Resource>> {
         let mut change_set = Changes::<Resource>::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
             let mut resources = BTreeMap::new();
-            for (ty, (layout, gv, has_aggregator_lifting)) in account_data_cache.data_map {
-                if let Some(op) = gv.into_effect_with_layout(layout) {
-                    let struct_tag = match module_storage.runtime_environment().ty_to_ty_tag(&ty)? {
-                        TypeTag::Struct(struct_tag) => *struct_tag,
-                        _ => return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)),
-                    };
+            for entry in account_data_cache.into_values() {
+                let DataCacheEntry {
+                    struct_tag,
+                    layout,
+                    contains_delayed_fields,
+                    value,
+                } = entry;
+                if let Some(op) = value.into_effect_with_layout(layout) {
                     resources.insert(
                         struct_tag,
                         op.and_then(|(value, layout)| {
-                            resource_converter(value, layout, has_aggregator_lifting)
+                            resource_converter(value, layout, contains_delayed_fields)
                         })?,
                     );
                 }
@@ -118,104 +119,208 @@ impl TransactionDataCache {
         Ok(change_set)
     }
 
-    fn get_mut_or_insert_with<'a, K, V, F>(map: &'a mut BTreeMap<K, V>, k: &K, gen: F) -> &'a mut V
-    where
-        F: FnOnce() -> (K, V),
-        K: Ord,
-    {
-        if !map.contains_key(k) {
-            let (k, v) = gen();
-            map.insert(k, v);
-        }
-        map.get_mut(k).unwrap()
+    pub(crate) fn is_resource_loaded(&self, addr: &AccountAddress, ty: &Type) -> bool {
+        self.account_map
+            .get(addr)
+            .is_some_and(|account_cache| account_cache.contains_key(ty))
     }
 
-    // Retrieves data from the local cache or loads it from the remote cache into the local cache.
-    // All operations on the global data are based on this API and they all load the data
-    // into the cache.
-    pub(crate) fn load_resource(
+    pub(crate) fn store_loaded_resource(
         &mut self,
-        module_storage: &dyn ModuleStorage,
-        resource_resolver: &dyn ResourceResolver,
         addr: AccountAddress,
+        ty: Type,
+        data_cache_entry: DataCacheEntry,
+    ) -> PartialVMResult<()> {
+        debug_assert!(!self.is_resource_loaded(&addr, &ty));
+
+        match self.account_map.entry(addr).or_default().entry(ty.clone()) {
+            Entry::Vacant(entry) => entry.insert(data_cache_entry),
+            Entry::Occupied(_) => {
+                let msg = format!("Entry for {:?} at {} already exists", ty, addr);
+                let err = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(msg);
+                return Err(err);
+            },
+        };
+        Ok(())
+    }
+
+    pub(crate) fn get_resource_if_loaded(
+        &mut self,
+        addr: &AccountAddress,
         ty: &Type,
-    ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
-        let account_cache = Self::get_mut_or_insert_with(&mut self.account_map, &addr, || {
-            (addr, AccountDataCache::new())
-        });
+    ) -> PartialVMResult<&mut GlobalValue> {
+        debug_assert!(self.is_resource_loaded(addr, ty));
 
-        let mut load_res = None;
-        if !account_cache.data_map.contains_key(ty) {
-            let ty_tag = match module_storage.runtime_environment().ty_to_ty_tag(ty)? {
-                TypeTag::Struct(s_tag) => s_tag,
-                _ =>
-                // non-struct top-level value; can't happen
-                {
-                    return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))
-                },
-            };
-            // TODO(Gas): Shall we charge for this?
-            let (ty_layout, has_aggregator_lifting) =
-                StorageLayoutConverter::new(module_storage)
-                    .type_to_type_layout_with_identifier_mappings(ty)?;
-
-            let (data, bytes_loaded) = {
-                let metadata = module_storage
-                    .fetch_existing_module_metadata(&ty_tag.address, ty_tag.module.as_ident_str())
-                    .map_err(|e| e.to_partial())?;
-
-                // If we need to process aggregator lifting, we pass type layout to remote.
-                // Remote, in turn ensures that all aggregator values are lifted if the resolved
-                // resource comes from storage.
-                resource_resolver.get_resource_bytes_with_metadata_and_layout(
-                    &addr,
-                    &ty_tag,
-                    &metadata,
-                    if has_aggregator_lifting {
-                        Some(&ty_layout)
-                    } else {
-                        None
-                    },
-                )?
-            };
-            load_res = Some(NumBytes::new(bytes_loaded as u64));
-
-            let function_value_extension = FunctionValueExtensionAdapter { module_storage };
-            let gv = match data {
-                Some(blob) => {
-                    let val = match ValueSerDeContext::new()
-                        .with_func_args_deserialization(&function_value_extension)
-                        .with_delayed_fields_serde()
-                        .deserialize(&blob, &ty_layout)
-                    {
-                        Some(val) => val,
-                        None => {
-                            let msg =
-                                format!("Failed to deserialize resource {} at {}!", ty_tag, addr);
-                            return Err(PartialVMError::new(
-                                StatusCode::FAILED_TO_DESERIALIZE_RESOURCE,
-                            )
-                            .with_message(msg));
-                        },
-                    };
-
-                    GlobalValue::cached(val)?
-                },
-                None => GlobalValue::none(),
-            };
-
-            account_cache
-                .data_map
-                .insert(ty.clone(), (ty_layout, gv, has_aggregator_lifting));
+        if let Some(account_cache) = self.account_map.get_mut(addr) {
+            if let Some(entry) = account_cache.get_mut(ty) {
+                return Ok(&mut entry.value);
+            }
         }
 
-        Ok((
-            account_cache
-                .data_map
-                .get_mut(ty)
-                .map(|(_ty_layout, gv, _has_aggregator_lifting)| gv)
-                .expect("global value must exist"),
-            load_res,
-        ))
+        let msg = format!("Resource for {:?} at {} must exist", ty, addr);
+        let err =
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(msg);
+        Err(err)
+    }
+
+    pub(crate) fn load_resource(
+        module_storage: &impl ModuleStorage,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        resource_resolver: &impl ResourceResolver,
+        addr: &AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
+        let use_lazy_loading = module_storage
+            .runtime_environment()
+            .vm_config()
+            .use_lazy_loading;
+
+        let struct_tag = match module_storage.runtime_environment().ty_to_ty_tag(ty)? {
+            TypeTag::Struct(struct_tag) => *struct_tag,
+            _ => {
+                // All resources must be structs, so this cannot happen.
+                return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR));
+            },
+        };
+
+        let (layout, contains_delayed_fields) = if use_lazy_loading {
+            MetredLazyLayoutConverter::new(gas_meter, traversal_context, module_storage)
+                .type_to_type_layout_with_identifier_mappings(ty)?
+        } else {
+            UnmeteredLayoutConverter::new(module_storage)
+                .type_to_type_layout_with_identifier_mappings(ty)?
+        };
+
+        let (data, bytes_loaded) = {
+            if use_lazy_loading {
+                let module_id = traversal_context
+                    .referenced_module_ids
+                    .alloc(struct_tag.module_id());
+                if !module_id.address().is_special()
+                    && traversal_context
+                        .visited
+                        .insert((module_id.address(), module_id.name()), ())
+                        .is_none()
+                {
+                    let size = module_storage
+                        .unmetered_get_existing_module_size(module_id.address(), module_id.name())
+                        .map_err(|err| err.to_partial())?;
+                    gas_meter.charge_dependency(
+                        false,
+                        module_id.address(),
+                        module_id.name(),
+                        NumBytes::new(size as u64),
+                    )?;
+                }
+            }
+
+            let metadata = module_storage
+                .unmetered_get_existing_module_metadata(&struct_tag.address, &struct_tag.module)
+                .map_err(|err| err.to_partial())?;
+
+            // If we need to process delayed fields, we pass the type layout to remote storage for
+            // any pre-processing. Remote storage should ensure that all delayed fields are
+            // replaced with identifiers if the resource comes from the DB.
+            resource_resolver.get_resource_bytes_with_metadata_and_layout(
+                addr,
+                &struct_tag,
+                &metadata,
+                contains_delayed_fields.then_some(&layout),
+            )?
+        };
+        let bytes_loaded = NumBytes::new(bytes_loaded as u64);
+
+        let function_value_extension = FunctionValueExtensionAdapter { module_storage };
+        let value = match data {
+            Some(blob) => {
+                let val = ValueSerDeContext::new()
+                    .with_func_args_deserialization(&function_value_extension)
+                    .with_delayed_fields_serde()
+                    .deserialize(&blob, &layout)
+                    .ok_or_else(|| {
+                        let msg =
+                            format!("Failed to deserialize resource {} at {}!", struct_tag, addr);
+                        PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
+                            .with_message(msg)
+                    })?;
+
+                GlobalValue::cached(val)?
+            },
+            None => GlobalValue::none(),
+        };
+
+        let entry = DataCacheEntry {
+            struct_tag,
+            layout,
+            contains_delayed_fields,
+            value,
+        };
+        Ok((entry, bytes_loaded))
+    }
+
+    pub(crate) fn load_resource_for_natives(
+        module_storage: &dyn ModuleStorage,
+        resource_resolver: &dyn ResourceResolver,
+        addr: &AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
+        let struct_tag = match module_storage.runtime_environment().ty_to_ty_tag(ty)? {
+            TypeTag::Struct(struct_tag) => *struct_tag,
+            _ => {
+                // All resources must be structs, so this cannot happen.
+                return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR));
+            },
+        };
+
+        // TODO(lazy-loading): charge gas for layouts
+        let (layout, contains_delayed_fields) = UnmeteredLayoutConverter::new(module_storage)
+            .type_to_type_layout_with_identifier_mappings(ty)?;
+
+        // TODO(lazy-loading): charge gas for access
+        let (data, bytes_loaded) = {
+            let metadata = module_storage
+                .unmetered_get_existing_module_metadata(&struct_tag.address, &struct_tag.module)
+                .map_err(|err| err.to_partial())?;
+
+            // If we need to process delayed fields, we pass the type layout to remote storage for
+            // any pre-processing. Remote storage should ensure that all delayed fields are
+            // replaced with identifiers if the resource comes from the DB.
+            resource_resolver.get_resource_bytes_with_metadata_and_layout(
+                addr,
+                &struct_tag,
+                &metadata,
+                contains_delayed_fields.then_some(&layout),
+            )?
+        };
+        let bytes_loaded = NumBytes::new(bytes_loaded as u64);
+
+        let function_value_extension = FunctionValueExtensionAdapter { module_storage };
+        let value = match data {
+            Some(blob) => {
+                let val = ValueSerDeContext::new()
+                    .with_func_args_deserialization(&function_value_extension)
+                    .with_delayed_fields_serde()
+                    .deserialize(&blob, &layout)
+                    .ok_or_else(|| {
+                        let msg =
+                            format!("Failed to deserialize resource {} at {}!", struct_tag, addr);
+                        PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
+                            .with_message(msg)
+                    })?;
+
+                GlobalValue::cached(val)?
+            },
+            None => GlobalValue::none(),
+        };
+
+        let entry = DataCacheEntry {
+            struct_tag,
+            layout,
+            contains_delayed_fields,
+            value,
+        };
+        Ok((entry, bytes_loaded))
     }
 }

@@ -14,8 +14,8 @@ use move_binary_format::{
     file_format::CodeOffset,
 };
 use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
-    vm_status::StatusCode,
+    account_address::AccountAddress, gas_algebra::NumModules, identifier::IdentStr,
+    language_storage::ModuleId, vm_status::StatusCode,
 };
 use move_vm_types::{
     gas::{GasMeter as MoveGasMeter, SimpleInstruction},
@@ -465,6 +465,26 @@ where
     #[inline]
     fn charge_heap_memory(&mut self, amount: u64) -> PartialVMResult<()> {
         self.use_heap_memory(amount.into())
+    }
+
+    #[inline]
+    fn total_dependency_size(&self) -> NumBytes {
+        self.base.total_dependency_size()
+    }
+
+    #[inline]
+    fn max_total_dependency_size(&self) -> NumBytes {
+        self.base.max_total_dependency_size()
+    }
+
+    #[inline]
+    fn num_dependencies(&self) -> NumModules {
+        self.base.num_dependencies()
+    }
+
+    #[inline]
+    fn max_num_dependencies(&self) -> NumModules {
+        self.base.max_num_dependencies()
     }
 }
 

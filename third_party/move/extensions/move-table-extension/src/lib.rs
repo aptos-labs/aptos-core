@@ -217,8 +217,8 @@ impl TableData {
     ) -> PartialVMResult<&mut Table> {
         Ok(match self.tables.entry(handle) {
             Entry::Vacant(e) => {
-                let key_layout = context.type_to_type_layout(key_ty)?;
-                let value_layout = context.type_to_type_layout(value_ty)?;
+                let key_layout = context.unmetered_type_to_type_layout(key_ty)?;
+                let value_layout = context.unmetered_type_to_type_layout(value_ty)?;
                 let table = Table {
                     handle,
                     key_layout,

@@ -336,4 +336,12 @@ where
         self.balance.add_assign(extra_unit);
         Ok(())
     }
+
+    fn num_dependencies(&self) -> NumModules {
+        self.num_dependencies
+    }
+
+    fn total_dependency_size(&self) -> NumBytes {
+        self.total_dependency_size
+    }
 }

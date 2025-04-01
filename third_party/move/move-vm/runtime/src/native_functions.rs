@@ -3,14 +3,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache, interpreter::InterpreterDebugInterface, loader::Function,
-    module_traversal::TraversalContext, native_extensions::NativeContextExtensions,
-    storage::module_storage::FunctionValueExtensionAdapter, LayoutConverter, ModuleStorage,
-    StorageLayoutConverter,
+    data_cache::TransactionDataCache,
+    interpreter::InterpreterDebugInterface,
+    loader::Function,
+    module_traversal::TraversalContext,
+    native_extensions::NativeContextExtensions,
+    storage::{
+        module_storage::FunctionValueExtensionAdapter,
+        ty_layout_converter::{
+            LayoutConverter, MetredLazyNativeLayoutConverter, UnmeteredLayoutConverter,
+        },
+    },
+    ModuleStorage,
 };
-use move_binary_format::errors::{
-    ExecutionState, Location, PartialVMError, PartialVMResult, VMResult,
-};
+use move_binary_format::errors::{ExecutionState, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, NumBytes},
@@ -95,14 +101,14 @@ impl NativeFunctions {
     }
 }
 
-pub struct NativeContext<'a, 'b> {
-    interpreter: &'a mut dyn InterpreterDebugInterface,
+pub struct NativeContext<'a, 'b, 'c> {
+    interpreter: &'a dyn InterpreterDebugInterface,
     data_store: &'a mut TransactionDataCache,
     resource_resolver: &'a dyn ResourceResolver,
     module_storage: &'a dyn ModuleStorage,
     extensions: &'a mut NativeContextExtensions<'b>,
     gas_balance: InternalGas,
-    traversal_context: &'a TraversalContext<'a>,
+    traversal_context: &'a mut TraversalContext<'c>,
 
     /// Counter used to record the (conceptual) heap memory usage by a native functions,
     /// measured in abstract memory unit.
@@ -112,15 +118,15 @@ pub struct NativeContext<'a, 'b> {
     heap_memory_usage: u64,
 }
 
-impl<'a, 'b> NativeContext<'a, 'b> {
+impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     pub(crate) fn new(
-        interpreter: &'a mut dyn InterpreterDebugInterface,
+        interpreter: &'a dyn InterpreterDebugInterface,
         data_store: &'a mut TransactionDataCache,
         resource_resolver: &'a dyn ResourceResolver,
         module_storage: &'a dyn ModuleStorage,
         extensions: &'a mut NativeContextExtensions<'b>,
         gas_balance: InternalGas,
-        traversal_context: &'a TraversalContext<'a>,
+        traversal_context: &'a mut TraversalContext<'c>,
     ) -> Self {
         Self {
             interpreter,
@@ -136,7 +142,7 @@ impl<'a, 'b> NativeContext<'a, 'b> {
     }
 }
 
-impl<'a, 'b> NativeContext<'a, 'b> {
+impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     pub fn print_stack_trace(&self, buf: &mut String) -> PartialVMResult<()> {
         self.interpreter
             .debug_print_stack_trace(buf, self.module_storage.runtime_environment())
@@ -146,38 +152,72 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         &mut self,
         address: AccountAddress,
         ty: &Type,
-    ) -> VMResult<(bool, Option<NumBytes>)> {
-        // TODO(Rati, George): propagate exists call the way to resolver, because we
-        //                     can implement the check more efficiently, without the
-        //                     need to actually load bytes.
-        let (value, num_bytes) = self
+    ) -> PartialVMResult<(bool, Option<NumBytes>)> {
+        let bytes_loaded = if !self.data_store.is_resource_loaded(&address, ty) {
+            let (entry, bytes_loaded) = TransactionDataCache::load_resource_for_natives(
+                self.module_storage,
+                self.resource_resolver,
+                &address,
+                ty,
+            )?;
+            self.data_store
+                .store_loaded_resource(address, ty.clone(), entry)?;
+            Some(bytes_loaded)
+        } else {
+            None
+        };
+        let exists = self
             .data_store
-            .load_resource(self.module_storage, self.resource_resolver, address, ty)
-            .map_err(|err| err.finish(Location::Undefined))?;
-        let exists = value
-            .exists()
-            .map_err(|err| err.finish(Location::Undefined))?;
-        Ok((exists, num_bytes))
+            .get_resource_if_loaded(&address, ty)?
+            .exists()?;
+        Ok((exists, bytes_loaded))
     }
 
     pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
         self.module_storage.runtime_environment().ty_to_ty_tag(ty)
     }
 
-    pub fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
-        StorageLayoutConverter::new(self.module_storage).type_to_type_layout(ty)
+    pub fn metered_lazy_type_to_type_layout(
+        &mut self,
+        ty: &Type,
+    ) -> PartialVMResult<MoveTypeLayout> {
+        MetredLazyNativeLayoutConverter::new(self.traversal_context, self.module_storage)
+            .type_to_type_layout(ty)
     }
 
-    pub fn type_to_type_layout_with_identifier_mappings(
-        &self,
+    pub fn unmetered_type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+        UnmeteredLayoutConverter::new(self.module_storage).type_to_type_layout(ty)
+    }
+
+    pub fn metered_lazy_type_to_type_layout_with_identifier_mappings(
+        &mut self,
         ty: &Type,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        StorageLayoutConverter::new(self.module_storage)
+        MetredLazyNativeLayoutConverter::new(self.traversal_context, self.module_storage)
             .type_to_type_layout_with_identifier_mappings(ty)
     }
 
-    pub fn type_to_fully_annotated_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
-        StorageLayoutConverter::new(self.module_storage).type_to_fully_annotated_layout(ty)
+    pub fn unmetered_type_to_type_layout_with_identifier_mappings(
+        &self,
+        ty: &Type,
+    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
+        UnmeteredLayoutConverter::new(self.module_storage)
+            .type_to_type_layout_with_identifier_mappings(ty)
+    }
+
+    pub fn metered_lazy_type_to_fully_annotated_layout(
+        &mut self,
+        ty: &Type,
+    ) -> PartialVMResult<MoveTypeLayout> {
+        MetredLazyNativeLayoutConverter::new(self.traversal_context, self.module_storage)
+            .type_to_fully_annotated_layout(ty)
+    }
+
+    pub fn unmetered_type_to_fully_annotated_layout(
+        &self,
+        ty: &Type,
+    ) -> PartialVMResult<MoveTypeLayout> {
+        UnmeteredLayoutConverter::new(self.module_storage).type_to_fully_annotated_layout(ty)
     }
 
     pub fn extensions(&self) -> &NativeContextExtensions<'b> {
@@ -206,7 +246,15 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         self.heap_memory_usage
     }
 
+    pub fn module_storage(&self) -> &dyn ModuleStorage {
+        self.module_storage
+    }
+
     pub fn traversal_context(&self) -> &TraversalContext {
+        self.traversal_context
+    }
+
+    pub fn traversal_context_mut(&mut self) -> &mut TraversalContext<'c> {
         self.traversal_context
     }
 
@@ -221,7 +269,14 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         module_id: &ModuleId,
         function_name: &Identifier,
     ) -> VMResult<Arc<Function>> {
-        let (_, function) = self.module_storage.fetch_function_definition(
+        // MODULE LOADING METERING:
+        //   Metering is done when native returns LoadModule result, so this access will never load
+        //   anything and will access cached and metered modules.
+        debug_assert!(self
+            .traversal_context
+            .visited
+            .contains_key(&(module_id.address(), module_id.name())));
+        let (_, function) = self.module_storage.unmetered_get_function_definition(
             module_id.address(),
             module_id.name(),
             function_name,

@@ -190,9 +190,9 @@ fn main() -> Result<()> {
     let code_storage = storage.as_unsync_code_storage();
 
     let func = match &entrypoint {
-        Entrypoint::Script(script_blob) => code_storage.load_script(script_blob, &[])?,
+        Entrypoint::Script(script_blob) => code_storage.unmetered_load_script(script_blob, &[])?,
         Entrypoint::Module(module_id) => {
-            code_storage.load_function(module_id, ident_str!("run"), &[])?
+            code_storage.unmetered_load_function(module_id, ident_str!("run"), &[])?
         },
     };
     let args: Vec<Vec<u8>> = vec![];

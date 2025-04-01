@@ -261,8 +261,10 @@ impl SharedTestingConfig {
         // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
 
         let now = Instant::now();
+
+        // TODO(lazy-loading): use lazy loading here to Unit test?
         let result = module_storage
-            .load_function(
+            .unmetered_load_function(
                 &test_plan.module_id,
                 IdentStr::new(function_name).unwrap(),
                 // No type args for now.

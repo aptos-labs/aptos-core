@@ -152,7 +152,7 @@ fn load_phantom_module() {
     let new_module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
 
     let _ = new_module_storage
-        .load_function(&module_id, ident_str!("foo"), &[])
+        .unmetered_load_function(&module_id, ident_str!("foo"), &[])
         .unwrap();
 }
 
@@ -212,7 +212,7 @@ fn load_with_extra_ability() {
     let new_module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
 
     let _ = new_module_storage
-        .load_function(&module_id, ident_str!("foo"), &[])
+        .unmetered_load_function(&module_id, ident_str!("foo"), &[])
         .unwrap();
 }
 

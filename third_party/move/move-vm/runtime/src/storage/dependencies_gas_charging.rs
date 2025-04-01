@@ -13,7 +13,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
 };
 use move_vm_metrics::{Timer, VM_TIMER};
-use move_vm_types::{gas::GasMeter, module_linker_error};
+use move_vm_types::gas::GasMeter;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub fn check_script_dependencies_and_check_gas(
@@ -98,9 +98,7 @@ where
     push_next_ids_to_visit(&mut stack, &mut traversal_context.visited, ids);
 
     while let Some((addr, name)) = stack.pop() {
-        let size = module_storage
-            .fetch_module_size_in_bytes(addr, name)?
-            .ok_or_else(|| module_linker_error!(addr, name))?;
+        let size = module_storage.unmetered_get_existing_module_size(addr, name)?;
         gas_meter
             .charge_dependency(false, addr, name, NumBytes::new(size as u64))
             .map_err(|err| err.finish(Location::Module(ModuleId::new(*addr, name.to_owned()))))?;
@@ -110,9 +108,8 @@ where
         //
         // This is needed because we need to store references derived from it in the
         // work list.
-        let compiled_module = module_storage
-            .fetch_deserialized_module(addr, name)?
-            .ok_or_else(|| module_linker_error!(addr, name))?;
+        let compiled_module =
+            module_storage.unmetered_get_existing_deserialized_module(addr, name)?;
         let compiled_module = traversal_context.referenced_modules.alloc(compiled_module);
 
         // Explore all dependencies and friends that have been visited yet.

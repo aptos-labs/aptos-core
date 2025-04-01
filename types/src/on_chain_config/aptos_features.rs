@@ -135,6 +135,7 @@ pub enum FeatureFlag {
     ENABLE_FUNCTION_VALUES = 89,
     NEW_ACCOUNTS_DEFAULT_TO_FA_STORE = 90,
     DEFAULT_ACCOUNT_RESOURCE = 91,
+    ENABLE_LAZY_LOADING = 92,
 }
 
 impl FeatureFlag {
@@ -383,6 +384,10 @@ impl Features {
 
     pub fn is_default_account_resource_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::DEFAULT_ACCOUNT_RESOURCE)
+    }
+
+    pub fn is_lazy_loading_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ENABLE_LAZY_LOADING)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

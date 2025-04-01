@@ -8,13 +8,16 @@ use crate::{
     module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
     runtime_type_checks::RuntimeTypeCheck,
-    LayoutConverter, ModuleStorage, StorageLayoutConverter,
+    storage::ty_layout_converter::{
+        LayoutConverter, MetredLazyLayoutConverter, UnmeteredLayoutConverter,
+    },
+    LazyMeteredCodeStorage, ModuleStorage,
 };
 use better_any::{Tid, TidAble, TidExt};
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
-    errors::{Location, PartialVMError, PartialVMResult},
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
         Bytecode, CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility,
     },
@@ -22,7 +25,6 @@ use move_binary_format::{
 use move_core_types::{
     ability::{Ability, AbilitySet},
     function::ClosureMask,
-    gas_algebra::NumBytes,
     identifier::{IdentStr, Identifier},
     language_storage,
     language_storage::{ModuleId, TypeTag},
@@ -35,7 +37,6 @@ use move_vm_types::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
     },
-    module_linker_error,
     values::{AbstractFunction, SerializedFunctionData},
 };
 use std::{cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc, sync::Arc};
@@ -82,6 +83,32 @@ pub struct LoadedFunction {
 impl LoadedFunction {
     pub fn owner(&self) -> &LoadedFunctionOwner {
         &self.owner
+    }
+
+    pub fn expect_script(&self) -> VMResult<&Script> {
+        match &self.owner {
+            LoadedFunctionOwner::Script(script) => Ok(script.as_ref()),
+            LoadedFunctionOwner::Module(_) => {
+                let msg = "Expected function from script, got module instead".to_string();
+                let err = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Undefined);
+                Err(err)
+            },
+        }
+    }
+
+    pub fn expect_module(&self) -> VMResult<&Module> {
+        match &self.owner {
+            LoadedFunctionOwner::Module(module) => Ok(module.as_ref()),
+            LoadedFunctionOwner::Script(_) => {
+                let msg = "Expected function from module, but got script instead".to_string();
+                let err = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Undefined);
+                Err(err)
+            },
+        }
     }
 }
 
@@ -166,7 +193,7 @@ impl LazyLoadedFunction {
     }
 
     /// Loads the function if it has not been resolved. Gas will be charged by this function.
-    pub(crate) fn load_if_unresolved<RTCheck: RuntimeTypeCheck>(
+    pub(crate) fn load_if_unresolved<RTTCheck: RuntimeTypeCheck>(
         &self,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -226,7 +253,7 @@ impl LazyLoadedFunction {
                         captured_layouts,
                     },
             } => {
-                let fun = Self::resolve::<RTCheck>(
+                let fun = Self::resolve::<RTTCheck>(
                     module_storage,
                     gas_meter,
                     traversal_context,
@@ -249,7 +276,7 @@ impl LazyLoadedFunction {
 
     /// Resolves a function into a loaded function. This verifies existence of the named
     /// function as well as whether it has the type used for deserializing the captured values.
-    fn resolve<RTCheck: RuntimeTypeCheck>(
+    fn resolve<RTTCheck: RuntimeTypeCheck>(
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -259,90 +286,52 @@ impl LazyLoadedFunction {
         mask: ClosureMask,
         captured_layouts: &[MoveTypeLayout],
     ) -> PartialVMResult<Rc<LoadedFunction>> {
-        let function = if module_storage
+        let use_lazy_loading = module_storage
             .runtime_environment()
             .vm_config()
-            .use_lazy_loading
-        {
-            let id = traversal_context
-                .referenced_module_ids
-                .alloc(module_id.clone());
-            let addr = id.address();
-            let name = id.name();
-
-            if !addr.is_special() && traversal_context.visited.insert((addr, name), ()).is_none() {
-                let size = module_storage
-                    .fetch_module_size_in_bytes(addr, name)
-                    .map_err(|err| err.to_partial())?
-                    .ok_or_else(|| module_linker_error!(addr, name).to_partial())?;
-                gas_meter.charge_dependency(
-                    false,
-                    id.address(),
-                    id.name(),
-                    NumBytes::new(size as u64),
-                )?;
-            }
-
-            let (module, function) = module_storage
-                .fetch_function_definition(module_id.address(), module_id.name(), fun_id)
-                .map_err(|err| err.to_partial())?;
-
-            let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
-            let ty_args = ty_args
-                .iter()
-                .map(|ty_arg| {
-                    ty_builder
-                        .create_ty(ty_arg, |st| {
-                            let id = traversal_context
-                                .referenced_module_ids
-                                .alloc(st.module_id());
-                            let addr = id.address();
-                            let name = id.name();
-
-                            if !addr.is_special()
-                                && traversal_context.visited.insert((addr, name), ()).is_none()
-                            {
-                                let size = module_storage
-                                    .fetch_module_size_in_bytes(addr, name)?
-                                    .ok_or_else(|| module_linker_error!(addr, name))?;
-                                gas_meter
-                                    .charge_dependency(
-                                        false,
-                                        id.address(),
-                                        id.name(),
-                                        NumBytes::new(size as u64),
-                                    )
-                                    .map_err(|err| err.finish(Location::Undefined))?;
-                            }
-
-                            module_storage
-                                .fetch_struct_ty(
-                                    &st.address,
-                                    st.module.as_ident_str(),
-                                    st.name.as_ident_str(),
-                                )
-                                .map_err(|err| err.finish(Location::Undefined))
-                        })
-                        .map_err(|err| err.to_partial())
-                })
-                .collect::<PartialVMResult<Vec<_>>>()?;
-
-            Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)?;
-            LoadedFunction {
-                owner: LoadedFunctionOwner::Module(module),
-                ty_args,
-                function,
-            }
+            .use_lazy_loading;
+        let function = if use_lazy_loading {
+            LazyMeteredCodeStorage::new(module_storage)
+                .metered_lazy_load_function(
+                    gas_meter,
+                    traversal_context,
+                    module_id,
+                    fun_id,
+                    ty_args,
+                )
+                .map_err(|err| err.to_partial())?
         } else {
             module_storage
-                .load_function(module_id, fun_id, ty_args)
+                .unmetered_load_function(module_id, fun_id, ty_args)
                 .map_err(|err| err.to_partial())?
         };
 
-        // In paranoid mode, we need to verify that the function argument types match the layouts
-        // used for deserialization. While this is only done in paranoid mode, gas still need to be
-        // charged.
-        // TODO(#15664): Charge gas here!
+        if use_lazy_loading {
+            Self::check_layouts_compatible::<RTTCheck>(
+                &mut MetredLazyLayoutConverter::new(gas_meter, traversal_context, module_storage),
+                &function,
+                mask,
+                captured_layouts,
+            )?;
+        } else {
+            Self::check_layouts_compatible::<RTTCheck>(
+                &mut UnmeteredLayoutConverter::new(module_storage),
+                &function,
+                mask,
+                captured_layouts,
+            )?;
+        }
+
+        Ok(Rc::new(function))
+    }
+
+    // Note: this function may charge gas and load modules.
+    fn check_layouts_compatible<RTCheck: RuntimeTypeCheck>(
+        converter: &mut impl LayoutConverter,
+        function: &LoadedFunction,
+        mask: ClosureMask,
+        captured_layouts: &[MoveTypeLayout],
+    ) -> PartialVMResult<()> {
         let captured_arg_types = mask.extract(function.param_tys(), true);
         if captured_arg_types.len() != captured_layouts.len() {
             return Err(
@@ -352,13 +341,11 @@ impl LazyLoadedFunction {
             );
         }
 
-        let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
-        let converter = StorageLayoutConverter::new(module_storage);
         for (actual_arg_ty, serialized_layout) in
             captured_arg_types.into_iter().zip(captured_layouts)
         {
-            // Note that the below call returns a runtime layout, so we can directly
-            // compare it without desugaring.
+            // Note that the below call returns a runtime layout, so we can directly compare it
+            // without desugaring. Also, gas may be charged here.
             let actual_arg_layout = if ty_args.is_empty() {
                 converter.type_to_type_layout(actual_arg_ty)?
             } else {
@@ -378,7 +365,7 @@ impl LazyLoadedFunction {
             }
         }
 
-        Ok(Rc::new(function))
+        Ok(())
     }
 }
 

@@ -3,9 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache, interpreter::Interpreter, module_traversal::TraversalContext,
-    native_extensions::NativeContextExtensions, AsFunctionValueExtension, LayoutConverter,
-    LoadedFunction, ModuleStorage, StorageLayoutConverter,
+    data_cache::TransactionDataCache,
+    interpreter::Interpreter,
+    module_traversal::TraversalContext,
+    native_extensions::NativeContextExtensions,
+    storage::ty_layout_converter::{
+        LayoutConverter, MetredLazyLayoutConverter, UnmeteredLayoutConverter,
+    },
+    AsFunctionValueExtension, LoadedFunction, ModuleStorage,
 };
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
@@ -137,17 +142,27 @@ impl MoveVM {
 
 fn deserialize_arg(
     module_storage: &impl ModuleStorage,
-    _gas_meter: &mut impl GasMeter,
-    _traversal_context: &mut TraversalContext,
+    gas_meter: &mut impl GasMeter,
+    traversal_context: &mut TraversalContext,
     ty: &Type,
     arg: impl Borrow<[u8]>,
 ) -> PartialVMResult<Value> {
-    let (layout, has_identifier_mappings) = StorageLayoutConverter::new(module_storage)
-        .type_to_type_layout_with_identifier_mappings(ty)
-        .map_err(|_| {
-            PartialVMError::new(StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION)
-                .with_message("[VM] failed to get layout from type".to_string())
-        })?;
+    let result = if module_storage
+        .runtime_environment()
+        .vm_config()
+        .use_lazy_loading
+    {
+        MetredLazyLayoutConverter::new(gas_meter, traversal_context, module_storage)
+            .type_to_type_layout_with_identifier_mappings(ty)
+    } else {
+        UnmeteredLayoutConverter::new(module_storage)
+            .type_to_type_layout_with_identifier_mappings(ty)
+    };
+
+    let (layout, has_identifier_mappings) = result.map_err(|_| {
+        PartialVMError::new(StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION)
+            .with_message("[VM] failed to get layout from type".to_string())
+    })?;
 
     let deserialization_error = || -> PartialVMError {
         PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)
@@ -218,8 +233,8 @@ fn deserialize_args(
 
 fn serialize_return_value(
     module_storage: &impl ModuleStorage,
-    _gas_meter: &mut impl GasMeter,
-    _traversal_context: &mut TraversalContext,
+    gas_meter: &mut impl GasMeter,
+    traversal_context: &mut TraversalContext,
     ty: &Type,
     value: Value,
 ) -> PartialVMResult<(Vec<u8>, MoveTypeLayout)> {
@@ -232,14 +247,23 @@ fn serialize_return_value(
         None => (ty, value),
     };
 
-    let (layout, has_identifier_mappings) = StorageLayoutConverter::new(module_storage)
-        .type_to_type_layout_with_identifier_mappings(ty)
-        .map_err(|_err| {
-            // TODO: Should we use `err` instead of mapping?
-            PartialVMError::new(StatusCode::VERIFICATION_ERROR).with_message(
-                "entry point functions cannot have non-serializable return types".to_string(),
-            )
-        })?;
+    let result = if module_storage
+        .runtime_environment()
+        .vm_config()
+        .use_lazy_loading
+    {
+        MetredLazyLayoutConverter::new(gas_meter, traversal_context, module_storage)
+            .type_to_type_layout_with_identifier_mappings(ty)
+    } else {
+        UnmeteredLayoutConverter::new(module_storage)
+            .type_to_type_layout_with_identifier_mappings(ty)
+    };
+    let (layout, has_identifier_mappings) = result.map_err(|_err| {
+        // TODO: Should we use `err` instead of mapping?
+        PartialVMError::new(StatusCode::VERIFICATION_ERROR).with_message(
+            "entry point functions cannot have non-serializable return types".to_string(),
+        )
+    })?;
 
     let serialization_error = || -> PartialVMError {
         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)

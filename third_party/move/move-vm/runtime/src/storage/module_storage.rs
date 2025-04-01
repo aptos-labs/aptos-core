@@ -4,7 +4,8 @@
 use crate::{
     loader::{Function, LazyLoadedFunction, LazyLoadedFunctionState, LoadedFunctionOwner, Module},
     logging::expect_no_verification_errors,
-    LayoutConverter, LoadedFunction, StorageLayoutConverter, WithRuntimeEnvironment,
+    storage::ty_layout_converter::{LayoutConverter, UnmeteredLayoutConverter},
+    LoadedFunction, WithRuntimeEnvironment,
 };
 use ambassador::delegatable_trait;
 use bytes::Bytes;
@@ -19,15 +20,12 @@ use move_core_types::{
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
-    vm_status::StatusCode,
+    vm_status::{sub_status::type_resolution_failure, StatusCode},
 };
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
-    loaded_data::{
-        runtime_types::{StructType, Type},
-        struct_name_indexing::StructNameIndex,
-    },
+    loaded_data::runtime_types::{StructType, Type},
     module_cyclic_dependency_error, module_linker_error,
     value_serde::FunctionValueExtension,
     values::{AbstractFunction, SerializedFunctionData},
@@ -40,7 +38,7 @@ use std::sync::Arc;
 pub trait ModuleStorage: WithRuntimeEnvironment {
     /// Returns true if the module exists, and false otherwise. An error is returned if there is a
     /// storage error.
-    fn check_module_exists(
+    fn unmetered_check_module_exists(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -48,7 +46,7 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
 
     /// Returns module bytes if module exists, or [None] otherwise. An error is returned if there
     /// is a storage error.
-    fn fetch_module_bytes(
+    fn unmetered_get_module_bytes(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -56,15 +54,26 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
 
     /// Returns the size of a module in bytes, or [None] otherwise. An error is returned if the
     /// there is a storage error.
-    fn fetch_module_size_in_bytes(
+    fn unmetered_get_module_size(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<usize>>;
 
+    /// Returns the size of the module if it exists. If it does not exist, or there is storage
+    /// error, an error is returned.
+    fn unmetered_get_existing_module_size(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<usize> {
+        self.unmetered_get_module_size(address, module_name)?
+            .ok_or_else(|| module_linker_error!(address, module_name))
+    }
+
     /// Returns the metadata in the module, or [None] otherwise. An error is returned if there is
     /// a storage error or the module fails deserialization.
-    fn fetch_module_metadata(
+    fn unmetered_get_module_metadata(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -72,19 +81,19 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
 
     /// Returns the metadata in the module. An error is returned if there is a storage error,
     /// module fails deserialization, or does not exist.
-    fn fetch_existing_module_metadata(
+    fn unmetered_get_existing_module_metadata(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Vec<Metadata>> {
-        self.fetch_module_metadata(address, module_name)?
+        self.unmetered_get_module_metadata(address, module_name)?
             .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
     /// Returns the deserialized module, or [None] otherwise. An error is returned if:
     ///   1. the deserialization fails, or
     ///   2. there is an error from the underlying storage.
-    fn fetch_deserialized_module(
+    fn unmetered_get_deserialized_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -94,19 +103,19 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     ///   1. the deserialization fails,
     ///   2. there is an error from the underlying storage,
     ///   3. module does not exist.
-    fn fetch_existing_deserialized_module(
+    fn unmetered_get_existing_deserialized_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Arc<CompiledModule>> {
-        self.fetch_deserialized_module(address, module_name)?
+        self.unmetered_get_deserialized_module(address, module_name)?
             .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
     /// Returns the verified module if it exists, or [None] otherwise. The existing module can be
     /// either in a cached state (it is then returned) or newly constructed. The error is returned
     /// if the storage fails to fetch the deserialized module and verify it.
-    fn fetch_verified_module(
+    fn unmetered_get_verified_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -115,81 +124,72 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     /// Returns the verified module. If it does not exist, a linker error is returned. All other
     /// errors are mapped using [expect_no_verification_errors] - since on-chain code should not
     /// fail bytecode verification.
-    fn fetch_existing_verified_module(
+    fn unmetered_get_existing_verified_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Arc<Module>> {
-        self.fetch_verified_module(address, module_name)
+        self.unmetered_get_verified_module(address, module_name)
             .map_err(expect_no_verification_errors)?
             .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
     /// Returns a struct type corresponding to the specified name. The module containing the struct
     /// will be fetched and cached beforehand.
-    fn fetch_struct_ty(
+    fn unmetered_get_struct_definition(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
         struct_name: &IdentStr,
     ) -> PartialVMResult<Arc<StructType>> {
         let module = self
-            .fetch_existing_verified_module(address, module_name)
+            .unmetered_get_existing_verified_module(address, module_name)
             .map_err(|err| err.to_partial())?;
         module
             .get_struct(struct_name)
             .map_err(|err| err.to_partial())
     }
 
-    fn fetch_struct_ty_by_idx(&self, idx: &StructNameIndex) -> PartialVMResult<Arc<StructType>> {
-        let struct_name = self
-            .runtime_environment()
-            .struct_name_index_map()
-            .idx_to_struct_name_ref(*idx)?;
-
-        self.fetch_struct_ty(
-            struct_name.module.address(),
-            struct_name.module.name(),
-            struct_name.name.as_ident_str(),
-        )
-    }
-
-    /// Returns a runtime type corresponding to the specified type tag (file format type
-    /// representation). If a struct type is constructed, the module containing the struct
-    /// definition is fetched and cached.
-    fn fetch_ty(&self, ty_tag: &TypeTag) -> PartialVMResult<Type> {
-        // TODO(loader_v2): Loader V1 uses VMResults everywhere, but partial VM errors
-        //                  seem better fit. Here we map error to VMError to reuse existing
-        //                  type builder implementation, and then strip the location info.
-        self.runtime_environment()
-            .vm_config()
-            .ty_builder
-            .create_ty(ty_tag, |st| {
-                self.fetch_struct_ty(
-                    &st.address,
-                    st.module.as_ident_str(),
-                    st.name.as_ident_str(),
-                )
-                .map_err(|err| err.finish(Location::Undefined))
-            })
-            .map_err(|err| err.to_partial())
-    }
-
     /// Returns the function definition corresponding to the specified name, as well as the module
     /// where this function is defined. The returned function can contain uninstantiated generic
     /// types and its signature. The returned module is verified.
-    fn fetch_function_definition(
+    fn unmetered_get_function_definition(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
         function_name: &IdentStr,
     ) -> VMResult<(Arc<Module>, Arc<Function>)> {
-        let module = self.fetch_existing_verified_module(address, module_name)?;
+        let module = self.unmetered_get_existing_verified_module(address, module_name)?;
         let function = module.get_function(function_name)?;
         Ok((module, function))
     }
 
-    fn load_function(
+    fn unmetered_load_ty_args(&self, ty_args: &[TypeTag]) -> PartialVMResult<Vec<Type>> {
+        let ty_builder = &self.runtime_environment().vm_config().ty_builder;
+        ty_args
+            .iter()
+            .map(|tag| {
+                ty_builder.create_ty(tag, |st| {
+                    self.unmetered_get_struct_definition(
+                        &st.address,
+                        st.module.as_ident_str(),
+                        st.name.as_ident_str(),
+                    )
+                })
+            })
+            .collect::<PartialVMResult<Vec<_>>>()
+            .map_err(|err| {
+                // User provided type argument failed to load. Set extra sub status to distinguish
+                // from internal type loading error.
+                if StatusCode::TYPE_RESOLUTION_FAILURE == err.major_status() {
+                    err.with_sub_status(type_resolution_failure::EUSER_TYPE_LOADING_FAILURE)
+                } else {
+                    err
+                }
+            })
+    }
+
+    fn unmetered_load_function(
         &self,
         module_id: &ModuleId,
         function_name: &IdentStr,
@@ -197,23 +197,17 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     ) -> VMResult<LoadedFunction> {
         let _timer = VM_TIMER.timer_with_label("Loader::load_function");
 
-        let (module, function) =
-            self.fetch_function_definition(module_id.address(), module_id.name(), function_name)?;
+        let (module, function) = self.unmetered_get_function_definition(
+            module_id.address(),
+            module_id.name(),
+            function_name,
+        )?;
 
-        let ty_args = ty_args
-            .iter()
-            .map(|ty_arg| self.fetch_ty(ty_arg).map_err(|e| e.finish(Location::Undefined)))
-            .collect::<VMResult<Vec<_>>>()
-            .map_err(|mut err| {
-                // User provided type argument failed to load. Set extra sub status to distinguish from internal type loading error.
-                if StatusCode::TYPE_RESOLUTION_FAILURE == err.major_status() {
-                    err.set_sub_status(move_core_types::vm_status::sub_status::type_resolution_failure::EUSER_TYPE_LOADING_FAILURE);
-                }
-                err
-            })?;
-
+        let ty_args = self
+            .unmetered_load_ty_args(ty_args)
+            .map_err(|err| err.finish(Location::Undefined))?;
         Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
-            .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
+            .map_err(|err| err.finish(Location::Module(module_id.clone())))?;
 
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),
@@ -241,7 +235,7 @@ where
     E: WithBytes + WithSize + WithHash,
     V: Clone + Default + Ord,
 {
-    fn check_module_exists(
+    fn unmetered_check_module_exists(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -250,7 +244,7 @@ where
         Ok(self.get_module_or_build_with(&id, self)?.is_some())
     }
 
-    fn fetch_module_bytes(
+    fn unmetered_get_module_bytes(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -261,7 +255,7 @@ where
             .map(|(module, _)| module.extension().bytes().clone()))
     }
 
-    fn fetch_module_size_in_bytes(
+    fn unmetered_get_module_size(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -272,7 +266,7 @@ where
             .map(|(module, _)| module.extension().bytes().len()))
     }
 
-    fn fetch_module_metadata(
+    fn unmetered_get_module_metadata(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -283,7 +277,7 @@ where
             .map(|(module, _)| module.code().deserialized().metadata.clone()))
     }
 
-    fn fetch_deserialized_module(
+    fn unmetered_get_deserialized_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -294,7 +288,7 @@ where
             .map(|(module, _)| module.code().deserialized().clone()))
     }
 
-    fn fetch_verified_module(
+    fn unmetered_get_verified_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -377,6 +371,19 @@ where
         module.extension().hash(),
     )?;
 
+    // For lazy loading, do not verify & load dependencies.
+    if runtime_environment.vm_config().use_lazy_loading {
+        let verified_code = runtime_environment
+            .build_verified_module_without_linking_checks(locally_verified_code)?;
+        let module = module_cache_with_context.insert_verified_module(
+            module_id,
+            verified_code,
+            module.extension().clone(),
+            version,
+        )?;
+        return Ok(module.code().verified().clone());
+    }
+
     // Step 2: Traverse and collect all verified immediate dependencies so that we can verify
     // non-local properties of the module.
     let mut verified_dependencies = vec![];
@@ -456,7 +463,9 @@ impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
         match &*LazyLoadedFunction::expect_this_impl(fun)?.0.borrow() {
             LazyLoadedFunctionState::Unresolved { data, .. } => Ok(data.clone()),
             LazyLoadedFunctionState::Resolved { fun, mask, ty_args } => {
-                let ty_converter = StorageLayoutConverter::new(self.module_storage);
+                // TODO(lazy-loading): charge gas here or refactor. All function value
+                //                     serialization depends on this.
+                let mut ty_converter = UnmeteredLayoutConverter::new(self.module_storage);
                 let ty_builder = &self
                     .module_storage
                     .runtime_environment()

@@ -24,7 +24,9 @@ use move_binary_format::{compatibility::Compatibility, errors::Location, Compile
 use move_core_types::{
     account_address::AccountAddress, ident_str, value::MoveValue, vm_status::VMStatus,
 };
-use move_vm_runtime::{module_traversal::TraversalContext, ModuleStorage, StagingModuleStorage};
+use move_vm_runtime::{
+    module_traversal::TraversalContext, LazyMeteredCodeStorage, ModuleStorage, StagingModuleStorage,
+};
 
 #[derive(Deref, DerefMut)]
 pub struct UserSession<'r> {
@@ -88,6 +90,8 @@ impl<'r> UserSession<'r> {
     ) -> Result<UserSessionChangeSet, VMStatus> {
         // Stage module bundle on top of module storage. In case modules cannot be added (for
         // example, fail compatibility checks, create cycles, etc.), we return an error here.
+        // Also, we have metered all modules that will be accessed here, so no extra metering is
+        // needed.
         let staging_module_storage = StagingModuleStorage::create_with_compat_config(
             &destination,
             compatability_checks,
@@ -97,26 +101,46 @@ impl<'r> UserSession<'r> {
 
         let init_func_name = ident_str!("init_module");
         for module in modules {
-            // Check if module existed previously. If not, we do not run initialization.
-            if module_storage.check_module_exists(module.self_addr(), module.self_name())? {
+            // MODULE LOADING METERING:
+            //   We have charged for the old version (if it exists) before when pre-processing the
+            //   module bundle.
+            if module_storage
+                .unmetered_check_module_exists(module.self_addr(), module.self_name())?
+            {
+                // Module existed before, so do not run initialization.
                 continue;
             }
 
             self.session.execute(|session| {
                 let module_id = module.self_id();
-                let init_function_exists = staging_module_storage
-                    .load_function(&module_id, init_func_name, &[])
-                    .is_ok();
+                let init_func_load_result = if features.is_lazy_loading_enabled() {
+                    // With lazy loading, when charging gas for publish modules we must mark new
+                    // modules in the bundle as visited, to avoid double charging here.
+                    debug_assert!(
+                        module_id.address().is_special()
+                            || traversal_context
+                                .visited
+                                .contains_key(&(module_id.address(), module_id.name()))
+                    );
 
-                if init_function_exists {
+                    LazyMeteredCodeStorage::new(&staging_module_storage).metered_lazy_load_function(
+                        gas_meter,
+                        traversal_context,
+                        &module_id,
+                        init_func_name,
+                        &[],
+                    )
+                } else {
+                    staging_module_storage.unmetered_load_function(&module_id, init_func_name, &[])
+                };
+
+                if let Ok(init_func) = init_func_load_result {
                     // We need to check that init_module function we found is well-formed.
                     verifier::module_init::verify_module_init_function(module)
                         .map_err(|e| e.finish(Location::Undefined))?;
 
-                    session.execute_function_bypass_visibility(
-                        &module_id,
-                        init_func_name,
-                        vec![],
+                    session.execute_loaded_function(
+                        init_func,
                         vec![MoveValue::Signer(destination).simple_serialize().unwrap()],
                         gas_meter,
                         traversal_context,

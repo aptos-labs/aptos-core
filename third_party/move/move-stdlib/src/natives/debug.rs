@@ -178,7 +178,7 @@ mod testing {
         context: &NativeContext,
         ty: &Type,
     ) -> PartialVMResult<MoveStructLayout> {
-        let annotated_type_layout = context.type_to_fully_annotated_layout(ty)?;
+        let annotated_type_layout = context.unmetered_type_to_fully_annotated_layout(ty)?;
         match annotated_type_layout {
             MoveTypeLayout::Struct(annotated_struct_layout) => Ok(annotated_struct_layout),
             _ => Err(
@@ -259,13 +259,13 @@ mod testing {
         include_int_types: bool,
     ) -> PartialVMResult<()> {
         // get type layout in VM format
-        let ty_layout = context.type_to_type_layout(&ty)?;
+        let ty_layout = context.unmetered_type_to_type_layout(&ty)?;
 
         match &ty_layout {
             MoveTypeLayout::Vector(_) => {
                 // get the inner type T of a vector<T>
                 let inner_ty = get_vector_inner_type(&ty)?;
-                let inner_tyl = context.type_to_type_layout(inner_ty)?;
+                let inner_tyl = context.unmetered_type_to_type_layout(inner_ty)?;
 
                 match inner_tyl {
                     // We cannot simply convert a `Value` (of type vector) to a `MoveValue` because

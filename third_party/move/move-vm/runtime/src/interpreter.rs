@@ -922,6 +922,7 @@ impl InterpreterImpl<'_> {
                 ret_vals: return_values,
             } => {
                 gas_meter.charge_native_function(cost, Some(return_values.iter()))?;
+
                 // Paranoid check to protect us against incorrect native function implementations. A native function that
                 // returns a different number of values than its declared types will trigger this check.
                 if return_values.len() != function.return_tys().len() {
@@ -1044,16 +1045,32 @@ impl InterpreterImpl<'_> {
                 .map_err(|err| err.to_partial())
             },
             NativeResult::LoadModule { module_name } => {
-                // With lazy loading, gas will only be charged when loading a function.
-                if !self.vm_config.use_lazy_loading {
-                    let arena_id = traversal_context
-                        .referenced_module_ids
-                        .alloc(module_name.clone());
+                let module_id = traversal_context
+                    .referenced_module_ids
+                    .alloc(module_name.clone());
+                let addr = module_id.address();
+                let name = module_id.name();
+
+                if self.vm_config.use_lazy_loading {
+                    if !addr.is_special()
+                        && traversal_context.visited.insert((addr, name), ()).is_none()
+                    {
+                        let size = module_storage
+                            .unmetered_get_existing_module_size(addr, name)
+                            .map_err(|err| err.to_partial())?;
+                        gas_meter.charge_dependency(
+                            false,
+                            addr,
+                            name,
+                            NumBytes::new(size as u64),
+                        )?;
+                    }
+                } else {
                     check_dependencies_and_charge_gas(
                         module_storage,
                         gas_meter,
                         traversal_context,
-                        [(arena_id.address(), arena_id.name())],
+                        [(addr, name)],
                     )
                         .map_err(|err| err
                             .to_partial()
@@ -1144,27 +1161,31 @@ impl InterpreterImpl<'_> {
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
-        _traversal_context: &mut TraversalContext,
+        traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<&'c mut GlobalValue> {
-        match data_store.load_resource(module_storage, resource_resolver, addr, ty) {
-            Ok((gv, load_res)) => {
-                if let Some(bytes_loaded) = load_res {
-                    gas_meter.charge_load_resource(
-                        addr,
-                        TypeWithRuntimeEnvironment {
-                            ty,
-                            runtime_environment: module_storage.runtime_environment(),
-                        },
-                        gv.view(),
-                        bytes_loaded,
-                    )?;
-                }
-                Ok(gv)
-            },
-            Err(e) => Err(e),
+        if !data_store.is_resource_loaded(&addr, ty) {
+            let (entry, bytes_loaded) = TransactionDataCache::load_resource(
+                module_storage,
+                gas_meter,
+                traversal_context,
+                resource_resolver,
+                &addr,
+                ty,
+            )?;
+            gas_meter.charge_load_resource(
+                addr,
+                TypeWithRuntimeEnvironment {
+                    ty,
+                    runtime_environment: module_storage.runtime_environment(),
+                },
+                entry.value.view(),
+                bytes_loaded,
+            )?;
+            data_store.store_loaded_resource(addr, ty.clone(), entry)?;
         }
+        data_store.get_resource_if_loaded(&addr, ty)
     }
 
     /// BorrowGlobal (mutable and not) opcode.
@@ -3308,7 +3329,7 @@ impl Frame {
 
             if !addr.is_special() && traversal_context.visited.insert((addr, name), ()).is_none() {
                 let size = module_storage
-                    .fetch_module_size_in_bytes(addr, name)
+                    .unmetered_get_module_size(addr, name)
                     .map_err(|err| err.to_partial())?
                     .ok_or_else(|| module_linker_error!(addr, name).to_partial())?;
                 gas_meter.charge_dependency(
@@ -3321,7 +3342,7 @@ impl Frame {
         }
 
         let (module, function) = module_storage
-            .fetch_function_definition(module_id.address(), module_id.name(), function_name)
+            .unmetered_get_function_definition(module_id.address(), module_id.name(), function_name)
             .map_err(|_| {
                 // Note: legacy loader implementation used this error, so we need to remap.
                 PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(format!(

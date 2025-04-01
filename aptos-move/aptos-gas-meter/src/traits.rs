@@ -16,7 +16,7 @@ use aptos_vm_types::{
     },
 };
 use move_binary_format::errors::{Location, PartialVMResult, VMResult};
-use move_core_types::gas_algebra::{InternalGas, InternalGasUnit, NumBytes};
+use move_core_types::gas_algebra::{InternalGas, InternalGasUnit, NumBytes, NumModules};
 use move_vm_types::gas::GasMeter as MoveGasMeter;
 use std::fmt::Debug;
 
@@ -86,6 +86,10 @@ pub trait GasAlgebra {
 
     /// Bump the `extra_balance`.
     fn inject_balance(&mut self, extra_balance: impl Into<Gas>) -> PartialVMResult<()>;
+
+    fn num_dependencies(&self) -> NumModules;
+
+    fn total_dependency_size(&self) -> NumBytes;
 }
 
 /// Trait representing a gas meter used inside the Aptos VM.

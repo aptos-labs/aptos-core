@@ -90,7 +90,7 @@ fn execute_function_for_test(
 ) -> VMResult<SerializedReturnValues> {
     let traversal_storage = TraversalStorage::new();
 
-    let func = module_storage.load_function(module_id, function_name, ty_args)?;
+    let func = module_storage.unmetered_load_function(module_id, function_name, ty_args)?;
     MoveVM::execute_loaded_function(
         func,
         args,
@@ -112,7 +112,7 @@ fn execute_script_impl(
     let code_storage = storage.as_unsync_code_storage();
     let traversal_storage = TraversalStorage::new();
 
-    let function = code_storage.load_script(script, ty_args)?;
+    let function = code_storage.unmetered_load_script(script, ty_args)?;
     let mut data_cache = TransactionDataCache::empty();
 
     MoveVM::execute_loaded_function(

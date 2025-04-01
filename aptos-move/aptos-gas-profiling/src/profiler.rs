@@ -21,6 +21,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
+    gas_algebra::NumModules,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
 };
@@ -506,6 +507,22 @@ where
 
     fn charge_heap_memory(&mut self, amount: u64) -> PartialVMResult<()> {
         self.base.charge_heap_memory(amount)
+    }
+
+    fn total_dependency_size(&self) -> NumBytes {
+        self.base.total_dependency_size()
+    }
+
+    fn max_total_dependency_size(&self) -> NumBytes {
+        self.base.max_total_dependency_size()
+    }
+
+    fn num_dependencies(&self) -> NumModules {
+        self.base.num_dependencies()
+    }
+
+    fn max_num_dependencies(&self) -> NumModules {
+        self.base.max_num_dependencies()
     }
 }
 

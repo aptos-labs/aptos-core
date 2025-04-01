@@ -87,6 +87,24 @@ struct Table {
     content: BTreeMap<Vec<u8>, GlobalValue>,
 }
 
+impl Table {
+    fn new(
+        context: &mut SafeNativeContext,
+        handle: TableHandle,
+        key_ty: &Type,
+        value_ty: &Type,
+    ) -> PartialVMResult<Table> {
+        let key_layout = context.type_to_type_layout(key_ty)?;
+        let value_layout_info = LayoutInfo::from_value_ty(context, value_ty)?;
+        Ok(Self {
+            handle,
+            key_layout,
+            value_layout_info,
+            content: Default::default(),
+        })
+    }
+}
+
 /// The field index of the `handle` field in the `Table` Move struct.
 const HANDLE_FIELD_INDEX: usize = 0;
 
@@ -181,34 +199,37 @@ impl<'a> NativeTableContext<'a> {
 }
 
 impl TableData {
-    /// Gets or creates a new table in the TableData. This initializes information about
-    /// the table, like the type layout for keys and values.
-    fn get_or_create_table(
-        &mut self,
-        context: &SafeNativeContext,
+    /// Creates a new table in the TableData if it does not exist. This initializes information
+    /// about the table, like the type layout for keys and values.
+    fn maybe_create_table_data(
+        context: &mut SafeNativeContext,
         handle: TableHandle,
         key_ty: &Type,
         value_ty: &Type,
-    ) -> PartialVMResult<&mut Table> {
-        Ok(match self.tables.entry(handle) {
-            Entry::Vacant(e) => {
-                let key_layout = context.type_to_type_layout(key_ty)?;
-                let value_layout_info = LayoutInfo::from_value_ty(context, value_ty)?;
-                let table = Table {
-                    handle,
-                    key_layout,
-                    value_layout_info,
-                    content: Default::default(),
-                };
-                e.insert(table)
-            },
-            Entry::Occupied(e) => e.into_mut(),
-        })
+    ) -> PartialVMResult<()> {
+        let need_to_create_table = !context
+            .extensions()
+            .get::<NativeTableContext>()
+            .table_data
+            .borrow()
+            .tables
+            .contains_key(&handle);
+        if need_to_create_table {
+            let table = Table::new(context, handle, key_ty, value_ty)?;
+            context
+                .extensions()
+                .get::<NativeTableContext>()
+                .table_data
+                .borrow_mut()
+                .tables
+                .insert(handle, table);
+        }
+        Ok(())
     }
 }
 
 impl LayoutInfo {
-    fn from_value_ty(context: &SafeNativeContext, value_ty: &Type) -> PartialVMResult<Self> {
+    fn from_value_ty(context: &mut SafeNativeContext, value_ty: &Type) -> PartialVMResult<Self> {
         let (layout, has_identifier_mappings) =
             context.type_to_type_layout_with_identifier_mappings(value_ty)?;
         Ok(Self {
@@ -365,16 +386,19 @@ fn native_add_box(
 
     context.charge(ADD_BOX_BASE)?;
 
-    let function_value_extension = context.function_value_extension();
-    let table_context = context.extensions().get::<NativeTableContext>();
-    let mut table_data = table_context.table_data.borrow_mut();
-
     let val = args.pop_back().unwrap();
     let key = args.pop_back().unwrap();
     let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
 
-    let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
+    TableData::maybe_create_table_data(context, handle, &ty_args[0], &ty_args[2])?;
+    let table_context = context.extensions().get::<NativeTableContext>();
+    let mut table_data = table_context.table_data.borrow_mut();
+    let table = table_data
+        .tables
+        .get_mut(&handle)
+        .expect("Table should exist");
 
+    let function_value_extension = context.function_value_extension();
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
     let key_cost = ADD_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
@@ -417,15 +441,18 @@ fn native_borrow_box(
 
     context.charge(BORROW_BOX_BASE)?;
 
-    let function_value_extension = context.function_value_extension();
-    let table_context = context.extensions().get::<NativeTableContext>();
-    let mut table_data = table_context.table_data.borrow_mut();
-
     let key = args.pop_back().unwrap();
     let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
 
-    let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
+    TableData::maybe_create_table_data(context, handle, &ty_args[0], &ty_args[2])?;
+    let table_context = context.extensions().get::<NativeTableContext>();
+    let mut table_data = table_context.table_data.borrow_mut();
+    let table = table_data
+        .tables
+        .get_mut(&handle)
+        .expect("Table should exist");
 
+    let function_value_extension = context.function_value_extension();
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
     let key_cost = BORROW_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
@@ -468,15 +495,18 @@ fn native_contains_box(
 
     context.charge(CONTAINS_BOX_BASE)?;
 
-    let function_value_extension = context.function_value_extension();
-    let table_context = context.extensions().get::<NativeTableContext>();
-    let mut table_data = table_context.table_data.borrow_mut();
-
     let key = args.pop_back().unwrap();
     let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
 
-    let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
+    TableData::maybe_create_table_data(context, handle, &ty_args[0], &ty_args[2])?;
+    let table_context = context.extensions().get::<NativeTableContext>();
+    let mut table_data = table_context.table_data.borrow_mut();
+    let table = table_data
+        .tables
+        .get_mut(&handle)
+        .expect("Table should exist");
 
+    let function_value_extension = context.function_value_extension();
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
     let key_cost = CONTAINS_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
@@ -513,14 +543,18 @@ fn native_remove_box(
 
     context.charge(REMOVE_BOX_BASE)?;
 
-    let function_value_extension = context.function_value_extension();
-    let table_context = context.extensions().get::<NativeTableContext>();
-    let mut table_data = table_context.table_data.borrow_mut();
-
     let key = args.pop_back().unwrap();
     let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
 
-    let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
+    TableData::maybe_create_table_data(context, handle, &ty_args[0], &ty_args[2])?;
+    let table_context = context.extensions().get::<NativeTableContext>();
+    let mut table_data = table_context.table_data.borrow_mut();
+    let table = table_data
+        .tables
+        .get_mut(&handle)
+        .expect("Table should exist");
+
+    let function_value_extension = context.function_value_extension();
 
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
     let key_cost = REMOVE_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
@@ -564,13 +598,11 @@ fn native_destroy_empty_box(
 
     context.charge(DESTROY_EMPTY_BOX_BASE)?;
 
+    let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
+
+    TableData::maybe_create_table_data(context, handle, &ty_args[0], &ty_args[2])?;
     let table_context = context.extensions().get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
-
-    let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
-    // TODO: Can the following line be removed?
-    table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
-
     assert!(table_data.removed_tables.insert(handle));
 
     Ok(smallvec![])

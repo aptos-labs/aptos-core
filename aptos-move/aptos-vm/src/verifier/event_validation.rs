@@ -12,9 +12,7 @@ use move_binary_format::{
     },
     CompiledModule,
 };
-use move_core_types::{
-    account_address::AccountAddress, language_storage::ModuleId, vm_status::StatusCode,
-};
+use move_core_types::{account_address::AccountAddress, vm_status::StatusCode};
 use std::collections::HashSet;
 
 const EVENT_MODULE_NAME: &str = "event";
@@ -46,13 +44,22 @@ pub(crate) fn validate_module_events(
         // Check all the emit calls have the correct struct with event attribute.
         validate_emit_calls(&new_event_structs, module)?;
 
-        let original_event_structs =
-            extract_event_metadata_from_module(module_storage, &module.self_id())?;
-
-        for member in original_event_structs {
-            // Fail if we see a removal of an event attribute.
-            if !new_event_structs.remove(&member) {
-                metadata_validation_err("Invalid change in event attributes")?;
+        // MODULE LOADING METERING:
+        //   This is used to fetch old version of the code. If such exists, we have already charged
+        //   gas for it when processing publish request, so this access is safe.
+        let old_module_metadata_if_exists = module_storage
+            .unmetered_get_deserialized_module(module.address(), module.name())?
+            .and_then(|module| {
+                // TODO(loader_v2): We can optimize this to fetch metadata directly.
+                get_metadata_from_compiled_code(module.as_ref())
+            });
+        if let Some(metadata) = old_module_metadata_if_exists {
+            let original_event_structs = extract_event_metadata(&metadata)?;
+            for member in original_event_structs {
+                // Fail if we see a removal of an event attribute.
+                if !new_event_structs.remove(&member) {
+                    metadata_validation_err("Invalid change in event attributes")?;
+                }
             }
         }
     }
@@ -111,22 +118,6 @@ pub(crate) fn validate_emit_calls(
         }
     }
     Ok(())
-}
-
-/// Given a module id extract all event metadata
-pub(crate) fn extract_event_metadata_from_module(
-    module_storage: &impl AptosModuleStorage,
-    module_id: &ModuleId,
-) -> VMResult<HashSet<String>> {
-    // TODO(loader_v2): We can optimize metadata calls as well.
-    let metadata = module_storage
-        .fetch_deserialized_module(module_id.address(), module_id.name())?
-        .map(|module| get_metadata_from_compiled_code(module.as_ref()));
-    if let Some(Some(metadata)) = metadata {
-        extract_event_metadata(&metadata)
-    } else {
-        Ok(HashSet::new())
-    }
 }
 
 /// Given a module id extract all event metadata

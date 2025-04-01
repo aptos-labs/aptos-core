@@ -98,8 +98,11 @@ impl ModuleWriteSet {
         module_storage: &'a impl ModuleStorage,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
         self.writes.iter_mut().map(move |(key, write)| {
+            // MODULE LOADING METERING:
+            //    It is fine not to meter access to module here, because at publish time the gas is
+            //    paid for the module, either the new one, or both its new and old versions.
             let prev_size = module_storage
-                .fetch_module_size_in_bytes(write.module_address(), write.module_name())
+                .unmetered_get_module_size(write.module_address(), write.module_name())
                 .map_err(|e| e.to_partial())?
                 .unwrap_or(0) as u64;
             Ok(WriteOpInfo {

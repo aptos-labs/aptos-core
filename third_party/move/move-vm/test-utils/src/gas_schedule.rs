@@ -22,7 +22,7 @@ use move_core_types::{
     function::ClosureMask,
     gas_algebra::{
         AbstractMemorySize, GasQuantity, InternalGas, InternalGasPerAbstractMemoryUnit,
-        InternalGasUnit, NumArgs, NumBytes, NumTypeNodes, ToUnit,
+        InternalGasUnit, NumArgs, NumBytes, NumModules, NumTypeNodes, ToUnit,
     },
     identifier::IdentStr,
     language_storage::ModuleId,
@@ -35,10 +35,7 @@ use move_vm_types::{
 };
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use std::{
-    ops::{Add, Mul},
-    u64,
-};
+use std::ops::{Add, Mul};
 
 pub enum GasUnit {}
 
@@ -525,6 +522,22 @@ impl GasMeter for GasStatus {
 
     fn charge_heap_memory(&mut self, _amount: u64) -> PartialVMResult<()> {
         Ok(())
+    }
+
+    fn total_dependency_size(&self) -> NumBytes {
+        u64::MAX.into()
+    }
+
+    fn max_total_dependency_size(&self) -> NumBytes {
+        NumBytes::zero()
+    }
+
+    fn num_dependencies(&self) -> NumModules {
+        NumModules::zero()
+    }
+
+    fn max_num_dependencies(&self) -> NumModules {
+        u64::MAX.into()
     }
 }
 

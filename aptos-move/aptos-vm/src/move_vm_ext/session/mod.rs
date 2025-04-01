@@ -42,7 +42,8 @@ use move_vm_runtime::{
     module_traversal::TraversalContext,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
-    AsFunctionValueExtension, LoadedFunction, ModuleStorage, VerifiedModuleBundle,
+    AsFunctionValueExtension, LazyMeteredCodeStorage, LoadedFunction, ModuleStorage,
+    VerifiedModuleBundle,
 };
 use move_vm_types::{gas::GasMeter, value_serde::ValueSerDeContext, values::Value};
 use std::{borrow::Borrow, collections::BTreeMap, sync::Arc};
@@ -118,43 +119,6 @@ where
         }
     }
 
-    pub fn execute_entry_function(
-        &mut self,
-        func: LoadedFunction,
-        args: Vec<impl Borrow<[u8]>>,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        module_storage: &impl ModuleStorage,
-    ) -> VMResult<()> {
-        if !func.is_entry() {
-            let module_id = func
-                .module_id()
-                .ok_or_else(|| {
-                    let msg = "Entry function always has module id".to_string();
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(msg)
-                        .finish(Location::Undefined)
-                })?
-                .clone();
-            return Err(PartialVMError::new(
-                StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION,
-            )
-            .finish(Location::Module(module_id)));
-        }
-
-        MoveVM::execute_loaded_function(
-            func,
-            args,
-            &mut self.data_cache,
-            gas_meter,
-            traversal_context,
-            &mut self.extensions,
-            module_storage,
-            self.resolver,
-        )?;
-        Ok(())
-    }
-
     pub fn execute_function_bypass_visibility(
         &mut self,
         module_id: &ModuleId,
@@ -165,7 +129,22 @@ where
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
-        let func = module_storage.load_function(module_id, function_name, &ty_args)?;
+        let func = if module_storage
+            .runtime_environment()
+            .vm_config()
+            .use_lazy_loading
+        {
+            LazyMeteredCodeStorage::new(module_storage).metered_lazy_load_function(
+                gas_meter,
+                traversal_context,
+                module_id,
+                function_name,
+                &ty_args,
+            )?
+        } else {
+            module_storage.unmetered_load_function(module_id, function_name, &ty_args)?
+        };
+
         MoveVM::execute_loaded_function(
             func,
             args,
@@ -240,7 +219,7 @@ where
         } = self;
 
         let change_set = data_cache
-            .into_custom_effects(&resource_converter, module_storage)
+            .into_custom_effects(&resource_converter)
             .map_err(|e| e.finish(Location::Undefined))?;
 
         let (change_set, resource_group_change_set) =
@@ -395,7 +374,10 @@ where
             for (struct_tag, blob_op) in resources {
                 let resource_group_tag = {
                     let metadata = module_storage
-                        .fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
+                        .unmetered_get_existing_module_metadata(
+                            &struct_tag.address,
+                            &struct_tag.module,
+                        )
                         .map_err(|e| e.to_partial())?;
                     get_resource_group_member_from_metadata(&struct_tag, &metadata)
                 };

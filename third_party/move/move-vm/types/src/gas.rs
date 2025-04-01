@@ -7,7 +7,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    gas_algebra::{InternalGas, NumArgs, NumBytes, NumTypeNodes},
+    gas_algebra::{InternalGas, NumArgs, NumBytes, NumModules, NumTypeNodes},
     identifier::IdentStr,
     language_storage::ModuleId,
 };
@@ -142,6 +142,14 @@ impl SimpleInstruction {
 /// their own metering scheme.
 pub trait GasMeter {
     fn balance_internal(&self) -> InternalGas;
+
+    fn total_dependency_size(&self) -> NumBytes;
+
+    fn max_total_dependency_size(&self) -> NumBytes;
+
+    fn num_dependencies(&self) -> NumModules;
+
+    fn max_num_dependencies(&self) -> NumModules;
 
     /// Charge an instruction and fail if not enough gas units are left.
     fn charge_simple_instr(&mut self, instr: SimpleInstruction) -> PartialVMResult<()>;
@@ -590,5 +598,21 @@ impl GasMeter for UnmeteredGasMeter {
 
     fn charge_heap_memory(&mut self, _amount: u64) -> PartialVMResult<()> {
         Ok(())
+    }
+
+    fn total_dependency_size(&self) -> NumBytes {
+        u64::MAX.into()
+    }
+
+    fn max_total_dependency_size(&self) -> NumBytes {
+        NumBytes::zero()
+    }
+
+    fn num_dependencies(&self) -> NumModules {
+        NumModules::zero()
+    }
+
+    fn max_num_dependencies(&self) -> NumModules {
+        u64::MAX.into()
     }
 }

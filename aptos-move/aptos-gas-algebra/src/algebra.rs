@@ -42,11 +42,6 @@ pub type FeePerSlot = GasQuantity<UnitDiv<Octa, Slot>>;
 
 pub type FeePerByte = GasQuantity<UnitDiv<Octa, Byte>>;
 
-/// Unit of module
-pub enum Module {}
-
-pub type NumModules = GasQuantity<Module>;
-
 /***************************************************************************************************
  * Unit Conversion
  *
