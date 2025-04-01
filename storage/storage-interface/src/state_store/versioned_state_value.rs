@@ -86,53 +86,33 @@ impl<'kv> StateUpdateRef<'kv> {
 pub enum MemorizedStateRead {
     /// Underlying storage doesn't have an entry for this state key.
     NonExistent,
-    /// A creation or modification at a known version.
-    Value {
-        version: Version,
-        value: DbStateValue,
-    },
+    /// A state update at a known version
+    StateUpdate(DbStateUpdate),
 }
 
 impl MemorizedStateRead {
     pub fn from_db_get(tuple_opt: Option<(Version, StateValue)>) -> Self {
         match tuple_opt {
             None => Self::NonExistent,
-            Some((version, value)) => Self::Value {
+            Some((version, value)) => Self::StateUpdate(DbStateUpdate {
                 version,
-                value: value.into_db_state_value(0),
-            },
+                // N.B. Item will end up in hot state with refreshed access time down the stack.
+                value: Some(value.into_db_state_value(0)),
+            }),
         }
     }
 
     pub fn from_speculative_state(db_update: DbStateUpdate) -> Self {
-        match db_update.value {
-            None => Self::NonExistent,
-            Some(value) => Self::Value {
-                version: db_update.version,
-                value,
-            },
-        }
+        Self::StateUpdate(db_update)
     }
 
     pub fn from_hot_state_hit(db_update: DbStateUpdate) -> Self {
-        match db_update.value {
-            None => unreachable!("Hot state doesn't have None value."),
-            Some(value) => Self::Value {
-                version: db_update.version,
-                value,
-            },
-        }
+        Self::StateUpdate(db_update)
     }
 
     /// TODO(aldenhu): Remove. Use only in a context where the access time doesn't matter
     pub fn dummy_from_state_update_ref(state_update_ref: &StateUpdateRef) -> Self {
-        match state_update_ref.value {
-            None => Self::NonExistent,
-            Some(value) => Self::Value {
-                version: state_update_ref.version,
-                value: value.clone().into_db_state_value(0),
-            },
-        }
+        Self::StateUpdate(state_update_ref.to_db_state_update(0))
     }
 
     pub fn to_state_value_opt(&self) -> Option<StateValue> {
@@ -142,20 +122,26 @@ impl MemorizedStateRead {
     pub fn to_state_value_ref_opt(&self) -> Option<&StateValue> {
         match self {
             Self::NonExistent => None,
-            Self::Value { value, .. } => value.to_state_value_opt(),
+            Self::StateUpdate(DbStateUpdate { version: _, value }) => value
+                .as_ref()
+                .and_then(|db_val| db_val.to_state_value_opt()),
         }
     }
 
     pub fn into_state_value_opt(self) -> Option<StateValue> {
         match self {
             Self::NonExistent => None,
-            Self::Value { value, .. } => value.into_state_value_opt(),
+            Self::StateUpdate(DbStateUpdate { version: _, value }) => {
+                value.and_then(|db_val| db_val.into_state_value_opt())
+            },
         }
     }
 
-    pub fn to_hot_state_refresh(&self, access_time_secs: u32) -> Option<DbStateUpdate> {
-        const READ_CACHE_REFRESH_INTERVAL: u32 = 600;
-
+    pub fn to_hot_state_refresh(
+        &self,
+        access_time_secs: u32,
+        refresh_internal_secs: u32,
+    ) -> Option<DbStateUpdate> {
         match self {
             MemorizedStateRead::NonExistent => {
                 COUNTER.inc_with(&["memorized_read_new_hot_non_existent"]);
@@ -165,22 +151,34 @@ impl MemorizedStateRead {
                     value: Some(DbStateValue::new_hot_non_existent(access_time_secs)),
                 })
             },
-            MemorizedStateRead::Value { version, value } => {
-                let old_ts = value.access_time_secs();
-                if old_ts + READ_CACHE_REFRESH_INTERVAL < access_time_secs {
-                    if old_ts == 0 {
-                        COUNTER.inc_with(&["memorized_read_new_hot"]);
-                    } else {
-                        COUNTER.inc_with(&["memorized_read_refreshed_hot"]);
-                    }
-                    Some(DbStateUpdate {
-                        version: *version,
-                        value: Some(value.clone()),
-                    })
-                } else {
-                    COUNTER.inc_with(&["memorized_read_still_hot"]);
-                    None
-                } // end if-else
+            MemorizedStateRead::StateUpdate(DbStateUpdate { version, value }) => {
+                match value {
+                    None => {
+                        // a deletion from speculative state, no need to refresh
+                        COUNTER.inc_with(&["memorized_read_speculative_delete"]);
+                        None
+                    },
+                    Some(db_value) => {
+                        let old_ts = db_value.access_time_secs();
+                        if old_ts + refresh_internal_secs < access_time_secs {
+                            if old_ts == 0 {
+                                // comes from DB read
+                                COUNTER.inc_with(&["memorized_read_new_hot"]);
+                            } else {
+                                COUNTER.inc_with(&["memorized_read_refreshed_hot"]);
+                            }
+                            Some(DbStateUpdate {
+                                version: *version,
+                                value: Some(
+                                    db_value.clone().with_access_time_secs(access_time_secs),
+                                ),
+                            })
+                        } else {
+                            COUNTER.inc_with(&["memorized_read_still_hot"]);
+                            None
+                        } // end if-else
+                    },
+                }
             }, // end ::Value
         } // end match
     }

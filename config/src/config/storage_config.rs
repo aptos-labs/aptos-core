@@ -292,9 +292,7 @@ impl Default for LedgerPrunerConfig {
     fn default() -> Self {
         LedgerPrunerConfig {
             enable: true,
-            // This assumes we have 1T disk, minus the space needed by state merkle db and the
-            // overhead in storage.
-            prune_window: 150_000_000,
+            prune_window: 100_000_000,
             batch_size: 5_000,
             user_pruning_window_offset: 200_000,
         }
@@ -407,6 +405,7 @@ impl StorageConfig {
     }
 }
 
+#[derive(Debug)]
 pub struct StorageDirPaths {
     default_path: PathBuf,
     ledger_db_path: Option<PathBuf>,
@@ -475,7 +474,7 @@ impl StorageDirPaths {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct ShardedDbPaths {
     metadata_path: Option<PathBuf>,
     shard_paths: [Option<PathBuf>; 16],

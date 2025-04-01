@@ -56,6 +56,8 @@ for blind signing.
 -  [Function `check_permission_consume`](#0x1_permissioned_signer_check_permission_consume)
 -  [Function `capacity`](#0x1_permissioned_signer_capacity)
 -  [Function `revoke_permission`](#0x1_permissioned_signer_revoke_permission)
+-  [Function `address_of`](#0x1_permissioned_signer_address_of)
+-  [Function `borrow_address`](#0x1_permissioned_signer_borrow_address)
 -  [Function `is_permissioned_signer_impl`](#0x1_permissioned_signer_is_permissioned_signer_impl)
 -  [Function `permission_address`](#0x1_permissioned_signer_permission_address)
 -  [Function `signer_from_permissioned_handle_impl`](#0x1_permissioned_signer_signer_from_permissioned_handle_impl)
@@ -1540,6 +1542,56 @@ to bypass the checks.
     <b>if</b> (perm_storage.contains(&key)) {
         perm_storage.remove(&key);
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_permissioned_signer_address_of"></a>
+
+## Function `address_of`
+
+Unused function. Keeping it for compatibility purpose.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_address_of">address_of</a>(_s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_address_of">address_of</a>(_s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <b>address</b> {
+    <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_EPERMISSION_SIGNER_DISABLED">EPERMISSION_SIGNER_DISABLED</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_permissioned_signer_borrow_address"></a>
+
+## Function `borrow_address`
+
+Unused function. Keeping it for compatibility purpose.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_borrow_address">borrow_address</a>(_s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): &<b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_borrow_address">borrow_address</a>(_s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): &<b>address</b> {
+    <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_EPERMISSION_SIGNER_DISABLED">EPERMISSION_SIGNER_DISABLED</a>)
 }
 </code></pre>
 

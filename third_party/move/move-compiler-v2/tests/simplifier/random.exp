@@ -222,7 +222,7 @@ module 0x8675::M {
 
 
 Diagnostics:
-warning: Unused assignment to `q`. Consider removing or prefixing with an underscore: `_q`
+warning: Unused assignment/binding to `q`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_q`), or binding to `_`
    ┌─ tests/simplifier/random.move:48:17
    │
 48 │         let q = v;

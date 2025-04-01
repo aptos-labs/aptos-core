@@ -47,18 +47,18 @@ use codespan_reporting::{
     term::termcolor::{ColorChoice, StandardStream, WriteColor},
 };
 pub use experiments::{Experiment, EXPERIMENTS};
-use log::{debug, info, log_enabled, Level};
-use move_binary_format::errors::VMError;
-use move_bytecode_source_map::source_map::SourceMap;
-use move_compiler::{
+use legacy_move_compiler::{
     command_line,
     compiled_unit::{
         AnnotatedCompiledModule, AnnotatedCompiledScript, AnnotatedCompiledUnit, CompiledUnit,
         FunctionInfo, NamedCompiledModule, NamedCompiledScript,
     },
     diagnostics::FilesSourceText,
-    shared::{known_attributes::KnownAttribute, unique_map::UniqueMap},
+    shared::known_attributes::KnownAttribute,
 };
+use log::{debug, info, log_enabled, Level};
+use move_binary_format::errors::VMError;
+use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::vm_status::StatusType;
 use move_disassembler::disassembler::Disassembler;
 use move_model::{
@@ -230,7 +230,7 @@ pub fn run_checker_and_rewriters(options: Options) -> anyhow::Result<GlobalEnv> 
     } else {
         RewritingScope::CompilationTarget
     };
-    let env_pipeline = check_and_rewrite_pipeline(&options, false, scope);
+    let env_pipeline = check_and_rewrite_pipeline(&options, scope);
     let mut env = run_checker(options)?;
     if !env.has_errors() {
         if whole_program {
@@ -287,16 +287,14 @@ pub fn run_file_format_gen(
 
 /// Constructs the env checking and rewriting processing pipeline. `inlining_scope` can be set to
 /// `Everything` for use with the Move Prover, otherwise `CompilationTarget`
-/// should be used. If the model this is run on is produced via the v1 pipeline, the code
-/// can be assumed already checked by the v1 compiler, so we skip some steps.
+/// should be used.
 pub fn check_and_rewrite_pipeline<'a, 'b>(
     options: &'a Options,
-    for_v1_model: bool,
     inlining_scope: RewritingScope,
 ) -> EnvProcessorPipeline<'b> {
     let mut env_pipeline = EnvProcessorPipeline::<'b>::default();
 
-    if !for_v1_model && options.experiment_on(Experiment::USAGE_CHECK) {
+    if options.experiment_on(Experiment::USAGE_CHECK) {
         env_pipeline.add(
             "unused checks",
             flow_insensitive_checkers::check_for_unused_vars_and_params,
@@ -307,7 +305,7 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
         );
     }
 
-    if !for_v1_model && options.experiment_on(Experiment::RECURSIVE_TYPE_CHECK) {
+    if options.experiment_on(Experiment::RECURSIVE_TYPE_CHECK) {
         env_pipeline.add("check recursive struct definition", |env| {
             recursive_struct_checker::check_recursive_struct(env)
         });
@@ -316,13 +314,13 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
         });
     }
 
-    if !for_v1_model && options.experiment_on(Experiment::UNUSED_STRUCT_PARAMS_CHECK) {
+    if options.experiment_on(Experiment::UNUSED_STRUCT_PARAMS_CHECK) {
         env_pipeline.add("unused struct params check", |env| {
             unused_params_checker::unused_params_checker(env)
         });
     }
 
-    if !for_v1_model && options.experiment_on(Experiment::ACCESS_CHECK) {
+    if options.experiment_on(Experiment::ACCESS_CHECK) {
         env_pipeline.add(
             "access and use check before inlining",
             |env: &mut GlobalEnv| function_checker::check_access_and_use(env, true),
@@ -335,14 +333,14 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
         .is_at_least(LanguageVersion::V2_0)
         && options.experiment_on(Experiment::SEQS_IN_BINOPS_CHECK);
 
-    if !for_v1_model && check_seqs_in_binops {
+    if check_seqs_in_binops {
         env_pipeline.add("binop side effect check", |env| {
             // This check should be done before inlining.
             seqs_in_binop_checker::checker(env)
         });
     }
 
-    if !for_v1_model && options.experiment_on(Experiment::LINT_CHECKS) {
+    if options.experiment_on(Experiment::LINT_CHECKS) {
         // Perform all the model AST lint checks before AST transformations, to be closer
         // in form to the user code.
         env_pipeline.add("model AST lints", model_ast_lints::checker);
@@ -355,14 +353,14 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
         });
     }
 
-    if !for_v1_model && options.experiment_on(Experiment::ACCESS_CHECK) {
+    if options.experiment_on(Experiment::ACCESS_CHECK) {
         env_pipeline.add(
             "access and use check after inlining",
             |env: &mut GlobalEnv| function_checker::check_access_and_use(env, false),
         );
     }
 
-    if !for_v1_model && options.experiment_on(Experiment::ACQUIRES_CHECK) {
+    if options.experiment_on(Experiment::ACQUIRES_CHECK) {
         env_pipeline.add("acquires check", |env| {
             acquires_checker::acquires_checker(env)
         });
@@ -378,7 +376,11 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
         });
     }
 
-    if options.experiment_on(Experiment::LAMBDA_LIFTING) {
+    if options
+        .language_version
+        .unwrap_or_default()
+        .is_at_least(LanguageVersion::V2_2)
+    {
         let include_inline_functions = options.experiment_on(Experiment::LAMBDA_LIFTING_INLINE);
         env_pipeline.add("lambda-lifting", move |env: &mut GlobalEnv| {
             lambda_lifter::lift_lambdas(
@@ -389,7 +391,11 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
             )
         });
     }
-    if options.experiment_on(Experiment::FUNCTION_VALUES) {
+    if options
+        .language_version
+        .unwrap_or_default()
+        .is_at_least(LanguageVersion::V2_2)
+    {
         env_pipeline.add("closure-ability-checker", |env: &mut GlobalEnv| {
             closure_checker::check_closures(env)
         });
@@ -635,7 +641,6 @@ pub fn annotate_units(units: Vec<CompiledUnit>) -> Vec<AnnotatedCompiledUnit> {
                     module_name_loc: loc,
                     address_name: None,
                     named_module,
-                    function_infos: UniqueMap::new(),
                 })
             },
             CompiledUnit::Script(named_script) => {

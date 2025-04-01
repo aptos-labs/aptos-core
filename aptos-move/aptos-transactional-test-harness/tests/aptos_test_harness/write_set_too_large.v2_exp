@@ -1,4 +1,0 @@
-processed 3 tasks
-
-task 2 'run'. lines 29-29:
-Error: Failed to execute transaction. ExecutionStatus: ExecutionFailure { location: Script, function: 0, code_offset: 0 }

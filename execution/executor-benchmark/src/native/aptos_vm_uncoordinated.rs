@@ -42,7 +42,7 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
         // let features = Features::fetch_config(&state_view).unwrap_or_default();
 
         let env = AptosEnvironment::new(state_view);
-        let vm = AptosVM::new(env.clone(), state_view);
+        let vm = AptosVM::new(&env, state_view);
 
         let transaction_outputs = NATIVE_EXECUTOR_POOL.install(|| {
             txn_provider
@@ -51,7 +51,7 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
                 .enumerate()
                 .map(|(txn_idx, txn)| {
                     let log_context = AdapterLogSchema::new(state_view.id(), txn_idx);
-                    let code_storage = state_view.as_aptos_code_storage(env.clone());
+                    let code_storage = state_view.as_aptos_code_storage(&env);
 
                     vm.execute_single_transaction(
                         txn,

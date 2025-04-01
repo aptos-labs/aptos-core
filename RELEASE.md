@@ -33,7 +33,7 @@ The aptos node release tags are created for validator/fullnode deployment of the
 The aptos framework release tags are created to facilitate the on-chain framework upgrade of the given release branch. The minor number *Z* will increment when a new hot-fix release or a new  framework update is required on this release branch.
 
 ### aptos-cli-v*X.Y.Z* release tag
-The aptos cli release tags are created to track the CLI versions for community to use when developing on the Aptos network. It's always recommended to upgrade your CLI when a new version is released, for the best user experience. Learn how to update to the [latest CLI version](https://aptos.dev/tools/aptos-cli/install-cli/install-from-brew/#upgrading-the-cli).
+The aptos cli release tags are created to track the CLI versions for community to use when developing on the Aptos network. It's always recommended to upgrade your CLI when a new version is released, for the best user experience. Learn how to update to the [latest CLI version](https://aptos.dev/en/build/cli).
 
 ## Aptos Release Lifecycle
 (The time length here is a rough estimate, it varies depends on each release.)

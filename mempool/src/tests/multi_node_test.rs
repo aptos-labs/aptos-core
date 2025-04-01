@@ -244,7 +244,7 @@ impl TestHarness {
         node_a.find_common_network(node_b)
     }
 
-    /// Connect two nodes, Dialer -> Reciever, direction is important
+    /// Connect two nodes, Dialer -> Receiver, direction is important
     fn connect(&mut self, dialer_id: &NodeId, receiver_id: &NodeId) {
         self.connect_with_network(
             self.find_common_network(dialer_id, receiver_id),

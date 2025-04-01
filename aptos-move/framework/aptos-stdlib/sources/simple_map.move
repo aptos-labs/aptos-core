@@ -29,7 +29,7 @@ module aptos_std::simple_map {
     }
 
     public fun length<Key: store, Value: store>(self: &SimpleMap<Key, Value>): u64 {
-        vector::length(&self.data)
+        self.data.length()
     }
 
     /// Create an empty SimpleMap.
@@ -45,7 +45,7 @@ module aptos_std::simple_map {
         values: vector<Value>,
     ): SimpleMap<Key, Value> {
         let map = new();
-        add_all(&mut map, keys, values);
+        map.add_all(keys, values);
         map
     }
 
@@ -60,33 +60,33 @@ module aptos_std::simple_map {
         self: &SimpleMap<Key, Value>,
         key: &Key,
     ): &Value {
-        let maybe_idx = find(self, key);
-        assert!(option::is_some(&maybe_idx), error::invalid_argument(EKEY_NOT_FOUND));
-        let idx = option::extract(&mut maybe_idx);
-        &vector::borrow(&self.data, idx).value
+        let maybe_idx = self.find(key);
+        assert!(maybe_idx.is_some(), error::invalid_argument(EKEY_NOT_FOUND));
+        let idx = maybe_idx.extract();
+        &self.data.borrow(idx).value
     }
 
     public fun borrow_mut<Key: store, Value: store>(
         self: &mut SimpleMap<Key, Value>,
         key: &Key,
     ): &mut Value {
-        let maybe_idx = find(self, key);
-        assert!(option::is_some(&maybe_idx), error::invalid_argument(EKEY_NOT_FOUND));
-        let idx = option::extract(&mut maybe_idx);
-        &mut vector::borrow_mut(&mut self.data, idx).value
+        let maybe_idx = self.find(key);
+        assert!(maybe_idx.is_some(), error::invalid_argument(EKEY_NOT_FOUND));
+        let idx = maybe_idx.extract();
+        &mut self.data.borrow_mut(idx).value
     }
 
     public fun contains_key<Key: store, Value: store>(
         self: &SimpleMap<Key, Value>,
         key: &Key,
     ): bool {
-        let maybe_idx = find(self, key);
-        option::is_some(&maybe_idx)
+        let maybe_idx = self.find(key);
+        maybe_idx.is_some()
     }
 
     public fun destroy_empty<Key: store, Value: store>(self: SimpleMap<Key, Value>) {
         let SimpleMap { data } = self;
-        vector::destroy_empty(data);
+        data.destroy_empty();
     }
 
     /// Add a key/value pair to the map. The key must not already exist.
@@ -95,10 +95,10 @@ module aptos_std::simple_map {
         key: Key,
         value: Value,
     ) {
-        let maybe_idx = find(self, &key);
-        assert!(option::is_none(&maybe_idx), error::invalid_argument(EKEY_ALREADY_EXISTS));
+        let maybe_idx = self.find(&key);
+        assert!(maybe_idx.is_none(), error::invalid_argument(EKEY_ALREADY_EXISTS));
 
-        vector::push_back(&mut self.data, Element { key, value });
+        self.data.push_back(Element { key, value });
     }
 
     /// Add multiple key/value pairs to the map. The keys must not already exist.
@@ -107,8 +107,8 @@ module aptos_std::simple_map {
         keys: vector<Key>,
         values: vector<Value>,
     ) {
-        vector::zip(keys, values, |key, value| {
-            add(self, key, value);
+        keys.zip(values, |key, value| {
+            self.add(key, value);
         });
     }
 
@@ -119,34 +119,30 @@ module aptos_std::simple_map {
         value: Value
     ): (std::option::Option<Key>, std::option::Option<Value>) {
         let data = &mut self.data;
-        let len = vector::length(data);
-        let i = 0;
-        while (i < len) {
-            let element = vector::borrow(data, i);
+        let len = data.length();
+        for (i in 0..len) {
+            let element = data.borrow(i);
             if (&element.key == &key) {
-                vector::push_back(data, Element { key, value });
-                vector::swap(data, i, len);
-                let Element { key, value } = vector::pop_back(data);
+                data.push_back(Element { key, value });
+                data.swap(i, len);
+                let Element { key, value } = data.pop_back();
                 return (std::option::some(key), std::option::some(value))
             };
-            i = i + 1;
         };
-        vector::push_back(&mut self.data, Element { key, value });
+        self.data.push_back(Element { key, value });
         (std::option::none(), std::option::none())
     }
 
     /// Return all keys in the map. This requires keys to be copyable.
     public fun keys<Key: copy, Value>(self: &SimpleMap<Key, Value>): vector<Key> {
-        vector::map_ref(&self.data, |e| {
-            let e: &Element<Key, Value> = e;
+        self.data.map_ref(|e| {
             e.key
         })
     }
 
     /// Return all values in the map. This requires values to be copyable.
     public fun values<Key, Value: copy>(self: &SimpleMap<Key, Value>): vector<Value> {
-        vector::map_ref(&self.data, |e| {
-            let e: &Element<Key, Value> = e;
+        self.data.map_ref(|e| {
             e.value
         })
     }
@@ -158,10 +154,10 @@ module aptos_std::simple_map {
         let keys: vector<Key> = vector::empty();
         let values: vector<Value> = vector::empty();
         let SimpleMap { data } = self;
-        vector::for_each(data, |e| {
+        data.for_each(|e| {
             let Element { key, value } = e;
-            vector::push_back(&mut keys, key);
-            vector::push_back(&mut values, value);
+            keys.push_back(key);
+            values.push_back(value);
         });
         (keys, values)
     }
@@ -173,9 +169,9 @@ module aptos_std::simple_map {
         dk: |Key|,
         dv: |Value|
     ) {
-        let (keys, values) = to_vec_pair(self);
-        vector::destroy(keys, |_k| dk(_k));
-        vector::destroy(values, |_v| dv(_v));
+        let (keys, values) = self.to_vec_pair();
+        keys.destroy(|_k| dk(_k));
+        values.destroy(|_v| dv(_v));
     }
 
     /// Remove a key/value pair from the map. The key must exist.
@@ -183,10 +179,10 @@ module aptos_std::simple_map {
         self: &mut SimpleMap<Key, Value>,
         key: &Key,
     ): (Key, Value) {
-        let maybe_idx = find(self, key);
-        assert!(option::is_some(&maybe_idx), error::invalid_argument(EKEY_NOT_FOUND));
-        let placement = option::extract(&mut maybe_idx);
-        let Element { key, value } = vector::swap_remove(&mut self.data, placement);
+        let maybe_idx = self.find(key);
+        assert!(maybe_idx.is_some(), error::invalid_argument(EKEY_NOT_FOUND));
+        let placement = maybe_idx.extract();
+        let Element { key, value } = self.data.swap_remove(placement);
         (key, value)
     }
 
@@ -194,14 +190,12 @@ module aptos_std::simple_map {
         self: &SimpleMap<Key, Value>,
         key: &Key,
     ): option::Option<u64> {
-        let leng = vector::length(&self.data);
-        let i = 0;
-        while (i < leng) {
-            let element = vector::borrow(&self.data, i);
+        let len = self.data.length();
+        for (i in 0..len) {
+            let element = self.data.borrow(i);
             if (&element.key == key) {
                 return option::some(i)
             };
-            i = i + 1;
         };
         option::none<u64>()
     }
@@ -210,115 +204,115 @@ module aptos_std::simple_map {
     public fun test_add_remove_many() {
         let map = create<u64, u64>();
 
-        assert!(length(&map) == 0, 0);
-        assert!(!contains_key(&map, &3), 1);
-        add(&mut map, 3, 1);
-        assert!(length(&map) == 1, 2);
-        assert!(contains_key(&map, &3), 3);
-        assert!(borrow(&map, &3) == &1, 4);
-        *borrow_mut(&mut map, &3) = 2;
-        assert!(borrow(&map, &3) == &2, 5);
+        assert!(map.length() == 0, 0);
+        assert!(!map.contains_key(&3), 1);
+        map.add(3, 1);
+        assert!(map.length() == 1, 2);
+        assert!(map.contains_key(&3), 3);
+        assert!(map.borrow(&3) == &1, 4);
+        *map.borrow_mut(&3) = 2;
+        assert!(map.borrow(&3) == &2, 5);
 
-        assert!(!contains_key(&map, &2), 6);
-        add(&mut map, 2, 5);
-        assert!(length(&map) == 2, 7);
-        assert!(contains_key(&map, &2), 8);
-        assert!(borrow(&map, &2) == &5, 9);
-        *borrow_mut(&mut map, &2) = 9;
-        assert!(borrow(&map, &2) == &9, 10);
+        assert!(!map.contains_key(&2), 6);
+        map.add(2, 5);
+        assert!(map.length() == 2, 7);
+        assert!(map.contains_key(&2), 8);
+        assert!(map.borrow(&2) == &5, 9);
+        *map.borrow_mut(&2) = 9;
+        assert!(map.borrow(&2) == &9, 10);
 
-        remove(&mut map, &2);
-        assert!(length(&map) == 1, 11);
-        assert!(!contains_key(&map, &2), 12);
-        assert!(borrow(&map, &3) == &2, 13);
+        map.remove(&2);
+        assert!(map.length() == 1, 11);
+        assert!(!map.contains_key(&2), 12);
+        assert!(map.borrow(&3) == &2, 13);
 
-        remove(&mut map, &3);
-        assert!(length(&map) == 0, 14);
-        assert!(!contains_key(&map, &3), 15);
+        map.remove(&3);
+        assert!(map.length() == 0, 14);
+        assert!(!map.contains_key(&3), 15);
 
-        destroy_empty(map);
+        map.destroy_empty();
     }
 
     #[test]
     public fun test_add_all() {
         let map = create<u64, u64>();
 
-        assert!(length(&map) == 0, 0);
-        add_all(&mut map, vector[1, 2, 3], vector[10, 20, 30]);
-        assert!(length(&map) == 3, 1);
-        assert!(borrow(&map, &1) == &10, 2);
-        assert!(borrow(&map, &2) == &20, 3);
-        assert!(borrow(&map, &3) == &30, 4);
+        assert!(map.length() == 0, 0);
+        map.add_all(vector[1, 2, 3], vector[10, 20, 30]);
+        assert!(map.length() == 3, 1);
+        assert!(map.borrow(&1) == &10, 2);
+        assert!(map.borrow(&2) == &20, 3);
+        assert!(map.borrow(&3) == &30, 4);
 
-        remove(&mut map, &1);
-        remove(&mut map, &2);
-        remove(&mut map, &3);
-        destroy_empty(map);
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
     }
 
     #[test]
     public fun test_keys() {
         let map = create<u64, u64>();
-        assert!(keys(&map) == vector[], 0);
-        add(&mut map, 2, 1);
-        add(&mut map, 3, 1);
+        assert!(map.keys() == vector[], 0);
+        map.add(2, 1);
+        map.add(3, 1);
 
-        assert!(keys(&map) == vector[2, 3], 0);
+        assert!(map.keys() == vector[2, 3], 0);
     }
 
     #[test]
     public fun test_values() {
         let map = create<u64, u64>();
-        assert!(values(&map) == vector[], 0);
-        add(&mut map, 2, 1);
-        add(&mut map, 3, 2);
+        assert!(map.values() == vector[], 0);
+        map.add(2, 1);
+        map.add(3, 2);
 
-        assert!(values(&map) == vector[1, 2], 0);
+        assert!(map.values() == vector[1, 2], 0);
     }
 
     #[test]
     #[expected_failure]
     public fun test_add_twice() {
         let map = create<u64, u64>();
-        add(&mut map, 3, 1);
-        add(&mut map, 3, 1);
+        map.add(3, 1);
+        map.add(3, 1);
 
-        remove(&mut map, &3);
-        destroy_empty(map);
+        map.remove(&3);
+        map.destroy_empty();
     }
 
     #[test]
     #[expected_failure]
     public fun test_remove_twice() {
         let map = create<u64, u64>();
-        add(&mut map, 3, 1);
-        remove(&mut map, &3);
-        remove(&mut map, &3);
+        map.add(3, 1);
+        map.remove(&3);
+        map.remove(&3);
 
-        destroy_empty(map);
+        map.destroy_empty();
     }
 
     #[test]
     public fun test_upsert_test() {
         let map = create<u64, u64>();
         // test adding 3 elements using upsert
-        upsert<u64, u64>(&mut map, 1, 1);
-        upsert(&mut map, 2, 2);
-        upsert(&mut map, 3, 3);
+        map.upsert::<u64, u64>(1, 1);
+        map.upsert(2, 2);
+        map.upsert(3, 3);
 
-        assert!(length(&map) == 3, 0);
-        assert!(contains_key(&map, &1), 1);
-        assert!(contains_key(&map, &2), 2);
-        assert!(contains_key(&map, &3), 3);
-        assert!(borrow(&map, &1) == &1, 4);
-        assert!(borrow(&map, &2) == &2, 5);
-        assert!(borrow(&map, &3) == &3, 6);
+        assert!(map.length() == 3, 0);
+        assert!(map.contains_key(&1), 1);
+        assert!(map.contains_key(&2), 2);
+        assert!(map.contains_key(&3), 3);
+        assert!(map.borrow(&1) == &1, 4);
+        assert!(map.borrow(&2) == &2, 5);
+        assert!(map.borrow(&3) == &3, 6);
 
         // change mapping 1->1 to 1->4
-        upsert(&mut map, 1, 4);
+        map.upsert(1, 4);
 
-        assert!(length(&map) == 3, 7);
-        assert!(contains_key(&map, &1), 8);
-        assert!(borrow(&map, &1) == &4, 9);
+        assert!(map.length() == 3, 7);
+        assert!(map.contains_key(&1), 8);
+        assert!(map.borrow(&1) == &4, 9);
     }
 }

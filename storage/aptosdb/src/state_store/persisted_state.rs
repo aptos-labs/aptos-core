@@ -18,11 +18,24 @@ pub struct PersistedState {
 }
 
 impl PersistedState {
+    const HOT_STATE_MAX_ITEMS: usize = 1_000_000;
+    const HOT_STATE_MAX_VALUE_BYTES: usize = 4096;
     const MAX_PENDING_DROPS: usize = 8;
 
-    pub fn new_dummy() -> Self {
+    pub fn new_empty() -> Self {
+        Self::new_empty_with_config(Self::HOT_STATE_MAX_ITEMS, Self::HOT_STATE_MAX_VALUE_BYTES)
+    }
+
+    pub fn new_empty_with_config(
+        hot_state_capacity: usize,
+        hot_state_max_value_bytes: usize,
+    ) -> Self {
         let state = State::new_empty();
-        let hot_state = Arc::new(HotState::new(state));
+        let hot_state = Arc::new(HotState::new(
+            state,
+            hot_state_capacity,
+            hot_state_max_value_bytes,
+        ));
         let summary = Arc::new(Mutex::new(StateSummary::new_empty()));
         Self { hot_state, summary }
     }
