@@ -4,7 +4,6 @@
 
 use crate::{
     access_control::AccessControlState,
-    check_type_tag_dependencies_and_charge_gas,
     config::VMConfig,
     data_cache::TransactionDataCache,
     frame_type_cache::{
@@ -594,47 +593,14 @@ impl InterpreterImpl<'_> {
                         .map_err(|e| set_err_info!(current_frame, e))?;
                     let mask = lazy_function.closure_mask();
 
-                    // Before trying to resolve the function, charge gas for associated
-                    // module loading.
-                    let module_id = lazy_function.with_name_and_ty_args(
-                        |module_opt, _func_name, ty_arg_tags| {
-                            let Some(module_id) = module_opt else {
-                                // TODO(#15664): currently we need the module id for gas charging
-                                //   of calls, so we can't proceed here without one. But we want
-                                //   to be able to let scripts use closures.
-                                let err = PartialVMError::new_invariant_violation(format!(
-                                    "module id required to charge gas for function `{}`",
-                                    lazy_function.to_stable_string()
-                                ));
-                                return Err(set_err_info!(current_frame, err));
-                            };
-
-                            // Charge gas for function code loading.
-                            let arena_id = traversal_context
-                                .referenced_module_ids
-                                .alloc(module_id.clone());
-                            check_dependencies_and_charge_gas(
-                                module_storage,
-                                gas_meter,
-                                traversal_context,
-                                [(arena_id.address(), arena_id.name())],
-                            )?;
-
-                            // Charge gas for code loading of modules used by type arguments.
-                            check_type_tag_dependencies_and_charge_gas(
-                                module_storage,
-                                gas_meter,
-                                traversal_context,
-                                ty_arg_tags,
-                            )?;
-                            Ok(module_id.clone())
-                        },
-                    )?;
-
                     // Resolve the function. This may lead to loading the code related
                     // to this function.
-                    let callee = lazy_function
-                        .with_resolved_function(module_storage, |f| Ok(f.clone()))
+                    let (callee, module_id) = lazy_function
+                        .load_if_unresolved::<RTTCheck>(
+                            module_storage,
+                            gas_meter,
+                            traversal_context,
+                        )
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     // Charge gas for call and for the parameters. The current APIs

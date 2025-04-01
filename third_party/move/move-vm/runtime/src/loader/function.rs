@@ -3,8 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    check_dependencies_and_charge_gas, check_type_tag_dependencies_and_charge_gas,
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
+    module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
+    runtime_type_checks::RuntimeTypeCheck,
     LayoutConverter, ModuleStorage, StorageLayoutConverter,
 };
 use better_any::{Tid, TidAble, TidExt};
@@ -26,6 +29,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
+    gas::GasMeter,
     loaded_data::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
@@ -159,16 +163,52 @@ impl LazyLoadedFunction {
         }
     }
 
-    /// Executed an action with the resolved loaded function. If the function hasn't been
-    /// loaded yet, it will be loaded now.
-    pub(crate) fn with_resolved_function<T>(
+    /// Loads the function if it has not been resolved. Gas will be charged by this function.
+    pub(crate) fn load_if_unresolved<RTCheck: RuntimeTypeCheck>(
         &self,
-        storage: &dyn ModuleStorage,
-        action: impl FnOnce(Rc<LoadedFunction>) -> PartialVMResult<T>,
-    ) -> PartialVMResult<T> {
+        module_storage: &impl ModuleStorage,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+    ) -> PartialVMResult<(Rc<LoadedFunction>, ModuleId)> {
+        // Step 1: charge gas.
+        let module_id = self.with_name_and_ty_args(|module_opt, _func_name, ty_arg_tags| {
+            let Some(module_id) = module_opt else {
+                // TODO(#15664): currently we need the module id for gas charging
+                //   of calls, so we can't proceed here without one. But we want
+                //   to be able to let scripts use closures.
+                let err = PartialVMError::new_invariant_violation(format!(
+                    "module id required to charge gas for function `{}`",
+                    self.to_stable_string()
+                ));
+                return Err(err);
+            };
+
+            // Charge gas for function code loading.
+            let arena_id = traversal_context
+                .referenced_module_ids
+                .alloc(module_id.clone());
+            check_dependencies_and_charge_gas(module_storage, gas_meter, traversal_context, [(
+                arena_id.address(),
+                arena_id.name(),
+            )])
+            .map_err(|err| err.to_partial())?;
+
+            // Charge gas for code loading of modules used by type arguments.
+            check_type_tag_dependencies_and_charge_gas(
+                module_storage,
+                gas_meter,
+                traversal_context,
+                ty_arg_tags,
+            )
+            .map_err(|err| err.to_partial())?;
+
+            Ok(module_id.clone())
+        })?;
+
+        // Step 2: load the function.
         let mut state = self.0.borrow_mut();
-        match &mut *state {
-            LazyLoadedFunctionState::Resolved { fun, .. } => action(fun.clone()),
+        let fun = match &mut *state {
+            LazyLoadedFunctionState::Resolved { fun, .. } => fun.clone(),
             LazyLoadedFunctionState::Unresolved {
                 data:
                     SerializedFunctionData {
@@ -180,23 +220,33 @@ impl LazyLoadedFunction {
                         captured_layouts,
                     },
             } => {
-                let fun =
-                    Self::resolve(storage, module_id, fun_id, ty_args, *mask, captured_layouts)?;
-                let result = action(fun.clone());
+                let fun = Self::resolve::<RTCheck>(
+                    module_storage,
+                    gas_meter,
+                    traversal_context,
+                    module_id,
+                    fun_id,
+                    ty_args,
+                    *mask,
+                    captured_layouts,
+                )?;
                 *state = LazyLoadedFunctionState::Resolved {
-                    fun,
+                    fun: fun.clone(),
                     ty_args: ty_args.clone(),
                     mask: *mask,
                 };
-                result
+                fun
             },
-        }
+        };
+        Ok((fun, module_id))
     }
 
     /// Resolves a function into a loaded function. This verifies existence of the named
     /// function as well as whether it has the type used for deserializing the captured values.
-    fn resolve(
-        module_storage: &dyn ModuleStorage,
+    fn resolve<RTCheck: RuntimeTypeCheck>(
+        module_storage: &impl ModuleStorage,
+        _gas_meter: &mut impl GasMeter,
+        _traversal_context: &mut TraversalContext,
         module_id: &ModuleId,
         fun_id: &IdentStr,
         ty_args: &[TypeTag],
@@ -207,36 +257,35 @@ impl LazyLoadedFunction {
             .load_function(module_id, fun_id, ty_args)
             .map_err(|err| err.to_partial())?;
 
-        // Verify that the function argument types match the layouts used for deserialization.
-        // This is only done in paranoid mode. Since integrity of storage
-        // and guarantee of public function, this should not able to fail.
-        if module_storage
-            .runtime_environment()
-            .vm_config()
-            .paranoid_type_checks
-        {
-            // TODO(#15664): Determine whether we need to charge gas here.
-            let captured_arg_types = mask.extract(function.param_tys(), true);
-            let converter = StorageLayoutConverter::new(module_storage);
-            if captured_arg_types.len() != captured_layouts.len() {
-                return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                    .with_message(
-                        "captured argument count does not match declared parameters".to_string(),
-                    ));
-            }
+        // In paranoid mode, we need to verify that the function argument types match the layouts
+        // used for deserialization. While this is only done in paranoid mode, gas still need to be
+        // charged.
+        // TODO(#15664): Charge gas here!
+        let captured_arg_types = mask.extract(function.param_tys(), true);
+        if captured_arg_types.len() != captured_layouts.len() {
+            return Err(
+                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
+                    "captured argument count does not match declared parameters".to_string(),
+                ),
+            );
+        }
 
-            let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
-            for (actual_arg_ty, serialized_layout) in
-                captured_arg_types.into_iter().zip(captured_layouts)
-            {
-                // Note that the below call returns a runtime layout, so we can directly
-                // compare it without desugaring.
-                let actual_arg_layout = if ty_args.is_empty() {
-                    converter.type_to_type_layout(actual_arg_ty)?
-                } else {
-                    let actual_arg_ty = ty_builder.create_ty_with_subst(actual_arg_ty, &ty_args)?;
-                    converter.type_to_type_layout(&actual_arg_ty)?
-                };
+        let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
+        let converter = StorageLayoutConverter::new(module_storage);
+        for (actual_arg_ty, serialized_layout) in
+            captured_arg_types.into_iter().zip(captured_layouts)
+        {
+            // Note that the below call returns a runtime layout, so we can directly
+            // compare it without desugaring.
+            let actual_arg_layout = if ty_args.is_empty() {
+                converter.type_to_type_layout(actual_arg_ty)?
+            } else {
+                let actual_arg_ty = ty_builder.create_ty_with_subst(actual_arg_ty, &ty_args)?;
+                converter.type_to_type_layout(&actual_arg_ty)?
+            };
+
+            #[allow(clippy::collapsible_if)]
+            if RTCheck::should_perform_checks() {
                 if !serialized_layout.is_compatible_with(&actual_arg_layout) {
                     return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                         .with_message(
@@ -246,6 +295,7 @@ impl LazyLoadedFunction {
                 }
             }
         }
+
         Ok(Rc::new(function))
     }
 }
