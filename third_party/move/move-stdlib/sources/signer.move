@@ -20,7 +20,6 @@ module std::signer {
     /// semantics.
     ///
     /// `borrow_address` borrows this inner field
-    /// This function would abort on permissioned signer.
     native public fun borrow_address(s: &signer): &address;
 
     // Copies the address of the signer

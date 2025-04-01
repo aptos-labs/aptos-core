@@ -44,6 +44,8 @@ impl TryFrom<&[u8]> for UnvalidatedPublicKey {
 }
 
 impl ValidCryptoMaterial for UnvalidatedPublicKey {
+    const AIP_80_PREFIX: &'static str = "bls12381-pub-";
+
     fn to_bytes(&self) -> Vec<u8> {
         self.0.to_vec()
     }

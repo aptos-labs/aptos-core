@@ -21,17 +21,17 @@ error: global memory invariant does not hold
    =     at tests/sources/functional/global_invariants.move:53: remove_S_invalid
    =         account = <redacted>
    =     at tests/sources/functional/global_invariants.move:55: remove_S_invalid
-   =     at ../move-stdlib/sources/signer.move:27: address_of
+   =     at ../move-stdlib/sources/signer.move:26: address_of
    =         s = <redacted>
-   =     at ../move-stdlib/sources/signer.move:28: address_of
+   =     at ../move-stdlib/sources/signer.move:27: address_of
    =         result = <redacted>
-   =     at ../move-stdlib/sources/signer.move:29: address_of
+   =     at ../move-stdlib/sources/signer.move:28: address_of
    =     at tests/sources/functional/global_invariants.move:56: remove_S_invalid
-   =     at ../move-stdlib/sources/signer.move:27: address_of
+   =     at ../move-stdlib/sources/signer.move:26: address_of
    =         s = <redacted>
-   =     at ../move-stdlib/sources/signer.move:28: address_of
+   =     at ../move-stdlib/sources/signer.move:27: address_of
    =         result = <redacted>
-   =     at ../move-stdlib/sources/signer.move:29: address_of
+   =     at ../move-stdlib/sources/signer.move:28: address_of
    =     at tests/sources/functional/global_invariants.move:18
 
 error: global memory invariant does not hold
@@ -43,17 +43,17 @@ error: global memory invariant does not hold
    =     at tests/sources/functional/global_invariants.move:62: remove_R_invalid
    =         account = <redacted>
    =     at tests/sources/functional/global_invariants.move:64: remove_R_invalid
-   =     at ../move-stdlib/sources/signer.move:27: address_of
+   =     at ../move-stdlib/sources/signer.move:26: address_of
    =         s = <redacted>
-   =     at ../move-stdlib/sources/signer.move:28: address_of
+   =     at ../move-stdlib/sources/signer.move:27: address_of
    =         result = <redacted>
-   =     at ../move-stdlib/sources/signer.move:29: address_of
+   =     at ../move-stdlib/sources/signer.move:28: address_of
    =     at tests/sources/functional/global_invariants.move:65: remove_R_invalid
-   =     at ../move-stdlib/sources/signer.move:27: address_of
+   =     at ../move-stdlib/sources/signer.move:26: address_of
    =         s = <redacted>
-   =     at ../move-stdlib/sources/signer.move:28: address_of
+   =     at ../move-stdlib/sources/signer.move:27: address_of
    =         result = <redacted>
-   =     at ../move-stdlib/sources/signer.move:29: address_of
+   =     at ../move-stdlib/sources/signer.move:28: address_of
    =     at tests/sources/functional/global_invariants.move:62: remove_R_invalid
    =     at tests/sources/functional/global_invariants.move:65: remove_R_invalid
    =     at tests/sources/functional/global_invariants.move:18

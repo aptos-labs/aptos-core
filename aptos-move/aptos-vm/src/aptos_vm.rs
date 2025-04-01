@@ -33,7 +33,7 @@ use aptos_block_executor::{
     txn_provider::{default::DefaultTxnProvider, TxnProvider},
 };
 use aptos_crypto::HashValue;
-use aptos_framework::{natives::code::PublishRequest, RuntimeModuleMetadataV1};
+use aptos_framework::natives::code::PublishRequest;
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
 use aptos_gas_schedule::{
@@ -74,9 +74,13 @@ use aptos_types::{
         TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         ViewFunctionOutput, WriteSetPayload,
     },
+    vm::module_metadata::{
+        get_compilation_metadata_from_compiled_module,
+        get_compilation_metadata_from_compiled_script, get_metadata, get_metadata_v0,
+        verify_module_metadata, RuntimeModuleMetadataV1,
+    },
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
-use aptos_utils::aptos_try;
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
 use aptos_vm_types::{
@@ -1059,65 +1063,6 @@ impl AptosVM {
         ))
     }
 
-    fn simulate_multisig_transaction<'a, 'r>(
-        &self,
-        resolver: &'r impl AptosMoveResolver,
-        module_storage: &impl AptosModuleStorage,
-        session: UserSession<'r>,
-        serialized_signers: &SerializedSigners,
-        gas_meter: &mut impl AptosGasMeter,
-        traversal_context: &mut TraversalContext<'a>,
-        txn_data: &TransactionMetadata,
-        payload: &'a Multisig,
-        log_context: &AdapterLogSchema,
-        change_set_configs: &ChangeSetConfigs,
-    ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        match &payload.transaction_payload {
-            None => Err(VMStatus::error(StatusCode::MISSING_DATA, None)),
-            Some(multisig_payload) => {
-                match multisig_payload {
-                    MultisigTransactionPayload::EntryFunction(entry_function) => {
-                        aptos_try!({
-                            let user_session_change_set = self.execute_multisig_entry_function(
-                                resolver,
-                                module_storage,
-                                session,
-                                gas_meter,
-                                traversal_context,
-                                payload.multisig_address,
-                                entry_function,
-                                change_set_configs,
-                            )?;
-
-                            // TODO: Deduplicate this against execute_multisig_transaction
-                            // A bit tricky since we need to skip success/failure cleanups,
-                            // which is in the middle. Introducing a boolean would make the code
-                            // messier.
-                            let epilogue_session = self.charge_change_set_and_respawn_session(
-                                user_session_change_set,
-                                resolver,
-                                module_storage,
-                                gas_meter,
-                                txn_data,
-                            )?;
-
-                            self.success_transaction_cleanup(
-                                epilogue_session,
-                                module_storage,
-                                serialized_signers,
-                                gas_meter,
-                                txn_data,
-                                log_context,
-                                change_set_configs,
-                                traversal_context,
-                            )
-                        })
-                    },
-                }
-            },
-        }
-    }
-
     // Execute a multisig transaction:
     // 1. Obtain the payload of the transaction to execute. This could have been stored on chain
     // when the multisig transaction was created.
@@ -1204,12 +1149,14 @@ impl AptosVM {
         // EntryFunction payload type.
         // If either deserialization fails for some reason, that means the user provided incorrect
         // payload data either during transaction creation or execution.
-        let deserialization_error = PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)
-            .finish(Location::Undefined);
+        let deserialization_error = || {
+            PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)
+                .finish(Location::Undefined)
+        };
         let payload_bytes =
-            bcs::from_bytes::<Vec<u8>>(payload_bytes).map_err(|_| deserialization_error.clone())?;
+            bcs::from_bytes::<Vec<u8>>(payload_bytes).map_err(|_| deserialization_error())?;
         let payload = bcs::from_bytes::<MultisigTransactionPayload>(&payload_bytes)
-            .map_err(|_| deserialization_error)?;
+            .map_err(|_| deserialization_error())?;
 
         // Step 2: Execute the target payload. Transaction failure here is tolerated. In case of any
         // failures, we'll discard the session and start a new one. This ensures that any data
@@ -1288,56 +1235,6 @@ impl AptosVM {
             change_set_configs,
             traversal_context,
         )
-    }
-
-    fn execute_or_simulate_multisig_transaction<'a, 'r>(
-        &self,
-        resolver: &'r impl AptosMoveResolver,
-        module_storage: &impl AptosModuleStorage,
-        session: UserSession<'r>,
-        serialized_signers: &SerializedSigners,
-        prologue_session_change_set: &SystemSessionChangeSet,
-        gas_meter: &mut impl AptosGasMeter,
-        traversal_context: &mut TraversalContext<'a>,
-        txn_data: &TransactionMetadata,
-        payload: &'a Multisig,
-        log_context: &AdapterLogSchema,
-        change_set_configs: &ChangeSetConfigs,
-    ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        // Once `simulation_enhancement` is enabled, we use `execute_multisig_transaction` for simulation,
-        // deprecating `simulate_multisig_transaction`.
-        if self.is_simulation
-            && !self
-                .features()
-                .is_transaction_simulation_enhancement_enabled()
-        {
-            self.simulate_multisig_transaction(
-                resolver,
-                module_storage,
-                session,
-                serialized_signers,
-                gas_meter,
-                traversal_context,
-                txn_data,
-                payload,
-                log_context,
-                change_set_configs,
-            )
-        } else {
-            self.execute_multisig_transaction(
-                resolver,
-                module_storage,
-                session,
-                serialized_signers,
-                prologue_session_change_set,
-                gas_meter,
-                traversal_context,
-                txn_data,
-                payload,
-                log_context,
-                change_set_configs,
-            )
-        }
     }
 
     fn execute_multisig_entry_function(
@@ -1620,7 +1517,7 @@ impl AptosVM {
                     }
                 }
             }
-            aptos_framework::verify_module_metadata(m, self.features(), self.timed_features())
+            verify_module_metadata(m, self.features(), self.timed_features())
                 .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
         }
 
@@ -1644,9 +1541,7 @@ impl AptosVM {
     fn reject_unstable_bytecode(&self, modules: &[CompiledModule]) -> VMResult<()> {
         if self.chain_id().is_mainnet() {
             for module in modules {
-                if let Some(metadata) =
-                    aptos_framework::get_compilation_metadata_from_compiled_module(module)
-                {
+                if let Some(metadata) = get_compilation_metadata_from_compiled_module(module) {
                     if metadata.unstable {
                         return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
                             .with_message(
@@ -1663,9 +1558,7 @@ impl AptosVM {
     /// Check whether the script can be run on mainnet based on the unstable tag in the metadata
     pub fn reject_unstable_bytecode_for_script(&self, module: &CompiledScript) -> VMResult<()> {
         if self.chain_id().is_mainnet() {
-            if let Some(metadata) =
-                aptos_framework::get_compilation_metadata_from_compiled_script(module)
-            {
+            if let Some(metadata) = get_compilation_metadata_from_compiled_script(module) {
                 if metadata.unstable {
                     return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
                         .with_message("script marked unstable cannot be run on mainnet".to_string())
@@ -1936,7 +1829,7 @@ impl AptosVM {
                     log_context,
                     change_set_configs,
                 ),
-            TransactionPayload::Multisig(payload) => self.execute_or_simulate_multisig_transaction(
+            TransactionPayload::Multisig(payload) => self.execute_multisig_transaction(
                 resolver,
                 code_storage,
                 user_session,
@@ -2381,10 +2274,13 @@ impl AptosVM {
         module_storage: &impl AptosModuleStorage,
         module_id: &ModuleId,
     ) -> Option<Arc<RuntimeModuleMetadataV1>> {
+        let metadata = module_storage
+            .fetch_module_metadata(module_id.address(), module_id.name())
+            .ok()??;
         if self.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
-            aptos_framework::get_vm_metadata(module_storage, module_id)
+            get_metadata(&metadata)
         } else {
-            aptos_framework::get_vm_metadata_v0(module_storage, module_id)
+            get_metadata_v0(&metadata)
         }
     }
 

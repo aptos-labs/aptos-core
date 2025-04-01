@@ -50,7 +50,7 @@ scopeguard = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
-aptos-language-e2e-tests = { workspace = true }
+aptos-transaction-simulation = { workspace = true }
 aptos-types = { workspace = true, features = ["testing"] }
 criterion = { workspace = true }
 fail = { workspace = true, features = ["failpoints"] }

@@ -32,7 +32,6 @@ aptos-mvhashmap = { workspace = true }
 aptos-native-interface = { workspace = true }
 aptos-table-natives = { workspace = true }
 aptos-types = { workspace = true }
-aptos-utils = { workspace = true }
 aptos-vm-environment = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
@@ -63,7 +62,9 @@ serde = { workspace = true }
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
 aptos-block-executor = { workspace = true, features = ["testing"] }
+aptos-keygen = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
+aptos-transaction-simulation = { workspace = true }
 aptos-types = { workspace = true, features = ["fuzzing", "testing"] }
 claims = { workspace = true }
 move-vm-types = { workspace = true, features = ["testing"] }

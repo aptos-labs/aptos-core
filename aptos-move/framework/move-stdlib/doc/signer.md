@@ -5,22 +5,18 @@
 
 
 
--  [Constants](#@Constants_0)
 -  [Function `borrow_address`](#0x1_signer_borrow_address)
 -  [Function `address_of`](#0x1_signer_address_of)
--  [Specification](#@Specification_1)
+-  [Specification](#@Specification_0)
 
 
 <pre><code></code></pre>
 
 
 
-<a id="@Constants_0"></a>
+<a id="0x1_signer_borrow_address"></a>
 
-## Constants
-
-
-<a id="0x1_signer_EADDRESS_OF_PERMISSIONED"></a>
+## Function `borrow_address`
 
 signer is a builtin move type that represents an address that has been verfied by the VM.
 
@@ -41,17 +37,6 @@ account: address,
 ```
 ^ The discrepency is needed to maintain backwards compatibility of signer serialization
 semantics.
-Calling address_of on a permissioned signer.
-
-
-<pre><code><b>const</b> <a href="signer.md#0x1_signer_EADDRESS_OF_PERMISSIONED">EADDRESS_OF_PERMISSIONED</a>: u64 = 0;
-</code></pre>
-
-
-
-<a id="0x1_signer_borrow_address"></a>
-
-## Function `borrow_address`
 
 <code>borrow_address</code> borrows this inner field
 
@@ -96,7 +81,7 @@ Calling address_of on a permissioned signer.
 
 </details>
 
-<a id="@Specification_1"></a>
+<a id="@Specification_0"></a>
 
 ## Specification
 

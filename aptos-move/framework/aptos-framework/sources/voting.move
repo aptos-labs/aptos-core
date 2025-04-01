@@ -208,7 +208,7 @@ module aptos_framework::voting {
 
     public fun register<ProposalType: store>(account: &signer) {
         check_vote_permission(account);
-        let addr = permissioned_signer::address_of(account);
+        let addr = signer::address_of(account);
         assert!(!exists<VotingForum<ProposalType>>(addr), error::already_exists(EVOTING_FORUM_ALREADY_REGISTERED));
 
         let voting_forum = VotingForum<ProposalType> {

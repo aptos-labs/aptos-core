@@ -83,6 +83,8 @@ impl PublicParameters {
 }
 
 impl ValidCryptoMaterial for PublicParameters {
+    const AIP_80_PREFIX: &'static str = "";
+
     fn to_bytes(&self) -> Vec<u8> {
         self.to_bytes()
     }

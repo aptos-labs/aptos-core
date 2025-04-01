@@ -258,7 +258,7 @@ module aptos_framework::object {
     /// Create a new named object and return the ConstructorRef. Named objects can be queried globally
     /// by knowing the user generated seed used to create them. Named objects cannot be deleted.
     public fun create_named_object(creator: &signer, seed: vector<u8>): ConstructorRef {
-        let creator_address = permissioned_signer::address_of(creator);
+        let creator_address = signer::address_of(creator);
         let obj_addr = create_object_address(&creator_address, seed);
         create_object_internal(creator_address, obj_addr, false)
     }
@@ -302,7 +302,7 @@ module aptos_framework::object {
     /// doesn't have the same bottlenecks.
     public fun create_object_from_account(creator: &signer): ConstructorRef {
         let guid = account::create_guid(creator);
-        create_object_from_guid(permissioned_signer::address_of(creator), guid)
+        create_object_from_guid(signer::address_of(creator), guid)
     }
 
     #[deprecated]
@@ -314,7 +314,7 @@ module aptos_framework::object {
     /// doesn't have the same bottlenecks.
     public fun create_object_from_object(creator: &signer): ConstructorRef acquires ObjectCore {
         let guid = create_guid(creator);
-        create_object_from_guid(permissioned_signer::address_of(creator), guid)
+        create_object_from_guid(signer::address_of(creator), guid)
     }
 
     fun create_object_from_guid(creator_address: address, guid: guid::GUID): ConstructorRef {
@@ -395,7 +395,7 @@ module aptos_framework::object {
 
     /// Create a guid for the object, typically used for events
     public fun create_guid(object: &signer): guid::GUID acquires ObjectCore {
-        let addr = permissioned_signer::address_of(object);
+        let addr = signer::address_of(object);
         let object_data = borrow_global_mut<ObjectCore>(addr);
         guid::create(addr, &mut object_data.guid_creation_num)
     }
@@ -545,7 +545,7 @@ module aptos_framework::object {
         object: address,
         to: address,
     ) acquires ObjectCore {
-        let owner_address = permissioned_signer::address_of(owner);
+        let owner_address = signer::address_of(owner);
         assert!(
             permissioned_signer::check_permission_exists(owner, TransferPermission { object }),
             error::permission_denied(EOBJECT_NOT_TRANSFERRABLE)
@@ -629,11 +629,7 @@ module aptos_framework::object {
     /// Original owners can reclaim burnt objects any time in the future by calling unburn.
     /// Please use the test only [`object::burn_object_with_transfer`] for testing with previously burned objects.
     public entry fun burn<T: key>(owner: &signer, object: Object<T>) acquires ObjectCore {
-        assert!(
-            permissioned_signer::check_permission_exists(owner, TransferPermission { object: object.inner }),
-            error::permission_denied(EOBJECT_NOT_TRANSFERRABLE)
-        );
-        let original_owner = permissioned_signer::address_of(owner);
+        let original_owner = signer::address_of(owner);
         assert!(is_owner(object, original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
         let object_addr = object.inner;
         assert!(!exists<TombStone>(object_addr), EOBJECT_ALREADY_BURNT);
@@ -654,13 +650,13 @@ module aptos_framework::object {
 
         // The new owner of the object can always unburn it, but if it's the burn address, we go to the old functionality
         let object_core = borrow_global<ObjectCore>(object_addr);
-        if (object_core.owner == permissioned_signer::address_of(original_owner)) {
+        if (object_core.owner == signer::address_of(original_owner)) {
             let TombStone { original_owner: _ } = move_from<TombStone>(object_addr);
         } else if (object_core.owner == BURN_ADDRESS) {
             // The old functionality
             let TombStone { original_owner: original_owner_addr } = move_from<TombStone>(object_addr);
             assert!(
-                original_owner_addr == permissioned_signer::address_of(original_owner),
+                original_owner_addr == signer::address_of(original_owner),
                 error::permission_denied(ENOT_OBJECT_OWNER)
             );
             transfer_raw_inner(object_addr, original_owner_addr);

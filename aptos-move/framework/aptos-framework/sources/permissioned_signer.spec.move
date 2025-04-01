@@ -11,26 +11,6 @@ spec aptos_framework::permissioned_signer {
             );
     }
 
-    spec fun spec_borrow_address(s: &signer): &address;
-
-    spec borrow_address(s: &signer): &address {
-        pragma opaque;
-        ensures [abstract] result == spec_borrow_address(s);
-    }
-
-    spec address_of(s: &signer): address {
-        // use std::features;
-        // use std::features::PERMISSIONED_SIGNER;
-        pragma opaque;
-        aborts_if [abstract] false; //TODO: add back !features::spec_is_enabled(PERMISSIONED_SIGNER);
-        ensures [abstract] result == signer::address_of(s); //TODO: remove this
-        ensures [abstract] result == spec_borrow_address(s);
-    }
-
-    spec fun spec_address_of(s: &signer): &address {
-        spec_borrow_address(s)
-    }
-
     spec fun spec_is_permissioned_signer_impl(s: signer): bool;
 
     spec is_permissioned_signer_impl(s: &signer): bool {

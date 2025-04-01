@@ -13,6 +13,7 @@ use crate::{
     Tool,
 };
 use aptos_cli_common::generate_cli_completions;
+use aptos_crypto::ValidCryptoMaterialStringExt;
 use async_trait::async_trait;
 use clap::{Parser, ValueEnum};
 use clap_complete::Shell;
@@ -25,13 +26,13 @@ use std::{collections::BTreeMap, fmt::Formatter, path::PathBuf, str::FromStr};
 /// default configuration, and user specific settings.
 #[derive(Parser)]
 pub enum ConfigTool {
-    DeleteProfile(DeleteProfile),
     GenerateShellCompletions(GenerateShellCompletions),
-    RenameProfile(RenameProfile),
-    SetGlobalConfig(SetGlobalConfig),
     ShowGlobalConfig(ShowGlobalConfig),
-    ShowPrivateKey(ShowPrivateKey),
+    SetGlobalConfig(SetGlobalConfig),
     ShowProfiles(ShowProfiles),
+    ShowPrivateKey(ShowPrivateKey),
+    RenameProfile(RenameProfile),
+    DeleteProfile(DeleteProfile),
 }
 
 impl ConfigTool {
@@ -138,7 +139,7 @@ impl CliCommand<String> for ShowPrivateKey {
         if let Some(profiles) = &config.profiles {
             if let Some(profile) = profiles.get(&self.profile.clone()) {
                 if let Some(private_key) = &profile.private_key {
-                    Ok(format!("0x{}", hex::encode(private_key.to_bytes())))
+                    Ok(private_key.to_aip_80_string()?)
                 } else {
                     Err(CliError::CommandArgumentError(format!(
                         "Profile {} does not have a private key",

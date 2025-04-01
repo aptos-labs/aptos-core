@@ -916,7 +916,7 @@ module aptos_framework::fungible_asset {
         abort_on_dispatch: bool,
     ) acquires FungibleStore, DispatchFunctionStore {
         withdraw_sanity_check_impl(
-            permissioned_signer::address_of(owner),
+            signer::address_of(owner),
             store,
             abort_on_dispatch,
         )
@@ -1359,7 +1359,6 @@ module aptos_framework::fungible_asset {
         owner: &signer,
         store: Object<T>,
     ) acquires FungibleStore {
-        // TODO: Can permissioned signer invoked from here?
         assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
         assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));
         assert!(allow_upgrade_to_concurrent_fungible_balance(), error::invalid_argument(ECONCURRENT_BALANCE_NOT_ENABLED));

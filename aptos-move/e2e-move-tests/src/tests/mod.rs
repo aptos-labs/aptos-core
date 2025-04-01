@@ -15,6 +15,7 @@ mod common;
 mod constructor_args;
 mod dependencies;
 mod enum_upgrade;
+mod enum_variant_count;
 mod error_map;
 mod fee_payer;
 mod function_values;

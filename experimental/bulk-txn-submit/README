@@ -1,0 +1,17 @@
+Script that allows you to submit a set of transactions, from a given file, to Aptos Blockchain, in a reliable manner.
+
+You can create your own file, with one address per line, or for testing, you can create bunch of sample addresses (not attached to private keys, so don't send meaningful funds there, as they are just lost):
+cargo run --release --package aptos-experimental-bulk-txn-submit --bin aptos-experimental-bulk-txn-submit -- create-sample-addresses --output-file experimental/airdrop/data/sample_1m.txt --num-addresses 100
+
+Then you can create and fund those accounts with 
+cargo run --release --package aptos-experimental-bulk-txn-submit --bin aptos-experimental-bulk-txn-submit -- submit -t https://fullnode.devnet.aptoslabs.com --coin-source-key {PRIVATE_KEY_FOR_ACCOUNT_WITH_FUNDS} --chain-id testnet --octas-per-workload-transaction 72000 --num-worker-accounts 5 --output-file {output_file_name} create-and-transfer-apt --destinations-file {input_file_name}
+
+Arguments: 
+--octas-per-workload-transaction - how much octas a single transaction will need
+--num-worker-accounts - number of worker accounts to use, defines how fast it can go. it can go around 50 txns/second for each worker account.
+
+After first run , it prints --accounts-seed "" param you can pass in the future , to reuse same worker accounts, or to get the funds back with: 
+
+cargo run --release --package aptos-experimental-bulk-txn-submit --bin aptos-experimental-bulk-txn-submit -- submit -t https://fullnode.mainnet.aptoslabs.com --coin-source-key {PRIVATE_KEY_FOR_ACCOUNT_WITH_FUNDS} --chain-id testnet --accounts-seed "[seed,number,list]" --octas-per-workload-transaction 0 --num-worker-accounts 5 return-worker-funds
+
+Script is extensible, if you want to add support for your transaction type.

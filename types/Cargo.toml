@@ -40,8 +40,10 @@ hashbrown = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
 jsonwebtoken = { workspace = true }
+lru = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
+move-model = { workspace = true }
 move-table-extension = { workspace = true }
 move-vm-types = { workspace = true }
 num-bigint = { workspace = true }

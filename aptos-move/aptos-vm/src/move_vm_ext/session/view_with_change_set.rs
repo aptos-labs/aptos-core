@@ -335,7 +335,7 @@ mod test {
         move_vm_ext::resolver::{AsExecutorView, AsResourceGroupView},
     };
     use aptos_aggregator::delta_change_set::{delta_add, serialize};
-    use aptos_language_e2e_tests::data_store::FakeDataStore;
+    use aptos_transaction_simulation::{InMemoryStateStore, SimulationStateStore};
     use aptos_types::{account_address::AccountAddress, write_set::WriteOp};
     use aptos_vm_types::abstract_write_op::GroupWrite;
     use move_core_types::{
@@ -402,21 +402,56 @@ mod test {
 
     #[test]
     fn test_change_set_state_view() {
-        let mut state_view = FakeDataStore::default();
+        let state_view = InMemoryStateStore::new();
 
-        state_view.set_legacy(key("resource_base"), serialize(&30));
-        state_view.set_legacy(key("resource_both"), serialize(&40));
+        state_view
+            .set_state_value(
+                key("resource_base"),
+                StateValue::new_legacy(serialize(&30).into()),
+            )
+            .unwrap();
+        state_view
+            .set_state_value(
+                key("resource_both"),
+                StateValue::new_legacy(serialize(&40).into()),
+            )
+            .unwrap();
 
-        state_view.set_legacy(key("aggregator_base"), serialize(&50));
-        state_view.set_legacy(key("aggregator_both"), serialize(&60));
-        state_view.set_legacy(key("aggregator_delta_set"), serialize(&70));
+        state_view
+            .set_state_value(
+                key("aggregator_base"),
+                StateValue::new_legacy(serialize(&50).into()),
+            )
+            .unwrap();
+        state_view
+            .set_state_value(
+                key("aggregator_both"),
+                StateValue::new_legacy(serialize(&60).into()),
+            )
+            .unwrap();
+        state_view
+            .set_state_value(
+                key("aggregator_delta_set"),
+                StateValue::new_legacy(serialize(&70).into()),
+            )
+            .unwrap();
 
         let tree: BTreeMap<StructTag, Bytes> = BTreeMap::from([
             (mock_tag_0(), serialize(&100).into()),
             (mock_tag_1(), serialize(&200).into()),
         ]);
-        state_view.set_legacy(key("resource_group_base"), bcs::to_bytes(&tree).unwrap());
-        state_view.set_legacy(key("resource_group_both"), bcs::to_bytes(&tree).unwrap());
+        state_view
+            .set_state_value(
+                key("resource_group_base"),
+                StateValue::new_legacy(bcs::to_bytes(&tree).unwrap().into()),
+            )
+            .unwrap();
+        state_view
+            .set_state_value(
+                key("resource_group_both"),
+                StateValue::new_legacy(bcs::to_bytes(&tree).unwrap().into()),
+            )
+            .unwrap();
 
         let resource_write_set = BTreeMap::from([
             (key("resource_both"), (write(80), None)),

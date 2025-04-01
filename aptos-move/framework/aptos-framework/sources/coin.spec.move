@@ -160,12 +160,12 @@ spec aptos_framework::coin {
         }
     }
 
-    spec fun spec_is_account_registered<CoinType>(account_addr: address): bool {
-        let paired_metadata_opt = spec_paired_metadata<CoinType>();
-        exists<CoinStore<CoinType>>(account_addr) || features::spec_new_accounts_default_to_fa_apt_store_enabled(
-        ) || (option::spec_is_some(
-            paired_metadata_opt
-        ) && primary_fungible_store::spec_primary_store_exists(account_addr, option::spec_borrow(paired_metadata_opt)))
+    spec fun spec_is_account_registered<CoinType>(account_addr:address): bool;
+
+    spec is_account_registered<CoinType>(account_addr: address): bool {
+        pragma aborts_if_is_partial;
+        aborts_if false;
+        ensures [abstract] result == spec_is_account_registered<CoinType>(account_addr);
     }
 
     spec schema CoinSubAbortsIf<CoinType> {

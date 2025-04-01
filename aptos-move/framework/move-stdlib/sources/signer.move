@@ -18,10 +18,7 @@ module std::signer {
     /// ```
     /// ^ The discrepency is needed to maintain backwards compatibility of signer serialization
     /// semantics.
-
-    /// Calling address_of on a permissioned signer.
-    const EADDRESS_OF_PERMISSIONED: u64 = 0;
-
+    ///
     /// `borrow_address` borrows this inner field
     native public fun borrow_address(s: &signer): &address;
 

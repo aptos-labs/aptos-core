@@ -100,6 +100,10 @@ spec std::features {
         spec_is_enabled(NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE)
     }
 
+    spec fun spec_new_accounts_default_to_fa_store_enabled(): bool {
+        spec_is_enabled(NEW_ACCOUNTS_DEFAULT_TO_FA_STORE)
+    }
+
     spec fun spec_simulation_enhancement_enabled(): bool {
         spec_is_enabled(TRANSACTION_SIMULATION_ENHANCEMENT)
     }

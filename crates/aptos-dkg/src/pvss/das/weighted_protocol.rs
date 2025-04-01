@@ -67,6 +67,8 @@ pub struct Transcript {
 }
 
 impl ValidCryptoMaterial for Transcript {
+    const AIP_80_PREFIX: &'static str = "";
+
     fn to_bytes(&self) -> Vec<u8> {
         bcs::to_bytes(&self).expect("unexpected error during PVSS transcript serialization")
     }

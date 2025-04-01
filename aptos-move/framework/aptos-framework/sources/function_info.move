@@ -30,7 +30,6 @@ module aptos_framework::function_info {
         function_name: String,
     ): FunctionInfo {
         new_function_info_from_address(
-            // TODO: [signer::address_of] Is permissioned signer allowed here?
             signer::address_of(module_signer),
             module_name,
             function_name,

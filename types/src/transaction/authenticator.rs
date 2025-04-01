@@ -839,6 +839,8 @@ impl AuthenticationKey {
 }
 
 impl ValidCryptoMaterial for AuthenticationKey {
+    const AIP_80_PREFIX: &'static str = "";
+
     fn to_bytes(&self) -> Vec<u8> {
         self.to_vec()
     }
