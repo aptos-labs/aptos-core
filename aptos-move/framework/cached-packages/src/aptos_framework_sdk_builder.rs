@@ -37,6 +37,30 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum EntryFunctionCall {
+    /// Adds an ED25519 backup key to a keyless account by converting the account's authentication key to a multi-key.
+    /// This function takes a keyless account (identified by having a keyless public key scheme) and adds an ED25519 backup key,
+    /// creating a multi-key that requires 1 signature from either key to authenticate.
+    ///
+    /// # Arguments
+    /// * `account` - The signer representing the keyless account
+    /// * `keyless_public_key` - The current keyless public key of the account
+    /// * `backup_key` - The ED25519 public key to add as a backup
+    /// * `backup_key_proof` - A signature from the backup key proving ownership
+    ///
+    /// # Aborts
+    /// * If the current public key is not a keyless public key
+    /// * If the provided keyless public key does not match the account's current authentication key
+    /// * If the keyless public key is not the original public key of the account
+    /// * If the backup key proof signature is invalid
+    ///
+    /// # Events
+    /// * Emits a `KeyRotationToMultiPublicKey` event with the new multi-key configuration
+    AccountAddEd25519BackupKeyOnKeylessAccount {
+        keyless_public_key: Vec<u8>,
+        backup_key: Vec<u8>,
+        backup_key_proof: Vec<u8>,
+    },
+
     /// Offers rotation capability on behalf of `account` to the account at address `recipient_address`.
     /// An account can delegate its rotation capability to only one other address at one time. If the account
     /// has an existing rotation capability offer, calling this function will update the rotation capability offer with
@@ -75,6 +99,32 @@ pub enum EntryFunctionCall {
         account_scheme: u8,
         account_public_key_bytes: Vec<u8>,
         recipient_address: AccountAddress,
+    },
+
+    /// Replaces the ED25519 backup key on a keyless account that already has a backup key configured.
+    /// This function takes a keyless account with an existing backup key and replaces it with a new ED25519 backup key,
+    /// maintaining the multi-key configuration that requires 1 signature from either key to authenticate.
+    ///
+    /// # Arguments
+    /// * `account` - The signer representing the keyless account
+    /// * `keyless_public_key` - The current keyless public key of the account
+    /// * `cur_backup_key` - The current ED25519 backup public key to be replaced
+    /// * `new_backup_key` - The new ED25519 public key to replace the current backup key
+    /// * `new_backup_key_proof` - A signature from the new backup key proving ownership
+    ///
+    /// # Aborts
+    /// * If the main public key is not a keyless public key
+    /// * If the constructed multi-key (keyless + current backup) does not match the account's current authentication key
+    /// * If the keyless public key is not the original public key of the account
+    /// * If the new backup key proof signature is invalid
+    ///
+    /// # Events
+    /// * Emits a `KeyRotationToMultiPublicKey` event with the updated multi-key configuration
+    AccountReplaceEd25519BackupKeyOnKeylessAccount {
+        keyless_public_key: Vec<u8>,
+        cur_backup_key: Vec<u8>,
+        new_backup_key: Vec<u8>,
+        new_backup_key_proof: Vec<u8>,
     },
 
     /// Revoke any rotation capability offer in the specified account.
@@ -141,6 +191,11 @@ pub enum EntryFunctionCall {
     /// `set_originating_address()`.
     AccountRotateAuthenticationKeyCall {
         new_auth_key: Vec<u8>,
+    },
+
+    AccountRotateAuthenticationKeyCallToPublicKey {
+        to_scheme: u8,
+        to_public_key_bytes: Vec<u8>,
     },
 
     AccountRotateAuthenticationKeyWithRotationCapability {
@@ -1218,6 +1273,15 @@ impl EntryFunctionCall {
     pub fn encode(self) -> TransactionPayload {
         use EntryFunctionCall::*;
         match self {
+            AccountAddEd25519BackupKeyOnKeylessAccount {
+                keyless_public_key,
+                backup_key,
+                backup_key_proof,
+            } => account_add_ed25519_backup_key_on_keyless_account(
+                keyless_public_key,
+                backup_key,
+                backup_key_proof,
+            ),
             AccountOfferRotationCapability {
                 rotation_capability_sig_bytes,
                 account_scheme,
@@ -1239,6 +1303,17 @@ impl EntryFunctionCall {
                 account_scheme,
                 account_public_key_bytes,
                 recipient_address,
+            ),
+            AccountReplaceEd25519BackupKeyOnKeylessAccount {
+                keyless_public_key,
+                cur_backup_key,
+                new_backup_key,
+                new_backup_key_proof,
+            } => account_replace_ed25519_backup_key_on_keyless_account(
+                keyless_public_key,
+                cur_backup_key,
+                new_backup_key,
+                new_backup_key_proof,
             ),
             AccountRevokeAnyRotationCapability {} => account_revoke_any_rotation_capability(),
             AccountRevokeAnySignerCapability {} => account_revoke_any_signer_capability(),
@@ -1265,6 +1340,12 @@ impl EntryFunctionCall {
             ),
             AccountRotateAuthenticationKeyCall { new_auth_key } => {
                 account_rotate_authentication_key_call(new_auth_key)
+            },
+            AccountRotateAuthenticationKeyCallToPublicKey {
+                to_scheme,
+                to_public_key_bytes,
+            } => {
+                account_rotate_authentication_key_call_to_public_key(to_scheme, to_public_key_bytes)
             },
             AccountRotateAuthenticationKeyWithRotationCapability {
                 rotation_cap_offerer_address,
@@ -1931,6 +2012,47 @@ impl EntryFunctionCall {
     }
 }
 
+/// Adds an ED25519 backup key to a keyless account by converting the account's authentication key to a multi-key.
+/// This function takes a keyless account (identified by having a keyless public key scheme) and adds an ED25519 backup key,
+/// creating a multi-key that requires 1 signature from either key to authenticate.
+///
+/// # Arguments
+/// * `account` - The signer representing the keyless account
+/// * `keyless_public_key` - The current keyless public key of the account
+/// * `backup_key` - The ED25519 public key to add as a backup
+/// * `backup_key_proof` - A signature from the backup key proving ownership
+///
+/// # Aborts
+/// * If the current public key is not a keyless public key
+/// * If the provided keyless public key does not match the account's current authentication key
+/// * If the keyless public key is not the original public key of the account
+/// * If the backup key proof signature is invalid
+///
+/// # Events
+/// * Emits a `KeyRotationToMultiPublicKey` event with the new multi-key configuration
+pub fn account_add_ed25519_backup_key_on_keyless_account(
+    keyless_public_key: Vec<u8>,
+    backup_key: Vec<u8>,
+    backup_key_proof: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("add_ed25519_backup_key_on_keyless_account").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&keyless_public_key).unwrap(),
+            bcs::to_bytes(&backup_key).unwrap(),
+            bcs::to_bytes(&backup_key_proof).unwrap(),
+        ],
+    ))
+}
+
 /// Offers rotation capability on behalf of `account` to the account at address `recipient_address`.
 /// An account can delegate its rotation capability to only one other address at one time. If the account
 /// has an existing rotation capability offer, calling this function will update the rotation capability offer with
@@ -2003,6 +2125,50 @@ pub fn account_offer_signer_capability(
             bcs::to_bytes(&account_scheme).unwrap(),
             bcs::to_bytes(&account_public_key_bytes).unwrap(),
             bcs::to_bytes(&recipient_address).unwrap(),
+        ],
+    ))
+}
+
+/// Replaces the ED25519 backup key on a keyless account that already has a backup key configured.
+/// This function takes a keyless account with an existing backup key and replaces it with a new ED25519 backup key,
+/// maintaining the multi-key configuration that requires 1 signature from either key to authenticate.
+///
+/// # Arguments
+/// * `account` - The signer representing the keyless account
+/// * `keyless_public_key` - The current keyless public key of the account
+/// * `cur_backup_key` - The current ED25519 backup public key to be replaced
+/// * `new_backup_key` - The new ED25519 public key to replace the current backup key
+/// * `new_backup_key_proof` - A signature from the new backup key proving ownership
+///
+/// # Aborts
+/// * If the main public key is not a keyless public key
+/// * If the constructed multi-key (keyless + current backup) does not match the account's current authentication key
+/// * If the keyless public key is not the original public key of the account
+/// * If the new backup key proof signature is invalid
+///
+/// # Events
+/// * Emits a `KeyRotationToMultiPublicKey` event with the updated multi-key configuration
+pub fn account_replace_ed25519_backup_key_on_keyless_account(
+    keyless_public_key: Vec<u8>,
+    cur_backup_key: Vec<u8>,
+    new_backup_key: Vec<u8>,
+    new_backup_key_proof: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("replace_ed25519_backup_key_on_keyless_account").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&keyless_public_key).unwrap(),
+            bcs::to_bytes(&cur_backup_key).unwrap(),
+            bcs::to_bytes(&new_backup_key).unwrap(),
+            bcs::to_bytes(&new_backup_key_proof).unwrap(),
         ],
     ))
 }
@@ -2153,6 +2319,27 @@ pub fn account_rotate_authentication_key_call(new_auth_key: Vec<u8>) -> Transact
         ident_str!("rotate_authentication_key_call").to_owned(),
         vec![],
         vec![bcs::to_bytes(&new_auth_key).unwrap()],
+    ))
+}
+
+pub fn account_rotate_authentication_key_call_to_public_key(
+    to_scheme: u8,
+    to_public_key_bytes: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("rotate_authentication_key_call_to_public_key").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&to_scheme).unwrap(),
+            bcs::to_bytes(&to_public_key_bytes).unwrap(),
+        ],
     ))
 }
 
@@ -5351,6 +5538,22 @@ pub fn vesting_vest_many(contract_addresses: Vec<AccountAddress>) -> Transaction
 }
 mod decoder {
     use super::*;
+    pub fn account_add_ed25519_backup_key_on_keyless_account(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountAddEd25519BackupKeyOnKeylessAccount {
+                    keyless_public_key: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    backup_key: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    backup_key_proof: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn account_offer_rotation_capability(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -5376,6 +5579,23 @@ mod decoder {
                 account_public_key_bytes: bcs::from_bytes(script.args().get(2)?).ok()?,
                 recipient_address: bcs::from_bytes(script.args().get(3)?).ok()?,
             })
+        } else {
+            None
+        }
+    }
+
+    pub fn account_replace_ed25519_backup_key_on_keyless_account(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountReplaceEd25519BackupKeyOnKeylessAccount {
+                    keyless_public_key: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    cur_backup_key: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    new_backup_key: bcs::from_bytes(script.args().get(2)?).ok()?,
+                    new_backup_key_proof: bcs::from_bytes(script.args().get(3)?).ok()?,
+                },
+            )
         } else {
             None
         }
@@ -5449,6 +5669,21 @@ mod decoder {
             Some(EntryFunctionCall::AccountRotateAuthenticationKeyCall {
                 new_auth_key: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
+        } else {
+            None
+        }
+    }
+
+    pub fn account_rotate_authentication_key_call_to_public_key(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountRotateAuthenticationKeyCallToPublicKey {
+                    to_scheme: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    to_public_key_bytes: bcs::from_bytes(script.args().get(1)?).ok()?,
+                },
+            )
         } else {
             None
         }
@@ -7320,12 +7555,20 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
     once_cell::sync::Lazy::new(|| {
         let mut map: EntryFunctionDecoderMap = std::collections::HashMap::new();
         map.insert(
+            "account_add_ed25519_backup_key_on_keyless_account".to_string(),
+            Box::new(decoder::account_add_ed25519_backup_key_on_keyless_account),
+        );
+        map.insert(
             "account_offer_rotation_capability".to_string(),
             Box::new(decoder::account_offer_rotation_capability),
         );
         map.insert(
             "account_offer_signer_capability".to_string(),
             Box::new(decoder::account_offer_signer_capability),
+        );
+        map.insert(
+            "account_replace_ed25519_backup_key_on_keyless_account".to_string(),
+            Box::new(decoder::account_replace_ed25519_backup_key_on_keyless_account),
         );
         map.insert(
             "account_revoke_any_rotation_capability".to_string(),
@@ -7350,6 +7593,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "account_rotate_authentication_key_call".to_string(),
             Box::new(decoder::account_rotate_authentication_key_call),
+        );
+        map.insert(
+            "account_rotate_authentication_key_call_to_public_key".to_string(),
+            Box::new(decoder::account_rotate_authentication_key_call_to_public_key),
         );
         map.insert(
             "account_rotate_authentication_key_with_rotation_capability".to_string(),
