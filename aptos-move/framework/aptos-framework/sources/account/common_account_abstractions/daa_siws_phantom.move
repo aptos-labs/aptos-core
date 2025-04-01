@@ -9,6 +9,7 @@ module aptos_framework::daa_siws_phantom {
     };
     use std::chain_id;
     use std::error;
+    use std::option::{Self, Option};
     use std::string_utils;
     use std::transaction_context::{Self, EntryFunctionPayload};
     use std::vector;
@@ -17,10 +18,8 @@ module aptos_framework::daa_siws_phantom {
     const EINVALID_SIGNATURE: u64 = 1;
     /// Non base58 character found in public key.
     const EINVALID_BASE_58_PUBLIC_KEY: u64 = 2;
-    /// Unsupported chain id.
-    const EUNSUPPORTED_CHAIN_ID: u64 = 3;
     /// Entry function payload is missing.
-    const EMISSING_ENTRY_FUNCTION_PAYLOAD: u64 = 4;
+    const EMISSING_ENTRY_FUNCTION_PAYLOAD: u64 = 3;
 
     const BASE_58_ALPHABET: vector<u8> = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
     const HEX_ALPHABET: vector<u8> = b"0123456789abcdef";
@@ -32,18 +31,16 @@ module aptos_framework::daa_siws_phantom {
         (base58_public_key, domain)
     }
 
-    fun network_name(): vector<u8> {
+    fun network_name(): Option<vector<u8>> {
         let chain_id = chain_id::get();
         if (chain_id == 1) {
-            b"mainnet"
+            option::some(b"mainnet")
         } else if (chain_id == 2) {
-            b"testnet"
-        } else if (chain_id == 3) {
-            b"devnet"
+            option::some(b"testnet")
         } else if (chain_id == 4) {
-            b"local"
+            option::some(b"local")
         } else {
-            abort(EUNSUPPORTED_CHAIN_ID)
+            option::none()
         }
     }
 
@@ -59,9 +56,14 @@ module aptos_framework::daa_siws_phantom {
         message.append(*base58_public_key);
         message.append(b"\n\nTo execute transaction ");
         message.append(*entry_function_name);
-        message.append(b" on Aptos blockchain (");
-        message.append(network_name());
-        message.append(b").");
+        message.append(b" on Aptos blockchain");
+        let maybe_network_name = network_name();
+        if (maybe_network_name.is_some()) {
+            message.append(b" (");
+            message.append(maybe_network_name.destroy_some());
+            message.append(b")");
+        };
+        message.append(b".");
         message.append(b"\n\nNonce: ");
         message.append(*digest_utf8);
         *message
@@ -201,20 +203,25 @@ module aptos_framework::daa_siws_phantom {
     #[test(framework = @0x1)]
     fun test_network_name_mainnet(framework: &signer) {
         chain_id::initialize_for_test(framework, 1);
-        assert!(network_name() == b"mainnet");
+        assert!(network_name() == option::some(b"mainnet"));
     }
 
     #[test(framework = @0x1)]
     fun test_network_name_testnet(framework: &signer) {
         chain_id::initialize_for_test(framework, 2);
-        assert!(network_name() == b"testnet");
+        assert!(network_name() == option::some(b"testnet"));
     }
 
     #[test(framework = @0x1)]
-    #[expected_failure(abort_code = EUNSUPPORTED_CHAIN_ID)]
-    fun test_network_name_unsupported(framework: &signer) {
+    fun test_network_name_local(framework: &signer) {
+        chain_id::initialize_for_test(framework, 4);
+        assert!(network_name() == option::some(b"local"));
+    }
+
+    #[test(framework = @0x1)]
+    fun test_network_name_other(framework: &signer) {
         chain_id::initialize_for_test(framework, 99);
-        network_name();
+        assert!(network_name() == option::none());
     }
 
     #[test(framework = @0x1)]
