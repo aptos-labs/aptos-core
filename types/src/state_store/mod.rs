@@ -11,7 +11,7 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use bytes::Bytes;
-use move_core_types::move_resource::MoveResource;
+use move_core_types::{language_storage::StructTag, move_resource::MoveResource};
 #[cfg(any(test, feature = "testing"))]
 use std::hash::Hash;
 use std::ops::Deref;
@@ -140,6 +140,23 @@ pub trait MoveResourceExt: MoveResource {
             .get_state_value_bytes(&state_key)?
             .map(|bytes| bcs::from_bytes(&bytes))
             .transpose()?)
+    }
+
+    fn fetch_move_resource_from_group(
+        state_view: &dyn StateView,
+        address: &AccountAddress,
+        group: &StructTag,
+    ) -> StateViewResult<Option<Self>> {
+        let rg = state_view
+            .get_state_value_bytes(&StateKey::resource_group(address, group))?
+            .map(|data| bcs::from_bytes::<std::collections::BTreeMap<StructTag, Vec<u8>>>(&data))
+            .transpose()?;
+        if let Some(group) = rg {
+            if let Some(data) = group.get(&Self::struct_tag()) {
+                return Ok(Some(bcs::from_bytes::<Self>(data)?));
+            }
+        }
+        Ok(None)
     }
 }
 
