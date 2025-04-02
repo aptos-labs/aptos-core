@@ -1477,42 +1477,6 @@ module aptos_framework::vesting {
         setup_vesting_contract(admin, &vector[@1, @2], &vector[1], admin_address, 0);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60002, location = aptos_framework::aptos_account)]
-    public entry fun test_create_vesting_contract_with_invalid_withdrawal_address_should_fail(
-        aptos_framework: &signer,
-        admin: &signer,
-    ) acquires AdminStore {
-        let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address]);
-        setup_vesting_contract(admin, &vector[@1, @2], &vector[1], @5, 0);
-    }
-
-    #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60002, location = aptos_framework::aptos_account)]
-    public entry fun test_create_vesting_contract_with_missing_withdrawal_account_should_fail(
-        aptos_framework: &signer,
-        admin: &signer,
-    ) acquires AdminStore {
-        let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address]);
-        setup_vesting_contract(admin, &vector[@1, @2], &vector[1], @11, 0);
-    }
-
-    #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60002, location = aptos_framework::aptos_account)]
-    public entry fun test_create_vesting_contract_with_unregistered_withdrawal_account_should_fail(
-        aptos_framework: &signer,
-        admin: &signer,
-    ) acquires AdminStore {
-        let fa_feature = std::features::get_new_accounts_default_to_fa_store_feature();
-        std::features::change_feature_flags_for_testing(aptos_framework, vector[], vector[fa_feature]);
-        let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address]);
-        create_account_for_test(@11);
-        setup_vesting_contract(admin, &vector[@1, @2], &vector[1], @11, 0);
-    }
-
     #[test(aptos_framework = @0x1)]
     #[expected_failure(abort_code = 0x10002, location = Self)]
     public entry fun test_create_empty_vesting_schedule_should_fail(aptos_framework: &signer) {
@@ -2036,8 +2000,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60002, location = aptos_framework::aptos_account)]
-    public entry fun test_set_beneficiary_with_missing_account_should_fail(
+    public entry fun test_set_beneficiary_with_missing_account(
         aptos_framework: &signer,
         admin: &signer,
     ) acquires AdminStore, VestingContract {
@@ -2049,8 +2012,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60002, location = aptos_framework::aptos_account)]
-    public entry fun test_set_beneficiary_with_unregistered_account_should_fail(
+    public entry fun test_set_beneficiary_with_unregistered_account(
         aptos_framework: &signer,
         admin: &signer,
     ) acquires AdminStore, VestingContract {

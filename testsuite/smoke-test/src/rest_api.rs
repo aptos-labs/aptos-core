@@ -124,7 +124,7 @@ async fn test_gas_estimation_inner(swarm: &mut LocalSwarm) {
                 invalid_transaction_ratio: 0,
                 sender_use_account_pool: false,
                 non_conflicting: false,
-                use_fa_transfer: false,
+                use_fa_transfer: true,
             },
             100,
         )]],
@@ -270,25 +270,6 @@ async fn test_bcs() {
     assert_eq!(expected_auth_key, onchain_auth_key);
     assert_eq!(0, account_resource.sequence_number());
 
-    // Check get resources
-    let resources = client
-        .get_account_resources_bcs(account)
-        .await
-        .unwrap()
-        .into_inner();
-    let bytes = resources
-        .get(&StructTag::from_str("0x1::account::Account").unwrap())
-        .unwrap();
-    let account_resource: AccountResource = bcs::from_bytes(bytes).unwrap();
-    assert_eq!(0, account_resource.sequence_number());
-
-    let single_account_resource: AccountResource = client
-        .get_account_resource_bcs(account, "0x1::account::Account")
-        .await
-        .unwrap()
-        .into_inner();
-    assert_eq!(account_resource, single_account_resource);
-
     // Check Modules align
     let modules = client
         .get_account_modules(AccountAddress::ONE)
@@ -338,6 +319,25 @@ async fn test_bcs() {
         .unwrap()
         .into_inner();
     let expected_txn_version = expected_txn.version;
+
+    // Check get resources
+    let resources = client
+        .get_account_resources_bcs(account)
+        .await
+        .unwrap()
+        .into_inner();
+    let bytes = resources
+        .get(&StructTag::from_str("0x1::account::Account").unwrap())
+        .unwrap();
+    let account_resource: AccountResource = bcs::from_bytes(bytes).unwrap();
+    assert_eq!(1, account_resource.sequence_number());
+
+    let single_account_resource: AccountResource = client
+        .get_account_resource_bcs(account, "0x1::account::Account")
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(account_resource, single_account_resource);
 
     // Check transactions on an account
     let transactions = client
