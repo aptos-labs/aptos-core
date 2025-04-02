@@ -1,0 +1,8 @@
+[package]
+name = "duplicate_scripts"
+version = "1.0.0"
+authors = []
+
+[addresses]
+
+[dev-addresses]
