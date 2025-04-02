@@ -303,9 +303,9 @@ pub fn verify_keyless_signature_without_ephemeral_signature_check(
                     ZKP::Groth16(groth16proof) => {
                         // let start = std::time::Instant::now();
                         let public_inputs_hash = get_public_inputs_hash(
-                            &signature,
+                            signature,
                             public_key.inner_keyless_pk(),
-                            &rsa_jwk,
+                            rsa_jwk,
                             config,
                         )
                         .map_err(|_| {
@@ -388,7 +388,7 @@ pub fn verify_keyless_signature_without_ephemeral_signature_check(
                     //
                     // We are now ready to verify the RSA signature
                     openid_sig
-                        .verify_jwt_signature(&rsa_jwk, &signature.jwt_header_json)
+                        .verify_jwt_signature(rsa_jwk, &signature.jwt_header_json)
                         .map_err(|_| {
                             invalid_signature!("RSA signature verification failed for OpenIdSig")
                         })?;
