@@ -1,6 +1,3 @@
-// Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
-
 // @generated
 impl serde::Serialize for GetTransactionsFromNodeRequest {
     #[allow(deprecated)]
@@ -93,7 +90,7 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsFromNodeRequest {
                             if starting_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("startingVersion"));
                             }
-                            starting_version__ =
+                            starting_version__ = 
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
@@ -101,7 +98,7 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsFromNodeRequest {
                             if transactions_count__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("transactionsCount"));
                             }
-                            transactions_count__ =
+                            transactions_count__ = 
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
@@ -387,7 +384,7 @@ impl<'de> serde::Deserialize<'de> for StreamStatus {
                             if start_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("startVersion"));
                             }
-                            start_version__ =
+                            start_version__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -395,7 +392,7 @@ impl<'de> serde::Deserialize<'de> for StreamStatus {
                             if end_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("endVersion"));
                             }
-                            end_version__ =
+                            end_version__ = 
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
@@ -587,7 +584,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsFromNodeResponse {
                             if chain_id__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("chainId"));
                             }
-                            chain_id__ =
+                            chain_id__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }

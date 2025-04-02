@@ -1,6 +1,3 @@
-// Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
-
 // @generated
 impl serde::Serialize for Empty {
     #[allow(deprecated)]
@@ -163,7 +160,7 @@ impl<'de> serde::Deserialize<'de> for NetworkMessage {
                             if message__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("message"));
                             }
-                            message__ =
+                            message__ = 
                                 Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
                             ;
                         }
