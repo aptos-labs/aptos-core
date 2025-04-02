@@ -7891,9 +7891,6 @@ impl serde::Serialize for UserTransactionRequest {
         if !self.sender.is_empty() {
             len += 1;
         }
-        if self.sequence_number != 0 {
-            len += 1;
-        }
         if self.max_gas_amount != 0 {
             len += 1;
         }
@@ -7909,12 +7906,12 @@ impl serde::Serialize for UserTransactionRequest {
         if self.signature.is_some() {
             len += 1;
         }
+        if self.replay_protector.is_some() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.UserTransactionRequest", len)?;
         if !self.sender.is_empty() {
             struct_ser.serialize_field("sender", &self.sender)?;
-        }
-        if self.sequence_number != 0 {
-            struct_ser.serialize_field("sequenceNumber", ToString::to_string(&self.sequence_number).as_str())?;
         }
         if self.max_gas_amount != 0 {
             struct_ser.serialize_field("maxGasAmount", ToString::to_string(&self.max_gas_amount).as_str())?;
@@ -7931,6 +7928,16 @@ impl serde::Serialize for UserTransactionRequest {
         if let Some(v) = self.signature.as_ref() {
             struct_ser.serialize_field("signature", v)?;
         }
+        if let Some(v) = self.replay_protector.as_ref() {
+            match v {
+                user_transaction_request::ReplayProtector::SequenceNumber(v) => {
+                    struct_ser.serialize_field("sequenceNumber", ToString::to_string(&v).as_str())?;
+                }
+                user_transaction_request::ReplayProtector::ReplayProtectionNonce(v) => {
+                    struct_ser.serialize_field("replayProtectionNonce", ToString::to_string(&v).as_str())?;
+                }
+            }
+        }
         struct_ser.end()
     }
 }
@@ -7942,8 +7949,6 @@ impl<'de> serde::Deserialize<'de> for UserTransactionRequest {
     {
         const FIELDS: &[&str] = &[
             "sender",
-            "sequence_number",
-            "sequenceNumber",
             "max_gas_amount",
             "maxGasAmount",
             "gas_unit_price",
@@ -7952,17 +7957,22 @@ impl<'de> serde::Deserialize<'de> for UserTransactionRequest {
             "expirationTimestampSecs",
             "payload",
             "signature",
+            "sequence_number",
+            "sequenceNumber",
+            "replay_protection_nonce",
+            "replayProtectionNonce",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Sender,
-            SequenceNumber,
             MaxGasAmount,
             GasUnitPrice,
             ExpirationTimestampSecs,
             Payload,
             Signature,
+            SequenceNumber,
+            ReplayProtectionNonce,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -7985,12 +7995,13 @@ impl<'de> serde::Deserialize<'de> for UserTransactionRequest {
                     {
                         match value {
                             "sender" => Ok(GeneratedField::Sender),
-                            "sequenceNumber" | "sequence_number" => Ok(GeneratedField::SequenceNumber),
                             "maxGasAmount" | "max_gas_amount" => Ok(GeneratedField::MaxGasAmount),
                             "gasUnitPrice" | "gas_unit_price" => Ok(GeneratedField::GasUnitPrice),
                             "expirationTimestampSecs" | "expiration_timestamp_secs" => Ok(GeneratedField::ExpirationTimestampSecs),
                             "payload" => Ok(GeneratedField::Payload),
                             "signature" => Ok(GeneratedField::Signature),
+                            "sequenceNumber" | "sequence_number" => Ok(GeneratedField::SequenceNumber),
+                            "replayProtectionNonce" | "replay_protection_nonce" => Ok(GeneratedField::ReplayProtectionNonce),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -8011,12 +8022,12 @@ impl<'de> serde::Deserialize<'de> for UserTransactionRequest {
                     V: serde::de::MapAccess<'de>,
             {
                 let mut sender__ = None;
-                let mut sequence_number__ = None;
                 let mut max_gas_amount__ = None;
                 let mut gas_unit_price__ = None;
                 let mut expiration_timestamp_secs__ = None;
                 let mut payload__ = None;
                 let mut signature__ = None;
+                let mut replay_protector__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Sender => {
@@ -8024,14 +8035,6 @@ impl<'de> serde::Deserialize<'de> for UserTransactionRequest {
                                 return Err(serde::de::Error::duplicate_field("sender"));
                             }
                             sender__ = Some(map.next_value()?);
-                        }
-                        GeneratedField::SequenceNumber => {
-                            if sequence_number__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("sequenceNumber"));
-                            }
-                            sequence_number__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
                         }
                         GeneratedField::MaxGasAmount => {
                             if max_gas_amount__.is_some() {
@@ -8067,16 +8070,28 @@ impl<'de> serde::Deserialize<'de> for UserTransactionRequest {
                             }
                             signature__ = map.next_value()?;
                         }
+                        GeneratedField::SequenceNumber => {
+                            if replay_protector__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("sequenceNumber"));
+                            }
+                            replay_protector__ = map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| user_transaction_request::ReplayProtector::SequenceNumber(x.0));
+                        }
+                        GeneratedField::ReplayProtectionNonce => {
+                            if replay_protector__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("replayProtectionNonce"));
+                            }
+                            replay_protector__ = map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| user_transaction_request::ReplayProtector::ReplayProtectionNonce(x.0));
+                        }
                     }
                 }
                 Ok(UserTransactionRequest {
                     sender: sender__.unwrap_or_default(),
-                    sequence_number: sequence_number__.unwrap_or_default(),
                     max_gas_amount: max_gas_amount__.unwrap_or_default(),
                     gas_unit_price: gas_unit_price__.unwrap_or_default(),
                     expiration_timestamp_secs: expiration_timestamp_secs__,
                     payload: payload__,
                     signature: signature__,
+                    replay_protector: replay_protector__,
                 })
             }
         }

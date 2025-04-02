@@ -493,6 +493,7 @@ class UserTransactionRequest(_message.Message):
     __slots__ = [
         "sender",
         "sequence_number",
+        "replay_protection_nonce",
         "max_gas_amount",
         "gas_unit_price",
         "expiration_timestamp_secs",
@@ -501,6 +502,7 @@ class UserTransactionRequest(_message.Message):
     ]
     SENDER_FIELD_NUMBER: _ClassVar[int]
     SEQUENCE_NUMBER_FIELD_NUMBER: _ClassVar[int]
+    REPLAY_PROTECTION_NONCE_FIELD_NUMBER: _ClassVar[int]
     MAX_GAS_AMOUNT_FIELD_NUMBER: _ClassVar[int]
     GAS_UNIT_PRICE_FIELD_NUMBER: _ClassVar[int]
     EXPIRATION_TIMESTAMP_SECS_FIELD_NUMBER: _ClassVar[int]
@@ -508,6 +510,7 @@ class UserTransactionRequest(_message.Message):
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     sender: str
     sequence_number: int
+    replay_protection_nonce: int
     max_gas_amount: int
     gas_unit_price: int
     expiration_timestamp_secs: _timestamp_pb2.Timestamp
@@ -517,6 +520,7 @@ class UserTransactionRequest(_message.Message):
         self,
         sender: _Optional[str] = ...,
         sequence_number: _Optional[int] = ...,
+        replay_protection_nonce: _Optional[int] = ...,
         max_gas_amount: _Optional[int] = ...,
         gas_unit_price: _Optional[int] = ...,
         expiration_timestamp_secs: _Optional[

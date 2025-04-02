@@ -416,6 +416,7 @@ export interface EventKey {
 export interface UserTransactionRequest {
   sender?: string | undefined;
   sequenceNumber?: bigint | undefined;
+  replayProtectionNonce?: bigint | undefined;
   maxGasAmount?: bigint | undefined;
   gasUnitPrice?: bigint | undefined;
   expirationTimestampSecs?: Timestamp | undefined;
@@ -4231,7 +4232,8 @@ export const EventKey = {
 function createBaseUserTransactionRequest(): UserTransactionRequest {
   return {
     sender: "",
-    sequenceNumber: BigInt("0"),
+    sequenceNumber: undefined,
+    replayProtectionNonce: undefined,
     maxGasAmount: BigInt("0"),
     gasUnitPrice: BigInt("0"),
     expirationTimestampSecs: undefined,
@@ -4245,11 +4247,17 @@ export const UserTransactionRequest = {
     if (message.sender !== undefined && message.sender !== "") {
       writer.uint32(10).string(message.sender);
     }
-    if (message.sequenceNumber !== undefined && message.sequenceNumber !== BigInt("0")) {
+    if (message.sequenceNumber !== undefined) {
       if (BigInt.asUintN(64, message.sequenceNumber) !== message.sequenceNumber) {
         throw new globalThis.Error("value provided for field message.sequenceNumber of type uint64 too large");
       }
       writer.uint32(16).uint64(message.sequenceNumber.toString());
+    }
+    if (message.replayProtectionNonce !== undefined) {
+      if (BigInt.asUintN(64, message.replayProtectionNonce) !== message.replayProtectionNonce) {
+        throw new globalThis.Error("value provided for field message.replayProtectionNonce of type uint64 too large");
+      }
+      writer.uint32(64).uint64(message.replayProtectionNonce.toString());
     }
     if (message.maxGasAmount !== undefined && message.maxGasAmount !== BigInt("0")) {
       if (BigInt.asUintN(64, message.maxGasAmount) !== message.maxGasAmount) {
@@ -4295,6 +4303,13 @@ export const UserTransactionRequest = {
           }
 
           message.sequenceNumber = longToBigint(reader.uint64() as Long);
+          continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.replayProtectionNonce = longToBigint(reader.uint64() as Long);
           continue;
         case 3:
           if (tag !== 24) {
@@ -4377,7 +4392,8 @@ export const UserTransactionRequest = {
   fromJSON(object: any): UserTransactionRequest {
     return {
       sender: isSet(object.sender) ? globalThis.String(object.sender) : "",
-      sequenceNumber: isSet(object.sequenceNumber) ? BigInt(object.sequenceNumber) : BigInt("0"),
+      sequenceNumber: isSet(object.sequenceNumber) ? BigInt(object.sequenceNumber) : undefined,
+      replayProtectionNonce: isSet(object.replayProtectionNonce) ? BigInt(object.replayProtectionNonce) : undefined,
       maxGasAmount: isSet(object.maxGasAmount) ? BigInt(object.maxGasAmount) : BigInt("0"),
       gasUnitPrice: isSet(object.gasUnitPrice) ? BigInt(object.gasUnitPrice) : BigInt("0"),
       expirationTimestampSecs: isSet(object.expirationTimestampSecs)
@@ -4393,8 +4409,11 @@ export const UserTransactionRequest = {
     if (message.sender !== undefined && message.sender !== "") {
       obj.sender = message.sender;
     }
-    if (message.sequenceNumber !== undefined && message.sequenceNumber !== BigInt("0")) {
+    if (message.sequenceNumber !== undefined) {
       obj.sequenceNumber = message.sequenceNumber.toString();
+    }
+    if (message.replayProtectionNonce !== undefined) {
+      obj.replayProtectionNonce = message.replayProtectionNonce.toString();
     }
     if (message.maxGasAmount !== undefined && message.maxGasAmount !== BigInt("0")) {
       obj.maxGasAmount = message.maxGasAmount.toString();
@@ -4420,7 +4439,8 @@ export const UserTransactionRequest = {
   fromPartial(object: DeepPartial<UserTransactionRequest>): UserTransactionRequest {
     const message = createBaseUserTransactionRequest();
     message.sender = object.sender ?? "";
-    message.sequenceNumber = object.sequenceNumber ?? BigInt("0");
+    message.sequenceNumber = object.sequenceNumber ?? undefined;
+    message.replayProtectionNonce = object.replayProtectionNonce ?? undefined;
     message.maxGasAmount = object.maxGasAmount ?? BigInt("0");
     message.gasUnitPrice = object.gasUnitPrice ?? BigInt("0");
     message.expirationTimestampSecs =

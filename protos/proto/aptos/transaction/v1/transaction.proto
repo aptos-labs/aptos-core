@@ -185,7 +185,10 @@ message EventKey {
 
 message UserTransactionRequest {
   string sender = 1;
-  uint64 sequence_number = 2 [jstype = JS_STRING];
+  oneof replay_protector {
+    uint64 sequence_number = 2 [jstype = JS_STRING];
+    uint64 replay_protection_nonce = 8 [jstype = JS_STRING];
+  }
   uint64 max_gas_amount = 3 [jstype = JS_STRING];
   uint64 gas_unit_price = 4 [jstype = JS_STRING];
   aptos.util.timestamp.Timestamp expiration_timestamp_secs = 5;
