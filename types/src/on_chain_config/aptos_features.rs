@@ -224,6 +224,7 @@ impl FeatureFlag {
             FeatureFlag::DERIVABLE_ACCOUNT_ABSTRACTION,
             FeatureFlag::VM_BINARY_FORMAT_V8,
             FeatureFlag::ENABLE_FUNCTION_VALUES,
+            FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE,
             FeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
         ]
     }

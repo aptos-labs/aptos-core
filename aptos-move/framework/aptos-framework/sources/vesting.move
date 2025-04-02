@@ -1505,6 +1505,8 @@ module aptos_framework::vesting {
         aptos_framework: &signer,
         admin: &signer,
     ) acquires AdminStore {
+        let fa_feature = std::features::get_new_accounts_default_to_fa_store_feature();
+        std::features::change_feature_flags_for_testing(aptos_framework, vector[], vector[fa_feature]);
         let admin_address = signer::address_of(admin);
         setup(aptos_framework, &vector[admin_address]);
         create_account_for_test(@11);
@@ -2052,6 +2054,8 @@ module aptos_framework::vesting {
         aptos_framework: &signer,
         admin: &signer,
     ) acquires AdminStore, VestingContract {
+        let fa_feature = std::features::get_new_accounts_default_to_fa_store_feature();
+        std::features::change_feature_flags_for_testing(aptos_framework, vector[], vector[fa_feature]);
         let admin_address = signer::address_of(admin);
         setup(aptos_framework, &vector[admin_address]);
         let contract_address = setup_vesting_contract(
