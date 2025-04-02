@@ -1474,6 +1474,7 @@ dependencies = [
  "aptos-sdk",
  "aptos-storage-interface",
  "aptos-temppath",
+ "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
@@ -1597,6 +1598,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
+ "move-core-types",
  "rand 0.7.3",
 ]
 

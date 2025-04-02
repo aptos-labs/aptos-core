@@ -785,6 +785,7 @@ impl Client {
                 Ok(WaitForTransactionResult::NotFound(error)) => {
                     if let RestError::Api(aptos_error_response) = error {
                         if let Some(state) = aptos_error_response.state {
+                            println!("### error: {:?}", aptos_error_response.error);
                             if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
                                 if reached_mempool {
                                     return Err(anyhow!("Used to be pending and now not found. Transaction expired. It is guaranteed it will not be committed on chain.").into());

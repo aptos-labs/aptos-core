@@ -1257,20 +1257,7 @@ impl CliTestFramework {
 // and json is serialized with different types from both, so hardcoding deserialization.
 
 fn json_account_to_balance(value: &Value) -> u64 {
-    u64::from_str(
-        value
-            .as_object()
-            .unwrap()
-            .get("coin")
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .get("value")
-            .unwrap()
-            .as_str()
-            .unwrap(),
-    )
-    .unwrap()
+    value.as_u64().unwrap()
 }
 
 #[derive(Debug, Serialize, Deserialize)]

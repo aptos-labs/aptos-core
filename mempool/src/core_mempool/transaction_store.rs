@@ -263,6 +263,7 @@ impl TransactionStore {
                     // If the transaction is the same, it's an idempotent call
                     // Updating signers is not supported, the previous submission must fail
                     counters::CORE_MEMPOOL_IDEMPOTENT_TXNS.inc();
+                    self.process_ready_transactions(&address, acc_seq_num);
                     return MempoolStatus::new(MempoolStatusCode::Accepted);
                 }
             }

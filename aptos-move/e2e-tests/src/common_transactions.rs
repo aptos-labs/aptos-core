@@ -68,7 +68,7 @@ pub fn peer_to_peer_txn(
     // get a SignedTransaction
     sender
         .transaction()
-        .payload(aptos_stdlib::aptos_coin_transfer(
+        .payload(aptos_stdlib::aptos_account_fungible_transfer_only(
             *receiver.address(),
             transfer_amount,
         ))

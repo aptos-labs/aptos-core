@@ -648,7 +648,7 @@ async fn sign_transaction_any_keyless_pk<'a>(
     info!(
         "{} balance before TXN: {}",
         addr.to_hex_literal(),
-        info.get_balance(addr).await.unwrap()
+        info.get_balance(addr).await
     );
     // TODO: No idea why, but these calls do not actually reflect the updated sequence number after a successful TXN.
     info!(
