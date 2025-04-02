@@ -33,13 +33,13 @@ const PROCESSOR_NAMES: &[ProcessorName] = {
 
     &[
         AccountTransactionsProcessor,
-        DefaultProcessor,
-        EventsProcessor,
-        FungibleAssetProcessor,
-        ObjectsProcessor,
-        StakeProcessor,
-        TokenV2Processor,
-        UserTransactionProcessor,
+        // DefaultProcessor,
+        // EventsProcessor,
+        // FungibleAssetProcessor,
+        // ObjectsProcessor,
+        // StakeProcessor,
+        // TokenV2Processor,
+        // UserTransactionProcessor,
     ]
 };
 
@@ -78,7 +78,7 @@ fn start_processor(
                 indexer_grpc_http2_ping_timeout_secs: Default::default(),
                 indexer_grpc_reconnection_timeout_secs: Default::default(),
                 indexer_grpc_response_item_timeout_secs: 10,
-                reconnection_max_retries: 1000,
+                reconnection_max_retries: 5,
                 transaction_filter: Default::default(),
             },
             db_config: DbConfig::PostgresConfig(PostgresConfig {
