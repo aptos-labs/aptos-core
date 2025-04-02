@@ -274,13 +274,13 @@ pub fn verify_keyless_signature_without_ephemeral_signature_check(
     public_key: &AnyKeylessPublicKey,
     signature: &KeylessSignature,
     jwk: &JWK,
-    onchain_timestamp_mus: u64,
+    onchain_timestamp_microseconds: u64,
     training_wheels_pk: &Option<EphemeralPublicKey>,
     config: &Configuration,
     pvk: &Option<PreparedVerifyingKey<Bn254>>,
 ) -> Result<(), VMStatus> {
     signature
-        .verify_expiry(onchain_timestamp_mus)
+        .verify_expiry(onchain_timestamp_microseconds)
         .map_err(|_| {
             // println!("[aptos-vm][groth16] ZKP expired");
 
