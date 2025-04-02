@@ -32,9 +32,12 @@
 -  [Function `unified_prologue`](#0x1_transaction_validation_unified_prologue)
 -  [Function `unified_prologue_fee_payer`](#0x1_transaction_validation_unified_prologue_fee_payer)
 -  [Function `unified_epilogue`](#0x1_transaction_validation_unified_epilogue)
+<<<<<<< HEAD
 -  [Function `unified_prologue_v2`](#0x1_transaction_validation_unified_prologue_v2)
 -  [Function `unified_prologue_fee_payer_v2`](#0x1_transaction_validation_unified_prologue_fee_payer_v2)
 -  [Function `unified_epilogue_v2`](#0x1_transaction_validation_unified_epilogue_v2)
+=======
+>>>>>>> fbdc411893 ([Scheduled Txns] Introduce scheduled txns move module)
 -  [Function `scheduled_txn_epilogue`](#0x1_transaction_validation_scheduled_txn_epilogue)
 -  [Function `scheduled_txn_cleanup`](#0x1_transaction_validation_scheduled_txn_cleanup)
 -  [Specification](#@Specification_1)
@@ -1763,6 +1766,98 @@ If there is no fee_payer, fee_payer = sender
 
 </details>
 
+<a id="0x1_transaction_validation_scheduled_txn_epilogue"></a>
+
+## Function `scheduled_txn_epilogue`
+
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_epilogue">scheduled_txn_epilogue</a>(deposit_store_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, txn_id: <a href="scheduled_txns.md#0x1_scheduled_txns_TransactionId">scheduled_txns::TransactionId</a>, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, scheduling_deposit: u64, gas_units_remaining: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_epilogue">scheduled_txn_epilogue</a>(
+    deposit_store_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="account.md#0x1_account">account</a>: <b>address</b>,
+    txn_id: TransactionId,
+    storage_fee_refunded: u64,
+    txn_gas_price: u64,
+    txn_max_gas_units: u64,
+    scheduling_deposit: u64,
+    gas_units_remaining: u64
+) {
+    <b>assert</b>!(txn_max_gas_units &gt;= gas_units_remaining, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>));
+    <b>let</b> gas_used = txn_max_gas_units - gas_units_remaining;
+
+    <b>assert</b>!(
+        (txn_gas_price <b>as</b> u128) * (gas_used <b>as</b> u128) &lt;= <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>)
+    );
+    <b>let</b> transaction_fee_amount = txn_gas_price * gas_used;
+
+    <b>assert</b>!(scheduling_deposit &gt;= transaction_fee_amount, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>));
+    <b>let</b> deposit_store_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(deposit_store_owner);
+
+    <b>if</b> (transaction_fee_amount &gt; storage_fee_refunded) {
+        <b>let</b> burn_amount = transaction_fee_amount - storage_fee_refunded;
+        <b>let</b> refund_from_scheduling_deposit = scheduling_deposit - burn_amount;
+        <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;AptosCoin&gt;(
+            deposit_store_owner,
+            <a href="account.md#0x1_account">account</a>,
+            refund_from_scheduling_deposit
+        );
+        <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(deposit_store_addr, burn_amount);
+    } <b>else</b> <b>if</b> (transaction_fee_amount &lt; storage_fee_refunded) {
+        // <b>return</b> the full deposit and mint the remaining
+        <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;AptosCoin&gt;(
+            deposit_store_owner,
+            <a href="account.md#0x1_account">account</a>,
+            scheduling_deposit
+        );
+        <b>let</b> mint_and_refund_amount = storage_fee_refunded - transaction_fee_amount;
+        <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(<a href="account.md#0x1_account">account</a>, mint_and_refund_amount);
+    };
+
+    // Increment sequence number
+    <a href="account.md#0x1_account_increment_sequence_number">account::increment_sequence_number</a>(<a href="account.md#0x1_account">account</a>);
+
+    <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_cleanup">scheduled_txn_cleanup</a>(txn_id);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_validation_scheduled_txn_cleanup"></a>
+
+## Function `scheduled_txn_cleanup`
+
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_cleanup">scheduled_txn_cleanup</a>(txn_id: <a href="scheduled_txns.md#0x1_scheduled_txns_TransactionId">scheduled_txns::TransactionId</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_cleanup">scheduled_txn_cleanup</a>(txn_id: TransactionId) {
+    <a href="scheduled_txns.md#0x1_scheduled_txns_finish_execution">scheduled_txns::finish_execution</a>(txn_id);
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="@Specification_1"></a>
 
 ## Specification
@@ -1881,7 +1976,11 @@ Give some constraints that may abort according to the conditions.
 <pre><code><b>schema</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a> {
     sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
     gas_payer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+<<<<<<< HEAD
     replay_protector: <a href="transaction_validation.md#0x1_transaction_validation_ReplayProtector">ReplayProtector</a>;
+=======
+    txn_sequence_number: u64;
+>>>>>>> fbdc411893 ([Scheduled Txns] Introduce scheduled txns move module)
     txn_authentication_key: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;;
     txn_gas_price: u64;
     txn_max_gas_units: u64;
@@ -1893,6 +1992,35 @@ Give some constraints that may abort according to the conditions.
     <b>aborts_if</b> !(<a href="chain_id.md#0x1_chain_id_get">chain_id::get</a>() == <a href="chain_id.md#0x1_chain_id">chain_id</a>);
     <b>let</b> transaction_sender = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
     <b>let</b> gas_payer_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(gas_payer);
+<<<<<<< HEAD
+=======
+    <b>aborts_if</b> (
+        !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_SPONSORED_AUTOMATIC_ACCOUNT_CREATION">features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION</a>)
+            || <a href="account.md#0x1_account_spec_exists_at">account::spec_exists_at</a>(transaction_sender)
+            || transaction_sender == gas_payer_addr
+            || txn_sequence_number &gt; 0
+    ) && (
+        !(txn_sequence_number &gt;= <b>global</b>&lt;Account&gt;(transaction_sender).sequence_number)
+            || !(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(txn_authentication_key) || <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(
+            txn_authentication_key
+        ) == <b>global</b>&lt;Account&gt;(transaction_sender).authentication_key)
+            || !<a href="account.md#0x1_account_spec_exists_at">account::spec_exists_at</a>(transaction_sender)
+            || !(txn_sequence_number == <b>global</b>&lt;Account&gt;(transaction_sender).sequence_number)
+    );
+    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_SPONSORED_AUTOMATIC_ACCOUNT_CREATION">features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION</a>)
+        && transaction_sender != gas_payer_addr
+        && txn_sequence_number == 0
+        && !<a href="account.md#0x1_account_spec_exists_at">account::spec_exists_at</a>(transaction_sender)
+        && (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(txn_authentication_key) || <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(
+        txn_authentication_key
+    ) != <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(transaction_sender));
+    <b>aborts_if</b> !(txn_sequence_number &lt; (1u64 &lt;&lt; 63));
+    <b>let</b> max_transaction_fee = txn_gas_price * txn_max_gas_units;
+    <b>aborts_if</b> max_transaction_fee &gt; <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>;
+    <b>aborts_if</b> !<b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(gas_payer_addr);
+    // This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+    <b>aborts_if</b> !(<b>global</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(gas_payer_addr).<a href="coin.md#0x1_coin">coin</a>.value &gt;= max_transaction_fee);
+>>>>>>> fbdc411893 ([Scheduled Txns] Introduce scheduled txns move module)
 }
 </code></pre>
 

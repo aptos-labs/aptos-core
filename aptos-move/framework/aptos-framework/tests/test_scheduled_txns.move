@@ -187,7 +187,6 @@ module aptos_framework::test_scheduled_txns {
                 == 1,
             scheduled_txns::get_num_txns()
         );
-
         // Shutdown should cancel all transactions and refund all deposits
         scheduled_txns::shutdown_test(fx);
 

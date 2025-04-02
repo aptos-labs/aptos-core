@@ -17,7 +17,6 @@ module aptos_framework::scheduled_txns {
     use aptos_framework::primary_fungible_store;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
-    #[test_only]
     use aptos_framework::transaction_fee;
 
     friend aptos_framework::block;
@@ -33,7 +32,6 @@ module aptos_framework::scheduled_txns {
 
     /// Scheduling is stopped
     const EUNAVAILABLE: u64 = 3;
-
     const U64_MAX: u64 = 18446744073709551615;
 
     /// Conversion factor between our time granularity (100ms) and microseconds
