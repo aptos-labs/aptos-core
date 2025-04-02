@@ -204,40 +204,36 @@
         "type": "write_resource"
       },
       {
-        "address": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+        "address": "0xa5a7c7e10f3329999eb018de4dd05d03829f79585327b3df63121a8526acef61",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::account::Account",
+          "type": "0x1::fungible_asset::FungibleStore",
           "data": {
-            "authentication_key": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
-            "coin_register_events": {
+            "balance": "0",
+            "frozen": false,
+            "metadata": {
+              "inner": "0xa"
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0xa5a7c7e10f3329999eb018de4dd05d03829f79585327b3df63121a8526acef61",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::object::ObjectCore",
+          "data": {
+            "allow_ungated_transfer": false,
+            "guid_creation_num": "1125899906842625",
+            "owner": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+            "transfer_events": {
               "counter": "0",
               "guid": {
                 "id": {
-                  "addr": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
-                  "creation_num": "0"
+                  "addr": "0xa5a7c7e10f3329999eb018de4dd05d03829f79585327b3df63121a8526acef61",
+                  "creation_num": "1125899906842624"
                 }
-              }
-            },
-            "guid_creation_num": "2",
-            "key_rotation_events": {
-              "counter": "0",
-              "guid": {
-                "id": {
-                  "addr": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
-                  "creation_num": "1"
-                }
-              }
-            },
-            "rotation_capability_offer": {
-              "for": {
-                "vec": []
-              }
-            },
-            "sequence_number": "0",
-            "signer_capability_offer": {
-              "for": {
-                "vec": []
               }
             }
           }
@@ -272,8 +268,8 @@
         "sequence_number": "0",
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
-          "execution_gas_units": "5",
-          "io_gas_units": "4",
+          "execution_gas_units": "4",
+          "io_gas_units": "5",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "8"
