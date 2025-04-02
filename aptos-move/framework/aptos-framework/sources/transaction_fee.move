@@ -108,12 +108,13 @@ module aptos_framework::transaction_fee {
     public(friend) fun store_aptos_coin_burn_cap(aptos_framework: &signer, burn_cap: BurnCapability<AptosCoin>) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        if (features::operations_default_to_fa_apt_store_enabled()) {
-            let burn_ref = coin::convert_and_take_paired_burn_ref(burn_cap);
-            move_to(aptos_framework, AptosFABurnCapabilities { burn_ref });
-        } else {
-            move_to(aptos_framework, AptosCoinCapabilities { burn_cap })
-        }
+        // TODO: remove the comment after the migration is done and the fungible asset store migration test in e2e-move-tests is removed
+        // if (features::operations_default_to_fa_apt_store_enabled()) {
+        //     let burn_ref = coin::convert_and_take_paired_burn_ref(burn_cap);
+        //     move_to(aptos_framework, AptosFABurnCapabilities { burn_ref });
+        // } else {
+        move_to(aptos_framework, AptosCoinCapabilities { burn_cap })
+        // }
     }
 
     public entry fun convert_to_aptos_fa_burn_ref(aptos_framework: &signer) acquires AptosCoinCapabilities {

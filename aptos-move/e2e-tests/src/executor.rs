@@ -28,8 +28,8 @@ use aptos_transaction_simulation::{
 use aptos_types::{
     account_config::{
         new_block_event_key, primary_apt_store, AccountResource, CoinInfoResource,
-        CoinStoreResource, ConcurrentSupplyResource, FungibleStoreResource, NewBlockEvent,
-        ObjectGroupResource, CORE_CODE_ADDRESS,
+        ConcurrentSupplyResource, FungibleStoreResource, NewBlockEvent, ObjectGroupResource,
+        CORE_CODE_ADDRESS,
     },
     block_executor::{
         config::{
@@ -622,14 +622,6 @@ impl FakeExecutor {
     }
 
     /// Reads the CoinStore resource value for an account from this executor's data store.
-    pub fn read_apt_coin_store_resource(
-        &self,
-        account: &Account,
-    ) -> Option<CoinStoreResource<AptosCoinType>> {
-        self.read_apt_coin_store_resource_at_address(account.address())
-    }
-
-    /// Reads the CoinStore resource value for an account from this executor's data store.
     pub fn read_apt_fungible_store_resource(
         &self,
         account: &Account,
@@ -661,15 +653,6 @@ impl FakeExecutor {
     /// Reads the CoinInfo resource value from this executor's data store.
     pub fn read_apt_coin_info_resource(&self) -> Option<CoinInfoResource<AptosCoinType>> {
         self.read_resource(&AptosCoinType::coin_info_address())
-    }
-
-    /// Reads the CoinStore resource value for an account under the given address from this executor's
-    /// data store.
-    pub fn read_apt_coin_store_resource_at_address(
-        &self,
-        addr: &AccountAddress,
-    ) -> Option<CoinStoreResource<AptosCoinType>> {
-        self.read_resource(addr)
     }
 
     /// Executes the given block of transactions.

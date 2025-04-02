@@ -41,7 +41,12 @@ pub static OBJ_GROUP_TAG: Lazy<StructTag> = Lazy::new(|| StructTag {
 });
 #[test]
 fn test_basic_fungible_token() {
-    let mut h = MoveHarness::new();
+    let mut h = MoveHarness::new_with_features(vec![], vec![
+        FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE,
+        FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE,
+        FeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE,
+        FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE,
+    ]);
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap());
@@ -179,7 +184,12 @@ fn test_basic_fungible_token() {
 // A simple test to verify gas paying still work for prologue and epilogue.
 #[test]
 fn test_coin_to_fungible_asset_migration() {
-    let mut h = MoveHarness::new();
+    let mut h = MoveHarness::new_with_features(vec![], vec![
+        FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE,
+        FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE,
+        FeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE,
+        FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE,
+    ]);
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     let alice_primary_store_addr =
