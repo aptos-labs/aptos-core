@@ -343,7 +343,7 @@ module aptos_framework::aptos_account {
         let (resource_account, _) = account::create_resource_account(alice, vector[]);
         let resource_acc_addr = signer::address_of(&resource_account);
         let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(core);
-        assert!(!coin::is_account_registered<AptosCoin>(resource_acc_addr), 0);
+        assert!(coin::is_account_registered<AptosCoin>(resource_acc_addr), 0);
 
         create_account(signer::address_of(alice));
         coin::deposit(signer::address_of(alice), coin::mint(10000, &mint_cap));
@@ -468,6 +468,8 @@ module aptos_framework::aptos_account {
     #[expected_failure(abort_code = 0x50003, location = Self)]
     public fun test_direct_coin_transfers_fail_if_recipient_opted_out(
         from: &signer, to: &signer) acquires DirectTransferConfig {
+        let fa_feature = std::features::get_new_accounts_default_to_fa_store_feature();
+        std::features::change_feature_flags_for_testing(from, vector[], vector[fa_feature]);
         coin::create_coin_conversion_map(from);
         let (burn_cap, freeze_cap, mint_cap) = coin::initialize<FakeCoin>(
             from,
