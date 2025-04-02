@@ -204,6 +204,8 @@ pub(crate) fn validate_authenticators(
 
     let onchain_timestamp_obj = get_current_time_onchain(resolver)?;
     // Check the expiry timestamp on all authenticators first to fail fast
+    // This is a redundant check to quickly dismiss expired signatures early and save compute on more computationally costly checks.
+    // The actual check is performed in `verify_keyless_signature_without_ephemeral_signature_check`.
     for (_, sig) in authenticators {
         sig.verify_expiry(onchain_timestamp_obj.microseconds)
             .map_err(|_| {
@@ -272,16 +274,18 @@ pub fn verify_keyless_signature_without_ephemeral_signature_check(
     public_key: &AnyKeylessPublicKey,
     signature: &KeylessSignature,
     jwk: &JWK,
-    exp_date_secs: u64,
+    onchain_timestamp_mus: u64,
     training_wheels_pk: &Option<EphemeralPublicKey>,
     config: &Configuration,
     pvk: &Option<PreparedVerifyingKey<Bn254>>,
 ) -> Result<(), VMStatus> {
-    signature.verify_expiry(exp_date_secs).map_err(|_| {
-        // println!("[aptos-vm][groth16] ZKP expired");
+    signature
+        .verify_expiry(onchain_timestamp_mus)
+        .map_err(|_| {
+            // println!("[aptos-vm][groth16] ZKP expired");
 
-        invalid_signature!("The ephemeral keypair has expired")
-    })?;
+            invalid_signature!("The ephemeral keypair has expired")
+        })?;
     match &signature.cert {
         EphemeralCertificate::ZeroKnowledgeSig(zksig) => match jwk {
             JWK::RSA(rsa_jwk) => {
