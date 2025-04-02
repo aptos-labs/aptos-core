@@ -19,7 +19,7 @@ TokenV1MintAndTransferNFTSequential	61	0.927	1.104	1099.5
 TokenV2AmbassadorMint { numbered: true }	61	0.950	1.045	642.8
 LiquidityPoolSwap { is_stable: true }	61	0.929	1.035	902.4
 LiquidityPoolSwap { is_stable: false }	61	0.926	1.034	849.9
-CoinInitAndMint	61	0.952	1.087	722.9
+CoinInitAndMint	61	0.952	1.087	981.8
 FungibleAssetMint	61	0.942	1.050	326.1
 IncGlobalMilestoneAggV2 { milestone_every: 1 }	61	0.919	1.054	41.7
 IncGlobalMilestoneAggV2 { milestone_every: 2 }	61	0.920	1.116	25.2
