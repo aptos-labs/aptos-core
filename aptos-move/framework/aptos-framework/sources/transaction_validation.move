@@ -14,6 +14,8 @@ module aptos_framework::transaction_validation {
     use aptos_framework::coin;
     use aptos_framework::create_signer;
     use aptos_framework::permissioned_signer;
+    use aptos_framework::scheduled_txns;
+    use aptos_framework::scheduled_txns::TransactionId;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
@@ -856,5 +858,80 @@ module aptos_framework::transaction_validation {
             let addr = signer::address_of(&account);
             account::increment_sequence_number(addr);
         }
+    }
+
+    fun scheduled_txn_epilogue(
+        deposit_store_owner: &signer,
+        account: address,
+        txn_id: TransactionId,
+        storage_fee_refunded: u64,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        scheduling_deposit: u64,
+        gas_units_remaining: u64
+    ) {
+        assert!(txn_max_gas_units >= gas_units_remaining, error::invalid_argument(EOUT_OF_GAS));
+        let gas_used = txn_max_gas_units - gas_units_remaining;
+
+        assert!(
+            (txn_gas_price as u128) * (gas_used as u128) <= MAX_U64,
+            error::out_of_range(EOUT_OF_GAS)
+        );
+        let transaction_fee_amount = txn_gas_price * gas_used;
+
+        assert!(scheduling_deposit >= transaction_fee_amount, error::invalid_argument(EOUT_OF_GAS));
+        let deposit_store_addr = signer::address_of(deposit_store_owner);
+
+        if (transaction_fee_amount > storage_fee_refunded) {
+            let burn_amount = transaction_fee_amount - storage_fee_refunded;
+            let refund_from_scheduling_deposit = scheduling_deposit - burn_amount;
+            coin::transfer<AptosCoin>(
+                deposit_store_owner,
+                account,
+                refund_from_scheduling_deposit
+            );
+            transaction_fee::burn_fee(deposit_store_addr, burn_amount);
+        } else if (transaction_fee_amount < storage_fee_refunded) {
+            // return the full deposit and mint the remaining
+            coin::transfer<AptosCoin>(
+                deposit_store_owner,
+                account,
+                scheduling_deposit
+            );
+            let mint_and_refund_amount = storage_fee_refunded - transaction_fee_amount;
+            transaction_fee::mint_and_refund(account, mint_and_refund_amount);
+        };
+
+        // Increment sequence number
+        account::increment_sequence_number(account);
+
+        scheduled_txn_cleanup(txn_id);
+    }
+
+    fun scheduled_txn_cleanup(txn_id: TransactionId) {
+        scheduled_txns::finish_execution(txn_id);
+    }
+
+    #[test_only]
+    public fun scheduled_txn_epilogue_test_helper(
+        deposit_store_owner: &signer,
+        account: address,
+        txn_id: TransactionId,
+        storage_fee_refunded: u64,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        scheduling_deposit: u64,
+        gas_units_remaining: u64
+    ) {
+        scheduled_txn_epilogue(
+            deposit_store_owner,
+            account,
+            txn_id,
+            storage_fee_refunded,
+            txn_gas_price,
+            txn_max_gas_units,
+            scheduling_deposit,
+            gas_units_remaining
+        );
     }
 }
