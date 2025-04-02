@@ -93,7 +93,7 @@ fn test_existing_account_with_fee_payer_aborts() {
 
     let output = h.run_raw(transaction);
     // Alice has an insufficient balance, trying to 1 when she has 0.
-    assert_abort!(output.status(), 65542);
+    assert_abort!(output.status(), 65540);
 
     let alice_after = h.read_aptos_balance(alice.address());
     let bob_after = h.read_aptos_balance(bob.address());
