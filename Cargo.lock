@@ -332,6 +332,7 @@ dependencies = [
  "aptos-vm-types",
  "aptos-workspace-server",
  "async-trait",
+ "backoff",
  "base64 0.13.1",
  "bcs 0.1.4",
  "bollard",
