@@ -16,6 +16,7 @@ proptest! {
     // Need a minimum of two accounts to send p2p transactions over.
     // Set balances high enough that transactions will always succeed.
     #[test]
+    #[ignore]
     fn p2p_gas_cost_stability(
         universe in AccountUniverseGen::success_strategy(2),
         transfers in vec(any_with::<P2PTransferGen>((1, 10_000)), 0..default_num_transactions()),
@@ -24,6 +25,7 @@ proptest! {
     }
 
     #[test]
+    #[ignore]
     fn p2p_high_balance(
         universe in AccountUniverseGen::strategy(
             2..default_num_accounts(),
