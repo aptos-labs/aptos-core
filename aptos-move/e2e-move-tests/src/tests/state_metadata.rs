@@ -30,6 +30,8 @@ fn test_metadata_tracking() {
         FeatureFlag::STORAGE_SLOT_METADATA,
         FeatureFlag::REFUNDABLE_BYTES,
         FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE,
+        FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE,
+        FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE,
     ]);
     // Create and fund account2
     harness.run_transaction_payload(
