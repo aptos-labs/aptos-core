@@ -102,8 +102,8 @@ function App() {
     const latestId = tasks.length > 0 ? parseInt(tasks[tasks.length - 1].task_id) + 1 : 1;
 
     // build a newTaskToPush objct into our local state
-    const newTaskToPush = {
-      address: account.address,
+    const newTaskToPush: Task = {
+      address: account.address.toStringLong(),
       completed: false,
       content: newTask,
       task_id: latestId + "",
