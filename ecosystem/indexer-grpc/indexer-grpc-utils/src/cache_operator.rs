@@ -262,7 +262,10 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         for transaction in transactions {
             let version = transaction.version;
             let cache_key = CacheEntry::build_key(version, self.storage_format).to_string();
-            let timestamp_in_seconds = transaction.timestamp.clone().map_or(0, |t| t.seconds as u64);
+            let timestamp_in_seconds = transaction
+                .timestamp
+                .clone()
+                .map_or(0, |t| t.seconds as u64);
             let cache_entry: CacheEntry =
                 CacheEntry::from_transaction(transaction, self.storage_format);
             let bytes = cache_entry.into_inner();

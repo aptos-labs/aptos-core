@@ -804,10 +804,16 @@ pub fn convert_transaction(
             transaction::transaction::TxnData::User(transaction::UserTransaction {
                 request: Some(transaction::UserTransactionRequest {
                     sender: ut.request.sender.to_string(),
-                    replay_protector: if let Some(replay_protection_nonce) = ut.request.replay_protection_nonce {
+                    replay_protector: if let Some(replay_protection_nonce) =
+                        ut.request.replay_protection_nonce
+                    {
                         Some(transaction::user_transaction_request::ReplayProtector::ReplayProtectionNonce(replay_protection_nonce.0))
                     } else {
-                        Some(transaction::user_transaction_request::ReplayProtector::SequenceNumber(ut.request.sequence_number.0))
+                        Some(
+                            transaction::user_transaction_request::ReplayProtector::SequenceNumber(
+                                ut.request.sequence_number.0,
+                            ),
+                        )
                     },
                     max_gas_amount: ut.request.max_gas_amount.0,
                     gas_unit_price: ut.request.gas_unit_price.0,
