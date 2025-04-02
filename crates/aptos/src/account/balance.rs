@@ -8,7 +8,11 @@ use aptos_api_types::ViewFunction;
 use aptos_types::{account_address::AccountAddress, AptosCoinType, CoinType};
 use async_trait::async_trait;
 use clap::Parser;
-use move_core_types::{ident_str, language_storage::ModuleId, parser::parse_type_tag};
+use move_core_types::{
+    ident_str,
+    language_storage::{ModuleId, StructTag, TypeTag},
+    parser::parse_type_tag,
+};
 use serde::Serialize;
 
 /// Show the account's balance of different coins
@@ -59,7 +63,20 @@ impl CliCommand<Vec<AccountBalance>> for Balance {
                 "Please provide an account using --account or run aptos init".to_string(),
             ));
         };
+        if let Some(ref coin) = self.coin_type {
+            if let Ok(addr) = AccountAddress::from_hex_literal(coin) {
+                self.fa_balance(account, addr).await
+            } else {
+                self.coin_balance(account).await
+            }
+        } else {
+            self.coin_balance(account).await
+        }
+    }
+}
 
+impl Balance {
+    async fn coin_balance(self, account: AccountAddress) -> CliTypedResult<Vec<AccountBalance>> {
         let coin_type = if let Some(coin) = self.coin_type {
             parse_type_tag(&coin).map_err(|err| {
                 CliError::CommandArgumentError(format!("Invalid coin type '{}': {:#?}", coin, err))
@@ -88,10 +105,49 @@ impl CliCommand<Vec<AccountBalance>> for Balance {
             .parse::<u64>()
             .unwrap();
 
-        return Ok(vec![AccountBalance {
+        Ok(vec![AccountBalance {
             asset_type: "coin".to_string(),
             coin_type: Some(coin_type.to_string()),
             balance,
-        }]);
+        }])
+    }
+
+    async fn fa_balance(
+        self,
+        account: AccountAddress,
+        fa_addr: AccountAddress,
+    ) -> CliTypedResult<Vec<AccountBalance>> {
+        let client = self.rest_options.client(&self.profile_options)?;
+        let response = client
+            .view_bcs_with_json_response(
+                &ViewFunction {
+                    module: ModuleId::new(
+                        AccountAddress::ONE,
+                        ident_str!("primary_fungible_store").to_owned(),
+                    ),
+                    function: ident_str!("balance").to_owned(),
+                    ty_args: vec![TypeTag::Struct(Box::new(StructTag {
+                        address: AccountAddress::ONE,
+                        module: ident_str!("fungible_asset").into(),
+                        name: ident_str!("Metadata").into(),
+                        type_args: vec![],
+                    }))],
+                    args: vec![account.to_vec(), fa_addr.to_vec()],
+                },
+                None,
+            )
+            .await?;
+
+        let balance = response.inner()[0]
+            .as_str()
+            .unwrap()
+            .parse::<u64>()
+            .unwrap();
+
+        Ok(vec![AccountBalance {
+            asset_type: "fa".to_string(),
+            coin_type: Some(fa_addr.to_string()),
+            balance,
+        }])
     }
 }
