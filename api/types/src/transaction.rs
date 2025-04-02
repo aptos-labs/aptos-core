@@ -335,6 +335,7 @@ impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
             expiration_timestamp_secs: txn.expiration_timestamp_secs().into(),
             signature: Some(txn.authenticator().into()),
             payload,
+            replay_protection_nonce: None,
         }
     }
 }
@@ -468,6 +469,7 @@ pub struct UserTransactionRequestInner {
     pub gas_unit_price: U64,
     pub expiration_timestamp_secs: U64,
     pub payload: TransactionPayload,
+    pub replay_protection_nonce: Option<U64>,
 }
 
 impl VerifyInput for UserTransactionRequestInner {
@@ -496,6 +498,7 @@ pub struct UserTransactionRequest {
     pub payload: TransactionPayload,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<TransactionSignature>,
+    pub replay_protection_nonce: Option<U64>,
 }
 
 /// Request to create signing messages

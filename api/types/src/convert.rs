@@ -638,6 +638,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             expiration_timestamp_secs,
             payload,
             signature: _,
+            replay_protection_nonce: _,
         } = txn;
         Ok(RawTransaction::new(
             sender.into(),
@@ -662,6 +663,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             gas_unit_price,
             expiration_timestamp_secs,
             payload,
+            replay_protection_nonce: _,
         } = user_transaction_request;
         Ok(RawTransaction::new(
             sender.into(),
