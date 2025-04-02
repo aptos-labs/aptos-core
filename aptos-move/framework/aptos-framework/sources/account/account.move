@@ -25,6 +25,7 @@ module aptos_framework::account {
     friend aptos_framework::genesis;
     friend aptos_framework::multisig_account;
     friend aptos_framework::resource_account;
+    friend aptos_framework::scheduled_txns;
     friend aptos_framework::transaction_validation;
 
     #[event]
@@ -1160,7 +1161,8 @@ module aptos_framework::account {
                 addr == @0x7 ||
                 addr == @0x8 ||
                 addr == @0x9 ||
-                addr == @0xa,
+                addr == @0xa ||
+                addr == @0xb,
             error::permission_denied(ENO_VALID_FRAMEWORK_RESERVED_ADDRESS),
         );
         let signer = create_account_unchecked(addr);

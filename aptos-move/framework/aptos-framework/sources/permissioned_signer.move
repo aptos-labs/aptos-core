@@ -81,7 +81,7 @@ module aptos_framework::permissioned_signer {
     ///
     /// This handle is storable and thus should be treated very carefully as it serves similar functionality
     /// as signer delegation.
-    enum StorablePermissionedHandle has store {
+    enum StorablePermissionedHandle has copy, drop, store {
         V1 {
             /// Address of the signer that creates this handle.
             master_account_addr: address,
