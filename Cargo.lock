@@ -290,7 +290,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "7.0.0"
+version = "7.1.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -1474,6 +1474,7 @@ dependencies = [
  "aptos-sdk",
  "aptos-storage-interface",
  "aptos-temppath",
+ "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
@@ -1597,6 +1598,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
+ "move-core-types",
  "rand 0.7.3",
 ]
 

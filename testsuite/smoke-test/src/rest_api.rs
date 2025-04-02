@@ -564,7 +564,7 @@ async fn test_view_function() {
     // Balance should be 0 and there should only be one return value
     let json_ret_values = client.view(&view_request, None).await.unwrap().into_inner();
     assert_eq!(json_ret_values.len(), 1);
-    assert!(!json_ret_values[0].as_bool().unwrap());
+    assert!(json_ret_values[0].as_bool().unwrap());
 
     // BCS
     let bcs_view_request = ViewFunction {
@@ -583,5 +583,5 @@ async fn test_view_function() {
         .unwrap()
         .into_inner();
     assert_eq!(bcs_ret_values.len(), 1);
-    assert!(!bcs_ret_values[0]);
+    assert!(bcs_ret_values[0]);
 }

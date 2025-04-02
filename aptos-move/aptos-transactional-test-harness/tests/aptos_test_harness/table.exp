@@ -44,7 +44,7 @@ key 0x3::token::Collections {
         counter: 0
         guid: drop store 0x1::guid::GUID {
             id: copy drop store 0x1::guid::ID {
-                creation_num: 4
+                creation_num: 2
                 addr: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
             }
         }
@@ -53,7 +53,7 @@ key 0x3::token::Collections {
         counter: 0
         guid: drop store 0x1::guid::GUID {
             id: copy drop store 0x1::guid::ID {
-                creation_num: 5
+                creation_num: 3
                 addr: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
             }
         }
@@ -62,7 +62,7 @@ key 0x3::token::Collections {
         counter: 0
         guid: drop store 0x1::guid::GUID {
             id: copy drop store 0x1::guid::ID {
-                creation_num: 6
+                creation_num: 4
                 addr: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
             }
         }

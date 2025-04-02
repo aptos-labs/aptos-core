@@ -12,16 +12,10 @@ permissions:
 on:
   # Allow triggering manually
   workflow_dispatch:
-  schedule:
-    - cron: "0 * * * *" # Run every hour
   push:
     branches:
       # Use this branch for canary
-      - 03-27-_gha_continuous_forge_on_main_composite_action_for_wait_images
-
-concurrency:
-  group: forge-clbt-${{ format('{0}-{1}', github.event_name, github.sha) }}
-  cancel-in-progress: true
+      - 04-01-_gha_forge_clbt_fix
 
 env:
   AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
@@ -32,9 +26,6 @@ env:
   # on the prospective merge result instead of only on the tip of the PR.
   # For more info also see https://github.com/actions/checkout#checkout-pull-request-head-commit-instead-of-merge-commit
   GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-  # NOTE: use a workflow-specific prefix to avoid collisions with other workflows
-  #       clbt stands for continuous land blocking test
-  TARGET_CACHE_ID: clbt-${{ format('{0}-{1}', github.event_name, github.sha) }}
 
 jobs:
   permission-check:
@@ -61,21 +52,25 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      # NOTE: Because these tests are run in quick succession there's a change that jobs may overlap and preempt each other if they have the same namespace.
+      #       To avoid this, we derive a unique suffix from the trigger event name and timestamp.
+      - name: Normalize and Derive Forge Namespace Suffix
+        id: normalize
+        run: |
+          GHA_TRIGGER_EVENT_NAME=${{ github.event_name == 'workflow_dispatch' && 'w-d' || github.event_name }}
+          TIMESTAMP=$(date +%s)
+          FORGE_NAMESPACE_SUFFIX="clbt-${GHA_TRIGGER_EVENT_NAME}-${TIMESTAMP}-${GIT_SHA}"
+          FORGE_NAMESPACE_SUFFIX=${FORGE_NAMESPACE_SUFFIX:0:30}
+          echo "FORGE_NAMESPACE_SUFFIX=${FORGE_NAMESPACE_SUFFIX}" >> "$GITHUB_OUTPUT"
       - uses: ./.github/actions/wait-images-ci
         with:
           GIT_SHA: ${{ env.GIT_SHA }}
           GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
           WAIT_FOR_IMAGE_SECONDS: 1800
-      - name: Normalize outputs
-        id: normalize
-        run: |
-          TARGET_CACHE_ID_NORMALIZED=${TARGET_CACHE_ID:0:20}
-          echo "TARGET_CACHE_ID_NORMALIZED=${TARGET_CACHE_ID_NORMALIZED}" >> "$GITHUB_OUTPUT"
-          echo "TARGET_CACHE_ID_NORMALIZED=${TARGET_CACHE_ID_NORMALIZED}"
+
     outputs:
       gitSha: ${{ env.GIT_SHA }}
-      targetCacheId: ${{ env.TARGET_CACHE_ID }}
-      targetCacheIdNormalized: ${{ steps.normalize.outputs.TARGET_CACHE_ID_NORMALIZED }}
+      FORGE_NAMESPACE_SUFFIX: ${{ steps.normalize.outputs.FORGE_NAMESPACE_SUFFIX }}
 
   forge-e2e-test:
     needs:
@@ -90,10 +85,7 @@ jobs:
       FORGE_TEST_SUITE: realistic_env_max_load
       IMAGE_TAG: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_RUNNER_DURATION_SECS: 480
-      # Use the cache ID as the Forge namespace so we can limit Forge test concurrency on k8s, since Forge
-      # test lifecycle is separate from that of GHA. This protects us from the case where many Forge tests are triggered
-      # by this GHA. If there is a Forge namespace collision, Forge will pre-empt the existing test running in the namespace.
-      FORGE_NAMESPACE: forge-e2e-${{ needs.determine-docker-build-metadata.outputs.targetCacheIdNormalized }}
+      FORGE_NAMESPACE: forge-e2e-${{ needs.determine-docker-build-metadata.outputs.FORGE_NAMESPACE_SUFFIX }}
       SEND_RESULTS_TO_TRUNK: true
 
   # This job determines the last released docker image tag, which is used by forge compat test.
@@ -152,7 +144,7 @@ jobs:
       FORGE_TEST_SUITE: compat
       IMAGE_TAG: ${{ needs.fetch-last-released-docker-image-tag.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 300
-      FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheIdNormalized }}
+      FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.FORGE_NAMESPACE_SUFFIX }}
       SEND_RESULTS_TO_TRUNK: true
 
   forge-framework-upgrade-test:
@@ -169,5 +161,5 @@ jobs:
       FORGE_TEST_SUITE: framework_upgrade
       IMAGE_TAG: ${{ needs.fetch-last-released-docker-image-tag.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 300
-      FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.targetCacheIdNormalized }}
+      FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.FORGE_NAMESPACE_SUFFIX }}
       SEND_RESULTS_TO_TRUNK: true
