@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::freeze_mut_ref {
     use std::vector;
     struct G {
@@ -103,7 +103,7 @@ module 0x42::freeze_mut_ref {
     }
 } // end 0x42::freeze_mut_ref
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::freeze_mut_ref {
     struct G {
         f: u64,
@@ -168,7 +168,7 @@ module 0x42::freeze_mut_ref {
     }
 }
 
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 public fun freeze_mut_ref::borrow_mut<#0>($t0: &mut vector<#0>): &#0 {
@@ -401,6 +401,307 @@ warning: Unused assignment/binding to `x`. Consider removing the assignment/bind
    │
 74 │         if (cond) x = copy s else x = other;
    │                                   ^^^^^^^^^
+
+// -- Model dump before second bytecode pipeline
+module 0x42::freeze_mut_ref {
+    use std::vector;
+    struct G {
+        f: u64,
+    }
+    struct S {
+        dummy_field: bool,
+    }
+    public fun borrow_mut<Element>(map: &mut vector<Element>): &Element {
+        Freeze(false)(vector::borrow_mut<Element>(map, 0))
+    }
+    public fun borrow_mut2<Element>(v: &mut Element): &Element {
+        Freeze(false)(v)
+    }
+    public fun borrow_mut3<Element>(v1: &mut Element,v2: &Element): &Element {
+        if true {
+          Freeze(false)(v1)
+        } else {
+          v2
+        }
+    }
+    public fun borrow_mut4<Element>(v: &mut Element): &Element {
+        return Freeze(false)(v)
+    }
+    private fun t0() {
+        {
+          let x: &u64 = Freeze(false)(Borrow(Mutable)(0));
+          x;
+          Tuple()
+        }
+    }
+    private fun t1(s: &mut S): &S {
+        Freeze(false)(s)
+    }
+    private fun t2(u1: &mut u64,u2: &mut u64): (&u64, &mut u64) {
+        Tuple(Freeze(false)(u1), u2)
+    }
+    public fun t4() {
+        {
+          let x: &u64;
+          {
+            let y: &u64;
+            (x: &u64, y: &u64): (&u64, &u64) = Tuple(Freeze(false)(Borrow(Mutable)(0)), Freeze(false)(Borrow(Mutable)(0)));
+            Tuple()
+          }
+        }
+    }
+    public fun t5(s: &mut G) {
+        {
+          let x: u64 = 0;
+          {
+            let f: &mut u64 = Borrow(Mutable)(select freeze_mut_ref::G.f<&mut G>(x: u64 = Add<u64>(x, 1);
+            s));
+            {
+              let g: &mut u64 = Borrow(Mutable)(select freeze_mut_ref::G.f<&mut G>(x: u64 = Add<u64>(x, 1);
+              s));
+              {
+                let y: &mut u64 = Borrow(Mutable)(2);
+                {
+                  let z: &u64;
+                  f = 0;
+                  z: &u64 = Freeze(false)(y);
+                  g = 2;
+                  Tuple()
+                }
+              }
+            }
+          }
+        }
+    }
+    private fun t6(cond: bool,s: &mut S,other: &S) {
+        {
+          let x: &S;
+          if cond {
+            x: &S = Freeze(false)(Copy(s))
+          } else {
+            x: &S = other
+          };
+          Tuple()
+        }
+    }
+    private fun t7(cond: bool,s: &mut S,other: &S) {
+        {
+          let _x: &S;
+          _x: &S = if cond {
+            Freeze(false)(s)
+          } else {
+            other
+          };
+          Tuple()
+        }
+    }
+    private fun t8(cond: bool,s: &mut S,other: &S) {
+        {
+          let _x: &S = if cond {
+            Freeze(false)(s)
+          } else {
+            other
+          };
+          Tuple()
+        }
+    }
+} // end 0x42::freeze_mut_ref
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun freeze_mut_ref::borrow_mut<#0>($t0: &mut vector<#0>): &#0 {
+     var $t1: &#0
+     var $t2: &mut #0
+     var $t3: &mut vector<#0>
+     var $t4: u64
+  0: $t3 := infer($t0)
+  1: $t4 := 0
+  2: $t2 := vector::borrow_mut<#0>($t3, $t4)
+  3: $t1 := freeze_ref(implicit)($t2)
+  4: return $t1
+}
+
+
+[variant baseline]
+public fun freeze_mut_ref::borrow_mut2<#0>($t0: &mut #0): &#0 {
+     var $t1: &#0
+  0: $t1 := freeze_ref(implicit)($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public fun freeze_mut_ref::borrow_mut3<#0>($t0: &mut #0, $t1: &#0): &#0 {
+     var $t2: &#0
+     var $t3: bool
+  0: $t3 := true
+  1: if ($t3) goto 2 else goto 5
+  2: label L0
+  3: $t2 := freeze_ref(implicit)($t0)
+  4: goto 7
+  5: label L1
+  6: $t2 := infer($t1)
+  7: label L2
+  8: return $t2
+}
+
+
+[variant baseline]
+public fun freeze_mut_ref::borrow_mut4<#0>($t0: &mut #0): &#0 {
+     var $t1: &#0
+  0: $t1 := freeze_ref(implicit)($t0)
+  1: return $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+fun freeze_mut_ref::t0() {
+     var $t0: &u64
+     var $t1: &mut u64
+     var $t2: u64
+     var $t3: &u64
+  0: $t2 := 0
+  1: $t1 := borrow_local($t2)
+  2: $t0 := freeze_ref(implicit)($t1)
+  3: $t3 := infer($t0)
+  4: return ()
+}
+
+
+[variant baseline]
+fun freeze_mut_ref::t1($t0: &mut 0x42::freeze_mut_ref::S): &0x42::freeze_mut_ref::S {
+     var $t1: &0x42::freeze_mut_ref::S
+  0: $t1 := freeze_ref(implicit)($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun freeze_mut_ref::t2($t0: &mut u64, $t1: &mut u64): (&u64, &mut u64) {
+     var $t2: &u64
+     var $t3: &mut u64
+  0: $t2 := freeze_ref(implicit)($t0)
+  1: $t3 := infer($t1)
+  2: return ($t2, $t3)
+}
+
+
+[variant baseline]
+public fun freeze_mut_ref::t4() {
+     var $t0: &u64
+     var $t1: &u64
+     var $t2: &u64
+     var $t3: &mut u64
+     var $t4: u64
+     var $t5: &u64
+     var $t6: &mut u64
+     var $t7: u64
+  0: $t4 := 0
+  1: $t3 := borrow_local($t4)
+  2: $t2 := freeze_ref(implicit)($t3)
+  3: $t0 := infer($t2)
+  4: $t7 := 0
+  5: $t6 := borrow_local($t7)
+  6: $t5 := freeze_ref(implicit)($t6)
+  7: $t1 := infer($t5)
+  8: return ()
+}
+
+
+[variant baseline]
+public fun freeze_mut_ref::t5($t0: &mut 0x42::freeze_mut_ref::G) {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: &mut 0x42::freeze_mut_ref::G
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: &mut u64
+     var $t8: &mut 0x42::freeze_mut_ref::G
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: &mut u64
+     var $t13: u64
+     var $t14: &u64
+     var $t15: u64
+     var $t16: &mut u64
+     var $t17: u64
+     var $t18: &u64
+  0: $t1 := 0
+  1: $t5 := infer($t1)
+  2: $t6 := 1
+  3: $t4 := +($t5, $t6)
+  4: $t1 := infer($t4)
+  5: $t3 := infer($t0)
+  6: $t2 := borrow_field<0x42::freeze_mut_ref::G>.f($t3)
+  7: $t10 := infer($t1)
+  8: $t11 := 1
+  9: $t9 := +($t10, $t11)
+ 10: $t1 := infer($t9)
+ 11: $t8 := infer($t0)
+ 12: $t7 := borrow_field<0x42::freeze_mut_ref::G>.f($t8)
+ 13: $t13 := 2
+ 14: $t12 := borrow_local($t13)
+ 15: $t15 := 2
+ 16: $t17 := 0
+ 17: write_ref($t2, $t17)
+ 18: $t18 := freeze_ref(implicit)($t12)
+ 19: $t14 := infer($t18)
+ 20: $t16 := infer($t7)
+ 21: write_ref($t16, $t15)
+ 22: return ()
+}
+
+
+[variant baseline]
+fun freeze_mut_ref::t6($t0: bool, $t1: &mut 0x42::freeze_mut_ref::S, $t2: &0x42::freeze_mut_ref::S) {
+     var $t3: &0x42::freeze_mut_ref::S
+     var $t4: &0x42::freeze_mut_ref::S
+     var $t5: &mut 0x42::freeze_mut_ref::S
+  0: if ($t0) goto 1 else goto 6
+  1: label L0
+  2: $t5 := copy($t1)
+  3: $t4 := freeze_ref(implicit)($t5)
+  4: $t3 := infer($t4)
+  5: goto 8
+  6: label L1
+  7: $t3 := infer($t2)
+  8: label L2
+  9: return ()
+}
+
+
+[variant baseline]
+fun freeze_mut_ref::t7($t0: bool, $t1: &mut 0x42::freeze_mut_ref::S, $t2: &0x42::freeze_mut_ref::S) {
+     var $t3: &0x42::freeze_mut_ref::S
+     var $t4: &0x42::freeze_mut_ref::S
+  0: if ($t0) goto 1 else goto 4
+  1: label L0
+  2: $t4 := freeze_ref(implicit)($t1)
+  3: goto 6
+  4: label L1
+  5: $t4 := infer($t2)
+  6: label L2
+  7: $t3 := infer($t4)
+  8: return ()
+}
+
+
+[variant baseline]
+fun freeze_mut_ref::t8($t0: bool, $t1: &mut 0x42::freeze_mut_ref::S, $t2: &0x42::freeze_mut_ref::S) {
+     var $t3: &0x42::freeze_mut_ref::S
+  0: if ($t0) goto 1 else goto 4
+  1: label L0
+  2: $t3 := freeze_ref(implicit)($t1)
+  3: goto 6
+  4: label L1
+  5: $t3 := infer($t2)
+  6: label L2
+  7: return ()
+}
 
 
 ============ disassembled file-format ==================

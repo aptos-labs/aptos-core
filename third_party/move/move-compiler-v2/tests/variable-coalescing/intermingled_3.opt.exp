@@ -1,4 +1,34 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+  0: $t1 := 1
+  1: $t2 := 2
+  2: $t4 := infer($t1)
+  3: $t5 := 1
+  4: $t3 := +($t4, $t5)
+  5: $t1 := infer($t3)
+  6: $t6 := infer($t2)
+  7: $t0 := infer($t6)
+  8: return $t0
+}
+
+
+Diagnostics:
+warning: Unused assignment/binding to `t`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_t`), or binding to `_`
+  ┌─ tests/variable-coalescing/intermingled_3.move:5:9
+  │
+5 │         t = t + 1;
+  │         ^^^^^^^^^
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::test(): u64 {
@@ -15,14 +45,6 @@ fun m::test(): u64 {
   5: $t0 := 2
   6: return $t0
 }
-
-
-Diagnostics:
-warning: Unused assignment/binding to `t`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_t`), or binding to `_`
-  ┌─ tests/variable-coalescing/intermingled_3.move:5:9
-  │
-5 │         t = t + 1;
-  │         ^^^^^^^^^
 
 ============ after DeadStoreElimination: ================
 

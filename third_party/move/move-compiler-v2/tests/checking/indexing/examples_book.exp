@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x1::m {
     struct R {
         value: bool,
@@ -25,7 +25,7 @@ module 0x1::m {
     }
 } // end 0x1::m
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x1::m {
     struct R has drop, key {
         value: bool,

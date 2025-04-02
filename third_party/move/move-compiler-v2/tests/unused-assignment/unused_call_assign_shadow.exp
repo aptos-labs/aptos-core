@@ -38,6 +38,12 @@ warning: Unused assignment/binding to `x`. Consider removing the assignment/bind
 4 │         x = x + 1;
   │         ^^^^^^^^^
 
+warning: Unused assignment/binding to `y`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_y`), or binding to `_`
+  ┌─ tests/unused-assignment/unused_call_assign_shadow.move:5:17
+  │
+5 │         let y = 0;
+  │                 ^
+
 warning: Unused assignment/binding to `w`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_w`), or binding to `_`
   ┌─ tests/unused-assignment/unused_call_assign_shadow.move:8:17
   │
@@ -55,3 +61,15 @@ warning: Unused assignment/binding to `y`. Consider removing the assignment/bind
    │
 16 │             y = y + 2;
    │             ^^^^^^^^^
+
+warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+   ┌─ tests/unused-assignment/unused_call_assign_shadow.move:22:17
+   │
+22 │         let x = 0;
+   │                 ^
+
+warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+   ┌─ tests/unused-assignment/unused_call_assign_shadow.move:24:17
+   │
+24 │         let x = 1;
+   │                 ^

@@ -1,4 +1,4 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::consume($t0: u64) {
@@ -46,6 +46,41 @@ warning: Unused assignment/binding to `c`. Consider removing the assignment/bind
    │
 13 │             c = c + 1;
    │             ^^^^^^^^^
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::consume($t0: u64) {
+     var $t1: u64
+  0: $t1 := infer($t0)
+  1: return ()
+}
+
+
+[variant baseline]
+fun m::test($t0: u64, $t1: bool) {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t2 := move($t0)
+  1: if ($t1) goto 2 else goto 5
+  2: label L0
+  3: m::consume($t2)
+  4: goto 13
+  5: label L1
+  6: $t3 := 99
+  7: $t0 := infer($t3)
+  8: $t4 := infer($t2)
+  9: $t6 := infer($t4)
+ 10: $t7 := 1
+ 11: $t5 := +($t6, $t7)
+ 12: $t4 := infer($t5)
+ 13: label L2
+ 14: return ()
+}
 
 ============ after DeadStoreElimination: ================
 

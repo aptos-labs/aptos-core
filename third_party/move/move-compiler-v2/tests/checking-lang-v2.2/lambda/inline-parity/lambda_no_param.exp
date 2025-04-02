@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0xdecafbad::m {
     private fun bar(f: |()|u64): u64 {
         (f)()
@@ -22,7 +22,7 @@ module 0xdecafbad::m {
     }
 } // end 0xdecafbad::m
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0xdecafbad::m {
     fun bar(f: |()|u64): u64 {
         f()

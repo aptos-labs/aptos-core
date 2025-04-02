@@ -6,7 +6,7 @@ warning: Unused local variable `y`. Consider removing or prefixing with an under
 4 │     let y = x;
   │         ^
 
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module <SELF>_0 {
     private fun main() {
         {
@@ -19,7 +19,7 @@ module <SELF>_0 {
     }
 } // end <SELF>_0
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 script {
     fun main() {
         let x;
