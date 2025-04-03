@@ -49,14 +49,16 @@ impl<D: TAugmentedData> AugDataStore<D> {
         db: Arc<dyn RandStorage<D>>,
     ) -> Self {
         let all_data = db.get_all_aug_data().unwrap_or_default();
-        let (to_remove, aug_data) = Self::filter_by_epoch(epoch, all_data.into_iter());
+        let to_remove = all_data.into_iter().map(|(_, data)| data).collect();
         if let Err(e) = db.remove_aug_data(to_remove) {
             error!("[AugDataStore] failed to remove aug data: {:?}", e);
         }
 
         let all_certified_data = db.get_all_certified_aug_data().unwrap_or_default();
-        let (to_remove, certified_data) =
-            Self::filter_by_epoch(epoch, all_certified_data.into_iter());
+        let to_remove = all_certified_data
+            .into_iter()
+            .map(|(_, data)| data)
+            .collect();
         if let Err(e) = db.remove_certified_aug_data(to_remove) {
             error!(
                 "[AugDataStore] failed to remove certified aug data: {:?}",
@@ -64,25 +66,13 @@ impl<D: TAugmentedData> AugDataStore<D> {
             );
         }
 
-        for (_, certified_data) in &certified_data {
-            certified_data
-                .data()
-                .augment(&config, &fast_config, certified_data.author());
-        }
-
         Self {
             epoch,
             signer,
             config,
             fast_config,
-            data: aug_data
-                .into_iter()
-                .map(|(id, data)| (id.author(), data))
-                .collect(),
-            certified_data: certified_data
-                .into_iter()
-                .map(|(id, data)| (id.author(), data))
-                .collect(),
+            data: HashMap::new(),
+            certified_data: HashMap::new(),
             db,
         }
     }
