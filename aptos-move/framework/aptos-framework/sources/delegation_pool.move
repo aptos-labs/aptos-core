@@ -592,6 +592,24 @@ module aptos_framework::delegation_pool {
     }
 
     #[view]
+    public fun pending_voter(
+        pool_address: address,
+        delegator_address: address
+    ): address acquires GovernanceRecords {
+        assert_delegation_pool_exists(pool_address);
+
+        let pending_voter = @0x0;
+        let vote_delegation = &GovernanceRecords[pool_address].vote_delegation;
+        if (exists<DelegationPoolAllowlisting>(pool_address)) {
+            if (vote_delegation.contains(delegator_address)) {
+                pending_voter = vote_delegation.borrow(delegator_address).pending_voter
+            };
+        };
+
+        pending_voter
+    }
+
+    #[view]
     /// Return whether the given delegator has any withdrawable stake. If they recently requested to unlock
     /// some stake and the stake pool's lockup cycle has not ended, their coins are not withdrawable yet.
     public fun get_pending_withdrawal(
@@ -1232,7 +1250,7 @@ module aptos_framework::delegation_pool {
         // By default, a delegator's delegated voter is itself.
         // TODO: recycle storage when VoteDelegation equals to default value.
         if (!smart_table::contains(vote_delegation_table, delegator)) {
-            return smart_table::borrow_mut_with_default(vote_delegation_table, delegator, VoteDelegation {
+            return vote_delegation_table.borrow_mut_with_default(delegator, VoteDelegation {
                 voter: delegator,
                 last_locked_until_secs: locked_until_secs,
                 pending_voter: delegator,
@@ -1241,8 +1259,10 @@ module aptos_framework::delegation_pool {
 
         let vote_delegation = smart_table::borrow_mut(vote_delegation_table, delegator);
         // A lockup period has passed since last time `vote_delegation` was updated. Pending voter takes effect.
-        if (vote_delegation.last_locked_until_secs < locked_until_secs) {
+        if (vote_delegation.last_locked_until_secs < locked_until_secs && vote_delegation.pending_voter != @0x0) {
             vote_delegation.voter = vote_delegation.pending_voter;
+            // Set this to @0x0 to indicate the voter has been updated.
+            vote_delegation.pending_voter = @0x0;
             vote_delegation.last_locked_until_secs = locked_until_secs;
         };
         vote_delegation
@@ -1449,29 +1469,31 @@ module aptos_framework::delegation_pool {
             governance_records,
             delegator_address
         );
-        let pending_voter: address = delegator_vote_delegation.pending_voter;
+        let pending_voter = delegator_vote_delegation.pending_voter;
 
         // No need to update if the voter doesn't really change.
         if (pending_voter != new_voter) {
             delegator_vote_delegation.pending_voter = new_voter;
+
             let active_shares = get_delegator_active_shares(delegation_pool, delegator_address);
+            // Remove the delegated shares from the previous pending voter's active shares. This might be the current
+            // voter if there's pending voter set yet . These shares will be moved to the new voter's active shares.
+            let previous_voter = if (pending_voter == @0x0) delegator_vote_delegation.voter else pending_voter;
             // <active shares> of <pending voter of shareholder> -= <active_shares>
             // <active shares> of <new voter of shareholder> += <active_shares>
             let pending_delegated_votes = update_and_borrow_mut_delegated_votes(
                 delegation_pool,
                 governance_records,
-                pending_voter
+                previous_voter
             );
-            pending_delegated_votes.active_shares_next_lockup =
-                pending_delegated_votes.active_shares_next_lockup - active_shares;
+            pending_delegated_votes.active_shares_next_lockup -= active_shares;
 
             let new_delegated_votes = update_and_borrow_mut_delegated_votes(
                 delegation_pool,
                 governance_records,
                 new_voter
             );
-            new_delegated_votes.active_shares_next_lockup =
-                new_delegated_votes.active_shares_next_lockup + active_shares;
+            new_delegated_votes.active_shares_next_lockup += active_shares;
         };
 
         if (features::module_event_migration_enabled()) {
@@ -2193,15 +2215,13 @@ module aptos_framework::delegation_pool {
         let pending_voter = vote_delegation.pending_voter;
         let current_delegated_votes =
             update_and_borrow_mut_delegated_votes(pool, governance_records, current_voter);
-        current_delegated_votes.active_shares = current_delegated_votes.active_shares + new_shares;
-        if (pending_voter == current_voter) {
-            current_delegated_votes.active_shares_next_lockup =
-                current_delegated_votes.active_shares_next_lockup + new_shares;
+        current_delegated_votes.active_shares += new_shares;
+        if (pending_voter == current_voter || pending_voter == @0x0) {
+            current_delegated_votes.active_shares_next_lockup += new_shares;
         } else {
             let pending_delegated_votes =
                 update_and_borrow_mut_delegated_votes(pool, governance_records, pending_voter);
-            pending_delegated_votes.active_shares_next_lockup =
-                pending_delegated_votes.active_shares_next_lockup + new_shares;
+            pending_delegated_votes.active_shares_next_lockup += new_shares;
         };
     }
 
@@ -2232,15 +2252,13 @@ module aptos_framework::delegation_pool {
         let current_voter = vote_delegation.voter;
         let pending_voter = vote_delegation.pending_voter;
         let current_delegated_votes = update_and_borrow_mut_delegated_votes(pool, governance_records, current_voter);
-        current_delegated_votes.active_shares = current_delegated_votes.active_shares - shares_to_redeem;
-        if (current_voter == pending_voter) {
-            current_delegated_votes.active_shares_next_lockup =
-                current_delegated_votes.active_shares_next_lockup - shares_to_redeem;
+        current_delegated_votes.active_shares -= shares_to_redeem;
+        if (current_voter == pending_voter || pending_voter == @0x0) {
+            current_delegated_votes.active_shares_next_lockup -= shares_to_redeem;
         } else {
             let pending_delegated_votes =
                 update_and_borrow_mut_delegated_votes(pool, governance_records, pending_voter);
-            pending_delegated_votes.active_shares_next_lockup =
-                pending_delegated_votes.active_shares_next_lockup - shares_to_redeem;
+            pending_delegated_votes.active_shares_next_lockup -= shares_to_redeem;
         };
     }
 
@@ -4483,6 +4501,7 @@ module aptos_framework::delegation_pool {
         end_aptos_epoch();
         // Withdrawl inactive shares will not change voting power.
         withdraw(delegator1, pool_address, 45 * ONE_APT);
+        assert!(pending_voter(pool_address, delegator1_address) == @0x0);
         assert!(calculate_and_update_voter_total_voting_power(pool_address, voter1_address) == 0, 1);
         assert!(calculate_and_update_voter_total_voting_power(pool_address, voter2_address) == 100 * ONE_APT, 1);
         assert!(calculate_and_update_voter_total_voting_power(pool_address, delegator1_address) == 0, 1);
@@ -5101,7 +5120,7 @@ module aptos_framework::delegation_pool {
         );
         // voter 1 becomes current voter and owns all voting power of delegator
         assert!(voter == voter1_address, 0);
-        assert!(pending_voter == voter1_address, 0);
+        assert!(pending_voter == @0x0);
         assert!(last_locked_until_secs == second_lockup_end, 0);
         assert!(
             calculate_and_update_voter_total_voting_power(pool_address, voter1_address) == 20 * ONE_APT,
@@ -5164,7 +5183,7 @@ module aptos_framework::delegation_pool {
             delegator_address
         );
         assert!(voter == voter2_address, 0);
-        assert!(pending_voter == voter2_address, 0);
+        assert!(pending_voter == @0x0);
         assert!(last_locked_until_secs == third_lockup_end, 0);
         assert!(
             calculate_and_update_voter_total_voting_power(pool_address, voter2_address) == 5070199999,
@@ -5239,7 +5258,7 @@ module aptos_framework::delegation_pool {
             delegator_address
         );
         assert!(voter == voter1_address, 0);
-        assert!(pending_voter == voter1_address, 0);
+        assert!(pending_voter == @0x0);
         assert!(last_locked_until_secs == second_lockup_end, 0);
 
         // delegate to voter 2 which should apply next lockup
@@ -5286,7 +5305,7 @@ module aptos_framework::delegation_pool {
             delegator_address
         );
         assert!(voter == voter2_address, 0);
-        assert!(pending_voter == voter2_address, 0);
+        assert!(pending_voter == @0x0);
         assert!(last_locked_until_secs == third_lockup_end, 0);
     }
 
