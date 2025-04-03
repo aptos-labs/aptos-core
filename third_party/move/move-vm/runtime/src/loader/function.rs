@@ -30,6 +30,7 @@ use move_vm_types::{
     loaded_data::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
+        struct_name_indexing::StructNameIndexMap,
     },
     resolver::ResourceResolver,
     values::{AbstractFunction, SerializedFunctionData},
@@ -451,6 +452,7 @@ impl Debug for Function {
 impl Function {
     pub(crate) fn new(
         natives: &NativeFunctions,
+        struct_name_index_map: &StructNameIndexMap,
         index: FunctionDefinitionIndex,
         module: &CompiledModule,
         signature_table: &[Vec<Type>],
@@ -492,14 +494,14 @@ impl Function {
             vec![]
         };
         let param_tys = signature_table[handle.parameters.0 as usize].clone();
-
         let access_specifier = load_access_specifier(
             BinaryIndexedView::Module(module),
+            &param_tys,
             signature_table,
             struct_names,
+            struct_name_index_map,
             &handle.access_specifiers,
         )?;
-
         Ok(Self {
             file_format_version: module.version(),
             index,
