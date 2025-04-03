@@ -20,6 +20,8 @@ module aptos_experimental::daa_siws_phantom {
     /// Entry function payload is missing.
     const EMISSING_ENTRY_FUNCTION_PAYLOAD: u64 = 3;
 
+    // a 58-character alphabet consisting of numbers (1-9) and almost all (A-Z, a-z) letters,
+    // excluding 0, O, I, and l to avoid confusion between similar-looking characters.
     const BASE_58_ALPHABET: vector<u8> = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
     const HEX_ALPHABET: vector<u8> = b"0123456789abcdef";
 
