@@ -11,11 +11,12 @@ module aptos_framework::account_abstraction {
     use aptos_std::big_ordered_map::{Self, BigOrderedMap};
     use aptos_framework::create_signer;
     use aptos_framework::event;
+    use aptos_framework::features;
     use aptos_framework::function_info::{Self, FunctionInfo};
     use aptos_framework::object;
     use aptos_framework::auth_data::AbstractionAuthData;
     use aptos_framework::system_addresses;
-    use aptos_framework::permissioned_signer::{Self, is_permissioned_signer};
+    use aptos_framework::permissioned_signer::is_permissioned_signer;
     #[test_only]
     use aptos_framework::account::create_account_for_test;
     #[test_only]
@@ -31,7 +32,10 @@ module aptos_framework::account_abstraction {
     const ENOT_MASTER_SIGNER: u64 = 4;
     const EINCONSISTENT_SIGNER_ADDRESS: u64 = 5;
     const EDEPRECATED_FUNCTION: u64 = 6;
-    const EDERIVABLE_AA_NOT_INITIALIZED: u64 = 6;
+    const EDERIVABLE_AA_NOT_INITIALIZED: u64 = 7;
+
+    const EACCOUNT_ABSTRACTION_NOT_ENABLED: u64 = 8;
+    const EDERIVABLE_ACCOUNT_ABSTRACTION_NOT_ENABLED: u64 = 9;
 
     /// derivable_aa_account_address uses this for domain separation within its native implementation
     /// source is defined in Scheme enum in types/src/transaction/authenticator.rs
@@ -121,6 +125,7 @@ module aptos_framework::account_abstraction {
         module_name: String,
         function_name: String,
     ) acquires DispatchableAuthenticator {
+        assert!(features::is_account_abstraction_enabled(), error::invalid_state(EACCOUNT_ABSTRACTION_NOT_ENABLED));
         assert!(!is_permissioned_signer(account), error::permission_denied(ENOT_MASTER_SIGNER));
         update_dispatchable_authenticator_impl(
             account,
@@ -178,6 +183,7 @@ module aptos_framework::account_abstraction {
         module_name: String,
         function_name: String,
     ) acquires DerivableDispatchableAuthenticator {
+        assert!(features::is_derivable_account_abstraction_enabled(), error::invalid_state(EDERIVABLE_ACCOUNT_ABSTRACTION_NOT_ENABLED));
         system_addresses::assert_aptos_framework(aptos_framework);
 
         DerivableDispatchableAuthenticator[@aptos_framework].auth_functions.add(
@@ -273,11 +279,14 @@ module aptos_framework::account_abstraction {
         let master_signer_addr = signer::address_of(&account);
 
         if (signing_data.is_derivable()) {
+            assert!(features::is_derivable_account_abstraction_enabled(), error::invalid_state(EDERIVABLE_ACCOUNT_ABSTRACTION_NOT_ENABLED));
             assert!(master_signer_addr == derive_account_address(func_info, signing_data.derivable_abstract_public_key()), error::invalid_state(EINCONSISTENT_SIGNER_ADDRESS));
 
             let func_infos = dispatchable_derivable_authenticator_internal();
             assert!(func_infos.contains(&func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
         } else {
+            assert!(features::is_account_abstraction_enabled(), error::invalid_state(EACCOUNT_ABSTRACTION_NOT_ENABLED));
+
             let func_infos = dispatchable_authenticator_internal(master_signer_addr);
             assert!(func_infos.contains(&func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
         };
@@ -286,7 +295,7 @@ module aptos_framework::account_abstraction {
         let returned_signer = dispatchable_authenticate(account, signing_data, &func_info);
         // Returned signer MUST represent the same account address. Otherwise, it may break the invariant of Aptos blockchain!
         assert!(
-            master_signer_addr == permissioned_signer::address_of(&returned_signer),
+            master_signer_addr == signer::address_of(&returned_signer),
             error::invalid_state(EINCONSISTENT_SIGNER_ADDRESS)
         );
         returned_signer

@@ -338,8 +338,8 @@ pub fn run_and_assert_gas_cost_stability(
     universe: AccountUniverseGen,
     transaction_gens: Vec<impl AUTransactionGen + Clone>,
 ) -> Result<(), TestCaseError> {
-    let mut executor = FakeExecutor::from_head_genesis();
-    let mut universe = universe.setup_gas_cost_stability(&mut executor);
+    let executor = FakeExecutor::from_head_genesis();
+    let mut universe = universe.setup_gas_cost_stability(executor.state_store());
     let (transactions, expected_values): (Vec<_>, Vec<_>) = transaction_gens
         .iter()
         .map(|transaction_gen| transaction_gen.clone().apply(&mut universe))

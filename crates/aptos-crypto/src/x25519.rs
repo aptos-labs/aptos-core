@@ -185,6 +185,8 @@ impl traits::Uniform for PrivateKey {
 
 // TODO: should this be gated under test flag? (mimoo)
 impl traits::ValidCryptoMaterial for PrivateKey {
+    const AIP_80_PREFIX: &'static str = "x25519-priv-";
+
     fn to_bytes(&self) -> Vec<u8> {
         self.0.to_bytes().to_vec()
     }
@@ -240,6 +242,8 @@ impl traits::PublicKey for PublicKey {
 }
 
 impl traits::ValidCryptoMaterial for PublicKey {
+    const AIP_80_PREFIX: &'static str = "x25519-pub-";
+
     fn to_bytes(&self) -> Vec<u8> {
         self.0.to_vec()
     }
