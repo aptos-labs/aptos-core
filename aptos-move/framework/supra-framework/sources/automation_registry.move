@@ -572,7 +572,7 @@ module supra_framework::automation_registry {
         aei: &AutomationEpochInfo,
         current_time: u64
     ) {
-        // If no funds where locked for the previous epoch then there is nothing to refund.
+        // If no funds were locked for the previous epoch then there is nothing to refund.
         // This may happen when feature was disabled, and no automation task was registered and charged for the next epoch.
         if (automation_registry.epoch_locked_fees == 0) {
             return
@@ -1023,7 +1023,7 @@ module supra_framework::automation_registry {
     ) {
         assert!(expiry_time > registration_time, EINVALID_EXPIRY_TIME);
         let task_duration = expiry_time - registration_time;
-        assert!(task_duration < automation_registry_config.task_duration_cap_in_secs, EEXPIRY_TIME_UPPER);
+        assert!(task_duration <= automation_registry_config.task_duration_cap_in_secs, EEXPIRY_TIME_UPPER);
 
         // Check that task is valid at least in the next epoch
         assert!(
@@ -1633,6 +1633,43 @@ module supra_framework::automation_registry {
         register(user,
             PAYLOAD,
             EPOCH_INTERVAL_FOR_TEST_IN_SECS / 2,
+            70,
+            20,
+            1000,
+            PARENT_HASH,
+            AUX_DATA
+        );
+    }
+
+    #[test(framework = @supra_framework, user = @0x1cafe)]
+    #[expected_failure(abort_code = EEXPIRY_TIME_UPPER, location = Self)]
+    fun check_registration_invalid_expiry_time_surpassing_task_duration_cap(
+        framework: &signer,
+        user: &signer
+    ) acquires AutomationRegistry, AutomationEpochInfo, ActiveAutomationRegistryConfig {
+        initialize_registry_test(framework, user);
+
+        register(user,
+            PAYLOAD,
+            TTL_UPPER_BOUND_TEST + 1,
+            70,
+            20,
+            1000,
+            PARENT_HASH,
+            AUX_DATA
+        );
+    }
+
+    #[test(framework = @supra_framework, user = @0x1cafe)]
+    fun check_registration_valid_expiry_time_matches_task_duration_cap(
+        framework: &signer,
+        user: &signer
+    ) acquires AutomationRegistry, AutomationEpochInfo, ActiveAutomationRegistryConfig {
+        initialize_registry_test(framework, user);
+
+        register(user,
+            PAYLOAD,
+            TTL_UPPER_BOUND_TEST,
             70,
             20,
             1000,

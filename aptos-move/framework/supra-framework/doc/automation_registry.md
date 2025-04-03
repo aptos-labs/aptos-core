@@ -1822,7 +1822,7 @@ Adjusts task fees and processes refunds when there's a change in epoch duration.
     aei: &<a href="automation_registry.md#0x1_automation_registry_AutomationEpochInfo">AutomationEpochInfo</a>,
     current_time: u64
 ) {
-    // If no funds <b>where</b> locked for the previous epoch then there is nothing <b>to</b> refund.
+    // If no funds were locked for the previous epoch then there is nothing <b>to</b> refund.
     // This may happen when feature was disabled, and no automation task was registered and charged for the next epoch.
     <b>if</b> (<a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.epoch_locked_fees == 0) {
         <b>return</b>
@@ -2553,7 +2553,7 @@ Registers a new automation task entry.
 ) {
     <b>assert</b>!(expiry_time &gt; registration_time, <a href="automation_registry.md#0x1_automation_registry_EINVALID_EXPIRY_TIME">EINVALID_EXPIRY_TIME</a>);
     <b>let</b> task_duration = expiry_time - registration_time;
-    <b>assert</b>!(task_duration &lt; automation_registry_config.task_duration_cap_in_secs, <a href="automation_registry.md#0x1_automation_registry_EEXPIRY_TIME_UPPER">EEXPIRY_TIME_UPPER</a>);
+    <b>assert</b>!(task_duration &lt;= automation_registry_config.task_duration_cap_in_secs, <a href="automation_registry.md#0x1_automation_registry_EEXPIRY_TIME_UPPER">EEXPIRY_TIME_UPPER</a>);
 
     // Check that task is valid at least in the next epoch
     <b>assert</b>!(
