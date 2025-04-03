@@ -107,6 +107,7 @@ impl DataCollection {
         map: HashMap<(AccountAddress, String), PackageMetadata>,
         compilation_cache: &mut CompilationCache,
         current_dir: PathBuf,
+        base_experiments: &[String],
     ) -> Option<PackageInfo> {
         let upgrade_number = if is_aptos_package(&package_name) {
             None
@@ -134,6 +135,8 @@ impl DataCollection {
                 &map,
                 compilation_cache,
                 None,
+                base_experiments,
+                &[],
             );
             if res.is_err() {
                 eprintln!("{} at: {}", res.unwrap_err(), version);
@@ -163,7 +166,7 @@ impl DataCollection {
         }
     }
 
-    pub async fn dump_data(&self, begin: Version, limit: u64, rate: u32) -> Result<()> {
+    pub async fn dump_data(&self, begin: Version, limit: u64, rate: u32, base_experiments: Vec<String>) -> Result<()> {
         println!("begin dumping data");
         let aptos_commons_path = self.current_dir.join(APTOS_COMMONS);
         if self.filter_condition.check_source_code && !check_aptos_packages_availability(aptos_commons_path.clone()) {
@@ -173,7 +176,8 @@ impl DataCollection {
         let _ = compile_aptos_packages(
             &aptos_commons_path,
             &mut compiled_cache.compiled_package_cache_v1,
-            false,
+            &base_experiments,
+            "base",
         );
         let compilation_cache: Arc<Mutex<CompilationCache>> = Arc::new(Mutex::new(compiled_cache));
         let data_manager = Arc::new(Mutex::new(DataManager::new_with_dir_creation(
@@ -219,10 +223,13 @@ impl DataCollection {
                     let dump_write_set = self.dump_write_set;
                     let data_manager= data_manager.clone();
                     let index = index_writer.clone();
-
+                    let base_experiments = base_experiments.clone();
                     let mut data_state = InMemoryStateStore::default();
-                    let mut features_to_enable = vec![FeatureFlag::VM_BINARY_FORMAT_V7, FeatureFlag::NATIVE_MEMORY_OPERATIONS];
-
+                    let mut features_to_enable = vec![
+                        FeatureFlag::VM_BINARY_FORMAT_V8,
+                        FeatureFlag::ENABLE_FUNCTION_VALUES,
+                        FeatureFlag::ENABLE_ENUM_TYPES,
+                        FeatureFlag::VM_BINARY_FORMAT_V7, FeatureFlag::NATIVE_MEMORY_OPERATIONS,];
                     let cache_v1 = compilation_cache
                         .lock()
                         .unwrap()
@@ -266,6 +273,7 @@ impl DataCollection {
                                 map,
                                 &mut compilation_cache.lock().unwrap(),
                                 current_dir.clone(),
+                                &base_experiments,
                             );
                             if package_info_opt.is_none() {
                                 return;
