@@ -463,9 +463,6 @@ impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
         match &*LazyLoadedFunction::expect_this_impl(fun)?.0.borrow() {
             LazyLoadedFunctionState::Unresolved { data, .. } => Ok(data.clone()),
             LazyLoadedFunctionState::Resolved { fun, mask, ty_args } => {
-                // TODO(lazy-loading): charge gas here or refactor. All function value
-                //                     serialization depends on this.
-                let mut ty_converter = UnmeteredLayoutConverter::new(self.module_storage);
                 let ty_builder = &self
                     .module_storage
                     .runtime_environment()
@@ -478,11 +475,25 @@ impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
                         ty_builder.create_ty_with_subst(ty, &fun.ty_args)
                     }
                 };
+
+                // MODULE LOADING METERING:
+                //   1. If function was unresolved, we are ok.
+                //   2. If function was unresolved and then resolved, we must have done a check on
+                //      captured layouts and so the gas should have been metered for loading the
+                //      modules.
+                //   3. If function was resolved, it means that it was constructed by interpreter
+                //      and captured values must have been taken from the stack. If captured values
+                //      come from storage, we must have constructed layout and charged gas. If they
+                //      were constructed, the corresponding modules where they are constructed must
+                //      have been loaded, so at this point the gas should have been metered for the
+                //      corresponding value layout as well.
+                let mut ty_converter = UnmeteredLayoutConverter::new(self.module_storage);
                 let captured_layouts = mask
                     .extract(fun.param_tys(), true)
                     .into_iter()
                     .map(|t| ty_converter.type_to_type_layout(&instantiate(t)?))
                     .collect::<PartialVMResult<Vec<_>>>()?;
+
                 Ok(SerializedFunctionData {
                     format_version: FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
                     module_id: fun

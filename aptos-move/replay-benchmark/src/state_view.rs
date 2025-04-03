@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Represents the read-set obtained when executing transactions.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub(crate) struct ReadSet {
     data: HashMap<StateKey, StateValue>,
 }
@@ -35,7 +35,32 @@ pub(crate) struct ReadSetCapturingStateView<'s, S> {
 }
 
 impl<'s, S: StateView> ReadSetCapturingStateView<'s, S> {
-    pub(crate) fn new(state_view: &'s S, initial_read_set: HashMap<StateKey, StateValue>) -> Self {
+    pub(crate) fn new(
+        state_view: &'s S,
+        mut initial_read_set: HashMap<StateKey, StateValue>,
+    ) -> Self {
+        // For generating and capturing reads, benchmark uses sequential execution. This means that
+        // at runtime, due to speculation in parallel execution, it is possible to access something
+        // outside the read-set. This is ok, but we preload framework to avoid unexpected logs and
+        // issues in the VM where prologue cannot find modules like 0x1::error.
+        for package in &aptos_framework::testnet_release_bundle().packages {
+            for (_, module) in package.sorted_code_and_modules() {
+                let state_key = StateKey::module(module.self_addr(), module.self_name());
+                if let Some(state_value) =
+                    state_view
+                        .get_state_value(&state_key)
+                        .unwrap_or_else(|err| {
+                            panic!("Failed to fetch module for {:?}: {:?}", state_key, err)
+                        })
+                {
+                    // If there is an override, we do not want to insert the value.
+                    if !initial_read_set.contains_key(&state_key) {
+                        initial_read_set.insert(state_key, state_value);
+                    }
+                }
+            }
+        }
+
         Self {
             captured_reads: Mutex::new(initial_read_set),
             state_view,

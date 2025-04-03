@@ -289,6 +289,8 @@ fn prefetch_aptos_framework(
 ) -> Result<(), PanicError> {
     let code_storage = state_view.as_aptos_code_storage(guard.environment());
 
+    // TODO(lazy-loading): Here we should load the transitive dependencies! With lazy loading, this
+    //   will not be the case...
     // If framework code exists in storage, the transitive closure will be verified and cached.
     let maybe_loaded = code_storage
         .unmetered_get_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"))
