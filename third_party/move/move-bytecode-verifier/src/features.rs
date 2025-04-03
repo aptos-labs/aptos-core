@@ -55,7 +55,14 @@ impl<'a> FeatureVerifier<'a> {
         };
         verifier.verify_signatures()?;
         verifier.verify_function_handles()?;
-        verifier.verify_function_defs()
+        verifier.verify_function_defs()?;
+
+        if !config.enable_resource_access_control && script.access_specifiers.is_some() {
+            Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED)
+                .with_message("resource access control feature not enabled".to_string()))
+        } else {
+            Ok(())
+        }
     }
 
     fn verify_struct_defs(&self) -> PartialVMResult<()> {

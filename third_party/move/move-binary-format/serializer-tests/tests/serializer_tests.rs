@@ -6,12 +6,15 @@ use move_binary_format::{
     access::ModuleAccess,
     deserializer::DeserializerConfig,
     file_format::{
-        empty_module, CompiledModule, FunctionHandle, IdentifierIndex, Signature, SignatureIndex,
-        SignatureToken,
+        empty_module, empty_script, AccessKind, AccessSpecifier, AddressIdentifierIndex,
+        AddressSpecifier, CompiledModule, CompiledScript, FunctionHandle, IdentifierIndex,
+        ResourceSpecifier, Signature, SignatureIndex, SignatureToken, TableIndex,
     },
     file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_MAX},
 };
-use move_core_types::{ability::AbilitySet, identifier::Identifier};
+use move_core_types::{
+    ability::AbilitySet, account_address::AccountAddress, identifier::Identifier,
+};
 use proptest::prelude::*;
 
 proptest! {
@@ -86,4 +89,29 @@ fn simple_generic_module_round_trip() {
     .expect("deserialization should work");
 
     assert_eq!(m, deserialized_m);
+}
+
+#[test]
+fn simple_script_round_trip() {
+    let mut s = empty_script();
+    let addr = AddressIdentifierIndex::new(s.address_identifiers.len() as TableIndex);
+    s.address_identifiers.push(AccountAddress::ONE);
+    s.access_specifiers = Some(vec![AccessSpecifier {
+        kind: AccessKind::Reads,
+        negated: false,
+        resource: ResourceSpecifier::DeclaredAtAddress(addr),
+        address: AddressSpecifier::Any,
+    }]);
+
+    let mut serialized = Vec::with_capacity(2048);
+    s.serialize_for_version(Some(VERSION_MAX), &mut serialized)
+        .expect("serialization should work");
+
+    let deserialized_s = CompiledScript::deserialize_with_config(
+        &serialized,
+        &DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX),
+    )
+    .expect("deserialization should work");
+
+    assert_eq!(s, deserialized_s);
 }
