@@ -894,6 +894,16 @@ module aptos_framework::voting {
         };
     }
 
+    #[test_only]
+    public fun extend_voting<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+        new_expiration_secs: u64,
+    ) acquires VotingForum {
+        let proposal = VotingForum<ProposalType>[voting_forum_address].proposals.borrow_mut(proposal_id);
+        proposal.expiration_secs = new_expiration_secs;
+    }
+
     #[test(governance = @0x123)]
     #[expected_failure(abort_code = 0x10004, location = Self)]
     public fun create_proposal_with_empty_execution_hash_should_fail(governance: &signer) acquires VotingForum {
