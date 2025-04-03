@@ -22,6 +22,7 @@ members = [
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-sdk-builder",
     "aptos-move/aptos-transaction-benchmarks",
+    "aptos-move/aptos-transaction-simulation",
     "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
@@ -37,7 +38,6 @@ members = [
     "aptos-move/e2e-tests",
     "aptos-move/e2e-testsuite",
     "aptos-move/framework",
-    "aptos-move/framework-experimental",
     "aptos-move/framework/cached-packages",
     "aptos-move/framework/table-natives",
     "aptos-move/move-examples",
@@ -47,7 +47,6 @@ members = [
     "aptos-move/script-composer",
     "aptos-move/vm-genesis",
     "aptos-node",
-    "aptos-utils",
     "config",
     "config/global-constants",
     "consensus",
@@ -144,6 +143,7 @@ members = [
     "execution/executor-service",
     "execution/executor-test-helpers",
     "execution/executor-types",
+    "experimental/bulk-txn-submit",
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
     "experimental/storage/hexy",
@@ -333,6 +333,7 @@ aptos-executor-service = { path = "execution/executor-service" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }
 aptos-experimental-hexy = { path = "experimental/storage/hexy" }
+aptos-experimental-bulk-txn-submit = { path = "experimental/bulk-txn-submit" }
 aptos-experimental-layered-map = { path = "experimental/storage/layered-map" }
 aptos-experimental-ptx-executor = { path = "experimental/execution/ptx-executor" }
 aptos-experimental-runtimes = { path = "experimental/runtimes" }
@@ -343,7 +344,6 @@ aptos-faucet-metrics-server = { path = "crates/aptos-faucet/metrics-server" }
 aptos-fallible = { path = "crates/fallible" }
 aptos-forge = { path = "testsuite/forge" }
 aptos-framework = { path = "aptos-move/framework" }
-aptos-framework-experimental = { path = "aptos-move/framework-experimental" }
 fuzzer = { path = "testsuite/fuzzer" }
 aptos-abstract-gas-usage = { path = "aptos-move/aptos-abstract-gas-usage" }
 aptos-gas-meter = { path = "aptos-move/aptos-gas-meter" }
@@ -455,9 +455,9 @@ aptos-time-service = { path = "crates/aptos-time-service", features = [
 aptos-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
 aptos-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
 aptos-transaction-workloads-lib = { path = "crates/transaction-workloads-lib" }
+aptos-transaction-simulation = { path = "aptos-move/aptos-transaction-simulation" }
 aptos-transactional-test-harness = { path = "aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "types" }
-aptos-utils = { path = "aptos-utils" }
 aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
 aptos-validator-transaction-pool = { path = "crates/validator-transaction-pool" }
 aptos-vault-client = { path = "secure/storage/vault" }
@@ -655,7 +655,7 @@ mockall = "0.11.4"
 more-asserts = "0.3.0"
 named-lock = "0.2.0"
 native-tls = "0.2.10"
-neptune = { version = "13.0.0", default_features = false }
+neptune = { version = "13.0.0", default-features = false }
 ntest = "0.9.3"
 num = "0.4.0"
 num-bigint = { version = "0.3.2", features = ["rand"] }
@@ -734,7 +734,7 @@ ripemd = "0.1.1"
 rlimit = "0.10.2"
 rocksdb = { version = "0.22.0", features = ["lz4"] }
 rsa = { version = "0.9.6" }
-rstack-self = { version = "0.3.0", features = ["dw"], default_features = false }
+rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }
 rstest = "0.15.0"
 rusty-fork = "0.3.0"
 rustversion = "1.0.14"
@@ -813,7 +813,7 @@ uint = "0.9.4"
 ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",
-], default_features = false }
+], default-features = false }
 url = { version = "2.4.0", features = ["serde"] }
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
 variant_count = "1.1.0"

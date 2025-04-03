@@ -352,8 +352,9 @@ fn handle_committed_blocks(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::consensus_observer::network::observer_message::{
-        BlockPayload, BlockTransactionPayload, OrderedBlock,
+    use crate::consensus_observer::{
+        network::observer_message::{BlockPayload, BlockTransactionPayload, OrderedBlock},
+        observer::execution_pool::ObservedOrderedBlock,
     };
     use aptos_channels::{aptos_channel, message_queues::QueueStyle};
     use aptos_consensus_types::{
@@ -575,10 +576,14 @@ mod test {
                 create_ledger_info(epoch, i as aptos_consensus_types::common::Round);
             let ordered_block = OrderedBlock::new(blocks, ordered_proof);
 
+            // Create an observed ordered block
+            let observed_ordered_block =
+                ObservedOrderedBlock::new_for_testing(ordered_block.clone());
+
             // Insert the block into the ordered block store
             ordered_block_store
                 .lock()
-                .insert_ordered_block(ordered_block.clone());
+                .insert_ordered_block(observed_ordered_block.clone());
 
             // Add the block to the ordered blocks
             ordered_blocks.push(ordered_block);

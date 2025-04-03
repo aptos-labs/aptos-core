@@ -42,34 +42,34 @@ spec aptos_std::big_vector {
 
     spec empty<T: store>(bucket_size: u64): BigVector<T> {
         aborts_if bucket_size == 0;
-        ensures length(result) == 0;
+        ensures result.length() == 0;
         ensures result.bucket_size == bucket_size;
     }
 
     spec singleton<T: store>(element: T, bucket_size: u64): BigVector<T> {
         aborts_if bucket_size == 0;
-        ensures length(result) == 1;
+        ensures result.length() == 1;
         ensures result.bucket_size == bucket_size;
     }
 
     spec destroy_empty<T>(self: BigVector<T>) {
-        aborts_if !is_empty(self);
+        aborts_if !self.is_empty();
     }
 
     spec borrow<T>(self: &BigVector<T>, i: u64): &T {
-        aborts_if i >= length(self);
+        aborts_if i >= self.length();
         ensures result == spec_at(self, i);
     }
 
     spec borrow_mut<T>(self: &mut BigVector<T>, i: u64): &mut T {
-        aborts_if i >= length(self);
+        aborts_if i >= self.length();
         ensures result == spec_at(self, i);
     }
 
     spec push_back<T: store>(self: &mut BigVector<T>, val: T) {
         let num_buckets = spec_table_len(self.buckets);
         include PushbackAbortsIf<T>;
-        ensures length(self) == length(old(self)) + 1;
+        ensures self.length() == old(self).length() + 1;
         ensures self.end_index == old(self.end_index) + 1;
         ensures spec_at(self, self.end_index-1) == val;
         ensures forall i in 0..self.end_index-1: spec_at(self, i) == spec_at(old(self), i);
@@ -84,26 +84,26 @@ spec aptos_std::big_vector {
     }
 
     spec pop_back<T>(self: &mut BigVector<T>): T {
-        aborts_if is_empty(self);
-        ensures length(self) == length(old(self)) - 1;
+        aborts_if self.is_empty();
+        ensures self.length() == old(self).length() - 1;
         ensures result == old(spec_at(self, self.end_index-1));
         ensures forall i in 0..self.end_index: spec_at(self, i) == spec_at(old(self), i);
     }
 
     spec swap_remove<T>(self: &mut BigVector<T>, i: u64): T {
         pragma verify_duration_estimate = 120;
-        aborts_if i >= length(self);
-        ensures length(self) == length(old(self)) - 1;
+        aborts_if i >= self.length();
+        ensures self.length() == old(self).length() - 1;
         ensures result == spec_at(old(self), i);
     }
 
     spec swap<T>(self: &mut BigVector<T>, i: u64, j: u64) {
         pragma verify_duration_estimate = 1000;
-        aborts_if i >= length(self) || j >= length(self);
-        ensures length(self) == length(old(self));
+        aborts_if i >= self.length() || j >= self.length();
+        ensures self.length() == old(self).length();
         ensures spec_at(self, i) == spec_at(old(self), j);
         ensures spec_at(self, j) == spec_at(old(self), i);
-        ensures forall idx in 0..length(self)
+        ensures forall idx in 0..self.length()
             where idx != i && idx != j:
             spec_at(self, idx) == spec_at(old(self), idx);
     }
