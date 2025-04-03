@@ -22,6 +22,8 @@ fn make_failed_native() -> NativeFunction {
     Arc::new(move |_, _, _| -> PartialVMResult<NativeResult> {
         Ok(NativeResult::Abort {
             cost: InternalGas::new(0),
+            num_dependencies: 0.into(),
+            total_dependency_size: 0.into(),
             abort_code: 12,
         })
     })

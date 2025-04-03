@@ -41,7 +41,7 @@ use aptos_framework::{
     prover::ProverOptions,
     BuildOptions, BuiltPackage,
 };
-use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
+use aptos_gas_schedule::{NativeGasParameters, VMGasParameters};
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_rest_client::{
     aptos_api_types::{EntryFunctionId, HexEncodedBytes, IdentifierWrapper, MoveModuleId},
@@ -614,7 +614,7 @@ impl CliCommand<&'static str> for TestPackage {
             // TODO(Gas): we may want to switch to non-zero costs in the future
             aptos_debug_natives::aptos_debug_natives(
                 NativeGasParameters::zeros(),
-                MiscGasParameters::zeros(),
+                VMGasParameters::zeros(),
             ),
             aptos_test_feature_flags_genesis(),
             None,

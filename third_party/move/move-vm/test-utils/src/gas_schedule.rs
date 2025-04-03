@@ -539,6 +539,14 @@ impl GasMeter for GasStatus {
     fn max_num_dependencies(&self) -> NumModules {
         u64::MAX.into()
     }
+
+    fn charge_native_dependencies(
+        &mut self,
+        _num_dependencies: NumModules,
+        _total_dependency_size: NumBytes,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
 }
 
 pub fn new_from_instructions(mut instrs: Vec<(Bytecode, GasCost)>) -> CostTable {

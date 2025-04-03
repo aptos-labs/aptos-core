@@ -6,9 +6,8 @@ use crate::{
     errors::{SafeNativeError, SafeNativeResult},
 };
 use aptos_gas_algebra::DynamicExpression;
-use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, ToOnChainGasSchedule};
+use aptos_gas_schedule::{NativeGasParameters, VMGasParameters};
 use aptos_types::on_chain_config::{Features, TimedFeatures};
-use bytes::Bytes;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
@@ -21,7 +20,7 @@ use std::{collections::VecDeque, sync::Arc};
 struct SharedData {
     gas_feature_version: u64,
     native_gas_params: NativeGasParameters,
-    misc_gas_params: MiscGasParameters,
+    vm_gas_params: VMGasParameters,
     timed_features: TimedFeatures,
     features: Features,
 }
@@ -42,7 +41,7 @@ impl SafeNativeBuilder {
     pub fn new(
         gas_feature_version: u64,
         native_gas_params: NativeGasParameters,
-        misc_gas_params: MiscGasParameters,
+        vm_gas_params: VMGasParameters,
         timed_features: TimedFeatures,
         features: Features,
         gas_hook: Option<Arc<dyn Fn(DynamicExpression) + Send + Sync>>,
@@ -51,7 +50,7 @@ impl SafeNativeBuilder {
             data: Arc::new(SharedData {
                 gas_feature_version,
                 native_gas_params,
-                misc_gas_params,
+                vm_gas_params,
                 timed_features,
                 features,
             }),
@@ -116,8 +115,8 @@ impl SafeNativeBuilder {
                 timed_features: &data.timed_features,
                 features: &data.features,
                 gas_feature_version: data.gas_feature_version,
+                vm_gas_params: &data.vm_gas_params,
                 native_gas_params: &data.native_gas_params,
-                misc_gas_params: &data.misc_gas_params,
 
                 gas_budget,
                 gas_used: 0.into(),
@@ -131,10 +130,24 @@ impl SafeNativeBuilder {
                 native(&mut context, ty_args, args);
 
             match res {
-                Ok(ret_vals) => Ok(NativeResult::ok(context.gas_used, ret_vals)),
+                Ok(ret_vals) => Ok(NativeResult::ok(
+                    context.gas_used,
+                    context.inner.num_dependencies(),
+                    context.inner.total_dependency_size(),
+                    ret_vals,
+                )),
                 Err(err) => match err {
-                    Abort { abort_code } => Ok(NativeResult::err(context.gas_used, abort_code)),
-                    OutOfGas => Ok(NativeResult::out_of_gas(context.gas_used)),
+                    Abort { abort_code } => Ok(NativeResult::err(
+                        context.gas_used,
+                        context.inner.num_dependencies(),
+                        context.inner.total_dependency_size(),
+                        abort_code,
+                    )),
+                    OutOfGas => Ok(NativeResult::out_of_gas(
+                        context.gas_used,
+                        context.inner.num_dependencies(),
+                        context.inner.total_dependency_size(),
+                    )),
                     // TODO(Gas): Check if err is indeed an invariant violation.
                     InvariantViolation(err) => Err(err),
                     FunctionDispatch {
@@ -178,31 +191,5 @@ impl SafeNativeBuilder {
         natives
             .into_iter()
             .map(|(func_name, func)| (func_name.into(), self.make_native(func)))
-    }
-
-    pub fn id_bytes(&self) -> Bytes {
-        let Self {
-            data,
-            enable_incremental_gas_charging,
-            gas_hook: _gas_hook,
-        } = self;
-        let SharedData {
-            gas_feature_version,
-            native_gas_params,
-            misc_gas_params,
-            timed_features,
-            features,
-        } = data.as_ref();
-
-        bcs::to_bytes(&(
-            enable_incremental_gas_charging,
-            gas_feature_version,
-            native_gas_params.to_on_chain_gas_schedule(*gas_feature_version),
-            misc_gas_params.to_on_chain_gas_schedule(*gas_feature_version),
-            timed_features,
-            features,
-        ))
-        .expect("bcs::to_bytes() failed.")
-        .into()
     }
 }

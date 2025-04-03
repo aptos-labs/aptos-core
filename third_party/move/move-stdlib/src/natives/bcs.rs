@@ -58,7 +58,12 @@ fn native_to_bytes(
         Ok(layout) => layout,
         Err(_) => {
             cost += gas_params.failure;
-            return Ok(NativeResult::err(cost, NFE_BCS_SERIALIZATION_FAILURE));
+            return Ok(NativeResult::err(
+                cost,
+                0.into(),
+                0.into(),
+                NFE_BCS_SERIALIZATION_FAILURE,
+            ));
         },
     };
     // serialize value
@@ -73,7 +78,12 @@ fn native_to_bytes(
         Some(serialized_value) => serialized_value,
         None => {
             cost += gas_params.failure;
-            return Ok(NativeResult::err(cost, NFE_BCS_SERIALIZATION_FAILURE));
+            return Ok(NativeResult::err(
+                cost,
+                0.into(),
+                0.into(),
+                NFE_BCS_SERIALIZATION_FAILURE,
+            ));
         },
     };
     cost += gas_params.per_byte_serialized
@@ -82,9 +92,9 @@ fn native_to_bytes(
             gas_params.legacy_min_output_size,
         );
 
-    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(
-        serialized_value
-    )]))
+    Ok(NativeResult::ok(cost, 0.into(), 0.into(), smallvec![
+        Value::vector_u8(serialized_value)
+    ]))
 }
 
 pub fn make_native_to_bytes(gas_params: ToBytesGasParameters) -> NativeFunction {

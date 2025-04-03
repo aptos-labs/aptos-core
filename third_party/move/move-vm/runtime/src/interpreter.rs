@@ -897,7 +897,7 @@ impl InterpreterImpl<'_> {
             resource_resolver,
             module_storage,
             extensions,
-            gas_meter.balance_internal(),
+            gas_meter,
             traversal_context,
         );
         let native_function = function.get_native()?;
@@ -919,9 +919,12 @@ impl InterpreterImpl<'_> {
         match result {
             NativeResult::Success {
                 cost,
+                num_dependencies,
+                total_dependency_size,
                 ret_vals: return_values,
             } => {
                 gas_meter.charge_native_function(cost, Some(return_values.iter()))?;
+                gas_meter.charge_native_dependencies(num_dependencies, total_dependency_size)?;
 
                 // Paranoid check to protect us against incorrect native function implementations. A native function that
                 // returns a different number of values than its declared types will trigger this check.
@@ -947,15 +950,36 @@ impl InterpreterImpl<'_> {
                 current_frame.pc += 1; // advance past the Call instruction in the caller
                 Ok(())
             },
-            NativeResult::Abort { cost, abort_code } => {
+            NativeResult::Abort {
+                cost,
+                num_dependencies,
+                total_dependency_size,
+                abort_code,
+            } => {
                 gas_meter.charge_native_function(cost, Option::<std::iter::Empty<&Value>>::None)?;
+                gas_meter.charge_native_dependencies(num_dependencies, total_dependency_size)?;
                 Err(PartialVMError::new(StatusCode::ABORTED).with_sub_status(abort_code))
             },
-            NativeResult::OutOfGas { partial_cost } => {
-                let err = match gas_meter
+            NativeResult::OutOfGas {
+                partial_cost,
+                partial_num_dependencies,
+                partial_total_dependency_size,
+            } => {
+                let charging_result = gas_meter
                     .charge_native_function(partial_cost, Option::<std::iter::Empty<&Value>>::None)
-                {
-                    Err(err) if err.major_status() == StatusCode::OUT_OF_GAS => err,
+                    .and_then(|_| {
+                        gas_meter.charge_native_dependencies(
+                            partial_num_dependencies,
+                            partial_total_dependency_size,
+                        )
+                    });
+                let err = match charging_result {
+                    Err(err)
+                        if err.major_status() == StatusCode::OUT_OF_GAS
+                            || err.major_status() == StatusCode::DEPENDENCY_LIMIT_REACHED =>
+                    {
+                        err
+                    },
                     Ok(_) | Err(_) => PartialVMError::new_invariant_violation(
                         "The partial cost returned by the native function did \
                         not cause the gas meter to trigger an OutOfGas error, at least \

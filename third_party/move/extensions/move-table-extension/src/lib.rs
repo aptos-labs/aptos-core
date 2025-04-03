@@ -366,9 +366,12 @@ fn native_new_table_handle(
         .insert(TableHandle(handle), TableInfo::new(key_type, value_type))
         .is_none());
 
-    Ok(NativeResult::ok(gas_params.base, smallvec![
-        Value::address(handle)
-    ]))
+    Ok(NativeResult::ok(
+        gas_params.base,
+        0.into(),
+        0.into(),
+        smallvec![Value::address(handle)],
+    ))
 }
 
 pub fn make_native_new_table_handle(gas_params: NewTableHandleGasParameters) -> NativeFunction {
@@ -415,8 +418,8 @@ fn native_add_box(
     cost += common_gas_params.calculate_load_cost(loaded);
 
     match gv.move_to(val) {
-        Ok(_) => Ok(NativeResult::ok(cost, smallvec![])),
-        Err(_) => Ok(NativeResult::err(cost, ALREADY_EXISTS)),
+        Ok(_) => Ok(NativeResult::ok(cost, 0.into(), 0.into(), smallvec![])),
+        Err(_) => Ok(NativeResult::err(cost, 0.into(), 0.into(), ALREADY_EXISTS)),
     }
 }
 
@@ -466,8 +469,10 @@ fn native_borrow_box(
     cost += common_gas_params.calculate_load_cost(loaded);
 
     match gv.borrow_global() {
-        Ok(ref_val) => Ok(NativeResult::ok(cost, smallvec![ref_val])),
-        Err(_) => Ok(NativeResult::err(cost, NOT_FOUND)),
+        Ok(ref_val) => Ok(NativeResult::ok(cost, 0.into(), 0.into(), smallvec![
+            ref_val
+        ])),
+        Err(_) => Ok(NativeResult::err(cost, 0.into(), 0.into(), NOT_FOUND)),
     }
 }
 
@@ -518,7 +523,9 @@ fn native_contains_box(
 
     let exists = Value::bool(gv.exists()?);
 
-    Ok(NativeResult::ok(cost, smallvec![exists]))
+    Ok(NativeResult::ok(cost, 0.into(), 0.into(), smallvec![
+        exists
+    ]))
 }
 
 pub fn make_native_contains_box(
@@ -567,8 +574,8 @@ fn native_remove_box(
     cost += common_gas_params.calculate_load_cost(loaded);
 
     match gv.move_from() {
-        Ok(val) => Ok(NativeResult::ok(cost, smallvec![val])),
-        Err(_) => Ok(NativeResult::err(cost, NOT_FOUND)),
+        Ok(val) => Ok(NativeResult::ok(cost, 0.into(), 0.into(), smallvec![val])),
+        Err(_) => Ok(NativeResult::err(cost, 0.into(), 0.into(), NOT_FOUND)),
     }
 }
 
@@ -606,7 +613,12 @@ fn native_destroy_empty_box(
 
     assert!(table_data.removed_tables.insert(handle));
 
-    Ok(NativeResult::ok(gas_params.base, smallvec![]))
+    Ok(NativeResult::ok(
+        gas_params.base,
+        0.into(),
+        0.into(),
+        smallvec![],
+    ))
 }
 
 pub fn make_native_destroy_empty_box(gas_params: DestroyEmptyBoxGasParameters) -> NativeFunction {
@@ -631,7 +643,12 @@ fn native_drop_unchecked_box(
     assert_eq!(ty_args.len(), 3);
     assert_eq!(args.len(), 1);
 
-    Ok(NativeResult::ok(gas_params.base, smallvec![]))
+    Ok(NativeResult::ok(
+        gas_params.base,
+        0.into(),
+        0.into(),
+        smallvec![],
+    ))
 }
 
 pub fn make_native_drop_unchecked_box(gas_params: DropUncheckedBoxGasParameters) -> NativeFunction {

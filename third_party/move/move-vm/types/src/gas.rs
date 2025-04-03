@@ -326,6 +326,12 @@ pub trait GasMeter {
         ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView> + Clone>,
     ) -> PartialVMResult<()>;
 
+    fn charge_native_dependencies(
+        &mut self,
+        num_dependencies: NumModules,
+        total_dependency_size: NumBytes,
+    ) -> PartialVMResult<()>;
+
     fn charge_native_function_before_execution(
         &mut self,
         ty_args: impl ExactSizeIterator<Item = impl TypeView> + Clone,
@@ -614,5 +620,13 @@ impl GasMeter for UnmeteredGasMeter {
 
     fn max_num_dependencies(&self) -> NumModules {
         u64::MAX.into()
+    }
+
+    fn charge_native_dependencies(
+        &mut self,
+        _num_dependencies: NumModules,
+        _total_dependency_size: NumBytes,
+    ) -> PartialVMResult<()> {
+        Ok(())
     }
 }

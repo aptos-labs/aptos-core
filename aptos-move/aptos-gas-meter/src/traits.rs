@@ -72,6 +72,12 @@ pub trait GasAlgebra {
     /// Counts a dependency against the limits.
     fn count_dependency(&mut self, size: NumBytes) -> PartialVMResult<()>;
 
+    fn count_native_dependencies(
+        &mut self,
+        num_dependencies: NumModules,
+        total_size: NumBytes,
+    ) -> PartialVMResult<()>;
+
     /// Returns the amount of gas used under the execution category.
     fn execution_gas_used(&self) -> InternalGas;
 

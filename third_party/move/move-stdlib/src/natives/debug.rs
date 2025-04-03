@@ -64,7 +64,12 @@ fn native_print(
         println!("{}", out);
     }
 
-    Ok(NativeResult::ok(gas_params.base_cost, smallvec![]))
+    Ok(NativeResult::ok(
+        gas_params.base_cost,
+        0.into(),
+        0.into(),
+        smallvec![],
+    ))
 }
 
 pub fn make_native_print(
@@ -106,7 +111,12 @@ fn native_print_stack_trace(
         println!("{}", s);
     }
 
-    Ok(NativeResult::ok(gas_params.base_cost, smallvec![]))
+    Ok(NativeResult::ok(
+        gas_params.base_cost,
+        0.into(),
+        0.into(),
+        smallvec![],
+    ))
 }
 
 pub fn make_native_print_stack_trace(gas_params: PrintStackTraceGasParameters) -> NativeFunction {

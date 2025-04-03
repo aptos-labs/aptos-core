@@ -3,7 +3,7 @@
 
 use crate::move_vm_ext::{AptosMoveResolver, SessionExt, SessionId};
 use aptos_crypto::HashValue;
-use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_gas_schedule::{NativeGasParameters, VMGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{
     chain_id::ChainId,
@@ -40,7 +40,8 @@ impl GenesisRuntimeBuilder {
         let mut native_builder = SafeNativeBuilder::new(
             LATEST_GAS_FEATURE_VERSION,
             NativeGasParameters::zeros(),
-            MiscGasParameters::zeros(),
+            // TODO(lazy-loading): double check this is correct, because then the limit is 0?
+            VMGasParameters::zeros(),
             timed_features.clone(),
             features.clone(),
             None,

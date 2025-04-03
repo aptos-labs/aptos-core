@@ -19,15 +19,15 @@ use crate::{
 use move_binary_format::errors::{ExecutionState, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
-    gas_algebra::{InternalGas, NumBytes},
+    gas_algebra::{InternalGas, NumBytes, NumModules},
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, resolver::ResourceResolver,
-    values::Value,
+    gas::GasMeter, loaded_data::runtime_types::Type, natives::function::NativeResult,
+    resolver::ResourceResolver, values::Value,
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -116,6 +116,11 @@ pub struct NativeContext<'a, 'b, 'c> {
     /// This is a hack to emulate memory usage tracking, before we could refactor native functions
     /// and allow them to access the gas meter directly.
     heap_memory_usage: u64,
+
+    total_dependency_size: NumBytes,
+    max_total_dependency_size: NumBytes,
+    num_dependencies: NumModules,
+    max_num_dependencies: NumModules,
 }
 
 impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
@@ -125,7 +130,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         resource_resolver: &'a dyn ResourceResolver,
         module_storage: &'a dyn ModuleStorage,
         extensions: &'a mut NativeContextExtensions<'b>,
-        gas_balance: InternalGas,
+        gas_meter: &impl GasMeter,
         traversal_context: &'a mut TraversalContext<'c>,
     ) -> Self {
         Self {
@@ -134,10 +139,14 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
             resource_resolver,
             module_storage,
             extensions,
-            gas_balance,
+            gas_balance: gas_meter.balance_internal(),
             traversal_context,
 
             heap_memory_usage: 0,
+            total_dependency_size: gas_meter.total_dependency_size(),
+            max_total_dependency_size: gas_meter.max_total_dependency_size(),
+            num_dependencies: gas_meter.num_dependencies(),
+            max_num_dependencies: gas_meter.max_num_dependencies(),
         }
     }
 }
@@ -177,24 +186,54 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         self.module_storage.runtime_environment().ty_to_ty_tag(ty)
     }
 
-    pub fn metered_lazy_type_to_type_layout(
+    pub fn metered_lazy_type_to_type_layout<F>(
         &mut self,
         ty: &Type,
-    ) -> PartialVMResult<MoveTypeLayout> {
-        MetredLazyNativeLayoutConverter::new(self.traversal_context, self.module_storage)
-            .type_to_type_layout(ty)
+        gas_used: InternalGas,
+        cost_fn: F,
+    ) -> PartialVMResult<MoveTypeLayout>
+    where
+        F: Fn(u64) -> InternalGas,
+    {
+        MetredLazyNativeLayoutConverter::new(
+            self.traversal_context,
+            self.module_storage,
+            gas_used,
+            self.gas_balance,
+            self.total_dependency_size,
+            self.max_total_dependency_size,
+            self.num_dependencies,
+            self.max_num_dependencies,
+            cost_fn,
+        )
+        .type_to_type_layout(ty)
     }
 
     pub fn unmetered_type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
         UnmeteredLayoutConverter::new(self.module_storage).type_to_type_layout(ty)
     }
 
-    pub fn metered_lazy_type_to_type_layout_with_identifier_mappings(
+    pub fn metered_lazy_type_to_type_layout_with_identifier_mappings<F>(
         &mut self,
         ty: &Type,
-    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        MetredLazyNativeLayoutConverter::new(self.traversal_context, self.module_storage)
-            .type_to_type_layout_with_identifier_mappings(ty)
+        gas_used: InternalGas,
+        cost_fn: F,
+    ) -> PartialVMResult<(MoveTypeLayout, bool)>
+    where
+        F: Fn(u64) -> InternalGas,
+    {
+        MetredLazyNativeLayoutConverter::new(
+            self.traversal_context,
+            self.module_storage,
+            gas_used,
+            self.gas_balance,
+            self.total_dependency_size,
+            self.max_total_dependency_size,
+            self.num_dependencies,
+            self.max_num_dependencies,
+            cost_fn,
+        )
+        .type_to_type_layout_with_identifier_mappings(ty)
     }
 
     pub fn unmetered_type_to_type_layout_with_identifier_mappings(
@@ -205,12 +244,27 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
             .type_to_type_layout_with_identifier_mappings(ty)
     }
 
-    pub fn metered_lazy_type_to_fully_annotated_layout(
+    pub fn metered_lazy_type_to_fully_annotated_layout<F>(
         &mut self,
         ty: &Type,
-    ) -> PartialVMResult<MoveTypeLayout> {
-        MetredLazyNativeLayoutConverter::new(self.traversal_context, self.module_storage)
-            .type_to_fully_annotated_layout(ty)
+        gas_used: InternalGas,
+        cost_fn: F,
+    ) -> PartialVMResult<MoveTypeLayout>
+    where
+        F: Fn(u64) -> InternalGas,
+    {
+        MetredLazyNativeLayoutConverter::new(
+            self.traversal_context,
+            self.module_storage,
+            gas_used,
+            self.gas_balance,
+            self.total_dependency_size,
+            self.max_total_dependency_size,
+            self.num_dependencies,
+            self.max_num_dependencies,
+            cost_fn,
+        )
+        .type_to_fully_annotated_layout(ty)
     }
 
     pub fn unmetered_type_to_fully_annotated_layout(
@@ -236,6 +290,14 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
 
     pub fn gas_balance(&self) -> InternalGas {
         self.gas_balance
+    }
+
+    pub fn num_dependencies(&self) -> NumModules {
+        self.num_dependencies
+    }
+
+    pub fn total_dependency_size(&self) -> NumBytes {
+        self.total_dependency_size
     }
 
     pub fn use_heap_memory(&mut self, amount: u64) {

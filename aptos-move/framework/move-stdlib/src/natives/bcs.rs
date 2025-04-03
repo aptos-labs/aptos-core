@@ -131,18 +131,19 @@ fn serialized_size_impl(
     context: &mut SafeNativeContext,
     reference: Reference,
     ty: &Type,
-) -> PartialVMResult<usize> {
+) -> SafeNativeResult<usize> {
     // TODO(#14175): Reading the reference performs a deep copy, and we can
     //               implement it in a more efficient way.
     let value = reference.read_ref()?;
     let ty_layout = context.type_to_type_layout(ty)?;
 
     let function_value_extension = context.function_value_extension();
-    ValueSerDeContext::new()
+    let size = ValueSerDeContext::new()
         .with_legacy_signer()
         .with_func_args_deserialization(&function_value_extension)
         .with_delayed_fields_serde()
-        .serialized_size(&value, &ty_layout)
+        .serialized_size(&value, &ty_layout)?;
+    Ok(size)
 }
 
 fn native_constant_serialized_size(

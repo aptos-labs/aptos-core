@@ -121,7 +121,7 @@ fn native_sub_string(
 
     if j < i {
         // TODO: what abort code should we use here?
-        return Ok(NativeResult::err(gas_params.base, 1));
+        return Ok(NativeResult::err(gas_params.base, 0.into(), 0.into(), 1));
     }
 
     let s_arg = pop_arg!(args, VectorRef);

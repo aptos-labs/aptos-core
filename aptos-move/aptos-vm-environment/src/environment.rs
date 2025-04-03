@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use aptos_gas_algebra::DynamicExpression;
-use aptos_gas_schedule::{AptosGasParameters, MiscGasParameters, NativeGasParameters};
+use aptos_gas_schedule::{AptosGasParameters, NativeGasParameters, VMGasParameters};
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{
     chain_id::ChainId,
@@ -204,12 +204,12 @@ impl Environment {
         //   all. We should clean up the logic here once we get that refactored.
         let (gas_params, storage_gas_params, gas_feature_version) =
             get_gas_parameters(&mut sha3_256, &features, state_view);
-        let (native_gas_params, misc_gas_params, ty_builder) = match &gas_params {
+        let (native_gas_params, vm_gas_params, ty_builder) = match &gas_params {
             Ok(gas_params) => {
                 let ty_builder = aptos_prod_ty_builder(gas_feature_version, gas_params);
                 (
                     gas_params.natives.clone(),
-                    gas_params.vm.misc.clone(),
+                    gas_params.vm.clone(),
                     ty_builder,
                 )
             },
@@ -217,7 +217,7 @@ impl Environment {
                 let ty_builder = aptos_default_ty_builder();
                 (
                     NativeGasParameters::zeros(),
-                    MiscGasParameters::zeros(),
+                    VMGasParameters::zeros(),
                     ty_builder,
                 )
             },
@@ -226,7 +226,7 @@ impl Environment {
         let mut builder = SafeNativeBuilder::new(
             gas_feature_version,
             native_gas_params,
-            misc_gas_params,
+            vm_gas_params,
             timed_features.clone(),
             features.clone(),
             gas_hook,

@@ -505,13 +505,24 @@ where
         Ok(())
     }
 
+    fn charge_native_dependencies(
+        &mut self,
+        num_dependencies: NumModules,
+        total_dependency_size: NumBytes,
+    ) -> PartialVMResult<()> {
+        // Execution is charged separately along with other native gas charges.
+        self.algebra
+            .count_native_dependencies(num_dependencies, total_dependency_size)?;
+        Ok(())
+    }
+
     #[inline]
     fn charge_heap_memory(&mut self, _amount: u64) -> PartialVMResult<()> {
         Ok(())
     }
 
     fn total_dependency_size(&self) -> NumBytes {
-        self.algebra.vm_gas_params().txn.max_total_dependency_size
+        self.algebra.total_dependency_size()
     }
 
     fn max_total_dependency_size(&self) -> NumBytes {
@@ -519,7 +530,7 @@ where
     }
 
     fn num_dependencies(&self) -> NumModules {
-        todo!()
+        self.algebra.num_dependencies()
     }
 
     fn max_num_dependencies(&self) -> NumModules {

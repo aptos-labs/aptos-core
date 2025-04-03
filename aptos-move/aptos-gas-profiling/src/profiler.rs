@@ -524,6 +524,22 @@ where
     fn max_num_dependencies(&self) -> NumModules {
         self.base.max_num_dependencies()
     }
+
+    fn charge_native_dependencies(
+        &mut self,
+        num_dependencies: NumModules,
+        total_dependency_size: NumBytes,
+    ) -> PartialVMResult<()> {
+        let (cost, res) = self.delegate_charge(|base| {
+            base.charge_native_dependencies(num_dependencies, total_dependency_size)
+        });
+
+        if !cost.is_zero() {
+            // TODO(lazy-loading): add support for recording dependencies from natives.
+        }
+
+        res
+    }
 }
 
 fn write_op_type(op: &WriteOpSize) -> WriteOpType {

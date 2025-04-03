@@ -85,6 +85,15 @@ impl<A: GasAlgebra> GasAlgebra for CalibrationAlgebra<A> {
         self.base.count_dependency(size)
     }
 
+    fn count_native_dependencies(
+        &mut self,
+        num_dependencies: NumModules,
+        total_size: NumBytes,
+    ) -> PartialVMResult<()> {
+        self.base
+            .count_native_dependencies(num_dependencies, total_size)
+    }
+
     fn execution_gas_used(&self) -> InternalGas {
         self.base.execution_gas_used()
     }

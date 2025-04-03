@@ -311,6 +311,23 @@ where
         Ok(())
     }
 
+    fn count_native_dependencies(
+        &mut self,
+        num_dependencies: NumModules,
+        total_size: NumBytes,
+    ) -> PartialVMResult<()> {
+        self.num_dependencies += num_dependencies;
+        self.total_dependency_size += total_size;
+
+        if self.num_dependencies > self.vm_gas_params.txn.max_num_dependencies {
+            return Err(PartialVMError::new(StatusCode::DEPENDENCY_LIMIT_REACHED));
+        }
+        if self.total_dependency_size > self.vm_gas_params.txn.max_total_dependency_size {
+            return Err(PartialVMError::new(StatusCode::DEPENDENCY_LIMIT_REACHED));
+        }
+        Ok(())
+    }
+
     fn execution_gas_used(&self) -> InternalGas {
         self.execution_gas_used
     }

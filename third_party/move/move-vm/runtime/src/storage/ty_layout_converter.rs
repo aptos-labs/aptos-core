@@ -8,7 +8,7 @@ use crate::{
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     function::MoveFunctionLayout,
-    gas_algebra::NumBytes,
+    gas_algebra::{InternalGas, NumBytes, NumModules},
     language_storage::StructTag,
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
@@ -549,24 +549,55 @@ where
 {
 }
 
-pub(crate) struct MetredLazyNativeLayoutConverter<'a, 'b> {
+pub(crate) struct MetredLazyNativeLayoutConverter<'a, 'b, F> {
     traversal_context: &'a mut TraversalContext<'b>,
     code_storage: &'a dyn ModuleStorage,
+
+    gas_used: InternalGas,
+    gas_balance: InternalGas,
+    total_dependency_size: NumBytes,
+    max_total_dependency_size: NumBytes,
+    num_dependencies: NumModules,
+    max_num_dependencies: NumModules,
+
+    cost_fn: F,
 }
 
-impl<'a, 'b> MetredLazyNativeLayoutConverter<'a, 'b> {
+impl<'a, 'b, F> MetredLazyNativeLayoutConverter<'a, 'b, F>
+where
+    F: Fn(u64) -> InternalGas,
+{
     pub fn new(
         traversal_context: &'a mut TraversalContext<'b>,
         code_storage: &'a dyn ModuleStorage,
+        gas_used: InternalGas,
+        gas_balance: InternalGas,
+        total_dependency_size: NumBytes,
+        max_total_dependency_size: NumBytes,
+        num_dependencies: NumModules,
+        max_num_dependencies: NumModules,
+        cost_fn: F,
     ) -> Self {
         Self {
             traversal_context,
             code_storage,
+
+            gas_used,
+            gas_balance,
+            total_dependency_size,
+            max_total_dependency_size,
+            num_dependencies,
+            max_num_dependencies,
+
+            cost_fn,
         }
     }
 }
 
-impl<'a, 'b> LayoutConverterBase for MetredLazyNativeLayoutConverter<'a, 'b> {
+impl<'a, 'b, F> LayoutConverterBase for MetredLazyNativeLayoutConverter<'a, 'b, F>
+where
+    F: Fn(u64) -> InternalGas,
+{
     fn vm_config(&self) -> &VMConfig {
         self.code_storage.runtime_environment().vm_config()
     }
@@ -592,13 +623,29 @@ impl<'a, 'b> LayoutConverterBase for MetredLazyNativeLayoutConverter<'a, 'b> {
                 .insert((addr, name), ())
                 .is_none()
         {
-            let _size = self
+            let size = self
                 .code_storage
                 .unmetered_get_existing_module_size(addr, name)
+                .map(|v| v as u64)
                 .map_err(|err| err.to_partial())?;
-            unimplemented!()
-            // self.gas_meter
-            //     .charge_dependency(false, addr, name, NumBytes::new(size as u64))?;
+
+            // Simulate gas charging... Here we return partial VM errors, and the caller will remap
+            // them to safe native results.
+            let amount = (self.cost_fn)(size);
+            self.gas_used += amount;
+            if self.gas_used > self.gas_balance {
+                return Err(PartialVMError::new(StatusCode::OUT_OF_GAS));
+            }
+
+            self.num_dependencies += 1.into();
+            self.total_dependency_size += size.into();
+
+            if self.num_dependencies > self.max_num_dependencies {
+                return Err(PartialVMError::new(StatusCode::DEPENDENCY_LIMIT_REACHED));
+            }
+            if self.total_dependency_size > self.max_total_dependency_size {
+                return Err(PartialVMError::new(StatusCode::DEPENDENCY_LIMIT_REACHED));
+            }
         }
 
         self.code_storage.unmetered_get_struct_definition(
@@ -624,4 +671,7 @@ impl<'a, 'b> LayoutConverterBase for MetredLazyNativeLayoutConverter<'a, 'b> {
     }
 }
 
-impl<'a, 'b> LayoutConverter for MetredLazyNativeLayoutConverter<'a, 'b> {}
+impl<'a, 'b, F> LayoutConverter for MetredLazyNativeLayoutConverter<'a, 'b, F> where
+    F: Fn(u64) -> InternalGas
+{
+}

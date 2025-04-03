@@ -93,7 +93,7 @@ impl Table {
         handle: TableHandle,
         key_ty: &Type,
         value_ty: &Type,
-    ) -> PartialVMResult<Table> {
+    ) -> SafeNativeResult<Table> {
         let key_layout = context.type_to_type_layout(key_ty)?;
         let value_layout_info = LayoutInfo::from_value_ty(context, value_ty)?;
         Ok(Self {
@@ -206,7 +206,7 @@ impl TableData {
         handle: TableHandle,
         key_ty: &Type,
         value_ty: &Type,
-    ) -> PartialVMResult<()> {
+    ) -> SafeNativeResult<()> {
         let need_to_create_table = !context
             .extensions()
             .get::<NativeTableContext>()
@@ -229,7 +229,7 @@ impl TableData {
 }
 
 impl LayoutInfo {
-    fn from_value_ty(context: &mut SafeNativeContext, value_ty: &Type) -> PartialVMResult<Self> {
+    fn from_value_ty(context: &mut SafeNativeContext, value_ty: &Type) -> SafeNativeResult<Self> {
         let (layout, has_identifier_mappings) =
             context.type_to_type_layout_with_identifier_mappings(value_ty)?;
         Ok(Self {

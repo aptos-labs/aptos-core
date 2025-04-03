@@ -486,6 +486,16 @@ where
     fn max_num_dependencies(&self) -> NumModules {
         self.base.max_num_dependencies()
     }
+
+    #[inline]
+    fn charge_native_dependencies(
+        &mut self,
+        num_dependencies: NumModules,
+        total_dependency_size: NumBytes,
+    ) -> PartialVMResult<()> {
+        self.base
+            .charge_native_dependencies(num_dependencies, total_dependency_size)
+    }
 }
 
 impl<G> AptosGasMeter for MemoryTrackedGasMeter<G>
