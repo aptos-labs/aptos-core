@@ -10,6 +10,7 @@ use crate::{
     executor::FakeExecutor,
 };
 use aptos_proptest_helpers::{pick_slice_idxs, Index};
+use aptos_transaction_simulation::SimulationStateStore;
 use proptest::{
     collection::{vec, SizeRange},
     prelude::*,
@@ -113,9 +114,14 @@ impl AccountUniverseGen {
     ///
     /// The stability mode causes new accounts to be dropped, since those accounts will usually
     /// not be funded enough.
-    pub fn setup_gas_cost_stability(self, executor: &mut FakeExecutor) -> AccountUniverse {
+    pub fn setup_gas_cost_stability(
+        self,
+        state_store: &impl SimulationStateStore,
+    ) -> AccountUniverse {
         for account_data in &self.accounts {
-            executor.add_account_data(account_data);
+            state_store
+                .add_account_data(account_data)
+                .expect("failed to add account data, this should not happen");
         }
 
         AccountUniverse::new(self.accounts, self.pick_style, true)

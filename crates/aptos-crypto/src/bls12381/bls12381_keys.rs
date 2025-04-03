@@ -129,6 +129,8 @@ impl traits::SigningKey for PrivateKey {
 }
 
 impl traits::ValidCryptoMaterial for PrivateKey {
+    const AIP_80_PREFIX: &'static str = "bls12381-priv-";
+
     fn to_bytes(&self) -> Vec<u8> {
         self.to_bytes().to_vec()
     }
@@ -209,6 +211,8 @@ impl VerifyingKey for PublicKey {
 }
 
 impl ValidCryptoMaterial for PublicKey {
+    const AIP_80_PREFIX: &'static str = "bls12381-pub-";
+
     fn to_bytes(&self) -> Vec<u8> {
         self.to_bytes().to_vec()
     }

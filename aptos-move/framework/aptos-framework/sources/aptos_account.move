@@ -5,7 +5,6 @@ module aptos_framework::aptos_account {
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::event::{EventHandle, emit_event, emit};
     use aptos_framework::fungible_asset::{Self, Metadata, BurnRef, FungibleAsset};
-    use aptos_framework::permissioned_signer;
     use aptos_framework::primary_fungible_store;
     use aptos_framework::object;
 
@@ -119,9 +118,10 @@ module aptos_framework::aptos_account {
         if (!account::exists_at(to)) {
             create_account(to);
             spec {
-                assert coin::spec_is_account_registered<AptosCoin>(to);
-                assume aptos_std::type_info::type_of<CoinType>() == aptos_std::type_info::type_of<AptosCoin>() ==>
-                    coin::spec_is_account_registered<CoinType>(to);
+                // TODO(fa_migration)
+                // assert coin::spec_is_account_registered<AptosCoin>(to);
+                // assume aptos_std::type_info::type_of<CoinType>() == aptos_std::type_info::type_of<AptosCoin>() ==>
+                //     coin::spec_is_account_registered<CoinType>(to);
             };
         };
         if (!coin::is_account_registered<CoinType>(to)) {
@@ -179,7 +179,6 @@ module aptos_framework::aptos_account {
 
     /// Set whether `account` can receive direct transfers of coins that they have not explicitly registered to receive.
     public entry fun set_allow_direct_coin_transfers(account: &signer, allow: bool) acquires DirectTransferConfig {
-        // TODO: [signer::address_of] Is permissioned signer allowed?
         let addr = signer::address_of(account);
         if (exists<DirectTransferConfig>(addr)) {
             let direct_transfer_config = borrow_global_mut<DirectTransferConfig>(addr);
@@ -225,7 +224,7 @@ module aptos_framework::aptos_account {
 
     public(friend) fun register_apt(account_signer: &signer) {
         if (features::new_accounts_default_to_fa_apt_store_enabled()) {
-            ensure_primary_fungible_store_exists(permissioned_signer::address_of(account_signer));
+            ensure_primary_fungible_store_exists(signer::address_of(account_signer));
         } else {
             coin::register<AptosCoin>(account_signer);
         }
@@ -241,7 +240,7 @@ module aptos_framework::aptos_account {
     public(friend) entry fun fungible_transfer_only(
         source: &signer, to: address, amount: u64
     ) {
-        let sender_store = ensure_primary_fungible_store_exists(permissioned_signer::address_of(source));
+        let sender_store = ensure_primary_fungible_store_exists(signer::address_of(source));
         let recipient_store = ensure_primary_fungible_store_exists(to);
 
         // use internal APIs, as they skip:
@@ -344,7 +343,7 @@ module aptos_framework::aptos_account {
         let (resource_account, _) = account::create_resource_account(alice, vector[]);
         let resource_acc_addr = signer::address_of(&resource_account);
         let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(core);
-        assert!(!coin::is_account_registered<AptosCoin>(resource_acc_addr), 0);
+        assert!(coin::is_account_registered<AptosCoin>(resource_acc_addr), 0);
 
         create_account(signer::address_of(alice));
         coin::deposit(signer::address_of(alice), coin::mint(10000, &mint_cap));
@@ -469,6 +468,8 @@ module aptos_framework::aptos_account {
     #[expected_failure(abort_code = 0x50003, location = Self)]
     public fun test_direct_coin_transfers_fail_if_recipient_opted_out(
         from: &signer, to: &signer) acquires DirectTransferConfig {
+        let fa_feature = std::features::get_new_accounts_default_to_fa_store_feature();
+        std::features::change_feature_flags_for_testing(from, vector[], vector[fa_feature]);
         coin::create_coin_conversion_map(from);
         let (burn_cap, freeze_cap, mint_cap) = coin::initialize<FakeCoin>(
             from,

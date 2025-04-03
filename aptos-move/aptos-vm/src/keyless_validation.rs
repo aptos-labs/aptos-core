@@ -204,6 +204,8 @@ pub(crate) fn validate_authenticators(
 
     let onchain_timestamp_obj = get_current_time_onchain(resolver)?;
     // Check the expiry timestamp on all authenticators first to fail fast
+    // This is a redundant check to quickly dismiss expired signatures early and save compute on more computationally costly checks.
+    // The actual check is performed in `verify_keyless_signature_without_ephemeral_signature_check`.
     for (_, sig) in authenticators {
         sig.verify_expiry(onchain_timestamp_obj.microseconds)
             .map_err(|_| {
@@ -254,122 +256,146 @@ pub(crate) fn validate_authenticators(
                 }
             },
         };
-
-        match &sig.cert {
-            EphemeralCertificate::ZeroKnowledgeSig(zksig) => match jwk {
-                JWK::RSA(rsa_jwk) => {
-                    if zksig.exp_horizon_secs > config.max_exp_horizon_secs {
-                        // println!("[aptos-vm][groth16] Expiration horizon is too long");
-                        return Err(invalid_signature!("The expiration horizon is too long"));
-                    }
-
-                    // If an `aud` override was set for account recovery purposes, check that it is
-                    // in the allow-list on-chain.
-                    if zksig.override_aud_val.is_some() {
-                        config.is_allowed_override_aud(zksig.override_aud_val.as_ref().unwrap())?;
-                    }
-
-                    match &zksig.proof {
-                        ZKP::Groth16(groth16proof) => {
-                            // let start = std::time::Instant::now();
-                            let public_inputs_hash = get_public_inputs_hash(
-                                sig,
-                                pk.inner_keyless_pk(),
-                                &rsa_jwk,
-                                config,
-                            )
-                            .map_err(|_| {
-                                // println!("[aptos-vm][groth16] PIH computation failed");
-                                invalid_signature!("Could not compute public inputs hash")
-                            })?;
-                            // println!("Public inputs hash time: {:?}", start.elapsed());
-
-                            let groth16_and_stmt =
-                                Groth16ProofAndStatement::new(*groth16proof, public_inputs_hash);
-
-                            // The training wheels signature is only checked if a training wheels PK is set on chain
-                            if training_wheels_pk.is_some() {
-                                match &zksig.training_wheels_signature {
-                                    Some(training_wheels_sig) => {
-                                        training_wheels_sig
-                                            .verify(
-                                                &groth16_and_stmt,
-                                                training_wheels_pk.as_ref().unwrap(),
-                                            )
-                                            .map_err(|_| {
-                                                // println!("[aptos-vm][groth16] TW sig verification failed");
-                                                invalid_signature!(
-                                                    "Could not verify training wheels signature"
-                                                )
-                                            })?;
-                                    },
-                                    None => {
-                                        // println!("[aptos-vm][groth16] Expected TW sig to be set");
-                                        return Err(invalid_signature!(
-                                            "Training wheels signature expected but it is missing"
-                                        ));
-                                    },
-                                }
-                            }
-
-                            let result = zksig
-                                .verify_groth16_proof(public_inputs_hash, pvk.as_ref().unwrap());
-
-                            result.map_err(|_| {
-                                // println!("[aptos-vm][groth16] ZKP verification failed");
-                                // println!("[aptos-vm][groth16] PIH: {}", public_inputs_hash);
-                                // match zksig.proof {
-                                //     ZKP::Groth16(proof) => {
-                                //         println!("[aptos-vm][groth16] ZKP: {}", proof.hash());
-                                //     },
-                                // }
-                                // println!(
-                                //     "[aptos-vm][groth16] PVK: {}",
-                                //     Groth16VerificationKey::from(pvk).hash()
-                                // );
-                                invalid_signature!("Proof verification failed")
-                            })?;
-                        },
-                    }
-                },
-                JWK::Unsupported(_) => return Err(invalid_signature!("JWK is not supported")),
-            },
-            EphemeralCertificate::OpenIdSig(openid_sig) => {
-                match jwk {
-                    JWK::RSA(rsa_jwk) => {
-                        openid_sig
-                            .verify_jwt_claims(
-                                sig.exp_date_secs,
-                                &sig.ephemeral_pubkey,
-                                pk.inner_keyless_pk(),
-                                config,
-                            )
-                            .map_err(|_| invalid_signature!("OpenID claim verification failed"))?;
-
-                        // TODO(OpenIdSig): Implement batch verification for all RSA signatures in
-                        //  one TXN.
-                        // Note: Individual OpenID RSA signature verification will be fast when the
-                        // RSA public exponent is small (e.g., 65537). For the same TXN, batch
-                        // verification of all RSA signatures will be even faster even when the
-                        // exponent is the same. Across different TXNs, batch verification will be
-                        // (1) more difficult to implement and (2) not very beneficial since, when
-                        // it fails, bad signature identification will require re-verifying all
-                        // signatures assuming an adversarial batch.
-                        //
-                        // We are now ready to verify the RSA signature
-                        openid_sig
-                            .verify_jwt_signature(&rsa_jwk, &sig.jwt_header_json)
-                            .map_err(|_| {
-                                invalid_signature!(
-                                    "RSA signature verification failed for OpenIdSig"
-                                )
-                            })?;
-                    },
-                    JWK::Unsupported(_) => return Err(invalid_signature!("JWK is not supported")),
-                }
-            },
-        }
+        verify_keyless_signature_without_ephemeral_signature_check(
+            pk,
+            sig,
+            &jwk,
+            onchain_timestamp_obj.microseconds,
+            &training_wheels_pk,
+            config,
+            pvk,
+        )?;
     }
 
+    Ok(())
+}
+
+pub fn verify_keyless_signature_without_ephemeral_signature_check(
+    public_key: &AnyKeylessPublicKey,
+    signature: &KeylessSignature,
+    jwk: &JWK,
+    onchain_timestamp_microseconds: u64,
+    training_wheels_pk: &Option<EphemeralPublicKey>,
+    config: &Configuration,
+    pvk: &Option<PreparedVerifyingKey<Bn254>>,
+) -> Result<(), VMStatus> {
+    signature
+        .verify_expiry(onchain_timestamp_microseconds)
+        .map_err(|_| {
+            // println!("[aptos-vm][groth16] ZKP expired");
+
+            invalid_signature!("The ephemeral keypair has expired")
+        })?;
+    match &signature.cert {
+        EphemeralCertificate::ZeroKnowledgeSig(zksig) => match jwk {
+            JWK::RSA(rsa_jwk) => {
+                if zksig.exp_horizon_secs > config.max_exp_horizon_secs {
+                    // println!("[aptos-vm][groth16] Expiration horizon is too long");
+                    return Err(invalid_signature!("The expiration horizon is too long"));
+                }
+
+                // If an `aud` override was set for account recovery purposes, check that it is
+                // in the allow-list on-chain.
+                if zksig.override_aud_val.is_some() {
+                    config.is_allowed_override_aud(zksig.override_aud_val.as_ref().unwrap())?;
+                }
+                match &zksig.proof {
+                    ZKP::Groth16(groth16proof) => {
+                        // let start = std::time::Instant::now();
+                        let public_inputs_hash = get_public_inputs_hash(
+                            signature,
+                            public_key.inner_keyless_pk(),
+                            rsa_jwk,
+                            config,
+                        )
+                        .map_err(|_| {
+                            // println!("[aptos-vm][groth16] PIH computation failed");
+                            invalid_signature!("Could not compute public inputs hash")
+                        })?;
+                        // println!("Public inputs hash time: {:?}", start.elapsed());
+
+                        let groth16_and_stmt =
+                            Groth16ProofAndStatement::new(*groth16proof, public_inputs_hash);
+
+                        // The training wheels signature is only checked if a training wheels PK is set on chain
+                        if training_wheels_pk.is_some() {
+                            match &zksig.training_wheels_signature {
+                                Some(training_wheels_sig) => {
+                                    training_wheels_sig
+                                        .verify(
+                                            &groth16_and_stmt,
+                                            training_wheels_pk.as_ref().unwrap(),
+                                        )
+                                        .map_err(|_| {
+                                            // println!("[aptos-vm][groth16] TW sig verification failed");
+                                            invalid_signature!(
+                                                "Could not verify training wheels signature"
+                                            )
+                                        })?;
+                                },
+                                None => {
+                                    // println!("[aptos-vm][groth16] Expected TW sig to be set");
+                                    return Err(invalid_signature!(
+                                        "Training wheels signature expected but it is missing"
+                                    ));
+                                },
+                            }
+                        }
+
+                        let result =
+                            zksig.verify_groth16_proof(public_inputs_hash, pvk.as_ref().unwrap());
+
+                        result.map_err(|_| {
+                            // println!("[aptos-vm][groth16] ZKP verification failed");
+                            // println!("[aptos-vm][groth16] PIH: {}", public_inputs_hash);
+                            // match zksig.proof {
+                            //     ZKP::Groth16(proof) => {
+                            //         println!("[aptos-vm][groth16] ZKP: {}", proof.hash());
+                            //     },
+                            // }
+                            // println!(
+                            //     "[aptos-vm][groth16] PVK: {}",
+                            //     Groth16VerificationKey::from(pvk).hash()
+                            // );
+                            invalid_signature!("Proof verification failed")
+                        })?;
+                    },
+                }
+            },
+            JWK::Unsupported(_) => return Err(invalid_signature!("JWK is not supported")),
+        },
+        EphemeralCertificate::OpenIdSig(openid_sig) => {
+            match jwk {
+                JWK::RSA(rsa_jwk) => {
+                    openid_sig
+                        .verify_jwt_claims(
+                            signature.exp_date_secs,
+                            &signature.ephemeral_pubkey,
+                            public_key.inner_keyless_pk(),
+                            config,
+                        )
+                        .map_err(|_| invalid_signature!("OpenID claim verification failed"))?;
+
+                    // TODO(OpenIdSig): Implement batch verification for all RSA signatures in
+                    //  one TXN.
+                    // Note: Individual OpenID RSA signature verification will be fast when the
+                    // RSA public exponent is small (e.g., 65537). For the same TXN, batch
+                    // verification of all RSA signatures will be even faster even when the
+                    // exponent is the same. Across different TXNs, batch verification will be
+                    // (1) more difficult to implement and (2) not very beneficial since, when
+                    // it fails, bad signature identification will require re-verifying all
+                    // signatures assuming an adversarial batch.
+                    //
+                    // We are now ready to verify the RSA signature
+                    openid_sig
+                        .verify_jwt_signature(rsa_jwk, &signature.jwt_header_json)
+                        .map_err(|_| {
+                            invalid_signature!("RSA signature verification failed for OpenIdSig")
+                        })?;
+                },
+                JWK::Unsupported(_) => return Err(invalid_signature!("JWK is not supported")),
+            }
+        },
+    }
     Ok(())
 }

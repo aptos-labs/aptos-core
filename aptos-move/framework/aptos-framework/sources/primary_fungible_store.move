@@ -15,11 +15,13 @@ module aptos_framework::primary_fungible_store {
     use aptos_framework::dispatchable_fungible_asset;
     use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleStore, Metadata, MintRef, TransferRef, BurnRef};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
-    use aptos_framework::permissioned_signer;
 
     use std::option::Option;
+    use std::signer;
     use std::string::String;
 
+    #[test_only]
+    use aptos_framework::permissioned_signer;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// A resource that holds the derive ref for the fungible asset metadata object. This is used to create primary
@@ -134,7 +136,7 @@ module aptos_framework::primary_fungible_store {
         fungible_asset::grant_permission_by_address(
             master,
             permissioned,
-            primary_store_address_inlined(permissioned_signer::address_of(permissioned), metadata),
+            primary_store_address_inlined(signer::address_of(permissioned), metadata),
             amount
         );
     }
@@ -147,7 +149,7 @@ module aptos_framework::primary_fungible_store {
         fungible_asset::grant_permission_by_address(
             master,
             permissioned,
-            object::create_user_derived_object_address(permissioned_signer::address_of(permissioned), @aptos_fungible_asset),
+            object::create_user_derived_object_address(signer::address_of(permissioned), @aptos_fungible_asset),
             amount
         );
     }
@@ -183,7 +185,7 @@ module aptos_framework::primary_fungible_store {
 
     /// Withdraw `amount` of fungible asset from the given account's primary store.
     public fun withdraw<T: key>(owner: &signer, metadata: Object<T>, amount: u64): FungibleAsset acquires DeriveRefPod {
-        let store = ensure_primary_store_exists(permissioned_signer::address_of(owner), metadata);
+        let store = ensure_primary_store_exists(signer::address_of(owner), metadata);
         // Check if the store object has been burnt or not. If so, unburn it first.
         may_be_unburn(owner, store);
         dispatchable_fungible_asset::withdraw(owner, store, amount)
@@ -205,12 +207,12 @@ module aptos_framework::primary_fungible_store {
             owner,
             fungible_asset::amount(&fa),
             primary_store_address_inlined(
-                permissioned_signer::address_of(owner),
+                signer::address_of(owner),
                 fungible_asset::metadata_from_asset(&fa),
             )
         );
         let metadata = fungible_asset::asset_metadata(&fa);
-        let store = ensure_primary_store_exists(permissioned_signer::address_of(owner), metadata);
+        let store = ensure_primary_store_exists(signer::address_of(owner), metadata);
         dispatchable_fungible_asset::deposit(store, fa);
     }
 
@@ -221,7 +223,7 @@ module aptos_framework::primary_fungible_store {
         recipient: address,
         amount: u64,
     ) acquires DeriveRefPod {
-        let sender_store = ensure_primary_store_exists(permissioned_signer::address_of(sender), metadata);
+        let sender_store = ensure_primary_store_exists(signer::address_of(sender), metadata);
         // Check if the sender store object has been burnt or not. If so, unburn it first.
         may_be_unburn(sender, sender_store);
         let recipient_store = ensure_primary_store_exists(recipient, metadata);
@@ -237,7 +239,7 @@ module aptos_framework::primary_fungible_store {
         amount: u64,
         expected: u64,
     ) acquires DeriveRefPod {
-        let sender_store = ensure_primary_store_exists(permissioned_signer::address_of(sender), metadata);
+        let sender_store = ensure_primary_store_exists(signer::address_of(sender), metadata);
         // Check if the sender store object has been burnt or not. If so, unburn it first.
         may_be_unburn(sender, sender_store);
         let recipient_store = ensure_primary_store_exists(recipient, metadata);
@@ -312,8 +314,6 @@ module aptos_framework::primary_fungible_store {
     use std::string;
     #[test_only]
     use std::option;
-    #[test_only]
-    use std::signer;
 
     #[test_only]
     public fun init_test_metadata_with_primary_store_enabled(

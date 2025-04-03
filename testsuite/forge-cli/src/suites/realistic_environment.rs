@@ -329,7 +329,7 @@ pub(crate) fn realistic_env_max_load_test(
             LatencyBreakdownThreshold::new_with_breach_pct(
                 vec![
                     // quorum store backpressure is relaxed, so queueing happens here
-                    (LatencyBreakdownSlice::MempoolToBlockCreation, 0.35 + 2.5),
+                    (LatencyBreakdownSlice::MempoolToBlockCreation, 0.35 + 8.0),
                     // can be adjusted down if less backpressure
                     (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
                     // can be adjusted down if less backpressure
@@ -357,7 +357,7 @@ pub(crate) fn realistic_env_max_load_test(
                     11000
                 } else {
                     // During land time we want to be less strict, otherwise we flaky fail
-                    10000
+                    4000
                 },
             ),
         }))

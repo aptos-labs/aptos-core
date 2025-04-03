@@ -11,20 +11,24 @@ use aptos_crypto::{
     ValidCryptoMaterialStringExt,
 };
 use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
-use aptos_language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD};
-use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
+use aptos_resource_viewer::AptosValueAnnotator;
+use aptos_transaction_simulation::{
+    InMemoryStateStore, SimulationStateStore, GENESIS_CHANGE_SET_HEAD,
+};
 use aptos_types::{
-    account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
+    account_config::{
+        aptos_test_root_address, primary_apt_store, AccountResource, FungibleStoreResource,
+        ObjectGroupResource,
+    },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
-    state_store::{state_key::StateKey, table::TableHandle, TStateView},
+    state_store::{state_key::StateKey, table::TableHandle, MoveResourceExt, TStateView},
     transaction::{
         signature_verified_transaction::into_signature_verified_block,
         EntryFunction as TransactionEntryFunction, ExecutionStatus, RawTransaction,
         Script as TransactionScript, Transaction, TransactionOutput, TransactionStatus,
     },
-    AptosCoinType,
 };
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
@@ -55,7 +59,7 @@ use move_transactional_test_runner::{
 use move_vm_runtime::move_vm::SerializedReturnValues;
 use once_cell::sync::Lazy;
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet},
     convert::TryFrom,
     fmt,
     path::Path,
@@ -76,7 +80,7 @@ use tempfile::NamedTempFile;
 ///   - It executes transactions through AptosVM, instead of MoveVM directly
 struct AptosTestAdapter<'a> {
     compiled_state: CompiledState<'a>,
-    storage: FakeDataStore,
+    storage: InMemoryStateStore,
     default_syntax: SyntaxChoice,
     private_key_mapping: BTreeMap<String, Ed25519PrivateKey>,
     run_config: TestRunConfig,
@@ -392,42 +396,13 @@ impl<'a> AptosTestAdapter<'a> {
 
     /// Obtain the AptosCoin amount under address `signer_addr`
     fn fetch_account_balance(&self, signer_addr: &AccountAddress) -> Result<u64> {
-        let aptos_coin_tag = CoinStoreResource::<AptosCoinType>::struct_tag();
-
-        let balance_blob = self
-            .storage
-            .get_state_value_bytes(&StateKey::resource(signer_addr, &aptos_coin_tag)?)
-            .unwrap()
-            .ok_or_else(|| {
-                format_err!(
-                    "Failed to fetch balance resource under address {}.",
-                    signer_addr
-                )
-            })?;
-
-        let annotated = AptosValueAnnotator::new(&self.storage)
-            .view_resource(&aptos_coin_tag, &balance_blob)?;
-
-        // Filter the Coin resource and return the resouce value
-        for (key, val) in annotated.value {
-            if key != Identifier::new("coin").unwrap() {
-                continue;
-            }
-
-            if let AnnotatedMoveValue::Struct(s) = val {
-                for (key, val) in s.value {
-                    if key != Identifier::new("value").unwrap() {
-                        continue;
-                    }
-
-                    if let AnnotatedMoveValue::U64(v) = val {
-                        return Ok(v);
-                    }
-                }
-            }
-        }
-
-        bail!("Failed to fetch balance under address {}.", signer_addr)
+        Ok(FungibleStoreResource::fetch_move_resource_from_group(
+            &self.storage,
+            &primary_apt_store(*signer_addr),
+            &ObjectGroupResource::struct_tag(),
+        )?
+        .unwrap()
+        .balance())
     }
 
     /// Derive the default transaction parameters from the account and balance resources fetched
@@ -484,7 +459,7 @@ impl<'a> AptosTestAdapter<'a> {
         let output = outputs.pop().unwrap();
         match output.status() {
             TransactionStatus::Keep(kept_vm_status) => {
-                self.storage.add_write_set(output.write_set());
+                self.storage.apply_write_set(output.write_set())?;
                 match kept_vm_status {
                     ExecutionStatus::Success => Ok(output),
                     _ => {
@@ -589,8 +564,10 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         }
 
         // Genesis modules
-        let mut storage = FakeDataStore::new(HashMap::new());
-        storage.add_write_set(GENESIS_CHANGE_SET_HEAD.write_set());
+        let storage = InMemoryStateStore::new();
+        storage
+            .apply_write_set(GENESIS_CHANGE_SET_HEAD.write_set())
+            .unwrap();
 
         // Builtin private key mapping
         let mut private_key_mapping = BTreeMap::new();
@@ -763,7 +740,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         //  through native context. Implement in a cleaner way, and simply run the bytecode verifier
         //  for now.
         verify_module(&module)?;
-        self.storage.add_module(&module_id, module_blob);
+        self.storage.add_module_blob(&module_id, module_blob)?;
         Ok((None, module))
     }
 

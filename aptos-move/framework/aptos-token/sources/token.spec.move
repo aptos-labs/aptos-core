@@ -86,12 +86,12 @@ spec aptos_token::token {
 
         include CreateTokenDataIdAbortsIf{
         creator: token_data_address,
-        collection: collection,
-        name: name
+        collection,
+        name
         };
 
         include MintTokenAbortsIf {
-        token_data_id: token_data_id
+        token_data_id
         };
     }
 
@@ -113,7 +113,7 @@ spec aptos_token::token {
         let addr = signer::address_of(account);
         aborts_if addr != creator;
         include CreateTokenDataIdAbortsIf {
-            creator: creator,
+            creator,
             collection: collection_name,
             name: token_name
         };
@@ -132,8 +132,8 @@ spec aptos_token::token {
         pragma aborts_if_is_partial;
         include CreateTokenDataIdAbortsIf{
             creator: creators_address,
-            collection: collection,
-            name: name
+            collection,
+            name
         };
     }
 
@@ -162,7 +162,7 @@ spec aptos_token::token {
         //TODO: Abort condition is complex because of transfer function.
         pragma aborts_if_is_partial;
         include CreateTokenDataIdAbortsIf{
-            creator: creator,
+            creator,
             collection: collection_name,
             name: token_name
         };
@@ -243,7 +243,7 @@ spec aptos_token::token {
         let collection_data = table::spec_get(global<Collections>(addr).collection_data, collection_name);
         include AssertCollectionExistsAbortsIf {
             creator_address: addr,
-            collection_name: collection_name
+            collection_name
         };
         aborts_if !collection_data.mutability_config.description;
         aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && !exists<account::Account>(addr);
@@ -259,7 +259,7 @@ spec aptos_token::token {
         aborts_if len(uri.bytes) > MAX_URI_LENGTH;
         include AssertCollectionExistsAbortsIf {
             creator_address: addr,
-            collection_name: collection_name
+            collection_name
         };
         aborts_if !collection_data.mutability_config.uri;
         aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && !exists<account::Account>(addr);
@@ -276,7 +276,7 @@ spec aptos_token::token {
         let collection_data = table::spec_get(global<Collections>(addr).collection_data, collection_name);
         include AssertCollectionExistsAbortsIf {
             creator_address: addr,
-            collection_name: collection_name
+            collection_name
         };
         aborts_if collection_data.maximum == 0 || maximum == 0;
         aborts_if maximum < collection_data.supply;
@@ -565,7 +565,7 @@ spec aptos_token::token {
     spec check_tokendata_exists(creator: address, collection_name: String, token_name: String): bool {
         aborts_if !exists<Collections>(creator);
         include CreateTokenDataIdAbortsIf {
-            creator: creator,
+            creator,
             collection: collection_name,
             name: token_name
         };
@@ -603,8 +603,8 @@ spec aptos_token::token {
         aborts_if !exists<Collections>(account_addr);
         include CreateTokenDataIdAbortsIf {
             creator: account_addr,
-            collection: collection,
-            name: name
+            collection,
+            name
         };
         aborts_if !table::spec_contains(collections.collection_data, collection);
         aborts_if table::spec_contains(collections.token_data, token_data_id);
@@ -752,7 +752,7 @@ spec aptos_token::token {
 
         include DirectDepositAbortsIf {
             account_addr: receiver,
-            token_id: token_id,
+            token_id,
             token_amount: amount,
         };
     }
