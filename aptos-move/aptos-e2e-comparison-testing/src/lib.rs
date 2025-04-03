@@ -42,12 +42,13 @@ use move_package::{
 };
 pub use online_execution::*;
 
-const APTOS_PACKAGES_DIR_NAMES: [&str; 5] = [
+const APTOS_PACKAGES_DIR_NAMES: [&str; 6] = [
     "aptos-framework",
     "move-stdlib",
     "aptos-stdlib",
     "aptos-token",
     "aptos-token-objects",
+    "aptos-experimental",
 ];
 
 const STATE_DATA: &str = "state_data";
@@ -404,7 +405,7 @@ fn generate_compiled_blob(
     let mut blob_map = HashMap::new();
     for compiled_module in root_modules {
         if let CompiledUnitEnum::Module(module) = &compiled_module.unit {
-            let module_blob = compiled_module.unit.serialize(None);
+            let module_blob = compiled_module.unit.serialize(Some(8));
             blob_map.insert(module.module.self_id(), module_blob);
         }
     }
@@ -414,22 +415,18 @@ fn generate_compiled_blob(
 fn compile_aptos_packages(
     aptos_commons_path: &Path,
     compiled_package_map: &mut HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
-    v2_flag: bool,
+    experiments: &[String],
+    version: &str,
 ) -> anyhow::Result<()> {
     for package in APTOS_PACKAGES {
         let root_package_dir = aptos_commons_path.join(get_aptos_dir(package).unwrap());
-        let compiler_version = if v2_flag {
-            Some(CompilerVersion::latest_stable())
-        } else {
-            Some(CompilerVersion::V1)
-        };
         // For simplicity, all packages including aptos token are stored under 0x1 in the map
         let package_info = PackageInfo {
             address: AccountAddress::ONE,
             package_name: package.to_string(),
             upgrade_number: None,
         };
-        let compiled_package = compile_package(root_package_dir, &package_info, compiler_version, vec![]);
+        let compiled_package = compile_package(root_package_dir, &package_info, experiments, version);
         if let Ok(built_package) = compiled_package {
             generate_compiled_blob(&package_info, &built_package, compiled_package_map);
         } else {
@@ -445,14 +442,13 @@ fn compile_aptos_packages(
 fn compile_package(
     root_dir: PathBuf,
     package_info: &PackageInfo,
-    compiler_version: Option<CompilerVersion>,
-    experiments: Vec<String>,
+    experiments: &[String],
+    version: &str,
 ) -> anyhow::Result<CompiledPackage> {
     let mut build_options = aptos_framework::BuildOptions {
-        compiler_version,
-        bytecode_version: Some(7),
+        bytecode_version: Some(8),
         language_version: Some(LanguageVersion::latest()),
-        experiments,
+        experiments: experiments.to_vec(),
         ..Default::default()
     };
     build_options
@@ -463,9 +459,9 @@ fn compile_package(
         Ok(built_package.package)
     } else {
         Err(anyhow::Error::msg(format!(
-            "compilation failed for the package:{} when using compiler: {:?}",
+            "compilation failed for the package:{} when using compiler: {}",
             package_info.package_name.clone(),
-            compiler_version
+            version
         )))
     }
 }
@@ -476,6 +472,8 @@ fn dump_and_compile_from_package_metadata(
     dep_map: &HashMap<(AccountAddress, String), PackageMetadata>,
     compilation_cache: &mut CompilationCache,
     execution_mode: Option<ExecutionMode>,
+    base_experiments: &[String],
+    compared_experiments: &[String],
 ) -> anyhow::Result<()> {
     let root_package_dir = root_dir.join(format!("{}", package_info,));
     if compilation_cache.failed_packages_v1.contains(&package_info) {
@@ -570,6 +568,8 @@ fn dump_and_compile_from_package_metadata(
                         dep_map,
                         compilation_cache,
                         execution_mode,
+                        base_experiments,
+                        compared_experiments,
                     )?;
                 }
                 break;
@@ -589,8 +589,8 @@ fn dump_and_compile_from_package_metadata(
         let package_v1 = compile_package(
             root_package_dir.clone(),
             &package_info,
-            Some(CompilerVersion::latest_stable()),
-            vec![],
+            base_experiments,
+            "base",
         );
         if let Ok(built_package) = package_v1 {
             if execution_mode.is_some_and(|mode| mode.is_v1_or_compare()) {
@@ -618,8 +618,8 @@ fn dump_and_compile_from_package_metadata(
             let package_v2 = compile_package(
                 root_package_dir,
                 &package_info,
-                Some(CompilerVersion::latest()),
-                vec![],
+                compared_experiments,
+                "compared",
             );
             if let Ok(built_package) = package_v2 {
                 generate_compiled_blob(

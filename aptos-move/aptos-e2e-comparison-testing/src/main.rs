@@ -46,6 +46,9 @@ pub enum Cmd {
         /// Branch of framework
         #[clap(long)]
         branch: Option<String>,
+        /// Experiments flag to be used for compilation
+        #[clap(long)]
+        experiments: Option<String>,
     },
     /// Collect and execute txns without dumping the state data
     Online {
@@ -72,6 +75,12 @@ pub enum Cmd {
         /// Sampling rate (1-10)
         #[clap(long, default_value_t = SAMPLING_RATE)]
         rate: u32,
+        /// Base experiments
+        #[clap(long)]
+        base_experiments: Option<String>,
+        /// Compared experiments
+        #[clap(long)]
+        compared_experiments: Option<String>,
     },
     /// Execution of txns
     Execute {
@@ -89,6 +98,12 @@ pub enum Cmd {
         /// Branch of framework for v2
         #[clap(long)]
         branch_v2: Option<String>,
+        /// Base experiments
+        #[clap(long)]
+        base_experiments: Option<String>,
+        /// Compared experiments
+        #[clap(long)]
+        compared_experiments: Option<String>,
     },
 }
 
@@ -108,16 +123,15 @@ pub struct Argument {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let parse_experiments = |opt: Option<String>| {
+        opt.map(|s| {
+            s.split(',')
+             .map(|part| part.trim().to_string())
+             .collect()
+        })
+        .unwrap_or_else(Vec::new)
+    };
     let args = Argument::parse();
-    // env::set_var(
-    //     OVERRIDE_EXP_CACHE,
-    //     format!(
-    //         "{},{}",
-    //         Experiment::SPEC_CHECK,
-    //         Experiment::REFERENCE_SAFETY
-    //     ),
-    // );
-    // env::set_var("MOVE_COMPILER_EXP", DISABLE_SPEC_CHECK);
     match args.cmd {
         Cmd::Dump {
             endpoint,
@@ -128,7 +142,8 @@ async fn main() -> Result<()> {
             dump_write_set,
             target_account,
             rate,
-            branch
+            branch,
+            experiments,
         } => {
             let batch_size = BATCH_SIZE;
             let output = if let Some(path) = output_path {
@@ -152,8 +167,9 @@ async fn main() -> Result<()> {
                 skip_source_code,
                 target_account,
             )?;
+            let experiments = parse_experiments(experiments);
             data_collector
-                .dump_data(args.begin_version, args.limit, rate)
+                .dump_data(args.begin_version, args.limit, rate, experiments)
                 .await?;
         },
         Cmd::Online {
@@ -163,7 +179,9 @@ async fn main() -> Result<()> {
             skip_publish_txns,
             execution_mode,
             skip_ref_packages,
-            rate
+            rate,
+            base_experiments,
+            compared_experiments,
         } => {
             let batch_size = BATCH_SIZE;
             let output = if let Some(path) = output_path {
@@ -185,7 +203,9 @@ async fn main() -> Result<()> {
                 endpoint,
                 skip_ref_packages,
             )?;
-            online.execute(args.begin_version, args.limit, rate).await?;
+            let base_experiments = parse_experiments(base_experiments);
+            let compared_experiments = parse_experiments(compared_experiments);
+            online.execute(args.begin_version, args.limit, rate, base_experiments, compared_experiments).await?;
         },
         Cmd::Execute {
             input_path,
@@ -193,6 +213,8 @@ async fn main() -> Result<()> {
             skip_ref_packages,
             branch_v1,
             branch_v2,
+            base_experiments,
+            compared_experiments,
         } => {
             let input = if let Some(path) = input_path {
                 path
@@ -206,10 +228,12 @@ async fn main() -> Result<()> {
             if exec_mode.is_v2_or_compare() {
                 prepare_aptos_packages(input.join(APTOS_COMMONS_V2), branch_v2).await;
             }
+            let base_experiments = parse_experiments(base_experiments);
+            let compared_experiments = parse_experiments(compared_experiments);
             let executor =
                 Execution::new(input, exec_mode, skip_ref_packages);
             executor
-                .execute_txns(args.begin_version, args.limit)
+                .execute_txns(args.begin_version, args.limit, base_experiments, compared_experiments)
                 .await?;
         },
     };

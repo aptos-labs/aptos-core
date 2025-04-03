@@ -88,6 +88,8 @@ impl OnlineExecutor {
         compilation_cache: &mut CompilationCache,
         execution_mode: Option<ExecutionMode>,
         current_dir: PathBuf,
+        base_experiments: &[String],
+        compared_experiments: &[String],
     ) -> Option<PackageInfo> {
         let upgrade_number = if is_aptos_package(&package_name) {
             None
@@ -115,6 +117,8 @@ impl OnlineExecutor {
                 &map,
                 compilation_cache,
                 execution_mode,
+                base_experiments,
+                compared_experiments,
             );
             if res.is_err() {
                 eprintln!("{} at:{}", res.unwrap_err(), version);
@@ -124,7 +128,7 @@ impl OnlineExecutor {
         Some(package_info)
     }
 
-    pub async fn execute(&self, begin: Version, limit: u64, rate: u32) -> Result<()> {
+    pub async fn execute(&self, begin: Version, limit: u64, rate: u32, base_experiments: Vec<String>, compared_experiments: Vec<String>) -> Result<()> {
         println!("begin executing events");
         let compilation_cache = Arc::new(Mutex::new(CompilationCache::default()));
         let index_writer = Arc::new(Mutex::new(IndexWriter::new(&self.current_dir)));
@@ -134,14 +138,16 @@ impl OnlineExecutor {
             compile_aptos_packages(
                 &aptos_commons_path,
                 &mut compilation_cache.lock().unwrap().compiled_package_cache_v1,
-                false,
+                &base_experiments,
+                "base",
             )?;
         }
         if self.execution_mode.is_v2_or_compare() {
             compile_aptos_packages(
                 &aptos_commons_path,
                 &mut compilation_cache.lock().unwrap().compiled_package_cache_v2,
-                true,
+                &compared_experiments,
+                "compared",
             )?;
         }
 
@@ -187,6 +193,8 @@ impl OnlineExecutor {
                     let execution_mode = self.execution_mode;
                     let endpoint = self.endpoint.clone();
                     let skip_ref_packages = self.skip_ref_packages.clone();
+                    let base_experiments = base_experiments.clone();
+                    let compared_experiments = compared_experiments.clone();
 
                     let txn_execution_thread = tokio::task::spawn_blocking(move || {
                         println!("skip packages:{:?}", skip_ref_packages);
@@ -203,17 +211,6 @@ impl OnlineExecutor {
 
                         // handle source code
                         if let Some((address, package_name, map)) = source_code_data {
-                            // if executor.check_package_skip(&package_name) {
-                            //     env::set_var(
-                            //         "MOVE_COMPILER_EXP",
-                            //         format!("{},{}", DISABLE_SPEC_CHECK, DISABLE_REF_CHECK),
-                            //     );
-                            // } else {
-                            //     env::set_var(
-                            //         "MOVE_COMPILER_EXP",
-                            //         format!("{},{}", DISABLE_SPEC_CHECK, ENABLE_REF_CHECK),
-                            //     );
-                            // }
                             let execution_mode_opt = Some(execution_mode);
                             let package_info_opt = Self::dump_and_check_src(
                                 version,
@@ -223,6 +220,8 @@ impl OnlineExecutor {
                                 &mut compilation_cache.lock().unwrap(),
                                 execution_mode_opt,
                                 current_dir.clone(),
+                                &base_experiments,
+                                &compared_experiments,
                             );
                             if package_info_opt.is_none() {
                                 return;
