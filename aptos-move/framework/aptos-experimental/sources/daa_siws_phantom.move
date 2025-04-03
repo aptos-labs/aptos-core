@@ -7,6 +7,7 @@ module aptos_experimental::daa_siws_phantom {
         new_signature_from_bytes,
         new_unvalidated_public_key_from_bytes,
     };
+    use std::bcs_stream::{Self};
     use std::chain_id;
     use std::error;
     use std::string_utils;
@@ -25,10 +26,10 @@ module aptos_experimental::daa_siws_phantom {
     const BASE_58_ALPHABET: vector<u8> = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
     const HEX_ALPHABET: vector<u8> = b"0123456789abcdef";
 
-    fun split_abstract_public_key(abstract_public_key: &vector<u8>): (vector<u8>, vector<u8>) {
-        // First 44 bytes are the base58 utf8 encoded public key
-        let base58_public_key = abstract_public_key.slice(0, 44);
-        let domain = abstract_public_key.slice(44, abstract_public_key.length());
+    fun deserialize_abstract_public_key(abstract_public_key: &vector<u8>): (vector<u8>, vector<u8>) {
+        let stream = bcs_stream::new(*abstract_public_key);
+        let base58_public_key = *bcs_stream::deserialize_string(&mut stream).bytes();
+        let domain = *bcs_stream::deserialize_string(&mut stream).bytes();
         (base58_public_key, domain)
     }
 
@@ -134,7 +135,7 @@ module aptos_experimental::daa_siws_phantom {
         entry_function_name: &vector<u8>
     ) {
         let abstract_public_key = aa_auth_data.derivable_abstract_public_key();
-        let (base58_public_key, domain) = split_abstract_public_key(abstract_public_key);
+        let (base58_public_key, domain) = deserialize_abstract_public_key(abstract_public_key);
         let digest_utf8 = string_utils::to_string(aa_auth_data.digest()).bytes();
         let message = construct_message(&base58_public_key, &domain, entry_function_name, digest_utf8);
 
@@ -165,16 +166,35 @@ module aptos_experimental::daa_siws_phantom {
     }
 
     #[test_only]
-    use std::string::{utf8};
+    use std::bcs;
+    #[test_only]
+    use std::string::{String, utf8};
     #[test_only]
     use aptos_framework::auth_data::{create_derivable_auth_data};
 
+    #[test_only]
+    struct SIWSAbstractPublicKey has drop {
+        base58_public_key: String,
+        domain: String,
+    }
+
+    #[test_only]
+    fun create_abstract_public_key(base58_public_key: String, domain: String): vector<u8> {
+        let abstract_public_key = SIWSAbstractPublicKey {
+            base58_public_key,
+            domain,
+        };
+        bcs::to_bytes(&abstract_public_key)
+    }
+
     #[test]
-    fun test_split_abstract_public_key() {
-        let abstract_public_key = b"G56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmVaptos-labs.github.io";
-        let (public_key, domain) = split_abstract_public_key(&abstract_public_key);
-        assert!(public_key == b"G56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV");
-        assert!(domain == b"aptos-labs.github.io");
+    fun test_deserialize_abstract_public_key() {
+        let base58_public_key = b"G56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV";
+        let domain = b"aptos-labs.github.io";
+        let abstract_public_key = create_abstract_public_key(utf8(base58_public_key), utf8(domain));
+        let (public_key, domain) = deserialize_abstract_public_key(&abstract_public_key);
+        assert!(public_key == base58_public_key);
+        assert!(domain == domain);
     }
 
     #[test(framework = @0x1)]
@@ -246,7 +266,9 @@ module aptos_experimental::daa_siws_phantom {
         83, 37, 121, 5, 216, 30, 25, 243, 207, 172, 248, 94, 201, 123, 66, 237,
         66, 122, 201, 171, 215, 162, 187, 218, 188, 24, 165, 52, 147, 210, 39,
         128, 78, 62, 81, 73, 167, 235, 1];
-        let abstract_public_key = b"G56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmVlocalhost:3000";
+        let base58_public_key = b"G56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV";
+        let domain = b"localhost:3000";
+        let abstract_public_key = create_abstract_public_key(utf8(base58_public_key), utf8(domain));
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
         let entry_function_name = b"0x1::coin::transfer";
         authenticate_auth_data(auth_data, &entry_function_name);
