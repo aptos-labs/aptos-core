@@ -9,7 +9,6 @@ module aptos_experimental::daa_siws_phantom {
     };
     use std::chain_id;
     use std::error;
-    use std::option::{Self, Option};
     use std::string_utils;
     use std::transaction_context::{Self, EntryFunctionPayload};
     use std::vector;
@@ -31,16 +30,16 @@ module aptos_experimental::daa_siws_phantom {
         (base58_public_key, domain)
     }
 
-    fun network_name(): Option<vector<u8>> {
+    fun network_name(): vector<u8> {
         let chain_id = chain_id::get();
         if (chain_id == 1) {
-            option::some(b"mainnet")
+            b"mainnet"
         } else if (chain_id == 2) {
-            option::some(b"testnet")
+            b"testnet"
         } else if (chain_id == 4) {
-            option::some(b"local")
+            b"local"
         } else {
-            option::none()
+            *string_utils::to_string(&chain_id).bytes()
         }
     }
 
@@ -57,12 +56,10 @@ module aptos_experimental::daa_siws_phantom {
         message.append(b"\n\nTo execute transaction ");
         message.append(*entry_function_name);
         message.append(b" on Aptos blockchain");
-        let maybe_network_name = network_name();
-        if (maybe_network_name.is_some()) {
-            message.append(b" (");
-            message.append(maybe_network_name.destroy_some());
-            message.append(b")");
-        };
+        let network_name = network_name();
+        message.append(b" (");
+        message.append(network_name);
+        message.append(b")");
         message.append(b".");
         message.append(b"\n\nNonce: ");
         message.append(*digest_utf8);
@@ -203,25 +200,25 @@ module aptos_experimental::daa_siws_phantom {
     #[test(framework = @0x1)]
     fun test_network_name_mainnet(framework: &signer) {
         chain_id::initialize_for_test(framework, 1);
-        assert!(network_name() == option::some(b"mainnet"));
+        assert!(network_name() == b"mainnet");
     }
 
     #[test(framework = @0x1)]
     fun test_network_name_testnet(framework: &signer) {
         chain_id::initialize_for_test(framework, 2);
-        assert!(network_name() == option::some(b"testnet"));
+        assert!(network_name() == b"testnet");
     }
 
     #[test(framework = @0x1)]
     fun test_network_name_local(framework: &signer) {
         chain_id::initialize_for_test(framework, 4);
-        assert!(network_name() == option::some(b"local"));
+        assert!(network_name() == b"local");
     }
 
     #[test(framework = @0x1)]
     fun test_network_name_other(framework: &signer) {
         chain_id::initialize_for_test(framework, 99);
-        assert!(network_name() == option::none());
+        assert!(network_name() == b"99");
     }
 
     #[test(framework = @0x1)]
