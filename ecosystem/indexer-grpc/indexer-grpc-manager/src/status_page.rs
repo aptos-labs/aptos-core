@@ -70,7 +70,7 @@ fn render_fullnode_tab(fullnodes_info: HashMap<String, VecDeque<FullnodeInfo>>) 
                     let last_sample = fullnode_info.1.back();
                     let (timestamp, known_latest_version) = if let Some(last_sample) = last_sample {
                         (
-                            format!("{:?}", last_sample.timestamp.unwrap()),
+                            format!("{:?}", last_sample.timestamp.clone().unwrap()),
                             format!("{}", last_sample.known_latest_version()),
                         )
                     } else {
@@ -115,7 +115,7 @@ fn render_live_data_service_tab(
             let (timestamp, known_latest_version, min_servable_version, num_connected_streams) =
                 if let Some(last_sample) = last_sample {
                     (
-                        format!("{:?}", last_sample.timestamp.unwrap()),
+                        format!("{:?}", last_sample.timestamp.clone().unwrap()),
                         format!("{}", last_sample.known_latest_version()),
                         format!("{:?}", last_sample.min_servable_version),
                         format!(
@@ -167,7 +167,7 @@ fn render_historical_data_service_tab(
             let (timestamp, known_latest_version, num_connected_streams) =
                 if let Some(last_sample) = last_sample {
                     (
-                        format!("{:?}", last_sample.timestamp.unwrap()),
+                        format!("{:?}", last_sample.timestamp.clone().unwrap()),
                         format!("{}", last_sample.known_latest_version()),
                         format!(
                             "{}",
