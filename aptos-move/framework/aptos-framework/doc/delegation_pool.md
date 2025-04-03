@@ -125,6 +125,7 @@ transferred to A
 -  [Resource `NextCommissionPercentage`](#0x1_delegation_pool_NextCommissionPercentage)
 -  [Resource `DelegationPoolAllowlisting`](#0x1_delegation_pool_DelegationPoolAllowlisting)
 -  [Enum `DelegationPermission`](#0x1_delegation_pool_DelegationPermission)
+-  [Resource `DelegatorLock`](#0x1_delegation_pool_DelegatorLock)
 -  [Struct `AddStake`](#0x1_delegation_pool_AddStake)
 -  [Struct `AddStakeEvent`](#0x1_delegation_pool_AddStakeEvent)
 -  [Struct `ReactivateStake`](#0x1_delegation_pool_ReactivateStake)
@@ -154,6 +155,8 @@ transferred to A
 -  [Function `delegation_pool_exists`](#0x1_delegation_pool_delegation_pool_exists)
 -  [Function `partial_governance_voting_enabled`](#0x1_delegation_pool_partial_governance_voting_enabled)
 -  [Function `observed_lockup_cycle`](#0x1_delegation_pool_observed_lockup_cycle)
+-  [Function `delegator_extra_lockup`](#0x1_delegation_pool_delegator_extra_lockup)
+-  [Function `delegator_lockup_expiration`](#0x1_delegation_pool_delegator_lockup_expiration)
 -  [Function `is_next_commission_percentage_effective`](#0x1_delegation_pool_is_next_commission_percentage_effective)
 -  [Function `operator_commission_percentage`](#0x1_delegation_pool_operator_commission_percentage)
 -  [Function `operator_commission_percentage_next_lockup_cycle`](#0x1_delegation_pool_operator_commission_percentage_next_lockup_cycle)
@@ -180,6 +183,9 @@ transferred to A
 -  [Function `beneficiary_for_operator`](#0x1_delegation_pool_beneficiary_for_operator)
 -  [Function `enable_partial_governance_voting`](#0x1_delegation_pool_enable_partial_governance_voting)
 -  [Function `vote`](#0x1_delegation_pool_vote)
+-  [Function `vote_internal`](#0x1_delegation_pool_vote_internal)
+-  [Function `lock_shares`](#0x1_delegation_pool_lock_shares)
+-  [Function `vote_with_active_locks`](#0x1_delegation_pool_vote_with_active_locks)
 -  [Function `create_proposal`](#0x1_delegation_pool_create_proposal)
 -  [Function `assert_owner_cap_exists`](#0x1_delegation_pool_assert_owner_cap_exists)
 -  [Function `assert_delegation_pool_exists`](#0x1_delegation_pool_assert_delegation_pool_exists)
@@ -219,6 +225,7 @@ transferred to A
 -  [Function `unlock_internal`](#0x1_delegation_pool_unlock_internal)
 -  [Function `reactivate_stake`](#0x1_delegation_pool_reactivate_stake)
 -  [Function `withdraw`](#0x1_delegation_pool_withdraw)
+-  [Function `assert_no_active_lockup`](#0x1_delegation_pool_assert_no_active_lockup)
 -  [Function `withdraw_internal`](#0x1_delegation_pool_withdraw_internal)
 -  [Function `pending_withdrawal_exists`](#0x1_delegation_pool_pending_withdrawal_exists)
 -  [Function `pending_inactive_shares_pool_mut`](#0x1_delegation_pool_pending_inactive_shares_pool_mut)
@@ -250,6 +257,7 @@ transferred to A
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/math64.md#0x1_math64">0x1::math64</a>;
 <b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/pool_u64_unbound.md#0x1_pool_u64_unbound">0x1::pool_u64_unbound</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
@@ -732,6 +740,34 @@ evicted later by the pool owner.
 </details>
 
 </details>
+
+</details>
+
+<a id="0x1_delegation_pool_DelegatorLock"></a>
+
+## Resource `DelegatorLock`
+
+
+
+<pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegatorLock">DelegatorLock</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>pools: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;<b>address</b>, u64&gt;</code>
+</dt>
+<dd>
+ Map from stake pool address to the lock expiration timestamp (in seconds).
+ Before the lock expires, the delegator cannot unlock the stake.
+</dd>
+</dl>
+
 
 </details>
 
@@ -1873,12 +1909,42 @@ Delegator's pending_inactive balance cannot be less than <code><a href="delegati
 
 
 
+<a id="0x1_delegation_pool_EDELEGATOR_STILL_LOCKED"></a>
+
+The delegator has an extra lock from having voted on governance proposals and cannot withdraw until the lock expires.
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_EDELEGATOR_STILL_LOCKED">EDELEGATOR_STILL_LOCKED</a>: u64 = 31;
+</code></pre>
+
+
+
+<a id="0x1_delegation_pool_EINSUFFICIENT_LOCKUP"></a>
+
+Voter connot vote because one or more of the specified delegators doesn't have enough voting power.
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_EINSUFFICIENT_LOCKUP">EINSUFFICIENT_LOCKUP</a>: u64 = 33;
+</code></pre>
+
+
+
 <a id="0x1_delegation_pool_EINVALID_COMMISSION_PERCENTAGE"></a>
 
 Commission percentage has to be between 0 and <code><a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a></code> - 100%.
 
 
 <pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_EINVALID_COMMISSION_PERCENTAGE">EINVALID_COMMISSION_PERCENTAGE</a>: u64 = 5;
+</code></pre>
+
+
+
+<a id="0x1_delegation_pool_EMISSING_DELEGATORS"></a>
+
+Voter must specify all delegators that have delegated to them for lockup verification.
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_EMISSING_DELEGATORS">EMISSING_DELEGATORS</a>: u64 = 30;
 </code></pre>
 
 
@@ -1899,6 +1965,16 @@ Signer does not have permission to perform delegation logic.
 
 
 <pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_ENO_DELEGATION_PERMISSION">ENO_DELEGATION_PERMISSION</a>: u64 = 28;
+</code></pre>
+
+
+
+<a id="0x1_delegation_pool_EONE_OR_MORE_DELEGATIONS_MISMATCH"></a>
+
+Voter cannot vote because one or more of the specified delegators didn't delegate to them.
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_EONE_OR_MORE_DELEGATIONS_MISMATCH">EONE_OR_MORE_DELEGATIONS_MISMATCH</a>: u64 = 32;
 </code></pre>
 
 
@@ -2168,6 +2244,63 @@ Return the index of current observed lockup cycle on delegation pool <code>pool_
 <pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_observed_lockup_cycle">observed_lockup_cycle</a>(pool_address: <b>address</b>): u64 <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a> {
     <a href="delegation_pool.md#0x1_delegation_pool_assert_delegation_pool_exists">assert_delegation_pool_exists</a>(pool_address);
     <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).observed_lockup_cycle.index
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_delegator_extra_lockup"></a>
+
+## Function `delegator_extra_lockup`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_delegator_extra_lockup">delegator_extra_lockup</a>(delegator: <b>address</b>, pool_address: <b>address</b>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_delegator_extra_lockup">delegator_extra_lockup</a>(delegator: <b>address</b>, pool_address: <b>address</b>): u64 <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegatorLock">DelegatorLock</a> {
+    <b>if</b> (<b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegatorLock">DelegatorLock</a>&gt;(delegator)) {
+        *<a href="delegation_pool.md#0x1_delegation_pool_DelegatorLock">DelegatorLock</a>[delegator].pools.borrow_with_default(pool_address, &0)
+    } <b>else</b> {
+        0
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_delegator_lockup_expiration"></a>
+
+## Function `delegator_lockup_expiration`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_delegator_lockup_expiration">delegator_lockup_expiration</a>(delegator: <b>address</b>, pool_address: <b>address</b>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_delegator_lockup_expiration">delegator_lockup_expiration</a>(delegator: <b>address</b>, pool_address: <b>address</b>): u64 <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegatorLock">DelegatorLock</a> {
+    // Return the longer between the <a href="stake.md#0x1_stake">stake</a> pool's lockup and self-imposed delegator's extra lockup.
+    <b>let</b> pool_lockup_expiration = <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(pool_address);
+    <b>let</b> delegator_extra_lockup = <a href="delegation_pool.md#0x1_delegation_pool_delegator_extra_lockup">delegator_extra_lockup</a>(delegator, pool_address);
+    <a href="../../aptos-stdlib/doc/math64.md#0x1_math64_max">math64::max</a>(pool_lockup_expiration, delegator_extra_lockup)
 }
 </code></pre>
 
@@ -3112,6 +3245,7 @@ Vote on a proposal with a voter's voting power. To successfully vote, the follow
     voting_power: u64,
     should_pass: bool
 ) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+    <a href="aptos_governance.md#0x1_aptos_governance_assert_proposal_expiration">aptos_governance::assert_proposal_expiration</a>(pool_address, proposal_id);
     <a href="delegation_pool.md#0x1_delegation_pool_check_stake_management_permission">check_stake_management_permission</a>(voter);
     <a href="delegation_pool.md#0x1_delegation_pool_assert_partial_governance_voting_enabled">assert_partial_governance_voting_enabled</a>(pool_address);
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation.
@@ -3126,22 +3260,60 @@ Vote on a proposal with a voter's voting power. To successfully vote, the follow
     <b>if</b> (voting_power &gt; remaining_voting_power) {
         voting_power = remaining_voting_power;
     };
-    <a href="aptos_governance.md#0x1_aptos_governance_assert_proposal_expiration">aptos_governance::assert_proposal_expiration</a>(pool_address, proposal_id);
     <b>assert</b>!(voting_power &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_ENO_VOTING_POWER">ENO_VOTING_POWER</a>));
 
-    <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
+    // This doesn't consider delegator's self-imposed extra lockup.
+    // If the extra lockup needs be considered, <b>use</b> vote_with_active_locks instead.
+    <a href="delegation_pool.md#0x1_delegation_pool_vote_internal">vote_internal</a>(voter_address, pool_address, proposal_id, voting_power, should_pass, <b>true</b>);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_vote_internal"></a>
+
+## Function `vote_internal`
+
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_vote_internal">vote_internal</a>(voter: <b>address</b>, pool_address: <b>address</b>, proposal_id: u64, voting_power: u64, should_pass: bool, check_expiration: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_vote_internal">vote_internal</a>(
+    voter: <b>address</b>,
+    pool_address: <b>address</b>,
+    proposal_id: u64,
+    voting_power: u64,
+    should_pass: bool,
+    check_expiration: bool
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+    <b>let</b> governance_records = &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>[pool_address];
     // Check a edge case during the transient period of enabling partial governance <a href="voting.md#0x1_voting">voting</a>.
     <a href="delegation_pool.md#0x1_delegation_pool_assert_and_update_proposal_used_voting_power">assert_and_update_proposal_used_voting_power</a>(governance_records, pool_address, proposal_id, voting_power);
-    <b>let</b> used_voting_power = <a href="delegation_pool.md#0x1_delegation_pool_borrow_mut_used_voting_power">borrow_mut_used_voting_power</a>(governance_records, voter_address, proposal_id);
-    *used_voting_power = *used_voting_power + voting_power;
+    <b>let</b> used_voting_power = <a href="delegation_pool.md#0x1_delegation_pool_borrow_mut_used_voting_power">borrow_mut_used_voting_power</a>(governance_records, voter, proposal_id);
+    *used_voting_power += voting_power;
 
-    <b>let</b> pool_signer = <a href="delegation_pool.md#0x1_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(<b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address));
-    <a href="aptos_governance.md#0x1_aptos_governance_partial_vote">aptos_governance::partial_vote</a>(&pool_signer, pool_address, proposal_id, voting_power, should_pass);
+    <b>let</b> pool_signer = <a href="delegation_pool.md#0x1_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(&<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>[pool_address]);
+    // In cases <b>where</b> delegators have an extra lockup that is sufficient <b>to</b> cover the <a href="voting.md#0x1_voting">voting</a> duration of the
+    // governance proposal, we can skip the expiration check.
+    <b>if</b> (check_expiration) {
+        <a href="aptos_governance.md#0x1_aptos_governance_partial_vote">aptos_governance::partial_vote</a>(&pool_signer, pool_address, proposal_id, voting_power, should_pass);
+    } <b>else</b> {
+        <a href="aptos_governance.md#0x1_aptos_governance_partial_vote_without_expiration_check">aptos_governance::partial_vote_without_expiration_check</a>(&pool_signer, pool_address, proposal_id, voting_power, should_pass);
+    };
 
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_migration_enabled">features::module_event_migration_enabled</a>()) {
         <a href="event.md#0x1_event_emit">event::emit</a>(
             <a href="delegation_pool.md#0x1_delegation_pool_Vote">Vote</a> {
-                voter: voter_address,
+                voter,
                 proposal_id,
                 <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: pool_address,
                 num_votes: voting_power,
@@ -3152,7 +3324,7 @@ Vote on a proposal with a voter's voting power. To successfully vote, the follow
         <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
             &<b>mut</b> governance_records.vote_events,
             <a href="delegation_pool.md#0x1_delegation_pool_VoteEvent">VoteEvent</a> {
-                voter: voter_address,
+                voter,
                 proposal_id,
                 <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: pool_address,
                 num_votes: voting_power,
@@ -3160,6 +3332,140 @@ Vote on a proposal with a voter's voting power. To successfully vote, the follow
             }
         );
     };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_lock_shares"></a>
+
+## Function `lock_shares`
+
+Allows a delegator to lock up their shares for at least as long as the specified Aptos governance proposal in
+addition to the pool's unlock rules. This is useful for voting on proposals that require a longer lockup period
+than the delegation pool's lockup period.
+
+If the pool's lockup or any existing extra lock the delegator has is already sufficient to cover the voting
+duration of the governance proposal, no changes will be made.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_lock_shares">lock_shares</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, proposal_id: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_lock_shares">lock_shares</a>(
+    delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    pool_address: <b>address</b>,
+    proposal_id: u64
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegatorLock">DelegatorLock</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+    <a href="delegation_pool.md#0x1_delegation_pool_check_stake_management_permission">check_stake_management_permission</a>(delegator);
+    // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation.
+    <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
+
+    <b>let</b> delegator_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator);
+    <b>let</b> proposal_expiration = <a href="aptos_governance.md#0x1_aptos_governance_get_proposal_expiration">aptos_governance::get_proposal_expiration</a>(proposal_id);
+    <b>let</b> delegation_pool_lockup = <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(pool_address);
+    <b>if</b> (delegation_pool_lockup &lt; proposal_expiration) {
+        <b>if</b> (!<b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegatorLock">DelegatorLock</a>&gt;(delegator_addr)) {
+            <b>move_to</b>(delegator, <a href="delegation_pool.md#0x1_delegation_pool_DelegatorLock">DelegatorLock</a> {
+                pools: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>()
+            });
+        };
+
+        // Only <b>update</b> the lock expiration <b>if</b> the new expiration is later than the current expiration.
+        // This prevents "cheating" by <a href="voting.md#0x1_voting">voting</a> on a proposal <b>with</b> a longer expiration and then <a href="voting.md#0x1_voting">voting</a> on a proposal
+        // <b>with</b> a shorter expiration <b>to</b> shorten the lock duration.
+        <b>let</b> curr_lock_expiration = <a href="delegation_pool.md#0x1_delegation_pool_delegator_extra_lockup">delegator_extra_lockup</a>(delegator_addr, pool_address);
+        <b>if</b> (curr_lock_expiration &lt; proposal_expiration) {
+            <a href="delegation_pool.md#0x1_delegation_pool_DelegatorLock">DelegatorLock</a>[delegator_addr].pools.upsert(pool_address, proposal_expiration);
+        };
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_vote_with_active_locks"></a>
+
+## Function `vote_with_active_locks`
+
+Allows a voter to vote on proposals when the pool's lockup is less than the required lockup to vote on the
+specified proposal. To call this function, the voter needs to specify all delegators that have delegated the
+votes to them (including themselves if they have shares in the delegation pool). This is necessary to check
+that all the delegators have extra lockups that are sufficient to cover the voting duration of the governance.
+
+For simplicity, no partial voting is allowed. This will vote with all remaining voting power.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_vote_with_active_locks">vote_with_active_locks</a>(voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, delegators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, proposal_id: u64, should_pass: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_vote_with_active_locks">vote_with_active_locks</a>(
+    voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    pool_address: <b>address</b>,
+    delegators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
+    proposal_id: u64,
+    should_pass: bool
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegatorLock">DelegatorLock</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+    <b>let</b> voter_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(voter);
+    <b>let</b> total_delegator_active_shares = 0;
+    <b>let</b> total_delegator_pending_inactive_shares = 0;
+    <b>let</b> proposal_expiration = <a href="aptos_governance.md#0x1_aptos_governance_get_proposal_expiration">aptos_governance::get_proposal_expiration</a>(proposal_id);
+    delegators.for_each(|delegator| {
+        // If <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> delegator delegates <b>to</b> someone <b>else</b> or the voter will be updated soon, disallow <a href="voting.md#0x1_voting">voting</a> <b>to</b> avoid
+        // double <a href="voting.md#0x1_voting">voting</a>.
+        <b>let</b> (voter, pending_voter, _) = <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_voting_delegation">calculate_and_update_voting_delegation</a>(pool_address, delegator);
+        <b>assert</b>!(
+            voter == voter_addr && (pending_voter == @0x0 || pending_voter == voter_addr),
+            <a href="delegation_pool.md#0x1_delegation_pool_EONE_OR_MORE_DELEGATIONS_MISMATCH">EONE_OR_MORE_DELEGATIONS_MISMATCH</a>
+        );
+
+        // Make sure either the pool's lockup is sufficient or the delegator <b>has</b> an extra lock longer than the
+        // <a href="voting.md#0x1_voting">voting</a> duration of the proposal.
+        <b>let</b> lock_expiration = <a href="delegation_pool.md#0x1_delegation_pool_delegator_lockup_expiration">delegator_lockup_expiration</a>(delegator, pool_address);
+        <b>assert</b>!(lock_expiration &gt;= proposal_expiration, <a href="delegation_pool.md#0x1_delegation_pool_EINSUFFICIENT_LOCKUP">EINSUFFICIENT_LOCKUP</a>);
+
+        // Need <b>to</b> borrow this in every iteration instead of outside <b>to</b> avoid multiple references from function
+        // calls above this line.
+        <b>let</b> <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a> = &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>[pool_address];
+        total_delegator_active_shares += <a href="delegation_pool.md#0x1_delegation_pool_get_delegator_active_shares">get_delegator_active_shares</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>, delegator);
+        total_delegator_pending_inactive_shares += <a href="delegation_pool.md#0x1_delegation_pool_get_delegator_pending_inactive_shares">get_delegator_pending_inactive_shares</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>, delegator);
+    });
+
+    <b>let</b> governance_records = &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>[pool_address];
+    <b>let</b> <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a> = &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>[pool_address];
+    <b>let</b> delegated_votes =
+        <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegated_votes">update_and_borrow_mut_delegated_votes</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>, governance_records, voter_addr);
+    // All specified delegators must <a href="account.md#0x1_account">account</a> for 100% of the voter's delegated votes. This prevents voters from
+    // not including delegators that delegated <b>to</b> them who don't have enough lockup.
+    <b>assert</b>!(
+        delegated_votes.active_shares == total_delegator_active_shares &&
+            delegated_votes.pending_inactive_shares == total_delegator_pending_inactive_shares,
+        <a href="delegation_pool.md#0x1_delegation_pool_EMISSING_DELEGATORS">EMISSING_DELEGATORS</a>
+    );
+
+    // <a href="delegation_pool.md#0x1_delegation_pool_Vote">Vote</a> <b>with</b> all remaining (unused) <a href="voting.md#0x1_voting">voting</a> power.
+    <b>let</b> total_voting_power = <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_voter_total_voting_power">calculate_and_update_voter_total_voting_power</a>(pool_address, voter_addr);
+    <b>let</b> governance_records = &<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>[pool_address];
+    <b>let</b> remaining_voting_power =
+        total_voting_power - <a href="delegation_pool.md#0x1_delegation_pool_get_used_voting_power">get_used_voting_power</a>(governance_records, voter_addr, proposal_id);
+    // No need <b>to</b> check proposal expiration again <b>as</b> we've already checked the extra lockup earlier
+    <a href="delegation_pool.md#0x1_delegation_pool_vote_internal">vote_internal</a>(voter_addr, pool_address, proposal_id, remaining_voting_power, should_pass, <b>false</b>);
 }
 </code></pre>
 
@@ -4138,12 +4444,16 @@ this change won't take effects until the next lockup period.
     delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     pool_address: <b>address</b>,
     new_voter: <b>address</b>
-) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegatorLock">DelegatorLock</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     <a href="delegation_pool.md#0x1_delegation_pool_check_stake_management_permission">check_stake_management_permission</a>(delegator);
     <a href="delegation_pool.md#0x1_delegation_pool_assert_partial_governance_voting_enabled">assert_partial_governance_voting_enabled</a>(pool_address);
 
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation
     <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
+
+    // Disallow switching voter <b>if</b> the delegator <b>has</b> an active lockup. This is because the pool's lockup can end
+    // before the extra lockup added for <a href="voting.md#0x1_voting">voting</a> on proposals, which can allow double <a href="voting.md#0x1_voting">voting</a>.
+    <a href="delegation_pool.md#0x1_delegation_pool_assert_no_active_lockup">assert_no_active_lockup</a>(delegator, pool_address);
 
     <b>let</b> delegator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator);
     <b>let</b> <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a> = <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
@@ -4659,12 +4969,43 @@ Withdraw <code>amount</code> of owned inactive stake from the delegation pool at
     delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     pool_address: <b>address</b>,
     amount: u64
-) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegatorLock">DelegatorLock</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     <a href="delegation_pool.md#0x1_delegation_pool_check_stake_management_permission">check_stake_management_permission</a>(delegator);
     <b>assert</b>!(amount &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_EWITHDRAW_ZERO_STAKE">EWITHDRAW_ZERO_STAKE</a>));
+
+    // Check <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> extra delegator lock. This is done at this step instead of unlock <b>as</b> pending_inactive <a href="voting.md#0x1_voting">voting</a> power
+    // could have been used <b>to</b> vote earlier. This means that even <b>if</b> this <b>has</b> become inactive (withdrawable), it
+    // should still not be withdrawn until the extra lock expires <b>to</b> avoid double <a href="voting.md#0x1_voting">voting</a> on governance proposals.
+    <a href="delegation_pool.md#0x1_delegation_pool_assert_no_active_lockup">assert_no_active_lockup</a>(delegator, pool_address);
+
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation
     <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
     <a href="delegation_pool.md#0x1_delegation_pool_withdraw_internal">withdraw_internal</a>(<b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address), <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator), amount);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_assert_no_active_lockup"></a>
+
+## Function `assert_no_active_lockup`
+
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_assert_no_active_lockup">assert_no_active_lockup</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_assert_no_active_lockup">assert_no_active_lockup</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegatorLock">DelegatorLock</a> {
+    <b>let</b> lock_expiration = <a href="delegation_pool.md#0x1_delegation_pool_delegator_extra_lockup">delegator_extra_lockup</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator), pool_address);
+    <b>assert</b>!(lock_expiration &lt;= <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>(), <a href="delegation_pool.md#0x1_delegation_pool_EDELEGATOR_STILL_LOCKED">EDELEGATOR_STILL_LOCKED</a>);
 }
 </code></pre>
 
@@ -5322,7 +5663,8 @@ shares pools, assign commission to operator and eventually prepare delegation po
 <pre><code>inline <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_assert_and_update_proposal_used_voting_power">assert_and_update_proposal_used_voting_power</a>(
     governance_records: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, pool_address: <b>address</b>, proposal_id: u64, voting_power: u64
 ) {
-    <b>let</b> stake_pool_remaining_voting_power = <a href="aptos_governance.md#0x1_aptos_governance_get_remaining_voting_power">aptos_governance::get_remaining_voting_power</a>(pool_address, proposal_id);
+    <b>let</b> stake_pool_remaining_voting_power =
+        <a href="aptos_governance.md#0x1_aptos_governance_get_remaining_voting_power_skipping_expiration">aptos_governance::get_remaining_voting_power_skipping_expiration</a>(pool_address, proposal_id);
     <b>let</b> stake_pool_used_voting_power = <a href="aptos_governance.md#0x1_aptos_governance_get_voting_power">aptos_governance::get_voting_power</a>(
         pool_address
     ) - stake_pool_remaining_voting_power;

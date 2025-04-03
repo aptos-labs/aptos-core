@@ -345,6 +345,7 @@ spec aptos_framework::aptos_governance {
         proposal_id: u64,
         voting_power: u64,
         should_pass: bool,
+        check_expiration: bool,
     ) {
         use aptos_framework::chain_status;
         pragma verify_duration_estimate = 60;

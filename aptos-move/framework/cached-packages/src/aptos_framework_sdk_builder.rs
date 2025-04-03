@@ -455,6 +455,17 @@ pub enum EntryFunctionCall {
         delegation_pool_creation_seed: Vec<u8>,
     },
 
+    /// Allows a delegator to lock up their shares for at least as long as the specified Aptos governance proposal in
+    /// addition to the pool's unlock rules. This is useful for voting on proposals that require a longer lockup period
+    /// than the delegation pool's lockup period.
+    ///
+    /// If the pool's lockup or any existing extra lock the delegator has is already sufficient to cover the voting
+    /// duration of the governance proposal, no changes will be made.
+    DelegationPoolLockShares {
+        pool_address: AccountAddress,
+        proposal_id: u64,
+    },
+
     /// Move `amount` of coins from pending_inactive to active.
     DelegationPoolReactivateStake {
         pool_address: AccountAddress,
@@ -511,6 +522,19 @@ pub enum EntryFunctionCall {
         pool_address: AccountAddress,
         proposal_id: u64,
         voting_power: u64,
+        should_pass: bool,
+    },
+
+    /// Allows a voter to vote on proposals when the pool's lockup is less than the required lockup to vote on the
+    /// specified proposal. To call this function, the voter needs to specify all delegators that have delegated the
+    /// votes to them (including themselves if they have shares in the delegation pool). This is necessary to check
+    /// that all the delegators have extra lockups that are sufficient to cover the voting duration of the governance.
+    ///
+    /// For simplicity, no partial voting is allowed. This will vote with all remaining voting power.
+    DelegationPoolVoteWithActiveLocks {
+        pool_address: AccountAddress,
+        delegators: Vec<AccountAddress>,
+        proposal_id: u64,
         should_pass: bool,
     },
 
@@ -904,7 +928,10 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
-    /// Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
+    /// Update the lockup duration of the stake pool to now + the recurring lockup duration of the network.
+    /// Note that this is named increase_lockup as an artifact of the previous implementation.
+    /// update_lockup is now preferred unless user specifically wants to set the lockup to the recurring lockup
+    /// duration.
     StakeIncreaseLockup {},
 
     /// Initialize the validator account and give ownership to the signing account
@@ -967,6 +994,11 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    /// Update the lockup duration of the stake pool to `new_locked_until_secs`.
+    StakeUpdateLockup {
+        new_locked_until_secs: u64,
+    },
+
     /// Update the network and full node addresses of the validator. This only takes effect in the next epoch.
     StakeUpdateNetworkAndFullnodeAddresses {
         pool_address: AccountAddress,
@@ -999,6 +1031,20 @@ pub enum EntryFunctionCall {
     StakingContractDistribute {
         staker: AccountAddress,
         operator: AccountAddress,
+    },
+
+    /// Extend the lockup period of the stake pool to match a governance proposal's expiration.
+    /// Can only be called by the staker.
+    StakingContractExtendLockup {
+        operator: AccountAddress,
+        proposal_id: u64,
+    },
+
+    /// Convenience function to allow a staker to vote on a proposal and extend the lockup period if necessary.
+    StakingContractExtendLockupAndVote {
+        operator: AccountAddress,
+        proposal_id: u64,
+        should_pass: bool,
     },
 
     /// Unlock commission amount from the stake pool. Operator needs to wait for the amount to become withdrawable
@@ -1470,6 +1516,10 @@ impl EntryFunctionCall {
                 operator_commission_percentage,
                 delegation_pool_creation_seed,
             ),
+            DelegationPoolLockShares {
+                pool_address,
+                proposal_id,
+            } => delegation_pool_lock_shares(pool_address, proposal_id),
             DelegationPoolReactivateStake {
                 pool_address,
                 amount,
@@ -1502,6 +1552,17 @@ impl EntryFunctionCall {
                 voting_power,
                 should_pass,
             } => delegation_pool_vote(pool_address, proposal_id, voting_power, should_pass),
+            DelegationPoolVoteWithActiveLocks {
+                pool_address,
+                delegators,
+                proposal_id,
+                should_pass,
+            } => delegation_pool_vote_with_active_locks(
+                pool_address,
+                delegators,
+                proposal_id,
+                should_pass,
+            ),
             DelegationPoolWithdraw {
                 pool_address,
                 amount,
@@ -1762,6 +1823,9 @@ impl EntryFunctionCall {
             StakeSetDelegatedVoter { new_voter } => stake_set_delegated_voter(new_voter),
             StakeSetOperator { new_operator } => stake_set_operator(new_operator),
             StakeUnlock { amount } => stake_unlock(amount),
+            StakeUpdateLockup {
+                new_locked_until_secs,
+            } => stake_update_lockup(new_locked_until_secs),
             StakeUpdateNetworkAndFullnodeAddresses {
                 pool_address,
                 new_network_addresses,
@@ -1791,6 +1855,15 @@ impl EntryFunctionCall {
             StakingContractDistribute { staker, operator } => {
                 staking_contract_distribute(staker, operator)
             },
+            StakingContractExtendLockup {
+                operator,
+                proposal_id,
+            } => staking_contract_extend_lockup(operator, proposal_id),
+            StakingContractExtendLockupAndVote {
+                operator,
+                proposal_id,
+                should_pass,
+            } => staking_contract_extend_lockup_and_vote(operator, proposal_id, should_pass),
             StakingContractRequestCommission { staker, operator } => {
                 staking_contract_request_commission(staker, operator)
             },
@@ -3115,6 +3188,33 @@ pub fn delegation_pool_initialize_delegation_pool(
     ))
 }
 
+/// Allows a delegator to lock up their shares for at least as long as the specified Aptos governance proposal in
+/// addition to the pool's unlock rules. This is useful for voting on proposals that require a longer lockup period
+/// than the delegation pool's lockup period.
+///
+/// If the pool's lockup or any existing extra lock the delegator has is already sufficient to cover the voting
+/// duration of the governance proposal, no changes will be made.
+pub fn delegation_pool_lock_shares(
+    pool_address: AccountAddress,
+    proposal_id: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("lock_shares").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pool_address).unwrap(),
+            bcs::to_bytes(&proposal_id).unwrap(),
+        ],
+    ))
+}
+
 /// Move `amount` of coins from pending_inactive to active.
 pub fn delegation_pool_reactivate_stake(
     pool_address: AccountAddress,
@@ -3290,6 +3390,37 @@ pub fn delegation_pool_vote(
             bcs::to_bytes(&pool_address).unwrap(),
             bcs::to_bytes(&proposal_id).unwrap(),
             bcs::to_bytes(&voting_power).unwrap(),
+            bcs::to_bytes(&should_pass).unwrap(),
+        ],
+    ))
+}
+
+/// Allows a voter to vote on proposals when the pool's lockup is less than the required lockup to vote on the
+/// specified proposal. To call this function, the voter needs to specify all delegators that have delegated the
+/// votes to them (including themselves if they have shares in the delegation pool). This is necessary to check
+/// that all the delegators have extra lockups that are sufficient to cover the voting duration of the governance.
+///
+/// For simplicity, no partial voting is allowed. This will vote with all remaining voting power.
+pub fn delegation_pool_vote_with_active_locks(
+    pool_address: AccountAddress,
+    delegators: Vec<AccountAddress>,
+    proposal_id: u64,
+    should_pass: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("vote_with_active_locks").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pool_address).unwrap(),
+            bcs::to_bytes(&delegators).unwrap(),
+            bcs::to_bytes(&proposal_id).unwrap(),
             bcs::to_bytes(&should_pass).unwrap(),
         ],
     ))
@@ -4312,7 +4443,10 @@ pub fn stake_add_stake(amount: u64) -> TransactionPayload {
     ))
 }
 
-/// Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
+/// Update the lockup duration of the stake pool to now + the recurring lockup duration of the network.
+/// Note that this is named increase_lockup as an artifact of the previous implementation.
+/// update_lockup is now preferred unless user specifically wants to set the lockup to the recurring lockup
+/// duration.
 pub fn stake_increase_lockup() -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -4506,6 +4640,22 @@ pub fn stake_unlock(amount: u64) -> TransactionPayload {
     ))
 }
 
+/// Update the lockup duration of the stake pool to `new_locked_until_secs`.
+pub fn stake_update_lockup(new_locked_until_secs: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("stake").to_owned(),
+        ),
+        ident_str!("update_lockup").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&new_locked_until_secs).unwrap()],
+    ))
+}
+
 /// Update the network and full node addresses of the validator. This only takes effect in the next epoch.
 pub fn stake_update_network_and_fullnode_addresses(
     pool_address: AccountAddress,
@@ -4612,6 +4762,53 @@ pub fn staking_contract_distribute(
         vec![
             bcs::to_bytes(&staker).unwrap(),
             bcs::to_bytes(&operator).unwrap(),
+        ],
+    ))
+}
+
+/// Extend the lockup period of the stake pool to match a governance proposal's expiration.
+/// Can only be called by the staker.
+pub fn staking_contract_extend_lockup(
+    operator: AccountAddress,
+    proposal_id: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("staking_contract").to_owned(),
+        ),
+        ident_str!("extend_lockup").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&operator).unwrap(),
+            bcs::to_bytes(&proposal_id).unwrap(),
+        ],
+    ))
+}
+
+/// Convenience function to allow a staker to vote on a proposal and extend the lockup period if necessary.
+pub fn staking_contract_extend_lockup_and_vote(
+    operator: AccountAddress,
+    proposal_id: u64,
+    should_pass: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("staking_contract").to_owned(),
+        ),
+        ident_str!("extend_lockup_and_vote").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&operator).unwrap(),
+            bcs::to_bytes(&proposal_id).unwrap(),
+            bcs::to_bytes(&should_pass).unwrap(),
         ],
     ))
 }
@@ -6023,6 +6220,17 @@ mod decoder {
         }
     }
 
+    pub fn delegation_pool_lock_shares(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolLockShares {
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn delegation_pool_reactivate_stake(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -6127,6 +6335,21 @@ mod decoder {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
                 voting_power: bcs::from_bytes(script.args().get(2)?).ok()?,
+                should_pass: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_vote_with_active_locks(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolVoteWithActiveLocks {
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                delegators: bcs::from_bytes(script.args().get(1)?).ok()?,
+                proposal_id: bcs::from_bytes(script.args().get(2)?).ok()?,
                 should_pass: bcs::from_bytes(script.args().get(3)?).ok()?,
             })
         } else {
@@ -6796,6 +7019,16 @@ mod decoder {
         }
     }
 
+    pub fn stake_update_lockup(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakeUpdateLockup {
+                new_locked_until_secs: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn stake_update_network_and_fullnode_addresses(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -6852,6 +7085,33 @@ mod decoder {
             Some(EntryFunctionCall::StakingContractDistribute {
                 staker: bcs::from_bytes(script.args().get(0)?).ok()?,
                 operator: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn staking_contract_extend_lockup(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakingContractExtendLockup {
+                operator: bcs::from_bytes(script.args().get(0)?).ok()?,
+                proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn staking_contract_extend_lockup_and_vote(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakingContractExtendLockupAndVote {
+                operator: bcs::from_bytes(script.args().get(0)?).ok()?,
+                proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
+                should_pass: bcs::from_bytes(script.args().get(2)?).ok()?,
             })
         } else {
             None
@@ -7536,6 +7796,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::delegation_pool_initialize_delegation_pool),
         );
         map.insert(
+            "delegation_pool_lock_shares".to_string(),
+            Box::new(decoder::delegation_pool_lock_shares),
+        );
+        map.insert(
             "delegation_pool_reactivate_stake".to_string(),
             Box::new(decoder::delegation_pool_reactivate_stake),
         );
@@ -7570,6 +7834,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "delegation_pool_vote".to_string(),
             Box::new(decoder::delegation_pool_vote),
+        );
+        map.insert(
+            "delegation_pool_vote_with_active_locks".to_string(),
+            Box::new(decoder::delegation_pool_vote_with_active_locks),
         );
         map.insert(
             "delegation_pool_withdraw".to_string(),
@@ -7775,6 +8043,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         );
         map.insert("stake_unlock".to_string(), Box::new(decoder::stake_unlock));
         map.insert(
+            "stake_update_lockup".to_string(),
+            Box::new(decoder::stake_update_lockup),
+        );
+        map.insert(
             "stake_update_network_and_fullnode_addresses".to_string(),
             Box::new(decoder::stake_update_network_and_fullnode_addresses),
         );
@@ -7793,6 +8065,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "staking_contract_distribute".to_string(),
             Box::new(decoder::staking_contract_distribute),
+        );
+        map.insert(
+            "staking_contract_extend_lockup".to_string(),
+            Box::new(decoder::staking_contract_extend_lockup),
+        );
+        map.insert(
+            "staking_contract_extend_lockup_and_vote".to_string(),
+            Box::new(decoder::staking_contract_extend_lockup_and_vote),
         );
         map.insert(
             "staking_contract_request_commission".to_string(),

@@ -40,8 +40,11 @@ on a proposal multiple times as long as the total voting power of these votes do
 -  [Function `get_voting_duration_secs`](#0x1_aptos_governance_get_voting_duration_secs)
 -  [Function `get_min_voting_threshold`](#0x1_aptos_governance_get_min_voting_threshold)
 -  [Function `get_required_proposer_stake`](#0x1_aptos_governance_get_required_proposer_stake)
+-  [Function `used_voting_power`](#0x1_aptos_governance_used_voting_power)
 -  [Function `has_entirely_voted`](#0x1_aptos_governance_has_entirely_voted)
 -  [Function `get_remaining_voting_power`](#0x1_aptos_governance_get_remaining_voting_power)
+-  [Function `get_remaining_voting_power_skipping_expiration`](#0x1_aptos_governance_get_remaining_voting_power_skipping_expiration)
+-  [Function `get_proposal_expiration`](#0x1_aptos_governance_get_proposal_expiration)
 -  [Function `assert_proposal_expiration`](#0x1_aptos_governance_assert_proposal_expiration)
 -  [Function `create_proposal`](#0x1_aptos_governance_create_proposal)
 -  [Function `create_proposal_v2`](#0x1_aptos_governance_create_proposal_v2)
@@ -50,6 +53,7 @@ on a proposal multiple times as long as the total voting power of these votes do
 -  [Function `batch_partial_vote`](#0x1_aptos_governance_batch_partial_vote)
 -  [Function `vote`](#0x1_aptos_governance_vote)
 -  [Function `partial_vote`](#0x1_aptos_governance_partial_vote)
+-  [Function `partial_vote_without_expiration_check`](#0x1_aptos_governance_partial_vote_without_expiration_check)
 -  [Function `vote_internal`](#0x1_aptos_governance_vote_internal)
 -  [Function `add_approved_script_hash_script`](#0x1_aptos_governance_add_approved_script_hash_script)
 -  [Function `add_approved_script_hash`](#0x1_aptos_governance_add_approved_script_hash)
@@ -1176,6 +1180,35 @@ proposals with a signer for the aptos_framework (0x1) account.
 
 </details>
 
+<a id="0x1_aptos_governance_used_voting_power"></a>
+
+## Function `used_voting_power`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_used_voting_power">used_voting_power</a>(stake_pool: <b>address</b>, proposal_id: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_used_voting_power">used_voting_power</a>(stake_pool: <b>address</b>, proposal_id: u64): u64 <b>acquires</b> <a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a> {
+    <b>let</b> record_key = <a href="aptos_governance.md#0x1_aptos_governance_RecordKey">RecordKey</a> {
+        stake_pool,
+        proposal_id,
+    };
+    *<a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>[@aptos_framework].votes.borrow_with_default(record_key, &0)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_aptos_governance_has_entirely_voted"></a>
 
 ## Function `has_entirely_voted`
@@ -1231,18 +1264,48 @@ Note: a stake pool's voting power on a proposal could increase over time(e.g. re
     stake_pool: <b>address</b>,
     proposal_id: u64
 ): u64 <b>acquires</b> <a href="aptos_governance.md#0x1_aptos_governance_VotingRecords">VotingRecords</a>, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a> {
-    <a href="aptos_governance.md#0x1_aptos_governance_assert_voting_initialization">assert_voting_initialization</a>();
-
-    <b>let</b> proposal_expiration = <a href="voting.md#0x1_voting_get_proposal_expiration_secs">voting::get_proposal_expiration_secs</a>&lt;GovernanceProposal&gt;(
-        @aptos_framework,
-        proposal_id
-    );
+    <b>let</b> proposal_expiration = <a href="aptos_governance.md#0x1_aptos_governance_get_proposal_expiration">get_proposal_expiration</a>(proposal_id);
     <b>let</b> lockup_until = <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(stake_pool);
     // The voter's <a href="stake.md#0x1_stake">stake</a> needs <b>to</b> be locked up at least <b>as</b> long <b>as</b> the proposal's expiration.
     // Also no one can vote on a expired proposal.
     <b>if</b> (proposal_expiration &gt; lockup_until || <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt; proposal_expiration) {
         <b>return</b> 0
     };
+
+    <a href="aptos_governance.md#0x1_aptos_governance_get_remaining_voting_power_skipping_expiration">get_remaining_voting_power_skipping_expiration</a>(
+        stake_pool,
+        proposal_id
+    )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aptos_governance_get_remaining_voting_power_skipping_expiration"></a>
+
+## Function `get_remaining_voting_power_skipping_expiration`
+
+Return remaining voting power of a stake pool on a proposal without checking that the pool's remaining lockup is
+at least as long as the proposal's expiration.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_get_remaining_voting_power_skipping_expiration">get_remaining_voting_power_skipping_expiration</a>(stake_pool: <b>address</b>, proposal_id: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_get_remaining_voting_power_skipping_expiration">get_remaining_voting_power_skipping_expiration</a>(
+    stake_pool: <b>address</b>,
+    proposal_id: u64
+): u64 <b>acquires</b> <a href="aptos_governance.md#0x1_aptos_governance_VotingRecords">VotingRecords</a>, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a> {
+    <a href="aptos_governance.md#0x1_aptos_governance_assert_voting_initialization">assert_voting_initialization</a>();
 
     // If a <a href="stake.md#0x1_stake">stake</a> pool <b>has</b> already voted on a proposal before partial governance <a href="voting.md#0x1_voting">voting</a> is enabled, the <a href="stake.md#0x1_stake">stake</a> pool
     // cannot vote on the proposal even after partial governance <a href="voting.md#0x1_voting">voting</a> is enabled.
@@ -1255,6 +1318,31 @@ Note: a stake pool's voting power on a proposal could increase over time(e.g. re
     };
     <b>let</b> used_voting_power = *<a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>[@aptos_framework].votes.borrow_with_default(record_key, &0);
     <a href="aptos_governance.md#0x1_aptos_governance_get_voting_power">get_voting_power</a>(stake_pool) - used_voting_power
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aptos_governance_get_proposal_expiration"></a>
+
+## Function `get_proposal_expiration`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_get_proposal_expiration">get_proposal_expiration</a>(proposal_id: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_get_proposal_expiration">get_proposal_expiration</a>(proposal_id: u64): u64 {
+    <a href="voting.md#0x1_voting_get_proposal_expiration_secs">voting::get_proposal_expiration_secs</a>&lt;GovernanceProposal&gt;(@aptos_framework, proposal_id)
 }
 </code></pre>
 
@@ -1279,10 +1367,7 @@ Note: a stake pool's voting power on a proposal could increase over time(e.g. re
 
 <pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_assert_proposal_expiration">assert_proposal_expiration</a>(stake_pool: <b>address</b>, proposal_id: u64) {
     <a href="aptos_governance.md#0x1_aptos_governance_assert_voting_initialization">assert_voting_initialization</a>();
-    <b>let</b> proposal_expiration = <a href="voting.md#0x1_voting_get_proposal_expiration_secs">voting::get_proposal_expiration_secs</a>&lt;GovernanceProposal&gt;(
-        @aptos_framework,
-        proposal_id
-    );
+    <b>let</b> proposal_expiration = <a href="aptos_governance.md#0x1_aptos_governance_get_proposal_expiration">get_proposal_expiration</a>(proposal_id);
     // The voter's <a href="stake.md#0x1_stake">stake</a> needs <b>to</b> be locked up at least <b>as</b> long <b>as</b> the proposal's expiration.
     <b>assert</b>!(
         proposal_expiration &lt;= <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(stake_pool),
@@ -1402,6 +1487,8 @@ Return proposal_id when a proposal is successfully created.
 ): u64 <b>acquires</b> <a href="aptos_governance.md#0x1_aptos_governance_GovernanceConfig">GovernanceConfig</a>, <a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a> {
     <a href="aptos_governance.md#0x1_aptos_governance_check_governance_permission">check_governance_permission</a>(proposer);
     <b>let</b> proposer_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(proposer);
+    // This effectively disallows delegation pool delegators <b>to</b> create proposals
+    // TODO: Support delegators creating proposals
     <b>assert</b>!(
         <a href="stake.md#0x1_stake_get_delegated_voter">stake::get_delegated_voter</a>(stake_pool) == proposer_address,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aptos_governance.md#0x1_aptos_governance_ENOT_DELEGATED_VOTER">ENOT_DELEGATED_VOTER</a>)
@@ -1504,7 +1591,7 @@ Vote on proposal with proposal_id and all voting power from multiple stake_pools
     should_pass: bool,
 ) <b>acquires</b> <a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecords">VotingRecords</a>, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>, <a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a> {
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each">vector::for_each</a>(stake_pools, |stake_pool| {
-        <a href="aptos_governance.md#0x1_aptos_governance_vote_internal">vote_internal</a>(voter, stake_pool, proposal_id, <a href="aptos_governance.md#0x1_aptos_governance_MAX_U64">MAX_U64</a>, should_pass);
+        <a href="aptos_governance.md#0x1_aptos_governance_vote_internal">vote_internal</a>(voter, stake_pool, proposal_id, <a href="aptos_governance.md#0x1_aptos_governance_MAX_U64">MAX_U64</a>, should_pass, <b>true</b>);
     });
 }
 </code></pre>
@@ -1537,7 +1624,7 @@ Batch vote on proposal with proposal_id and specified voting power from multiple
     should_pass: bool,
 ) <b>acquires</b> <a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecords">VotingRecords</a>, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>, <a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a> {
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each">vector::for_each</a>(stake_pools, |stake_pool| {
-        <a href="aptos_governance.md#0x1_aptos_governance_vote_internal">vote_internal</a>(voter, stake_pool, proposal_id, voting_power, should_pass);
+        <a href="aptos_governance.md#0x1_aptos_governance_vote_internal">vote_internal</a>(voter, stake_pool, proposal_id, voting_power, should_pass, <b>true</b>);
     });
 }
 </code></pre>
@@ -1568,7 +1655,7 @@ Vote on proposal with <code>proposal_id</code> and all voting power from <code>s
     proposal_id: u64,
     should_pass: bool,
 ) <b>acquires</b> <a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecords">VotingRecords</a>, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>, <a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a> {
-    <a href="aptos_governance.md#0x1_aptos_governance_vote_internal">vote_internal</a>(voter, stake_pool, proposal_id, <a href="aptos_governance.md#0x1_aptos_governance_MAX_U64">MAX_U64</a>, should_pass);
+    <a href="aptos_governance.md#0x1_aptos_governance_vote_internal">vote_internal</a>(voter, stake_pool, proposal_id, <a href="aptos_governance.md#0x1_aptos_governance_MAX_U64">MAX_U64</a>, should_pass, <b>true</b>);
 }
 </code></pre>
 
@@ -1599,7 +1686,42 @@ Vote on proposal with <code>proposal_id</code> and specified voting power from <
     voting_power: u64,
     should_pass: bool,
 ) <b>acquires</b> <a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecords">VotingRecords</a>, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>, <a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a> {
-    <a href="aptos_governance.md#0x1_aptos_governance_vote_internal">vote_internal</a>(voter, stake_pool, proposal_id, voting_power, should_pass);
+    <a href="aptos_governance.md#0x1_aptos_governance_vote_internal">vote_internal</a>(voter, stake_pool, proposal_id, voting_power, should_pass, <b>true</b>);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aptos_governance_partial_vote_without_expiration_check"></a>
+
+## Function `partial_vote_without_expiration_check`
+
+Vote on proposal with <code>proposal_id</code> and specified voting power from <code>stake_pool</code> WITHOUT CHECKING PROPOSAL
+EXPIRATION.
+
+This is only callable by the delegation module for cases where delegators have separate extra lockups from the
+delegation pool.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_partial_vote_without_expiration_check">partial_vote_without_expiration_check</a>(voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, stake_pool: <b>address</b>, proposal_id: u64, voting_power: u64, should_pass: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>friend</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_partial_vote_without_expiration_check">partial_vote_without_expiration_check</a>(
+    voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    stake_pool: <b>address</b>,
+    proposal_id: u64,
+    voting_power: u64,
+    should_pass: bool,
+) <b>acquires</b> <a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecords">VotingRecords</a>, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>, <a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a> {
+    <a href="aptos_governance.md#0x1_aptos_governance_vote_internal">vote_internal</a>(voter, stake_pool, proposal_id, voting_power, should_pass, <b>false</b>);
 }
 </code></pre>
 
@@ -1617,7 +1739,7 @@ If a stake pool has already voted on a proposal before partial governance voting
 cannot vote on the proposal even after partial governance voting is enabled.
 
 
-<pre><code><b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_vote_internal">vote_internal</a>(voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, stake_pool: <b>address</b>, proposal_id: u64, voting_power: u64, should_pass: bool)
+<pre><code><b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_vote_internal">vote_internal</a>(voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, stake_pool: <b>address</b>, proposal_id: u64, voting_power: u64, should_pass: bool, check_expiration: bool)
 </code></pre>
 
 
@@ -1632,16 +1754,23 @@ cannot vote on the proposal even after partial governance voting is enabled.
     proposal_id: u64,
     voting_power: u64,
     should_pass: bool,
+    check_expiration: bool,
 ) <b>acquires</b> <a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecords">VotingRecords</a>, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>, <a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a> {
     <a href="permissioned_signer.md#0x1_permissioned_signer_assert_master_signer">permissioned_signer::assert_master_signer</a>(voter);
     <b>let</b> voter_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(voter);
     <b>assert</b>!(<a href="stake.md#0x1_stake_get_delegated_voter">stake::get_delegated_voter</a>(stake_pool) == voter_address, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aptos_governance.md#0x1_aptos_governance_ENOT_DELEGATED_VOTER">ENOT_DELEGATED_VOTER</a>));
 
-    <a href="aptos_governance.md#0x1_aptos_governance_assert_proposal_expiration">assert_proposal_expiration</a>(stake_pool, proposal_id);
+    <b>if</b> (check_expiration) {
+        <a href="aptos_governance.md#0x1_aptos_governance_assert_proposal_expiration">assert_proposal_expiration</a>(stake_pool, proposal_id);
+    };
 
     // If a <a href="stake.md#0x1_stake">stake</a> pool <b>has</b> already voted on a proposal before partial governance <a href="voting.md#0x1_voting">voting</a> is enabled,
     // `get_remaining_voting_power` returns 0.
-    <b>let</b> staking_pool_voting_power = <a href="aptos_governance.md#0x1_aptos_governance_get_remaining_voting_power">get_remaining_voting_power</a>(stake_pool, proposal_id);
+    <b>let</b> staking_pool_voting_power = <b>if</b> (check_expiration) {
+        <a href="aptos_governance.md#0x1_aptos_governance_get_remaining_voting_power">get_remaining_voting_power</a>(stake_pool, proposal_id)
+    } <b>else</b> {
+        <a href="aptos_governance.md#0x1_aptos_governance_get_remaining_voting_power_skipping_expiration">get_remaining_voting_power_skipping_expiration</a>(stake_pool, proposal_id)
+    };
     voting_power = <b>min</b>(voting_power, staking_pool_voting_power);
 
     // Short-circuit <b>if</b> the voter <b>has</b> no <a href="voting.md#0x1_voting">voting</a> power.
@@ -2771,7 +2900,7 @@ Address @aptos_framework must exist VotingRecordsV2 if partial_governance_voting
 ### Function `vote_internal`
 
 
-<pre><code><b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_vote_internal">vote_internal</a>(voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, stake_pool: <b>address</b>, proposal_id: u64, voting_power: u64, should_pass: bool)
+<pre><code><b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_vote_internal">vote_internal</a>(voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, stake_pool: <b>address</b>, proposal_id: u64, voting_power: u64, should_pass: bool, check_expiration: bool)
 </code></pre>
 
 
