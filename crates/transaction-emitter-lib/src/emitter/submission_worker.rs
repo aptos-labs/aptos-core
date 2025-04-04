@@ -507,7 +507,7 @@ pub async fn submit_transactions(
                     let last_transactions =
                         if let Ok(account) = client.get_account_bcs(sender).await {
                             client
-                                .get_account_transactions_bcs(
+                                .get_account_ordered_transactions_bcs(
                                     sender,
                                     Some(account.into_inner().sequence_number().saturating_sub(1)),
                                     Some(5),

@@ -347,7 +347,7 @@ impl AptosValidatorInterface for RestDebuggerInterface {
     ) -> Result<Option<Version>> {
         Ok(Some(
             self.0
-                .get_account_transactions_bcs(account, Some(seq), None)
+                .get_account_ordered_transactions_bcs(account, Some(seq), None)
                 .await?
                 .into_inner()[0]
                 .version,

@@ -21,13 +21,15 @@ use crate::{
 };
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    verify_function_identifier, verify_module_identifier, Address, AptosError, AptosErrorCode,
-    AsConverter, EncodeSubmissionRequest, GasEstimation, GasEstimationBcs, HashValue,
-    HexEncodedBytes, LedgerInfo, MoveType, PendingTransaction, SubmitTransactionRequest,
-    Transaction, TransactionData, TransactionOnChainData, TransactionsBatchSingleSubmissionFailure,
-    TransactionsBatchSubmissionResult, UserTransaction, VerifyInput, VerifyInputWithRecursion, U64,
+    transaction::TransactionSummary, verify_function_identifier, verify_module_identifier, Address,
+    AptosError, AptosErrorCode, AsConverter, EncodeSubmissionRequest, GasEstimation,
+    GasEstimationBcs, HashValue, HexEncodedBytes, LedgerInfo, MoveType, PendingTransaction,
+    SubmitTransactionRequest, Transaction, TransactionData, TransactionOnChainData,
+    TransactionsBatchSingleSubmissionFailure, TransactionsBatchSubmissionResult, UserTransaction,
+    VerifyInput, VerifyInputWithRecursion, MAX_RECURSIVE_TYPES_ALLOWED, U64,
 };
 use aptos_crypto::{hash::CryptoHash, signing_message};
+use aptos_logger::{error, info};
 use aptos_types::{
     account_address::AccountAddress,
     mempool_status::MempoolStatusCode,
@@ -46,7 +48,7 @@ use poem_openapi::{
     payload::Json,
     ApiRequest, OpenApi,
 };
-use std::{sync::Arc, time::Duration};
+use std::{cmp::min, sync::Arc, time::Duration};
 
 generate_success_response!(SubmitTransactionResponse, (202, Accepted));
 
@@ -306,12 +308,15 @@ impl TransactionsApi {
 
     /// Get account transactions
     ///
-    /// Retrieves on-chain committed transactions from an account. If the start
-    /// version is too far in the past, a 410 will be returned.
+    /// Retrieves on-chain committed sequence-number based transactions from an account.
+    /// Does not retrieve orderless transactions sent from the account.
+    /// If the start version is too far in the past, a 410 will be returned.
     ///
     /// If no start version is given, it will start at version 0.
     ///
     /// To retrieve a pending transaction, use /transactions/by_hash.
+
+    // Question[Orderless]: Can this operation id and function name be changed to "get_account_ordered_transactions"?
     #[oai(
         path = "/accounts/:address/transactions",
         method = "get",
@@ -341,7 +346,62 @@ impl TransactionsApi {
             self.context.max_transactions_page_size(),
         );
         let api = self.clone();
-        api_spawn_blocking(move || api.list_by_account(&accept_type, page, address.0)).await
+        api_spawn_blocking(move || api.list_ordered_txns_by_account(&accept_type, page, address.0))
+            .await
+    }
+
+    /// Get account transaction summaries
+    ///
+    /// Retrieves on-chain committed transactions (both sequence number based
+    /// and orderless transactions) from an account.
+    /// If no start version is given, it will start at version 0.
+    ///
+    /// To retrieve a pending transaction, use /transactions/by_hash.
+    #[oai(
+        path = "/accounts/:address/transaction_summaries",
+        method = "get",
+        operation_id = "get_account_transaction_summaries",
+        tag = "ApiTags::Transactions"
+    )]
+    // Question[Orderless]: Should the API support taking start_time an end_time as inputs? If yes, we need to update
+    // the schemas appropriately.
+    async fn get_accounts_transaction_summaries(
+        &self,
+        accept_type: AcceptType,
+        /// Address of account with or without a `0x` prefix
+        address: Path<Address>,
+        /// Transaction version to start list of transactions
+        ///
+        /// If not provided, defaults to showing the latest transactions
+        start_version: Query<Option<U64>>,
+        /// Transaction version to end list of transactions
+        ///
+        /// If not provided, defaults to showing the latest transactions
+        end_version: Query<Option<U64>>,
+        /// Max number of transactions to retrieve.
+        ///
+        /// If not provided, defaults to default page size
+        limit: Query<Option<u16>>,
+    ) -> BasicResultWith404<Vec<TransactionSummary>> {
+        fail_point_poem("endpoint_get_accounts_transaction_summaries")?;
+        self.context
+            .check_api_output_enabled("Get account transaction summaries", &accept_type)?;
+        let limit = if let Some(limit) = limit.0 {
+            min(limit, self.context.max_transactions_page_size())
+        } else {
+            self.context.max_transactions_page_size()
+        };
+        let api = self.clone();
+        api_spawn_blocking(move || {
+            api.list_all_txn_summaries_by_account(
+                &accept_type,
+                address.0,
+                start_version.0,
+                end_version.0,
+                limit,
+            )
+        })
+        .await
     }
 
     /// Submit transaction
@@ -1002,8 +1062,8 @@ impl TransactionsApi {
         )
     }
 
-    /// List all transactions for an account
-    fn list_by_account(
+    /// List sequence number based transactions for an account
+    fn list_ordered_txns_by_account(
         &self,
         accept_type: &AcceptType,
         page: Page,
@@ -1034,13 +1094,62 @@ impl TransactionsApi {
         }
     }
 
+    /// List all transactions for an account
+    fn list_all_txn_summaries_by_account(
+        &self,
+        accept_type: &AcceptType,
+        address: Address,
+        start_version: Option<U64>,
+        end_version: Option<U64>,
+        limit: u16,
+    ) -> BasicResultWith404<Vec<TransactionSummary>> {
+        let (latest_ledger_info, ledger_version) = self
+            .context
+            .get_latest_ledger_info_and_verify_lookup_version(None)?;
+
+        // TODO: Return more specific errors from within this function.
+        match self.context.get_account_all_transaction_summaries(
+            address.into(),
+            start_version.map(|v| v.into()),
+            end_version.map(|v| v.into()),
+            limit,
+            ledger_version,
+            &latest_ledger_info,
+        ) {
+            Ok(data) => {
+                for txn_summary in &data {
+                    info!(
+                        "list_all_txn_summaries_by_account address: {:?}, replay_protector: {:?}",
+                        txn_summary.sender, txn_summary.replay_protector
+                    );
+                }
+                match accept_type {
+                    AcceptType::Json => BasicResponse::try_from_json((
+                        self.context
+                            .render_transaction_summaries(&latest_ledger_info, data)?,
+                        &latest_ledger_info,
+                        BasicResponseStatus::Ok,
+                    )),
+                    AcceptType::Bcs => BasicResponse::try_from_bcs((
+                        data,
+                        &latest_ledger_info,
+                        BasicResponseStatus::Ok,
+                    )),
+                }
+            },
+            Err(e) => {
+                error!("list_all_txn_summaries_by_account error: {:?}", e);
+                Err(e)
+            },
+        }
+    }
+
     /// Parses a single signed transaction
     fn get_signed_transaction(
         &self,
         ledger_info: &LedgerInfo,
         data: SubmitTransactionPost,
     ) -> Result<SignedTransaction, SubmitTransactionError> {
-        pub const MAX_SIGNED_TRANSACTION_DEPTH: usize = 16;
         let validate_script = |script: &Script| -> Result<(), SubmitTransactionError> {
             if script.code().is_empty() {
                 return Err(SubmitTransactionError::bad_request_with_code(
@@ -1069,10 +1178,11 @@ impl TransactionsApi {
             |entry_function: &EntryFunction| -> Result<(), SubmitTransactionError> {
                 TransactionsApi::validate_entry_function_payload_format(ledger_info, entry_function)
             };
+
         match data {
             SubmitTransactionPost::Bcs(data) => {
                 let signed_transaction: SignedTransaction =
-                    bcs::from_bytes_with_limit(&data.0, MAX_SIGNED_TRANSACTION_DEPTH)
+                    bcs::from_bytes_with_limit(&data.0, MAX_RECURSIVE_TYPES_ALLOWED as usize)
                         .context("Failed to deserialize input into SignedTransaction")
                         .map_err(|err| {
                             SubmitTransactionError::bad_request_with_code(
