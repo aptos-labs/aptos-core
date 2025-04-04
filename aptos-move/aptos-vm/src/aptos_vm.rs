@@ -9,6 +9,7 @@ use crate::{
     errors::{discarded_output, expect_only_successful_execution},
     gas::{check_gas, make_prod_gas_meter, ProdGasMeter},
     keyless_validation,
+    loader::{AptosVmLoader, AptosVmScriptLoader, LazyLoader, LegacyLoader},
     move_vm_ext::{
         session::user_transaction_sessions::{
             abort_hook::AbortHookSession,
@@ -128,11 +129,10 @@ use move_core_types::{
 };
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_runtime::{
-    check_dependencies_and_charge_gas, check_script_dependencies_and_check_gas,
-    check_type_tag_dependencies_and_charge_gas,
+    check_dependencies_and_charge_gas,
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
-    LazyMeteredCodeStorage, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
+    ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use num_cpus;
@@ -792,34 +792,15 @@ impl AptosVM {
         }
 
         let func = if self.features().is_lazy_loading_enabled() {
-            LazyMeteredCodeStorage::new(code_storage).metered_lazy_load_script(
-                gas_meter,
-                traversal_context,
-                serialized_script.code(),
-                serialized_script.ty_args(),
-            )?
+            let loader = LazyLoader::new(code_storage)?;
+            loader.load_script(gas_meter, traversal_context, serialized_script)?
         } else {
-            if self.gas_feature_version() >= RELEASE_V1_10 {
-                check_script_dependencies_and_check_gas(
-                    code_storage,
-                    gas_meter,
-                    traversal_context,
-                    serialized_script.code(),
-                )?;
-            }
-            if self.gas_feature_version() >= RELEASE_V1_27 {
-                check_type_tag_dependencies_and_charge_gas(
-                    code_storage,
-                    gas_meter,
-                    traversal_context,
-                    serialized_script.ty_args(),
-                )?;
-            }
-
-            // Loading unmetered because above checks charge gas for the transitive closure of all
-            // script dependencies and its friends.
-            code_storage
-                .unmetered_load_script(serialized_script.code(), serialized_script.ty_args())?
+            let loader = LegacyLoader::new(
+                self.gas_feature_version() >= RELEASE_V1_10,
+                self.gas_feature_version() >= RELEASE_V1_27,
+                code_storage,
+            )?;
+            loader.load_script(gas_meter, traversal_context, serialized_script)?
         };
 
         // Check that unstable bytecode cannot be executed on mainnet and verify events.
@@ -850,7 +831,8 @@ impl AptosVM {
         entry_fn: &EntryFunction,
     ) -> Result<(), VMStatus> {
         let function = if self.features().is_lazy_loading_enabled() {
-            LazyMeteredCodeStorage::new(module_storage).metered_lazy_load_function(
+            let loader = LazyLoader::new(module_storage)?;
+            loader.load_function(
                 gas_meter,
                 traversal_context,
                 entry_fn.module(),
@@ -858,27 +840,14 @@ impl AptosVM {
                 entry_fn.ty_args(),
             )?
         } else {
-            if self.gas_feature_version() >= RELEASE_V1_10 {
-                let module_id = traversal_context
-                    .referenced_module_ids
-                    .alloc(entry_fn.module().clone());
-                check_dependencies_and_charge_gas(module_storage, gas_meter, traversal_context, [
-                    (module_id.address(), module_id.name()),
-                ])?;
-            }
-
-            if self.gas_feature_version() >= RELEASE_V1_27 {
-                check_type_tag_dependencies_and_charge_gas(
-                    module_storage,
-                    gas_meter,
-                    traversal_context,
-                    entry_fn.ty_args(),
-                )?;
-            }
-
-            // Here we load as unmetered because the metering above charges gas for the whole
-            // transitive closure of entry function module dependencies and friends.
-            module_storage.unmetered_load_function(
+            let loader = LegacyLoader::new(
+                self.gas_feature_version() >= RELEASE_V1_10,
+                self.gas_feature_version() >= RELEASE_V1_27,
+                module_storage,
+            )?;
+            loader.load_function(
+                gas_meter,
+                traversal_context,
                 entry_fn.module(),
                 entry_fn.function(),
                 entry_fn.ty_args(),
@@ -2388,7 +2357,8 @@ impl AptosVM {
         let mut traversal_context = TraversalContext::new(&traversal_storage);
 
         let function = if vm.features().is_lazy_loading_enabled() {
-            LazyMeteredCodeStorage::new(module_storage).metered_lazy_load_function(
+            let loader = LazyLoader::new(module_storage)?;
+            loader.load_function(
                 gas_meter,
                 &mut traversal_context,
                 &module_id,
@@ -2397,7 +2367,14 @@ impl AptosVM {
             )?
         } else {
             // Note: historically, there was no metering for view functions for loading modules.
-            module_storage.unmetered_load_function(&module_id, &func_name, &ty_args)?
+            let loader = LegacyLoader::new(false, false, module_storage)?;
+            loader.load_function(
+                gas_meter,
+                &mut traversal_context,
+                &module_id,
+                &func_name,
+                &ty_args,
+            )?
         };
         let metadata = get_metadata(&function.expect_module()?.metadata);
 

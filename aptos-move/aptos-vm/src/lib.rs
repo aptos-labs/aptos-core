@@ -114,6 +114,7 @@ pub mod gas;
 mod keyless_validation;
 #[cfg(feature = "testing")]
 pub mod keyless_validation;
+pub(crate) mod loader;
 pub mod move_vm_ext;
 pub mod natives;
 pub mod sharded_block_executor;
