@@ -29,7 +29,6 @@ fn test_metadata_tracking() {
     harness.enable_features(vec![], vec![
         FeatureFlag::STORAGE_SLOT_METADATA,
         FeatureFlag::REFUNDABLE_BYTES,
-        FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE,
     ]);
     // Create and fund account2
     harness.run_transaction_payload(

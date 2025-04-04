@@ -22,10 +22,11 @@ use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{
-        aptos_test_root_address, new_block_event_key, primary_apt_store, FungibleStoreResource,
-        NewBlockEvent, ObjectGroupResource, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
+        aptos_test_root_address, new_block_event_key, CoinStoreResource, NewBlockEvent,
+        NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
     },
     contract_event::ContractEvent,
+    event::EventHandle,
     on_chain_config::{ConfigurationResource, OnChainConfig, ValidatorSet},
     state_store::{state_key::StateKey, MoveResourceExt},
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
@@ -34,6 +35,7 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
     waypoint::Waypoint,
     write_set::{WriteOp, WriteSetMut},
+    AptosCoinType,
 };
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
@@ -172,14 +174,10 @@ fn get_aptos_coin_transfer_transaction(
 
 fn get_balance(account: &AccountAddress, db: &DbReaderWriter) -> u64 {
     let db_state_view = db.reader.latest_state_checkpoint_view().unwrap();
-    FungibleStoreResource::fetch_move_resource_from_group(
-        &db_state_view,
-        &primary_apt_store(*account),
-        &ObjectGroupResource::struct_tag(),
-    )
-    .unwrap()
-    .unwrap()
-    .balance()
+    CoinStoreResource::<AptosCoinType>::fetch_move_resource(&db_state_view, account)
+        .unwrap()
+        .unwrap()
+        .coin()
 }
 
 fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
@@ -236,19 +234,15 @@ fn test_new_genesis() {
                 ),
             ),
             (
-                StateKey::resource_group(
-                    &primary_apt_store(account1),
-                    &ObjectGroupResource::struct_tag(),
-                ),
+                StateKey::resource_typed::<CoinStoreResource<AptosCoinType>>(&account1).unwrap(),
                 WriteOp::legacy_modification(
-                    aptos_transaction_simulation::FungibleStore::new(
-                        account1,
-                        AccountAddress::TEN,
+                    bcs::to_bytes(&CoinStoreResource::<AptosCoinType>::new(
                         100_000_000,
                         false,
-                        false,
-                    )
-                    .to_bytes()
+                        EventHandle::random(0),
+                        EventHandle::random(0),
+                    ))
+                    .unwrap()
                     .into(),
                 ),
             ),

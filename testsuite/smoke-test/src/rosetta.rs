@@ -335,7 +335,7 @@ async fn test_account_balance() {
     let _ = cli
         .transfer_invalid_addr(
             0,
-            u64::MAX,
+            TRANSFER_AMOUNT,
             Some(GasOptions {
                 gas_unit_price: None,
                 max_gas: Some(1000),
@@ -1846,10 +1846,11 @@ async fn test_invalid_transaction_gas_charged() {
         .await;
 
     // Now let's see some transfers
+    const TRANSFER_AMOUNT: u64 = 5000;
     let _ = cli
         .transfer_invalid_addr(
             0,
-            DEFAULT_FUNDED_COINS + 1,
+            TRANSFER_AMOUNT,
             Some(GasOptions {
                 gas_unit_price: None,
                 max_gas: Some(1000),
@@ -1898,7 +1899,7 @@ async fn test_invalid_transaction_gas_charged() {
     assert_failed_transfer_transaction(
         sender,
         AccountAddress::from_hex_literal(INVALID_ACCOUNT).unwrap(),
-        DEFAULT_FUNDED_COINS + 1,
+        TRANSFER_AMOUNT,
         actual_txn,
         rosetta_txn,
     );
