@@ -1424,10 +1424,15 @@ module aptos_framework::fungible_asset {
         )
     }
 
-    /// Removing permissions from permissioned signer.
-    public fun revoke_permission(permissioned: &signer, token_type: Object<Metadata>) {
+    #[deprecated]
+    public fun revoke_permission(_permissioned: &signer, _token_type: Object<Metadata>) {
+        abort 0
+    }
+
+    /// Removing permissions given to a permissioned signer to withdraw from a store.
+    public fun revoke_permission_by_store(permissioned: &signer, store: Object<FungibleStore>) {
         permissioned_signer::revoke_permission(permissioned, WithdrawPermission::ByStore {
-            store_address: object::object_address(&token_type),
+            store_address: object::object_address(&store),
         })
     }
 
@@ -1974,6 +1979,37 @@ module aptos_framework::fungible_asset {
         deposit(aaron_store, fa);
 
         permissioned_signer::destroy_permissioned_handle(aaron_permission_handle);
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 0x50024, location = Self)]
+    fun test_revoke_permission_by_store(
+        creator: &signer,
+    ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance {
+        let aptos_framework = account::create_signer_for_test(@0x1);
+        timestamp::set_time_has_started_for_testing(&aptos_framework);
+
+        let (mint_ref, _, _, _, _) = create_fungible_asset(creator);
+        let metadata = mint_ref.metadata;
+        let creator_store = create_test_store(creator, metadata);
+        let fa = mint(&mint_ref, 100);
+        deposit(creator_store, fa);
+
+        // Create a permissioned signer
+        let permission_handle = permissioned_signer::create_permissioned_handle(creator);
+        let permission_signer = &permissioned_signer::signer_from_permissioned_handle(&permission_handle);
+
+        // Grant alice_permission_signer permission but immediately revoke to withdraw 10 FA
+        grant_permission_by_store(creator, permission_signer, creator_store, 10);
+        revoke_permission_by_store(permission_signer, creator_store);
+
+        // Withdrawing FA should yield an error because the permission was revoked.
+        let fa = withdraw(permission_signer, creator_store, 5);
+
+        // Need to clean up the permissioned handle and FA because they cannot be dropped.
+        // These lines should not actually be invoked during the test
+        permissioned_signer::destroy_permissioned_handle(permission_handle);
+        deposit(creator_store, fa);
     }
 
     #[deprecated]
