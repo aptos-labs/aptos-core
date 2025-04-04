@@ -41,11 +41,11 @@ pub(crate) trait AptosVmScriptLoader {
     ) -> VMResult<LoadedFunction>;
 }
 
-pub(crate) struct LazyLoader<'a, T> {
+pub(crate) struct AptosVmLazyLoader<'a, T> {
     code_storage: LazyMeteredCodeStorage<'a, T>,
 }
 
-impl<'a, T> LazyLoader<'a, T>
+impl<'a, T> AptosVmLazyLoader<'a, T>
 where
     T: ModuleStorage,
 {
@@ -69,7 +69,7 @@ where
     }
 }
 
-impl<'a, T> AptosVmLoader for LazyLoader<'a, T>
+impl<'a, T> AptosVmLoader for AptosVmLazyLoader<'a, T>
 where
     T: ModuleStorage,
 {
@@ -95,7 +95,7 @@ where
     }
 }
 
-impl<'a, T> AptosVmScriptLoader for LazyLoader<'a, T>
+impl<'a, T> AptosVmScriptLoader for AptosVmLazyLoader<'a, T>
 where
     T: CodeStorage,
 {
@@ -114,13 +114,13 @@ where
     }
 }
 
-pub(crate) struct LegacyLoader<'a, T> {
+pub(crate) struct AptosVmLegacyLoader<'a, T> {
     meter_dependencies_and_friends: bool,
     meter_ty_tags: bool,
     code_storage: &'a T,
 }
 
-impl<'a, T> LegacyLoader<'a, T>
+impl<'a, T> AptosVmLegacyLoader<'a, T>
 where
     T: ModuleStorage,
 {
@@ -148,7 +148,7 @@ where
     }
 }
 
-impl<'a, T> AptosVmLoader for LegacyLoader<'a, T>
+impl<'a, T> AptosVmLoader for AptosVmLegacyLoader<'a, T>
 where
     T: ModuleStorage,
 {
@@ -187,7 +187,7 @@ where
     }
 }
 
-impl<'a, T> AptosVmScriptLoader for LegacyLoader<'a, T>
+impl<'a, T> AptosVmScriptLoader for AptosVmLegacyLoader<'a, T>
 where
     T: CodeStorage,
 {

@@ -5,10 +5,9 @@
 use crate::{
     module_traversal::TraversalContext,
     storage::{
+        loader::MoveVmLoader,
         module_storage::FunctionValueExtensionAdapter,
-        ty_layout_converter::{
-            LayoutConverter, MetredLazyLayoutConverter, UnmeteredLayoutConverter,
-        },
+        ty_layout_converter::{LayoutConverter, UnmeteredLayoutConverter},
     },
     ModuleStorage,
 };
@@ -165,19 +164,14 @@ impl TransactionDataCache {
     }
 
     pub(crate) fn load_resource(
-        module_storage: &impl ModuleStorage,
+        loader: &impl MoveVmLoader,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         resource_resolver: &impl ResourceResolver,
         addr: &AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
-        let use_lazy_loading = module_storage
-            .runtime_environment()
-            .vm_config()
-            .use_lazy_loading;
-
-        let struct_tag = match module_storage.runtime_environment().ty_to_ty_tag(ty)? {
+        let struct_tag = match loader.runtime_environment().ty_to_ty_tag(ty)? {
             TypeTag::Struct(struct_tag) => *struct_tag,
             _ => {
                 // All resources must be structs, so this cannot happen.
@@ -185,37 +179,15 @@ impl TransactionDataCache {
             },
         };
 
-        let (layout, contains_delayed_fields) = if use_lazy_loading {
-            MetredLazyLayoutConverter::new(gas_meter, traversal_context, module_storage)
-                .type_to_type_layout_with_identifier_mappings(ty)?
-        } else {
-            UnmeteredLayoutConverter::new(module_storage)
-                .type_to_type_layout_with_identifier_mappings(ty)?
-        };
+        let (layout, contains_delayed_fields) =
+            loader.load_ty_layout_with_delayed_fields_check(gas_meter, traversal_context, ty)?;
 
         let (data, bytes_loaded) = {
-            if use_lazy_loading {
-                let module_id = traversal_context
-                    .referenced_module_ids
-                    .alloc(struct_tag.module_id());
-                if traversal_context
-                    .visit_if_not_special_address(module_id.address(), module_id.name())
-                {
-                    let size = module_storage
-                        .unmetered_get_existing_module_size(module_id.address(), module_id.name())
-                        .map_err(|err| err.to_partial())?;
-                    gas_meter.charge_dependency(
-                        false,
-                        module_id.address(),
-                        module_id.name(),
-                        NumBytes::new(size as u64),
-                    )?;
-                }
-            }
-
-            let metadata = module_storage
-                .unmetered_get_existing_module_metadata(&struct_tag.address, &struct_tag.module)
-                .map_err(|err| err.to_partial())?;
+            let metadata = loader.load_module_metadata(
+                gas_meter,
+                traversal_context,
+                &struct_tag.module_id(),
+            )?;
 
             // If we need to process delayed fields, we pass the type layout to remote storage for
             // any pre-processing. Remote storage should ensure that all delayed fields are
@@ -229,11 +201,12 @@ impl TransactionDataCache {
         };
         let bytes_loaded = NumBytes::new(bytes_loaded as u64);
 
-        let function_value_extension = FunctionValueExtensionAdapter { module_storage };
+        // TODO: fixme
+        // let function_value_extension = FunctionValueExtensionAdapter { module_storage };
         let value = match data {
             Some(blob) => {
                 let val = ValueSerDeContext::new()
-                    .with_func_args_deserialization(&function_value_extension)
+                    // .with_func_args_deserialization(&function_value_extension)
                     .with_delayed_fields_serde()
                     .deserialize(&blob, &layout)
                     .ok_or_else(|| {
@@ -242,7 +215,6 @@ impl TransactionDataCache {
                         PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
                             .with_message(msg)
                     })?;
-
                 GlobalValue::cached(val)?
             },
             None => GlobalValue::none(),

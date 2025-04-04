@@ -1,12 +1,12 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{module_traversal::TraversalContext, ModuleStorage};
+use crate::{module_traversal::TraversalContext, storage::loader::MoveVmLoader};
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::TypeParameterIndex,
 };
-use move_core_types::{gas_algebra::NumBytes, vm_status::StatusCode};
+use move_core_types::vm_status::StatusCode;
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::{
@@ -17,18 +17,18 @@ use move_vm_types::{
 use std::collections::{BTreeMap, HashMap};
 
 /// Calculates [DepthFormula] for struct types. Stores a cache of visited formulas.
-pub(crate) struct DepthFormulaCalculator<'a, M> {
-    module_storage: &'a M,
+pub(crate) struct DepthFormulaCalculator<'a, T> {
+    loader: &'a T,
     visited_formulas: HashMap<StructNameIndex, DepthFormula>,
 }
 
-impl<'a, M> DepthFormulaCalculator<'a, M>
+impl<'a, T> DepthFormulaCalculator<'a, T>
 where
-    M: ModuleStorage,
+    T: MoveVmLoader,
 {
-    pub(crate) fn new(module_storage: &'a M) -> Self {
+    pub(crate) fn new(loader: &'a T) -> Self {
         Self {
-            module_storage,
+            loader,
             visited_formulas: HashMap::new(),
         }
     }
@@ -43,40 +43,11 @@ where
             return Ok(depth_formula.clone());
         }
 
-        let struct_name = self
-            .module_storage
-            .runtime_environment()
-            .struct_name_index_map()
-            .idx_to_struct_name_ref(*struct_name_idx)?;
+        let struct_definition =
+            self.loader
+                .load_struct_definition(gas_meter, traversal_context, struct_name_idx)?;
 
-        // TODO(lazy-loading): consider moving this upwards, to avoid many switches in the impl.
-        if self
-            .module_storage
-            .runtime_environment()
-            .vm_config()
-            .use_lazy_loading
-        {
-            let module_id = traversal_context
-                .referenced_module_ids
-                .alloc(struct_name.module.clone());
-            let addr = module_id.address();
-            let name = module_id.name();
-
-            if traversal_context.visit_if_not_special_address(addr, name) {
-                let size = self
-                    .module_storage
-                    .unmetered_get_existing_module_size(addr, name)
-                    .map_err(|err| err.to_partial())?;
-                gas_meter.charge_dependency(false, addr, name, NumBytes::new(size as u64))?;
-            }
-        }
-        let struct_type = self.module_storage.unmetered_get_struct_definition(
-            struct_name.module.address(),
-            struct_name.module.name(),
-            struct_name.name.as_ident_str(),
-        )?;
-
-        let formulas = match &struct_type.layout {
+        let formulas = match &struct_definition.layout {
             StructLayout::Single(fields) => fields
                 .iter()
                 .map(|(_, field_ty)| {
@@ -100,7 +71,7 @@ where
         {
             // Same thread has put this entry previously, which means there is a recursion.
             let struct_name = self
-                .module_storage
+                .loader
                 .runtime_environment()
                 .struct_name_index_map()
                 .idx_to_struct_name_ref(*struct_name_idx)?;

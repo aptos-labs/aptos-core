@@ -9,7 +9,7 @@ use crate::{
     errors::{discarded_output, expect_only_successful_execution},
     gas::{check_gas, make_prod_gas_meter, ProdGasMeter},
     keyless_validation,
-    loader::{AptosVmLoader, AptosVmScriptLoader, LazyLoader, LegacyLoader},
+    loader::{AptosVmLazyLoader, AptosVmLegacyLoader, AptosVmLoader, AptosVmScriptLoader},
     move_vm_ext::{
         session::user_transaction_sessions::{
             abort_hook::AbortHookSession,
@@ -792,10 +792,10 @@ impl AptosVM {
         }
 
         let func = if self.features().is_lazy_loading_enabled() {
-            let loader = LazyLoader::new(code_storage)?;
+            let loader = AptosVmLazyLoader::new(code_storage)?;
             loader.load_script(gas_meter, traversal_context, serialized_script)?
         } else {
-            let loader = LegacyLoader::new(
+            let loader = AptosVmLegacyLoader::new(
                 self.gas_feature_version() >= RELEASE_V1_10,
                 self.gas_feature_version() >= RELEASE_V1_27,
                 code_storage,
@@ -831,7 +831,7 @@ impl AptosVM {
         entry_fn: &EntryFunction,
     ) -> Result<(), VMStatus> {
         let function = if self.features().is_lazy_loading_enabled() {
-            let loader = LazyLoader::new(module_storage)?;
+            let loader = AptosVmLazyLoader::new(module_storage)?;
             loader.load_function(
                 gas_meter,
                 traversal_context,
@@ -840,7 +840,7 @@ impl AptosVM {
                 entry_fn.ty_args(),
             )?
         } else {
-            let loader = LegacyLoader::new(
+            let loader = AptosVmLegacyLoader::new(
                 self.gas_feature_version() >= RELEASE_V1_10,
                 self.gas_feature_version() >= RELEASE_V1_27,
                 module_storage,
@@ -2357,7 +2357,7 @@ impl AptosVM {
         let mut traversal_context = TraversalContext::new(&traversal_storage);
 
         let function = if vm.features().is_lazy_loading_enabled() {
-            let loader = LazyLoader::new(module_storage)?;
+            let loader = AptosVmLazyLoader::new(module_storage)?;
             loader.load_function(
                 gas_meter,
                 &mut traversal_context,
@@ -2367,7 +2367,7 @@ impl AptosVM {
             )?
         } else {
             // Note: historically, there was no metering for view functions for loading modules.
-            let loader = LegacyLoader::new(false, false, module_storage)?;
+            let loader = AptosVmLegacyLoader::new(false, false, module_storage)?;
             loader.load_function(
                 gas_meter,
                 &mut traversal_context,

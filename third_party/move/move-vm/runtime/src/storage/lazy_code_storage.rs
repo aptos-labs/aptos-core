@@ -37,7 +37,7 @@ where
         self.code_storage.runtime_environment()
     }
 
-    fn charge_module(
+    pub(crate) fn charge_module(
         &self,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,

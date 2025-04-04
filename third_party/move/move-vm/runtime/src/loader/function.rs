@@ -3,15 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    check_dependencies_and_charge_gas, check_type_tag_dependencies_and_charge_gas,
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
     module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
     runtime_type_checks::RuntimeTypeCheck,
-    storage::ty_layout_converter::{
-        LayoutConverter, MetredLazyLayoutConverter, UnmeteredLayoutConverter,
-    },
-    LazyMeteredCodeStorage, ModuleStorage,
+    storage::loader::MoveVmLoader,
+    RuntimeEnvironment,
 };
 use better_any::{Tid, TidAble, TidExt};
 use move_binary_format::{
@@ -39,7 +36,7 @@ use move_vm_types::{
     },
     values::{AbstractFunction, SerializedFunctionData},
 };
-use std::{cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc, sync::Arc};
+use std::{cell::RefCell, cmp::Ordering, fmt::Debug, ops::DerefMut, rc::Rc, sync::Arc};
 
 /// A runtime function definition representation.
 pub struct Function {
@@ -144,14 +141,14 @@ impl LazyLoadedFunction {
     }
 
     pub(crate) fn new_resolved(
-        module_storage: &impl ModuleStorage,
+        runtime_environment: &RuntimeEnvironment,
         fun: Rc<LoadedFunction>,
         mask: ClosureMask,
     ) -> PartialVMResult<Self> {
         let ty_args = fun
             .ty_args
             .iter()
-            .map(|t| module_storage.runtime_environment().ty_to_ty_tag(t))
+            .map(|t| runtime_environment.ty_to_ty_tag(t))
             .collect::<PartialVMResult<Vec<_>>>()?;
         Ok(Self(Rc::new(RefCell::new(
             LazyLoadedFunctionState::Resolved { fun, ty_args, mask },
@@ -195,52 +192,13 @@ impl LazyLoadedFunction {
     /// Loads the function if it has not been resolved. Gas will be charged by this function.
     pub(crate) fn load_if_unresolved<RTTCheck: RuntimeTypeCheck>(
         &self,
-        module_storage: &impl ModuleStorage,
+        loader: &impl MoveVmLoader,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
     ) -> PartialVMResult<(Rc<LoadedFunction>, ModuleId)> {
-        let module_id = self.with_name_and_ty_args(|module_opt, _func_name, ty_arg_tags| {
-            let module_id = module_opt.ok_or_else(|| {
-                // TODO(#15664): currently we need the module id for gas charging
-                //   of calls, so we can't proceed here without one. But we want
-                //   to be able to let scripts use closures.
-                PartialVMError::new_invariant_violation(format!(
-                    "module id required to charge gas for function `{}`",
-                    self.to_stable_string()
-                ))
-            })?;
-
-            // Step 1: charge gas (only if non-lazy loading is used). For lazy loading, we will be
-            // charging gas at load time.
-            if !module_storage
-                .runtime_environment()
-                .vm_config()
-                .use_lazy_loading
-            {
-                // Charge gas for function code loading.
-                let arena_id = traversal_context
-                    .referenced_module_ids
-                    .alloc(module_id.clone());
-                check_dependencies_and_charge_gas(module_storage, gas_meter, traversal_context, [
-                    (arena_id.address(), arena_id.name()),
-                ])
-                .map_err(|err| err.to_partial())?;
-
-                // Charge gas for code loading of modules used by type arguments.
-                check_type_tag_dependencies_and_charge_gas(
-                    module_storage,
-                    gas_meter,
-                    traversal_context,
-                    ty_arg_tags,
-                )
-                .map_err(|err| err.to_partial())?;
-            }
-            Ok(module_id.clone())
-        })?;
-
-        // Step 2: load the function.
+        let module_id = loader.charge_before_resolve_closure(gas_meter, traversal_context, self)?;
         let mut state = self.0.borrow_mut();
-        let fun = match &mut *state {
+        let fun = match state.deref_mut() {
             LazyLoadedFunctionState::Resolved { fun, .. } => fun.clone(),
             LazyLoadedFunctionState::Unresolved {
                 data:
@@ -253,13 +211,18 @@ impl LazyLoadedFunction {
                         captured_layouts,
                     },
             } => {
-                let fun = Self::resolve::<RTTCheck>(
-                    module_storage,
+                let fun = Rc::new(loader.resolve_closure(
                     gas_meter,
                     traversal_context,
                     module_id,
                     fun_id,
                     ty_args,
+                )?);
+                Self::check_layouts_compatible::<RTTCheck>(
+                    loader,
+                    gas_meter,
+                    traversal_context,
+                    &fun,
                     *mask,
                     captured_layouts,
                 )?;
@@ -274,60 +237,11 @@ impl LazyLoadedFunction {
         Ok((fun, module_id))
     }
 
-    /// Resolves a function into a loaded function. This verifies existence of the named
-    /// function as well as whether it has the type used for deserializing the captured values.
-    fn resolve<RTTCheck: RuntimeTypeCheck>(
-        module_storage: &impl ModuleStorage,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        module_id: &ModuleId,
-        fun_id: &IdentStr,
-        ty_args: &[TypeTag],
-        mask: ClosureMask,
-        captured_layouts: &[MoveTypeLayout],
-    ) -> PartialVMResult<Rc<LoadedFunction>> {
-        let use_lazy_loading = module_storage
-            .runtime_environment()
-            .vm_config()
-            .use_lazy_loading;
-        let function = if use_lazy_loading {
-            LazyMeteredCodeStorage::new(module_storage)
-                .metered_lazy_load_function(
-                    gas_meter,
-                    traversal_context,
-                    module_id,
-                    fun_id,
-                    ty_args,
-                )
-                .map_err(|err| err.to_partial())?
-        } else {
-            module_storage
-                .unmetered_load_function(module_id, fun_id, ty_args)
-                .map_err(|err| err.to_partial())?
-        };
-
-        if use_lazy_loading {
-            Self::check_layouts_compatible::<RTTCheck>(
-                &mut MetredLazyLayoutConverter::new(gas_meter, traversal_context, module_storage),
-                &function,
-                mask,
-                captured_layouts,
-            )?;
-        } else {
-            Self::check_layouts_compatible::<RTTCheck>(
-                &mut UnmeteredLayoutConverter::new(module_storage),
-                &function,
-                mask,
-                captured_layouts,
-            )?;
-        }
-
-        Ok(Rc::new(function))
-    }
-
     // Note: this function may charge gas and load modules.
     fn check_layouts_compatible<RTCheck: RuntimeTypeCheck>(
-        converter: &mut impl LayoutConverter,
+        loader: &impl MoveVmLoader,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         function: &LoadedFunction,
         mask: ClosureMask,
         captured_layouts: &[MoveTypeLayout],
@@ -347,10 +261,10 @@ impl LazyLoadedFunction {
             // Note that the below call returns a runtime layout, so we can directly compare it
             // without desugaring. Also, gas may be charged here.
             let actual_arg_layout = if ty_args.is_empty() {
-                converter.type_to_type_layout(actual_arg_ty)?
+                loader.load_ty_layout(gas_meter, traversal_context, actual_arg_ty)?
             } else {
                 let actual_arg_ty = ty_builder.create_ty_with_subst(actual_arg_ty, &ty_args)?;
-                converter.type_to_type_layout(&actual_arg_ty)?
+                loader.load_ty_layout(gas_meter, traversal_context, &actual_arg_ty)?
             };
 
             #[allow(clippy::collapsible_if)]
