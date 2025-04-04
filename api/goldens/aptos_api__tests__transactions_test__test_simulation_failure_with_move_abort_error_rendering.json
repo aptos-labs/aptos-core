@@ -5,9 +5,9 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "12",
+    "gas_used": "13",
     "success": false,
-    "vm_status": "Move abort in 0x1::coin: EINSUFFICIENT_BALANCE(0x10006): Not enough coins to complete transaction",
+    "vm_status": "Move abort in 0x1::fungible_asset: EINSUFFICIENT_BALANCE(0x10004): Insufficient balance to withdraw or transfer.",
     "accumulator_root_hash": "",
     "changes": [
       {
@@ -26,7 +26,7 @@
                 }
               }
             },
-            "guid_creation_num": "4",
+            "guid_creation_num": "2",
             "key_rotation_events": {
               "counter": "0",
               "guid": {
@@ -56,7 +56,7 @@
     "sequence_number": "0",
     "max_gas_amount": "100000000",
     "gas_unit_price": "0",
-    "expiration_timestamp_secs": "18446744073709551615",
+    "expiration_timestamp_secs": "59",
     "payload": {
       "function": "0x1::aptos_account::transfer",
       "type_arguments": [],
@@ -68,9 +68,10 @@
     },
     "signature": {
       "public_key": "0xd5a781494d2bf1a174ddffde1e02cb8881cff6dab70e61cbdef393deac0ce639",
-      "signature": "0x0090fadcba9d32d9918286f8b651772a4d04a23633cc9d10f4339ad4d0b1b7c4ca4829542aa9a8b5a6a28e0e63dfd52863d38ca1ba1d2a57c4bf1efc72c0fb06",
+      "signature": "0x6cdf9e9e6d101b4b47349568c3aea79cf3a5849b933f9e9ac33fdeecdf2aad303baee6ac184af96fd3036b63894c0f525fef0eab5fa61f3a14e90249c7e56d0e",
       "type": "ed25519_signature"
     },
+    "replay_protection_nonce": null,
     "events": [
       {
         "guid": {
@@ -81,10 +82,10 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "6",
-          "io_gas_units": "6",
+          "io_gas_units": "8",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "12"
+          "total_charge_gas_units": "13"
         }
       }
     ],
