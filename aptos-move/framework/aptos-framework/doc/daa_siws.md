@@ -5,10 +5,26 @@
 
 Derivable account abstraction that verifies a message signed by
 SIWS.
+1. The message format is as follows:
+
+<domain> wants you to sign in with your Solana account:
+<base58_public_key>
+
+To execute transaction <entry_function_name> on Aptos blockchain
+(<network_name>).
+
+Nonce: <digest>
+
+2. The abstract public key is a BCS serialized <code>SIWSAbstractPublicKey</code>.
+3. The abstract signature is the signature in raw bytes. The first byte is
+the message format
+4. This module has been tested for the following wallets:
+- Phantom
 
 
 -  [Constants](#@Constants_0)
 -  [Function `deserialize_abstract_public_key`](#0x1_daa_siws_deserialize_abstract_public_key)
+-  [Function `deserialize_abstract_signature`](#0x1_daa_siws_deserialize_abstract_signature)
 -  [Function `network_name`](#0x1_daa_siws_network_name)
 -  [Function `construct_message`](#0x1_daa_siws_construct_message)
 -  [Function `to_public_key_bytes`](#0x1_daa_siws_to_public_key_bytes)
@@ -21,7 +37,6 @@ SIWS.
 <b>use</b> <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream">0x1::bcs_stream</a>;
 <b>use</b> <a href="chain_id.md#0x1_chain_id">0x1::chain_id</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519">0x1::ed25519</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/string_utils.md#0x1_string_utils">0x1::string_utils</a>;
@@ -65,6 +80,16 @@ Signature failed to verify.
 
 
 
+<a id="0x1_daa_siws_EINVALID_SIGNATURE_TYPE"></a>
+
+Invalid signature type.
+
+
+<pre><code><b>const</b> <a href="daa_siws.md#0x1_daa_siws_EINVALID_SIGNATURE_TYPE">EINVALID_SIGNATURE_TYPE</a>: u64 = 4;
+</code></pre>
+
+
+
 <a id="0x1_daa_siws_EMISSING_ENTRY_FUNCTION_PAYLOAD"></a>
 
 Entry function payload is missing.
@@ -80,6 +105,15 @@ Entry function payload is missing.
 
 
 <pre><code><b>const</b> <a href="daa_siws.md#0x1_daa_siws_HEX_ALPHABET">HEX_ALPHABET</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 97, 98, 99, 100, 101, 102];
+</code></pre>
+
+
+
+<a id="0x1_daa_siws_SIGNATURE_TYPE0"></a>
+
+
+
+<pre><code><b>const</b> <a href="daa_siws.md#0x1_daa_siws_SIGNATURE_TYPE0">SIGNATURE_TYPE0</a>: u8 = 0;
 </code></pre>
 
 
@@ -111,6 +145,33 @@ the raw bytes version to do signature verification.
     <b>let</b> base58_public_key = *<a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_string">bcs_stream::deserialize_string</a>(&<b>mut</b> stream).bytes();
     <b>let</b> domain = *<a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_string">bcs_stream::deserialize_string</a>(&<b>mut</b> stream).bytes();
     (base58_public_key, domain)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_daa_siws_deserialize_abstract_signature"></a>
+
+## Function `deserialize_abstract_signature`
+
+Returns a tuple of the signature type and the signature.
+
+
+<pre><code><b>fun</b> <a href="daa_siws.md#0x1_daa_siws_deserialize_abstract_signature">deserialize_abstract_signature</a>(abstract_signature: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (u8, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="daa_siws.md#0x1_daa_siws_deserialize_abstract_signature">deserialize_abstract_signature</a>(abstract_signature: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (u8, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
+    <b>let</b> signature_type = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(abstract_signature, 0);
+    <b>let</b> signature = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(abstract_signature, 1, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(abstract_signature));
+    (signature_type, signature)
 }
 </code></pre>
 
@@ -220,7 +281,7 @@ the raw bytes version to do signature verification.
     <b>while</b> (i &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(base58_public_key)) {
         <b>let</b> char = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(base58_public_key, i);
         <b>let</b> (found, char_index) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_index_of">vector::index_of</a>(&<a href="daa_siws.md#0x1_daa_siws_BASE_58_ALPHABET">BASE_58_ALPHABET</a>, &char);
-        <b>assert</b>!(found, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="daa_siws.md#0x1_daa_siws_EINVALID_BASE_58_PUBLIC_KEY">EINVALID_BASE_58_PUBLIC_KEY</a>));
+        <b>assert</b>!(found, <a href="daa_siws.md#0x1_daa_siws_EINVALID_BASE_58_PUBLIC_KEY">EINVALID_BASE_58_PUBLIC_KEY</a>);
 
         <b>let</b> mut_bytes = &<b>mut</b> bytes;
         <b>let</b> j = 0;
@@ -324,14 +385,16 @@ the raw bytes version to do signature verification.
 
     <b>let</b> public_key_bytes = <a href="daa_siws.md#0x1_daa_siws_to_public_key_bytes">to_public_key_bytes</a>(&base58_public_key);
     <b>let</b> public_key = new_unvalidated_public_key_from_bytes(public_key_bytes);
-    <b>let</b> signature = new_signature_from_bytes(*aa_auth_data.derivable_abstract_signature());
+    <b>let</b> (signature_type, signature_bytes) = <a href="daa_siws.md#0x1_daa_siws_deserialize_abstract_signature">deserialize_abstract_signature</a>(aa_auth_data.derivable_abstract_signature());
+    <b>assert</b>!(signature_type == <a href="daa_siws.md#0x1_daa_siws_SIGNATURE_TYPE0">SIGNATURE_TYPE0</a>, <a href="daa_siws.md#0x1_daa_siws_EINVALID_SIGNATURE_TYPE">EINVALID_SIGNATURE_TYPE</a>);
+    <b>let</b> signature = new_signature_from_bytes(signature_bytes);
     <b>assert</b>!(
         <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_signature_verify_strict">ed25519::signature_verify_strict</a>(
             &signature,
             &public_key,
             message,
         ),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="daa_siws.md#0x1_daa_siws_EINVALID_SIGNATURE">EINVALID_SIGNATURE</a>)
+        <a href="daa_siws.md#0x1_daa_siws_EINVALID_SIGNATURE">EINVALID_SIGNATURE</a>
     );
 }
 </code></pre>

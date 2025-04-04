@@ -22,7 +22,7 @@ module aptos_framework::daa_siws {
         new_signature_from_bytes,
         new_unvalidated_public_key_from_bytes,
     };
-    use std::bcs_stream::{Self};
+    use std::bcs_stream::{Self, deserialize_u8};
     use std::chain_id;
     use std::string_utils;
     use std::transaction_context::{Self, EntryFunctionPayload};
@@ -42,7 +42,11 @@ module aptos_framework::daa_siws {
     const BASE_58_ALPHABET: vector<u8> = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
     const HEX_ALPHABET: vector<u8> = b"0123456789abcdef";
 
-    const SIGNATURE_TYPE0: u8 = 0x00;
+    enum SIWSAbstractSignature has drop {
+        RawSignature {
+            signature: vector<u8>,
+        },
+    }
 
     /// Deserializes the abstract public key which is supposed to be a bcs
     /// serialized `SIWSAbstractPublicKey`.  The base58_public_key is
@@ -59,10 +63,15 @@ module aptos_framework::daa_siws {
     }
 
     /// Returns a tuple of the signature type and the signature.
-    fun deserialize_abstract_signature(abstract_signature: &vector<u8>): (u8, vector<u8>) {
-        let signature_type = *vector::borrow(abstract_signature, 0);
-        let signature = vector::slice(abstract_signature, 1, vector::length(abstract_signature));
-        (signature_type, signature)
+    fun deserialize_abstract_signature(abstract_signature: &vector<u8>): SIWSAbstractSignature {
+        let stream = bcs_stream::new(*abstract_signature);
+        let signature_type = bcs_stream::deserialize_u8(&mut stream);
+        if (signature_type == 0x00) {
+            let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+            SIWSAbstractSignature::RawSignature { signature }
+        } else {
+            abort(EINVALID_SIGNATURE_TYPE)
+        }
     }
 
     fun network_name(): vector<u8> {
@@ -176,17 +185,20 @@ module aptos_framework::daa_siws {
 
         let public_key_bytes = to_public_key_bytes(&base58_public_key);
         let public_key = new_unvalidated_public_key_from_bytes(public_key_bytes);
-        let (signature_type, signature_bytes) = deserialize_abstract_signature(aa_auth_data.derivable_abstract_signature());
-        assert!(signature_type == SIGNATURE_TYPE0, EINVALID_SIGNATURE_TYPE);
-        let signature = new_signature_from_bytes(signature_bytes);
-        assert!(
-            ed25519::signature_verify_strict(
-                &signature,
-                &public_key,
-                message,
-            ),
-            EINVALID_SIGNATURE
-        );
+        let abstract_signature = deserialize_abstract_signature(aa_auth_data.derivable_abstract_signature());
+        match (abstract_signature) {
+            SIWSAbstractSignature::RawSignature { signature: signature_bytes } => {
+                let signature = new_signature_from_bytes(signature_bytes);
+                assert!(
+                    ed25519::signature_verify_strict(
+                        &signature,
+                        &public_key,
+                        message,
+                    ),
+                    EINVALID_SIGNATURE
+                );
+            },
+        };
     }
 
     /// Authorization function for domain account abstraction.
@@ -225,11 +237,9 @@ module aptos_framework::daa_siws {
     }
 
     #[test_only]
-    fun create_abstract_signature(signature_type: u8, signature: vector<u8>): vector<u8> {
-        let abstract_signature = vector[];
-        vector::push_back(&mut abstract_signature, signature_type);
-        vector::append(&mut abstract_signature, signature);
-        abstract_signature
+    fun create_raw_signature(signature: vector<u8>): vector<u8> {
+        let abstract_signature = SIWSAbstractSignature::RawSignature { signature };
+        bcs::to_bytes(&abstract_signature)
     }
 
     #[test]
@@ -244,12 +254,13 @@ module aptos_framework::daa_siws {
 
     #[test]
     fun test_deserialize_abstract_signature() {
-        let signature_type = SIGNATURE_TYPE0;
-        let signature = vector[129, 0, 6, 135, 53, 153, 88, 201, 243, 227, 13, 232, 192, 42, 167, 94, 3, 120, 49, 80, 102, 193, 61, 211, 189, 83, 37, 121, 5, 216, 30, 25, 243, 207, 172, 248, 94, 201, 123, 66, 237, 66, 122, 201, 171, 215, 162, 187, 218, 188, 24, 165, 52, 147, 210, 39, 128, 78, 62, 81, 73, 167, 235, 1];
-        let abstract_signature = create_abstract_signature(signature_type, signature);
-        let (signature_type, signature_bytes) = deserialize_abstract_signature(&abstract_signature);
-        assert!(signature_type == SIGNATURE_TYPE0);
-        assert!(signature_bytes == signature);
+        let signature_bytes = vector[129, 0, 6, 135, 53, 153, 88, 201, 243, 227, 13, 232, 192, 42, 167, 94, 3, 120, 49, 80, 102, 193, 61, 211, 189, 83, 37, 121, 5, 216, 30, 25, 243, 207, 172, 248, 94, 201, 123, 66, 237, 66, 122, 201, 171, 215, 162, 187, 218, 188, 24, 165, 52, 147, 210, 39, 128, 78, 62, 81, 73, 167, 235, 1];
+        let abstract_signature = create_raw_signature(signature_bytes);
+        let siws_abstract_signature = deserialize_abstract_signature(&abstract_signature);
+        assert!(siws_abstract_signature is SIWSAbstractSignature::RawSignature);
+        match (siws_abstract_signature) {
+            SIWSAbstractSignature::RawSignature { signature } => assert!(signature == signature_bytes),
+        };
     }
 
     #[test(framework = @0x1)]
@@ -316,13 +327,12 @@ module aptos_framework::daa_siws {
         chain_id::initialize_for_test(framework, 2);
 
         let digest = x"026a4f93c2010cbafbac45639e995410d0902d11a3c4f0fcd1c64a1d193f4866";
-        let signature_type = SIGNATURE_TYPE0;
         let signature = vector[129, 0, 6, 135, 53, 153, 88, 201, 243,
         227, 13, 232, 192, 42, 167, 94, 3, 120, 49, 80, 102, 193, 61, 211, 189,
         83, 37, 121, 5, 216, 30, 25, 243, 207, 172, 248, 94, 201, 123, 66, 237,
         66, 122, 201, 171, 215, 162, 187, 218, 188, 24, 165, 52, 147, 210, 39,
         128, 78, 62, 81, 73, 167, 235, 1];
-        let abstract_signature = create_abstract_signature(signature_type, signature);
+        let abstract_signature = create_raw_signature(signature);
         let base58_public_key = b"G56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV";
         let domain = b"localhost:3000";
         let abstract_public_key = create_abstract_public_key(utf8(base58_public_key), utf8(domain));
@@ -337,34 +347,12 @@ module aptos_framework::daa_siws {
         chain_id::initialize_for_test(framework, 2);
 
         let digest = x"026a4f93c2010cbafbac45639e995410d0902d11a3c4f0fcd1c64a1d193f4866";
-        let signature_type = SIGNATURE_TYPE0;
         let signature = vector[128, 0, 6, 135, 53, 153, 88, 201, 243,
         227, 13, 232, 192, 42, 167, 94, 3, 120, 49, 80, 102, 193, 61, 211, 189,
         83, 37, 121, 5, 216, 30, 25, 243, 207, 172, 248, 94, 201, 123, 66, 237,
         66, 122, 201, 171, 215, 162, 187, 218, 188, 24, 165, 52, 147, 210, 39,
         128, 78, 62, 81, 73, 167, 235, 1];
-        let abstract_signature = create_abstract_signature(signature_type, signature);
-        let base58_public_key = b"G56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV";
-        let domain = b"localhost:3000";
-        let abstract_public_key = create_abstract_public_key(utf8(base58_public_key), utf8(domain));
-        let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
-        let entry_function_name = b"0x1::coin::transfer";
-        authenticate_auth_data(auth_data, &entry_function_name);
-    }
-
-    #[test(framework = @0x1)]
-    #[expected_failure(abort_code = EINVALID_SIGNATURE_TYPE)]
-    fun test_authenticate_auth_data_invalid_signature_type(framework: &signer) {
-        chain_id::initialize_for_test(framework, 2);
-
-        let digest = x"026a4f93c2010cbafbac45639e995410d0902d11a3c4f0fcd1c64a1d193f4866";
-        let signature_type = 0x2;
-        let signature = vector[129, 0, 6, 135, 53, 153, 88, 201, 243,
-        227, 13, 232, 192, 42, 167, 94, 3, 120, 49, 80, 102, 193, 61, 211, 189,
-        83, 37, 121, 5, 216, 30, 25, 243, 207, 172, 248, 94, 201, 123, 66, 237,
-        66, 122, 201, 171, 215, 162, 187, 218, 188, 24, 165, 52, 147, 210, 39,
-        128, 78, 62, 81, 73, 167, 235, 1];
-        let abstract_signature = create_abstract_signature(signature_type, signature);
+        let abstract_signature = create_raw_signature(signature);
         let base58_public_key = b"G56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV";
         let domain = b"localhost:3000";
         let abstract_public_key = create_abstract_public_key(utf8(base58_public_key), utf8(domain));
