@@ -29,7 +29,7 @@ use once_cell::sync::Lazy;
 use rand::{distributions::Alphanumeric, prelude::StdRng, seq::SliceRandom, Rng};
 use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, time::{SystemTime, UNIX_EPOCH}};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct BCSStream {
@@ -236,6 +236,9 @@ pub enum EntryPoints {
     APTTransferWithPermissionedSigner,
     /// Transfer APT using vanilla master signer to compare the performance.
     APTTransferWithMasterSigner,
+    InitializeNonceTable,
+    AddNonceBucket,
+    NonceTableInsert,
 }
 
 impl EntryPointTrait for EntryPoints {
@@ -304,6 +307,9 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "aggregator_examples",
             EntryPoints::DeserializeU256 => "bcs_stream",
+            EntryPoints::InitializeNonceTable |
+            EntryPoints::NonceTableInsert | 
+            EntryPoints::AddNonceBucket => "nonce_table",
         }
     }
 
@@ -371,6 +377,9 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::DeserializeU256 => "bcs_stream",
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => "permissioned_transfer",
+            EntryPoints::InitializeNonceTable
+            | EntryPoints::NonceTableInsert
+            | EntryPoints::AddNonceBucket => "nonce_table",
         }
     }
 
@@ -803,6 +812,33 @@ impl EntryPointTrait for EntryPoints {
                     bcs::to_bytes(&1u64).unwrap(),
                 ])
             },
+            EntryPoints::InitializeNonceTable => {
+                get_payload(module_id, ident_str!("initialize_table").to_owned(), vec![])
+            },
+            EntryPoints::AddNonceBucket => {
+                get_payload(module_id, ident_str!("add_nonce_bucket").to_owned(), vec![
+                    bcs::to_bytes(&other.expect("Must provide other")).unwrap(),
+                ])
+            },
+            EntryPoints::NonceTableInsert => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let nonce: u64 = rng.gen();
+                let expiration_time: u64 = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_secs()
+                    + 200;
+                let sender = AccountAddress::random();
+                get_payload(module_id,
+                    ident_str!("check_and_insert_nonce").to_owned(),
+                    vec![
+                        bcs::to_bytes(&other.expect("Must provide other")).unwrap(),
+                        bcs::to_bytes(&sender).unwrap(),
+                        bcs::to_bytes(&nonce).unwrap(),
+                        bcs::to_bytes(&expiration_time).unwrap(),
+                    ],
+                )
+            },
         }
     }
 
@@ -834,6 +870,7 @@ impl EntryPointTrait for EntryPoints {
                     milestone_every: *milestone_every,
                 }))
             },
+            EntryPoints::NonceTableInsert => Some(Box::new(EntryPoints::InitializeNonceTable)),
             _ => None,
         }
     }
@@ -854,6 +891,7 @@ impl EntryPointTrait for EntryPoints {
             },
             EntryPoints::LiquidityPoolSwap { .. } => MultiSigConfig::Publisher,
             EntryPoints::CreateGlobalMilestoneAggV2 { .. } => MultiSigConfig::Publisher,
+            EntryPoints::InitializeNonceTable => MultiSigConfig::Publisher,
             _ => MultiSigConfig::None,
         }
     }
@@ -923,6 +961,9 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::CreateGlobalMilestoneAggV2 { .. } => AutomaticArgs::Signer,
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => AutomaticArgs::Signer,
+            EntryPoints::NonceTableInsert
+            | EntryPoints::InitializeNonceTable
+            | EntryPoints::AddNonceBucket => AutomaticArgs::None,
         }
     }
 }

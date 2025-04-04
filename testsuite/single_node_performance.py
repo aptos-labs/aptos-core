@@ -179,6 +179,8 @@ with open('testsuite/single_node_performance_values.tsv', 'r') as file:
 DEFAULT_MODULE_WORKING_SET_SIZE = 100
 
 TESTS = [
+    RunGroupConfig(key=RunGroupKey("non-conflicting-coin-transfer"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(key=RunGroupKey("non-conflicting-coin-transfer-orderless"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("apt-fa-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
