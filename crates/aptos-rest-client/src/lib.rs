@@ -43,8 +43,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag},
 };
 use reqwest::{
-    header::{ACCEPT, CONTENT_TYPE},
-    Client as ReqwestClient, StatusCode,
+    header::{HeaderMap, ACCEPT, CONTENT_TYPE}, Client as ReqwestClient, IntoUrl, RequestBuilder, StatusCode
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -81,6 +80,7 @@ pub struct Client {
     inner: ReqwestClient,
     base_url: Url,
     version_path_base: String,
+    additional_headers: HeaderMap,
 }
 
 // TODO: Dedupe the pepper/prover request/response types with the ones defined in the service.
@@ -161,6 +161,26 @@ impl Client {
 
     pub fn get_pepper_url(&self) -> Url {
         self.base_url.join("keyless/pepper/v0/fetch").unwrap()
+    }
+
+    fn post_impl<U: IntoUrl>(&self, url: U) -> RequestBuilder {
+        let mut builder = self.inner.post(url);
+        if !self.additional_headers.is_empty() {
+            builder = builder.headers(self.additional_headers.clone());
+        }
+        builder
+    }
+
+    fn get_impl(&self, url: Url) -> RequestBuilder {
+        let mut builder = self.inner.get(url);
+        if !self.additional_headers.is_empty() {
+            builder = builder.headers(self.additional_headers.clone());
+        }
+        builder
+    }
+
+    pub fn set_authorization(&mut self, key: String) {
+        self.additional_headers.insert("Authorization", format!("Bearer {key}").parse().unwrap());
     }
 
     pub async fn get_aptos_version(&self) -> AptosResult<Response<AptosVersion>> {
@@ -329,7 +349,7 @@ impl Client {
             address.to_hex(),
             asset_type
         ))?;
-        let response = self.inner.get(url).send().await?;
+        let response = self.get_impl(url).send().await?;
         self.json(response).await
     }
 
@@ -983,7 +1003,7 @@ impl Client {
     ) -> AptosResult<Response<Vec<Transaction>>> {
         let url = self.build_path("transactions")?;
 
-        let mut request = self.inner.get(url);
+        let mut request = self.get_impl(url);
         if let Some(start) = start {
             request = request.query(&[("start", start)])
         }
@@ -1029,7 +1049,7 @@ impl Client {
         hash: HashValue,
     ) -> AptosResult<reqwest::Response> {
         let url = self.build_path(&format!("transactions/by_hash/{}", hash.to_hex_literal()))?;
-        let response = self.inner.get(url).header(ACCEPT, BCS).send().await?;
+        let response = self.get_impl(url).header(ACCEPT, BCS).send().await?;
         Ok(response)
     }
 
@@ -1038,7 +1058,7 @@ impl Client {
         hash: HashValue,
     ) -> AptosResult<reqwest::Response> {
         let url = self.build_path(&format!("transactions/by_hash/{}", hash.to_hex_literal()))?;
-        Ok(self.inner.get(url).send().await?)
+        Ok(self.get_impl(url).send().await?)
     }
 
     pub async fn get_transaction_by_version(
@@ -1063,7 +1083,7 @@ impl Client {
         version: u64,
     ) -> AptosResult<reqwest::Response> {
         let url = self.build_path(&format!("transactions/by_version/{}", version))?;
-        Ok(self.inner.get(url).send().await?)
+        Ok(self.get_impl(url).send().await?)
     }
 
     pub async fn get_account_transactions(
@@ -1074,7 +1094,7 @@ impl Client {
     ) -> AptosResult<Response<Vec<Transaction>>> {
         let url = self.build_path(&format!("accounts/{}/transactions", address.to_hex()))?;
 
-        let mut request = self.inner.get(url);
+        let mut request = self.get_impl(url);
         if let Some(start) = start {
             request = request.query(&[("start", start)])
         }
@@ -1266,7 +1286,7 @@ impl Client {
             version
         ))?;
 
-        let response = self.inner.get(url).send().await?;
+        let response = self.get_impl(url).send().await?;
         self.json(response).await
     }
 
@@ -1349,7 +1369,7 @@ impl Client {
             struct_tag,
             field_name
         ))?;
-        let mut request = self.inner.get(url);
+        let mut request = self.get_impl(url);
         if let Some(start) = start {
             request = request.query(&[("start", start)])
         }
@@ -1472,7 +1492,7 @@ impl Client {
             "key": json!(key),
         });
 
-        let response = self.inner.post(url).json(&data).send().await?;
+        let response = self.post_impl(url).json(&data).send().await?;
         self.json(response).await
     }
 
@@ -1494,7 +1514,7 @@ impl Client {
             "key": json!(key),
         });
 
-        let response = self.inner.post(url).json(&data).send().await?;
+        let response = self.post_impl(url).json(&data).send().await?;
         self.json(response).await
     }
 
@@ -1575,7 +1595,7 @@ impl Client {
 
     pub async fn get_account(&self, address: AccountAddress) -> AptosResult<Response<Account>> {
         let url = self.build_path(&format!("accounts/{}", address.to_hex()))?;
-        let response = self.inner.get(url).send().await?;
+        let response = self.get_impl(url).send().await?;
         self.json(response).await
     }
 
@@ -1590,7 +1610,7 @@ impl Client {
 
     pub async fn estimate_gas_price(&self) -> AptosResult<Response<GasEstimation>> {
         let url = self.build_path("estimate_gas_price")?;
-        let response = self.inner.get(url).send().await?;
+        let response = self.get_impl(url).send().await?;
         self.json(response).await
     }
 
@@ -1601,7 +1621,7 @@ impl Client {
             .append_pair("name", &name)
             .append_pair("actions", &actions)
             .finish();
-        let response = self.inner.get(url.clone()).send().await?;
+        let response = self.get_impl(url.clone()).send().await?;
 
         if !response.status().is_success() {
             Err(parse_error(response).await)
@@ -1652,11 +1672,11 @@ impl Client {
     }
 
     async fn get<T: DeserializeOwned>(&self, url: Url) -> AptosResult<Response<T>> {
-        self.json(self.inner.get(url).send().await?).await
+        self.json(self.get_impl(url).send().await?).await
     }
 
     async fn get_bcs(&self, url: Url) -> AptosResult<Response<bytes::Bytes>> {
-        let response = self.inner.get(url).header(ACCEPT, BCS).send().await?;
+        let response = self.get_impl(url).header(ACCEPT, BCS).send().await?;
         self.check_and_parse_bcs_response(response).await
     }
 
@@ -1728,7 +1748,7 @@ impl Client {
         start: Option<u64>,
         limit: Option<u16>,
     ) -> AptosResult<Response<bytes::Bytes>> {
-        let mut request = self.inner.get(url).header(ACCEPT, BCS);
+        let mut request = self.get_impl(url).header(ACCEPT, BCS);
         if let Some(start) = start {
             request = request.query(&[("start", start)])
         }
@@ -1842,7 +1862,7 @@ impl Client {
                 ledger_version,
                 &cursor,
             )?;
-            let raw_response = self.inner.get(url).send().await?;
+            let raw_response = self.get_impl(url).send().await?;
             let response: Response<Vec<T>> = self.json(raw_response).await?;
             cursor.clone_from(&response.state().cursor);
             if cursor.is_none() {
