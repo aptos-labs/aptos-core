@@ -4,7 +4,7 @@
     "type": "secp256k1_ecdsa"
   },
   "signature": {
-    "value": "0x357a77abdb3ef4a01aea1e8d0cb932606655bcf66e6726d2cefbfd904d57703b0bf38eb19bc3da1e3e9f6929db0d4806f83fa5370f6981d704efa42cdba56fb9",
+    "value": "0x817076eee5a29656b1b20acd382f0d5792fc9b1002f8ae86dc3751c41c5c2ad903fda0c05a885bc45ef62003207148fdc90a1973896456a0c6557ea25525da91",
     "type": "secp256k1_ecdsa"
   },
   "type": "single_sender"
