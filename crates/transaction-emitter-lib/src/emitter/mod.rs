@@ -20,7 +20,7 @@ use again::RetryPolicy;
 use anyhow::{ensure, format_err, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_logger::{error, info, sample, sample::SampleRate, warn};
+use aptos_logger::{sample, sample::SampleRate};
 use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Client as RestClient};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -32,6 +32,7 @@ use aptos_transaction_generator_lib::{
 };
 use aptos_types::account_config::aptos_test_root_address;
 use futures::future::{try_join_all, FutureExt};
+use log::{error, info, warn};
 use once_cell::sync::Lazy;
 use rand::{
     rngs::StdRng,
