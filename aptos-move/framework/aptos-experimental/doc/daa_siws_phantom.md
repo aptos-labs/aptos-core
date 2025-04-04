@@ -8,7 +8,7 @@ SIWS from a Phantom wallet.
 
 
 -  [Constants](#@Constants_0)
--  [Function `split_abstract_public_key`](#0x7_daa_siws_phantom_split_abstract_public_key)
+-  [Function `deserialize_abstract_public_key`](#0x7_daa_siws_phantom_deserialize_abstract_public_key)
 -  [Function `network_name`](#0x7_daa_siws_phantom_network_name)
 -  [Function `construct_message`](#0x7_daa_siws_phantom_construct_message)
 -  [Function `to_public_key_bytes`](#0x7_daa_siws_phantom_to_public_key_bytes)
@@ -18,6 +18,7 @@ SIWS from a Phantom wallet.
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/auth_data.md#0x1_auth_data">0x1::auth_data</a>;
+<b>use</b> <a href="../../aptos-framework/../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream">0x1::bcs_stream</a>;
 <b>use</b> <a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id">0x1::chain_id</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/doc/ed25519.md#0x1_ed25519">0x1::ed25519</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -83,13 +84,13 @@ Entry function payload is missing.
 
 
 
-<a id="0x7_daa_siws_phantom_split_abstract_public_key"></a>
+<a id="0x7_daa_siws_phantom_deserialize_abstract_public_key"></a>
 
-## Function `split_abstract_public_key`
+## Function `deserialize_abstract_public_key`
 
 
 
-<pre><code><b>fun</b> <a href="daa_siws_phantom.md#0x7_daa_siws_phantom_split_abstract_public_key">split_abstract_public_key</a>(abstract_public_key: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="daa_siws_phantom.md#0x7_daa_siws_phantom_deserialize_abstract_public_key">deserialize_abstract_public_key</a>(abstract_public_key: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
 
 
@@ -98,10 +99,10 @@ Entry function payload is missing.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="daa_siws_phantom.md#0x7_daa_siws_phantom_split_abstract_public_key">split_abstract_public_key</a>(abstract_public_key: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
-    // First 44 bytes are the base58 utf8 encoded <b>public</b> key
-    <b>let</b> base58_public_key = abstract_public_key.slice(0, 44);
-    <b>let</b> domain = abstract_public_key.slice(44, abstract_public_key.length());
+<pre><code><b>fun</b> <a href="daa_siws_phantom.md#0x7_daa_siws_phantom_deserialize_abstract_public_key">deserialize_abstract_public_key</a>(abstract_public_key: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
+    <b>let</b> stream = <a href="../../aptos-framework/../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_new">bcs_stream::new</a>(*abstract_public_key);
+    <b>let</b> base58_public_key = *<a href="../../aptos-framework/../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_string">bcs_stream::deserialize_string</a>(&<b>mut</b> stream).bytes();
+    <b>let</b> domain = *<a href="../../aptos-framework/../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_string">bcs_stream::deserialize_string</a>(&<b>mut</b> stream).bytes();
     (base58_public_key, domain)
 }
 </code></pre>
@@ -116,7 +117,7 @@ Entry function payload is missing.
 
 
 
-<pre><code><b>fun</b> <a href="daa_siws_phantom.md#0x7_daa_siws_phantom_network_name">network_name</a>(): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
+<pre><code><b>fun</b> <a href="daa_siws_phantom.md#0x7_daa_siws_phantom_network_name">network_name</a>(): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -125,16 +126,19 @@ Entry function payload is missing.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="daa_siws_phantom.md#0x7_daa_siws_phantom_network_name">network_name</a>(): Option&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt; {
+<pre><code><b>fun</b> <a href="daa_siws_phantom.md#0x7_daa_siws_phantom_network_name">network_name</a>(): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <b>let</b> <a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id">chain_id</a> = <a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id_get">chain_id::get</a>();
     <b>if</b> (<a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id">chain_id</a> == 1) {
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(b"mainnet")
+        b"mainnet"
     } <b>else</b> <b>if</b> (<a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id">chain_id</a> == 2) {
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(b"testnet")
+        b"testnet"
     } <b>else</b> <b>if</b> (<a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id">chain_id</a> == 4) {
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(b"<b>local</b>")
+        b"<b>local</b>"
     } <b>else</b> {
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+        <b>let</b> network_name = &<b>mut</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
+        network_name.append(b"custom network: ");
+        network_name.append(*<a href="../../aptos-framework/../aptos-stdlib/doc/string_utils.md#0x1_string_utils_to_string">string_utils::to_string</a>(&<a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id">chain_id</a>).bytes());
+        *network_name
     }
 }
 </code></pre>
@@ -171,12 +175,10 @@ Entry function payload is missing.
     message.append(b"\n\nTo execute transaction ");
     message.append(*entry_function_name);
     message.append(b" on Aptos blockchain");
-    <b>let</b> maybe_network_name = <a href="daa_siws_phantom.md#0x7_daa_siws_phantom_network_name">network_name</a>();
-    <b>if</b> (maybe_network_name.is_some()) {
-        message.append(b" (");
-        message.append(maybe_network_name.destroy_some());
-        message.append(b")");
-    };
+    <b>let</b> network_name = <a href="daa_siws_phantom.md#0x7_daa_siws_phantom_network_name">network_name</a>();
+    message.append(b" (");
+    message.append(network_name);
+    message.append(b")");
     message.append(b".");
     message.append(b"\n\nNonce: ");
     message.append(*digest_utf8);
@@ -309,7 +311,7 @@ Entry function payload is missing.
     entry_function_name: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 ) {
     <b>let</b> abstract_public_key = aa_auth_data.derivable_abstract_public_key();
-    <b>let</b> (base58_public_key, domain) = <a href="daa_siws_phantom.md#0x7_daa_siws_phantom_split_abstract_public_key">split_abstract_public_key</a>(abstract_public_key);
+    <b>let</b> (base58_public_key, domain) = <a href="daa_siws_phantom.md#0x7_daa_siws_phantom_deserialize_abstract_public_key">deserialize_abstract_public_key</a>(abstract_public_key);
     <b>let</b> digest_utf8 = <a href="../../aptos-framework/../aptos-stdlib/doc/string_utils.md#0x1_string_utils_to_string">string_utils::to_string</a>(aa_auth_data.digest()).bytes();
     <b>let</b> message = <a href="daa_siws_phantom.md#0x7_daa_siws_phantom_construct_message">construct_message</a>(&base58_public_key, &domain, entry_function_name, digest_utf8);
 

@@ -42,7 +42,10 @@ module aptos_experimental::daa_siws_phantom {
         } else if (chain_id == 4) {
             b"local"
         } else {
-            *string_utils::to_string(&chain_id).bytes()
+            let network_name = &mut vector[];
+            network_name.append(b"custom network: ");
+            network_name.append(*string_utils::to_string(&chain_id).bytes());
+            *network_name
         }
     }
 
@@ -240,7 +243,7 @@ module aptos_experimental::daa_siws_phantom {
     #[test(framework = @0x1)]
     fun test_network_name_other(framework: &signer) {
         chain_id::initialize_for_test(framework, 99);
-        assert!(network_name() == b"99");
+        assert!(network_name() == b"custom network: 99");
     }
 
     #[test(framework = @0x1)]
