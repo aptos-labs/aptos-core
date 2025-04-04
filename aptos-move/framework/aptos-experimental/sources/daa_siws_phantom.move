@@ -26,7 +26,14 @@ module aptos_experimental::daa_siws_phantom {
     const BASE_58_ALPHABET: vector<u8> = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
     const HEX_ALPHABET: vector<u8> = b"0123456789abcdef";
 
-    fun deserialize_abstract_public_key(abstract_public_key: &vector<u8>): (vector<u8>, vector<u8>) {
+    /// Deserializes the abstract public key which is supposed to be a bcs
+    /// serialized `SIWSAbstractPublicKey`.  The base58_public_key is
+    /// represented in UTF8. We prefer this format because it's computationally
+    /// cheaper to decode a base58 string than to encode from raw bytes.  We
+    /// require both the base58 public key in UTF8 to construct the message and
+    /// the raw bytes version to do signature verification.
+    fun deserialize_abstract_public_key(abstract_public_key: &vector<u8>):
+    (vector<u8>, vector<u8>) {
         let stream = bcs_stream::new(*abstract_public_key);
         let base58_public_key = *bcs_stream::deserialize_string(&mut stream).bytes();
         let domain = *bcs_stream::deserialize_string(&mut stream).bytes();
