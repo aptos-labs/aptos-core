@@ -365,19 +365,11 @@ Remove Multiple Keys from the Enumerable Map
 ): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt; {
     <b>assert</b>!(!<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&keys), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="enumerable_map.md#0x1_enumerable_map_EVECTOR_EMPTY">EVECTOR_EMPTY</a>));
 
-    <b>let</b> map_length = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&map.list);
     <b>let</b> removed_keys = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;K&gt;();
 
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_reverse">vector::for_each_reverse</a>(keys, |key| {
         <b>if</b> (<a href="enumerable_map.md#0x1_enumerable_map_contains">contains</a>(map, key)) {
-            <b>let</b> index_of_element = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&map.map, key).position;
-            map_length = map_length - 1;
-            <b>let</b> tuple_to_modify = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> map.map, *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&map.list, map_length));
-            <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_swap">vector::swap</a>(&<b>mut</b> map.list, index_of_element, map_length);
-            tuple_to_modify.position = index_of_element;
-            <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> map.list);
-            <a href="../../aptos-stdlib/doc/table.md#0x1_table_remove">table::remove</a>(&<b>mut</b> map.map, key);
-
+            <a href="enumerable_map.md#0x1_enumerable_map_remove_value">remove_value</a>(map, key);
             <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> removed_keys, key);
         };
     });

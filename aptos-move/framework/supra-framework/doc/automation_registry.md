@@ -20,8 +20,12 @@ This contract is part of the Supra Framework and is designed to manage automated
 -  [Struct `TaskCancelled`](#0x1_automation_registry_TaskCancelled)
 -  [Struct `TaskCancelledInsufficentBalance`](#0x1_automation_registry_TaskCancelledInsufficentBalance)
 -  [Struct `TaskCancelledCapacitySurpassed`](#0x1_automation_registry_TaskCancelledCapacitySurpassed)
+-  [Struct `ErrorTaskDoesNotExist`](#0x1_automation_registry_ErrorTaskDoesNotExist)
+-  [Struct `ErrorTaskDoesNotExistForWithdrawal`](#0x1_automation_registry_ErrorTaskDoesNotExistForWithdrawal)
 -  [Struct `AutomationTaskFee`](#0x1_automation_registry_AutomationTaskFee)
+-  [Struct `IntermediateState`](#0x1_automation_registry_IntermediateState)
 -  [Constants](#@Constants_0)
+-  [Function `active_task_ids`](#0x1_automation_registry_active_task_ids)
 -  [Function `is_initialized`](#0x1_automation_registry_is_initialized)
 -  [Function `is_feature_enabled_and_initialized`](#0x1_automation_registry_is_feature_enabled_and_initialized)
 -  [Function `get_next_task_index`](#0x1_automation_registry_get_next_task_index)
@@ -53,6 +57,7 @@ This contract is part of the Supra Framework and is designed to manage automated
 -  [Function `calculate_automation_congestion_fee`](#0x1_automation_registry_calculate_automation_congestion_fee)
 -  [Function `calculate_exponentiation`](#0x1_automation_registry_calculate_exponentiation)
 -  [Function `try_withdraw_task_automation_fees`](#0x1_automation_registry_try_withdraw_task_automation_fees)
+-  [Function `try_withdraw_task_automation_fee`](#0x1_automation_registry_try_withdraw_task_automation_fee)
 -  [Function `update_config_from_buffer`](#0x1_automation_registry_update_config_from_buffer)
 -  [Function `withdraw_automation_task_fees`](#0x1_automation_registry_withdraw_automation_task_fees)
 -  [Function `transfer_fee_to_account_internal`](#0x1_automation_registry_transfer_fee_to_account_internal)
@@ -685,6 +690,66 @@ Event emitted when an automation task is cancelled due to automation fee capacit
 
 </details>
 
+<a id="0x1_automation_registry_ErrorTaskDoesNotExist"></a>
+
+## Struct `ErrorTaskDoesNotExist`
+
+Event emitted when on new epoch a task is accessed with index of the task for the expected list
+but value does not exist in the map
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="automation_registry.md#0x1_automation_registry_ErrorTaskDoesNotExist">ErrorTaskDoesNotExist</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>task_index: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_automation_registry_ErrorTaskDoesNotExistForWithdrawal"></a>
+
+## Struct `ErrorTaskDoesNotExistForWithdrawal`
+
+Event emitted when on new epoch a task is accessed with index of the task automation fee withdrawal
+but it does not exist in the list.
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="automation_registry.md#0x1_automation_registry_ErrorTaskDoesNotExistForWithdrawal">ErrorTaskDoesNotExistForWithdrawal</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>task_index: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="0x1_automation_registry_AutomationTaskFee"></a>
 
 ## Struct `AutomationTaskFee`
@@ -716,6 +781,46 @@ Represents the fee charged for an automation task execution and some additional 
 </dd>
 <dt>
 <code>fee: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_automation_registry_IntermediateState"></a>
+
+## Struct `IntermediateState`
+
+Represents intermediate state of the registry on epoch change.
+
+
+<pre><code><b>struct</b> <a href="automation_registry.md#0x1_automation_registry_IntermediateState">IntermediateState</a> <b>has</b> drop
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>active_task_ids: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>gas_committed_for_next_epoch: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>epoch_locked_fees: u64</code>
 </dt>
 <dd>
 
@@ -1047,6 +1152,30 @@ The length of the transaction hash.
 </code></pre>
 
 
+
+<a id="0x1_automation_registry_active_task_ids"></a>
+
+## Function `active_task_ids`
+
+
+
+<pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_active_task_ids">active_task_ids</a>(intermediate_state: <a href="automation_registry.md#0x1_automation_registry_IntermediateState">automation_registry::IntermediateState</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_active_task_ids">active_task_ids</a>(intermediate_state: <a href="automation_registry.md#0x1_automation_registry_IntermediateState">IntermediateState</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; {
+    intermediate_state.active_task_ids
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x1_automation_registry_is_initialized"></a>
 
@@ -1757,13 +1886,15 @@ On new epoch this function will be triggered and update the automation registry 
 
     // If feature is not enabled then we are not charging and tasks are cleared.
     <b>if</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_supra_native_automation_enabled">features::supra_native_automation_enabled</a>()) {
+
         <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.gas_committed_for_next_epoch = 0;
         <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.epoch_locked_fees = 0;
         <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.gas_committed_for_this_epoch = 0;
-        automation_epoch_info.start_time = current_time;
-        automation_epoch_info.expected_epoch_duration = automation_epoch_info.epoch_interval;
         <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.epoch_active_task_ids = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
         <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_clear">enumerable_map::clear</a>(&<b>mut</b> <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.tasks);
+
+        automation_epoch_info.start_time = current_time;
+        automation_epoch_info.expected_epoch_duration = automation_epoch_info.epoch_interval;
         <b>return</b>
     };
 
@@ -1780,17 +1911,18 @@ On new epoch this function will be triggered and update the automation registry 
         <b>false</b>
     );
 
-    <b>let</b> (gas_committed_for_next_epoch, epoch_locked_fees, epoch_active_task_ids) = <a href="automation_registry.md#0x1_automation_registry_try_withdraw_task_automation_fees">try_withdraw_task_automation_fees</a>(
+    <b>let</b> intermediate_state = <a href="automation_registry.md#0x1_automation_registry_try_withdraw_task_automation_fees">try_withdraw_task_automation_fees</a>(
         <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>,
         tasks_automation_fees,
         current_time,
         automation_epoch_info.epoch_interval
     );
 
-    <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.gas_committed_for_next_epoch = gas_committed_for_next_epoch;
-    <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.epoch_locked_fees = epoch_locked_fees;
+    <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.gas_committed_for_next_epoch = intermediate_state.gas_committed_for_next_epoch;
+    <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.epoch_locked_fees = intermediate_state.epoch_locked_fees;
     <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.gas_committed_for_this_epoch = tcmg;
-    <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.epoch_active_task_ids = <b>move</b> epoch_active_task_ids;
+    <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.epoch_active_task_ids = <a href="automation_registry.md#0x1_automation_registry_active_task_ids">active_task_ids</a>(intermediate_state);
+
     automation_epoch_info.start_time = current_time;
     automation_epoch_info.expected_epoch_duration = automation_epoch_info.epoch_interval;
 }
@@ -1911,14 +2043,18 @@ Cleanup and activate the automation task also it's calculate and return total co
 
     // Perform clean up and updation of state (we can't <b>use</b> enumerable_map::for_each, <b>as</b> actually we need value <b>as</b> mutable ref)
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each">vector::for_each</a>(ids, |task_index| {
-        <b>let</b> task = <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_get_value_mut">enumerable_map::get_value_mut</a>(&<b>mut</b> <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.tasks, task_index);
-
-        // Drop or activate task for this current epoch.
-        <b>if</b> (task.expiry_time &lt;= current_time || task.state == <a href="automation_registry.md#0x1_automation_registry_CANCELLED">CANCELLED</a>) {
-            <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_remove_value">enumerable_map::remove_value</a>(&<b>mut</b> <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.tasks, task_index);
+        <b>if</b> (!<a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_contains">enumerable_map::contains</a>(&<a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.tasks, task_index)) {
+            <a href="event.md#0x1_event_emit">event::emit</a>(<a href="automation_registry.md#0x1_automation_registry_ErrorTaskDoesNotExist">ErrorTaskDoesNotExist</a> { task_index })
         } <b>else</b> {
-            task.state = <a href="automation_registry.md#0x1_automation_registry_ACTIVE">ACTIVE</a>;
-            tcmg = tcmg + (task.max_gas_amount <b>as</b> u256);
+            <b>let</b> task = <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_get_value_mut">enumerable_map::get_value_mut</a>(&<b>mut</b> <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.tasks, task_index);
+
+            // Drop or activate task for this current epoch.
+            <b>if</b> (task.expiry_time &lt;= current_time || task.state == <a href="automation_registry.md#0x1_automation_registry_CANCELLED">CANCELLED</a>) {
+                <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_remove_value">enumerable_map::remove_value</a>(&<b>mut</b> <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.tasks, task_index);
+            } <b>else</b> {
+                task.state = <a href="automation_registry.md#0x1_automation_registry_ACTIVE">ACTIVE</a>;
+                tcmg = tcmg + (task.max_gas_amount <b>as</b> u256);
+            }
         }
     });
     tcmg
@@ -2183,7 +2319,7 @@ Processes automation task fees by checking user balances and task's commitment o
 Return estimated committed gas for the next epoch, locked automation fee amount for this epoch, and list of active task indexes
 
 
-<pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_try_withdraw_task_automation_fees">try_withdraw_task_automation_fees</a>(<a href="automation_registry.md#0x1_automation_registry">automation_registry</a>: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRegistry">automation_registry::AutomationRegistry</a>, tasks_automation_fees: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="automation_registry.md#0x1_automation_registry_AutomationTaskFee">automation_registry::AutomationTaskFee</a>&gt;, current_time: u64, epoch_interval: u64): (u64, u64, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+<pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_try_withdraw_task_automation_fees">try_withdraw_task_automation_fees</a>(<a href="automation_registry.md#0x1_automation_registry">automation_registry</a>: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRegistry">automation_registry::AutomationRegistry</a>, tasks_automation_fees: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="automation_registry.md#0x1_automation_registry_AutomationTaskFee">automation_registry::AutomationTaskFee</a>&gt;, current_time: u64, epoch_interval: u64): <a href="automation_registry.md#0x1_automation_registry_IntermediateState">automation_registry::IntermediateState</a>
 </code></pre>
 
 
@@ -2197,59 +2333,96 @@ Return estimated committed gas for the next epoch, locked automation fee amount 
     tasks_automation_fees: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="automation_registry.md#0x1_automation_registry_AutomationTaskFee">AutomationTaskFee</a>&gt;,
     current_time: u64,
     epoch_interval: u64,
-): (u64, u64, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;) {
-    <b>let</b> (gas_committed_for_next_epoch, epoch_locked_fees) = (0, 0);
-    <b>let</b> epoch_active_task_ids = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
+): <a href="automation_registry.md#0x1_automation_registry_IntermediateState">IntermediateState</a> {
+    <b>let</b> intermediate_state = <a href="automation_registry.md#0x1_automation_registry_IntermediateState">IntermediateState</a> {
+        gas_committed_for_next_epoch: 0,
+        epoch_locked_fees: 0,
+        active_task_ids: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]
+    };
 
     <a href="automation_registry.md#0x1_automation_registry_sort_by_task_index">sort_by_task_index</a>(&<b>mut</b> tasks_automation_fees);
 
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each">vector::for_each</a>(tasks_automation_fees, |task| {
         <b>let</b> task: <a href="automation_registry.md#0x1_automation_registry_AutomationTaskFee">AutomationTaskFee</a> = task;
-        <b>let</b> task_metadata = <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_get_value">enumerable_map::get_value</a>(&<a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.tasks, task.task_index);
+        <b>if</b> (!<a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_contains">enumerable_map::contains</a>(&<a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.tasks, task.task_index)) {
+            <a href="event.md#0x1_event_emit">event::emit</a>(<a href="automation_registry.md#0x1_automation_registry_ErrorTaskDoesNotExistForWithdrawal">ErrorTaskDoesNotExistForWithdrawal</a> {task_index: task.task_index})
+        } <b>else</b> {
+            <a href="automation_registry.md#0x1_automation_registry_try_withdraw_task_automation_fee">try_withdraw_task_automation_fee</a>(<a href="automation_registry.md#0x1_automation_registry">automation_registry</a>, task, current_time, epoch_interval, &<b>mut</b> intermediate_state);
+        };
+    });
+    intermediate_state
+}
+</code></pre>
 
-        // Remove the automation task <b>if</b> the epoch fee cap is exceeded
-        <b>if</b> (task.fee &gt; task_metadata.automation_fee_cap_for_epoch) {
+
+
+</details>
+
+<a id="0x1_automation_registry_try_withdraw_task_automation_fee"></a>
+
+## Function `try_withdraw_task_automation_fee`
+
+
+
+<pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_try_withdraw_task_automation_fee">try_withdraw_task_automation_fee</a>(<a href="automation_registry.md#0x1_automation_registry">automation_registry</a>: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRegistry">automation_registry::AutomationRegistry</a>, task: <a href="automation_registry.md#0x1_automation_registry_AutomationTaskFee">automation_registry::AutomationTaskFee</a>, current_time: u64, epoch_interval: u64, intermediate_state: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_IntermediateState">automation_registry::IntermediateState</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_try_withdraw_task_automation_fee">try_withdraw_task_automation_fee</a>(
+    <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRegistry">AutomationRegistry</a>,
+    task: <a href="automation_registry.md#0x1_automation_registry_AutomationTaskFee">AutomationTaskFee</a>,
+    current_time: u64,
+    epoch_interval: u64,
+    intermediate_state: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_IntermediateState">IntermediateState</a>) {
+
+    <b>let</b> task_metadata = <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_get_value">enumerable_map::get_value</a>(&<a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.tasks, task.task_index);
+
+    // Remove the automation task <b>if</b> the epoch fee cap is exceeded
+    <b>if</b> (task.fee &gt; task_metadata.automation_fee_cap_for_epoch) {
+        <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_remove_value">enumerable_map::remove_value</a>(&<b>mut</b> <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.tasks, task.task_index);
+        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="automation_registry.md#0x1_automation_registry_TaskCancelledCapacitySurpassed">TaskCancelledCapacitySurpassed</a> {
+            task_index: task.task_index,
+            owner: task_metadata.owner,
+            fee: task.fee,
+            automation_fee_cap: task_metadata.automation_fee_cap_for_epoch,
+        });
+    } <b>else</b> {
+        <b>let</b> user_balance = <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;SupraCoin&gt;(task_metadata.owner);
+        <b>if</b> (user_balance &lt; task.fee) {
+            // If the user does not have enough balance, remove the task and emit an <a href="event.md#0x1_event">event</a>
             <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_remove_value">enumerable_map::remove_value</a>(&<b>mut</b> <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.tasks, task.task_index);
-            <a href="event.md#0x1_event_emit">event::emit</a>(<a href="automation_registry.md#0x1_automation_registry_TaskCancelledCapacitySurpassed">TaskCancelledCapacitySurpassed</a> {
+            <a href="event.md#0x1_event_emit">event::emit</a>(<a href="automation_registry.md#0x1_automation_registry_TaskCancelledInsufficentBalance">TaskCancelledInsufficentBalance</a> {
                 task_index: task.task_index,
                 owner: task_metadata.owner,
                 fee: task.fee,
-                automation_fee_cap: task_metadata.automation_fee_cap_for_epoch,
             });
         } <b>else</b> {
-            <b>let</b> user_balance = <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;SupraCoin&gt;(task_metadata.owner);
-            <b>if</b> (user_balance &lt; task.fee) {
-                // If the user does not have enough balance, remove the task and emit an <a href="event.md#0x1_event">event</a>
-                <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_remove_value">enumerable_map::remove_value</a>(&<b>mut</b> <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.tasks, task.task_index);
-                <a href="event.md#0x1_event_emit">event::emit</a>(<a href="automation_registry.md#0x1_automation_registry_TaskCancelledInsufficentBalance">TaskCancelledInsufficentBalance</a> {
-                    task_index: task.task_index,
-                    owner: task_metadata.owner,
-                    fee: task.fee,
-                });
-            } <b>else</b> {
-                // Charge the fee and emit a success <a href="event.md#0x1_event">event</a>
-                <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;SupraCoin&gt;(
-                    &<a href="create_signer.md#0x1_create_signer">create_signer</a>(task_metadata.owner),
-                    <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.registry_fee_address,
-                    task.fee
-                );
-                <a href="event.md#0x1_event_emit">event::emit</a>(<a href="automation_registry.md#0x1_automation_registry_TaskEpochFeeWithdraw">TaskEpochFeeWithdraw</a> {
-                    task_index: task.task_index,
-                    owner: task_metadata.owner,
-                    fee: task.fee,
-                });
-                // Total task fees deducted from the user's <a href="account.md#0x1_account">account</a>
-                epoch_locked_fees = epoch_locked_fees + task.fee;
-                <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> epoch_active_task_ids, task.task_index);
+            // Charge the fee and emit a success <a href="event.md#0x1_event">event</a>
+            <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;SupraCoin&gt;(
+                &<a href="create_signer.md#0x1_create_signer">create_signer</a>(task_metadata.owner),
+                <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.registry_fee_address,
+                task.fee
+            );
+            <a href="event.md#0x1_event_emit">event::emit</a>(<a href="automation_registry.md#0x1_automation_registry_TaskEpochFeeWithdraw">TaskEpochFeeWithdraw</a> {
+                task_index: task.task_index,
+                owner: task_metadata.owner,
+                fee: task.fee,
+            });
+            // Total task fees deducted from the user's <a href="account.md#0x1_account">account</a>
+            intermediate_state.epoch_locked_fees = intermediate_state.epoch_locked_fees + task.fee;
+            <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> intermediate_state.active_task_ids, task.task_index);
 
-                // Calculate gas commitment for the next epoch only for valid active tasks
-                <b>if</b> (task_metadata.expiry_time &gt; (current_time + epoch_interval)) {
-                    gas_committed_for_next_epoch = gas_committed_for_next_epoch + task_metadata.max_gas_amount;
-                };
+            // Calculate gas commitment for the next epoch only for valid active tasks
+            <b>if</b> (task_metadata.expiry_time &gt; (current_time + epoch_interval)) {
+                intermediate_state.gas_committed_for_next_epoch = intermediate_state.gas_committed_for_next_epoch + task_metadata.max_gas_amount;
             };
-        }
-    });
-    (gas_committed_for_next_epoch, epoch_locked_fees, epoch_active_task_ids)
+        };
+    }
 }
 </code></pre>
 
@@ -2485,7 +2658,7 @@ Registers a new automation task entry.
     <b>assert</b>!(committed_gas &lt;= <a href="automation_registry.md#0x1_automation_registry_MAX_U64">MAX_U64</a>, <a href="automation_registry.md#0x1_automation_registry_EGAS_COMMITTEED_VALUE_OVERFLOW">EGAS_COMMITTEED_VALUE_OVERFLOW</a>);
 
     <b>let</b> committed_gas = (committed_gas <b>as</b> u64);
-    <b>assert</b>!(committed_gas &lt; automation_registry_config.next_epoch_registry_max_gas_cap, <a href="automation_registry.md#0x1_automation_registry_EGAS_AMOUNT_UPPER">EGAS_AMOUNT_UPPER</a>);
+    <b>assert</b>!(committed_gas &lt;= automation_registry_config.next_epoch_registry_max_gas_cap, <a href="automation_registry.md#0x1_automation_registry_EGAS_AMOUNT_UPPER">EGAS_AMOUNT_UPPER</a>);
 
     // Check the automation fee capacity
     <b>let</b> estimated_automation_fee_for_epoch = <a href="automation_registry.md#0x1_automation_registry_estimate_automation_fee_with_committed_occupancy_internal">estimate_automation_fee_with_committed_occupancy_internal</a>(

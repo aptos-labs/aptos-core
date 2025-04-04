@@ -102,19 +102,11 @@ module supra_std::enumerable_map {
     ): vector<K> {
         assert!(!vector::is_empty(&keys), error::invalid_argument(EVECTOR_EMPTY));
 
-        let map_length = vector::length(&map.list);
         let removed_keys = vector::empty<K>();
 
         vector::for_each_reverse(keys, |key| {
             if (contains(map, key)) {
-                let index_of_element = table::borrow(&map.map, key).position;
-                map_length = map_length - 1;
-                let tuple_to_modify = table::borrow_mut(&mut map.map, *vector::borrow(&map.list, map_length));
-                vector::swap(&mut map.list, index_of_element, map_length);
-                tuple_to_modify.position = index_of_element;
-                vector::pop_back(&mut map.list);
-                table::remove(&mut map.map, key);
-
+                remove_value(map, key);
                 vector::push_back(&mut removed_keys, key);
             };
         });
@@ -303,16 +295,23 @@ module supra_std::enumerable_map {
     }
 
     #[test(owner= @0x1111)]
-    #[expected_failure(abort_code = 1, location = Self)]
+    #[expected_failure(abort_code = 3, location = Self)]
     public fun test_remove_value(owner: &signer) {
         let enum_map = get_enum_map();
 
         remove_value(&mut enum_map, 1);
+        assert!(vector::borrow(&enum_map.list, 0) == &6, 1);
+        assert!(table::borrow(&enum_map.map, 6).position == 0, 11);
         remove_value(&mut enum_map, 2);
+        assert!(vector::borrow(&enum_map.list, 1) == &5, 2);
+        assert!(table::borrow(&enum_map.map, 5).position == 1, 22);
         remove_value(&mut enum_map, 3);
+        assert!(vector::borrow(&enum_map.list, 2) == &4, 3);
+        assert!(table::borrow(&enum_map.map, 4).position == 2, 33);
 
-        assert!(contains(&enum_map, 3), 1);
-        assert!(length(&enum_map) == 3, 2);
+        assert!(length(&enum_map) == 3, 4);
+        // Check that the removed key does not exists
+        assert!(contains(&enum_map, 3), 3);
 
         move_to(owner, EnumerableMapTest { e: enum_map })
     }
