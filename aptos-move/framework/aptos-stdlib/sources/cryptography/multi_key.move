@@ -1,4 +1,5 @@
 module aptos_std::multi_key {
+    use std::hash;
     use std::vector;
 
     //
@@ -26,9 +27,7 @@ module aptos_std::multi_key {
     //
 
     public fun new_unvalidated_public_key_from_bytes(bytes: vector<u8>): UnvalidatedPublicKey {
-        UnvalidatedPublicKey {
-            bytes: bytes
-        }
+        UnvalidatedPublicKey { bytes }
     }
 
     /// Derives the Aptos-specific authentication key of the given MultiKey public key.
@@ -38,7 +37,7 @@ module aptos_std::multi_key {
 
     /// Derives the Aptos-specific authentication key of the given MultiKey public key.
     fun public_key_bytes_to_authentication_key(pk_bytes: vector<u8>): vector<u8> {
-        vector::push_back(&mut pk_bytes, SIGNATURE_SCHEME_ID);
-        std::hash::sha3_256(pk_bytes)
+        pk_bytes.push_back(SIGNATURE_SCHEME_ID)
+        hash::sha3_256(pk_bytes)
     }
 }

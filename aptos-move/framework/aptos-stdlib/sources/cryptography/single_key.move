@@ -1,6 +1,6 @@
 module aptos_std::single_key {
     use aptos_std::ed25519;
-
+    use std::hash;
     //
     // Error codes
     //
@@ -66,9 +66,9 @@ module aptos_std::single_key {
     /// We do this by prepending the scheme identifier and the length of the public key (32 bytes or 0x20 in hex) to
     /// the public key bytes.
     public fun from_ed25519_public_key_unvalidated(pk: &ed25519::UnvalidatedPublicKey): UnvalidatedPublicKey {
-        let pk_bytes = std::vector::empty();
-        std::vector::push_back(&mut pk_bytes, ED25519_PUBLIC_KEY_TYPE);
-        std::vector::push_back(&mut pk_bytes, 0x20);
+        let pk_bytes = vector[];
+        pk_bytes.push_back(ED25519_PUBLIC_KEY_TYPE);
+        pk_bytes.push_back(0x20);
         std::vector::append(&mut pk_bytes, ed25519::unvalidated_public_key_to_bytes(pk));
         UnvalidatedPublicKey {
             bytes: pk_bytes
@@ -82,7 +82,7 @@ module aptos_std::single_key {
 
     /// Derives the Aptos-specific authentication key of the given bytes of a single key public key.
     fun public_key_bytes_to_authentication_key(pk_bytes: vector<u8>): vector<u8> {
-        std::vector::push_back(&mut pk_bytes, SIGNATURE_SCHEME_ID);
-        std::hash::sha3_256(pk_bytes)
+        pk_bytes.push_back(SIGNATURE_SCHEME_ID);
+        hash::sha3_256(pk_bytes)
     }
 }
