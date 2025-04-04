@@ -278,15 +278,15 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .map(|a| MoveValue::Signer(*a).simple_serialize().unwrap())
             .chain(args)
             .collect();
-        let verbose = extra_args.verbose;
 
+        // TODO(lazy-loading): use lazy loading here to run transactional tests?
         code_storage
-            .load_script(&script_bytes, &type_args)
+            .unmetered_load_script(&script_bytes, &type_args)
             .and_then(|func| self.execute_loaded_function(func, args, gas_budget, &code_storage))
             .map_err(|err| {
                 anyhow!(
                     "Script execution failed with VMError: {}",
-                    err.format_test_output(move_test_debug() || verbose)
+                    err.format_test_output(move_test_debug() || extra_args.verbose)
                 )
             })?;
         Ok(None)
@@ -319,15 +319,15 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .map(|a| MoveValue::Signer(*a).simple_serialize().unwrap())
             .chain(args)
             .collect();
-        let verbose = extra_args.verbose;
 
+        // TODO(lazy-loading): use lazy loading here to run transactional tests?
         let serialized_return_values = module_storage
-            .load_function(module, function, &type_args)
+            .unmetered_load_function(module, function, &type_args)
             .and_then(|func| self.execute_loaded_function(func, args, gas_budget, &module_storage))
             .map_err(|err| {
                 anyhow!(
                     "Function execution failed with VMError: {}",
-                    err.format_test_output(move_test_debug() || verbose)
+                    err.format_test_output(move_test_debug() || extra_args.verbose)
                 )
             })?;
         Ok((None, serialized_return_values))

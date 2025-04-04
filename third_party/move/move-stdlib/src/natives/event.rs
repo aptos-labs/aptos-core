@@ -37,7 +37,7 @@ fn native_write_to_event_store(
     let msg = arguments.pop_back().unwrap();
     let cost = gas_params.unit_cost * std::cmp::max(msg.legacy_abstract_memory_size(), 1.into());
 
-    Ok(NativeResult::ok(cost, smallvec![]))
+    Ok(NativeResult::ok(cost, 0.into(), 0.into(), smallvec![]))
 }
 
 pub fn make_native_write_to_event_store(

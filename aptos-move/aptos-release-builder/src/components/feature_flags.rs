@@ -142,6 +142,7 @@ pub enum FeatureFlag {
     DerivableAccountAbstraction,
     EnableFunctionValues,
     NewAccountsDefaultToFaStore,
+    EnableLazyLoading,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -379,6 +380,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::NewAccountsDefaultToFaStore => {
                 AptosFeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE
             },
+            FeatureFlag::EnableLazyLoading => AptosFeatureFlag::ENABLE_LAZY_LOADING,
         }
     }
 }
@@ -543,6 +545,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE => {
                 FeatureFlag::NewAccountsDefaultToFaStore
             },
+            AptosFeatureFlag::ENABLE_LAZY_LOADING => FeatureFlag::EnableLazyLoading,
         }
     }
 }

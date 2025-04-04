@@ -3,16 +3,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    check_dependencies_and_charge_gas, check_type_tag_dependencies_and_charge_gas,
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
+    module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
-    storage::ty_tag_converter::TypeTagConverter,
-    LayoutConverter, ModuleStorage, StorageLayoutConverter,
+    runtime_type_checks::RuntimeTypeCheck,
+    storage::ty_layout_converter::{
+        LayoutConverter, MetredLazyLayoutConverter, UnmeteredLayoutConverter,
+    },
+    LazyMeteredCodeStorage, ModuleStorage,
 };
 use better_any::{Tid, TidAble, TidExt};
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
-    errors::{PartialVMError, PartialVMResult},
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
         Bytecode, CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility,
     },
@@ -27,6 +32,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
+    gas::GasMeter,
     loaded_data::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
@@ -78,6 +84,32 @@ impl LoadedFunction {
     pub fn owner(&self) -> &LoadedFunctionOwner {
         &self.owner
     }
+
+    pub fn expect_script(&self) -> VMResult<&Script> {
+        match &self.owner {
+            LoadedFunctionOwner::Script(script) => Ok(script.as_ref()),
+            LoadedFunctionOwner::Module(_) => {
+                let msg = "Expected function from script, got module instead".to_string();
+                let err = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Undefined);
+                Err(err)
+            },
+        }
+    }
+
+    pub fn expect_module(&self) -> VMResult<&Module> {
+        match &self.owner {
+            LoadedFunctionOwner::Module(module) => Ok(module.as_ref()),
+            LoadedFunctionOwner::Script(_) => {
+                let msg = "Expected function from module, but got script instead".to_string();
+                let err = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Undefined);
+                Err(err)
+            },
+        }
+    }
 }
 
 /// A lazy loaded function, which can either be unresolved (as resulting
@@ -112,14 +144,14 @@ impl LazyLoadedFunction {
     }
 
     pub(crate) fn new_resolved(
-        converter: &TypeTagConverter,
+        module_storage: &impl ModuleStorage,
         fun: Rc<LoadedFunction>,
         mask: ClosureMask,
     ) -> PartialVMResult<Self> {
         let ty_args = fun
             .ty_args
             .iter()
-            .map(|t| converter.ty_to_ty_tag(t))
+            .map(|t| module_storage.runtime_environment().ty_to_ty_tag(t))
             .collect::<PartialVMResult<Vec<_>>>()?;
         Ok(Self(Rc::new(RefCell::new(
             LazyLoadedFunctionState::Resolved { fun, ty_args, mask },
@@ -160,17 +192,56 @@ impl LazyLoadedFunction {
         }
     }
 
-    /// Executed an action with the resolved loaded function. If the function hasn't been
-    /// loaded yet, it will be loaded now.
-    #[allow(unused)]
-    pub(crate) fn with_resolved_function<T>(
+    /// Loads the function if it has not been resolved. Gas will be charged by this function.
+    pub(crate) fn load_if_unresolved<RTTCheck: RuntimeTypeCheck>(
         &self,
-        storage: &dyn ModuleStorage,
-        action: impl FnOnce(Rc<LoadedFunction>) -> PartialVMResult<T>,
-    ) -> PartialVMResult<T> {
+        module_storage: &impl ModuleStorage,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+    ) -> PartialVMResult<(Rc<LoadedFunction>, ModuleId)> {
+        let module_id = self.with_name_and_ty_args(|module_opt, _func_name, ty_arg_tags| {
+            let module_id = module_opt.ok_or_else(|| {
+                // TODO(#15664): currently we need the module id for gas charging
+                //   of calls, so we can't proceed here without one. But we want
+                //   to be able to let scripts use closures.
+                PartialVMError::new_invariant_violation(format!(
+                    "module id required to charge gas for function `{}`",
+                    self.to_stable_string()
+                ))
+            })?;
+
+            // Step 1: charge gas (only if non-lazy loading is used). For lazy loading, we will be
+            // charging gas at load time.
+            if !module_storage
+                .runtime_environment()
+                .vm_config()
+                .use_lazy_loading
+            {
+                // Charge gas for function code loading.
+                let arena_id = traversal_context
+                    .referenced_module_ids
+                    .alloc(module_id.clone());
+                check_dependencies_and_charge_gas(module_storage, gas_meter, traversal_context, [
+                    (arena_id.address(), arena_id.name()),
+                ])
+                .map_err(|err| err.to_partial())?;
+
+                // Charge gas for code loading of modules used by type arguments.
+                check_type_tag_dependencies_and_charge_gas(
+                    module_storage,
+                    gas_meter,
+                    traversal_context,
+                    ty_arg_tags,
+                )
+                .map_err(|err| err.to_partial())?;
+            }
+            Ok(module_id.clone())
+        })?;
+
+        // Step 2: load the function.
         let mut state = self.0.borrow_mut();
-        match &mut *state {
-            LazyLoadedFunctionState::Resolved { fun, .. } => action(fun.clone()),
+        let fun = match &mut *state {
+            LazyLoadedFunctionState::Resolved { fun, .. } => fun.clone(),
             LazyLoadedFunctionState::Unresolved {
                 data:
                     SerializedFunctionData {
@@ -182,56 +253,103 @@ impl LazyLoadedFunction {
                         captured_layouts,
                     },
             } => {
-                let fun =
-                    Self::resolve(storage, module_id, fun_id, ty_args, *mask, captured_layouts)?;
-                let result = action(fun.clone());
+                let fun = Self::resolve::<RTTCheck>(
+                    module_storage,
+                    gas_meter,
+                    traversal_context,
+                    module_id,
+                    fun_id,
+                    ty_args,
+                    *mask,
+                    captured_layouts,
+                )?;
                 *state = LazyLoadedFunctionState::Resolved {
-                    fun,
+                    fun: fun.clone(),
                     ty_args: ty_args.clone(),
                     mask: *mask,
                 };
-                result
+                fun
             },
-        }
+        };
+        Ok((fun, module_id))
     }
 
     /// Resolves a function into a loaded function. This verifies existence of the named
     /// function as well as whether it has the type used for deserializing the captured values.
-    fn resolve(
-        module_storage: &dyn ModuleStorage,
+    fn resolve<RTTCheck: RuntimeTypeCheck>(
+        module_storage: &impl ModuleStorage,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         module_id: &ModuleId,
         fun_id: &IdentStr,
         ty_args: &[TypeTag],
         mask: ClosureMask,
         captured_layouts: &[MoveTypeLayout],
     ) -> PartialVMResult<Rc<LoadedFunction>> {
-        let function = module_storage
-            .load_function(module_id, fun_id, ty_args)
-            .map_err(|err| err.to_partial())?;
-
-        // Verify that the function argument types match the layouts used for deserialization.
-        // This is only done in paranoid mode. Since integrity of storage
-        // and guarantee of public function, this should not able to fail.
-        if module_storage
+        let use_lazy_loading = module_storage
             .runtime_environment()
             .vm_config()
-            .paranoid_type_checks
+            .use_lazy_loading;
+        let function = if use_lazy_loading {
+            LazyMeteredCodeStorage::new(module_storage)
+                .metered_lazy_load_function(
+                    gas_meter,
+                    traversal_context,
+                    module_id,
+                    fun_id,
+                    ty_args,
+                )
+                .map_err(|err| err.to_partial())?
+        } else {
+            module_storage
+                .unmetered_load_function(module_id, fun_id, ty_args)
+                .map_err(|err| err.to_partial())?
+        };
+
+        if use_lazy_loading {
+            Self::check_layouts_compatible::<RTTCheck>(
+                &mut MetredLazyLayoutConverter::new(gas_meter, traversal_context, module_storage),
+                &function,
+                mask,
+                captured_layouts,
+            )?;
+        } else {
+            Self::check_layouts_compatible::<RTTCheck>(
+                &mut UnmeteredLayoutConverter::new(module_storage),
+                &function,
+                mask,
+                captured_layouts,
+            )?;
+        }
+
+        Ok(Rc::new(function))
+    }
+
+    // Note: this function may charge gas and load modules.
+    fn check_layouts_compatible<RTCheck: RuntimeTypeCheck>(
+        converter: &mut impl LayoutConverter,
+        function: &LoadedFunction,
+        mask: ClosureMask,
+        captured_layouts: &[MoveTypeLayout],
+    ) -> PartialVMResult<()> {
+        let captured_arg_types = mask.extract(function.param_tys(), true);
+        if captured_arg_types.len() != captured_layouts.len() {
+            return Err(
+                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
+                    "captured argument count does not match declared parameters".to_string(),
+                ),
+            );
+        }
+
+        for (actual_arg_ty, serialized_layout) in
+            captured_arg_types.into_iter().zip(captured_layouts)
         {
-            // TODO(#15664): Determine whether we need to charge gas here.
-            let captured_arg_types = mask.extract(function.param_tys(), true);
-            let converter = StorageLayoutConverter::new(module_storage);
-            if captured_arg_types.len() != captured_layouts.len() {
-                return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                    .with_message(
-                        "captured argument count does not match declared parameters".to_string(),
-                    ));
-            }
-            for (actual_arg_ty, serialized_layout) in
-                captured_arg_types.into_iter().zip(captured_layouts)
-            {
-                // Note that the below call returns a runtime layout, so we can directly
-                // compare it without desugaring.
-                let actual_arg_layout = converter.type_to_type_layout(actual_arg_ty)?;
+            // Note that the below call returns a runtime layout, so we can directly compare it
+            // without desugaring. Also, gas may be charged here.
+            let actual_arg_layout = converter.type_to_type_layout(actual_arg_ty)?;
+
+            #[allow(clippy::collapsible_if)]
+            if RTCheck::should_perform_checks() {
                 if !serialized_layout.is_compatible_with(&actual_arg_layout) {
                     return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                         .with_message(
@@ -241,7 +359,8 @@ impl LazyLoadedFunction {
                 }
             }
         }
-        Ok(Rc::new(function))
+
+        Ok(())
     }
 }
 

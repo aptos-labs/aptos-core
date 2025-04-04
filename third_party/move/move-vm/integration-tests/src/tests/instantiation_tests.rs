@@ -141,7 +141,7 @@ fn instantiation_err() {
 }
 
 fn load_function(module_storage: &impl ModuleStorage, module_id: &ModuleId, ty_args: &[TypeTag]) {
-    let res = module_storage.load_function(module_id, ident_str!("f"), ty_args);
+    let res = module_storage.unmetered_load_function(module_id, ident_str!("f"), ty_args);
     assert!(
         res.is_err(),
         "Instantiation must fail at load time when converting from type tag to type "

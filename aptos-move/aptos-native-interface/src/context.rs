@@ -5,11 +5,19 @@ use crate::errors::{SafeNativeError, SafeNativeResult};
 use aptos_gas_algebra::{
     AbstractValueSize, DynamicExpression, GasExpression, GasQuantity, InternalGasUnit,
 };
-use aptos_gas_schedule::{AbstractValueSizeGasParameters, MiscGasParameters, NativeGasParameters};
+use aptos_gas_schedule::{
+    gas_params::txn::{DEPENDENCY_PER_BYTE, DEPENDENCY_PER_MODULE},
+    AbstractValueSizeGasParameters, NativeGasParameters, VMGasParameters,
+};
 use aptos_types::on_chain_config::{Features, TimedFeatureFlag, TimedFeatures};
-use move_core_types::gas_algebra::InternalGas;
+use move_binary_format::errors::PartialVMError;
+use move_core_types::{
+    gas_algebra::{InternalGas, NumBytes},
+    value::MoveTypeLayout,
+    vm_status::StatusCode,
+};
 use move_vm_runtime::native_functions::NativeContext;
-use move_vm_types::values::Value;
+use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use std::ops::{Deref, DerefMut};
 
 /// A proxy between the VM and the native functions, allowing the latter to query VM configurations
@@ -19,15 +27,15 @@ use std::ops::{Deref, DerefMut};
 /// Major features include incremental gas charging and less ambiguous error handling. For this
 /// reason, native functions should always use [`SafeNativeContext`] instead of [`NativeContext`].
 #[allow(unused)]
-pub struct SafeNativeContext<'a, 'b, 'c> {
-    pub(crate) inner: &'c mut NativeContext<'a, 'b>,
+pub struct SafeNativeContext<'a, 'b, 'c, 'd> {
+    pub(crate) inner: &'c mut NativeContext<'a, 'b, 'd>,
 
     pub(crate) timed_features: &'c TimedFeatures,
     pub(crate) features: &'c Features,
     pub(crate) gas_feature_version: u64,
 
+    pub(crate) vm_gas_params: &'c VMGasParameters,
     pub(crate) native_gas_params: &'c NativeGasParameters,
-    pub(crate) misc_gas_params: &'c MiscGasParameters,
 
     pub(crate) gas_budget: InternalGas,
     pub(crate) gas_used: InternalGas,
@@ -37,21 +45,21 @@ pub struct SafeNativeContext<'a, 'b, 'c> {
     pub(crate) gas_hook: Option<&'c (dyn Fn(DynamicExpression) + Send + Sync)>,
 }
 
-impl<'a, 'b, 'c> Deref for SafeNativeContext<'a, 'b, 'c> {
-    type Target = NativeContext<'a, 'b>;
+impl<'a, 'b, 'c, 'd> Deref for SafeNativeContext<'a, 'b, 'c, 'd> {
+    type Target = NativeContext<'a, 'b, 'd>;
 
     fn deref(&self) -> &Self::Target {
         self.inner
     }
 }
 
-impl<'a, 'b, 'c> DerefMut for SafeNativeContext<'a, 'b, 'c> {
+impl<'a, 'b, 'c, 'd> DerefMut for SafeNativeContext<'a, 'b, 'c, 'd> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.inner
     }
 }
 
-impl<'a, 'b, 'c> SafeNativeContext<'a, 'b, 'c> {
+impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
     /// Always remember: first charge gas, then execute!
     ///
     /// In other words, this function **MUST** always be called **BEFORE** executing **any**
@@ -89,21 +97,23 @@ impl<'a, 'b, 'c> SafeNativeContext<'a, 'b, 'c> {
 
     /// Computes the abstract size of the input value.
     pub fn abs_val_size(&self, val: &Value) -> AbstractValueSize {
-        self.misc_gas_params
+        self.vm_gas_params
+            .misc
             .abs_val
             .abstract_value_size(val, self.gas_feature_version)
     }
 
     /// Computes the abstract size of the input value.
     pub fn abs_val_size_dereferenced(&self, val: &Value) -> AbstractValueSize {
-        self.misc_gas_params
+        self.vm_gas_params
+            .misc
             .abs_val
             .abstract_value_size_dereferenced(val, self.gas_feature_version)
     }
 
     /// Returns the gas parameters that are used to define abstract value sizes.
     pub fn abs_val_gas_params(&self) -> &AbstractValueSizeGasParameters {
-        &self.misc_gas_params.abs_val
+        &self.vm_gas_params.misc.abs_val
     }
 
     /// Returns the current gas feature version.
@@ -127,6 +137,73 @@ impl<'a, 'b, 'c> SafeNativeContext<'a, 'b, 'c> {
         if self.timed_feature_enabled(TimedFeatureFlag::FixMemoryUsageTracking) {
             self.inner.use_heap_memory(amount);
         }
+    }
+
+    pub fn type_to_type_layout(&mut self, ty: &Type) -> SafeNativeResult<MoveTypeLayout> {
+        if self.features.is_lazy_loading_enabled() {
+            let cost_fn = |size: u64| -> InternalGas {
+                (DEPENDENCY_PER_MODULE + DEPENDENCY_PER_BYTE * NumBytes::new(size))
+                    .evaluate(self.gas_feature_version, self.vm_gas_params)
+            };
+            self.inner
+                .metered_lazy_type_to_type_layout(ty, self.gas_used, cost_fn)
+                .map_err(|err| self.convert_to_safe_error(err))
+        } else {
+            Ok(self.inner.unmetered_type_to_type_layout(ty)?)
+        }
+    }
+
+    pub fn type_to_type_layout_with_identifier_mappings(
+        &mut self,
+        ty: &Type,
+    ) -> SafeNativeResult<(MoveTypeLayout, bool)> {
+        if self.features.is_lazy_loading_enabled() {
+            let cost_fn = |size: u64| -> InternalGas {
+                (DEPENDENCY_PER_MODULE + DEPENDENCY_PER_BYTE * NumBytes::new(size))
+                    .evaluate(self.gas_feature_version, self.vm_gas_params)
+            };
+            self.inner
+                .metered_lazy_type_to_type_layout_with_identifier_mappings(
+                    ty,
+                    self.gas_used,
+                    cost_fn,
+                )
+                .map_err(|err| self.convert_to_safe_error(err))
+        } else {
+            Ok(self
+                .inner
+                .unmetered_type_to_type_layout_with_identifier_mappings(ty)?)
+        }
+    }
+
+    pub fn type_to_fully_annotated_layout(
+        &mut self,
+        ty: &Type,
+    ) -> SafeNativeResult<MoveTypeLayout> {
+        if self.features.is_lazy_loading_enabled() {
+            let cost_fn = |size: u64| -> InternalGas {
+                (DEPENDENCY_PER_MODULE + DEPENDENCY_PER_BYTE * NumBytes::new(size))
+                    .evaluate(self.gas_feature_version, self.vm_gas_params)
+            };
+            self.inner
+                .metered_lazy_type_to_fully_annotated_layout(ty, self.gas_used, cost_fn)
+                .map_err(|err| self.convert_to_safe_error(err))
+        } else {
+            Ok(self.inner.unmetered_type_to_fully_annotated_layout(ty)?)
+        }
+    }
+
+    fn convert_to_safe_error(&self, err: PartialVMError) -> SafeNativeError {
+        // Use out of gas, so that we can handle it on native finish and charge gas properly via
+        // the meter.
+        if err.major_status() == StatusCode::OUT_OF_GAS
+            || err.major_status() == StatusCode::DEPENDENCY_LIMIT_REACHED
+        {
+            return SafeNativeError::OutOfGas;
+        }
+
+        // Otherwise, use the same behaviour as for other natives returning partial error.
+        SafeNativeError::from(err)
     }
 
     /// Configures the behavior of [`Self::charge()`].

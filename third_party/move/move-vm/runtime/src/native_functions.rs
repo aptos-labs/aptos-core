@@ -3,25 +3,33 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache, interpreter::InterpreterDebugInterface, loader::Function,
-    module_traversal::TraversalContext, native_extensions::NativeContextExtensions,
-    storage::module_storage::FunctionValueExtensionAdapter, LayoutConverter, ModuleStorage,
-    StorageLayoutConverter,
+    data_cache::TransactionDataCache,
+    interpreter::InterpreterDebugInterface,
+    loader::Function,
+    module_traversal::TraversalContext,
+    native_extensions::NativeContextExtensions,
+    storage::{
+        module_storage::FunctionValueExtensionAdapter,
+        ty_layout_converter::{
+            LayoutConverter, MetredLazyNativeLayoutConverter, UnmeteredLayoutConverter,
+        },
+    },
+    ModuleStorage,
 };
 use move_binary_format::errors::{
     ExecutionState, Location, PartialVMError, PartialVMResult, VMResult,
 };
 use move_core_types::{
     account_address::AccountAddress,
-    gas_algebra::{InternalGas, NumBytes},
+    gas_algebra::{InternalGas, NumBytes, NumModules},
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, resolver::ResourceResolver,
-    values::Value,
+    gas::GasMeter, loaded_data::runtime_types::Type, natives::function::NativeResult,
+    resolver::ResourceResolver, values::Value,
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -95,14 +103,14 @@ impl NativeFunctions {
     }
 }
 
-pub struct NativeContext<'a, 'b> {
-    interpreter: &'a mut dyn InterpreterDebugInterface,
+pub struct NativeContext<'a, 'b, 'c> {
+    interpreter: &'a dyn InterpreterDebugInterface,
     data_store: &'a mut TransactionDataCache,
     resource_resolver: &'a dyn ResourceResolver,
     module_storage: &'a dyn ModuleStorage,
     extensions: &'a mut NativeContextExtensions<'b>,
     gas_balance: InternalGas,
-    traversal_context: &'a TraversalContext<'a>,
+    traversal_context: &'a mut TraversalContext<'c>,
 
     /// Counter used to record the (conceptual) heap memory usage by a native functions,
     /// measured in abstract memory unit.
@@ -110,17 +118,22 @@ pub struct NativeContext<'a, 'b> {
     /// This is a hack to emulate memory usage tracking, before we could refactor native functions
     /// and allow them to access the gas meter directly.
     heap_memory_usage: u64,
+
+    total_dependency_size: NumBytes,
+    max_total_dependency_size: NumBytes,
+    num_dependencies: NumModules,
+    max_num_dependencies: NumModules,
 }
 
-impl<'a, 'b> NativeContext<'a, 'b> {
+impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     pub(crate) fn new(
-        interpreter: &'a mut dyn InterpreterDebugInterface,
+        interpreter: &'a dyn InterpreterDebugInterface,
         data_store: &'a mut TransactionDataCache,
         resource_resolver: &'a dyn ResourceResolver,
         module_storage: &'a dyn ModuleStorage,
         extensions: &'a mut NativeContextExtensions<'b>,
-        gas_balance: InternalGas,
-        traversal_context: &'a TraversalContext<'a>,
+        gas_meter: &impl GasMeter,
+        traversal_context: &'a mut TraversalContext<'c>,
     ) -> Self {
         Self {
             interpreter,
@@ -128,15 +141,19 @@ impl<'a, 'b> NativeContext<'a, 'b> {
             resource_resolver,
             module_storage,
             extensions,
-            gas_balance,
+            gas_balance: gas_meter.balance_internal(),
             traversal_context,
 
             heap_memory_usage: 0,
+            total_dependency_size: gas_meter.total_dependency_size(),
+            max_total_dependency_size: gas_meter.max_total_dependency_size(),
+            num_dependencies: gas_meter.num_dependencies(),
+            max_num_dependencies: gas_meter.max_num_dependencies(),
         }
     }
 }
 
-impl<'a, 'b> NativeContext<'a, 'b> {
+impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     pub fn print_stack_trace(&self, buf: &mut String) -> PartialVMResult<()> {
         self.interpreter
             .debug_print_stack_trace(buf, self.module_storage.runtime_environment())
@@ -146,38 +163,117 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         &mut self,
         address: AccountAddress,
         ty: &Type,
-    ) -> VMResult<(bool, Option<NumBytes>)> {
-        // TODO(Rati, George): propagate exists call the way to resolver, because we
-        //                     can implement the check more efficiently, without the
-        //                     need to actually load bytes.
-        let (value, num_bytes) = self
+    ) -> PartialVMResult<(bool, Option<NumBytes>)> {
+        let bytes_loaded = if !self.data_store.is_resource_loaded(&address, ty) {
+            let (entry, bytes_loaded) = TransactionDataCache::load_resource_for_natives(
+                self.module_storage,
+                self.resource_resolver,
+                &address,
+                ty,
+            )?;
+            self.data_store
+                .store_loaded_resource(address, ty.clone(), entry)?;
+            Some(bytes_loaded)
+        } else {
+            None
+        };
+        let exists = self
             .data_store
-            .load_resource(self.module_storage, self.resource_resolver, address, ty)
-            .map_err(|err| err.finish(Location::Undefined))?;
-        let exists = value
-            .exists()
-            .map_err(|err| err.finish(Location::Undefined))?;
-        Ok((exists, num_bytes))
+            .get_resource_if_loaded(&address, ty)?
+            .exists()?;
+        Ok((exists, bytes_loaded))
     }
 
     pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
         self.module_storage.runtime_environment().ty_to_ty_tag(ty)
     }
 
-    pub fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
-        StorageLayoutConverter::new(self.module_storage).type_to_type_layout(ty)
+    pub fn metered_lazy_type_to_type_layout<F>(
+        &mut self,
+        ty: &Type,
+        gas_used: InternalGas,
+        cost_fn: F,
+    ) -> PartialVMResult<MoveTypeLayout>
+    where
+        F: Fn(u64) -> InternalGas,
+    {
+        MetredLazyNativeLayoutConverter::new(
+            self.traversal_context,
+            self.module_storage,
+            gas_used,
+            self.gas_balance,
+            self.total_dependency_size,
+            self.max_total_dependency_size,
+            self.num_dependencies,
+            self.max_num_dependencies,
+            cost_fn,
+        )
+        .type_to_type_layout(ty)
     }
 
-    pub fn type_to_type_layout_with_identifier_mappings(
+    pub fn unmetered_type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+        UnmeteredLayoutConverter::new(self.module_storage).type_to_type_layout(ty)
+    }
+
+    pub fn metered_lazy_type_to_type_layout_with_identifier_mappings<F>(
+        &mut self,
+        ty: &Type,
+        gas_used: InternalGas,
+        cost_fn: F,
+    ) -> PartialVMResult<(MoveTypeLayout, bool)>
+    where
+        F: Fn(u64) -> InternalGas,
+    {
+        MetredLazyNativeLayoutConverter::new(
+            self.traversal_context,
+            self.module_storage,
+            gas_used,
+            self.gas_balance,
+            self.total_dependency_size,
+            self.max_total_dependency_size,
+            self.num_dependencies,
+            self.max_num_dependencies,
+            cost_fn,
+        )
+        .type_to_type_layout_with_identifier_mappings(ty)
+    }
+
+    pub fn unmetered_type_to_type_layout_with_identifier_mappings(
         &self,
         ty: &Type,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        StorageLayoutConverter::new(self.module_storage)
+        UnmeteredLayoutConverter::new(self.module_storage)
             .type_to_type_layout_with_identifier_mappings(ty)
     }
 
-    pub fn type_to_fully_annotated_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
-        StorageLayoutConverter::new(self.module_storage).type_to_fully_annotated_layout(ty)
+    pub fn metered_lazy_type_to_fully_annotated_layout<F>(
+        &mut self,
+        ty: &Type,
+        gas_used: InternalGas,
+        cost_fn: F,
+    ) -> PartialVMResult<MoveTypeLayout>
+    where
+        F: Fn(u64) -> InternalGas,
+    {
+        MetredLazyNativeLayoutConverter::new(
+            self.traversal_context,
+            self.module_storage,
+            gas_used,
+            self.gas_balance,
+            self.total_dependency_size,
+            self.max_total_dependency_size,
+            self.num_dependencies,
+            self.max_num_dependencies,
+            cost_fn,
+        )
+        .type_to_fully_annotated_layout(ty)
+    }
+
+    pub fn unmetered_type_to_fully_annotated_layout(
+        &self,
+        ty: &Type,
+    ) -> PartialVMResult<MoveTypeLayout> {
+        UnmeteredLayoutConverter::new(self.module_storage).type_to_fully_annotated_layout(ty)
     }
 
     pub fn extensions(&self) -> &NativeContextExtensions<'b> {
@@ -198,6 +294,14 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         self.gas_balance
     }
 
+    pub fn num_dependencies(&self) -> NumModules {
+        self.num_dependencies
+    }
+
+    pub fn total_dependency_size(&self) -> NumBytes {
+        self.total_dependency_size
+    }
+
     pub fn use_heap_memory(&mut self, amount: u64) {
         self.heap_memory_usage = self.heap_memory_usage.saturating_add(amount);
     }
@@ -206,7 +310,22 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         self.heap_memory_usage
     }
 
+    pub fn module_storage(&self) -> &dyn ModuleStorage {
+        self.module_storage
+    }
+
+    pub fn use_lazy_loading(&self) -> bool {
+        self.module_storage
+            .runtime_environment()
+            .vm_config()
+            .use_lazy_loading
+    }
+
     pub fn traversal_context(&self) -> &TraversalContext {
+        self.traversal_context
+    }
+
+    pub fn traversal_context_mut(&mut self) -> &mut TraversalContext<'c> {
         self.traversal_context
     }
 
@@ -221,7 +340,15 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         module_id: &ModuleId,
         function_name: &Identifier,
     ) -> VMResult<Arc<Function>> {
-        let (_, function) = self.module_storage.fetch_function_definition(
+        // MODULE LOADING METERING:
+        //   Metering is done when native returns LoadModule result, so this access will never load
+        //   anything and will access cached and metered modules. Currently, native implementations
+        //   check if the loading was metered or not before calling here, but this kept as an extra
+        //   redundancy check in case there is a mistake and gas is not charged somehow.
+        self.traversal_context
+            .check_is_special_or_visited(module_id.address(), module_id.name())
+            .map_err(|err| err.finish(Location::Undefined))?;
+        let (_, function) = self.module_storage.unmetered_get_function_definition(
             module_id.address(),
             module_id.name(),
             function_name,

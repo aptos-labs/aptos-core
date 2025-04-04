@@ -12,6 +12,7 @@ use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_types::transaction::Version;
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use std::{
+    collections::BTreeMap,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -39,8 +40,8 @@ impl InputOutputDiffGenerator {
         let num_generated = Arc::new(AtomicU64::new(0));
         let num_blocks = txn_blocks.len();
 
-        let mut tasks = Vec::with_capacity(num_blocks);
-        for txn_block in txn_blocks {
+        let mut tasks = BTreeMap::new();
+        for (idx, txn_block) in txn_blocks.into_iter().enumerate() {
             let task = tokio::task::spawn_blocking({
                 let generator = generator.clone();
                 let num_generated = num_generated.clone();
@@ -57,12 +58,12 @@ impl InputOutputDiffGenerator {
                     inputs
                 }
             });
-            tasks.push(task);
+            tasks.insert(idx, task);
         }
 
-        let mut all_inputs = Vec::with_capacity(tasks.len());
-        for task in tasks {
-            all_inputs.push(task.await?);
+        let mut all_inputs: Vec<_> = (0..tasks.len()).map(|_| ReadSet::default()).collect();
+        for (idx, task) in tasks {
+            all_inputs[idx] = task.await?;
         }
 
         Ok(all_inputs)

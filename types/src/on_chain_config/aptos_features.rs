@@ -134,6 +134,7 @@ pub enum FeatureFlag {
     /// Whether function values are enabled.
     ENABLE_FUNCTION_VALUES = 89,
     NEW_ACCOUNTS_DEFAULT_TO_FA_STORE = 90,
+    ENABLE_LAZY_LOADING = 91,
 }
 
 impl FeatureFlag {
@@ -378,6 +379,10 @@ impl Features {
 
     pub fn is_call_tree_and_instruction_vm_cache_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE)
+    }
+
+    pub fn is_lazy_loading_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ENABLE_LAZY_LOADING)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

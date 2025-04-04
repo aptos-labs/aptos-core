@@ -1076,7 +1076,7 @@ impl FakeExecutor {
         // Create module storage, and ensure the module for the function we want to execute is
         // cached.
         let module_storage = self.state_store.as_aptos_code_storage(&env);
-        assert_ok!(module_storage.fetch_verified_module(module.address(), module.name()));
+        assert_ok!(module_storage.unmetered_get_verified_module(module.address(), module.name()));
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;
@@ -1085,7 +1085,7 @@ impl FakeExecutor {
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             // load function name into cache to ensure cache is hot
-            let _ = module_storage.load_function(
+            let _ = module_storage.unmetered_load_function(
                 module,
                 &Self::name(function_name),
                 &type_params.clone(),

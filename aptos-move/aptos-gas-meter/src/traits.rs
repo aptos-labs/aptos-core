@@ -16,7 +16,7 @@ use aptos_vm_types::{
     },
 };
 use move_binary_format::errors::{Location, PartialVMResult, VMResult};
-use move_core_types::gas_algebra::{InternalGas, InternalGasUnit, NumBytes};
+use move_core_types::gas_algebra::{InternalGas, InternalGasUnit, NumBytes, NumModules};
 use move_vm_types::gas::GasMeter as MoveGasMeter;
 use std::fmt::Debug;
 
@@ -72,6 +72,12 @@ pub trait GasAlgebra {
     /// Counts a dependency against the limits.
     fn count_dependency(&mut self, size: NumBytes) -> PartialVMResult<()>;
 
+    fn count_native_dependencies(
+        &mut self,
+        num_dependencies: NumModules,
+        total_size: NumBytes,
+    ) -> PartialVMResult<()>;
+
     /// Returns the amount of gas used under the execution category.
     fn execution_gas_used(&self) -> InternalGas;
 
@@ -86,6 +92,10 @@ pub trait GasAlgebra {
 
     /// Bump the `extra_balance`.
     fn inject_balance(&mut self, extra_balance: impl Into<Gas>) -> PartialVMResult<()>;
+
+    fn num_dependencies(&self) -> NumModules;
+
+    fn total_dependency_size(&self) -> NumBytes;
 }
 
 /// Trait representing a gas meter used inside the Aptos VM.

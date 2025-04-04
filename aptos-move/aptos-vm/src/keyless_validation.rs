@@ -47,9 +47,15 @@ fn get_resource_on_chain_at_addr<T: MoveStructType + for<'a> Deserialize<'a>>(
     module_storage: &impl ModuleStorage,
 ) -> anyhow::Result<T, VMStatus> {
     let struct_tag = T::struct_tag();
+
+    // MODULE LOADING METERING:
+    //   This is system code, and we access known modules (configs that happen to live not at 0x1
+    //   address). It has not been metered before, and it is safe to not meter it with lazy loading
+    //   either.
     let metadata = module_storage
-        .fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
+        .unmetered_get_existing_module_metadata(&struct_tag.address, &struct_tag.module)
         .map_err(|e| e.into_vm_status())?;
+
     let bytes = resolver
         .get_resource_bytes_with_metadata_and_layout(addr, &struct_tag, &metadata, None)
         .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
