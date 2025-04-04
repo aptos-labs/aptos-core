@@ -10,7 +10,7 @@ use move_binary_format::{
         AddressSpecifier, CompiledModule, CompiledScript, FunctionHandle, IdentifierIndex,
         ResourceSpecifier, Signature, SignatureIndex, SignatureToken, TableIndex,
     },
-    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_MAX},
+    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_7, VERSION_MAX},
 };
 use move_core_types::{
     ability::AbilitySet, account_address::AccountAddress, identifier::Identifier,
@@ -93,16 +93,7 @@ fn simple_generic_module_round_trip() {
 
 #[test]
 fn simple_script_round_trip() {
-    let mut s = empty_script();
-    let addr = AddressIdentifierIndex::new(s.address_identifiers.len() as TableIndex);
-    s.address_identifiers.push(AccountAddress::ONE);
-    s.access_specifiers = Some(vec![AccessSpecifier {
-        kind: AccessKind::Reads,
-        negated: false,
-        resource: ResourceSpecifier::DeclaredAtAddress(addr),
-        address: AddressSpecifier::Any,
-    }]);
-
+    let s = simple_script_with_access_specifiers();
     let mut serialized = Vec::with_capacity(2048);
     s.serialize_for_version(Some(VERSION_MAX), &mut serialized)
         .expect("serialization should work");
@@ -114,4 +105,29 @@ fn simple_script_round_trip() {
     .expect("deserialization should work");
 
     assert_eq!(s, deserialized_s);
+}
+
+fn simple_script_with_access_specifiers() -> CompiledScript {
+    let mut s = empty_script();
+    let addr = AddressIdentifierIndex::new(s.address_identifiers.len() as TableIndex);
+    s.address_identifiers.push(AccountAddress::ONE);
+    s.access_specifiers = Some(vec![AccessSpecifier {
+        kind: AccessKind::Reads,
+        negated: false,
+        resource: ResourceSpecifier::DeclaredAtAddress(addr),
+        address: AddressSpecifier::Any,
+    }]);
+    s
+}
+
+#[test]
+fn simple_script_round_trip_version_failure() {
+    let s = simple_script_with_access_specifiers();
+    let mut serialized = Vec::with_capacity(2048);
+    let err = s
+        .serialize_for_version(Some(VERSION_7), &mut serialized)
+        .expect_err("serialization should not work");
+    assert!(err
+        .to_string()
+        .contains("Access specifiers on scripts not supported"));
 }
