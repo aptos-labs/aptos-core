@@ -15,12 +15,15 @@ use aptos_bitvec::BitVec;
 use aptos_logger::warn;
 use aptos_protos::{
     transaction::v1::{
-        self as transaction, any_signature, validator_transaction,
-        validator_transaction::observed_jwk_update::exported_provider_jw_ks::{
-            jwk::{JwkType, Rsa, UnsupportedJwk},
-            Jwk as ProtoJwk,
+        self as transaction, any_signature,
+        validator_transaction::{
+            self,
+            observed_jwk_update::exported_provider_jw_ks::{
+                jwk::{JwkType, Rsa, UnsupportedJwk},
+                Jwk as ProtoJwk,
+            },
         },
-        Ed25519, Keyless, Secp256k1Ecdsa, TransactionSizeInfo, WebAuthn,
+        Ed25519, ExtraConfigV1, Keyless, Secp256k1Ecdsa, TransactionSizeInfo, WebAuthn,
     },
     util::timestamp,
 };
@@ -164,18 +167,36 @@ pub fn convert_transaction_payload(
                     convert_entry_function_payload(sfp),
                 ),
             ),
+            extra_config: Some(
+                transaction::transaction_payload::ExtraConfig::ExtraConfigV1(ExtraConfigV1 {
+                    multisig_address: None,
+                    replay_protection_nonce: None,
+                }),
+            ),
         },
         TransactionPayload::ScriptPayload(sp) => transaction::TransactionPayload {
             r#type: transaction::transaction_payload::Type::ScriptPayload as i32,
             payload: Some(transaction::transaction_payload::Payload::ScriptPayload(
                 convert_script_payload(sp),
             )),
+            extra_config: Some(
+                transaction::transaction_payload::ExtraConfig::ExtraConfigV1(ExtraConfigV1 {
+                    multisig_address: None,
+                    replay_protection_nonce: None,
+                }),
+            ),
         },
         TransactionPayload::MultisigPayload(mp) => transaction::TransactionPayload {
             r#type: transaction::transaction_payload::Type::MultisigPayload as i32,
             payload: Some(transaction::transaction_payload::Payload::MultisigPayload(
                 convert_multisig_payload(mp),
             )),
+            extra_config: Some(
+                transaction::transaction_payload::ExtraConfig::ExtraConfigV1(ExtraConfigV1 {
+                    multisig_address: None,
+                    replay_protection_nonce: None,
+                }),
+            ),
         },
 
         // Deprecated.
