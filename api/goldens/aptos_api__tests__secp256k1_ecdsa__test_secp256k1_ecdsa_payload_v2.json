@@ -1,0 +1,11 @@
+{
+  "public_key": {
+    "value": "0x049b8327d929a0e45285c04d19c9fffbee065c266b701972922d807228120e43f34ad68ac77f6ec0205fe39f7c5b6055dad973a03464a3a743302de0feaf6ec6d9",
+    "type": "secp256k1_ecdsa"
+  },
+  "signature": {
+    "value": "0xd6f0e354e7a49f9ea3fed101f47eab85bd50143a8c622271254b405a703150c677a8a46349cf39cd25799c47abbc3a36d4f0544bdd005fc22d199061e6a3d8ec",
+    "type": "secp256k1_ecdsa"
+  },
+  "type": "single_sender"
+}

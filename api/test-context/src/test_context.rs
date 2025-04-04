@@ -54,7 +54,7 @@ use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use aptos_vm_validator::vm_validator::PooledVMValidator;
 use bytes::Bytes;
 use hyper::{HeaderMap, Response};
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use serde_json::{json, Value};
 use std::{
     boxed::Box,
@@ -109,7 +109,14 @@ pub fn new_test_context(
     node_config: NodeConfig,
     use_db_with_indexer: bool,
 ) -> TestContext {
-    new_test_context_inner(test_name, node_config, use_db_with_indexer, None)
+    new_test_context_inner(
+        test_name,
+        node_config,
+        use_db_with_indexer,
+        None,
+        false,
+        false,
+    )
 }
 
 pub fn new_test_context_inner(
@@ -117,6 +124,8 @@ pub fn new_test_context_inner(
     mut node_config: NodeConfig,
     use_db_with_indexer: bool,
     end_version: Option<u64>,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> TestContext {
     // Speculative logging uses a global variable and when many instances use it together, they
     // panic, so we disable this to run tests.
@@ -222,6 +231,8 @@ pub fn new_test_context_inner(
         db,
         test_name,
         api_specific_config,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     )
 }
 
@@ -231,7 +242,7 @@ pub struct TestContext {
     pub validator_owner: AccountAddress,
     pub mempool: Arc<MockSharedMempool>,
     pub db: Arc<AptosDB>,
-    rng: rand::rngs::StdRng,
+    pub rng: rand::rngs::StdRng,
     root_key: ConfigKey<Ed25519PrivateKey>,
     executor: Arc<dyn BlockExecutorTrait>,
     expect_status_code: u16,
@@ -239,6 +250,8 @@ pub struct TestContext {
     golden_output: Option<GoldenOutputs>,
     fake_time_usecs: u64,
     pub api_specific_config: ApiSpecificConfig,
+    pub use_txn_payload_v2_format: bool,
+    pub use_orderless_transactions: bool,
 }
 
 impl TestContext {
@@ -252,6 +265,8 @@ impl TestContext {
         db: Arc<AptosDB>,
         test_name: String,
         api_specific_config: ApiSpecificConfig,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
     ) -> Self {
         Self {
             context,
@@ -266,6 +281,8 @@ impl TestContext {
             golden_output: None,
             fake_time_usecs: 0,
             api_specific_config,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
         }
     }
 
@@ -289,7 +306,6 @@ impl TestContext {
         let msg = pretty(&Self::prune_golden(msg));
         let re = regex::Regex::new("hash\": \".*\"").unwrap();
         let msg = re.replace_all(&msg, "hash\": \"\"");
-
         self.golden_output.as_ref().unwrap().log(&msg);
     }
 
@@ -447,7 +463,12 @@ impl TestContext {
         let txn = root.sign_with_transaction_builder(
             factory
                 .account_transfer(account.address(), TRANSFER_AMOUNT)
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(self.get_expiration_time())
+                .upgrade_payload(
+                    &mut self.rng,
+                    self.use_txn_payload_v2_format,
+                    self.use_orderless_transactions,
+                ),
         );
 
         let bcs_txn = bcs::to_bytes(&txn).unwrap();
@@ -498,23 +519,28 @@ impl TestContext {
         }
     }
 
-    pub async fn create_user_account(&self, account: &LocalAccount) -> SignedTransaction {
+    pub async fn create_user_account(&mut self, account: &LocalAccount) -> SignedTransaction {
         let mut tc = self.root_account().await;
         self.create_user_account_by(&mut tc, account)
     }
 
-    pub async fn mint_user_account(&self, account: &LocalAccount) -> SignedTransaction {
+    pub async fn mint_user_account(&mut self, account: &LocalAccount) -> SignedTransaction {
         let tc = self.root_account().await;
         let factory = self.transaction_factory();
         tc.sign_with_transaction_builder(
             factory
                 .account_transfer(account.address(), TRANSFER_AMOUNT)
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(self.get_expiration_time())
+                .upgrade_payload(
+                    &mut self.rng,
+                    self.use_txn_payload_v2_format,
+                    self.use_orderless_transactions,
+                ),
         )
     }
 
     pub async fn add_dispatchable_authentication_function(
-        &self,
+        &mut self,
         account: &LocalAccount,
         func: FunctionInfo,
     ) -> SignedTransaction {
@@ -522,7 +548,12 @@ impl TestContext {
         account.sign_with_transaction_builder(
             factory
                 .add_dispatchable_authentication_function(func)
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(self.get_expiration_time())
+                .upgrade_payload(
+                    &mut self.rng,
+                    self.use_txn_payload_v2_format,
+                    self.use_orderless_transactions,
+                ),
         )
     }
 
@@ -586,13 +617,15 @@ impl TestContext {
         let create_multisig_txn = account.sign_with_transaction_builder(
             factory
                 .create_multisig_account(additional_owners, signatures_required)
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(self.get_expiration_time())
+                .upgrade_payload(
+                    &mut self.rng,
+                    self.use_txn_payload_v2_format,
+                    self.use_orderless_transactions,
+                ),
         );
-        self.commit_block(&vec![
-            create_multisig_txn,
-            self.account_transfer_to(account, multisig_address, initial_balance),
-        ])
-        .await;
+        let txn2 = self.account_transfer_to(account, multisig_address, initial_balance);
+        self.commit_block(&vec![create_multisig_txn, txn2]).await;
         multisig_address
     }
 
@@ -604,16 +637,19 @@ impl TestContext {
         initial_balance: u64,
     ) {
         let factory = self.transaction_factory();
-        let txn = account.sign_with_transaction_builder(
+        let txn1 = account.sign_with_transaction_builder(
             factory
                 .create_multisig_account_with_existing_account(owners, signatures_required)
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(self.get_expiration_time())
+                .upgrade_payload(
+                    &mut self.rng,
+                    self.use_txn_payload_v2_format,
+                    self.use_orderless_transactions,
+                ),
         );
-        self.commit_block(&vec![
-            txn,
-            self.account_transfer_to(account, account.address(), initial_balance),
-        ])
-        .await;
+        let txn2 = self.account_transfer_to(account, account.address(), initial_balance);
+
+        self.commit_block(&vec![txn1, txn2]).await;
     }
 
     pub async fn create_multisig_transaction(
@@ -626,7 +662,12 @@ impl TestContext {
         let txn = owner.sign_with_transaction_builder(
             factory
                 .create_multisig_transaction(multisig_account, payload)
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(self.get_expiration_time())
+                .upgrade_payload(
+                    &mut self.rng,
+                    self.use_txn_payload_v2_format,
+                    self.use_orderless_transactions,
+                ),
         );
         self.commit_block(&vec![txn]).await;
     }
@@ -641,7 +682,12 @@ impl TestContext {
         let txn = owner.sign_with_transaction_builder(
             factory
                 .approve_multisig_transaction(multisig_account, transaction_id)
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(self.get_expiration_time())
+                .upgrade_payload(
+                    &mut self.rng,
+                    self.use_txn_payload_v2_format,
+                    self.use_orderless_transactions,
+                ),
         );
         self.commit_block(&vec![txn]).await;
     }
@@ -656,7 +702,12 @@ impl TestContext {
         let txn = owner.sign_with_transaction_builder(
             factory
                 .reject_multisig_transaction(multisig_account, transaction_id)
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(self.get_expiration_time())
+                .upgrade_payload(
+                    &mut self.rng,
+                    self.use_txn_payload_v2_format,
+                    self.use_orderless_transactions,
+                ),
         );
         self.commit_block(&vec![txn]).await;
     }
@@ -671,13 +722,18 @@ impl TestContext {
         let txn = owner.sign_with_transaction_builder(
             factory
                 .create_multisig_transaction_with_payload_hash(multisig_account, payload)
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(self.get_expiration_time())
+                .upgrade_payload(
+                    &mut self.rng,
+                    self.use_txn_payload_v2_format,
+                    self.use_orderless_transactions,
+                ),
         );
         self.commit_block(&vec![txn]).await;
     }
 
     pub fn account_transfer(
-        &self,
+        &mut self,
         sender: &mut LocalAccount,
         receiver: &LocalAccount,
         amount: u64,
@@ -686,7 +742,7 @@ impl TestContext {
     }
 
     pub fn account_transfer_to(
-        &self,
+        &mut self,
         sender: &mut LocalAccount,
         receiver: AccountAddress,
         amount: u64,
@@ -695,12 +751,18 @@ impl TestContext {
         sender.sign_with_transaction_builder(
             factory
                 .account_transfer(receiver, amount)
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(self.get_expiration_time())
+                .sequence_number(sender.sequence_number())
+                .upgrade_payload(
+                    &mut self.rng,
+                    self.use_txn_payload_v2_format,
+                    self.use_orderless_transactions,
+                ),
         )
     }
 
     pub fn create_user_account_by(
-        &self,
+        &mut self,
         creator: &mut LocalAccount,
         account: &LocalAccount,
     ) -> SignedTransaction {
@@ -708,7 +770,13 @@ impl TestContext {
         creator.sign_with_transaction_builder(
             factory
                 .create_user_account(account.public_key())
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(self.get_expiration_time())
+                .sequence_number(creator.sequence_number())
+                .upgrade_payload(
+                    &mut self.rng,
+                    self.use_txn_payload_v2_format,
+                    self.use_orderless_transactions,
+                ),
         )
     }
 
@@ -719,6 +787,12 @@ impl TestContext {
             .transfer(root_account.address(), 1)
             .sender(root_account.address())
             .sequence_number(root_account.sequence_number())
+            .expiration_timestamp_secs(self.get_expiration_time())
+            .upgrade_payload(
+                &mut self.rng,
+                self.use_txn_payload_v2_format,
+                self.use_orderless_transactions,
+            )
             .build();
         let invalid_key = AccountKey::generate(self.rng());
         txn.sign(invalid_key.private_key(), root_account.public_key().clone())
@@ -790,8 +864,16 @@ impl TestContext {
         publisher: &mut LocalAccount,
         payload: TransactionPayload,
     ) -> SignedTransaction {
-        let txn =
-            publisher.sign_with_transaction_builder(self.transaction_factory().payload(payload));
+        let txn = publisher.sign_with_transaction_builder(
+            self.transaction_factory()
+                .payload(payload)
+                .expiration_timestamp_secs(self.get_expiration_time())
+                .upgrade_payload(
+                    &mut self.rng,
+                    self.use_txn_payload_v2_format,
+                    self.use_orderless_transactions,
+                ),
+        );
         let bcs_txn = bcs::to_bytes(&txn).unwrap();
         self.expect_status_code(202)
             .post_bcs_txn("/transactions", bcs_txn)
@@ -1036,14 +1118,28 @@ impl TestContext {
         payload: Value,
         status_code: u16,
     ) {
-        let mut request = json!({
-            "sender": account.address(),
-            "sequence_number": account.sequence_number().to_string(),
-            "gas_unit_price": "100",
-            "max_gas_amount": "1000000",
-            "expiration_timestamp_secs": "16373698888888",
-            "payload": payload,
-        });
+        let mut request = if self.use_orderless_transactions {
+            let mut rng = rand::thread_rng();
+            let replay_protection_nonce: u64 = rng.gen();
+            json!({
+                "sender": account.address(),
+                "sequence_number": (u64::MAX).to_string(),
+                "gas_unit_price": "100",
+                "max_gas_amount": "1000000",
+                "expiration_timestamp_secs": self.get_expiration_time().to_string(),
+                "payload": payload,
+                "replay_protection_nonce": replay_protection_nonce.to_string(),
+            })
+        } else {
+            json!({
+                "sender": account.address(),
+                "sequence_number": account.sequence_number().to_string(),
+                "gas_unit_price": "100",
+                "max_gas_amount": "1000000",
+                "expiration_timestamp_secs": "16373698888888",
+                "payload": payload,
+            })
+        };
 
         let resp = self
             .post(
@@ -1070,7 +1166,9 @@ impl TestContext {
             .post("/transactions", request)
             .await;
         self.commit_mempool_txns(1).await;
-        account.increment_sequence_number();
+        if !self.use_orderless_transactions {
+            account.increment_sequence_number();
+        }
     }
 
     pub async fn simulate_multisig_transaction(
@@ -1105,14 +1203,28 @@ impl TestContext {
         payload: Value,
         status_code: u16,
     ) -> Value {
-        let mut request = json!({
-            "sender": sender.address(),
-            "sequence_number": sender.sequence_number().to_string(),
-            "gas_unit_price": "0",
-            "max_gas_amount": "1000000",
-            "expiration_timestamp_secs": "16373698888888",
-            "payload": payload,
-        });
+        let mut request = if self.use_orderless_transactions {
+            let mut rng = rand::thread_rng();
+            let replay_protection_nonce: u64 = rng.gen();
+            json!({
+                "sender": sender.address(),
+                "sequence_number": (u64::MAX).to_string(),
+                "gas_unit_price": "0",
+                "max_gas_amount": "1000000",
+                "expiration_timestamp_secs": self.get_expiration_time().to_string(),
+                "payload": payload,
+                "replay_protection_nonce": replay_protection_nonce.to_string(),
+            })
+        } else {
+            json!({
+                "sender": sender.address(),
+                "sequence_number": sender.sequence_number().to_string(),
+                "gas_unit_price": "0",
+                "max_gas_amount": "1000000",
+                "expiration_timestamp_secs": "16373698888888",
+                "payload": payload,
+            })
+        };
 
         // We're intentionally using invalid signatures since simulation API rejects valid ones.
         let random_account = self.gen_account();
@@ -1265,5 +1377,9 @@ impl TestContext {
             HashValue::zero(),
         );
         LedgerInfoWithSignatures::new(info, AggregateSignature::empty())
+    }
+
+    pub fn get_expiration_time(&self) -> u64 {
+        Duration::from_micros(self.fake_time_usecs).as_secs() + 59
     }
 }

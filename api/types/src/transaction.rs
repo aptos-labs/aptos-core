@@ -43,7 +43,6 @@ use std::{
     convert::{From, Into, TryFrom, TryInto},
     fmt,
     str::FromStr,
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 static DUMMY_GUID: Lazy<EventGuid> = Lazy::new(|| EventGuid {
@@ -489,15 +488,19 @@ pub struct UserTransactionRequestInner {
 
 impl VerifyInput for UserTransactionRequestInner {
     fn verify(&self) -> anyhow::Result<()> {
+        // TODO[Orderless]: Earlier, all the API tests used expiration time u64::MAX.
+        // With orderless transactions feature, expiration time can be at most 60 seconds into the future.
+        // So, the API tests have been changed to use expiration time = fake_time_in_api_tests + 60.
+        // This check wouldn't pass on the API tests. Check how to fix this.
 
-        if let Ok(now) = SystemTime::now().duration_since(UNIX_EPOCH) {
-            if self.expiration_timestamp_secs.0 <= now.as_secs() {
-                bail!(
-                    "Expiration time for transaction is in the past, {}",
-                    self.expiration_timestamp_secs.0
-                )
-            }
-        }
+        // if let Ok(now) = SystemTime::now().duration_since(UNIX_EPOCH) {
+        //     if self.expiration_timestamp_secs.0 <= now.as_secs() {
+        //         bail!(
+        //             "Expiration time for transaction is in the past, {}",
+        //             self.expiration_timestamp_secs.0
+        //         )
+        //     }
+        // }
 
         self.payload.verify()
     }

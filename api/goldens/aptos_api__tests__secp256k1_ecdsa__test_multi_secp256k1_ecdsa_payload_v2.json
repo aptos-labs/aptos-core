@@ -1,0 +1,19 @@
+{
+  "public_keys": [
+    {
+      "value": "0x049b8327d929a0e45285c04d19c9fffbee065c266b701972922d807228120e43f34ad68ac77f6ec0205fe39f7c5b6055dad973a03464a3a743302de0feaf6ec6d9",
+      "type": "secp256k1_ecdsa"
+    }
+  ],
+  "signatures": [
+    {
+      "index": 0,
+      "signature": {
+        "value": "0x5d9747557b56de08bade8cc8de87166a67daa78b0979bf57b95ea348a05e716e77ddffaf07b5a83f931d04f0f652be426b33cf7a1dcc7d419dd50a6ab60cbc37",
+        "type": "secp256k1_ecdsa"
+      }
+    }
+  ],
+  "signatures_required": 1,
+  "type": "single_sender"
+}
