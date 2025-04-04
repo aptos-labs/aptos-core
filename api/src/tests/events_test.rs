@@ -3,8 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::new_test_context;
+use crate::tests::{
+    new_test_context_with_db_sharding_and_internal_indexer, new_test_context_with_orderless_flags,
+};
 use aptos_api_test_context::{current_function_name, TestContext};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+use rstest::rstest;
 use serde_json::json;
 use std::path::PathBuf;
 
@@ -12,8 +16,19 @@ static ACCOUNT_ADDRESS: &str = "0xa550c18";
 static CREATION_NUMBER: &str = "0";
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_events() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_get_events(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     let resp = context
         .get(format!("/accounts/{}/events/{}", ACCOUNT_ADDRESS, CREATION_NUMBER).as_str())
@@ -23,8 +38,22 @@ async fn test_get_events() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_events_filter_by_start_sequence_number() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_get_events_filter_by_start_sequence_number(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     let resp = context
         .get(
@@ -38,7 +67,11 @@ async fn test_get_events_filter_by_start_sequence_number() {
     context.check_golden_output(resp.clone());
 
     // assert the same resp after db sharding migration with internal indexer turned on
-    let shard_context = new_test_context(current_function_name!());
+    let shard_context = new_test_context_with_db_sharding_and_internal_indexer(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let new_resp = shard_context
         .get(
             format!(
@@ -158,8 +191,19 @@ async fn test_get_events_by_invalid_account_event_handle_field_type() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_module_events() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_module_events(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     // Prepare accounts
     let mut user = context.create_account().await;
@@ -183,12 +227,40 @@ async fn test_module_events() {
         )
         .await;
 
-    let resp = context
+    let resp_txns = context
         .get(format!("/accounts/{}/transactions", user.address()).as_str())
         .await;
-    let txn = &resp.as_array().unwrap()[1];
+    let resp_summaries = context
+        .get(format!("/accounts/{}/transaction_summaries", user.address()).as_str())
+        .await;
+    assert_eq!(resp_summaries.as_array().unwrap().len(), 2);
+
+    if use_orderless_transactions {
+        // "/accounts/{}/transactions" endpoint returns only ordered transactions committed by an account.
+        assert_eq!(resp_txns.as_array().unwrap().len(), 0);
+    } else {
+        assert_eq!(resp_txns.as_array().unwrap().len(), 2);
+
+        assert_eq!(
+            resp_txns.as_array().unwrap()[0]["hash"],
+            resp_summaries.as_array().unwrap()[0]["transaction_hash"]
+        );
+        assert_eq!(
+            resp_txns.as_array().unwrap()[1]["hash"],
+            resp_summaries.as_array().unwrap()[1]["transaction_hash"]
+        );
+    }
+
     let resp = context
-        .get(format!("/transactions/by_hash/{}", txn["hash"].as_str().unwrap()).as_str())
+        .get(
+            format!(
+                "/transactions/by_hash/{}",
+                resp_summaries.as_array().unwrap()[1]["transaction_hash"]
+                    .as_str()
+                    .unwrap()
+            )
+            .as_str(),
+        )
         .await;
 
     let events = resp["events"]

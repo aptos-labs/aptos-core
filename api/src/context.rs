@@ -892,10 +892,19 @@ impl Context {
                 address,
                 ledger_info.version(),
                 ledger_info,
+<<<<<<< HEAD
             )?
             .map(|r| r.sequence_number())
             .unwrap_or(0)
             .saturating_sub(limit as u64)
+=======
+            )
+            .map_or(0, |account_resource| {
+                account_resource
+                    .sequence_number()
+                    .saturating_sub(limit as u64)
+            })
+>>>>>>> cd7e6a9b9c (satya/orderless_pr_api_tests,Update API tests for orderless transactions)
         };
 
         let txns_res = if !db_sharding_enabled(&self.node_config) {

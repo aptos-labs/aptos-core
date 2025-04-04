@@ -2,7 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::{new_test_context, new_test_context_with_config};
+use super::new_test_context;
+use crate::tests::{
+    new_test_context_with_config,
+    new_test_context_with_orderless_flags,
+};
 use aptos_api_test_context::{assert_json, current_function_name, pretty, TestContext};
 use aptos_config::config::{GasEstimationStaticOverride, NodeConfig, TransactionFilterConfig};
 use aptos_crypto::{
@@ -17,7 +21,7 @@ use aptos_types::{
     account_config::aptos_test_root_address,
     transaction::{
         authenticator::{AuthenticationKey, TransactionAuthenticator},
-        EntryFunction, Script, SignedTransaction,
+        EntryFunction, ReplayProtector, Script, SignedTransaction,
     },
     utility_coin::{AptosCoinType, CoinType},
 };
@@ -27,7 +31,8 @@ use move_core_types::{
 };
 use poem_openapi::types::ParseFromJSON;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use serde_json::json;
+use rstest::rstest;
+use serde_json::{json, Value};
 use std::{path::PathBuf, time::Duration};
 use tokio::time::sleep;
 
@@ -50,8 +55,24 @@ async fn test_get_transactions_output_genesis_transaction() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_transactions_returns_last_page_when_start_version_is_not_specified() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    case_name,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case("", false, false),
+    case("_payload_v2", true, false),
+    case("_orderless", true, true)
+)]
+async fn test_get_transactions_returns_last_page_when_start_version_is_not_specified(
+    case_name: &str,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!() + case_name,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     let mut root_account = context.root_account().await;
     for _i in 0..20 {
@@ -104,6 +125,8 @@ async fn test_get_transactions_with_zero_limit() {
     context.check_golden_output(resp);
 }
 
+// TODO: Add tests for /transaction_summaries endpoint.
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore]
 async fn test_get_transactions_param_limit_exceeds_limit() {
@@ -114,20 +137,56 @@ async fn test_get_transactions_param_limit_exceeds_limit() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_transactions_output_user_transaction_with_entry_function_payload() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    case_name,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case("", false, false),
+    case("_payload_v2", true, false),
+    case("_orderless", true, true)
+)]
+async fn test_get_transactions_output_user_transaction_with_entry_function_payload(
+    case_name: &str,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!() + case_name,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let initial_ledger_version = u64::from(context.get_latest_ledger_info().ledger_version);
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
     context.commit_block(&vec![txn.clone()]).await;
 
     let txns = context.get("/transactions?start=1").await;
-    assert_eq!(3, txns.as_array().unwrap().len());
+    assert_eq!(
+        (initial_ledger_version + 3) as usize,
+        txns.as_array().unwrap().len()
+    );
     context.check_golden_output(txns);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_post_bcs_format_transaction() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    case_name,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case("", false, false),
+    case("_payload_v2", true, false),
+    case("_orderless", true, true)
+)]
+async fn test_post_bcs_format_transaction(
+    case_name: &str,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!() + case_name,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
     let body = bcs::to_bytes(&txn).unwrap();
@@ -138,15 +197,33 @@ async fn test_post_bcs_format_transaction() {
     context.check_golden_output(resp.clone());
 
     // ensure ed25519 sig txn can be submitted into mempool by JSON format
-    context
-        .expect_status_code(202)
-        .post("/transactions", resp)
-        .await;
+    // TODO[Orderless]: When the input is given in JSON format, the /transactions endpoint will use payload v1 format
+    // to construct the transactions. So, the supplied signature that is signed on payload v2 format will not match.
+    if !context.use_txn_payload_v2_format || context.use_orderless_transactions {
+        context
+            .expect_status_code(202)
+            .post("/transactions", resp)
+            .await;
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_post_invalid_bcs_format_transaction() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_post_invalid_bcs_format_transaction(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     let resp = context
         .expect_status_code(400)
@@ -156,8 +233,22 @@ async fn test_post_invalid_bcs_format_transaction() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_post_invalid_signature_transaction() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_post_invalid_signature_transaction(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let txn = context.create_invalid_signature_transaction().await;
     let body = bcs::to_bytes(&txn).unwrap();
     let resp = context
@@ -168,8 +259,22 @@ async fn test_post_invalid_signature_transaction() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_post_transaction_rejected_by_mempool() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_post_transaction_rejected_by_mempool(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account1 = context.gen_account();
     let account2 = context.gen_account();
     let txn1 = context.create_user_account(&account1).await;
@@ -180,30 +285,60 @@ async fn test_post_transaction_rejected_by_mempool() {
         .post_bcs_txn("/transactions", &bcs::to_bytes(&txn1).unwrap())
         .await;
 
-    let resp = context
-        .expect_status_code(400)
-        .post_bcs_txn("/transactions", &bcs::to_bytes(&txn2).unwrap())
-        .await;
-    context.check_golden_output(resp);
+    // If txn1 and txn2 are sequence number based transactions, both of them have same sequence number.
+    // So, txn2 will be rejected by mempool.
+    // But if txn1 and txn2 are orderless transactions, both transactions should be accepted by mempool.
+    if context.use_orderless_transactions {
+        context
+            .expect_status_code(202)
+            .post_bcs_txn("/transactions", &bcs::to_bytes(&txn2).unwrap())
+            .await;
+    } else {
+        let resp = context
+            .expect_status_code(400)
+            .post_bcs_txn("/transactions", &bcs::to_bytes(&txn2).unwrap())
+            .await;
+        context.check_golden_output(resp);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_multi_agent_signed_transaction() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multi_agent_signed_transaction(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.gen_account();
     let secondary = context.gen_account();
     let factory = context.transaction_factory();
     let mut root_account = context.root_account().await;
 
     // Create secondary signer account
-    context
-        .commit_block(&[context.create_user_account_by(&mut root_account, &secondary)])
-        .await;
+    let txn1 = context.create_user_account_by(&mut root_account, &secondary);
+    context.commit_block(&[txn1]).await;
 
     // Create a new account with a multi-agent signer
     let txn = root_account.sign_multi_agent_with_transaction_builder(
         vec![&secondary],
-        factory.create_user_account(account.public_key()),
+        factory
+            .create_user_account(account.public_key())
+            .expiration_timestamp_secs(context.get_expiration_time())
+            .upgrade_payload(
+                &mut context.rng,
+                context.use_txn_payload_v2_format,
+                context.use_orderless_transactions,
+            ),
     );
 
     let body = bcs::to_bytes(&txn).unwrap();
@@ -246,29 +381,53 @@ async fn test_multi_agent_signed_transaction() {
     );
 
     // ensure multi agent txns can be submitted into mempool by JSON format
-    context
-        .expect_status_code(202)
-        .post("/transactions", resp)
-        .await;
+    // TODO[Orderless]: When the input is given in JSON format, the /transactions endpoint will use payload v1 format
+    // to construct the transactions. So, the supplied signature that is signed on payload v2 format will not match.
+    if !context.use_txn_payload_v2_format || context.use_orderless_transactions {
+        context
+            .expect_status_code(202)
+            .post("/transactions", resp)
+            .await;
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_fee_payer_signed_transaction() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_fee_payer_signed_transaction(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.gen_account();
     let fee_payer = context.create_account().await;
     let factory = context.transaction_factory();
     let mut root_account = context.root_account().await;
 
-    context
-        .commit_block(&[context.create_user_account_by(&mut root_account, &fee_payer)])
-        .await;
+    let txn1 = context.create_user_account_by(&mut root_account, &fee_payer);
+    context.commit_block(&[txn1]).await;
 
     // Create a new account with a multi-agent signer
     let txn = root_account.sign_fee_payer_with_transaction_builder(
         vec![],
         &fee_payer,
-        factory.create_user_account(account.public_key()),
+        factory
+            .create_user_account(account.public_key())
+            .expiration_timestamp_secs(context.get_expiration_time())
+            .upgrade_payload(
+                &mut context.rng,
+                context.use_txn_payload_v2_format,
+                context.use_orderless_transactions,
+            ),
     );
 
     let body = bcs::to_bytes(&txn).unwrap();
@@ -313,10 +472,14 @@ async fn test_fee_payer_signed_transaction() {
     );
 
     // ensure fee payer txns can be submitted into mempool by JSON format
-    context
-        .expect_status_code(202)
-        .post("/transactions", resp)
-        .await;
+    // TODO[Orderless]: When the input is given in JSON format, the /transactions endpoint will use payload v1 format
+    // to construct the transactions. So, the supplied signature that is signed on payload v2 format will not match.
+    if !context.use_txn_payload_v2_format || context.use_orderless_transactions {
+        context
+            .expect_status_code(202)
+            .post("/transactions", resp)
+            .await;
+    }
 
     // Now test for the new format where the fee payer is unset... this also tests account creation
     let another_account = context.gen_account();
@@ -328,7 +491,13 @@ async fn test_fee_payer_signed_transaction() {
             factory
                 .create_user_account(yet_another_account.public_key())
                 .max_gas_amount(200_000)
-                .gas_unit_price(1),
+                .gas_unit_price(1)
+                .expiration_timestamp_secs(context.get_expiration_time())
+                .upgrade_payload(
+                    &mut context.rng,
+                    context.use_txn_payload_v2_format,
+                    context.use_orderless_transactions,
+                ),
         )
         .into_raw_transaction();
     let another_txn = another_raw_txn
@@ -396,10 +565,14 @@ async fn test_fee_payer_signed_transaction() {
         .expect_status_code(202)
         .post_bcs_txn("/transactions", body)
         .await;
-    context
-        .expect_status_code(202)
-        .post("/transactions", resp)
-        .await;
+    // TODO[Orderless]: When the input is given in JSON format, the /transactions endpoint will use payload v1 format
+    // to construct the transactions. So, the supplied signature that is signed on payload v2 format will not match.
+    if !context.use_txn_payload_v2_format || context.use_orderless_transactions {
+        context
+            .expect_status_code(202)
+            .post("/transactions", resp)
+            .await;
+    }
 }
 
 #[ignore]
@@ -415,7 +588,14 @@ async fn test_multi_ed25519_signed_transaction() {
     let root_account = context.root_account().await;
     // TODO: migrate once multi-ed25519 is supported
     let create_account_txn = root_account.sign_with_transaction_builder(
-        factory.create_user_account(&Ed25519PrivateKey::generate_for_testing().public_key()),
+        factory
+            .create_user_account(&Ed25519PrivateKey::generate_for_testing().public_key())
+            .expiration_timestamp_secs(context.get_expiration_time())
+            .upgrade_payload(
+                &mut context.rng,
+                context.use_txn_payload_v2_format,
+                context.use_orderless_transactions,
+            ),
     );
     context.commit_block(&vec![create_account_txn]).await;
 
@@ -423,7 +603,12 @@ async fn test_multi_ed25519_signed_transaction() {
         .mint(auth_key.account_address(), 1000)
         .sender(auth_key.account_address())
         .sequence_number(0)
-        .expiration_timestamp_secs(u64::MAX) // set timestamp to max to ensure static raw transaction
+        .expiration_timestamp_secs(context.get_expiration_time())
+        .upgrade_payload(
+            &mut context.rng,
+            context.use_txn_payload_v2_format,
+            context.use_orderless_transactions,
+        )
         .build();
 
     let signature = private_key.sign(&raw_txn).unwrap();
@@ -471,8 +656,22 @@ async fn test_multi_ed25519_signed_transaction() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_transaction_by_hash() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_get_transaction_by_hash(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
     context.commit_block(&vec![txn.clone()]).await;
@@ -523,8 +722,22 @@ async fn test_get_transaction_by_version_not_found() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_transaction_by_version() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_get_transaction_by_version(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
     context.commit_block(&vec![txn.clone()]).await;
@@ -537,8 +750,22 @@ async fn test_get_transaction_by_version() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_pending_transaction_by_hash() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_get_pending_transaction_by_hash(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
     let body = bcs::to_bytes(&txn).unwrap();
@@ -572,10 +799,25 @@ async fn test_get_pending_transaction_by_hash() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_wait_transaction_by_hash() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_wait_transaction_by_hash(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut node_config = NodeConfig::default();
     node_config.api.wait_by_hash_timeout_ms = 2_000;
-    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+    let mut context = new_test_context_with_config(
+        current_function_name!(),
+        node_config,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
     context.commit_block(&vec![txn.clone()]).await;
@@ -615,7 +857,8 @@ async fn test_wait_transaction_by_hash_not_found() {
 async fn test_wait_transaction_by_invalid_hash() {
     let mut node_config = NodeConfig::default();
     node_config.api.wait_by_hash_timeout_ms = 2_000;
-    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+    let mut context =
+        new_test_context_with_config(current_function_name!(), node_config, false, false);
 
     let start_time = std::time::Instant::now();
     let resp = context
@@ -628,10 +871,25 @@ async fn test_wait_transaction_by_invalid_hash() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_wait_pending_transaction_by_hash() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_wait_pending_transaction_by_hash(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut node_config = NodeConfig::default();
     node_config.api.wait_by_hash_timeout_ms = 2_000;
-    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+    let mut context = new_test_context_with_config(
+        current_function_name!(),
+        node_config,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
     let body = bcs::to_bytes(&txn).unwrap();
@@ -668,8 +926,25 @@ async fn test_wait_pending_transaction_by_hash() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_signing_message_with_entry_function_payload() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    // TODO[Orderless]: `/transactions/encode_submission` API currently encodes transactions using payload v1 format
+    // unless a nonce is supplied. So, not testing with payload v2 format here. After the API is updated to use payload v2 format,
+    // we can also test with payload v2 format here.
+    // case(true, false),
+    case(true, true)
+)]
+async fn test_signing_message_with_entry_function_payload(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
     let payload = json!({
@@ -688,15 +963,32 @@ async fn test_signing_message_with_payload(
     txn: SignedTransaction,
     payload: serde_json::Value,
 ) {
+    let initial_ledger_version = context.get_latest_ledger_info().ledger_version;
     let sender = context.root_account().await;
-    let mut body = json!({
-        "sender": sender.address().to_hex_literal(),
-        "sequence_number": sender.sequence_number().to_string(),
-        "gas_unit_price": txn.gas_unit_price().to_string(),
-        "max_gas_amount": txn.max_gas_amount().to_string(),
-        "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
-        "payload": payload,
-    });
+    let mut body = {
+        let mut json = json!({
+            "sender": sender.address().to_hex_literal(),
+            "sequence_number": if context.use_orderless_transactions {
+                (u64::MAX).to_string()
+            } else {
+                sender.sequence_number().to_string()
+            },
+            "gas_unit_price": txn.gas_unit_price().to_string(),
+            "max_gas_amount": txn.max_gas_amount().to_string(),
+            "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
+            "payload": payload,
+        });
+
+        if context.use_orderless_transactions {
+            let nonce = match txn.replay_protector() {
+                ReplayProtector::Nonce(n) => n,
+                _ => rand::thread_rng().gen(),
+            };
+            json["replay_protection_nonce"] = json!(nonce.to_string());
+        }
+
+        json
+    };
 
     let resp = context
         .post("/transactions/encode_submission", body.clone())
@@ -746,53 +1038,154 @@ async fn test_signing_message_with_payload(
 
     context.commit_mempool_txns(10).await;
 
-    let ledger = context.get("/").await;
-    assert_eq!(ledger["ledger_version"].as_str().unwrap(), "3"); // metadata + user txn + state checkpoint
+    assert_eq!(
+        u64::from(context.get_latest_ledger_info().ledger_version),
+        u64::from(initial_ledger_version) + 3
+    ); // metadata + user txn + state checkpoint
+}
+
+async fn match_transactions_with_expected_value(
+    context: &TestContext,
+    addr: AccountAddress,
+    initial_sequence_number: u64,
+    initial_ledger_version: u64,
+    expected_txns: Value,
+    expected_num_txns: usize,
+) {
+    assert_eq!(expected_txns.as_array().unwrap().len(), expected_num_txns);
+    let txns = context
+        .get(
+            format!(
+                "/accounts/{}/transactions?start={}",
+                addr, initial_sequence_number,
+            )
+            .as_str(),
+        )
+        .await;
+
+    if context.use_orderless_transactions {
+        assert_eq!(txns.as_array().unwrap().len(), 0);
+    } else {
+        assert_eq!(
+            txns.as_array().unwrap().len(),
+            expected_txns.as_array().unwrap().len()
+        );
+    }
+    let txn_summaries = context
+        .get(
+            format!(
+                "/accounts/{}/transaction_summaries?start_version={}",
+                addr,
+                initial_ledger_version + 2,
+            )
+            .as_str(),
+        )
+        .await;
+    assert_eq!(
+        txn_summaries.as_array().unwrap().len(),
+        expected_txns.as_array().unwrap().len()
+    );
+    let mut txns_from_summaries = Vec::new();
+    for txn_summary in txn_summaries.as_array().unwrap() {
+        let txn = context
+            .get(
+                format!(
+                    "/transactions/by_hash/{}",
+                    txn_summary["transaction_hash"].as_str().unwrap()
+                )
+                .as_str(),
+            )
+            .await;
+        txns_from_summaries.push(txn);
+    }
+    if context.use_orderless_transactions {
+        assert_eq!(json!(txns_from_summaries), expected_txns);
+        assert_json(json!(txns_from_summaries), expected_txns);
+    } else {
+        assert_eq!(txns, json!(txns_from_summaries));
+        assert_eq!(txns, expected_txns);
+        assert_json(txns, expected_txns);
+    }
 }
 
 async fn test_account_transaction_with_context(mut context: TestContext) {
+    let initial_sequence_number = context.root_account().await.sequence_number();
+    let initial_ledger_version = u64::from(context.get_latest_ledger_info().ledger_version);
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
     context.commit_block(&vec![txn]).await;
 
     if let Some(indexer_reader) = context.context.indexer_reader.as_ref() {
-        indexer_reader.wait_for_internal_indexer(2).unwrap();
+        indexer_reader
+            .wait_for_internal_indexer(initial_ledger_version + 2)
+            .unwrap();
     }
-
-    let txns = context
-        .get(
-            format!(
-                "/accounts/{}/transactions",
-                context.root_account().await.address()
-            )
-            .as_str(),
-        )
+    let expected_txns = context
+        .get(&format!(
+            "/transactions?start={}&limit=1",
+            initial_ledger_version + 2
+        ))
         .await;
-    assert_eq!(1, txns.as_array().unwrap().len());
-    let expected_txns = context.get("/transactions?start=2&limit=1").await;
-    assert_json(txns, expected_txns);
+    match_transactions_with_expected_value(
+        &context,
+        context.root_account().await.address(),
+        initial_sequence_number,
+        initial_ledger_version,
+        expected_txns,
+        1,
+    )
+    .await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_account_transactions() {
-    let context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_get_account_transactions(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     test_account_transaction_with_context(context).await;
-    let shard_context = new_test_context(current_function_name!());
-    test_account_transaction_with_context(shard_context).await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_account_transactions_filter_transactions_by_start_sequence_number() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    // Not testing for orderless transactions as orderless transactions don't have sequence number
+    // case(true, true)
+)]
+async fn test_get_account_transactions_filter_transactions_by_start_sequence_number(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let initial_sequence_number = context.root_account().await.sequence_number();
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
-    context.commit_block(&vec![txn]).await;
+    context.commit_block(&vec![txn.clone()]).await;
 
     let txns = context
         .get(
             format!(
-                "/accounts/{}/transactions?start=1",
-                context.root_account().await.address()
+                "/accounts/{}/transactions?start={}",
+                context.root_account().await.address(),
+                initial_sequence_number + 1
             )
             .as_str(),
         )
@@ -801,8 +1194,22 @@ async fn test_get_account_transactions_filter_transactions_by_start_sequence_num
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_account_transactions_filter_transactions_by_start_sequence_number_is_too_large() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_get_account_transactions_filter_transactions_by_start_sequence_number_is_too_large(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
     context.commit_block(&vec![txn]).await;
@@ -820,55 +1227,128 @@ async fn test_get_account_transactions_filter_transactions_by_start_sequence_num
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_account_transactions_filter_transactions_by_limit() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_get_account_transactions_filter_transactions_by_limit(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let mut root_account = context.root_account().await;
+    let initial_sequence_number = root_account.sequence_number();
+    let initial_ledger_version = u64::from(context.get_latest_ledger_info().ledger_version);
     let account1 = context.gen_account();
     let txn1 = context.create_user_account_by(&mut root_account, &account1);
     let account2 = context.gen_account();
     let txn2 = context.create_user_account_by(&mut root_account, &account2);
     context.commit_block(&vec![txn1, txn2]).await;
 
-    let txns = context
-        .get(
-            format!(
-                "/accounts/{}/transactions?start=0&limit=1",
-                context.root_account().await.address()
+    if !context.use_orderless_transactions {
+        let txns = context
+            .get(
+                format!(
+                    "/accounts/{}/transactions?start={}&limit=1",
+                    context.root_account().await.address(),
+                    initial_sequence_number,
+                )
+                .as_str(),
             )
-            .as_str(),
-        )
-        .await;
-    assert_eq!(txns.as_array().unwrap().len(), 1);
+            .await;
+        assert_eq!(txns.as_array().unwrap().len(), 1);
 
-    let txns = context
-        .get(
-            format!(
-                "/accounts/{}/transactions?start=0&limit=2",
-                context.root_account().await.address()
+        let txns = context
+            .get(
+                format!(
+                    "/accounts/{}/transactions?start={}&limit=2",
+                    context.root_account().await.address(),
+                    initial_sequence_number,
+                )
+                .as_str(),
             )
-            .as_str(),
-        )
+            .await;
+        assert_eq!(txns.as_array().unwrap().len(), 2);
+    }
+
+    let expected_txns = context
+        .get(&format!(
+            "/transactions?start={}&limit=2",
+            initial_ledger_version + 2
+        ))
         .await;
-    assert_eq!(txns.as_array().unwrap().len(), 2);
+    match_transactions_with_expected_value(
+        &context,
+        context.root_account().await.address(),
+        initial_sequence_number,
+        initial_ledger_version,
+        expected_txns,
+        2,
+    )
+    .await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_invalid_script_payload_bytecode() {
-    let context = new_test_context(current_function_name!());
+#[rstest(
+    case_name,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case("", false, false),
+    case("_payload_v2", true, false),
+    case("_orderless", true, true)
+)]
+async fn test_get_txn_execute_failed_by_invalid_script_payload_bytecode(
+    case_name: &str,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!() + case_name,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let root_account = context.root_account().await;
     let invalid_bytecode = hex::decode("a11ceb0b030000").unwrap();
     let txn = root_account.sign_with_transaction_builder(
         context
             .transaction_factory()
             .script(Script::new(invalid_bytecode, vec![], vec![]))
-            .expiration_timestamp_secs(u64::MAX),
+            .expiration_timestamp_secs(context.get_expiration_time())
+            .upgrade_payload(
+                &mut context.rng,
+                context.use_txn_payload_v2_format,
+                context.use_orderless_transactions,
+            ),
     );
     test_transaction_vm_status(context, txn, false).await
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_invalid_entry_function_address() {
-    let context = new_test_context(current_function_name!());
+#[rstest(
+    case_name,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case("", false, false),
+    case("_payload_v2", true, false),
+    case("_orderless", true, true)
+)]
+async fn test_get_txn_execute_failed_by_invalid_entry_function_address(
+    case_name: &str,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let context = new_test_context_with_orderless_flags(
+        current_function_name!() + case_name,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.root_account().await;
     test_get_txn_execute_failed_by_invalid_entry_function(
         context,
@@ -886,8 +1366,24 @@ async fn test_get_txn_execute_failed_by_invalid_entry_function_address() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_invalid_entry_function_module_name() {
-    let context = new_test_context(current_function_name!());
+#[rstest(
+    case_name,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case("", false, false),
+    case("_payload_v2", true, false),
+    case("_orderless", true, true)
+)]
+async fn test_get_txn_execute_failed_by_invalid_entry_function_module_name(
+    case_name: &str,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let context = new_test_context_with_orderless_flags(
+        current_function_name!() + case_name,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.root_account().await;
     test_get_txn_execute_failed_by_invalid_entry_function(
         context,
@@ -905,8 +1401,24 @@ async fn test_get_txn_execute_failed_by_invalid_entry_function_module_name() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_invalid_entry_function_name() {
-    let context = new_test_context(current_function_name!());
+#[rstest(
+    case_name,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case("", false, false),
+    case("_payload_v2", true, false),
+    case("_orderless", true, true)
+)]
+async fn test_get_txn_execute_failed_by_invalid_entry_function_name(
+    case_name: &str,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let context = new_test_context_with_orderless_flags(
+        current_function_name!() + case_name,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.root_account().await;
     test_get_txn_execute_failed_by_invalid_entry_function(
         context,
@@ -924,8 +1436,24 @@ async fn test_get_txn_execute_failed_by_invalid_entry_function_name() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_invalid_entry_function_arguments() {
-    let context = new_test_context(current_function_name!());
+#[rstest(
+    case_name,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case("", false, false),
+    case("_payload_v2", true, false),
+    case("_orderless", true, true)
+)]
+async fn test_get_txn_execute_failed_by_invalid_entry_function_arguments(
+    case_name: &str,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let context = new_test_context_with_orderless_flags(
+        current_function_name!() + case_name,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.root_account().await;
     test_get_txn_execute_failed_by_invalid_entry_function(
         context,
@@ -943,8 +1471,24 @@ async fn test_get_txn_execute_failed_by_invalid_entry_function_arguments() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_missing_entry_function_arguments() {
-    let context = new_test_context(current_function_name!());
+#[rstest(
+    case_name,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case("", false, false),
+    case("_payload_v2", true, false),
+    case("_orderless", true, true)
+)]
+async fn test_get_txn_execute_failed_by_missing_entry_function_arguments(
+    case_name: &str,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let context = new_test_context_with_orderless_flags(
+        current_function_name!() + case_name,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.root_account().await;
     test_get_txn_execute_failed_by_invalid_entry_function(
         context,
@@ -962,12 +1506,27 @@ async fn test_get_txn_execute_failed_by_missing_entry_function_arguments() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_entry_function_validation() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    case_name,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case("", false, false),
+    case("_payload_v2", true, false),
+    case("_orderless", true, true)
+)]
+async fn test_get_txn_execute_failed_by_entry_function_validation(
+    case_name: &str,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!() + case_name,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.gen_account();
-    context
-        .commit_block(&vec![context.create_user_account(&account).await])
-        .await;
+    let txn1 = context.create_user_account(&account).await;
+    context.commit_block(&vec![txn1]).await;
 
     test_get_txn_execute_failed_by_invalid_entry_function(
         context,
@@ -985,12 +1544,25 @@ async fn test_get_txn_execute_failed_by_entry_function_validation() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_entry_function_invalid_module_name() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_get_txn_execute_failed_by_entry_function_invalid_module_name(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.gen_account();
-    context
-        .commit_block(&vec![context.create_user_account(&account).await])
-        .await;
+    let txn1 = context.create_user_account(&account).await;
+    context.commit_block(&vec![txn1]).await;
 
     test_submit_entry_function_api_validation(
         context,
@@ -1008,12 +1580,25 @@ async fn test_get_txn_execute_failed_by_entry_function_invalid_module_name() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_entry_function_invalid_function_name() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_get_txn_execute_failed_by_entry_function_invalid_function_name(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.gen_account();
-    context
-        .commit_block(&vec![context.create_user_account(&account).await])
-        .await;
+    let txn1 = context.create_user_account(&account).await;
+    context.commit_block(&vec![txn1]).await;
 
     test_submit_entry_function_api_validation(
         context,
@@ -1031,8 +1616,22 @@ async fn test_get_txn_execute_failed_by_entry_function_invalid_function_name() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_entry_function_execution_failure() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_get_txn_execute_failed_by_entry_function_execution_failure(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let mut admin = context.create_account().await;
 
     let named_addresses = vec![("entry_func_fail".to_string(), admin.address())];
@@ -1060,7 +1659,7 @@ async fn test_get_txn_execute_failed_by_entry_function_execution_failure() {
 #[ignore] // re-enable after cleaning compiled code
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_txn_execute_failed_by_script_execution_failure() {
-    let context = new_test_context(current_function_name!());
+    let mut context = new_test_context(current_function_name!());
 
     // script {
     //     fun main() {
@@ -1074,7 +1673,13 @@ async fn test_get_txn_execute_failed_by_script_execution_failure() {
     let txn = root_account.sign_with_transaction_builder(
         context
             .transaction_factory()
-            .script(Script::new(script, vec![], vec![])),
+            .script(Script::new(script, vec![], vec![]))
+            .expiration_timestamp_secs(context.get_expiration_time())
+            .upgrade_payload(
+                &mut context.rng,
+                context.use_txn_payload_v2_format,
+                context.use_orderless_transactions,
+            ),
     );
 
     test_transaction_vm_status(context, txn, false).await
@@ -1112,7 +1717,12 @@ async fn test_submit_entry_function_api_validation(
                 ty_args,
                 args,
             ))
-            .expiration_timestamp_secs(u64::MAX),
+            .expiration_timestamp_secs(context.get_expiration_time())
+            .upgrade_payload(
+                &mut context.rng,
+                context.use_txn_payload_v2_format,
+                context.use_orderless_transactions,
+            ),
     );
 
     let body = bcs::to_bytes(&txn).unwrap();
@@ -1125,7 +1735,7 @@ async fn test_submit_entry_function_api_validation(
 }
 
 async fn test_get_txn_execute_failed_by_invalid_entry_function(
-    context: TestContext,
+    mut context: TestContext,
     account: LocalAccount,
     address: &str,
     module_id: &str,
@@ -1145,7 +1755,12 @@ async fn test_get_txn_execute_failed_by_invalid_entry_function(
                 ty_args,
                 args,
             ))
-            .expiration_timestamp_secs(u64::MAX),
+            .expiration_timestamp_secs(context.get_expiration_time())
+            .upgrade_payload(
+                &mut context.rng,
+                context.use_txn_payload_v2_format,
+                context.use_orderless_transactions,
+            ),
     );
 
     test_transaction_vm_status(context, txn, false).await
@@ -1214,8 +1829,22 @@ async fn test_submit_transaction_rejects_payload_too_large_json_body() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_submit_transaction_rejects_invalid_content_type() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_submit_transaction_rejects_invalid_content_type(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let req = warp::test::request()
         .header("content-type", "invalid")
         .method("POST")
@@ -1227,8 +1856,22 @@ async fn test_submit_transaction_rejects_invalid_content_type() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_submit_transaction_rejects_invalid_json() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_submit_transaction_rejects_invalid_json(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let req = warp::test::request()
         .header("content-type", "application/json")
         .method("POST")
@@ -1257,8 +1900,22 @@ async fn test_create_signing_message_rejects_payload_too_large_json_body() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_create_signing_message_rejects_invalid_content_type() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_create_signing_message_rejects_invalid_content_type(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let req = warp::test::request()
         .header("content-type", "invalid")
         .method("POST")
@@ -1270,8 +1927,22 @@ async fn test_create_signing_message_rejects_invalid_content_type() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_create_signing_message_rejects_invalid_json() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_create_signing_message_rejects_invalid_json(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let req = warp::test::request()
         .header("content-type", "application/json")
         .method("POST")
@@ -1283,8 +1954,22 @@ async fn test_create_signing_message_rejects_invalid_json() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_create_signing_message_rejects_no_content_length_request() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_create_signing_message_rejects_no_content_length_request(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let req = warp::test::request()
         .header("content-type", "application/json")
         .method("POST")
@@ -1296,10 +1981,25 @@ async fn test_create_signing_message_rejects_no_content_length_request() {
 
 // Note: in tests, the min gas unit price is 0
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_gas_estimation_empty() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_gas_estimation_empty(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut node_config = NodeConfig::default();
     node_config.api.gas_estimation.enabled = true;
-    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+    let mut context = new_test_context_with_config(
+        current_function_name!(),
+        node_config,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     let resp = context.get("/estimate_gas_price").await;
     assert!(context.last_updated_gas_schedule().is_some());
@@ -1319,10 +2019,25 @@ async fn fill_block(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_gas_estimation_ten_blocks() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_gas_estimation_ten_blocks(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut node_config = NodeConfig::default();
     node_config.api.gas_estimation.enabled = true;
-    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+    let mut context = new_test_context_with_config(
+        current_function_name!(),
+        node_config,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     let ctx = &mut context;
     let creator = &mut ctx.gen_account();
@@ -1347,10 +2062,25 @@ async fn test_gas_estimation_ten_blocks() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_gas_estimation_ten_empty_blocks() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_gas_estimation_ten_empty_blocks(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut node_config = NodeConfig::default();
     node_config.api.gas_estimation.enabled = true;
-    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+    let mut context = new_test_context_with_config(
+        current_function_name!(),
+        node_config,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     let ctx = &mut context;
     // First block is ignored in gas estimate, so make 11
@@ -1368,7 +2098,17 @@ async fn test_gas_estimation_ten_empty_blocks() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_gas_estimation_cache() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_gas_estimation_cache(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut node_config = NodeConfig::default();
     node_config.api.gas_estimation.enabled = true;
     // Sets max cache size to 10
@@ -1378,7 +2118,12 @@ async fn test_gas_estimation_cache() {
     node_config.api.gas_estimation.aggressive_block_history = max_block_history;
     let sleep_duration =
         Duration::from_millis(node_config.api.gas_estimation.cache_expiration_ms * 2);
-    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+    let mut context = new_test_context_with_config(
+        current_function_name!(),
+        node_config,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     let ctx = &mut context;
     // First block is ignored in gas estimate, so expect 4 entries
@@ -1426,10 +2171,25 @@ async fn test_gas_estimation_cache() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_gas_estimation_disabled() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_gas_estimation_disabled(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut node_config = NodeConfig::default();
     node_config.api.gas_estimation.enabled = false;
-    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+    let mut context = new_test_context_with_config(
+        current_function_name!(),
+        node_config,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     let ctx = &mut context;
     let creator = &mut ctx.gen_account();
@@ -1454,7 +2214,17 @@ async fn test_gas_estimation_disabled() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_gas_estimation_static_override() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_gas_estimation_static_override(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut node_config = NodeConfig::default();
     node_config.api.gas_estimation.enabled = true;
     node_config.api.gas_estimation.static_override = Some(GasEstimationStaticOverride {
@@ -1462,7 +2232,12 @@ async fn test_gas_estimation_static_override() {
         market: 200,
         aggressive: 300,
     });
-    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+    let mut context = new_test_context_with_config(
+        current_function_name!(),
+        node_config,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     let ctx = &mut context;
     let creator = &mut ctx.gen_account();
@@ -1487,8 +2262,22 @@ async fn test_gas_estimation_static_override() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_simulation_failure_error_message() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_simulation_failure_error_message(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let admin0 = context.root_account().await;
 
     // script {
@@ -1515,8 +2304,24 @@ async fn test_simulation_failure_error_message() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_simulation_failure_with_move_abort_error_rendering() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    case_name,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case("", false, false),
+    case("_payload_v2", true, false),
+    case("_orderless", true, true)
+)]
+async fn test_simulation_failure_with_move_abort_error_rendering(
+    case_name: &str,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!() + case_name,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.create_account().await;
     let raw_txn = context
         .transaction_factory()
@@ -1534,7 +2339,12 @@ async fn test_simulation_failure_with_move_abort_error_rendering() {
         ))
         .sender(account.address())
         .sequence_number(account.sequence_number())
-        .expiration_timestamp_secs(u64::MAX)
+        .expiration_timestamp_secs(context.get_expiration_time())
+        .upgrade_payload(
+            &mut context.rng,
+            context.use_txn_payload_v2_format,
+            context.use_orderless_transactions,
+        )
         .build();
     let invalid_key = AccountKey::generate(&mut context.rng());
 
@@ -1551,8 +2361,24 @@ async fn test_simulation_failure_with_move_abort_error_rendering() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_simulation_failure_with_detail_error() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    case_name,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case("", false, false),
+    case("_payload_v2", true, false),
+    case("_orderless", true, true)
+)]
+async fn test_simulation_failure_with_detail_error(
+    case_name: &str,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!() + case_name,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.root_account().await;
     let raw_txn = context
         .transaction_factory()
@@ -1570,7 +2396,12 @@ async fn test_simulation_failure_with_detail_error() {
         ))
         .sender(account.address())
         .sequence_number(account.sequence_number())
-        .expiration_timestamp_secs(u64::MAX)
+        .expiration_timestamp_secs(context.get_expiration_time())
+        .upgrade_payload(
+            &mut context.rng,
+            context.use_txn_payload_v2_format,
+            context.use_orderless_transactions,
+        )
         .build();
     let invalid_key = AccountKey::generate(&mut context.rng());
     let txn = raw_txn
@@ -1586,39 +2417,66 @@ async fn test_simulation_failure_with_detail_error() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_runtime_error_message_in_interpreter() {
-    let context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_runtime_error_message_in_interpreter(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.root_account().await;
 
     let named_addresses = vec![("addr".to_string(), account.address())];
     let path =
         PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("src/tests/move/pack_exceed_limit");
     let payload = TestContext::build_package(path, named_addresses);
-    let txn = account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
+    let txn = account.sign_with_transaction_builder(
+        context
+            .transaction_factory()
+            .payload(payload)
+            .expiration_timestamp_secs(context.get_expiration_time())
+            .upgrade_payload(
+                &mut context.rng,
+                context.use_txn_payload_v2_format,
+                context.use_orderless_transactions,
+            ),
+    );
     let body = bcs::to_bytes(&txn).unwrap();
     let resp = context
         .expect_status_code(202)
         .post_bcs_txn("/transactions", body)
         .await;
 
+    let mut payload = json!({
+        "sender": resp["sender"],
+        "sequence_number": resp["sequence_number"],
+        "max_gas_amount": resp["max_gas_amount"],
+        "gas_unit_price": resp["gas_unit_price"],
+        "expiration_timestamp_secs": resp["expiration_timestamp_secs"],
+        "payload": resp["payload"],
+        "signature": {
+            "type": resp["signature"]["type"],
+            "public_key": resp["signature"]["public_key"],
+            "signature": Ed25519Signature::dummy_signature().to_string(),
+        }
+    });
+
+    if context.use_orderless_transactions {
+        let nonce = rand::thread_rng().gen::<u64>();
+        payload["replay_protection_nonce"] = json!(nonce.to_string());
+    }
     let resp = context
         .expect_status_code(200)
-        .post(
-            "/transactions/simulate",
-            json!({
-                "sender": resp["sender"],
-                "sequence_number": resp["sequence_number"],
-                "max_gas_amount": resp["max_gas_amount"],
-                "gas_unit_price": resp["gas_unit_price"],
-                "expiration_timestamp_secs":resp["expiration_timestamp_secs"],
-                "payload": resp["payload"],
-                "signature": {
-                    "type": resp["signature"]["type"],
-                    "public_key": resp["signature"]["public_key"],
-                    "signature": Ed25519Signature::dummy_signature().to_string(),
-                }
-            }),
-        )
+        .post("/transactions/simulate", payload)
         .await;
 
     assert!(!resp[0]["success"].as_bool().unwrap());
@@ -1629,7 +2487,17 @@ async fn test_runtime_error_message_in_interpreter() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_simulation_filter_deny() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_simulation_filter_deny(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut node_config = NodeConfig::default();
 
     // Blocklist the balance function.
@@ -1637,7 +2505,12 @@ async fn test_simulation_filter_deny() {
     let transaction_filter_config = TransactionFilterConfig::new(true, transaction_filter);
     node_config.transaction_filters.api_filter = transaction_filter_config;
 
-    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+    let mut context = new_test_context_with_config(
+        current_function_name!(),
+        node_config,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     let admin0 = context.root_account().await;
 
@@ -1654,7 +2527,17 @@ async fn test_simulation_filter_deny() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_simulation_filter_allow_sender() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_simulation_filter_allow_sender(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut node_config = NodeConfig::default();
 
     // Allow the root sender only.
@@ -1664,7 +2547,12 @@ async fn test_simulation_filter_allow_sender() {
     let transaction_filter_config = TransactionFilterConfig::new(true, transaction_filter);
     node_config.transaction_filters.api_filter = transaction_filter_config;
 
-    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+    let mut context = new_test_context_with_config(
+        current_function_name!(),
+        node_config,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     let admin0 = context.root_account().await;
     let other_account = context.create_account().await;
