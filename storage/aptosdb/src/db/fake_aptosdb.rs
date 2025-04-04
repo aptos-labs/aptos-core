@@ -739,7 +739,7 @@ impl DbReader for FakeAptosDB {
         self.inner.get_state_snapshot_before(next_version)
     }
 
-    fn get_account_transaction(
+    fn get_account_ordered_transaction(
         &self,
         address: aptos_types::PeerId,
         seq_num: u64,
@@ -747,19 +747,24 @@ impl DbReader for FakeAptosDB {
         ledger_version: Version,
     ) -> Result<Option<TransactionWithProof>> {
         self.inner
-            .get_account_transaction(address, seq_num, include_events, ledger_version)
+            .get_account_ordered_transaction(address, seq_num, include_events, ledger_version)
     }
 
-    fn get_account_transactions(
+    fn get_account_ordered_transactions(
         &self,
         address: aptos_types::PeerId,
         seq_num: u64,
         limit: u64,
         include_events: bool,
         ledger_version: Version,
-    ) -> Result<aptos_types::transaction::AccountTransactionsWithProof> {
-        self.inner
-            .get_account_transactions(address, seq_num, limit, include_events, ledger_version)
+    ) -> Result<aptos_types::transaction::AccountOrderedTransactionsWithProof> {
+        self.inner.get_account_ordered_transactions(
+            address,
+            seq_num,
+            limit,
+            include_events,
+            ledger_version,
+        )
     }
 
     fn get_state_proof_with_ledger_info(
