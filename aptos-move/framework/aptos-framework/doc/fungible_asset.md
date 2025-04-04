@@ -127,6 +127,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `grant_permission_by_address`](#0x1_fungible_asset_grant_permission_by_address)
 -  [Function `refill_permission`](#0x1_fungible_asset_refill_permission)
 -  [Function `revoke_permission`](#0x1_fungible_asset_revoke_permission)
+-  [Function `revoke_permission_by_store`](#0x1_fungible_asset_revoke_permission_by_store)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
@@ -4423,10 +4424,10 @@ Master signer grant permissioned signer ability to withdraw a given amount of fu
 
 ## Function `revoke_permission`
 
-Removing permissions from permissioned signer.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_revoke_permission">revoke_permission</a>(permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, token_type: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;)
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_revoke_permission">revoke_permission</a>(_permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _token_type: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;)
 </code></pre>
 
 
@@ -4435,9 +4436,34 @@ Removing permissions from permissioned signer.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_revoke_permission">revoke_permission</a>(permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, token_type: Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;) {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_revoke_permission">revoke_permission</a>(_permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _token_type: Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;) {
+    <b>abort</b> 0
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fungible_asset_revoke_permission_by_store"></a>
+
+## Function `revoke_permission_by_store`
+
+Removing permissions given to a permissioned signer to withdraw from a store.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_revoke_permission_by_store">revoke_permission_by_store</a>(permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">fungible_asset::FungibleStore</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_revoke_permission_by_store">revoke_permission_by_store</a>(permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, store: Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;) {
     <a href="permissioned_signer.md#0x1_permissioned_signer_revoke_permission">permissioned_signer::revoke_permission</a>(permissioned, WithdrawPermission::ByStore {
-        store_address: <a href="object.md#0x1_object_object_address">object::object_address</a>(&token_type),
+        store_address: <a href="object.md#0x1_object_object_address">object::object_address</a>(&store),
     })
 }
 </code></pre>
