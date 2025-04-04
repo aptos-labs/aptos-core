@@ -163,6 +163,10 @@ impl Client {
         self.base_url.join("keyless/pepper/v0/fetch").unwrap()
     }
 
+    pub fn get_faucet_url(&self) -> Url {
+        self.base_url.join("mint").unwrap()
+    }
+
     pub async fn get_aptos_version(&self) -> AptosResult<Response<AptosVersion>> {
         self.get_resource::<AptosVersion>(CORE_CODE_ADDRESS, "0x1::version::Version")
             .await
@@ -1686,6 +1690,28 @@ impl Client {
         Ok(Pepper::new(
             pepper.as_slice().try_into().map_err(anyhow::Error::from)?,
         ))
+    }
+
+    pub async fn mint_from_faucet(
+        &self,
+        to: AccountAddress,
+        amount: u64,
+    ) -> AptosResult<()> {
+        let mut url = self.get_faucet_url();
+        url.set_query(Some(format!("amount={}&address={}", amount, to).as_str()));
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, JSON)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            Err(parse_error(response).await)
+        } else {
+            Ok(())
+        }
     }
 
     async fn post_json_no_state<T: serde::de::DeserializeOwned>(
