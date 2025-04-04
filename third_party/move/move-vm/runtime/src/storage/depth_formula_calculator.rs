@@ -62,7 +62,7 @@ where
             let addr = module_id.address();
             let name = module_id.name();
 
-            if !addr.is_special() && traversal_context.visited.insert((addr, name), ()).is_none() {
+            if traversal_context.visit_if_not_special_address(addr, name) {
                 let size = self
                     .module_storage
                     .unmetered_get_existing_module_size(addr, name)

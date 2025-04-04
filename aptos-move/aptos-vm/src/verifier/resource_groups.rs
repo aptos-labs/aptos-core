@@ -65,11 +65,8 @@ pub(crate) fn validate_resource_groups(
                         .alloc(group_module_id.clone());
                     let group_module_addr = group_module_id.address();
                     let group_module_name = group_module_id.name();
-                    if !group_module_addr.is_special()
-                        && traversal_context
-                            .visited
-                            .insert((group_module_addr, group_module_name), ())
-                            .is_none()
+                    if !traversal_context
+                        .visit_if_not_special_address(group_module_addr, group_module_name)
                     {
                         let size = module_storage
                             .unmetered_get_existing_module_size(

@@ -16,7 +16,9 @@ use crate::{
     },
     ModuleStorage,
 };
-use move_binary_format::errors::{ExecutionState, PartialVMError, PartialVMResult, VMResult};
+use move_binary_format::errors::{
+    ExecutionState, Location, PartialVMError, PartialVMResult, VMResult,
+};
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, NumBytes, NumModules},
@@ -312,6 +314,13 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         self.module_storage
     }
 
+    pub fn use_lazy_loading(&self) -> bool {
+        self.module_storage
+            .runtime_environment()
+            .vm_config()
+            .use_lazy_loading
+    }
+
     pub fn traversal_context(&self) -> &TraversalContext {
         self.traversal_context
     }
@@ -333,11 +342,12 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     ) -> VMResult<Arc<Function>> {
         // MODULE LOADING METERING:
         //   Metering is done when native returns LoadModule result, so this access will never load
-        //   anything and will access cached and metered modules.
-        debug_assert!(self
-            .traversal_context
-            .visited
-            .contains_key(&(module_id.address(), module_id.name())));
+        //   anything and will access cached and metered modules. Currently, native implementations
+        //   check if the loading was metered or not before calling here, but this kept as an extra
+        //   redundancy check in case there is a mistake and gas is not charged somehow.
+        self.traversal_context
+            .check_is_special_or_visited(module_id.address(), module_id.name())
+            .map_err(|err| err.finish(Location::Undefined))?;
         let (_, function) = self.module_storage.unmetered_get_function_definition(
             module_id.address(),
             module_id.name(),

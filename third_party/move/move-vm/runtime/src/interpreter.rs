@@ -51,7 +51,6 @@ use move_vm_types::{
         runtime_access_specifier::{AccessInstance, AccessSpecifierEnv, AddressSpecifierFunction},
         runtime_types::{AbilityInfo, StructType, Type, TypeBuilder},
     },
-    module_linker_error,
     natives::function::NativeResult,
     resolver::ResourceResolver,
     values::{
@@ -1076,9 +1075,7 @@ impl InterpreterImpl<'_> {
                 let name = module_id.name();
 
                 if self.vm_config.use_lazy_loading {
-                    if !addr.is_special()
-                        && traversal_context.visited.insert((addr, name), ()).is_none()
-                    {
+                    if traversal_context.visit_if_not_special_address(addr, name) {
                         let size = module_storage
                             .unmetered_get_existing_module_size(addr, name)
                             .map_err(|err| err.to_partial())?;
@@ -1096,11 +1093,10 @@ impl InterpreterImpl<'_> {
                         traversal_context,
                         [(addr, name)],
                     )
-                        .map_err(|err| err
-                            .to_partial()
-                            .append_message_with_separator('.',
-                                                           format!("Failed to charge transitive dependency for {}. Does this module exists?", module_name)
-                            ))?;
+                        .map_err(|err| {
+                            let msg = format!("Failed to charge transitive dependency for {}. Does this module exists?", module_name);
+                            err.to_partial().append_message_with_separator('.', msg)
+                        })?;
                 }
 
                 current_frame.pc += 1; // advance past the Call instruction in the caller
@@ -3351,11 +3347,10 @@ impl Frame {
             let addr = id.address();
             let name = id.name();
 
-            if !addr.is_special() && traversal_context.visited.insert((addr, name), ()).is_none() {
+            if traversal_context.visit_if_not_special_address(addr, name) {
                 let size = module_storage
-                    .unmetered_get_module_size(addr, name)
-                    .map_err(|err| err.to_partial())?
-                    .ok_or_else(|| module_linker_error!(addr, name).to_partial())?;
+                    .unmetered_get_existing_module_size(addr, name)
+                    .map_err(|err| err.to_partial())?;
                 gas_meter.charge_dependency(
                     false,
                     id.address(),

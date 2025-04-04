@@ -198,11 +198,8 @@ impl TransactionDataCache {
                 let module_id = traversal_context
                     .referenced_module_ids
                     .alloc(struct_tag.module_id());
-                if !module_id.address().is_special()
-                    && traversal_context
-                        .visited
-                        .insert((module_id.address(), module_id.name()), ())
-                        .is_none()
+                if traversal_context
+                    .visit_if_not_special_address(module_id.address(), module_id.name())
                 {
                     let size = module_storage
                         .unmetered_get_existing_module_size(module_id.address(), module_id.name())

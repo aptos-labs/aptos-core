@@ -115,13 +115,11 @@ impl<'r> UserSession<'r> {
                 let module_id = module.self_id();
                 let init_func_load_result = if features.is_lazy_loading_enabled() {
                     // With lazy loading, when charging gas for publish modules we must mark new
-                    // modules in the bundle as visited, to avoid double charging here.
-                    debug_assert!(
-                        module_id.address().is_special()
-                            || traversal_context
-                                .visited
-                                .contains_key(&(module_id.address(), module_id.name()))
-                    );
+                    // modules in the bundle as visited, to avoid double charging here. Hence, the
+                    // module must be in the visited set!
+                    traversal_context
+                        .check_is_special_or_visited(module_id.address(), module_id.name())
+                        .map_err(|err| err.finish(Location::Undefined))?;
 
                     LazyMeteredCodeStorage::new(&staging_module_storage).metered_lazy_load_function(
                         gas_meter,

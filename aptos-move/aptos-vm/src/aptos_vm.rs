@@ -540,8 +540,8 @@ impl AptosVM {
         module_storage: &impl AptosModuleStorage,
         traversal_context: &TraversalContext,
         status: ExecutionStatus,
-    ) -> ExecutionStatus {
-        match status {
+    ) -> VMResult<ExecutionStatus> {
+        Ok(match status {
             ExecutionStatus::MoveAbort {
                 location: AbortLocation::Module(module),
                 code,
@@ -550,14 +550,11 @@ impl AptosVM {
                 // MODULE LOADING METERING:
                 //  It is fine not to charge gas here: transaction aborted in a module, so it must
                 //  have been loaded and metered. Note that this relies on the fact that the
-                //  location must be set to module only after it has been metered! Should be the
-                //  case, hence using debug assertion.
-                debug_assert!(
-                    module.address().is_special()
-                        || traversal_context
-                            .visited
-                            .contains_key(&(module.address(), module.name()))
-                );
+                //  location must be set to module only after it has been metered!
+                traversal_context
+                    .check_is_special_or_visited(module.address(), module.name())
+                    .map_err(|err| err.finish(Location::Undefined))?;
+
                 let info = module_storage
                     .unmetered_get_module_metadata(module.address(), module.name())
                     .ok()
@@ -572,7 +569,7 @@ impl AptosVM {
                 }
             },
             _ => status,
-        }
+        })
     }
 
     fn finish_aborted_transaction(
@@ -694,7 +691,8 @@ impl AptosVM {
         // Also, do not move this after we run failure epilogue below, because this will load
         // module, which alters abort info. We have a transaction at version 596888095 which
         // relies on this specific behavior...
-        let status = self.inject_abort_info_if_available(module_storage, traversal_context, status);
+        let status =
+            self.inject_abort_info_if_available(module_storage, traversal_context, status)?;
 
         epilogue_session.execute(|session| {
             transaction_validation::run_failure_epilogue(
@@ -1397,8 +1395,7 @@ impl AptosVM {
                 let name = module.self_name();
 
                 // TODO: Allow the check of special addresses to be customized.
-                if addr.is_special() || traversal_context.visited.insert((addr, name), ()).is_some()
-                {
+                if !traversal_context.visit_if_not_special_address(addr, name) {
                     continue;
                 }
 
@@ -1424,8 +1421,8 @@ impl AptosVM {
 
                 // In case of lazy loading: add all modules in a bundle as visited to avoid double
                 // charging during module initialization.
-                if self.features().is_lazy_loading_enabled() && !addr.is_empty() {
-                    traversal_context.visited.insert((addr, name), ());
+                if self.features().is_lazy_loading_enabled() {
+                    traversal_context.visit_if_not_special_address(addr, name);
                 }
             }
 
@@ -1451,9 +1448,7 @@ impl AptosVM {
                     })
                     .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name))
                 {
-                    if addr.is_special()
-                        || traversal_context.visited.insert((addr, name), ()).is_some()
-                    {
+                    if !traversal_context.visit_if_not_special_address(addr, name) {
                         continue;
                     }
 

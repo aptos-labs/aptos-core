@@ -504,12 +504,9 @@ where
         let addr = module_id.address();
         let name = module_id.name();
 
-        if !addr.is_special()
-            && self
-                .traversal_context
-                .visited
-                .insert((addr, name), ())
-                .is_none()
+        if self
+            .traversal_context
+            .visit_if_not_special_address(addr, name)
         {
             let size = self
                 .code_storage
@@ -616,12 +613,9 @@ where
         let addr = module_id.address();
         let name = module_id.name();
 
-        if !addr.is_special()
-            && self
-                .traversal_context
-                .visited
-                .insert((addr, name), ())
-                .is_none()
+        if self
+            .traversal_context
+            .visit_if_not_special_address(addr, name)
         {
             let size = self
                 .code_storage

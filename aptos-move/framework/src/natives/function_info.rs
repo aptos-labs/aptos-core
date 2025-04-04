@@ -83,25 +83,13 @@ fn native_check_dispatch_type_compatibility_impl(
 
     let (rhs, rhs_id) = {
         let (module, func) = extract_function_info(&mut arguments)?;
-        let is_err = if context.get_feature_flags().is_account_abstraction_enabled()
-            || context
-                .get_feature_flags()
-                .is_derivable_account_abstraction_enabled()
-        {
-            !module.address().is_special()
-                && !context
-                    .traversal_context()
-                    .visited
-                    .contains_key(&(module.address(), module.name()))
-        } else {
-            !context
-                .traversal_context()
-                .visited
-                .contains_key(&(module.address(), module.name()))
-        };
-        if is_err {
-            return Err(SafeNativeError::Abort { abort_code: 2 });
-        }
+
+        // The module must be metered and loaded.
+        context
+            .traversal_context()
+            .check_is_special_or_visited(module.address(), module.name())
+            .map_err(|_| SafeNativeError::Abort { abort_code: 2 })?;
+
         (
             context
                 .load_function(&module, &func)
