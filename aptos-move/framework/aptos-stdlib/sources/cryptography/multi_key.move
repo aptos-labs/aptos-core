@@ -37,7 +37,7 @@ module aptos_std::multi_key {
 
     /// Derives the Aptos-specific authentication key of the given MultiKey public key.
     fun public_key_bytes_to_authentication_key(pk_bytes: vector<u8>): vector<u8> {
-        pk_bytes.push_back(SIGNATURE_SCHEME_ID)
+        pk_bytes.push_back(SIGNATURE_SCHEME_ID);
         hash::sha3_256(pk_bytes)
     }
 }
