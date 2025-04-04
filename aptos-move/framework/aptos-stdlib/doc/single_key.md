@@ -163,7 +163,7 @@ Parses the input bytes as an *unvalidated* single key.  It does check that the f
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="single_key.md#0x1_single_key_new_unvalidated_public_key_from_bytes">new_unvalidated_public_key_from_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="single_key.md#0x1_single_key_UnvalidatedPublicKey">UnvalidatedPublicKey</a> {
-    <b>let</b> first_byte = *std::vector::borrow(&bytes, 0);
+    <b>let</b> first_byte = bytes[0];
     <b>assert</b>!(first_byte &lt;= 4, std::error::invalid_argument(<a href="single_key.md#0x1_single_key_E_INVALID_PUBLIC_KEY_TYPE">E_INVALID_PUBLIC_KEY_TYPE</a>));
     <a href="single_key.md#0x1_single_key_UnvalidatedPublicKey">UnvalidatedPublicKey</a> { bytes }
 }
@@ -217,9 +217,9 @@ the public key bytes.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="single_key.md#0x1_single_key_from_ed25519_public_key_unvalidated">from_ed25519_public_key_unvalidated</a>(pk: &<a href="ed25519.md#0x1_ed25519_UnvalidatedPublicKey">ed25519::UnvalidatedPublicKey</a>): <a href="single_key.md#0x1_single_key_UnvalidatedPublicKey">UnvalidatedPublicKey</a> {
-    <b>let</b> pk_bytes = std::vector::empty();
-    std::vector::push_back(&<b>mut</b> pk_bytes, <a href="single_key.md#0x1_single_key_ED25519_PUBLIC_KEY_TYPE">ED25519_PUBLIC_KEY_TYPE</a>);
-    std::vector::push_back(&<b>mut</b> pk_bytes, 0x20);
+    <b>let</b> pk_bytes = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
+    pk_bytes.push_back(<a href="single_key.md#0x1_single_key_ED25519_PUBLIC_KEY_TYPE">ED25519_PUBLIC_KEY_TYPE</a>);
+    pk_bytes.push_back(0x20);
     std::vector::append(&<b>mut</b> pk_bytes, <a href="ed25519.md#0x1_ed25519_unvalidated_public_key_to_bytes">ed25519::unvalidated_public_key_to_bytes</a>(pk));
     <a href="single_key.md#0x1_single_key_UnvalidatedPublicKey">UnvalidatedPublicKey</a> {
         bytes: pk_bytes
@@ -273,8 +273,8 @@ Derives the Aptos-specific authentication key of the given bytes of a single key
 
 
 <pre><code><b>fun</b> <a href="single_key.md#0x1_single_key_public_key_bytes_to_authentication_key">public_key_bytes_to_authentication_key</a>(pk_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    std::vector::push_back(&<b>mut</b> pk_bytes, <a href="single_key.md#0x1_single_key_SIGNATURE_SCHEME_ID">SIGNATURE_SCHEME_ID</a>);
-    std::hash::sha3_256(pk_bytes)
+    pk_bytes.push_back(<a href="single_key.md#0x1_single_key_SIGNATURE_SCHEME_ID">SIGNATURE_SCHEME_ID</a>);
+    <a href="../../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(pk_bytes)
 }
 </code></pre>
 

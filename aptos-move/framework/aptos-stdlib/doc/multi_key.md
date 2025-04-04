@@ -80,9 +80,7 @@ it together with an MultiEd25519 public key.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="multi_key.md#0x1_multi_key_new_unvalidated_public_key_from_bytes">new_unvalidated_public_key_from_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="multi_key.md#0x1_multi_key_UnvalidatedPublicKey">UnvalidatedPublicKey</a> {
-    <a href="multi_key.md#0x1_multi_key_UnvalidatedPublicKey">UnvalidatedPublicKey</a> {
-        bytes: bytes
-    }
+    <a href="multi_key.md#0x1_multi_key_UnvalidatedPublicKey">UnvalidatedPublicKey</a> { bytes }
 }
 </code></pre>
 
@@ -132,8 +130,8 @@ Derives the Aptos-specific authentication key of the given MultiKey public key.
 
 
 <pre><code><b>fun</b> <a href="multi_key.md#0x1_multi_key_public_key_bytes_to_authentication_key">public_key_bytes_to_authentication_key</a>(pk_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> pk_bytes, <a href="multi_key.md#0x1_multi_key_SIGNATURE_SCHEME_ID">SIGNATURE_SCHEME_ID</a>);
-    std::hash::sha3_256(pk_bytes)
+    pk_bytes.push_back(<a href="multi_key.md#0x1_multi_key_SIGNATURE_SCHEME_ID">SIGNATURE_SCHEME_ID</a>);
+    <a href="../../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(pk_bytes)
 }
 </code></pre>
 

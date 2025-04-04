@@ -52,7 +52,7 @@ module aptos_std::single_key {
 
     /// Parses the input bytes as an *unvalidated* single key.  It does check that the first byte is a valid scheme identifier.
     public fun new_unvalidated_public_key_from_bytes(bytes: vector<u8>): UnvalidatedPublicKey {
-        let first_byte = *std::vector::borrow(&bytes, 0);
+        let first_byte = bytes[0];
         assert!(first_byte <= 4, std::error::invalid_argument(E_INVALID_PUBLIC_KEY_TYPE));
         UnvalidatedPublicKey { bytes }
     }
