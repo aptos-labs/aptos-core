@@ -208,7 +208,7 @@ module aptos_framework::transaction_validation {
                 || txn_sequence_number > 0
         ) {
             if (!features::orderless_transactions_enabled()) {
-                // Question[Orderless]: After orderless transactions is enabled, this check is not performed 
+                // Question[Orderless]: After orderless transactions is enabled, this check is not performed
                 // to accommodate stateless accounts. Is it okay?
                 assert!(account::exists_at(transaction_sender), error::invalid_argument(PROLOGUE_EACCOUNT_DOES_NOT_EXIST));
             };

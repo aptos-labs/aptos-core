@@ -2880,6 +2880,118 @@ impl<'de> serde::Deserialize<'de> for EventSizeInfo {
         deserializer.deserialize_struct("aptos.transaction.v1.EventSizeInfo", FIELDS, GeneratedVisitor)
     }
 }
+impl serde::Serialize for ExtraConfigV1 {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if self.multisig_address.is_some() {
+            len += 1;
+        }
+        if self.replay_protection_nonce.is_some() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ExtraConfigV1", len)?;
+        if let Some(v) = self.multisig_address.as_ref() {
+            struct_ser.serialize_field("multisigAddress", v)?;
+        }
+        if let Some(v) = self.replay_protection_nonce.as_ref() {
+            struct_ser.serialize_field("replayProtectionNonce", ToString::to_string(&v).as_str())?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for ExtraConfigV1 {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "multisig_address",
+            "multisigAddress",
+            "replay_protection_nonce",
+            "replayProtectionNonce",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            MultisigAddress,
+            ReplayProtectionNonce,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "multisigAddress" | "multisig_address" => Ok(GeneratedField::MultisigAddress),
+                            "replayProtectionNonce" | "replay_protection_nonce" => Ok(GeneratedField::ReplayProtectionNonce),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = ExtraConfigV1;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct aptos.transaction.v1.ExtraConfigV1")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<ExtraConfigV1, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                let mut multisig_address__ = None;
+                let mut replay_protection_nonce__ = None;
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        GeneratedField::MultisigAddress => {
+                            if multisig_address__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("multisigAddress"));
+                            }
+                            multisig_address__ = map.next_value()?;
+                        }
+                        GeneratedField::ReplayProtectionNonce => {
+                            if replay_protection_nonce__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("replayProtectionNonce"));
+                            }
+                            replay_protection_nonce__ =
+                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
+                            ;
+                        }
+                    }
+                }
+                Ok(ExtraConfigV1 {
+                    multisig_address: multisig_address__,
+                    replay_protection_nonce: replay_protection_nonce__,
+                })
+            }
+        }
+        deserializer.deserialize_struct("aptos.transaction.v1.ExtraConfigV1", FIELDS, GeneratedVisitor)
+    }
+}
 impl serde::Serialize for FeePayerSignature {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -7416,6 +7528,9 @@ impl serde::Serialize for TransactionPayload {
         if self.payload.is_some() {
             len += 1;
         }
+        if self.extra_config.is_some() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.TransactionPayload", len)?;
         if self.r#type != 0 {
             let v = transaction_payload::Type::from_i32(self.r#type)
@@ -7438,6 +7553,13 @@ impl serde::Serialize for TransactionPayload {
                 }
             }
         }
+        if let Some(v) = self.extra_config.as_ref() {
+            match v {
+                transaction_payload::ExtraConfig::ExtraConfigV1(v) => {
+                    struct_ser.serialize_field("extraConfigV1", v)?;
+                }
+            }
+        }
         struct_ser.end()
     }
 }
@@ -7457,6 +7579,8 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
             "writeSetPayload",
             "multisig_payload",
             "multisigPayload",
+            "extra_config_v1",
+            "extraConfigV1",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -7466,6 +7590,7 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
             ScriptPayload,
             WriteSetPayload,
             MultisigPayload,
+            ExtraConfigV1,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -7492,6 +7617,7 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
                             "scriptPayload" | "script_payload" => Ok(GeneratedField::ScriptPayload),
                             "writeSetPayload" | "write_set_payload" => Ok(GeneratedField::WriteSetPayload),
                             "multisigPayload" | "multisig_payload" => Ok(GeneratedField::MultisigPayload),
+                            "extraConfigV1" | "extra_config_v1" => Ok(GeneratedField::ExtraConfigV1),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -7513,6 +7639,7 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
             {
                 let mut r#type__ = None;
                 let mut payload__ = None;
+                let mut extra_config__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Type => {
@@ -7549,11 +7676,19 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
                             payload__ = map.next_value::<::std::option::Option<_>>()?.map(transaction_payload::Payload::MultisigPayload)
 ;
                         }
+                        GeneratedField::ExtraConfigV1 => {
+                            if extra_config__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("extraConfigV1"));
+                            }
+                            extra_config__ = map.next_value::<::std::option::Option<_>>()?.map(transaction_payload::ExtraConfig::ExtraConfigV1)
+;
+                        }
                     }
                 }
                 Ok(TransactionPayload {
                     r#type: r#type__.unwrap_or_default(),
                     payload: payload__,
+                    extra_config: extra_config__,
                 })
             }
         }
