@@ -22,6 +22,7 @@ the message format
 - Phantom
 
 
+-  [Enum `SIWSAbstractSignature`](#0x1_daa_siws_SIWSAbstractSignature)
 -  [Constants](#@Constants_0)
 -  [Function `deserialize_abstract_public_key`](#0x1_daa_siws_deserialize_abstract_public_key)
 -  [Function `deserialize_abstract_signature`](#0x1_daa_siws_deserialize_abstract_signature)
@@ -45,6 +46,45 @@ the message format
 </code></pre>
 
 
+
+<a id="0x1_daa_siws_SIWSAbstractSignature"></a>
+
+## Enum `SIWSAbstractSignature`
+
+
+
+<pre><code>enum <a href="daa_siws.md#0x1_daa_siws_SIWSAbstractSignature">SIWSAbstractSignature</a> <b>has</b> drop
+</code></pre>
+
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>RawSignature</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>signature: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+</details>
+
+</details>
 
 <a id="@Constants_0"></a>
 
@@ -109,15 +149,6 @@ Entry function payload is missing.
 
 
 
-<a id="0x1_daa_siws_SIGNATURE_TYPE0"></a>
-
-
-
-<pre><code><b>const</b> <a href="daa_siws.md#0x1_daa_siws_SIGNATURE_TYPE0">SIGNATURE_TYPE0</a>: u8 = 0;
-</code></pre>
-
-
-
 <a id="0x1_daa_siws_deserialize_abstract_public_key"></a>
 
 ## Function `deserialize_abstract_public_key`
@@ -159,7 +190,7 @@ the raw bytes version to do signature verification.
 Returns a tuple of the signature type and the signature.
 
 
-<pre><code><b>fun</b> <a href="daa_siws.md#0x1_daa_siws_deserialize_abstract_signature">deserialize_abstract_signature</a>(abstract_signature: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (u8, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="daa_siws.md#0x1_daa_siws_deserialize_abstract_signature">deserialize_abstract_signature</a>(abstract_signature: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="daa_siws.md#0x1_daa_siws_SIWSAbstractSignature">daa_siws::SIWSAbstractSignature</a>
 </code></pre>
 
 
@@ -168,10 +199,15 @@ Returns a tuple of the signature type and the signature.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="daa_siws.md#0x1_daa_siws_deserialize_abstract_signature">deserialize_abstract_signature</a>(abstract_signature: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (u8, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
-    <b>let</b> signature_type = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(abstract_signature, 0);
-    <b>let</b> signature = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(abstract_signature, 1, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(abstract_signature));
-    (signature_type, signature)
+<pre><code><b>fun</b> <a href="daa_siws.md#0x1_daa_siws_deserialize_abstract_signature">deserialize_abstract_signature</a>(abstract_signature: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="daa_siws.md#0x1_daa_siws_SIWSAbstractSignature">SIWSAbstractSignature</a> {
+    <b>let</b> stream = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_new">bcs_stream::new</a>(*abstract_signature);
+    <b>let</b> signature_type = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_u8">bcs_stream::deserialize_u8</a>(&<b>mut</b> stream);
+    <b>if</b> (signature_type == 0x00) {
+        <b>let</b> signature = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
+        SIWSAbstractSignature::RawSignature { signature }
+    } <b>else</b> {
+        <b>abort</b>(<a href="daa_siws.md#0x1_daa_siws_EINVALID_SIGNATURE_TYPE">EINVALID_SIGNATURE_TYPE</a>)
+    }
 }
 </code></pre>
 
@@ -385,17 +421,20 @@ Returns a tuple of the signature type and the signature.
 
     <b>let</b> public_key_bytes = <a href="daa_siws.md#0x1_daa_siws_to_public_key_bytes">to_public_key_bytes</a>(&base58_public_key);
     <b>let</b> public_key = new_unvalidated_public_key_from_bytes(public_key_bytes);
-    <b>let</b> (signature_type, signature_bytes) = <a href="daa_siws.md#0x1_daa_siws_deserialize_abstract_signature">deserialize_abstract_signature</a>(aa_auth_data.derivable_abstract_signature());
-    <b>assert</b>!(signature_type == <a href="daa_siws.md#0x1_daa_siws_SIGNATURE_TYPE0">SIGNATURE_TYPE0</a>, <a href="daa_siws.md#0x1_daa_siws_EINVALID_SIGNATURE_TYPE">EINVALID_SIGNATURE_TYPE</a>);
-    <b>let</b> signature = new_signature_from_bytes(signature_bytes);
-    <b>assert</b>!(
-        <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_signature_verify_strict">ed25519::signature_verify_strict</a>(
-            &signature,
-            &public_key,
-            message,
-        ),
-        <a href="daa_siws.md#0x1_daa_siws_EINVALID_SIGNATURE">EINVALID_SIGNATURE</a>
-    );
+    <b>let</b> abstract_signature = <a href="daa_siws.md#0x1_daa_siws_deserialize_abstract_signature">deserialize_abstract_signature</a>(aa_auth_data.derivable_abstract_signature());
+    match (abstract_signature) {
+        SIWSAbstractSignature::RawSignature { signature: signature_bytes } =&gt; {
+            <b>let</b> signature = new_signature_from_bytes(signature_bytes);
+            <b>assert</b>!(
+                <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_signature_verify_strict">ed25519::signature_verify_strict</a>(
+                    &signature,
+                    &public_key,
+                    message,
+                ),
+                <a href="daa_siws.md#0x1_daa_siws_EINVALID_SIGNATURE">EINVALID_SIGNATURE</a>
+            );
+        },
+    };
 }
 </code></pre>
 
