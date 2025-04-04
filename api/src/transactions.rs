@@ -1013,7 +1013,7 @@ impl TransactionsApi {
 
         let latest_ledger_info = account.latest_ledger_info;
         // TODO: Return more specific errors from within this function.
-        let data = self.context.get_account_transactions(
+        let data = self.context.get_account_ordered_transactions(
             address.into(),
             page.start_option(),
             page.limit(&latest_ledger_info)?,
