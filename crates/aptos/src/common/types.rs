@@ -624,7 +624,7 @@ impl PromptOptions {
 }
 
 /// An insertable option for use with encodings.
-#[derive(Debug, Default, Parser)]
+#[derive(Debug, Default, Parser, Clone, Copy)]
 pub struct EncodingOptions {
     /// Encoding of data as one of [base64, bcs, hex]
     #[clap(long, default_value_t = EncodingType::Hex)]
@@ -689,7 +689,7 @@ impl PublicKeyInputOptions {
     }
 }
 
-impl ExtractPublicKey for PublicKeyInputOptions {
+impl ExtractEd25519PublicKey for PublicKeyInputOptions {
     fn extract_public_key(
         &self,
         encoding: EncodingType,
@@ -716,7 +716,7 @@ impl ExtractPublicKey for PublicKeyInputOptions {
     }
 }
 
-pub trait ParsePrivateKey {
+pub trait ParseEd25519PrivateKey {
     fn parse_private_key(
         &self,
         encoding: EncodingType,
@@ -785,7 +785,7 @@ pub struct PrivateKeyInputOptions {
     private_key: Option<String>,
 }
 
-impl ParsePrivateKey for PrivateKeyInputOptions {}
+impl ParseEd25519PrivateKey for PrivateKeyInputOptions {}
 
 impl PrivateKeyInputOptions {
     pub fn from_private_key(private_key: &Ed25519PrivateKey) -> CliTypedResult<Self> {
@@ -826,7 +826,7 @@ impl PrivateKeyInputOptions {
     /// With fallback to profile
     /// NOTE: Use this function instead of 'extract_private_key_and_address' if this is HardwareWallet profile
     /// HardwareWallet profile does not have private key in config
-    pub fn extract_public_key_and_address(
+    pub fn extract_ed25519_public_key_and_address(
         &self,
         encoding: EncodingType,
         profile: &ProfileOptions,
@@ -976,6 +976,18 @@ impl PrivateKeyInputOptions {
             self.private_key.clone(),
         )
     }
+
+    pub fn extract_private_key_input_from_cli_args(&self) -> CliTypedResult<Vec<u8>> {
+        if let Some(ref file) = self.private_key_file {
+            read_from_file(file)
+        } else if let Some(ref key) = self.private_key {
+            Ok(strip_private_key_prefix(key)?.as_bytes().to_vec())
+        } else {
+            Err(CliError::CommandArgumentError(
+                "No --private-key or --private-key-file provided".to_string(),
+            ))
+        }
+    }
 }
 
 // Extract the public key by deriving private key, fall back to public key from profile
@@ -983,7 +995,7 @@ impl PrivateKeyInputOptions {
 // 1. Get the private key (either from CLI input or profile), and derive the public key from it
 // 2. Else get the public key directly from the config profile
 // 3. Else error
-impl ExtractPublicKey for PrivateKeyInputOptions {
+impl ExtractEd25519PublicKey for PrivateKeyInputOptions {
     fn extract_public_key(
         &self,
         encoding: EncodingType,
@@ -1022,7 +1034,7 @@ impl ExtractPublicKey for PrivateKeyInputOptions {
     }
 }
 
-pub trait ExtractPublicKey {
+pub trait ExtractEd25519PublicKey {
     fn extract_public_key(
         &self,
         encoding: EncodingType,
@@ -1039,7 +1051,7 @@ pub fn account_address_from_auth_key(auth_key: &AuthenticationKey) -> AccountAdd
     AccountAddress::new(*auth_key.account_address())
 }
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Parser, Clone)]
 pub struct SaveFile {
     /// Output file path
     #[clap(long, value_parser)]
@@ -1807,11 +1819,12 @@ impl TransactionOptions {
     }
 
     pub fn get_public_key_and_address(&self) -> CliTypedResult<(Ed25519PublicKey, AccountAddress)> {
-        self.private_key_options.extract_public_key_and_address(
-            self.encoding_options.encoding,
-            &self.profile_options,
-            self.sender_account,
-        )
+        self.private_key_options
+            .extract_ed25519_public_key_and_address(
+                self.encoding_options.encoding,
+                &self.profile_options,
+                self.sender_account,
+            )
     }
 
     pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
