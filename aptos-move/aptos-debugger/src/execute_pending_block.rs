@@ -67,17 +67,19 @@ impl Command {
             info!("GET {url:?}...");
             let body = reqwest::get(url).await?.bytes().await?;
             bcs::from_bytes(&body)?
-        } else if let Some(consensus_db_path) = self.consensus_db_path {
-            info!(
-                "Getting block {:?} from {consensus_db_path:?}.",
-                self.block_id
-            );
-            let cmd = aptos_consensus::util::db_tool::Command {
-                db_dir: consensus_db_path,
-                block_id: self.block_id,
-            };
-            cmd.dump_pending_txns()?
-        } else {
+        } 
+        // else if let Some(consensus_db_path) = self.consensus_db_path {
+        //     info!(
+        //         "Getting block {:?} from {consensus_db_path:?}.",
+        //         self.block_id
+        //     );
+            // let cmd = aptos_consensus::util::db_tool::Command {
+            //     db_dir: consensus_db_path,
+            //     block_id: self.block_id,
+            // };
+            // cmd.dump_pending_txns()?
+        // }
+         else {
             unreachable!("Must provide one target.");
         };
 

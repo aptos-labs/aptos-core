@@ -36,7 +36,7 @@ use crate::{
     },
 };
 use anyhow::{Context, Result};
-use aptos_indexer_grpc_server_framework::setup_logging;
+// use aptos_indexer_grpc_server_framework::setup_logging;
 use async_trait::async_trait;
 use clap::Parser;
 use std::{
@@ -186,9 +186,9 @@ impl CliCommand<()> for RunLocalnet {
     }
 
     async fn execute(mut self) -> CliTypedResult<()> {
-        if self.log_to_stdout {
-            setup_logging(None);
-        }
+        // if self.log_to_stdout {
+        //     setup_logging(None);
+        // }
 
         let global_config = GlobalConfig::load().context("Failed to load global config")?;
         let test_dir = match &self.test_dir {

@@ -56,25 +56,25 @@ impl HealthChecker {
                 Ok(())
             },
             HealthChecker::DataServiceGrpc(url) => {
-                let mut client = aptos_indexer_grpc_utils::create_data_service_grpc_client(
-                    url.clone(),
-                    Some(Duration::from_secs(5)),
-                )
-                .await?;
-                let request = tonic::Request::new(GetTransactionsRequest {
-                    starting_version: Some(0),
-                    ..Default::default()
-                });
-                // Make sure we can stream the first message from the stream.
-                client
-                    .get_transactions(request)
-                    .await
-                    .context("GRPC connection error")?
-                    .into_inner()
-                    .next()
-                    .await
-                    .context("Did not receive init signal from data service GRPC stream")?
-                    .context("Error processing first message from GRPC stream")?;
+                // let mut client = aptos_indexer_grpc_utils::create_data_service_grpc_client(
+                //     url.clone(),
+                //     Some(Duration::from_secs(5)),
+                // )
+                // .await?;
+                // let request = tonic::Request::new(GetTransactionsRequest {
+                //     starting_version: Some(0),
+                //     ..Default::default()
+                // });
+                // // Make sure we can stream the first message from the stream.
+                // client
+                //     .get_transactions(request)
+                //     .await
+                //     .context("GRPC connection error")?
+                //     .into_inner()
+                //     .next()
+                //     .await
+                //     .context("Did not receive init signal from data service GRPC stream")?
+                //     .context("Error processing first message from GRPC stream")?;
                 Ok(())
             },
             HealthChecker::Postgres(connection_string) => {

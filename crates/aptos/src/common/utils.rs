@@ -14,7 +14,7 @@ use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_keygen::KeyGen;
 use aptos_logger::{debug, Level};
 use aptos_rest_client::{aptos_api_types::HashValue, Account, Client, FaucetClient, State};
-use aptos_telemetry::service::telemetry_is_disabled;
+// use aptos_telemetry::service::telemetry_is_disabled;
 use aptos_types::{
     account_address::create_multisig_account_address,
     chain_id::ChainId,
@@ -85,23 +85,23 @@ pub async fn to_common_result<T: Serialize>(
 ) -> CliResult {
     let latency = start_time.elapsed();
 
-    if !telemetry_is_disabled() {
-        let error = if let Err(ref error) = result {
-            // Only print the error type
-            Some(error.to_str())
-        } else {
-            None
-        };
+    // if !telemetry_is_disabled() {
+    //     let error = if let Err(ref error) = result {
+    //         // Only print the error type
+    //         Some(error.to_str())
+    //     } else {
+    //         None
+    //     };
 
-        if let Err(err) = timeout(
-            Duration::from_millis(2000),
-            send_telemetry_event(command, latency, error),
-        )
-        .await
-        {
-            debug!("send_telemetry_event timeout from CLI: {}", err.to_string())
-        }
-    }
+    //     if let Err(err) = timeout(
+    //         Duration::from_millis(2000),
+    //         send_telemetry_event(command, latency, error),
+    //     )
+    //     .await
+    //     {
+    //         debug!("send_telemetry_event timeout from CLI: {}", err.to_string())
+    //     }
+    // }
 
     // Return early with a non JSON error if requested.
     if let Err(err) = &result {
@@ -130,14 +130,14 @@ async fn send_telemetry_event(command: &str, latency: Duration, error: Option<&s
     let build_information = cli_build_information();
 
     // Send the event
-    aptos_telemetry::cli_metrics::send_cli_telemetry_event(
-        build_information,
-        command.into(),
-        latency,
-        error.is_none(),
-        error,
-    )
-    .await;
+    // aptos_telemetry::cli_metrics::send_cli_telemetry_event(
+    //     build_information,
+    //     command.into(),
+    //     latency,
+    //     error.is_none(),
+    //     error,
+    // )
+    // .await;
 }
 
 /// A result wrapper for displaying either a correct execution result or an error.

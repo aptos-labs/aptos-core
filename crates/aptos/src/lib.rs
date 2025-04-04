@@ -46,12 +46,12 @@ pub enum Tool {
     Move(move_tool::MoveTool),
     #[clap(subcommand)]
     Multisig(account::MultisigAccountTool),
-    #[clap(subcommand)]
-    Node(node::NodeTool),
+    // #[clap(subcommand)]
+    // Node(node::NodeTool),
     #[clap(subcommand)]
     Stake(stake::StakeTool),
-    #[clap(subcommand)]
-    Update(update::UpdateTool),
+    // #[clap(subcommand)]
+    // Update(update::UpdateTool),
 }
 
 impl Tool {
@@ -68,9 +68,9 @@ impl Tool {
             Key(tool) => tool.execute().await,
             Move(tool) => tool.execute().await,
             Multisig(tool) => tool.execute().await,
-            Node(tool) => tool.execute().await,
+            // Node(tool) => tool.execute().await,
             Stake(tool) => tool.execute().await,
-            Update(tool) => tool.execute().await,
+            // Update(tool) => tool.execute().await,
         }
     }
 }

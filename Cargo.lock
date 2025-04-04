@@ -110,7 +110,6 @@ dependencies = [
  "cfg-if",
  "getrandom 0.2.11",
  "once_cell",
- "serde",
  "version_check",
  "zerocopy",
 ]
@@ -258,19 +257,15 @@ dependencies = [
  "aptos-genesis",
  "aptos-github-client",
  "aptos-global-constants",
- "aptos-indexer-grpc-server-framework",
- "aptos-indexer-grpc-utils",
  "aptos-keygen",
  "aptos-ledger",
  "aptos-logger",
  "aptos-move-debugger",
  "aptos-network-checker",
- "aptos-node",
- "aptos-protos 1.3.1",
+ "aptos-protos",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-storage-interface",
- "aptos-telemetry",
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
@@ -286,7 +281,7 @@ dependencies = [
  "clap_complete",
  "dashmap",
  "diesel",
- "diesel-async 0.4.1 (git+https://github.com/weiznich/diesel_async.git?rev=d02798c67065d763154d7272dd0c09b39757d0f2)",
+ "diesel-async",
  "dirs",
  "futures",
  "hex",
@@ -309,21 +304,19 @@ dependencies = [
  "move-vm-runtime",
  "pathsearch",
  "poem",
- "processor",
  "rand 0.7.3",
  "reqwest",
  "self_update",
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
- "server-framework",
  "shadow-rs",
  "supra-aptos",
  "tempfile",
  "thiserror",
  "tokio",
  "toml 0.7.8",
- "tonic 0.11.0",
+ "tonic",
  "tracing",
  "tracing-subscriber 0.3.18",
  "url",
@@ -365,7 +358,7 @@ dependencies = [
  "aptos-logger",
  "aptos-runtimes",
  "aptos-storage-interface",
- "aptos-system-utils 0.1.0",
+ "aptos-system-utils",
  "aptos-types",
  "bcs 0.1.4",
  "http",
@@ -566,7 +559,7 @@ dependencies = [
  "move-bytecode-verifier",
  "num_cpus",
  "once_cell",
- "pin-project 1.1.3",
+ "pin-project",
  "proptest",
  "rand 0.7.3",
  "regex",
@@ -1424,7 +1417,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-node-resource-metrics",
- "aptos-profiler 0.1.0",
+ "aptos-profiler",
  "aptos-push-metrics",
  "aptos-sdk",
  "aptos-storage-interface",
@@ -1989,21 +1982,21 @@ dependencies = [
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
- "aptos-protos 1.3.1",
+ "aptos-moving-average",
+ "aptos-protos",
  "async-trait",
  "clap 4.4.14",
  "futures",
  "futures-core",
  "jemallocator",
  "once_cell",
- "prost 0.12.3",
+ "prost",
  "redis",
  "reqwest",
  "serde",
  "tempfile",
  "tokio",
- "tonic 0.11.0",
+ "tonic",
  "tracing",
  "url",
 ]
@@ -2016,21 +2009,21 @@ dependencies = [
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
- "aptos-protos 1.3.1",
+ "aptos-moving-average",
+ "aptos-protos",
  "aptos-transaction-filter",
  "async-trait",
  "clap 4.4.14",
  "futures",
  "jemallocator",
  "once_cell",
- "prost 0.12.3",
+ "prost",
  "redis",
  "serde",
  "serde_json",
  "tokio",
  "tokio-stream",
- "tonic 0.11.0",
+ "tonic",
  "tonic-reflection",
  "tracing",
  "uuid",
@@ -2044,7 +2037,7 @@ dependencies = [
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
+ "aptos-moving-average",
  "async-trait",
  "clap 4.4.14",
  "futures",
@@ -2078,9 +2071,9 @@ dependencies = [
  "aptos-mempool",
  "aptos-mempool-notifications",
  "aptos-metrics-core",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
+ "aptos-moving-average",
  "aptos-proptest-helpers",
- "aptos-protos 1.3.1",
+ "aptos-protos",
  "aptos-runtimes",
  "aptos-sdk",
  "aptos-secure-storage",
@@ -2107,7 +2100,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-stream",
- "tonic 0.11.0",
+ "tonic",
  "tonic-reflection",
 ]
 
@@ -2117,7 +2110,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-indexer-grpc-utils",
- "aptos-protos 1.3.1",
+ "aptos-protos",
  "futures",
  "jemallocator",
  "lazy_static",
@@ -2157,7 +2150,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-metrics-core",
- "aptos-system-utils 0.1.0",
+ "aptos-system-utils",
  "async-trait",
  "backtrace",
  "clap 4.4.14",
@@ -2201,7 +2194,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util 0.7.10",
- "tonic 0.11.0",
+ "tonic",
 ]
 
 [[package]]
@@ -2210,7 +2203,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-metrics-core",
- "aptos-protos 1.3.1",
+ "aptos-protos",
  "async-trait",
  "backoff",
  "base64 0.13.1",
@@ -2222,7 +2215,7 @@ dependencies = [
  "lz4",
  "once_cell",
  "prometheus",
- "prost 0.12.3",
+ "prost",
  "redis",
  "redis-test",
  "ripemd",
@@ -2230,7 +2223,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-util 0.7.10",
- "tonic 0.11.0",
+ "tonic",
  "tracing",
  "url",
 ]
@@ -2655,7 +2648,6 @@ name = "aptos-move-debugger"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-consensus",
  "aptos-crypto",
  "aptos-gas-profiling",
  "aptos-logger",
@@ -2731,14 +2723,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-moving-average"
-version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=5244b84fa5ed872e5280dc8df032d744d62ad29d#5244b84fa5ed872e5280dc8df032d744d62ad29d"
-dependencies = [
- "chrono",
-]
-
-[[package]]
 name = "aptos-mvhashmap"
 version = "0.1.0"
 dependencies = [
@@ -2787,7 +2771,7 @@ dependencies = [
  "aptos-types",
  "bytes",
  "futures",
- "pin-project 1.1.3",
+ "pin-project",
  "serde",
  "tokio",
  "tokio-util 0.7.10",
@@ -2827,7 +2811,7 @@ dependencies = [
  "maplit",
  "once_cell",
  "ordered-float 3.9.2",
- "pin-project 1.1.3",
+ "pin-project",
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
@@ -3215,19 +3199,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-profiler"
-version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93#4541add3fd29826ec57f22658ca286d2d6134b93"
-dependencies = [
- "anyhow",
- "backtrace",
- "jemalloc-sys",
- "jemallocator",
- "pprof",
- "regex",
-]
-
-[[package]]
 name = "aptos-proptest-helpers"
 version = "0.1.0"
 dependencies = [
@@ -3238,25 +3209,13 @@ dependencies = [
 
 [[package]]
 name = "aptos-protos"
-version = "1.3.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?tag=aptos-node-v1.12.1#4b9a2593facaee92b28df2e99b2773a7e4f930f5"
-dependencies = [
- "futures-core",
- "pbjson",
- "prost 0.12.3",
- "serde",
- "tonic 0.11.0",
-]
-
-[[package]]
-name = "aptos-protos"
 version = "1.3.1"
 dependencies = [
  "futures-core",
  "pbjson",
- "prost 0.12.3",
+ "prost",
  "serde",
- "tonic 0.11.0",
+ "tonic",
 ]
 
 [[package]]
@@ -3284,7 +3243,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "futures",
- "pin-project 1.1.3",
+ "pin-project",
  "tokio",
  "tokio-util 0.7.10",
 ]
@@ -3577,14 +3536,14 @@ dependencies = [
  "aptos-config",
  "aptos-logger",
  "aptos-metrics-core",
- "aptos-protos 1.3.1",
+ "aptos-protos",
  "bcs 0.1.4",
  "crossbeam-channel",
  "once_cell",
  "serde",
  "thiserror",
  "tokio",
- "tonic 0.11.0",
+ "tonic",
  "tonic-reflection",
 ]
 
@@ -3793,27 +3752,7 @@ name = "aptos-system-utils"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-profiler 0.1.0",
- "async-mutex",
- "http",
- "hyper",
- "lazy_static",
- "mime",
- "pprof",
- "regex",
- "rstack-self",
- "tokio",
- "tracing",
- "url",
-]
-
-[[package]]
-name = "aptos-system-utils"
-version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93#4541add3fd29826ec57f22658ca286d2d6134b93"
-dependencies = [
- "anyhow",
- "aptos-profiler 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93)",
+ "aptos-profiler",
  "async-mutex",
  "http",
  "hyper",
@@ -3969,7 +3908,7 @@ dependencies = [
  "aptos-infallible",
  "enum_dispatch",
  "futures",
- "pin-project 1.1.3",
+ "pin-project",
  "thiserror",
  "tokio",
  "tokio-test",
@@ -4048,10 +3987,10 @@ name = "aptos-transaction-filter"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-protos 1.3.1",
+ "aptos-protos",
  "derive_builder",
  "lz4",
- "prost 0.12.3",
+ "prost",
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
@@ -4753,19 +4692,6 @@ dependencies = [
  "event-listener-strategy",
  "futures-core",
  "pin-project-lite",
-]
-
-[[package]]
-name = "async-compression"
-version = "0.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc2d0cfb2a7388d34f590e76686704c494ed7aaceed62ee1ba35cbf363abc2a5"
-dependencies = [
- "flate2",
- "futures-core",
- "memchr",
- "pin-project-lite",
- "tokio",
 ]
 
 [[package]]
@@ -5940,7 +5866,7 @@ dependencies = [
  "bitflags 1.3.2",
  "strsim 0.8.0",
  "textwrap 0.11.0",
- "unicode-width",
+ "unicode-width 0.1.11",
  "vec_map",
 ]
 
@@ -6093,7 +6019,7 @@ checksum = "3538270d33cc669650c4b093848450d380def10c331d38c768e34cac80576e6e"
 dependencies = [
  "serde",
  "termcolor",
- "unicode-width",
+ "unicode-width 0.1.11",
 ]
 
 [[package]]
@@ -6163,7 +6089,7 @@ dependencies = [
  "encode_unicode 0.3.6",
  "lazy_static",
  "libc",
- "unicode-width",
+ "unicode-width 0.1.11",
  "windows-sys 0.45.0",
 ]
 
@@ -6174,9 +6100,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a257c22cd7e487dd4a13d413beabc512c5052f0bc048db0da6a84c3d8a6142fd"
 dependencies = [
  "futures-core",
- "prost 0.12.3",
- "prost-types 0.12.3",
- "tonic 0.11.0",
+ "prost",
+ "prost-types",
+ "tonic",
  "tracing-core",
 ]
 
@@ -6192,14 +6118,14 @@ dependencies = [
  "futures-task",
  "hdrhistogram",
  "humantime",
- "prost 0.12.3",
- "prost-types 0.12.3",
+ "prost",
+ "prost-types",
  "serde",
  "serde_json",
  "thread_local",
  "tokio",
  "tokio-stream",
- "tonic 0.11.0",
+ "tonic",
  "tracing",
  "tracing-core",
  "tracing-subscriber 0.3.18",
@@ -6659,16 +6585,15 @@ dependencies = [
 
 [[package]]
 name = "curve25519-dalek"
-version = "4.1.2"
+version = "4.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a677b8922c94e01bdbb12126b0bc852f00447528dee1782229af9c720c3f348"
+checksum = "97fb8b7c4503de7d6ae7b42ab72a5a59857b4c937ec27a3d4539dba95b5ab2be"
 dependencies = [
  "cfg-if",
  "cpufeatures",
  "curve25519-dalek-derive",
  "digest 0.10.7",
  "fiat-crypto",
- "platforms",
  "rustc_version",
  "subtle",
  "zeroize",
@@ -7034,20 +6959,6 @@ dependencies = [
 [[package]]
 name = "diesel-async"
 version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acada1517534c92d3f382217b485db8a8638f111b0e3f2a2a8e26165050f77be"
-dependencies = [
- "async-trait",
- "diesel",
- "futures-util",
- "scoped-futures",
- "tokio",
- "tokio-postgres",
-]
-
-[[package]]
-name = "diesel-async"
-version = "0.4.1"
 source = "git+https://github.com/weiznich/diesel_async.git?rev=d02798c67065d763154d7272dd0c09b39757d0f2#d02798c67065d763154d7272dd0c09b39757d0f2"
 dependencies = [
  "async-trait",
@@ -7057,18 +6968,6 @@ dependencies = [
  "scoped-futures",
  "tokio",
  "tokio-postgres",
-]
-
-[[package]]
-name = "diesel_async_migrations"
-version = "0.11.0"
-source = "git+https://github.com/niroco/diesel_async_migrations?rev=11f331b73c5cfcc894380074f748d8fda710ac12#11f331b73c5cfcc894380074f748d8fda710ac12"
-dependencies = [
- "diesel",
- "diesel-async 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "macros",
- "scoped-futures",
- "tracing",
 ]
 
 [[package]]
@@ -7352,7 +7251,7 @@ version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a3daa8e81a3963a60642bcc1f90a670680bd4a77535faa384e9d1c79d620871"
 dependencies = [
- "curve25519-dalek 4.1.2",
+ "curve25519-dalek 4.1.3",
  "ed25519 2.2.3",
  "serde",
  "sha2 0.10.8",
@@ -7828,9 +7727,9 @@ dependencies = [
 
 [[package]]
 name = "fiat-crypto"
-version = "0.2.6"
+version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1676f435fc1dadde4d03e43f5d62b259e1ce5f40bd4ffb21db2b42ebe59c1382"
+checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 
 [[package]]
 name = "field_count"
@@ -8223,49 +8122,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f5f3913fa0bfe7ee1fd8248b6b9f42a5af4b9d65ec2dd2c3c26132b950ecfc2"
 
 [[package]]
-name = "gcemeta"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47d460327b24cc34c86d53d60a90e9e6044817f7906ebd9baa5c3d0ee13e1ecf"
-dependencies = [
- "bytes",
- "hyper",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "gcloud-sdk"
-version = "0.20.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a24376e7850e7864bb326debc5765a1dda4fc47603c22e2bc0ebf30ff59141b"
-dependencies = [
- "async-trait",
- "chrono",
- "futures",
- "gcemeta",
- "hyper",
- "jsonwebtoken 8.3.0",
- "once_cell",
- "prost 0.11.9",
- "prost-types 0.11.9",
- "reqwest",
- "secret-vault-value",
- "serde",
- "serde_json",
- "tokio",
- "tonic 0.9.2",
- "tower",
- "tower-layer",
- "tower-util",
- "tracing",
- "url",
-]
-
-[[package]]
 name = "gcp-bigquery-client"
 version = "0.16.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8508,33 +8364,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "google-cloud-gax"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8bdaaa4bc036e8318274d1b25f0f2265b3e95418b765fd1ea1c7ef938fd69bd"
-dependencies = [
- "google-cloud-token",
- "http",
- "thiserror",
- "tokio",
- "tokio-retry",
- "tonic 0.9.2",
- "tower",
- "tracing",
-]
-
-[[package]]
-name = "google-cloud-googleapis"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a3b24a3f57be08afc02344e693afb55e48172c9c2ab86ff3fdb8efff550e4b9"
-dependencies = [
- "prost 0.11.9",
- "prost-types 0.11.9",
- "tonic 0.9.2",
-]
-
-[[package]]
 name = "google-cloud-metadata"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8543,25 +8372,6 @@ dependencies = [
  "reqwest",
  "thiserror",
  "tokio",
-]
-
-[[package]]
-name = "google-cloud-pubsub"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "095b104502b6e1abbad9b9768af944b9202e032dbc7f0947d3c30d4191761071"
-dependencies = [
- "async-channel 1.9.0",
- "async-stream",
- "google-cloud-auth",
- "google-cloud-gax",
- "google-cloud-googleapis",
- "google-cloud-token",
- "prost-types 0.11.9",
- "thiserror",
- "tokio",
- "tokio-util 0.7.10",
- "tracing",
 ]
 
 [[package]]
@@ -9115,7 +8925,7 @@ dependencies = [
  "futures-util",
  "hex",
  "hyper",
- "pin-project 1.1.3",
+ "pin-project",
  "tokio",
 ]
 
@@ -9344,15 +9154,15 @@ dependencies = [
 
 [[package]]
 name = "indicatif"
-version = "0.17.7"
+version = "0.17.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb28741c9db9a713d93deb3bb9515c20788cef5815265bee4980e87bde7e0f25"
+checksum = "183b3088984b400f4cfac3620d5e076c84da5364016b4f49473de574b2586235"
 dependencies = [
  "console",
- "instant",
  "number_prefix 0.4.0",
  "portable-atomic",
- "unicode-width",
+ "unicode-width 0.2.0",
+ "web-time",
 ]
 
 [[package]]
@@ -9657,16 +9467,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kanal"
-version = "0.1.0-pre8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b05d55519627edaf7fd0f29981f6dc03fb52df3f5b257130eb8d0bf2801ea1d7"
-dependencies = [
- "futures-core",
- "lock_api",
-]
-
-[[package]]
 name = "keccak"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9718,7 +9518,7 @@ dependencies = [
  "k8s-openapi",
  "kube-core",
  "pem 1.1.1",
- "pin-project 1.1.3",
+ "pin-project",
  "rustls 0.20.9",
  "rustls-pemfile 0.2.1",
  "serde",
@@ -10160,15 +9960,6 @@ checksum = "e9764018d143cc854c9f17f0b907de70f14393b1f502da6375dce70f00514eb3"
 dependencies = [
  "cc",
  "libc",
-]
-
-[[package]]
-name = "macros"
-version = "0.1.0"
-source = "git+https://github.com/niroco/diesel_async_migrations?rev=11f331b73c5cfcc894380074f748d8fda710ac12#11f331b73c5cfcc894380074f748d8fda710ac12"
-dependencies = [
- "proc-macro2",
- "quote",
 ]
 
 [[package]]
@@ -11914,7 +11705,7 @@ version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2ad9b889f1b12e0b9ee24db044b5129150d5eada288edc800f789928dc8c0e3"
 dependencies = [
- "unicode-width",
+ "unicode-width 0.1.11",
 ]
 
 [[package]]
@@ -12312,31 +12103,11 @@ dependencies = [
 
 [[package]]
 name = "pin-project"
-version = "0.4.30"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ef0f924a5ee7ea9cbcea77529dba45f8a9ba9f622419fe3386ca581a3ae9d5a"
-dependencies = [
- "pin-project-internal 0.4.30",
-]
-
-[[package]]
-name = "pin-project"
 version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fda4ed1c6c173e3fc7a83629421152e01d7b1f9b7f65fb301e490e8cfc656422"
 dependencies = [
- "pin-project-internal 1.1.3",
-]
-
-[[package]]
-name = "pin-project-internal"
-version = "0.4.30"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "851c8d0ce9bebe43790dedfc86614c23494ac9f423dd618d3a61fc693eafe61e"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
+ "pin-project-internal",
 ]
 
 [[package]]
@@ -12421,12 +12192,6 @@ name = "pkg-config"
 version = "0.3.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69d3587f8a9e599cc7ec2c00e331f71c4e69a5f9a4b8a6efd5b07466b9736f9a"
-
-[[package]]
-name = "platforms"
-version = "3.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "626dec3cac7cc0e1577a2ec3fc496277ec2baa084bebad95bb6fdbfae235f84c"
 
 [[package]]
 name = "plotters"
@@ -12629,9 +12394,9 @@ dependencies = [
 
 [[package]]
 name = "portable-atomic"
-version = "1.6.0"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7170ef9988bc169ba16dd36a7fa041e5c4cbeb6a35b76d4c03daded371eae7c0"
+checksum = "350e9b48cbc6b0e028b0473b114454c6316e57336ee184ceab6e53f72c178b3e"
 
 [[package]]
 name = "poseidon-ark"
@@ -12641,19 +12406,6 @@ dependencies = [
  "ark-bn254",
  "ark-ff",
  "ark-std",
-]
-
-[[package]]
-name = "postgres-native-tls"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d442770e2b1e244bb5eb03b31c79b65bb2568f413b899eaba850fa945a65954"
-dependencies = [
- "futures",
- "native-tls",
- "tokio",
- "tokio-native-tls",
- "tokio-postgres",
 ]
 
 [[package]]
@@ -12808,7 +12560,7 @@ dependencies = [
  "is-terminal",
  "lazy_static",
  "term",
- "unicode-width",
+ "unicode-width 0.1.11",
 ]
 
 [[package]]
@@ -12913,58 +12665,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "processor"
-version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=5244b84fa5ed872e5280dc8df032d744d62ad29d#5244b84fa5ed872e5280dc8df032d744d62ad29d"
-dependencies = [
- "ahash 0.8.11",
- "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=5244b84fa5ed872e5280dc8df032d744d62ad29d)",
- "aptos-protos 1.3.0",
- "async-trait",
- "base64 0.13.1",
- "bcs 0.1.4",
- "bigdecimal",
- "chrono",
- "clap 4.4.14",
- "diesel",
- "diesel-async 0.4.1 (git+https://github.com/weiznich/diesel_async.git?rev=d02798c67065d763154d7272dd0c09b39757d0f2)",
- "diesel_async_migrations",
- "diesel_migrations",
- "enum_dispatch",
- "field_count",
- "futures",
- "futures-util",
- "gcloud-sdk",
- "google-cloud-googleapis",
- "google-cloud-pubsub",
- "hex",
- "itertools 0.12.1",
- "jemallocator",
- "kanal",
- "native-tls",
- "num_cpus",
- "once_cell",
- "postgres-native-tls",
- "prometheus",
- "prost 0.12.3",
- "prost-types 0.12.3",
- "regex",
- "serde",
- "serde_json",
- "server-framework",
- "sha2 0.9.9",
- "sha3 0.9.1",
- "strum 0.24.1",
- "tokio",
- "tokio-postgres",
- "tonic 0.11.0",
- "tracing",
- "unescape",
- "url",
-]
-
-[[package]]
 name = "procfs"
 version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13057,35 +12757,12 @@ dependencies = [
 
 [[package]]
 name = "prost"
-version = "0.11.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b82eaa1d779e9a4bc1c3217db8ffbeabaae1dca241bf70183242128d48681cd"
-dependencies = [
- "bytes",
- "prost-derive 0.11.9",
-]
-
-[[package]]
-name = "prost"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "146c289cda302b98a28d40c8b3b90498d6e526dd24ac2ecea73e4e491685b94a"
 dependencies = [
  "bytes",
- "prost-derive 0.12.3",
-]
-
-[[package]]
-name = "prost-derive"
-version = "0.11.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5d2d8d10f3c6ded6da8b05b5fb3b8a5082514344d56c9f871412d29b4e075b4"
-dependencies = [
- "anyhow",
- "itertools 0.10.5",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
+ "prost-derive",
 ]
 
 [[package]]
@@ -13103,20 +12780,11 @@ dependencies = [
 
 [[package]]
 name = "prost-types"
-version = "0.11.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "213622a1460818959ac1181aaeb2dc9c7f63df720db7d788b3e24eacd1983e13"
-dependencies = [
- "prost 0.11.9",
-]
-
-[[package]]
-name = "prost-types"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "193898f59edcf43c26227dcd4c8427f00d99d61e95dcde58dabd49fa291d470e"
 dependencies = [
- "prost 0.12.3",
+ "prost",
 ]
 
 [[package]]
@@ -13559,7 +13227,6 @@ version = "0.11.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37b1ae8d9ac08420c66222fb9096fc5de435c3c48542bc5336c51892cffafb41"
 dependencies = [
- "async-compression",
  "base64 0.21.6",
  "bytes",
  "cookie 0.16.2",
@@ -13598,7 +13265,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-streams",
  "web-sys",
- "webpki-roots 0.25.3",
+ "webpki-roots",
  "winreg",
 ]
 
@@ -14030,16 +13697,6 @@ checksum = "5ede67b28608b4c60685c7d54122d4400d90f62b40caee7700e700380a390fa8"
 
 [[package]]
 name = "rustls-webpki"
-version = "0.100.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f6a5fc258f1c1276dfe3016516945546e2d5383911efc0fc4f1cdc5df3a4ae3"
-dependencies = [
- "ring 0.16.20",
- "untrusted 0.7.1",
-]
-
-[[package]]
-name = "rustls-webpki"
 version = "0.101.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b6275d1ee7a1cd780b64aca7726599a1dbc893b1e64144529e55c3c2f745765"
@@ -14198,19 +13855,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "secret-vault-value"
-version = "0.3.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5f8cfb86d2019f64a4cfb49e499f401f406fbec946c1ffeea9d0504284347de"
-dependencies = [
- "prost 0.12.3",
- "prost-types 0.12.3",
- "serde",
- "serde_json",
- "zeroize",
-]
-
-[[package]]
 name = "security-framework"
 version = "2.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14235,9 +13879,9 @@ dependencies = [
 
 [[package]]
 name = "self-replace"
-version = "1.3.7"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "525db198616b2bcd0f245daf7bfd8130222f7ee6af9ff9984c19a61bf1160c55"
+checksum = "f7828a58998685d8bf5a3c5e7a3379a5867289c20828c3ee436280b44b598515"
 dependencies = [
  "fastrand 1.9.0",
  "tempfile",
@@ -14250,7 +13894,7 @@ version = "0.39.0"
 source = "git+https://github.com/banool/self_update.git?rev=8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b#8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b"
 dependencies = [
  "hyper",
- "indicatif 0.17.7",
+ "indicatif 0.17.11",
  "log",
  "quick-xml 0.23.1",
  "regex",
@@ -14516,28 +14160,6 @@ dependencies = [
  "move-core-types",
  "proptest",
  "proptest-derive",
-]
-
-[[package]]
-name = "server-framework"
-version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=5244b84fa5ed872e5280dc8df032d744d62ad29d#5244b84fa5ed872e5280dc8df032d744d62ad29d"
-dependencies = [
- "anyhow",
- "aptos-system-utils 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93)",
- "async-trait",
- "backtrace",
- "clap 4.4.14",
- "futures",
- "prometheus",
- "serde",
- "serde_yaml 0.8.26",
- "tempfile",
- "tokio",
- "toml 0.7.8",
- "tracing",
- "tracing-subscriber 0.3.18",
- "warp",
 ]
 
 [[package]]
@@ -15113,9 +14735,6 @@ name = "strum"
 version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
-dependencies = [
- "strum_macros 0.24.3",
-]
 
 [[package]]
 name = "strum"
@@ -15467,7 +15086,7 @@ version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
 dependencies = [
- "unicode-width",
+ "unicode-width 0.1.11",
 ]
 
 [[package]]
@@ -15477,7 +15096,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd05616119e612a8041ef58f2b578906cc2531a6069047ae092cfb86a325d835"
 dependencies = [
  "smawk",
- "unicode-width",
+ "unicode-width 0.1.11",
 ]
 
 [[package]]
@@ -15488,7 +15107,7 @@ checksum = "b7b3e525a49ec206798b40326a44121291b530c963cfb01018f63e135bac543d"
 dependencies = [
  "smawk",
  "unicode-linebreak",
- "unicode-width",
+ "unicode-width 0.1.11",
 ]
 
 [[package]]
@@ -15714,7 +15333,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f57eb36ecbe0fc510036adff84824dd3c24bb781e21bfa67b69d556aa85214f"
 dependencies = [
- "pin-project 1.1.3",
+ "pin-project",
  "rand 0.8.5",
  "tokio",
 ]
@@ -15883,40 +15502,6 @@ dependencies = [
 
 [[package]]
 name = "tonic"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3082666a3a6433f7f511c7192923fa1fe07c69332d3c6a2e6bb040b569199d5a"
-dependencies = [
- "async-stream",
- "async-trait",
- "axum 0.6.20",
- "base64 0.21.6",
- "bytes",
- "flate2",
- "futures-core",
- "futures-util",
- "h2",
- "http",
- "http-body",
- "hyper",
- "hyper-timeout",
- "percent-encoding",
- "pin-project 1.1.3",
- "prost 0.11.9",
- "rustls-native-certs 0.6.3",
- "rustls-pemfile 1.0.4",
- "tokio",
- "tokio-rustls 0.24.1",
- "tokio-stream",
- "tower",
- "tower-layer",
- "tower-service",
- "tracing",
- "webpki-roots 0.23.1",
-]
-
-[[package]]
-name = "tonic"
 version = "0.11.0"
 source = "git+https://github.com/aptos-labs/tonic.git?rev=0da1ba8b1751d6e19eb55be24cccf9ae933c666e#0da1ba8b1751d6e19eb55be24cccf9ae933c666e"
 dependencies = [
@@ -15932,8 +15517,8 @@ dependencies = [
  "hyper",
  "hyper-timeout",
  "percent-encoding",
- "pin-project 1.1.3",
- "prost 0.12.3",
+ "pin-project",
+ "prost",
  "rustls-native-certs 0.7.0",
  "rustls-pemfile 2.1.1",
  "strum 0.26.2",
@@ -15954,11 +15539,11 @@ version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "548c227bd5c0fae5925812c4ec6c66ffcfced23ea370cb823f4d18f0fc1cb6a7"
 dependencies = [
- "prost 0.12.3",
- "prost-types 0.12.3",
+ "prost",
+ "prost-types",
  "tokio",
  "tokio-stream",
- "tonic 0.11.0",
+ "tonic",
 ]
 
 [[package]]
@@ -15970,7 +15555,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "indexmap 1.9.3",
- "pin-project 1.1.3",
+ "pin-project",
  "pin-project-lite",
  "rand 0.8.5",
  "slab",
@@ -16033,18 +15618,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
 
 [[package]]
-name = "tower-util"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1093c19826d33807c72511e68f73b4a0469a3f22c2bd5f7d5212178b4b89674"
-dependencies = [
- "futures-core",
- "futures-util",
- "pin-project 0.4.30",
- "tower-service",
-]
-
-[[package]]
 name = "tracing"
 version = "0.1.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -16083,7 +15656,7 @@ version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97d095ae15e245a057c8e8451bab9b3ee1e1f68e9ba2b4fbc18d0ac5237835f2"
 dependencies = [
- "pin-project 1.1.3",
+ "pin-project",
  "tracing",
 ]
 
@@ -16209,7 +15782,7 @@ dependencies = [
  "cassowary",
  "crossterm 0.25.0",
  "unicode-segmentation",
- "unicode-width",
+ "unicode-width 0.1.11",
 ]
 
 [[package]]
@@ -16329,12 +15902,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "unescape"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccb97dac3243214f8d8507998906ca3e2e0b900bf9bf4870477f125b82e68f6e"
-
-[[package]]
 name = "unic-char-property"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -16431,6 +15998,12 @@ name = "unicode-width"
 version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e51733f11c9c4f72aa0c160008246859e340b00807569a0da0e7a1079b27ba85"
+
+[[package]]
+name = "unicode-width"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fc81956842c57dac11422a97c3b8195a1ff727f06e85c84ed2e8aa277c9a0fd"
 
 [[package]]
 name = "unicode-xid"
@@ -16637,7 +16210,7 @@ dependencies = [
  "mime_guess",
  "multer",
  "percent-encoding",
- "pin-project 1.1.3",
+ "pin-project",
  "rustls-pemfile 1.0.4",
  "scoped-tls",
  "serde",
@@ -16789,6 +16362,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "web-time"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a6580f308b1fad9207618087a65c04e7a10bc77e02c8e84e9b00dd4b12fa0bb"
+dependencies = [
+ "js-sys",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "webpki"
 version = "0.22.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -16796,15 +16379,6 @@ checksum = "ed63aea5ce73d0ff405984102c42de94fc55a6b75765d621c65262469b3c9b53"
 dependencies = [
  "ring 0.17.7",
  "untrusted 0.9.0",
-]
-
-[[package]]
-name = "webpki-roots"
-version = "0.23.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b03058f88386e5ff5310d9111d53f48b17d732b401aeb83a8d5190f2ac459338"
-dependencies = [
- "rustls-webpki 0.100.3",
 ]
 
 [[package]]
@@ -17277,9 +16851,9 @@ dependencies = [
 
 [[package]]
 name = "zipsign-api"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ba5aa1827d6b1a35a29b3413ec69ce5f796e4d897e3e5b38f461bef41d225ea"
+checksum = "6413a546ada9dbcd0b9a3e0b0880581279e35047bce9797e523b3408e1df607c"
 dependencies = [
  "ed25519-dalek 2.1.1",
  "thiserror",
