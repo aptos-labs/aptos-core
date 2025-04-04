@@ -7,10 +7,11 @@ use crate::{
         init::Network,
         local_simulation,
         utils::{
-            check_if_file_exists, create_dir_if_not_exist, deserialize_private_key_with_prefix,
-            dir_default_to_current, get_account_with_state, get_auth_key, get_sequence_number,
-            parse_json_file, prompt_yes_with_override, read_from_file, start_logger,
-            to_common_result, to_common_success_result, write_to_file, write_to_file_with_opts,
+            check_if_file_exists, create_dir_if_not_exist, deserialize_address_str,
+            deserialize_material_with_prefix, dir_default_to_current, get_account_with_state,
+            get_auth_key, get_sequence_number, parse_json_file, prompt_yes_with_override,
+            read_from_file, serialize_material_with_prefix, start_logger, to_common_result,
+            to_common_success_result, write_to_file, write_to_file_with_opts,
             write_to_user_only_file,
         },
     },
@@ -51,6 +52,7 @@ use async_trait::async_trait;
 use clap::{Parser, ValueEnum};
 use hex::FromHexError;
 use indoc::indoc;
+use move_compiler_v2::Experiment;
 use move_core_types::{
     account_address::AccountAddress, language_storage::TypeTag, vm_status::VMStatus,
 };
@@ -74,8 +76,8 @@ use std::{
 use thiserror::Error;
 
 pub const USER_AGENT: &str = concat!("aptos-cli/", env!("CARGO_PKG_VERSION"));
-const US_IN_SECS: u64 = 1_000_000;
-const ACCEPTED_CLOCK_SKEW_US: u64 = 5 * US_IN_SECS;
+pub const US_IN_SECS: u64 = 1_000_000;
+pub const ACCEPTED_CLOCK_SKEW_US: u64 = 5 * US_IN_SECS;
 pub const DEFAULT_EXPIRATION_SECS: u64 = 30;
 pub const DEFAULT_PROFILE: &str = "default";
 pub const GIT_IGNORE: &str = ".gitignore";
@@ -266,14 +268,22 @@ pub struct ProfileConfig {
     #[serde(
         skip_serializing_if = "Option::is_none",
         default,
-        deserialize_with = "deserialize_private_key_with_prefix"
+        serialize_with = "serialize_material_with_prefix",
+        deserialize_with = "deserialize_material_with_prefix"
     )]
     pub private_key: Option<Ed25519PrivateKey>,
     /// Public key for commands
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_material_with_prefix",
+        deserialize_with = "deserialize_material_with_prefix"
+    )]
     pub public_key: Option<Ed25519PublicKey>,
     /// Account for commands
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_address_str"
+    )]
     pub account: Option<AccountAddress>,
     /// URL for the Aptos rest endpoint
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -289,10 +299,19 @@ pub struct ProfileConfig {
 /// ProfileConfig but without the private parts
 #[derive(Debug, Serialize)]
 pub struct ProfileSummary {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network: Option<Network>,
     pub has_private_key: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_material_with_prefix",
+        deserialize_with = "deserialize_material_with_prefix"
+    )]
     pub public_key: Option<Ed25519PublicKey>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_address_str"
+    )]
     pub account: Option<AccountAddress>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rest_url: Option<String>,
@@ -303,6 +322,7 @@ pub struct ProfileSummary {
 impl From<&ProfileConfig> for ProfileSummary {
     fn from(config: &ProfileConfig) -> Self {
         ProfileSummary {
+            network: config.network,
             has_private_key: config.private_key.is_some(),
             public_key: config.public_key.clone(),
             account: config.account,
@@ -604,7 +624,7 @@ impl PromptOptions {
 }
 
 /// An insertable option for use with encodings.
-#[derive(Debug, Default, Parser)]
+#[derive(Debug, Default, Parser, Clone, Copy)]
 pub struct EncodingOptions {
     /// Encoding of data as one of [base64, bcs, hex]
     #[clap(long, default_value_t = EncodingType::Hex)]
@@ -669,7 +689,7 @@ impl PublicKeyInputOptions {
     }
 }
 
-impl ExtractPublicKey for PublicKeyInputOptions {
+impl ExtractEd25519PublicKey for PublicKeyInputOptions {
     fn extract_public_key(
         &self,
         encoding: EncodingType,
@@ -696,7 +716,7 @@ impl ExtractPublicKey for PublicKeyInputOptions {
     }
 }
 
-pub trait ParsePrivateKey {
+pub trait ParseEd25519PrivateKey {
     fn parse_private_key(
         &self,
         encoding: EncodingType,
@@ -765,7 +785,7 @@ pub struct PrivateKeyInputOptions {
     private_key: Option<String>,
 }
 
-impl ParsePrivateKey for PrivateKeyInputOptions {}
+impl ParseEd25519PrivateKey for PrivateKeyInputOptions {}
 
 impl PrivateKeyInputOptions {
     pub fn from_private_key(private_key: &Ed25519PrivateKey) -> CliTypedResult<Self> {
@@ -797,12 +817,16 @@ impl PrivateKeyInputOptions {
         }
     }
 
+    pub fn has_key_or_file(&self) -> bool {
+        self.private_key.is_some() || self.private_key_file.is_some()
+    }
+
     /// Extract public key from CLI args with fallback to config
     /// This will first try to extract public key from private_key from CLI args
     /// With fallback to profile
     /// NOTE: Use this function instead of 'extract_private_key_and_address' if this is HardwareWallet profile
     /// HardwareWallet profile does not have private key in config
-    pub fn extract_public_key_and_address(
+    pub fn extract_ed25519_public_key_and_address(
         &self,
         encoding: EncodingType,
         profile: &ProfileOptions,
@@ -833,6 +857,44 @@ impl PrivateKeyInputOptions {
                     let address = account_address_from_public_key(&public_key);
                     Ok((public_key, address))
                 },
+            }
+        } else {
+            Err(CliError::CommandArgumentError(
+                "One of ['--private-key', '--private-key-file'], or ['public_key'] must present in profile".to_string(),
+            ))
+        }
+    }
+
+    /// Extract address
+    pub fn extract_address(
+        &self,
+        encoding: EncodingType,
+        profile: &ProfileOptions,
+        maybe_address: Option<AccountAddress>,
+    ) -> CliTypedResult<AccountAddress> {
+        // Order of operations
+        // 1. CLI inputs
+        // 2. Profile
+        // 3. Derived
+        if let Some(address) = maybe_address {
+            return Ok(address);
+        }
+
+        if let Some(private_key) = self.extract_private_key_cli(encoding)? {
+            // If we use the CLI inputs, then we should derive or use the address from the input
+            let address = account_address_from_public_key(&private_key.public_key());
+            Ok(address)
+        } else if let Some((Some(public_key), maybe_config_address)) = CliConfig::load_profile(
+            profile.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| (p.public_key, p.account))
+        {
+            if let Some(address) = maybe_config_address {
+                Ok(address)
+            } else {
+                let address = account_address_from_public_key(&public_key);
+                Ok(address)
             }
         } else {
             Err(CliError::CommandArgumentError(
@@ -914,6 +976,18 @@ impl PrivateKeyInputOptions {
             self.private_key.clone(),
         )
     }
+
+    pub fn extract_private_key_input_from_cli_args(&self) -> CliTypedResult<Vec<u8>> {
+        if let Some(ref file) = self.private_key_file {
+            read_from_file(file)
+        } else if let Some(ref key) = self.private_key {
+            Ok(strip_private_key_prefix(key)?.as_bytes().to_vec())
+        } else {
+            Err(CliError::CommandArgumentError(
+                "No --private-key or --private-key-file provided".to_string(),
+            ))
+        }
+    }
 }
 
 // Extract the public key by deriving private key, fall back to public key from profile
@@ -921,7 +995,7 @@ impl PrivateKeyInputOptions {
 // 1. Get the private key (either from CLI input or profile), and derive the public key from it
 // 2. Else get the public key directly from the config profile
 // 3. Else error
-impl ExtractPublicKey for PrivateKeyInputOptions {
+impl ExtractEd25519PublicKey for PrivateKeyInputOptions {
     fn extract_public_key(
         &self,
         encoding: EncodingType,
@@ -960,7 +1034,7 @@ impl ExtractPublicKey for PrivateKeyInputOptions {
     }
 }
 
-pub trait ExtractPublicKey {
+pub trait ExtractEd25519PublicKey {
     fn extract_public_key(
         &self,
         encoding: EncodingType,
@@ -977,7 +1051,7 @@ pub fn account_address_from_auth_key(auth_key: &AuthenticationKey) -> AccountAdd
     AccountAddress::new(*auth_key.account_address())
 }
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Parser, Clone)]
 pub struct SaveFile {
     /// Output file path
     #[clap(long, value_parser)]
@@ -1108,9 +1182,9 @@ impl FromStr for OptimizationLevel {
     }
 }
 
-/// Options for compiling a move package dir
+/// Options for compiling a move package.
 #[derive(Debug, Clone, Parser)]
-pub struct MovePackageDir {
+pub struct MovePackageOptions {
     /// Path to a move package (the folder with a Move.toml file).  Defaults to current directory.
     #[clap(long, value_parser)]
     pub package_dir: Option<PathBuf>,
@@ -1154,11 +1228,9 @@ pub struct MovePackageDir {
     #[clap(long)]
     pub dev: bool,
 
-    /// Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code.
-    /// NOTE: this behavior will become the default in the future.
-    /// See <https://github.com/aptos-labs/aptos-core/issues/10335>
-    #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
-    pub check_test_code: bool,
+    /// Skip extended checks (such as checks for the #[view] attribute) on test code.
+    #[clap(long, default_value = "false")]
+    pub skip_checks_on_test_code: bool,
 
     /// Select optimization level.  Choices are "none", "default", or "extra".
     /// Level "extra" may spend more time on expensive optimizations in the future.
@@ -1194,15 +1266,19 @@ pub struct MovePackageDir {
            default_value = LATEST_STABLE_LANGUAGE_VERSION,
            verbatim_doc_comment)]
     pub language_version: Option<LanguageVersion>,
+
+    /// Fail the compilation if there are any warnings.
+    #[clap(long)]
+    pub fail_on_warning: bool,
 }
 
-impl Default for MovePackageDir {
+impl Default for MovePackageOptions {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl MovePackageDir {
+impl MovePackageOptions {
     pub fn new() -> Self {
         Self {
             dev: false,
@@ -1215,8 +1291,9 @@ impl MovePackageDir {
             compiler_version: Some(CompilerVersion::latest_stable()),
             language_version: Some(LanguageVersion::latest_stable()),
             skip_attribute_checks: false,
-            check_test_code: false,
+            skip_checks_on_test_code: false,
             optimize: None,
+            fail_on_warning: false,
             experiments: vec![],
         }
     }
@@ -1237,6 +1314,30 @@ impl MovePackageDir {
     pub fn add_named_address(&mut self, key: String, value: String) {
         self.named_addresses
             .insert(key, AccountAddressWrapper::from_str(&value).unwrap());
+    }
+
+    /// Compute the experiments to be used for the compiler.
+    pub fn compute_experiments(&self) -> Vec<String> {
+        let mut experiments = self.experiments.clone();
+        let mut set = |k: &str, v: bool| {
+            experiments.push(format!("{}={}", k, if v { "on" } else { "off" }));
+        };
+        match self.optimize {
+            None | Some(OptimizationLevel::Default) => {
+                set(Experiment::OPTIMIZE, true);
+            },
+            Some(OptimizationLevel::None) => {
+                set(Experiment::OPTIMIZE, false);
+            },
+            Some(OptimizationLevel::Extra) => {
+                set(Experiment::OPTIMIZE_EXTRA, true);
+                set(Experiment::OPTIMIZE, true);
+            },
+        }
+        if self.fail_on_warning {
+            set(Experiment::FAIL_ON_WARNING, true);
+        }
+        experiments
     }
 }
 
@@ -1718,11 +1819,12 @@ impl TransactionOptions {
     }
 
     pub fn get_public_key_and_address(&self) -> CliTypedResult<(Ed25519PublicKey, AccountAddress)> {
-        self.private_key_options.extract_public_key_and_address(
-            self.encoding_options.encoding,
-            &self.profile_options,
-            self.sender_account,
-        )
+        self.private_key_options
+            .extract_ed25519_public_key_and_address(
+                self.encoding_options.encoding,
+                &self.profile_options,
+                self.sender_account,
+            )
     }
 
     pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {

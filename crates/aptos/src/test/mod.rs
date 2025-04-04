@@ -17,7 +17,7 @@ use crate::{
             account_address_from_public_key, AccountAddressWrapper, ArgWithTypeVec,
             AuthenticationKeyInputOptions, ChunkedPublishOption, CliError, CliTypedResult,
             EncodingOptions, EntryFunctionArguments, FaucetOptions, GasOptions, KeyType,
-            MoveManifestAccountWrapper, MovePackageDir, OptionalPoolAddressArgs,
+            MoveManifestAccountWrapper, MovePackageOptions, OptionalPoolAddressArgs,
             OverrideSizeCheckOption, PoolAddressArgs, PrivateKeyInputOptions, PromptOptions,
             PublicKeyInputOptions, RestOptions, RngArgs, SaveFile, ScriptFunctionArguments,
             TransactionOptions, TransactionSummary, TypeArgVec,
@@ -1106,12 +1106,12 @@ impl CliTestFramework {
             .join("aptos-framework")
     }
 
-    pub fn move_options(&self, account_strs: BTreeMap<&str, &str>) -> MovePackageDir {
-        MovePackageDir {
+    pub fn move_options(&self, account_strs: BTreeMap<&str, &str>) -> MovePackageOptions {
+        MovePackageOptions {
             dev: true,
             named_addresses: Self::named_addresses(account_strs),
             package_dir: Some(self.move_dir()),
-            ..MovePackageDir::new()
+            ..MovePackageOptions::new()
         }
     }
 
@@ -1275,20 +1275,7 @@ impl CliTestFramework {
 // and json is serialized with different types from both, so hardcoding deserialization.
 
 fn json_account_to_balance(value: &Value) -> u64 {
-    u64::from_str(
-        value
-            .as_object()
-            .unwrap()
-            .get("coin")
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .get("value")
-            .unwrap()
-            .as_str()
-            .unwrap(),
-    )
-    .unwrap()
+    value.as_u64().unwrap()
 }
 
 #[derive(Debug, Serialize, Deserialize)]

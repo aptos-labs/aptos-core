@@ -27,8 +27,11 @@ aptos-gas-schedule = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptos-sdk = { workspace = true }
+aptos-rest-client = { workspace = true }
 aptos-temppath = { workspace = true }
+aptos-transaction-simulation = { workspace = true }
 aptos-types = { workspace = true }
+aptos-validator-interface = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-environment = { workspace = true }
 aptos-vm-genesis = { workspace = true }

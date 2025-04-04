@@ -698,3 +698,9 @@ impl AccountData {
         self.coin_store.as_ref().unwrap().deposit_events.count()
     }
 }
+
+// Note: These types have been moved to crate `aptos-transactions-simulation`.
+//       Reimporting for backward compatibility.
+pub use aptos_transaction_simulation::{
+    Account, AccountData, AccountPublicKey, CoinStore, FungibleStore, TransactionBuilder,
+};

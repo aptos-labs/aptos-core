@@ -10,16 +10,15 @@ use bytes::Bytes;
 use move_binary_format::errors::*;
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{AccountChanges, ChangeSet, Changes, Op},
+    effects::{AccountChanges, ChangeSet, Changes},
     gas_algebra::NumBytes,
-    identifier::Identifier,
     language_storage::TypeTag,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    resolver::MoveResolver,
+    resolver::ResourceResolver,
     value_serde::ValueSerDeContext,
     values::{GlobalValue, Value},
 };
@@ -29,14 +28,12 @@ pub struct AccountDataCache {
     // The bool flag in the `data_map` indicates whether the resource contains
     // an aggregator or snapshot.
     data_map: BTreeMap<Type, (MoveTypeLayout, GlobalValue, bool)>,
-    module_map: BTreeMap<Identifier, (Bytes, bool)>,
 }
 
 impl AccountDataCache {
     fn new() -> Self {
         Self {
             data_map: BTreeMap::new(),
-            module_map: BTreeMap::new(),
         }
     }
 }
@@ -54,17 +51,15 @@ impl AccountDataCache {
 /// The Move VM takes a `DataStore` in input and this is the default and correct implementation
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
-pub(crate) struct TransactionDataCache<'r> {
-    remote: &'r dyn MoveResolver,
+pub struct TransactionDataCache {
     account_map: BTreeMap<AccountAddress, AccountDataCache>,
 }
 
-impl<'r> TransactionDataCache<'r> {
+impl TransactionDataCache {
     /// Create a `TransactionDataCache` with a `RemoteCache` that provides access to data
     /// not updated in the transaction.
-    pub(crate) fn new(remote: &'r impl MoveResolver) -> Self {
+    pub fn empty() -> Self {
         TransactionDataCache {
-            remote,
             account_map: BTreeMap::new(),
         }
     }
@@ -73,10 +68,7 @@ impl<'r> TransactionDataCache<'r> {
     /// published modules.
     ///
     /// Gives all proper guarantees on lifetime of global data as well.
-    pub(crate) fn into_effects(
-        self,
-        module_storage: &dyn ModuleStorage,
-    ) -> PartialVMResult<ChangeSet> {
+    pub fn into_effects(self, module_storage: &dyn ModuleStorage) -> PartialVMResult<ChangeSet> {
         let resource_converter =
             |value: Value, layout: MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
                 let function_value_extension = FunctionValueExtensionAdapter { module_storage };
@@ -94,23 +86,13 @@ impl<'r> TransactionDataCache<'r> {
 
     /// Same like `into_effects`, but also allows clients to select the format of
     /// produced effects for resources.
-    pub(crate) fn into_custom_effects<Resource>(
+    pub fn into_custom_effects<Resource>(
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
         module_storage: &dyn ModuleStorage,
-    ) -> PartialVMResult<Changes<Bytes, Resource>> {
-        let mut change_set = Changes::<Bytes, Resource>::new();
+    ) -> PartialVMResult<Changes<Resource>> {
+        let mut change_set = Changes::<Resource>::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
-            let mut modules = BTreeMap::new();
-            for (module_name, (module_blob, is_republishing)) in account_data_cache.module_map {
-                let op = if is_republishing {
-                    Op::Modify(module_blob)
-                } else {
-                    Op::New(module_blob)
-                };
-                modules.insert(module_name, op);
-            }
-
             let mut resources = BTreeMap::new();
             for (ty, (layout, gv, has_aggregator_lifting)) in account_data_cache.data_map {
                 if let Some(op) = gv.into_effect_with_layout(layout) {
@@ -128,28 +110,14 @@ impl<'r> TransactionDataCache<'r> {
                     );
                 }
             }
-            if !modules.is_empty() || !resources.is_empty() {
+            if !resources.is_empty() {
                 change_set
-                    .add_account_changeset(
-                        addr,
-                        AccountChanges::from_modules_resources(modules, resources),
-                    )
+                    .add_account_changeset(addr, AccountChanges::from_resources(resources))
                     .expect("accounts should be unique");
             }
         }
 
         Ok(change_set)
-    }
-
-    pub(crate) fn num_mutated_resources(&self, sender: &AccountAddress) -> u64 {
-        // The sender's account will always be mutated.
-        let mut total_mutated_accounts: u64 = 1;
-        for (addr, entry) in self.account_map.iter() {
-            if addr != sender && entry.data_map.values().any(|(_, v, _)| v.is_mutated()) {
-                total_mutated_accounts += 1;
-            }
-        }
-        total_mutated_accounts
     }
 
     fn get_mut_or_insert_with<'a, K, V, F>(map: &'a mut BTreeMap<K, V>, k: &K, gen: F) -> &'a mut V
@@ -170,6 +138,7 @@ impl<'r> TransactionDataCache<'r> {
     pub(crate) fn load_resource(
         &mut self,
         module_storage: &dyn ModuleStorage,
+        resource_resolver: &dyn ResourceResolver,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
@@ -201,7 +170,7 @@ impl<'r> TransactionDataCache<'r> {
                 // If we need to process aggregator lifting, we pass type layout to remote.
                 // Remote, in turn ensures that all aggregator values are lifted if the resolved
                 // resource comes from storage.
-                self.remote.get_resource_bytes_with_metadata_and_layout(
+                resource_resolver.get_resource_bytes_with_metadata_and_layout(
                     &addr,
                     &ty_tag,
                     &metadata,

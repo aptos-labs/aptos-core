@@ -9,12 +9,11 @@ AbstractionAuthData:
           - signing_message_digest: BYTES
           - authenticator: BYTES
     1:
-      DomainV1:
+      DerivableV1:
         STRUCT:
           - signing_message_digest: BYTES
-          - authenticator: BYTES
-          - account:
-              TYPENAME: DomainAccount
+          - abstract_signature: BYTES
+          - abstract_public_key: BYTES
 AccessPath:
   STRUCT:
     - address:
@@ -230,12 +229,6 @@ DKGTranscriptMetadata:
 DeprecatedPayload:
   STRUCT:
     - dummy_value: U64
-DomainAccount:
-  ENUM:
-    0:
-      V1:
-        STRUCT:
-          - account_identity: BYTES
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:

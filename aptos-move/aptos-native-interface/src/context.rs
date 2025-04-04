@@ -5,7 +5,7 @@ use crate::errors::{SafeNativeError, SafeNativeResult};
 use aptos_gas_algebra::{
     AbstractValueSize, DynamicExpression, GasExpression, GasQuantity, InternalGasUnit,
 };
-use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
+use aptos_gas_schedule::{AbstractValueSizeGasParameters, MiscGasParameters, NativeGasParameters};
 use aptos_types::on_chain_config::{Features, TimedFeatureFlag, TimedFeatures};
 use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::native_functions::NativeContext;
@@ -19,8 +19,8 @@ use std::ops::{Deref, DerefMut};
 /// Major features include incremental gas charging and less ambiguous error handling. For this
 /// reason, native functions should always use [`SafeNativeContext`] instead of [`NativeContext`].
 #[allow(unused)]
-pub struct SafeNativeContext<'a, 'b, 'c, 'd> {
-    pub(crate) inner: &'c mut NativeContext<'a, 'b, 'd>,
+pub struct SafeNativeContext<'a, 'b, 'c> {
+    pub(crate) inner: &'c mut NativeContext<'a, 'b>,
 
     pub(crate) timed_features: &'c TimedFeatures,
     pub(crate) features: &'c Features,
@@ -37,21 +37,21 @@ pub struct SafeNativeContext<'a, 'b, 'c, 'd> {
     pub(crate) gas_hook: Option<&'c (dyn Fn(DynamicExpression) + Send + Sync)>,
 }
 
-impl<'a, 'b, 'c, 'd> Deref for SafeNativeContext<'a, 'b, 'c, 'd> {
-    type Target = NativeContext<'a, 'b, 'd>;
+impl<'a, 'b, 'c> Deref for SafeNativeContext<'a, 'b, 'c> {
+    type Target = NativeContext<'a, 'b>;
 
     fn deref(&self) -> &Self::Target {
         self.inner
     }
 }
 
-impl<'a, 'b, 'c, 'd> DerefMut for SafeNativeContext<'a, 'b, 'c, 'd> {
+impl<'a, 'b, 'c> DerefMut for SafeNativeContext<'a, 'b, 'c> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.inner
     }
 }
 
-impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
+impl<'a, 'b, 'c> SafeNativeContext<'a, 'b, 'c> {
     /// Always remember: first charge gas, then execute!
     ///
     /// In other words, this function **MUST** always be called **BEFORE** executing **any**
@@ -101,6 +101,11 @@ impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
             .abstract_value_size_dereferenced(val, self.gas_feature_version)
     }
 
+    /// Returns the gas parameters that are used to define abstract value sizes.
+    pub fn abs_val_gas_params(&self) -> &AbstractValueSizeGasParameters {
+        &self.misc_gas_params.abs_val
+    }
+
     /// Returns the current gas feature version.
     pub fn gas_feature_version(&self) -> u64 {
         self.gas_feature_version
@@ -114,6 +119,14 @@ impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
     /// Checks if the timed feature corresponding to the given flag is enabled.
     pub fn timed_feature_enabled(&self, flag: TimedFeatureFlag) -> bool {
         self.timed_features.is_enabled(flag)
+    }
+
+    /// Signals to the VM (and by extension, the gas meter) that the native function has
+    /// incurred additional heap memory usage that should be tracked.
+    pub fn use_heap_memory(&mut self, amount: u64) {
+        if self.timed_feature_enabled(TimedFeatureFlag::FixMemoryUsageTracking) {
+            self.inner.use_heap_memory(amount);
+        }
     }
 
     /// Configures the behavior of [`Self::charge()`].

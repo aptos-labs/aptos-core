@@ -287,7 +287,7 @@ UTF8 check failed in conversion from bytes to string
 <pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_string">to_string</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): String {
     // To make this safe, we need <b>to</b> evaluate the utf8 <b>invariant</b>.
     <b>let</b> s = <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;String&gt;(v);
-    <b>assert</b>!(<a href="../../move-stdlib/doc/string.md#0x1_string_internal_check_utf8">string::internal_check_utf8</a>(<a href="../../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(&s)), <a href="from_bcs.md#0x1_from_bcs_EINVALID_UTF8">EINVALID_UTF8</a>);
+    <b>assert</b>!(<a href="../../move-stdlib/doc/string.md#0x1_string_internal_check_utf8">string::internal_check_utf8</a>(s.bytes()), <a href="from_bcs.md#0x1_from_bcs_EINVALID_UTF8">EINVALID_UTF8</a>);
     s
 }
 </code></pre>
@@ -318,7 +318,7 @@ Function would abort if T has signer in it.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>native</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T;
+<pre><code><b>native</b> <b>friend</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T;
 </code></pre>
 
 

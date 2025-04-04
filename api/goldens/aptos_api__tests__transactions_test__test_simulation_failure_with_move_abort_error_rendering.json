@@ -5,9 +5,9 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "11",
+    "gas_used": "13",
     "success": false,
-    "vm_status": "Move abort in 0x1::coin: EINSUFFICIENT_BALANCE(0x10006): Not enough coins to complete transaction",
+    "vm_status": "Move abort in 0x1::fungible_asset: EINSUFFICIENT_BALANCE(0x10004): Insufficient balance to withdraw or transfer.",
     "accumulator_root_hash": "",
     "changes": [
       {
@@ -26,7 +26,7 @@
                 }
               }
             },
-            "guid_creation_num": "4",
+            "guid_creation_num": "2",
             "key_rotation_events": {
               "counter": "0",
               "guid": {
@@ -81,10 +81,10 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "6",
-          "io_gas_units": "6",
+          "io_gas_units": "8",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "11"
+          "total_charge_gas_units": "13"
         }
       }
     ],

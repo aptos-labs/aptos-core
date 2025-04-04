@@ -2,26 +2,32 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    docgen::{get_docgen_output_dir, DocgenOptions},
+    docgen::DocgenOptions,
     extended_checks,
     natives::code::{ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy},
-    zip_metadata, zip_metadata_str, RuntimeModuleMetadataV1, APTOS_METADATA_KEY,
-    APTOS_METADATA_KEY_V1, METADATA_V1_MIN_FILE_FORMAT_VERSION,
+    zip_metadata, zip_metadata_str,
 };
 use anyhow::bail;
-use aptos_types::{account_address::AccountAddress, transaction::EntryABI};
+use aptos_types::{
+    account_address::AccountAddress,
+    transaction::EntryABI,
+    vm::module_metadata::{
+        RuntimeModuleMetadataV1, APTOS_METADATA_KEY, APTOS_METADATA_KEY_V1,
+        METADATA_V1_MIN_FILE_FORMAT_VERSION,
+    },
+};
 use clap::Parser;
 use codespan_reporting::{
     diagnostic::Severity,
     term::termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor},
 };
 use itertools::Itertools;
-use move_binary_format::{file_format_common, file_format_common::VERSION_7, CompiledModule};
-use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
-use move_compiler::{
+use legacy_move_compiler::{
     compiled_unit::{CompiledUnit, NamedCompiledModule},
     shared::NumericalAddress,
 };
+use move_binary_format::{file_format_common, file_format_common::VERSION_7, CompiledModule};
+use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_compiler_v2::{external_checks::ExternalChecks, options::Options, Experiment};
 use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_model::{
@@ -48,12 +54,13 @@ use std::{
 pub const METADATA_FILE_NAME: &str = "package-metadata.bcs";
 pub const UPGRADE_POLICY_CUSTOM_FIELD: &str = "upgrade_policy";
 
-pub const APTOS_PACKAGES: [&str; 5] = [
+pub const APTOS_PACKAGES: [&str; 6] = [
     "AptosFramework",
     "MoveStdlib",
     "AptosStdlib",
     "AptosToken",
     "AptosTokenObjects",
+    "AptosExperimental",
 ];
 
 /// Represents a set of options for building artifacts from Move.
@@ -127,7 +134,7 @@ impl Default for BuildOptions {
             compiler_version: None,
             language_version: None,
             skip_attribute_checks: false,
-            check_test_code: false,
+            check_test_code: true,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             experiments: vec![],
         }
@@ -308,7 +315,10 @@ impl BuiltPackage {
             }
 
             if let Some(model_options) = model.get_extension::<Options>() {
-                if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
+                if model_options.experiment_on(Experiment::FAIL_ON_WARNING) && model.has_warnings()
+                {
+                    bail!("found warning(s), and `--fail-on-warning` is set")
+                } else if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
                     std::process::exit(if model.has_warnings() { 1 } else { 0 })
                 }
             }
@@ -344,7 +354,7 @@ impl BuiltPackage {
                             .unwrap()
                             .parent()
                             .unwrap()
-                            .join(get_docgen_output_dir())
+                            .join("doc")
                             .display()
                             .to_string()
                     })

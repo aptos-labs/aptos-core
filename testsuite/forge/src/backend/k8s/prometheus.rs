@@ -4,8 +4,8 @@
 use crate::{create_k8s_client, K8sApi, ReadWrite, Result};
 use again::RetryPolicy;
 use anyhow::{anyhow, bail};
-use aptos_logger::{info, warn};
 use k8s_openapi::api::core::v1::Secret;
+use log::{info, warn};
 use once_cell::sync::Lazy;
 use prometheus_http_query::{
     response::{PromqlResult, Sample},
@@ -196,7 +196,7 @@ pub async fn query_range_with_metadata(
     }
     if range.len() > 1 {
         bail!(
-            "Expected only one range vector from prometheus, recieved {} ({:?}). start={}, end={}, query={}",
+            "Expected only one range vector from prometheus, received {} ({:?}). start={}, end={}, query={}",
             range.len(),
             range,
             start_time,

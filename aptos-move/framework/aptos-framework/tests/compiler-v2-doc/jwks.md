@@ -861,7 +861,7 @@ For the example JWK set snapshot below containing 2 keys for Google found at htt
 ```
 
 We can call update_federated_jwk_set for Google's <code>iss</code> - "https://accounts.google.com" and for each vector
-argument <code>kid_vec</code>, <code>alg_vec</code>, <code>e_vec</code>, <code>n_vec</code>, we set in index 0 the corresponding attribute in the first JWK and we set in index 1 the
+argument <code>kid_vec</code>, <code>alg_vec</code>, <code>e_vec</code>, <code>n_vec</code>, we set in index 0 the corresponding attribute in the first JWK and we set in index 1
 the corresponding attribute in the second JWK as shown below.
 
 ```move

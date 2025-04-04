@@ -97,19 +97,26 @@ impl NativeFunctions {
     }
 }
 
-pub struct NativeContext<'a, 'b, 'c> {
+pub struct NativeContext<'a, 'b> {
     interpreter: &'a mut dyn InterpreterDebugInterface,
-    data_store: &'a mut TransactionDataCache<'c>,
+    data_store: &'a mut TransactionDataCache,
     resolver: &'a Resolver<'a>,
     extensions: &'a mut NativeContextExtensions<'b>,
     gas_balance: InternalGas,
     traversal_context: &'a TraversalContext<'a>,
+
+    /// Counter used to record the (conceptual) heap memory usage by a native functions,
+    /// measured in abstract memory unit.
+    ///
+    /// This is a hack to emulate memory usage tracking, before we could refactor native functions
+    /// and allow them to access the gas meter directly.
+    heap_memory_usage: u64,
 }
 
-impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
+impl<'a, 'b> NativeContext<'a, 'b> {
     pub(crate) fn new(
         interpreter: &'a mut dyn InterpreterDebugInterface,
-        data_store: &'a mut TransactionDataCache<'c>,
+        data_store: &'a mut TransactionDataCache,
         resolver: &'a Resolver<'a>,
         extensions: &'a mut NativeContextExtensions<'b>,
         gas_balance: InternalGas,
@@ -122,11 +129,13 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
             extensions,
             gas_balance,
             traversal_context,
+
+            heap_memory_usage: 0,
         }
     }
 }
 
-impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
+impl<'a, 'b> NativeContext<'a, 'b> {
     pub fn print_stack_trace(&self, buf: &mut String) -> PartialVMResult<()> {
         self.interpreter.debug_print_stack_trace(buf, self.resolver)
     }
@@ -141,7 +150,12 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         //                     need to actually load bytes.
         let (value, num_bytes) = self
             .data_store
-            .load_resource(self.resolver.module_storage(), address, ty)
+            .load_resource(
+                self.resolver.module_storage(),
+                self.resolver.resource_resolver(),
+                address,
+                ty,
+            )
             .map_err(|err| err.finish(Location::Undefined))?;
         let exists = value
             .exists()
@@ -187,6 +201,14 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
 
     pub fn gas_balance(&self) -> InternalGas {
         self.gas_balance
+    }
+
+    pub fn use_heap_memory(&mut self, amount: u64) {
+        self.heap_memory_usage = self.heap_memory_usage.saturating_add(amount);
+    }
+
+    pub fn heap_memory_usage(&self) -> u64 {
+        self.heap_memory_usage
     }
 
     pub fn traversal_context(&self) -> &TraversalContext {

@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::bail;
+use legacy_move_compiler::shared::LanguageVersion as CompilerLanguageVersion;
 use move_binary_format::file_format_common::{
     VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2, VERSION_MAX,
 };
 use move_command_line_common::env;
-use move_compiler::shared::LanguageVersion as CompilerLanguageVersion;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt,

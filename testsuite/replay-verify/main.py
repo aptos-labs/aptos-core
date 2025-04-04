@@ -28,6 +28,7 @@ SHARDING_ENABLED = True
 MAX_RETRIES = 5
 RETRY_DELAY = 20  # seconds
 QUERY_DELAY = 5  # seconds
+TEARDOWN_DELAY= 30 * 60 # 30 minutes slack to allow for pod setup and teardown
 
 REPLAY_CONCURRENCY_LEVEL = 1
 
@@ -206,6 +207,8 @@ class WorkerPod:
         pod_manifest["metadata"]["name"] = self.name  # Unique name for each pod
         pod_manifest["metadata"]["labels"]["run"] = self.label
         pod_manifest["spec"]["containers"][0]["image"] = self.image
+        pod_ttl = self.config.timeout_secs + TEARDOWN_DELAY
+        pod_manifest["metadata"]["annotations"]["k8s-ttl-controller.twin.sh/ttl"] = f"{pod_ttl}s"
         pod_manifest["spec"]["volumes"][0]["persistentVolumeClaim"][
             "claimName"
         ] = self.get_claim_name()
@@ -371,9 +374,7 @@ class ReplayScheduler:
         return f"{self.id}-{self.network}"
 
     def humio_hash_mismatch_url(self, start_time: float, end_time: float) -> str:
-        query = (
-            f'k8s.labels.run = "{self.get_label()}" | "TransactionOutput does not match"'
-        )
+        query = f'k8s.labels.run = "{self.get_label()}" | "TransactionOutput does not match"'
 
         params = {
             "live": "false",
@@ -443,12 +444,17 @@ class ReplayScheduler:
             if self.network == Network.TESTNET
             else MAINNET_SNAPSHOT_NAME
         )
+        # Because PVCs can be shared among multiple replay-verify runs, a more correct TTL
+        # would be computed from the number of shards and the expected run time of the replay-verify
+        # run. However, for simplicity, we set the TTL to 3 hours.
+        pvc_ttl = 3 * 60 * 60  # 3 hours
         pvcs = create_replay_verify_pvcs_from_snapshot(
             self.id,
             snapshot_name,
             self.namespace,
             self.config.pvc_number,
             self.get_label(),
+            pvc_ttl,
         )
         assert len(pvcs) == self.config.pvc_number, "failed to create all pvcs"
         self.pvcs = pvcs
@@ -711,7 +717,9 @@ if __name__ == "__main__":
             print_logs(failed_logs, txn_mismatch_logs)
             if txn_mismatch_logs:
                 url = scheduler.humio_hash_mismatch_url(start_time, time.time())
-                logger.error(f"Transaction mismatch logs found. All mismatch logs: {url}")
+                logger.error(
+                    f"Transaction mismatch logs found. All mismatch logs: {url}"
+                )
                 exit(2)
             if len(failed_logs) > 0:
                 logger.error("Failed tasks found.")

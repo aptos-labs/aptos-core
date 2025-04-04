@@ -37,10 +37,10 @@ module aptos_std::table {
     /// Acquire an immutable reference to the value which `key` maps to.
     /// Returns specified default value if there is no entry for `key`.
     public fun borrow_with_default<K: copy + drop, V>(self: &Table<K, V>, key: K, default: &V): &V {
-        if (!contains(self, copy key)) {
+        if (!self.contains(copy key)) {
             default
         } else {
-            borrow(self, copy key)
+            self.borrow(copy key)
         }
     }
 
@@ -53,19 +53,19 @@ module aptos_std::table {
     /// Acquire a mutable reference to the value which `key` maps to.
     /// Insert the pair (`key`, `default`) first if there is no entry for `key`.
     public fun borrow_mut_with_default<K: copy + drop, V: drop>(self: &mut Table<K, V>, key: K, default: V): &mut V {
-        if (!contains(self, copy key)) {
-            add(self, copy key, default)
+        if (!self.contains(copy key)) {
+            self.add(copy key, default)
         };
-        borrow_mut(self, key)
+        self.borrow_mut(key)
     }
 
     /// Insert the pair (`key`, `value`) if there is no entry for `key`.
     /// update the value of the entry for `key` to `value` otherwise
     public fun upsert<K: copy + drop, V: drop>(self: &mut Table<K, V>, key: K, value: V) {
-        if (!contains(self, copy key)) {
-            add(self, copy key, value)
+        if (!self.contains(copy key)) {
+            self.add(copy key, value)
         } else {
-            let ref = borrow_mut(self, key);
+            let ref = self.borrow_mut(key);
             *ref = value;
         };
     }
@@ -90,7 +90,7 @@ module aptos_std::table {
 
     /// Table cannot know if it is empty or not, so this method is not public,
     /// and can be used only in modules that know by themselves that table is empty.
-    public(friend) fun destroy_known_empty_unsafe<K: copy + drop, V>(self: Table<K, V>) {
+    friend fun destroy_known_empty_unsafe<K: copy + drop, V>(self: Table<K, V>) {
         destroy_empty_box<K, V, Box<V>>(&self);
         drop_unchecked_box<K, V, Box<V>>(self)
     }
@@ -105,11 +105,11 @@ module aptos_std::table {
         let t = new<u64, u8>();
         let key: u64 = 111;
         let error_code: u64 = 1;
-        assert!(!contains(&t, key), error_code);
-        upsert(&mut t, key, 12);
-        assert!(*borrow(&t, key) == 12, error_code);
-        upsert(&mut t, key, 23);
-        assert!(*borrow(&t, key) == 23, error_code);
+        assert!(!t.contains(key), error_code);
+        t.upsert(key, 12);
+        assert!(*t.borrow(key) == 12, error_code);
+        t.upsert(key, 23);
+        assert!(*t.borrow(key) == 23, error_code);
 
         move_to(&account, TableHolder { t });
     }
@@ -119,10 +119,10 @@ module aptos_std::table {
         let t = new<u64, u8>();
         let key: u64 = 100;
         let error_code: u64 = 1;
-        assert!(!contains(&t, key), error_code);
-        assert!(*borrow_with_default(&t, key, &12) == 12, error_code);
-        add(&mut t, key, 1);
-        assert!(*borrow_with_default(&t, key, &12) == 1, error_code);
+        assert!(!t.contains(key), error_code);
+        assert!(*t.borrow_with_default(key, &12) == 12, error_code);
+        t.add(key, 1);
+        assert!(*t.borrow_with_default(key, &12) == 1, error_code);
 
         move_to(&account, TableHolder{ t });
     }

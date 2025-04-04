@@ -47,18 +47,18 @@ use codespan_reporting::{
     term::termcolor::{ColorChoice, StandardStream, WriteColor},
 };
 pub use experiments::{Experiment, EXPERIMENTS};
-use log::{debug, info, log_enabled, Level};
-use move_binary_format::errors::VMError;
-use move_bytecode_source_map::source_map::SourceMap;
-use move_compiler::{
+use legacy_move_compiler::{
     command_line,
     compiled_unit::{
         AnnotatedCompiledModule, AnnotatedCompiledScript, AnnotatedCompiledUnit, CompiledUnit,
         FunctionInfo, NamedCompiledModule, NamedCompiledScript,
     },
     diagnostics::FilesSourceText,
-    shared::{known_attributes::KnownAttribute, unique_map::UniqueMap},
+    shared::known_attributes::KnownAttribute,
 };
+use log::{debug, info, log_enabled, Level};
+use move_binary_format::errors::VMError;
+use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::vm_status::StatusType;
 use move_disassembler::disassembler::Disassembler;
 use move_model::{
@@ -641,7 +641,6 @@ pub fn annotate_units(units: Vec<CompiledUnit>) -> Vec<AnnotatedCompiledUnit> {
                     module_name_loc: loc,
                     address_name: None,
                     named_module,
-                    function_infos: UniqueMap::new(),
                 })
             },
             CompiledUnit::Script(named_script) => {

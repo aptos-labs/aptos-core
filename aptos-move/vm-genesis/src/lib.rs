@@ -43,7 +43,8 @@ use aptos_types::{
 use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{
-        convert_modules_into_write_ops, GenesisMoveVM, GenesisRuntimeBuilder, SessionExt,
+        convert_modules_into_write_ops, AptosMoveResolver, GenesisMoveVm, GenesisRuntimeBuilder,
+        SessionExt,
     },
 };
 use aptos_vm_types::{
@@ -187,12 +188,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     emit_new_block_and_epoch_event(&mut session, &module_storage);
 
     // Create a change set with all initialized resources.
-    let (mut change_set, module_write_set) =
-        assert_ok!(session.finish(&genesis_change_set_configs, &module_storage));
-    assert!(
-        module_write_set.is_empty(),
-        "Modules cannot be published in the first genesis session"
-    );
+    let mut change_set = assert_ok!(session.finish(&genesis_change_set_configs, &module_storage));
 
     // Publish the framework, using a different session id, in case both sessions create tables.
     let mut new_id = [0u8; 32];
@@ -320,12 +316,7 @@ pub fn encode_genesis_change_set(
     // Reconfiguration should happen after all on-chain invocations.
     emit_new_block_and_epoch_event(&mut session, &module_storage);
 
-    let (mut change_set, module_write_set) =
-        assert_ok!(session.finish(&genesis_change_set_configs, &module_storage));
-    assert!(
-        module_write_set.is_empty(),
-        "Modules cannot be published in the first genesis session"
-    );
+    let mut change_set = assert_ok!(session.finish(&genesis_change_set_configs, &module_storage));
 
     // Publish the framework, using a different id, in case both sessions create tables.
     let mut new_id = [0u8; 32];
@@ -383,7 +374,7 @@ fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
 }
 
 fn exec_function(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     module_name: &str,
     function_name: &str,
@@ -413,7 +404,7 @@ fn exec_function(
 }
 
 fn initialize(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
@@ -467,7 +458,7 @@ fn initialize(
 }
 
 fn initialize_features(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     features_override: Option<Vec<FeatureFlag>>,
 ) {
@@ -491,7 +482,10 @@ fn initialize_features(
     );
 }
 
-fn initialize_aptos_coin(session: &mut SessionExt, module_storage: &impl AptosModuleStorage) {
+fn initialize_aptos_coin(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+) {
     exec_function(
         session,
         module_storage,
@@ -502,7 +496,10 @@ fn initialize_aptos_coin(session: &mut SessionExt, module_storage: &impl AptosMo
     );
 }
 
-fn initialize_config_buffer(session: &mut SessionExt, module_storage: &impl AptosModuleStorage) {
+fn initialize_config_buffer(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+) {
     exec_function(
         session,
         module_storage,
@@ -513,7 +510,10 @@ fn initialize_config_buffer(session: &mut SessionExt, module_storage: &impl Apto
     );
 }
 
-fn initialize_dkg(session: &mut SessionExt, module_storage: &impl AptosModuleStorage) {
+fn initialize_dkg(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+) {
     exec_function(
         session,
         module_storage,
@@ -525,7 +525,7 @@ fn initialize_dkg(session: &mut SessionExt, module_storage: &impl AptosModuleSto
 }
 
 fn initialize_randomness_config_seqnum(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
 ) {
     exec_function(
@@ -539,7 +539,7 @@ fn initialize_randomness_config_seqnum(
 }
 
 fn initialize_randomness_api_v0_config(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
 ) {
     exec_function(
@@ -557,7 +557,7 @@ fn initialize_randomness_api_v0_config(
 }
 
 fn initialize_randomness_config(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     randomness_config: OnChainRandomnessConfig,
 ) {
@@ -575,7 +575,7 @@ fn initialize_randomness_config(
 }
 
 fn initialize_randomness_resources(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
 ) {
     exec_function(
@@ -589,7 +589,7 @@ fn initialize_randomness_resources(
 }
 
 fn initialize_account_abstraction(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
 ) {
     exec_function(
@@ -600,10 +600,26 @@ fn initialize_account_abstraction(
         vec![],
         serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
     );
+
+    exec_function(
+        session,
+        module_storage,
+        ACCOUNT_ABSTRACTION_MODULE_NAME,
+        "register_derivable_authentication_function",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            MoveValue::Address(AccountAddress::SEVEN),
+            "test_derivable_account_abstraction_ed25519_hex"
+                .to_string()
+                .as_move_value(),
+            "authenticate".to_string().as_move_value(),
+        ]),
+    );
 }
 
 fn initialize_reconfiguration_state(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
 ) {
     exec_function(
@@ -617,7 +633,7 @@ fn initialize_reconfiguration_state(
 }
 
 fn initialize_jwk_consensus_config(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     jwk_consensus_config: &OnChainJWKConsensusConfig,
 ) {
@@ -634,7 +650,10 @@ fn initialize_jwk_consensus_config(
     );
 }
 
-fn initialize_jwks_resources(session: &mut SessionExt, module_storage: &impl AptosModuleStorage) {
+fn initialize_jwks_resources(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+) {
     exec_function(
         session,
         module_storage,
@@ -645,7 +664,10 @@ fn initialize_jwks_resources(session: &mut SessionExt, module_storage: &impl Apt
     );
 }
 
-fn set_genesis_end(session: &mut SessionExt, module_storage: &impl AptosModuleStorage) {
+fn set_genesis_end(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+) {
     exec_function(
         session,
         module_storage,
@@ -657,7 +679,7 @@ fn set_genesis_end(session: &mut SessionExt, module_storage: &impl AptosModuleSt
 }
 
 fn initialize_core_resources_and_aptos_coin(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     core_resources_key: &Ed25519PublicKey,
 ) {
@@ -677,7 +699,7 @@ fn initialize_core_resources_and_aptos_coin(
 
 /// Create and initialize Association and Core Code accounts.
 fn initialize_on_chain_governance(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     genesis_config: &GenesisConfiguration,
 ) {
@@ -697,7 +719,7 @@ fn initialize_on_chain_governance(
 }
 
 fn initialize_keyless_accounts(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     chain_id: ChainId,
     mut initial_jwks: Vec<IssuerJWK>,
@@ -763,7 +785,7 @@ fn initialize_keyless_accounts(
 }
 
 fn create_accounts(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     accounts: &[AccountBalance],
 ) {
@@ -781,7 +803,7 @@ fn create_accounts(
 }
 
 fn create_employee_validators(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     employees: &[EmployeePool],
     genesis_config: &GenesisConfiguration,
@@ -807,7 +829,7 @@ fn create_employee_validators(
 /// the required accounts, sets the validator operators for each validator owner, and sets the
 /// validator config on-chain.
 fn create_and_initialize_validators(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     validators: &[Validator],
 ) {
@@ -825,7 +847,7 @@ fn create_and_initialize_validators(
 }
 
 fn create_and_initialize_validators_with_commission(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     validators: &[ValidatorWithCommissionRate],
 ) {
@@ -846,7 +868,7 @@ fn create_and_initialize_validators_with_commission(
 }
 
 fn allow_core_resources_to_set_version(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
 ) {
     exec_function(
@@ -860,7 +882,7 @@ fn allow_core_resources_to_set_version(
 }
 
 fn initialize_package(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     addr: AccountAddress,
     package: &ReleasePackage,
@@ -909,13 +931,11 @@ fn code_to_writes_for_publishing(
 ///  1. Resources containing package information.
 ///  2. Module write set with published code.
 fn publish_framework(
-    genesis_vm: &GenesisMoveVM,
+    genesis_vm: &GenesisMoveVm,
     genesis_runtime_environment: &RuntimeEnvironment,
     hash_value: HashValue,
     framework: &ReleaseBundle,
 ) -> (VMChangeSet, ModuleWriteSet) {
-    assert!(genesis_runtime_environment.vm_config().use_loader_v2);
-
     // Reset state view to be empty, to make sure all module write ops are creations.
     let mut state_view = GenesisStateView::new();
 
@@ -950,7 +970,7 @@ fn publish_framework(
         writes.extend(package_writes.clone());
         state_view.add_module_write_ops(package_writes);
     }
-    let module_write_set = ModuleWriteSet::new(true, writes);
+    let module_write_set = ModuleWriteSet::new(writes);
 
     // At this point we processed all packages, and the state view contains all the code. We can
     // run package initialization.
@@ -972,18 +992,14 @@ fn publish_framework(
         initialize_package(&mut session, &module_storage, addr, pack);
     }
 
-    let (change_set, empty_module_write_set) =
+    let change_set =
         assert_ok!(session.finish(&genesis_vm.genesis_change_set_configs(), &module_storage));
-
-    // We use loader V2, so modules are published outside the session and so the module write set
-    // returned when finishing the session should be empty.
-    assert!(empty_module_write_set.is_empty());
     (change_set, module_write_set)
 }
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.
 fn emit_new_block_and_epoch_event(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
 ) {
     exec_function(
