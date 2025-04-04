@@ -2,7 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::new_test_context;
+// Note[Orderless]: Done
+use super::new_test_context_with_orderless_flags;
 use aptos_api_test_context::{current_function_name, TestContext};
 use aptos_crypto::{
     bls12381::{PrivateKey, PublicKey},
@@ -15,14 +16,30 @@ use aptos_types::{
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
 use rand::rngs::OsRng;
+use rstest::rstest;
 use serde_json::json;
 use std::{path::PathBuf, sync::Arc};
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_account_abstraction_single_signer() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_account_abstraction_single_signer(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let key_pair = Arc::new(KeyPair::<PrivateKey, PublicKey>::generate(&mut OsRng));
 
-    let mut context = new_test_context(current_function_name!());
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let mut account = context.create_account().await;
     let user_addr = account.address();
     let other = context.create_account().await;
@@ -68,7 +85,11 @@ async fn test_account_abstraction_single_signer() {
         None,
         factory
             .account_transfer(other.address(), 1)
-            .expiration_timestamp_secs(u64::MAX),
+            .expiration_timestamp_secs(context.get_expiration_time())
+            .upgrade_payload(
+                context.use_txn_payload_v2_format,
+                context.use_orderless_transactions,
+            ),
     );
 
     let txn_status = context.try_commit_block(&vec![aa_txn]).await;
@@ -94,7 +115,11 @@ async fn test_account_abstraction_single_signer() {
         None,
         factory
             .account_transfer(other.address(), 4)
-            .expiration_timestamp_secs(u64::MAX),
+            .expiration_timestamp_secs(context.get_expiration_time())
+            .upgrade_payload(
+                context.use_txn_payload_v2_format,
+                context.use_orderless_transactions,
+            ),
     );
     context
         .expect_status_code(202)
@@ -110,9 +135,24 @@ async fn test_account_abstraction_single_signer() {
 /// This tests a function with params (signer_a, signer_b, signer_c, d) works for the AA authentication flow.
 /// a, c are AA; b, d are normal ed25519 accounts.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_account_abstraction_multi_agent_with_abstracted_sender() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_account_abstraction_multi_agent_with_abstracted_sender(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let key_pair = Arc::new(KeyPair::<PrivateKey, PublicKey>::generate(&mut OsRng));
-    let mut context = new_test_context(current_function_name!());
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let mut a = context.create_account().await;
     let b = context.create_account().await;
     let mut c = context.create_account().await;
@@ -174,7 +214,11 @@ async fn test_account_abstraction_multi_agent_with_abstracted_sender() {
                 vec![],
                 vec![bcs::to_bytes(&d.address()).unwrap()],
             ))
-            .expiration_timestamp_secs(u64::MAX),
+            .expiration_timestamp_secs(context.get_expiration_time())
+            .upgrade_payload(
+                context.use_txn_payload_v2_format,
+                context.use_orderless_transactions,
+            ),
     );
     context
         .expect_status_code(202)
