@@ -407,11 +407,11 @@ fn native_add_box(
 
     let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
 
-    let key_bytes = serialize(function_value_extension, &table.key_layout, &key)?;
+    let key_bytes = serialize(&function_value_extension, &table.key_layout, &key)?;
     cost += gas_params.per_byte_serialized * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) =
-        table.get_or_create_global_value(function_value_extension, table_context, key_bytes)?;
+        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
     cost += common_gas_params.calculate_load_cost(loaded);
 
     match gv.move_to(val) {
@@ -458,11 +458,11 @@ fn native_borrow_box(
 
     let mut cost = gas_params.base;
 
-    let key_bytes = serialize(function_value_extension, &table.key_layout, &key)?;
+    let key_bytes = serialize(&function_value_extension, &table.key_layout, &key)?;
     cost += gas_params.per_byte_serialized * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) =
-        table.get_or_create_global_value(function_value_extension, table_context, key_bytes)?;
+        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
     cost += common_gas_params.calculate_load_cost(loaded);
 
     match gv.borrow_global() {
@@ -509,11 +509,11 @@ fn native_contains_box(
 
     let mut cost = gas_params.base;
 
-    let key_bytes = serialize(function_value_extension, &table.key_layout, &key)?;
+    let key_bytes = serialize(&function_value_extension, &table.key_layout, &key)?;
     cost += gas_params.per_byte_serialized * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) =
-        table.get_or_create_global_value(function_value_extension, table_context, key_bytes)?;
+        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
     cost += common_gas_params.calculate_load_cost(loaded);
 
     let exists = Value::bool(gv.exists()?);
@@ -559,11 +559,11 @@ fn native_remove_box(
 
     let mut cost = gas_params.base;
 
-    let key_bytes = serialize(function_value_extension, &table.key_layout, &key)?;
+    let key_bytes = serialize(&function_value_extension, &table.key_layout, &key)?;
     cost += gas_params.per_byte_serialized * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) =
-        table.get_or_create_global_value(function_value_extension, table_context, key_bytes)?;
+        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
     cost += common_gas_params.calculate_load_cost(loaded);
 
     match gv.move_from() {

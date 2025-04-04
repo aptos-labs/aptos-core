@@ -136,18 +136,9 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
         let module = self
             .fetch_existing_verified_module(address, module_name)
             .map_err(|err| err.to_partial())?;
-        Ok(module
-            .struct_map
-            .get(struct_name)
-            .and_then(|idx| module.structs.get(*idx))
-            .ok_or_else(|| {
-                PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(format!(
-                    "Struct {}::{}::{} does not exist",
-                    address, module_name, struct_name
-                ))
-            })?
-            .definition_struct_type
-            .clone())
+        module
+            .get_struct(struct_name)
+            .map_err(|err| err.to_partial())
     }
 
     fn fetch_struct_ty_by_idx(&self, idx: &StructNameIndex) -> PartialVMResult<Arc<StructType>> {
@@ -194,19 +185,7 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
         function_name: &IdentStr,
     ) -> VMResult<(Arc<Module>, Arc<Function>)> {
         let module = self.fetch_existing_verified_module(address, module_name)?;
-        let function = module
-            .function_map
-            .get(function_name)
-            .and_then(|idx| module.function_defs.get(*idx))
-            .ok_or_else(|| {
-                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                    .with_message(format!(
-                        "Function {}::{}::{} does not exist",
-                        address, module_name, function_name
-                    ))
-                    .finish(Location::Undefined)
-            })?
-            .clone();
+        let function = module.get_function(function_name)?;
         Ok((module, function))
     }
 

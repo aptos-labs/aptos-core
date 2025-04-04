@@ -12,7 +12,7 @@ use crate::{
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
-    errors::{PartialVMError, PartialVMResult},
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
         Bytecode, CompiledModule, FieldDefinition, FieldHandleIndex, FieldInstantiationIndex,
         FunctionDefinitionIndex, SignatureIndex, StructDefinition, StructDefinitionIndex,
@@ -20,7 +20,11 @@ use move_binary_format::{
         TableIndex, VariantFieldHandleIndex, VariantFieldInstantiationIndex, VariantIndex,
     },
 };
-use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
+use move_core_types::{
+    identifier::{IdentStr, Identifier},
+    language_storage::ModuleId,
+    vm_status::StatusCode,
+};
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::loaded_data::{
     runtime_types::{StructIdentifier, StructLayout, StructType, Type},
@@ -488,8 +492,8 @@ impl Module {
         &self.id
     }
 
-    pub(crate) fn struct_at(&self, idx: StructDefinitionIndex) -> Arc<StructType> {
-        self.structs[idx.0 as usize].definition_struct_type.clone()
+    pub(crate) fn struct_at(&self, idx: StructDefinitionIndex) -> &Arc<StructType> {
+        &self.structs[idx.0 as usize].definition_struct_type
     }
 
     pub(crate) fn struct_instantiation_at(&self, idx: u16) -> &StructInstantiation {
@@ -548,6 +552,45 @@ impl Module {
 
     pub(crate) fn single_type_at(&self, idx: SignatureIndex) -> &Type {
         self.single_signature_token_map.get(&idx).unwrap()
+    }
+
+    pub(crate) fn get_function(&self, function_name: &IdentStr) -> VMResult<Arc<Function>> {
+        Ok(self
+            .function_map
+            .get(function_name)
+            .and_then(|idx| self.function_defs.get(*idx))
+            .ok_or_else(|| {
+                let module_id = self.self_id();
+                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                    .with_message(format!(
+                        "Function {}::{}::{} does not exist",
+                        module_id.address(),
+                        module_id.name(),
+                        function_name
+                    ))
+                    .finish(Location::Undefined)
+            })?
+            .clone())
+    }
+
+    pub(crate) fn get_struct(&self, struct_name: &IdentStr) -> VMResult<Arc<StructType>> {
+        Ok(self
+            .struct_map
+            .get(struct_name)
+            .and_then(|idx| self.structs.get(*idx))
+            .ok_or_else(|| {
+                let module_id = self.self_id();
+                PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE)
+                    .with_message(format!(
+                        "Struct {}::{}::{} does not exist",
+                        module_id.address(),
+                        module_id.name(),
+                        struct_name
+                    ))
+                    .finish(Location::Undefined)
+            })?
+            .definition_struct_type
+            .clone())
     }
 }
 
