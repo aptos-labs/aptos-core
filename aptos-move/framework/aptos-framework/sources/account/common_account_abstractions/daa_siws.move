@@ -11,8 +11,7 @@
 /// Nonce: <digest>
 ///
 /// 2. The abstract public key is a BCS serialized `SIWSAbstractPublicKey`.
-/// 3. The abstract signature is the signature in raw bytes. The first byte is
-/// the message format
+/// 3. The abstract signature is a BCS serialized `SIWSAbstractSignature`.
 /// 4. This module has been tested for the following wallets:
 /// - Phantom
 module aptos_framework::daa_siws {
