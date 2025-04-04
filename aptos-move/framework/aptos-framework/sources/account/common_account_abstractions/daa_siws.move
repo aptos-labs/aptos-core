@@ -42,7 +42,7 @@ module aptos_framework::daa_siws {
     const BASE_58_ALPHABET: vector<u8> = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
     const HEX_ALPHABET: vector<u8> = b"0123456789abcdef";
 
-    const SIGNATURE_TYPE1: u8 = 0x01;
+    const SIGNATURE_TYPE0: u8 = 0x00;
 
     /// Deserializes the abstract public key which is supposed to be a bcs
     /// serialized `SIWSAbstractPublicKey`.  The base58_public_key is
@@ -177,7 +177,7 @@ module aptos_framework::daa_siws {
         let public_key_bytes = to_public_key_bytes(&base58_public_key);
         let public_key = new_unvalidated_public_key_from_bytes(public_key_bytes);
         let (signature_type, signature_bytes) = deserialize_abstract_signature(aa_auth_data.derivable_abstract_signature());
-        assert!(signature_type == SIGNATURE_TYPE1, EINVALID_SIGNATURE_TYPE);
+        assert!(signature_type == SIGNATURE_TYPE0, EINVALID_SIGNATURE_TYPE);
         let signature = new_signature_from_bytes(signature_bytes);
         assert!(
             ed25519::signature_verify_strict(
@@ -244,11 +244,11 @@ module aptos_framework::daa_siws {
 
     #[test]
     fun test_deserialize_abstract_signature() {
-        let signature_type = SIGNATURE_TYPE1;
+        let signature_type = SIGNATURE_TYPE0;
         let signature = vector[129, 0, 6, 135, 53, 153, 88, 201, 243, 227, 13, 232, 192, 42, 167, 94, 3, 120, 49, 80, 102, 193, 61, 211, 189, 83, 37, 121, 5, 216, 30, 25, 243, 207, 172, 248, 94, 201, 123, 66, 237, 66, 122, 201, 171, 215, 162, 187, 218, 188, 24, 165, 52, 147, 210, 39, 128, 78, 62, 81, 73, 167, 235, 1];
         let abstract_signature = create_abstract_signature(signature_type, signature);
         let (signature_type, signature_bytes) = deserialize_abstract_signature(&abstract_signature);
-        assert!(signature_type == SIGNATURE_TYPE1);
+        assert!(signature_type == SIGNATURE_TYPE0);
         assert!(signature_bytes == signature);
     }
 
@@ -316,7 +316,7 @@ module aptos_framework::daa_siws {
         chain_id::initialize_for_test(framework, 2);
 
         let digest = x"026a4f93c2010cbafbac45639e995410d0902d11a3c4f0fcd1c64a1d193f4866";
-        let signature_type = SIGNATURE_TYPE1;
+        let signature_type = SIGNATURE_TYPE0;
         let signature = vector[129, 0, 6, 135, 53, 153, 88, 201, 243,
         227, 13, 232, 192, 42, 167, 94, 3, 120, 49, 80, 102, 193, 61, 211, 189,
         83, 37, 121, 5, 216, 30, 25, 243, 207, 172, 248, 94, 201, 123, 66, 237,
@@ -337,7 +337,7 @@ module aptos_framework::daa_siws {
         chain_id::initialize_for_test(framework, 2);
 
         let digest = x"026a4f93c2010cbafbac45639e995410d0902d11a3c4f0fcd1c64a1d193f4866";
-        let signature_type = SIGNATURE_TYPE1;
+        let signature_type = SIGNATURE_TYPE0;
         let signature = vector[128, 0, 6, 135, 53, 153, 88, 201, 243,
         227, 13, 232, 192, 42, 167, 94, 3, 120, 49, 80, 102, 193, 61, 211, 189,
         83, 37, 121, 5, 216, 30, 25, 243, 207, 172, 248, 94, 201, 123, 66, 237,
