@@ -833,7 +833,7 @@ impl Context {
             .collect()
     }
 
-    pub fn get_account_transactions<E: NotFoundError + InternalError>(
+    pub fn get_account_ordered_transactions<E: NotFoundError + InternalError>(
         &self,
         address: AccountAddress,
         start_seq_number: Option<u64>,
@@ -854,7 +854,7 @@ impl Context {
         };
 
         let txns_res = if !db_sharding_enabled(&self.node_config) {
-            self.db.get_account_transactions(
+            self.db.get_account_ordered_transactions(
                 address,
                 start_seq_number,
                 limit as u64,
@@ -868,7 +868,7 @@ impl Context {
                 .map_err(|err| {
                     E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
                 })?
-                .get_account_transactions(
+                .get_account_ordered_transactions(
                     address,
                     start_seq_number,
                     limit as u64,

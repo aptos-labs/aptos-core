@@ -82,7 +82,7 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_account_transaction(
+    fn get_account_ordered_transaction(
         &self,
         address: AccountAddress,
         seq_num: u64,
@@ -95,7 +95,7 @@ impl DbReader for AptosDB {
                 "This API is not supported with sharded DB"
             );
             self.transaction_store
-                .get_account_transaction_version(address, seq_num, ledger_version)?
+                .get_account_ordered_transaction_version(address, seq_num, ledger_version)?
                 .map(|txn_version| {
                     self.get_transaction_with_proof(txn_version, ledger_version, include_events)
                 })
@@ -103,14 +103,14 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_account_transactions(
+    fn get_account_ordered_transactions(
         &self,
         address: AccountAddress,
         start_seq_num: u64,
         limit: u64,
         include_events: bool,
         ledger_version: Version,
-    ) -> Result<AccountTransactionsWithProof> {
+    ) -> Result<AccountOrderedTransactionsWithProof> {
         gauged_api("get_account_transactions", || {
             ensure!(
                 !self.state_kv_db.enabled_sharding(),
@@ -120,7 +120,7 @@ impl DbReader for AptosDB {
 
             let txns_with_proofs = self
                 .transaction_store
-                .get_account_transaction_version_iter(
+                .get_account_ordered_transactions_iter(
                     address,
                     start_seq_num,
                     limit,
@@ -132,7 +132,7 @@ impl DbReader for AptosDB {
                 })
                 .collect::<Result<Vec<_>>>()?;
 
-            Ok(AccountTransactionsWithProof::new(txns_with_proofs))
+            Ok(AccountOrderedTransactionsWithProof::new(txns_with_proofs))
         })
     }
 
