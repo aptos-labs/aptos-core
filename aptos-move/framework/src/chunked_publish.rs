@@ -130,6 +130,7 @@ fn large_packages_stage_code_chunk_and_publish_to_account(
     code_chunks: Vec<Vec<u8>>,
     large_packages_module_address: AccountAddress,
 ) -> TransactionPayload {
+    // TODO[Orderless]: Change this to payload v2 format.
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             large_packages_module_address,
