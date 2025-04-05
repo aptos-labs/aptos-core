@@ -1,9 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{code_cache_global::GlobalModuleCache, types::InputOutputKey, view::LatestView};
+use crate::{
+    code_cache_global::GlobalModuleCache,
+    types::InputOutputKey,
+    view::{GroupReadResult, LatestView, ReadResult},
+};
 use anyhow::bail;
 use aptos_aggregator::{
+    delta_change_set::serialize,
     delta_math::DeltaHistory,
     types::{DelayedFieldValue, DelayedFieldsSpeculativeError, ReadPosition},
 };
@@ -43,12 +48,12 @@ use std::{
     sync::Arc,
 };
 
-/// The enum variants should not be re-ordered, as it defines a relation
-/// Existence < Metadata < Value.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd)]
 pub(crate) enum ReadKind {
     Exists,
     Metadata,
+    ResourceSize,
+    MetadataAndResourceSize,
     Value,
 }
 
@@ -69,7 +74,13 @@ pub(crate) enum DataRead<V> {
         #[derivative(PartialEq = "ignore", Debug = "ignore")] Arc<V>,
         #[derivative(PartialEq = "ignore", Debug = "ignore")] Option<Arc<MoveTypeLayout>>,
     ),
+    // Metadata and ResourceSize are insufficient to determine each other, but both
+    // can be determined from Versioned. When both are available, the information
+    // is stored in the MetadataAndResourceSize variant.
+    MetadataAndResourceSize(Option<StateValueMetadata>, Option<u64>),
     Metadata(Option<StateValueMetadata>),
+    ResourceSize(Option<u64>),
+    // Exists is a lower tier, can be determined both from Metadata and ResourceSize.
     Exists(bool),
     /// Read resolved an aggregatorV1 delta to a value.
     /// TODO[agg_v1](cleanup): deprecate.
@@ -98,7 +109,9 @@ impl<V: TransactionWrite> DataRead<V> {
         use DataRead::*;
         match self {
             Versioned(_, _, _) | Resolved(_) => ReadKind::Value,
+            MetadataAndResourceSize(_, _) => ReadKind::MetadataAndResourceSize,
             Metadata(_) => ReadKind::Metadata,
+            ResourceSize(_) => ReadKind::ResourceSize,
             Exists(_) => ReadKind::Exists,
         }
     }
@@ -110,55 +123,121 @@ impl<V: TransactionWrite> DataRead<V> {
         let self_kind = self.get_kind();
         let other_kind = other.get_kind();
 
-        if self_kind < other_kind {
-            DataReadComparison::Insufficient
-        } else {
-            let downcast_eq = if self_kind == other_kind {
-                // Optimization to avoid unnecessary clones (e.g. during validation).
-                self == other
-            } else {
-                self.downcast(other_kind)
-                    .expect("Downcast to lower kind must succeed")
-                    == *other
-            };
-
-            if downcast_eq {
+        if self_kind == other_kind {
+            // Optimization to avoid unnecessary clones (e.g. during validation).
+            // TODO: can do the same for MetadataAndResourceSize.
+            if self == other {
                 DataReadComparison::Contains
             } else {
                 DataReadComparison::Inconsistent
             }
+        } else {
+            if self
+                .downcast(&other_kind)
+                .is_some_and(|value| value == *other)
+            {
+                DataReadComparison::Contains
+            } else {
+                DataReadComparison::Insufficient
+            }
         }
     }
 
+    fn v_size(v: &Arc<V>) -> Option<u64> {
+        v.bytes().map(|bytes| bytes.len() as u64)
+    }
+
+    /// TODO: rename to convert_to.
     /// If the reads contains sufficient information, extract this information and generate
     /// a new DataRead of the desired kind (e.g. Metadata kind from Value).
-    pub(crate) fn downcast(&self, kind: ReadKind) -> Option<DataRead<V>> {
-        let self_kind = self.get_kind();
-        if self_kind == kind {
-            return Some(self.clone());
-        }
-
-        (self_kind > kind).then(|| match (self, &kind) {
+    pub(crate) fn downcast(&self, kind: &ReadKind) -> Option<DataRead<V>> {
+        match (self, kind) {
+            // Versioned cases.
+            (DataRead::Versioned(_, _, _), ReadKind::Value) => Some(self.clone()),
+            (DataRead::Versioned(_, v, _), ReadKind::MetadataAndResourceSize) => Some(
+                DataRead::MetadataAndResourceSize(v.as_state_value_metadata(), Self::v_size(v)),
+            ),
             (DataRead::Versioned(_, v, _), ReadKind::Metadata) => {
                 // For deletion, as_state_value_metadata returns None, also asserted by tests.
-                DataRead::Metadata(v.as_state_value_metadata())
+                Some(DataRead::Metadata(v.as_state_value_metadata()))
             },
-            (DataRead::Versioned(_, v, _), ReadKind::Exists) => DataRead::Exists(!v.is_deletion()),
+            (DataRead::Versioned(_, v, _), ReadKind::ResourceSize) => {
+                Some(DataRead::ResourceSize(Self::v_size(v)))
+            },
+            (DataRead::Versioned(_, v, _), ReadKind::Exists) => {
+                Some(DataRead::Exists(!v.is_deletion()))
+            },
+
+            // Resolved cases.
+            (DataRead::Resolved(_), ReadKind::Value) => Some(self.clone()),
+            (DataRead::Resolved(v), ReadKind::MetadataAndResourceSize) => {
+                Some(DataRead::MetadataAndResourceSize(
+                    Some(StateValueMetadata::none()),
+                    Some(serialize(&v).len() as u64),
+                ))
+            },
             (DataRead::Resolved(_), ReadKind::Metadata) => {
-                DataRead::Metadata(Some(StateValueMetadata::none()))
+                Some(DataRead::Metadata(Some(StateValueMetadata::none())))
             },
-            (DataRead::Resolved(_), ReadKind::Exists) => DataRead::Exists(true),
+            (DataRead::Resolved(v), ReadKind::ResourceSize) => {
+                Some(DataRead::ResourceSize(Some(serialize(&v).len() as u64)))
+            },
+            (DataRead::Resolved(_), ReadKind::Exists) => Some(DataRead::Exists(true)),
+
+            // Metadata and resource size cases.
+            (DataRead::MetadataAndResourceSize(_, _), ReadKind::Value) => None,
+            (DataRead::MetadataAndResourceSize(_, _), ReadKind::MetadataAndResourceSize) => {
+                Some(self.clone())
+            },
+            (DataRead::MetadataAndResourceSize(maybe_metadata, _), ReadKind::Metadata) => {
+                Some(DataRead::Metadata(maybe_metadata.clone()))
+            },
+            (DataRead::MetadataAndResourceSize(_, maybe_size), ReadKind::ResourceSize) => {
+                Some(DataRead::ResourceSize(maybe_size.clone()))
+            },
+            (DataRead::MetadataAndResourceSize(maybe_metadata, _), ReadKind::Exists) => {
+                Some(DataRead::Exists(maybe_metadata.is_some()))
+            },
+
+            // Metadata cases.
+            (DataRead::Metadata(_), ReadKind::Value) => None,
+            (DataRead::Metadata(m), ReadKind::MetadataAndResourceSize) => {
+                Some(DataRead::MetadataAndResourceSize(m.clone(), None))
+            },
+            (DataRead::Metadata(_), ReadKind::Metadata) => Some(self.clone()),
+            (DataRead::Metadata(_), ReadKind::ResourceSize) => None,
             (DataRead::Metadata(maybe_metadata), ReadKind::Exists) => {
-                DataRead::Exists(maybe_metadata.is_some())
+                Some(DataRead::Exists(maybe_metadata.is_some()))
             },
-            (_, _) => unreachable!("{:?}, {:?} must be covered", self_kind, kind),
-        })
+
+            // ResourceSize cases.
+            (DataRead::ResourceSize(_), ReadKind::Value) => None,
+            (DataRead::ResourceSize(size), ReadKind::MetadataAndResourceSize) => {
+                Some(DataRead::MetadataAndResourceSize(None, size.clone()))
+            },
+            (DataRead::ResourceSize(_), ReadKind::Metadata) => None,
+            (DataRead::ResourceSize(_), ReadKind::ResourceSize) => Some(self.clone()),
+            (DataRead::ResourceSize(maybe_size), ReadKind::Exists) => {
+                Some(DataRead::Exists(maybe_size.is_some()))
+            },
+
+            // Exists cases.
+            (DataRead::Exists(_), ReadKind::Value) => None,
+            (DataRead::Exists(_), ReadKind::MetadataAndResourceSize) => None,
+            (DataRead::Exists(_), ReadKind::Metadata) => None,
+            (DataRead::Exists(_), ReadKind::ResourceSize) => None,
+            (DataRead::Exists(_), ReadKind::Exists) => Some(self.clone()),
+        }
     }
 
     pub(crate) fn from_value_with_layout(version: Version, value: ValueWithLayout<V>) -> Self {
         match value {
-            // If value was never exchanged, then metadata can be the highest one without full value.
-            ValueWithLayout::RawFromStorage(v) => DataRead::Metadata(v.as_state_value_metadata()),
+            // If value was never exchanged, then value shouldn't be used, and so we construct
+            // a MetadataAndResourceSize variant that implies everything non-value. This also
+            // ensures that RawFromStorage can't be consistent with any other value read.
+            ValueWithLayout::RawFromStorage(v) => {
+                DataRead::MetadataAndResourceSize(v.as_state_value_metadata(), Self::v_size(&v))
+            },
             ValueWithLayout::Exchanged(v, layout) => {
                 DataRead::Versioned(version, v.clone(), layout)
             },
@@ -456,8 +535,76 @@ where
             .and_then(|group| group.collected_size)
     }
 
+    pub(crate) fn capture_group_read(
+        &mut self,
+        group_key: T::Key,
+        tag: T::Tag,
+        version: Version,
+        value: ValueWithLayout<T::Value>,
+        kind: ReadKind,
+    ) -> Result<GroupReadResult, PanicError> {
+        // Unpatched RawFromStorage should not be used for values, and should fail below:
+        // from_value_with_layout will return MetadataAndResourceSize (because value is
+        // unsafe) and then the downcast to the Value kind will return None.
+        let data_read = DataRead::from_value_with_layout(version, value)
+            .downcast(&kind)
+            .ok_or(code_invariant_error(
+                "Couldn't downcast a value from versioned group map",
+            ))?;
+
+        if self
+            .capture_read(group_key, Some(tag), data_read.clone())
+            .is_ok()
+        {
+            Ok(GroupReadResult::from_data_read(data_read))
+        } else {
+            Err(code_invariant_error(
+                "Couldn't capture read from versioned group map",
+            ))
+        }
+    }
+
+    pub(crate) fn capture_data_read(
+        &mut self,
+        group_key: T::Key,
+        version: Version,
+        value: ValueWithLayout<T::Value>,
+        kind: ReadKind,
+    ) -> Result<ReadResult, PanicError> {
+        // Unpatched RawFromStorage should not be used for values, and should fail below:
+        // from_value_with_layout will return MetadataAndResourceSize (because value is
+        // unsafe) and then the downcast to the Value kind will return None.
+        let data_read = match DataRead::from_value_with_layout(version, value).downcast(&kind) {
+            Some(data_read) => data_read,
+            None => {
+                self.incorrect_use = true;
+                // This may not happen due to concurrency, so we return PanicError
+                // which internally logs an error.
+                return Err(code_invariant_error(
+                    "Couldn't downcast a value from versioned data map",
+                ));
+            },
+        };
+
+        Ok(
+            if self
+                .capture_read(group_key, None, data_read.clone())
+                .is_ok()
+            {
+                ReadResult::from_data_read(data_read)
+            } else {
+                // This may happen due to concurrency, so we don't return PanicError, as
+                // PanicError is not expected to happen due to speculation.
+                ReadResult::HaltSpeculativeExecution(
+                    "Inconsistency in data reads (must be due to speculation)".to_string(),
+                )
+            },
+        )
+    }
+
     // Error means there was a inconsistency in information read (must be due to the
     // speculative nature of reads).
+    // TODO: Make it private when fully migrated to capture_group_read / capture_data_read.
     pub(crate) fn capture_read(
         &mut self,
         state_key: T::Key,
@@ -502,11 +649,11 @@ where
             Some(tag) => self
                 .group_reads
                 .get(state_key)
-                .and_then(|group| group.inner_reads.get(tag).and_then(|r| r.downcast(kind))),
+                .and_then(|group| group.inner_reads.get(tag).and_then(|r| r.downcast(&kind))),
             None => self
                 .data_reads
                 .get(state_key)
-                .and_then(|r| r.downcast(kind)),
+                .and_then(|r| r.downcast(&kind)),
         }
     }
 
@@ -823,6 +970,7 @@ pub(crate) struct UnsyncReadSet<T: Transaction, K> {
     pub(crate) group_reads: HashMap<T::Key, HashSet<T::Tag>>,
     pub(crate) delayed_field_reads: HashSet<DelayedFieldID>,
     module_reads: HashSet<K>,
+    pub(crate) incorrect_use: bool,
 }
 
 impl<T, K> UnsyncReadSet<T, K>
@@ -830,6 +978,44 @@ where
     T: Transaction,
     K: Hash + Eq + Ord + Clone + WithAddress + WithName,
 {
+    pub(crate) fn capture_data_read(
+        &mut self,
+        key: T::Key,
+        value: ValueWithLayout<T::Value>,
+        kind: ReadKind,
+    ) -> Result<ReadResult, PanicError> {
+        let res = ReadResult::from_value::<T>(value, &kind);
+
+        if res.is_ok() {
+            self.resource_reads.insert(key.clone());
+        } else {
+            self.incorrect_use = true;
+        }
+
+        res
+    }
+
+    pub(crate) fn capture_group_data_read(
+        &mut self,
+        key: T::Key,
+        tag: T::Tag,
+        value: ValueWithLayout<T::Value>,
+        kind: ReadKind,
+    ) -> Result<GroupReadResult, PanicError> {
+        let res = GroupReadResult::from_value::<T>(value, &kind);
+
+        if res.is_ok() {
+            self.group_reads
+            .entry(key.clone())
+            .or_default()
+            .insert(tag.clone());
+        } else {
+            self.incorrect_use = true;
+        }
+
+        res
+    }
+
     /// Captures the module read for sequential execution.
     pub(crate) fn capture_module_read(&mut self, key: K) {
         self.module_reads.insert(key);
@@ -942,14 +1128,14 @@ mod test {
 
     macro_rules! assert_contains {
         ($x:expr, $y:expr) => {{
-            assert_some_eq!($x.downcast($y.get_kind()), $y);
+            assert_some_eq!($x.downcast(&$y.get_kind()), $y);
             assert_matches!($x.contains(&$y), DataReadComparison::Contains);
         }};
     }
 
     macro_rules! assert_insufficient {
         ($x:expr, $y:expr) => {{
-            assert_none!($x.downcast($y.get_kind()));
+            assert_none!($x.downcast(&$y.get_kind()));
             assert_matches!($x.contains(&$y), DataReadComparison::Insufficient);
         }};
     }
