@@ -9,7 +9,8 @@ use crate::{
     versioned_data::Entry as SizeEntry,
     VersionedData,
 };
-use anyhow::{anyhow, bail};
+use anyhow::anyhow;
+use aptos_infallible::Mutex;
 use aptos_types::{
     error::{code_invariant_error, PanicError},
     write_set::{TransactionWrite, WriteOpKind},
@@ -22,7 +23,7 @@ use serde::Serialize;
 use std::{
     collections::{
         btree_map::{BTreeMap, Entry::Vacant},
-        HashSet,
+        BTreeSet, HashSet,
     },
     fmt::Debug,
     hash::Hash,
@@ -31,7 +32,10 @@ use std::{
 
 #[derive(Default)]
 struct VersionedGroupSize {
-    size_entries: BTreeMap<ShiftedTxnIndex, SizeEntry<ResourceGroupSize>>,
+    size_entries: BTreeMap<
+        ShiftedTxnIndex,
+        SizeEntry<(ResourceGroupSize, Mutex<BTreeSet<(TxnIndex, Incarnation)>>)>,
+    >,
     // Determines whether it is safe for size queries to read the value from an entry marked as
     // ESTIMATE. The heuristic checks on every write, whether the same size would be returned
     // after the respective write took effect. Once set, the flag remains set to true.
@@ -102,7 +106,7 @@ impl<
                 )
             })?;
 
-            entry.insert(SizeEntry::new(group_size));
+            entry.insert(SizeEntry::new((group_size, Mutex::new(BTreeSet::new()))));
 
             let mut superset_tags = self.group_tags.entry(group_key.clone()).or_default();
             for (tag, value) in base_values.into_iter() {
@@ -142,51 +146,14 @@ impl<
         incarnation: Incarnation,
         values: impl IntoIterator<Item = (T, (V, Option<Arc<MoveTypeLayout>>))>,
         size: ResourceGroupSize,
-        mut prev_tags: HashSet<T>,
+        prev_tags: HashSet<T>,
     ) -> Result<bool, PanicError> {
-        let mut ret = false;
-        let mut tags_to_write = vec![];
-
-        {
-            let superset_tags = self.group_tags.get(&group_key).ok_or_else(|| {
-                // Due to read-before-write.
-                code_invariant_error("Group (tags) must be initialized to write to")
-            })?;
-
-            for (tag, (value, layout)) in values.into_iter() {
-                if !superset_tags.contains(&tag) {
-                    tags_to_write.push(tag.clone());
-                }
-
-                ret |= !prev_tags.remove(&tag);
-
-                self.values.write(
-                    (group_key.clone(), tag),
-                    txn_idx,
-                    incarnation,
-                    Arc::new(value),
-                    layout,
-                );
-            }
-        }
-
-        for prev_tag in prev_tags {
-            let key = (group_key.clone(), prev_tag);
-            self.values.remove(&key, txn_idx);
-        }
-
-        if !tags_to_write.is_empty() {
-            let mut superset_tags = self
-                .group_tags
-                .get_mut(&group_key)
-                .expect("Group must be initialized");
-            superset_tags.extend(tags_to_write);
-        }
-
         let mut group_sizes = self.group_sizes.get_mut(&group_key).ok_or_else(|| {
             // Due to read-before-write.
             code_invariant_error("Group (sizes) must be initialized to write to")
         })?;
+        let (mut ret, _) =
+            self.data_write_impl::<false>(group_key, txn_idx, incarnation, values, prev_tags)?;
 
         if !(group_sizes.size_has_changed && ret) {
             let (size_changed, update_flag) = group_sizes
@@ -198,7 +165,7 @@ impl<
                 })
                 .map(|(idx, prev_size)| {
                     (
-                        prev_size.value != size,
+                        prev_size.value.0 != size,
                         // Update the size_has_changed flag if the entry isn't the base value
                         // (which may be non-existent) or if the incarnation > 0.
                         *idx != ShiftedTxnIndex::zero_idx() || incarnation > 0,
@@ -213,9 +180,51 @@ impl<
             }
         }
 
-        group_sizes
+        group_sizes.size_entries.insert(
+            ShiftedTxnIndex::new(txn_idx),
+            SizeEntry::new((size, Mutex::new(BTreeSet::new()))),
+        );
+
+        Ok(ret)
+    }
+
+    pub fn write_v2(
+        &self,
+        group_key: K,
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        values: impl IntoIterator<Item = (T, (V, Option<Arc<MoveTypeLayout>>))>,
+        size: ResourceGroupSize,
+        prev_tags: HashSet<T>,
+    ) -> Result<BTreeSet<(TxnIndex, Incarnation)>, PanicError> {
+        let mut group_sizes = self.group_sizes.get_mut(&group_key).ok_or_else(|| {
+            // Due to read-before-write.
+            code_invariant_error("Group (sizes) must be initialized to write to")
+        })?;
+        let (_, mut ret) =
+            self.data_write_impl::<true>(group_key, txn_idx, incarnation, values, prev_tags)?;
+
+        let mut store_deps = BTreeSet::new();
+        if let Some((_, size_entry)) = group_sizes
             .size_entries
-            .insert(ShiftedTxnIndex::new(txn_idx), SizeEntry::new(size));
+            .range(..=ShiftedTxnIndex::new(txn_idx))
+            .next_back()
+        {
+            let mut deps = size_entry.value.1.lock();
+            let new_deps = deps.split_off(&(txn_idx + 1, 0));
+
+            if size_entry.value.0 == size {
+                // Validation passed.
+                store_deps = new_deps;
+            } else {
+                ret.extend(new_deps)
+            }
+        }
+
+        group_sizes.size_entries.insert(
+            ShiftedTxnIndex::new(txn_idx),
+            SizeEntry::new((size, Mutex::new(store_deps))),
+        );
 
         Ok(ret)
     }
@@ -239,10 +248,7 @@ impl<
 
     /// Remove all entries from transaction 'txn_idx' at access path 'key'.
     pub fn remove(&self, group_key: &K, txn_idx: TxnIndex, tags: HashSet<T>) {
-        for tag in tags {
-            let key = (group_key.clone(), tag);
-            self.values.remove(&key, txn_idx);
-        }
+        self.remove_impl::<false>(group_key, txn_idx, tags, &mut BTreeSet::new());
 
         // TODO: consider setting size_has_changed flag if e.g. the size observed
         // after remove is different.
@@ -254,6 +260,57 @@ impl<
                 .remove(&ShiftedTxnIndex::new(txn_idx)),
             "Entry for the txn must exist to be deleted"
         );
+    }
+
+    // TODO(BlockSTMv2): Similar tests to VersionedData for remove_v2 and write_v2 logic,
+    // especially w.r.t. size.
+    pub fn remove_v2(
+        &self,
+        group_key: &K,
+        txn_idx: TxnIndex,
+        tags: HashSet<T>,
+    ) -> Result<BTreeSet<(TxnIndex, Incarnation)>, PanicError> {
+        let mut ret = BTreeSet::new();
+        self.remove_impl::<true>(group_key, txn_idx, tags, &mut ret);
+
+        let mut group_sizes = self
+            .group_sizes
+            .get_mut(group_key)
+            .expect("Path must exist");
+        let removed_size = group_sizes
+            .size_entries
+            .remove(&ShiftedTxnIndex::new(txn_idx));
+
+        match removed_size {
+            Some(size_entry) => {
+                // Handle removed dependencies.
+                let mut removed_deps: BTreeSet<(TxnIndex, Incarnation)> =
+                    std::mem::take(&mut size_entry.value.1.lock());
+                if let Some((_, next_entry)) = group_sizes
+                    .size_entries
+                    .range(..=ShiftedTxnIndex::new(txn_idx))
+                    .next_back()
+                {
+                    if next_entry.value.0 == size_entry.value.0 {
+                        next_entry
+                            .value
+                            .1
+                            .lock()
+                            .extend(std::mem::take(&mut removed_deps));
+                    }
+                }
+
+                ret.extend(removed_deps);
+            },
+            None => {
+                return Err(code_invariant_error(format!(
+                    "Entry at key {:?} for the txn {} must exist to be deleted",
+                    group_key, txn_idx
+                )));
+            },
+        }
+
+        Ok(ret)
     }
 
     /// Read the latest value corresponding to a tag at a given group (identified by key).
@@ -268,22 +325,26 @@ impl<
         txn_idx: TxnIndex,
     ) -> Result<(Version, ValueWithLayout<V>), MVGroupError> {
         let key = (group_key.clone(), tag.clone());
+        // Important to occur before data read. TODO: re-organize to make the logic clearer.
         let initialized = self.group_sizes.contains_key(group_key);
 
-        match self.values.fetch_data(&key, txn_idx) {
-            Ok(MVDataOutput::Versioned(version, value)) => Ok((version, value)),
-            Err(MVDataError::Uninitialized) => Err(if initialized {
-                MVGroupError::TagNotFound
-            } else {
-                MVGroupError::Uninitialized
-            }),
-            Err(MVDataError::Dependency(dep_idx)) => Err(MVGroupError::Dependency(dep_idx)),
-            Ok(MVDataOutput::Resolved(_))
-            | Err(MVDataError::Unresolved(_))
-            | Err(MVDataError::DeltaApplicationFailure) => {
-                unreachable!("Not using aggregatorV1")
-            },
-        }
+        let data_value = self.values.fetch_data(&key, txn_idx);
+        self.convert_tagged_data(data_value, initialized)
+    }
+
+    pub fn fetch_tagged_data_v2(
+        &self,
+        group_key: &K,
+        tag: &T,
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+    ) -> Result<(Version, ValueWithLayout<V>), MVGroupError> {
+        let key = (group_key.clone(), tag.clone());
+        // Important to occur before data read. TODO: re-organize to make the logic clearer.
+        let initialized = self.group_sizes.contains_key(group_key);
+
+        let data_value = self.values.fetch_data_v2(&key, txn_idx, incarnation);
+        self.convert_tagged_data(data_value, initialized)
     }
 
     pub fn get_group_size(
@@ -302,10 +363,29 @@ impl<
                             idx.idx().expect("May not depend on storage version"),
                         ))
                     } else {
-                        Ok(size.value)
+                        Ok(size.value.0)
                     }
                 })
                 .unwrap_or(Err(MVGroupError::Uninitialized)),
+            None => Err(MVGroupError::Uninitialized),
+        }
+    }
+
+    pub fn get_group_size_v2(
+        &self,
+        group_key: &K,
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+    ) -> Result<ResourceGroupSize, MVGroupError> {
+        match self.group_sizes.get(group_key) {
+            Some(g) => g
+                .size_entries
+                .range(ShiftedTxnIndex::zero_idx()..ShiftedTxnIndex::new(txn_idx))
+                .next_back()
+                .map_or(Err(MVGroupError::Uninitialized), |(_, size)| {
+                    size.value.1.lock().insert((txn_idx, incarnation));
+                    Ok(size.value.0)
+                }),
             None => Err(MVGroupError::Uninitialized),
         }
     }
@@ -336,7 +416,7 @@ impl<
         &self,
         group_key: &K,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<(Vec<(T, ValueWithLayout<V>)>, ResourceGroupSize)> {
+    ) -> Result<(Vec<(T, ValueWithLayout<V>)>, ResourceGroupSize), PanicError> {
         let superset_tags = self
             .group_tags
             .get(group_key)
@@ -350,20 +430,130 @@ impl<
                     Ok((_, value)) => Ok((value.write_op_kind() != WriteOpKind::Deletion)
                         .then(|| (tag, value.clone()))),
                     Err(MVGroupError::TagNotFound) => Ok(None),
-                    Err(e) => {
-                        bail!("Unexpected error in finalize group fetching value {:?}", e)
-                    },
+                    Err(e) => Err(code_invariant_error(format!(
+                        "Unexpected error in finalize group fetching value {:?}",
+                        e
+                    ))),
                 },
             )
-            .collect::<anyhow::Result<Vec<_>>>()?
+            .collect::<Result<Vec<_>, PanicError>>()?
             .into_iter()
             .flatten()
             .collect();
         Ok((
             committed_group,
-            self.get_group_size(group_key, txn_idx + 1)
-                .map_err(|e| anyhow!("Unexpected error in finalize group get size {:?}", e))?,
+            self.get_group_size(group_key, txn_idx + 1).map_err(|e| {
+                code_invariant_error(format!(
+                    "Unexpected error in finalize group get size {:?}",
+                    e
+                ))
+            })?,
         ))
+    }
+}
+
+// Private methods.
+impl<
+        K: Hash + Clone + Debug + Eq,
+        T: Hash + Clone + Debug + Eq + Serialize,
+        V: TransactionWrite,
+    > VersionedGroupData<K, T, V>
+{
+    fn remove_impl<const V2: bool>(
+        &self,
+        group_key: &K,
+        txn_idx: TxnIndex,
+        tags: HashSet<T>,
+        invalidated_deps: &mut BTreeSet<(TxnIndex, Incarnation)>,
+    ) {
+        for tag in tags {
+            // TODO(BlockSTMv2): Equivalent keys on top of DashMap.
+            let key = (group_key.clone(), tag.clone());
+            if V2 {
+                invalidated_deps.extend(self.values.remove_v2::<false>(&key, txn_idx));
+            } else {
+                self.values.remove(&key, txn_idx);
+            }
+        }
+    }
+
+    fn data_write_impl<const V2: bool>(
+        &self,
+        group_key: K,
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        values: impl IntoIterator<Item = (T, (V, Option<Arc<MoveTypeLayout>>))>,
+        mut prev_tags: HashSet<T>,
+    ) -> Result<(bool, BTreeSet<(TxnIndex, Incarnation)>), PanicError> {
+        let mut ret_v1 = false;
+        let mut ret_v2 = BTreeSet::new();
+        let mut tags_to_write = vec![];
+
+        {
+            let superset_tags = self.group_tags.get(&group_key).ok_or_else(|| {
+                // Due to read-before-write.
+                code_invariant_error("Group (tags) must be initialized to write to")
+            })?;
+
+            for (tag, (value, layout)) in values.into_iter() {
+                if !superset_tags.contains(&tag) {
+                    tags_to_write.push(tag.clone());
+                }
+
+                ret_v1 |= !prev_tags.remove(&tag);
+
+                if V2 {
+                    ret_v2.extend(self.values.write_v2::<false>(
+                        (group_key.clone(), tag),
+                        txn_idx,
+                        incarnation,
+                        Arc::new(value),
+                        layout,
+                    ));
+                } else {
+                    self.values.write(
+                        (group_key.clone(), tag),
+                        txn_idx,
+                        incarnation,
+                        Arc::new(value),
+                        layout,
+                    );
+                }
+            }
+        }
+
+        if !tags_to_write.is_empty() {
+            let mut superset_tags = self
+                .group_tags
+                .get_mut(&group_key)
+                .expect("Group must be initialized");
+            superset_tags.extend(tags_to_write);
+        }
+
+        self.remove_impl::<V2>(&group_key, txn_idx, prev_tags, &mut ret_v2);
+
+        Ok((ret_v1, ret_v2))
+    }
+
+    fn convert_tagged_data(
+        &self,
+        data_value: anyhow::Result<MVDataOutput<V>, MVDataError>,
+        initialized: bool,
+    ) -> Result<(Version, ValueWithLayout<V>), MVGroupError> {
+        match data_value {
+            Ok(MVDataOutput::Versioned(version, value)) => Ok((version, value)),
+            Err(MVDataError::Uninitialized) => Err(if initialized {
+                MVGroupError::TagNotFound
+            } else {
+                MVGroupError::Uninitialized
+            }),
+            Err(MVDataError::Dependency(dep_idx)) => Err(MVGroupError::Dependency(dep_idx)),
+            Ok(MVDataOutput::Resolved(_))
+            | Err(MVDataError::Unresolved(_))
+            | Err(MVDataError::DeltaApplicationFailure) => {
+                unreachable!("Not using aggregatorV1")
+            },
+        }
     }
 }
 
@@ -379,6 +569,368 @@ mod test {
     };
     use std::collections::HashMap;
     use test_case::test_case;
+
+    // Test for dependency tracking in V2 interfaces. Notice that due to the implementation,
+    // while the size of the base entry is computed at the time of the write, we can determine
+    // the recorded sizes for other entries - which allows flexibility in test cases. We test
+    // values and sizes separately (and keep the other from invalidating the same dependencies).
+    #[test_case(true, true, false; "value test: mid value high, mid size low")]
+    #[test_case(true, false, false; "value test: mid value low, mid size low")]
+    #[test_case(false, false, true; "size test: mid size high, mid value low")]
+    #[test_case(false, false, false; "size test: mid size low, mid value low")]
+    fn test_dependency_tracking(
+        test_value_or_size: bool,
+        mid_value_matches_low: bool,
+        mid_size_matches_low: bool,
+    ) {
+        // Initialize test data
+        let group_key = KeyType(b"/group/test".to_vec());
+        let tag: usize = 1;
+
+        // Create values and determine which one to use for mid_value
+        let base_value = TestValue::creation_with_len(1);
+        let high_value = TestValue::creation_with_len(2);
+        let mid_value = if mid_value_matches_low {
+            base_value.clone()
+        } else {
+            high_value.clone()
+        };
+
+        // Calculate base_size based on the actual values (as it will be computed by set_raw_base_values).
+        // Set high size arbitrary and determine mid_size.
+        let one_entry_len = base_value.bytes().unwrap().len();
+        let base_size = group_size_as_sum(vec![(&tag, one_entry_len)].into_iter()).unwrap();
+        let high_size = ResourceGroupSize::Combined {
+            num_tagged_resources: 3,
+            all_tagged_resources_size: 20,
+        };
+        let mid_size = if mid_size_matches_low {
+            base_size
+        } else {
+            high_size
+        };
+
+        // Fixed indices for our test
+        let mid_idx: TxnIndex = 5; // Middle index for the write that may invalidate
+        let high_idx: TxnIndex = 10; // High index for the first write
+        let inc_1: Incarnation = 1; // Fixed incarnation for simplicity
+
+        // Create a new VersionedGroupData instance and initialize it with base & high values.
+        let group_data = VersionedGroupData::<KeyType<Vec<u8>>, usize, TestValue>::empty();
+        assert_ok!(
+            group_data.set_raw_base_values(group_key.clone(), vec![(tag, base_value.clone())],)
+        );
+        assert_ok!(group_data.write_v2(
+            group_key.clone(),
+            high_idx,
+            inc_1,
+            vec![(tag, (high_value.clone(), None))],
+            high_size,
+            HashSet::new(),
+        ));
+
+        // Define indices for dependencies
+        let dependency_indices = [
+            // > high_idx
+            15, 20, // (mid_idx, high_idx]
+            6, 10, // ..=mid_idx
+            2, 5,
+        ];
+
+        let mut all_value_deps = BTreeSet::new();
+        let mut all_size_deps = BTreeSet::new();
+        for idx in dependency_indices {
+            if test_value_or_size {
+                // Create value dependency
+                let res = group_data
+                    .fetch_tagged_data_v2(&group_key, &tag, idx, inc_1)
+                    .unwrap();
+                assert_eq!(
+                    res.0,
+                    if idx > high_idx {
+                        Ok((high_idx, inc_1))
+                    } else {
+                        Err(StorageVersion)
+                    }
+                );
+                assert_eq!(
+                    res.1,
+                    if idx > high_idx {
+                        ValueWithLayout::Exchanged(Arc::new(high_value.clone()), None)
+                    } else {
+                        ValueWithLayout::RawFromStorage(Arc::new(base_value.clone()))
+                    }
+                );
+                all_value_deps.insert((idx, inc_1));
+            } else {
+                // Create size dependency
+                // Create size dependency
+                assert_ok!(group_data.get_group_size_v2(&group_key, idx, inc_1));
+                all_size_deps.insert((idx, inc_1));
+            }
+        }
+
+        // Make sure the base value actually matches based on layout / Exchanged.
+        group_data.update_tagged_base_value_with_layout(
+            group_key.clone(),
+            tag,
+            base_value.clone(),
+            None,
+        );
+        assert_eq!(
+            group_data
+                .fetch_tagged_data_v2(&group_key, &tag, 2, 1)
+                .unwrap(),
+            (
+                Err(StorageVersion),
+                ValueWithLayout::Exchanged(Arc::new(base_value.clone()), None)
+            )
+        );
+
+        // Write another value at a middle index and check dependency handling.
+        let write_invalidated_deps = group_data
+            .write_v2(
+                group_key.clone(),
+                mid_idx,
+                inc_1,
+                vec![(tag, (mid_value.clone(), None))],
+                mid_size,
+                HashSet::new(),
+            )
+            .unwrap();
+        let expected_invalidated = all_value_deps
+            .iter()
+            .filter(|(idx, _)| *idx > mid_idx && *idx <= high_idx && !mid_value_matches_low)
+            .chain(
+                all_size_deps
+                    .iter()
+                    .filter(|(idx, _)| *idx > mid_idx && *idx <= high_idx && !mid_size_matches_low),
+            )
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        assert_eq!(write_invalidated_deps, expected_invalidated);
+        // Remove the high index entry and check dependency handling
+        let remove_invalidated_deps = group_data
+            .remove_v2(&group_key, high_idx, HashSet::from([tag]))
+            .unwrap();
+        let expected_invalidated = all_value_deps
+            .iter()
+            // matching low value means not matching high in the test
+            .filter(|(idx, _)| *idx > high_idx && mid_value_matches_low)
+            .chain(
+                all_size_deps
+                    .iter()
+                    .filter(|(idx, _)| *idx > high_idx && mid_size_matches_low),
+            )
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        assert_eq!(remove_invalidated_deps, expected_invalidated);
+
+        // Verify stored size dependencies in the data structure
+        let group_sizes = group_data.group_sizes.get(&group_key).unwrap();
+        {
+            let mid_deps = group_sizes
+                .size_entries
+                .get(&ShiftedTxnIndex::new(mid_idx))
+                .unwrap()
+                .value
+                .1
+                .lock();
+            assert_eq!(
+                mid_deps.iter().collect::<BTreeSet<_>>(),
+                all_size_deps
+                    .iter()
+                    .filter(
+                        |(idx, _)| (*idx > mid_idx && *idx <= high_idx && mid_size_matches_low)
+                            || (*idx > high_idx && !mid_size_matches_low)
+                    )
+                    .collect::<BTreeSet<_>>()
+            );
+        }
+        {
+            let base_deps: std::sync::MutexGuard<'_, BTreeSet<(u32, u32)>> = group_sizes
+                .size_entries
+                .get(&ShiftedTxnIndex::zero_idx())
+                .unwrap()
+                .value
+                .1
+                .lock();
+            assert_eq!(
+                base_deps.iter().collect::<BTreeSet<_>>(),
+                all_size_deps
+                    .iter()
+                    .filter(|(idx, _)| *idx <= mid_idx)
+                    .collect::<BTreeSet<_>>()
+            );
+        }
+
+        // Verify we can access the value and size from mid write
+        let (_, value) = group_data
+            .fetch_tagged_data_v2(
+                &group_key, &tag, 21, inc_1, // higher than any idx.
+            )
+            .unwrap();
+        assert_eq!(value, ValueWithLayout::Exchanged(Arc::new(mid_value), None));
+        let size = group_data.get_group_size_v2(&group_key, 21, inc_1).unwrap();
+        assert_eq!(size, mid_size);
+    }
+
+    // Entries from storage may contain a special layout, which has not been processed yet. 
+    // It has to be validated (and fail) against a processed (Exchanged) layout (e.g. with
+    // IDs for delayed fields contained within). The other case checks that if the correct
+    // layout was provided and set (for transaction 0, the previous test instead provides 
+    // layout for storage version), then it passes validation.
+    #[test_case(true; "raw storage layout fails validation")]
+    #[test_case(true; "exchanged layout passes validation")]
+    fn test_raw_storage_layout_validation(raw_storage_layout: bool) {
+        let group_key = KeyType(b"/group/test".to_vec());
+        let tag: usize = 1;
+
+        let group_data = VersionedGroupData::<KeyType<Vec<u8>>, usize, TestValue>::empty();
+        let base_value = TestValue::creation_with_len(1);
+        let one_entry_len = base_value.bytes().unwrap().len();
+        let base_size = group_size_as_sum(vec![(&tag, one_entry_len)].into_iter()).unwrap();
+        if raw_storage_layout {
+            assert_ok!(
+                group_data.set_raw_base_values(group_key.clone(), vec![(tag, base_value.clone())])
+            );
+        } else {
+            assert_ok!(group_data.write_v2(
+                group_key.clone(),
+                0,
+                1,
+                vec![(tag, (base_value.clone(), None))],
+                base_size.clone(),
+                HashSet::new(),
+            ));
+        }
+
+        let (version, value) = group_data
+            .fetch_tagged_data_v2(&group_key, &tag, 5, 2)
+            .unwrap();
+        assert_eq!(version, if raw_storage_layout { Err(StorageVersion) } else { Ok((0, 1)) });
+        assert_eq!(
+            value,
+            ValueWithLayout::RawFromStorage(Arc::new(base_value.clone()))
+        );
+
+        let invalidated_deps = group_data
+            .write_v2(
+                group_key.clone(),
+                2,
+                1,
+                vec![(tag, (base_value.clone(), None))],
+                base_size,
+                HashSet::new(),
+            )
+            .unwrap();
+        assert_eq!(
+            invalidated_deps,
+            if raw_storage_layout {
+                BTreeSet::from([(5, 2)])
+            } else {
+                BTreeSet::new()
+            }
+        );
+    }
+
+    // This tests the case when after a write and remove, some entries in the group may pass 
+    // validation while others fail. The test ensures the proper dependencies are invalidated
+    // and returned. The test setup looks as follows:
+    // 
+    //                    Group Contents:
+    //                    TAG 0     TAG 1
+    //
+    //  txn 10             depB0    depB1
+    //  txn 9                B        B
+    //                       |        |
+    //  txn 8              depA0   depA1   
+    //  txn 7   test writes (A, B) or (B, A)
+    //                       |        |
+    //  txn 6                A        A
+    // 
+    //  We ensure that if (A, B) is written, depA1 is invalidated, and vice versa. Then, a 
+    //  similar test considers the removal of txn 9's output.
+    #[test_case(true; "partial: A, B")]
+    #[test_case(false; "partial: B, A")]
+    fn test_partial_invalidation(case_a_b: bool) {
+        let group_key = KeyType(b"/group/test".to_vec());
+        let tag0: usize = 0;
+        let tag1: usize = 1;
+
+        let group_data = VersionedGroupData::<KeyType<Vec<u8>>, usize, TestValue>::empty();
+
+        // Create base values A and B
+        let value_a = TestValue::creation_with_len(1);
+        let value_b = TestValue::creation_with_len(2);
+        let invariant_size = ResourceGroupSize::Combined {
+            num_tagged_resources: 3,
+            all_tagged_resources_size: 20,
+        };
+
+        // Need to initialize the group - detected by missing size entry.
+        assert_ok!(
+            group_data.set_raw_base_values(group_key.clone(), vec![])
+        );
+
+        // Initial setup: Write A at txn 6. Register dependencies for both tags at txn 8.
+        assert_ok!(group_data.write_v2(
+            group_key.clone(),
+            6,
+            1,
+            vec![(tag0, (value_a.clone(), None)), (tag1, (value_a.clone(), None))],
+            invariant_size,
+            HashSet::new(),
+        ));
+        assert_eq!(group_data.fetch_tagged_data_v2(&group_key, &tag0, 8, 0).unwrap().0, Ok((6, 1)));
+        assert_eq!(group_data.fetch_tagged_data_v2(&group_key, &tag1, 8, 1).unwrap().0, Ok((6, 1)));
+
+        // Write B at txn 9 & register dependencies at txn 10. Encode tag in incarnation.
+        assert_ok!(group_data.write_v2(
+            group_key.clone(),
+            9,
+            1,
+            vec![(tag0, (value_b.clone(), None)), (tag1, (value_b.clone(), None))],
+            invariant_size,
+            HashSet::new(),
+        ));
+        assert_eq!(group_data.fetch_tagged_data_v2(&group_key, &tag0, 10, 0).unwrap().0, Ok((9, 1)));
+        assert_eq!(group_data.fetch_tagged_data_v2(&group_key, &tag1, 10, 1).unwrap().0, Ok((9, 1)));
+
+
+        // Test write at txn 7 based on case_a_b
+        let write_value = if case_a_b {
+            vec![(tag0, (value_a.clone(), None)), (tag1, (value_b.clone(), None))]
+        } else {
+            vec![(tag0, (value_b.clone(), None)), (tag1, (value_a.clone(), None))]
+        };
+        
+        let write_invalidated = group_data.write_v2(
+            group_key.clone(),
+            7,
+            1,
+            write_value,
+            invariant_size,
+            HashSet::new(),
+        ).unwrap();
+        let expected_invalidated = if case_a_b {
+            // If writing (A, B), depA1 should be invalidated (incarnation = tag)
+            BTreeSet::from([(8, 1)])
+        } else {
+            // If writing (B, A), depA0 should be invalidated
+            BTreeSet::from([(8, 0)])
+        };
+        assert_eq!(write_invalidated, expected_invalidated);
+
+        // Remove txn 9's output
+        let remove_invalidated = group_data.remove_v2(&group_key, 9, HashSet::from([tag0, tag1])).unwrap();
+        let expected_invalidated= if case_a_b {
+            BTreeSet::from([(10, 0)])
+        } else {
+            BTreeSet::from([(10, 1)])
+        };
+        assert_eq!(remove_invalidated, expected_invalidated);
+    }
 
     #[should_panic]
     #[test_case(0)]
@@ -456,7 +1008,8 @@ mod test {
                     .size_entries
                     .get(&ShiftedTxnIndex::new(idx))
                     .unwrap()
-                    .value,
+                    .value
+                    .0,
                 size
             );
         };

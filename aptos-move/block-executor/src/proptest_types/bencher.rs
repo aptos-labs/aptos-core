@@ -106,7 +106,7 @@ where
 
         let transactions: Vec<_> = transaction_gens
             .into_iter()
-            .map(|txn_gen| txn_gen.materialize(&key_universe, (false, false)))
+            .map(|txn_gen| txn_gen.materialize(&key_universe))
             .collect();
         let txns_provider = DefaultTxnProvider::new(transactions.clone());
 
