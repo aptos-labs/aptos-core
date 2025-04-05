@@ -401,6 +401,6 @@ mod tests {
     }
 
     pub async fn new_test_context_async(test_name: String) -> TestContext {
-        new_test_context(test_name, NodeConfig::default(), false)
+        new_test_context(test_name, NodeConfig::default(), false).await
     }
 }
