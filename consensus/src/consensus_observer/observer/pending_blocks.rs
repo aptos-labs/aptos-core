@@ -8,17 +8,14 @@ use crate::{
             metrics,
         },
         network::observer_message::OrderedBlock,
-        observer::{
-            execution_pool, execution_pool::ObservedOrderedBlock, payload_store::BlockPayloadStore,
-        },
+        observer::{execution_pool, execution_pool::ObservedOrderedBlock},
     },
     util::BlockStorage,
 };
 use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_crypto::HashValue;
-use aptos_infallible::Mutex;
-use aptos_logger::{error, info, warn};
+use aptos_logger::{error, warn};
 use aptos_types::{block_info::Round, ledger_info::LedgerInfoWithSignatures};
 use std::{
     collections::{btree_map::Entry, BTreeMap},
@@ -240,7 +237,10 @@ impl PendingBlockStore {
 
     #[cfg(test)]
     /// Removes the pending block from the pending block store (only used for testing)
-    pub fn remove_pending_block(&mut self, ordered_block: &OrderedBlock) {
+    pub fn remove_pending_block(
+        &mut self,
+        ordered_block: &OrderedBlock,
+    ) -> Arc<PendingBlockWithMetadata> {
         // Get the epoch, round and hash of the first block
         let first_block = ordered_block.first_block();
         let first_block_epoch_round = (first_block.epoch(), first_block.round());
@@ -252,71 +252,7 @@ impl PendingBlockStore {
             .unwrap();
         self.pending_blocks_by_hash
             .remove(&first_block_hash)
-            .unwrap();
-    }
-
-    /// Removes and returns the block from the store that is now ready
-    /// to be processed (after the new payload has been received).
-    // TODO: identify how this will work with execution pool blocks!
-    pub fn remove_ready_block(
-        &mut self,
-        received_payload_epoch: u64,
-        received_payload_round: Round,
-        block_payload_store: Arc<Mutex<BlockPayloadStore>>,
-    ) -> Option<Arc<PendingBlockWithMetadata>> {
-        // Calculate the round at which to split the blocks
-        let split_round = received_payload_round.saturating_add(1);
-
-        // Split the blocks at the epoch and round
-        let mut blocks_at_higher_rounds = self
-            .pending_blocks
-            .split_off(&(received_payload_epoch, split_round));
-
-        // Check if the last block is ready (this should be the only ready block).
-        // Any earlier blocks are considered out-of-date and will be dropped.
-        let mut ready_block = None;
-        if let Some((epoch_and_round, pending_block)) = self.pending_blocks.pop_last() {
-            // If all payloads exist for the block, then the block is ready
-            if block_payload_store
-                .lock()
-                .all_payloads_exist(pending_block.ordered_block().blocks())
-            {
-                ready_block = Some(pending_block);
-            } else {
-                // Otherwise, check if we're still waiting for higher payloads for the block
-                let last_pending_block_round = pending_block.ordered_block().last_block().round();
-                if last_pending_block_round > received_payload_round {
-                    blocks_at_higher_rounds.insert(epoch_and_round, pending_block);
-                }
-            }
-        }
-
-        // Check if any out-of-date blocks are going to be dropped
-        if !self.pending_blocks.is_empty() {
-            info!(
-                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Dropped {:?} out-of-date pending blocks before epoch and round: {:?}",
-                    self.pending_blocks.len(),
-                    (received_payload_epoch, received_payload_round)
-                ))
-            );
-        }
-
-        // TODO: optimize this flow!
-
-        // Clear all blocks from the pending block stores
-        self.clear_pending_blocks();
-
-        // Update the pending block stores to only include the blocks at higher rounds
-        self.pending_blocks = blocks_at_higher_rounds;
-        for pending_block in self.pending_blocks.values() {
-            let first_block = pending_block.ordered_block().first_block();
-            self.pending_blocks_by_hash
-                .insert(first_block.id(), pending_block.clone());
-        }
-
-        // Return the ready block (if one exists)
-        ready_block
+            .unwrap()
     }
 
     /// Updates the metrics for the pending blocks
@@ -420,6 +356,7 @@ mod test {
         quorum_cert::QuorumCert,
     };
     use aptos_crypto::HashValue;
+    use aptos_infallible::Mutex;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
         block_info::BlockInfo,
@@ -512,13 +449,12 @@ mod test {
         let second_block = pending_blocks[1].clone();
         insert_payloads_for_ordered_block(block_payload_store.clone(), &second_block);
 
-        // Remove the second block (which is now ready)
-        let payload_round = second_block.first_block().round();
-        let ready_block = pending_block_store
-            .lock()
-            .remove_ready_block(current_epoch, payload_round, block_payload_store.clone())
-            .unwrap();
-        assert_eq!(ready_block.ordered_block().clone(), second_block);
+        // Remove the first and second blocks from the pending block store
+        for pending_block in &pending_blocks[..2] {
+            pending_block_store
+                .lock()
+                .remove_pending_block(pending_block);
+        }
 
         // Verify that the first and second blocks were removed
         verify_pending_blocks(
@@ -877,15 +813,9 @@ mod test {
                 expected_block_with_metadata.unpack();
 
             // Remove the pending block from the store
-            let first_block = expected_ordered_block.ordered_block().first_block();
             let removed_block_with_metadata = pending_block_store
                 .lock()
-                .remove_ready_block(
-                    first_block.epoch(),
-                    first_block.round(),
-                    block_payload_store.clone(),
-                )
-                .unwrap();
+                .remove_pending_block(expected_ordered_block.ordered_block());
 
             // Verify that the pending block metadata is correct
             assert_eq!(
@@ -1275,317 +1205,6 @@ mod test {
                 }
             }
         }
-    }
-
-    #[test]
-    fn test_remove_ready_block_multiple_blocks() {
-        // Create a new pending block store
-        let max_num_pending_blocks = 40;
-        let consensus_observer_config = ConsensusObserverConfig {
-            max_num_pending_blocks: max_num_pending_blocks as u64,
-            ..ConsensusObserverConfig::default()
-        };
-        let pending_block_store = Arc::new(Mutex::new(PendingBlockStore::new(
-            consensus_observer_config,
-        )));
-
-        // Insert the maximum number of blocks into the store
-        let current_epoch = 0;
-        let starting_round = 0;
-        let pending_blocks = create_and_add_pending_blocks(
-            pending_block_store.clone(),
-            max_num_pending_blocks,
-            current_epoch,
-            starting_round,
-            5,
-        );
-
-        // Create a new block payload store and insert payloads for the second block
-        let block_payload_store = Arc::new(Mutex::new(BlockPayloadStore::new(
-            consensus_observer_config,
-        )));
-        let second_block = pending_blocks[1].clone();
-        insert_payloads_for_ordered_block(block_payload_store.clone(), &second_block);
-
-        // Remove the second block (which is now ready)
-        let payload_round = second_block.first_block().round();
-        let ready_block = pending_block_store
-            .lock()
-            .remove_ready_block(current_epoch, payload_round, block_payload_store.clone())
-            .unwrap();
-        assert_eq!(ready_block.ordered_block().clone(), second_block);
-
-        // Verify that the first and second blocks were removed
-        verify_pending_blocks(
-            pending_block_store.clone(),
-            max_num_pending_blocks - 2,
-            &pending_blocks[2..].to_vec(),
-        );
-
-        // Insert payloads for the last block
-        let last_block = pending_blocks.last().unwrap().clone();
-        insert_payloads_for_ordered_block(block_payload_store.clone(), &last_block);
-
-        // Remove the last block (which is now ready)
-        let payload_round = last_block.first_block().round();
-        let ready_block = pending_block_store
-            .lock()
-            .remove_ready_block(current_epoch, payload_round, block_payload_store.clone())
-            .unwrap();
-
-        // Verify that the last block was removed
-        assert_eq!(ready_block.ordered_block().clone(), last_block);
-
-        // Verify that the store is empty
-        verify_pending_blocks(pending_block_store.clone(), 0, &vec![]);
-    }
-
-    #[test]
-    fn test_remove_ready_block_multiple_blocks_missing() {
-        // Create a new pending block store
-        let max_num_pending_blocks = 10;
-        let consensus_observer_config = ConsensusObserverConfig {
-            max_num_pending_blocks: max_num_pending_blocks as u64,
-            ..ConsensusObserverConfig::default()
-        };
-        let pending_block_store = Arc::new(Mutex::new(PendingBlockStore::new(
-            consensus_observer_config,
-        )));
-
-        // Insert the maximum number of blocks into the store
-        let current_epoch = 10;
-        let starting_round = 100;
-        let pending_blocks = create_and_add_pending_blocks(
-            pending_block_store.clone(),
-            max_num_pending_blocks,
-            current_epoch,
-            starting_round,
-            5,
-        );
-
-        // Create an empty block payload store
-        let block_payload_store = Arc::new(Mutex::new(BlockPayloadStore::new(
-            consensus_observer_config,
-        )));
-
-        // Incrementally insert and process each payload for the first block
-        let first_block = pending_blocks.first().unwrap().clone();
-        for block in first_block.blocks().clone() {
-            // Insert the block
-            let block_payload =
-                BlockPayload::new(block.block_info(), BlockTransactionPayload::empty());
-            block_payload_store
-                .lock()
-                .insert_block_payload(block_payload, true);
-
-            // Attempt to remove the block (which might not be ready)
-            let payload_round = block.round();
-            let ready_block = pending_block_store.lock().remove_ready_block(
-                current_epoch,
-                payload_round,
-                block_payload_store.clone(),
-            );
-
-            // If the block is ready, verify that it was removed.
-            // Otherwise, verify that the block still remains.
-            if payload_round == first_block.last_block().round() {
-                // The block should be ready
-                let ordered_block = ready_block.unwrap().ordered_block().clone();
-                assert_eq!(ordered_block, first_block.clone());
-
-                // Verify that the block was removed
-                verify_pending_blocks(
-                    pending_block_store.clone(),
-                    max_num_pending_blocks - 1,
-                    &pending_blocks[1..].to_vec(),
-                );
-            } else {
-                // The block should not be ready
-                assert!(ready_block.is_none());
-
-                // Verify that the block still remains
-                verify_pending_blocks(
-                    pending_block_store.clone(),
-                    max_num_pending_blocks,
-                    &pending_blocks,
-                );
-            }
-        }
-
-        // Incrementally insert and process payloads for the last block (except one)
-        let last_block = pending_blocks.last().unwrap().clone();
-        for block in last_block.blocks().clone() {
-            // Insert the block only if this is not the first block
-            let payload_round = block.round();
-            if payload_round != last_block.first_block().round() {
-                let block_payload =
-                    BlockPayload::new(block.block_info(), BlockTransactionPayload::empty());
-                block_payload_store
-                    .lock()
-                    .insert_block_payload(block_payload, true);
-            }
-
-            // Attempt to remove the block (which might not be ready)
-            let ready_block = pending_block_store.lock().remove_ready_block(
-                current_epoch,
-                payload_round,
-                block_payload_store.clone(),
-            );
-
-            // The block should not be ready
-            assert!(ready_block.is_none());
-
-            // Verify that the block still remains or has been removed on the last insert
-            if payload_round == last_block.last_block().round() {
-                verify_pending_blocks(pending_block_store.clone(), 0, &vec![]);
-            } else {
-                verify_pending_blocks(pending_block_store.clone(), 1, &vec![last_block.clone()]);
-            }
-        }
-
-        // Verify that the store is now empty
-        verify_pending_blocks(pending_block_store.clone(), 0, &vec![]);
-    }
-
-    #[test]
-    fn test_remove_ready_block_singular_blocks() {
-        // Create a new pending block store
-        let max_num_pending_blocks = 10;
-        let consensus_observer_config = ConsensusObserverConfig {
-            max_num_pending_blocks: max_num_pending_blocks as u64,
-            ..ConsensusObserverConfig::default()
-        };
-        let pending_block_store = Arc::new(Mutex::new(PendingBlockStore::new(
-            consensus_observer_config,
-        )));
-
-        // Insert the maximum number of blocks into the store
-        let current_epoch = 0;
-        let starting_round = 0;
-        let pending_blocks = create_and_add_pending_blocks(
-            pending_block_store.clone(),
-            max_num_pending_blocks,
-            current_epoch,
-            starting_round,
-            1,
-        );
-
-        // Create a new block payload store and insert payloads for the first block
-        let block_payload_store = Arc::new(Mutex::new(BlockPayloadStore::new(
-            consensus_observer_config,
-        )));
-        let first_block = pending_blocks.first().unwrap().clone();
-        insert_payloads_for_ordered_block(block_payload_store.clone(), &first_block);
-
-        // Remove the first block (which is now ready)
-        let payload_round = first_block.first_block().round();
-        let ready_block = pending_block_store
-            .lock()
-            .remove_ready_block(current_epoch, payload_round, block_payload_store.clone())
-            .unwrap();
-        assert_eq!(ready_block.ordered_block().clone(), first_block);
-
-        // Verify that the first block was removed
-        verify_pending_blocks(
-            pending_block_store.clone(),
-            max_num_pending_blocks - 1,
-            &pending_blocks[1..].to_vec(),
-        );
-
-        // Insert payloads for the second block
-        let second_block = pending_blocks[1].clone();
-        insert_payloads_for_ordered_block(block_payload_store.clone(), &second_block);
-
-        // Remove the second block (which is now ready)
-        let payload_round = second_block.first_block().round();
-        let ready_block = pending_block_store
-            .lock()
-            .remove_ready_block(current_epoch, payload_round, block_payload_store.clone())
-            .unwrap();
-        assert_eq!(ready_block.ordered_block().clone(), second_block);
-
-        // Verify that the first and second blocks were removed
-        verify_pending_blocks(
-            pending_block_store.clone(),
-            max_num_pending_blocks - 2,
-            &pending_blocks[2..].to_vec(),
-        );
-
-        // Insert payloads for the last block
-        let last_block = pending_blocks.last().unwrap().clone();
-        insert_payloads_for_ordered_block(block_payload_store.clone(), &last_block);
-
-        // Remove the last block (which is now ready)
-        let payload_round = last_block.first_block().round();
-        let ready_block = pending_block_store
-            .lock()
-            .remove_ready_block(current_epoch, payload_round, block_payload_store.clone())
-            .unwrap();
-
-        // Verify that the last block was removed
-        assert_eq!(ready_block.ordered_block().clone(), last_block);
-
-        // Verify that the store is empty
-        verify_pending_blocks(pending_block_store.clone(), 0, &vec![]);
-    }
-
-    #[test]
-    fn test_remove_ready_block_singular_blocks_missing() {
-        // Create a new pending block store
-        let max_num_pending_blocks = 100;
-        let consensus_observer_config = ConsensusObserverConfig {
-            max_num_pending_blocks: max_num_pending_blocks as u64,
-            ..ConsensusObserverConfig::default()
-        };
-        let pending_block_store = Arc::new(Mutex::new(PendingBlockStore::new(
-            consensus_observer_config,
-        )));
-
-        // Insert the maximum number of blocks into the store
-        let current_epoch = 10;
-        let starting_round = 100;
-        let pending_blocks = create_and_add_pending_blocks(
-            pending_block_store.clone(),
-            max_num_pending_blocks,
-            current_epoch,
-            starting_round,
-            1,
-        );
-
-        // Create an empty block payload store
-        let block_payload_store = Arc::new(Mutex::new(BlockPayloadStore::new(
-            consensus_observer_config,
-        )));
-
-        // Remove the third block (which is not ready)
-        let third_block = pending_blocks[2].clone();
-        let third_block_round = third_block.first_block().round();
-        let ready_block = pending_block_store.lock().remove_ready_block(
-            current_epoch,
-            third_block_round,
-            block_payload_store.clone(),
-        );
-        assert!(ready_block.is_none());
-
-        // Verify that the first three blocks were removed
-        verify_pending_blocks(
-            pending_block_store.clone(),
-            max_num_pending_blocks - 3,
-            &pending_blocks[3..].to_vec(),
-        );
-
-        // Remove the last block (which is not ready)
-        let last_block = pending_blocks.last().unwrap().clone();
-        let last_block_round = last_block.first_block().round();
-        let ready_block = pending_block_store.lock().remove_ready_block(
-            current_epoch,
-            last_block_round,
-            block_payload_store.clone(),
-        );
-        assert!(ready_block.is_none());
-
-        // Verify that the store is now empty
-        verify_pending_blocks(pending_block_store.clone(), 0, &vec![]);
     }
 
     /// Creates and adds the specified number of blocks to the pending block store
