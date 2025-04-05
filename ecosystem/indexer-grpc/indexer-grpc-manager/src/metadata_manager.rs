@@ -195,7 +195,7 @@ impl MetadataManager {
                     let (address, fullnode) = kv.pair();
                     let need_ping = fullnode.recent_states.back().map_or(true, |s| {
                         Self::is_stale_timestamp(
-                            s.timestamp.unwrap_or_default(),
+                            s.timestamp.clone().unwrap_or_default(),
                             Duration::from_secs(1),
                         )
                     });
@@ -214,7 +214,7 @@ impl MetadataManager {
                     let (address, live_data_service) = kv.pair();
                     let unreachable = live_data_service.recent_states.back().map_or(false, |s| {
                         Self::is_stale_timestamp(
-                            s.timestamp.unwrap_or_default(),
+                            s.timestamp.clone().unwrap_or_default(),
                             Duration::from_secs(60),
                         )
                     });
@@ -224,7 +224,7 @@ impl MetadataManager {
                     }
                     let need_ping = live_data_service.recent_states.back().map_or(true, |s| {
                         Self::is_stale_timestamp(
-                            s.timestamp.unwrap_or_default(),
+                            s.timestamp.clone().unwrap_or_default(),
                             Duration::from_secs(5),
                         )
                     });
@@ -249,7 +249,7 @@ impl MetadataManager {
                             .back()
                             .map_or(false, |s| {
                                 Self::is_stale_timestamp(
-                                    s.timestamp.unwrap_or_default(),
+                                    s.timestamp.clone().unwrap_or_default(),
                                     Duration::from_secs(60),
                                 )
                             });
@@ -263,7 +263,7 @@ impl MetadataManager {
                             .back()
                             .map_or(true, |s| {
                                 Self::is_stale_timestamp(
-                                    s.timestamp.unwrap_or_default(),
+                                    s.timestamp.clone().unwrap_or_default(),
                                     Duration::from_secs(5),
                                 )
                             });
@@ -527,7 +527,7 @@ impl MetadataManager {
             .fullnodes
             .entry(address.clone())
             .or_insert(Fullnode::new(address.clone()));
-        entry.value_mut().recent_states.push_back(info);
+        entry.value_mut().recent_states.push_back(info.clone());
         if let Some(known_latest_version) = info.known_latest_version {
             trace!(
                 "Received known_latest_version ({known_latest_version}) from fullnode {address}."

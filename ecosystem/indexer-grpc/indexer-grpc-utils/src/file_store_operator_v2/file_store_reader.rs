@@ -119,7 +119,7 @@ impl FileStoreReader {
                 .get_transaction_file_at_version(current_version, retries)
                 .await;
             if let Ok(mut transactions) = transactions {
-                let timestamp = transactions.last().unwrap().timestamp.unwrap();
+                let timestamp = transactions.last().unwrap().timestamp.clone().unwrap();
                 let num_to_skip = version.saturating_sub(current_version) as usize;
                 if num_to_skip > 0 {
                     transactions = transactions.split_off(num_to_skip);
