@@ -18,6 +18,10 @@ To publish the package, follow these steps.
 
 First, make sure you have updated the changelog and bumped the package version if necessary.
 
+### Publish with workflow
+Go to the Actions tab of the repo, click "Publish aptos-protos for Python" and then "Run Workflow".
+
+### Publish manually
 Configure Poetry with the PyPi credentials:
 ```
 poetry config pypi-token.pypi <token>
