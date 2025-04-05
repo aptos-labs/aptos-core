@@ -32,8 +32,8 @@ use aptos_types::{
     },
     state_store::state_value::StateValueChunkWithProof,
     transaction::{
-        use_case::UseCaseAwareTransaction, ExecutionStatus, RawTransaction, Script,
-        SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionInfo,
+        use_case::UseCaseAwareTransaction, ExecutionStatus, RawTransaction, ReplayProtector,
+        Script, SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionInfo,
         TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
         TransactionPayload, TransactionStatus, Version,
     },
@@ -291,7 +291,7 @@ pub async fn verify_commit_notification(
             let signed = txn.try_as_signed_user_txn().unwrap();
             CommittedTransaction {
                 sender: signed.sender(),
-                sequence_number: 0,
+                replay_protector: ReplayProtector::SequenceNumber(0),
                 use_case: signed.parse_use_case(),
             }
         })
