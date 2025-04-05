@@ -32,6 +32,8 @@ use std::sync::Arc;
 pub trait MoveVmLoader {
     fn runtime_environment(&self) -> &RuntimeEnvironment;
 
+    fn as_module_storage(&self) -> &impl ModuleStorage;
+
     fn load_struct_definition(
         &self,
         gas_meter: &mut impl GasMeter,
@@ -142,6 +144,10 @@ where
 {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
         self.code_storage.runtime_environment()
+    }
+
+    fn as_module_storage(&self) -> &impl ModuleStorage {
+        self.code_storage
     }
 
     fn load_struct_definition(
@@ -281,6 +287,10 @@ where
 {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
         self.code_storage.runtime_environment()
+    }
+
+    fn as_module_storage(&self) -> &impl ModuleStorage {
+        self.code_storage
     }
 
     fn load_struct_definition(

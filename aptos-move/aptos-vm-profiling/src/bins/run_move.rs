@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Result};
-use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_gas_schedule::{NativeGasParameters, VMGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_move_stdlib::natives::all_natives;
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::NativeTableContext;
@@ -38,9 +38,9 @@ fn make_native_create_signer() -> NativeFunction {
 
         let address = pop_arg!(args, AccountAddress);
 
-        Ok(NativeResult::ok(0.into(), smallvec![Value::master_signer(
-            address
-        )]))
+        Ok(NativeResult::ok(0.into(), 0.into(), 0.into(), smallvec![
+            Value::master_signer(address)
+        ]))
     })
 }
 
@@ -141,7 +141,7 @@ fn main() -> Result<()> {
     let mut builder = SafeNativeBuilder::new(
         LATEST_GAS_FEATURE_VERSION,
         NativeGasParameters::zeros(),
-        MiscGasParameters::zeros(),
+        VMGasParameters::zeros(),
         TimedFeaturesBuilder::enable_all().build(),
         Features::default(),
         None,

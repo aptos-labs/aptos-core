@@ -10,15 +10,20 @@ use aptos_gas_schedule::{
     AbstractValueSizeGasParameters, NativeGasParameters, VMGasParameters,
 };
 use aptos_types::on_chain_config::{Features, TimedFeatureFlag, TimedFeatures};
-use move_binary_format::errors::PartialVMError;
+use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     gas_algebra::{InternalGas, NumBytes},
+    identifier::Identifier,
+    language_storage::ModuleId,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
-use move_vm_runtime::native_functions::NativeContext;
+use move_vm_runtime::{native_functions::NativeContext, Function};
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
-use std::ops::{Deref, DerefMut};
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 /// A proxy between the VM and the native functions, allowing the latter to query VM configurations
 /// or access certain VM functionalities.
@@ -137,6 +142,28 @@ impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
         if self.timed_feature_enabled(TimedFeatureFlag::FixMemoryUsageTracking) {
             self.inner.use_heap_memory(amount);
         }
+    }
+
+    pub fn load_function(
+        &mut self,
+        module_id: &ModuleId,
+        function_name: &Identifier,
+    ) -> VMResult<Arc<Function>> {
+        // MODULE LOADING METERING:
+        //   Metering is done when native returns LoadModule result, so this access will never load
+        //   anything and will access cached and metered modules. Currently, native implementations
+        //   check if the loading was metered or not before calling here, but this kept as an extra
+        //   redundancy check in case there is a mistake and gas is not charged somehow.
+        self.traversal_context()
+            .check_is_special_or_visited(module_id.address(), module_id.name())
+            .map_err(|err| err.finish(Location::Undefined))?;
+
+        let (_, function) = self.module_storage().unmetered_get_function_definition(
+            module_id.address(),
+            module_id.name(),
+            function_name,
+        )?;
+        Ok(function)
     }
 
     pub fn type_to_type_layout(&mut self, ty: &Type) -> SafeNativeResult<MoveTypeLayout> {

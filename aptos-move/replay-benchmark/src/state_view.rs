@@ -54,9 +54,7 @@ impl<'s, S: StateView> ReadSetCapturingStateView<'s, S> {
                         })
                 {
                     // If there is an override, we do not want to insert the value.
-                    if !initial_read_set.contains_key(&state_key) {
-                        initial_read_set.insert(state_key, state_value);
-                    }
+                    initial_read_set.entry(state_key).or_insert(state_value);
                 }
             }
         }
