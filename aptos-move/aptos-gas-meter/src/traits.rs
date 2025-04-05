@@ -120,7 +120,7 @@ pub trait AptosGasMeter: MoveGasMeter {
 
     /// Charges an additional cost for keyless transactions to compensate for the
     /// expensive computation required.
-    fn charge_keyless(&mut self) -> VMResult<()>;
+    fn charge_keyless(&mut self, num_authenticators: u8) -> VMResult<()>;
 
     /// Charges IO gas for the transaction itself.
     fn charge_io_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;

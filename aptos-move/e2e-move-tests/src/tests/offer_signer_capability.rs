@@ -41,7 +41,7 @@ fn offer_signer_capability_v2() {
 
     let proof_struct_bytes = bcs::to_bytes(&proof_struct);
     let signature = account_alice
-        .privkey
+        .private_key()
         .sign_arbitrary_message(&proof_struct_bytes.unwrap());
 
     assert_success!(harness.run_transaction_payload(
@@ -49,7 +49,7 @@ fn offer_signer_capability_v2() {
         aptos_stdlib::account_offer_signer_capability(
             signature.to_bytes().to_vec(),
             0,
-            account_alice.pubkey.to_bytes(),
+            account_alice.public_key().to_bytes().to_vec(),
             *account_bob.address(),
         )
     ));
@@ -85,12 +85,12 @@ fn sample_offer_signer_capability_v2_test_case_for_move() {
 
     let proof_struct_bytes = bcs::to_bytes(&proof_struct);
     let signature = account_alice
-        .privkey
+        .private_key()
         .sign_arbitrary_message(&proof_struct_bytes.unwrap());
 
     println!(
         "Alice's PK: {}",
-        hex::encode(account_alice.pubkey.to_bytes().as_slice())
+        hex::encode(account_alice.public_key().to_bytes())
     );
     println!("Alice's address: {}", hex::encode(account_alice.address()));
     println!(
