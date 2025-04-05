@@ -33,7 +33,7 @@ use aptos_types::{
     mempool_status::MempoolStatusCode,
     transaction::{
         EntryFunction, ExecutionStatus, MultisigTransactionPayload, RawTransaction,
-        RawTransactionWithData, SignedTransaction, TransactionPayload,
+        RawTransactionWithData, Script, SignedTransaction, TransactionPayload,
     },
     vm_status::StatusCode,
     AptosCoinType, CoinType,
@@ -1040,7 +1040,34 @@ impl TransactionsApi {
         data: SubmitTransactionPost,
     ) -> Result<SignedTransaction, SubmitTransactionError> {
         pub const MAX_SIGNED_TRANSACTION_DEPTH: usize = 16;
+        let validate_script = |script: &Script| -> Result<(), SubmitTransactionError> {
+            if script.code().is_empty() {
+                return Err(SubmitTransactionError::bad_request_with_code(
+                    "Script payload bytecode must not be empty",
+                    AptosErrorCode::InvalidInput,
+                    ledger_info,
+                ));
+            }
 
+            for arg in script.ty_args() {
+                let arg = MoveType::from(arg);
+                arg.verify(0)
+                    .context("Transaction script function type arg invalid")
+                    .map_err(|err| {
+                        SubmitTransactionError::bad_request_with_code(
+                            err,
+                            AptosErrorCode::InvalidInput,
+                            ledger_info,
+                        )
+                    })?;
+            }
+            Ok(())
+        };
+
+        let validate_entry_function =
+            |entry_function: &EntryFunction| -> Result<(), SubmitTransactionError> {
+                TransactionsApi::validate_entry_function_payload_format(ledger_info, entry_function)
+            };
         match data {
             SubmitTransactionPost::Bcs(data) => {
                 let signed_transaction: SignedTransaction =
@@ -1056,41 +1083,16 @@ impl TransactionsApi {
                 // Verify the signed transaction
                 match signed_transaction.payload() {
                     TransactionPayload::EntryFunction(entry_function) => {
-                        TransactionsApi::validate_entry_function_payload_format(
-                            ledger_info,
-                            entry_function,
-                        )?;
+                        validate_entry_function(entry_function)?;
                     },
                     TransactionPayload::Script(script) => {
-                        if script.code().is_empty() {
-                            return Err(SubmitTransactionError::bad_request_with_code(
-                                "Script payload bytecode must not be empty",
-                                AptosErrorCode::InvalidInput,
-                                ledger_info,
-                            ));
-                        }
-
-                        for arg in script.ty_args() {
-                            let arg = MoveType::from(arg);
-                            arg.verify(0)
-                                .context("Transaction script function type arg invalid")
-                                .map_err(|err| {
-                                    SubmitTransactionError::bad_request_with_code(
-                                        err,
-                                        AptosErrorCode::InvalidInput,
-                                        ledger_info,
-                                    )
-                                })?;
-                        }
+                        validate_script(script)?;
                     },
                     TransactionPayload::Multisig(multisig) => {
                         if let Some(payload) = &multisig.transaction_payload {
                             match payload {
                                 MultisigTransactionPayload::EntryFunction(entry_function) => {
-                                    TransactionsApi::validate_entry_function_payload_format(
-                                        ledger_info,
-                                        entry_function,
-                                    )?;
+                                    validate_entry_function(entry_function)?;
                                 },
                             }
                         }
