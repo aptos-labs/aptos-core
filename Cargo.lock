@@ -1717,6 +1717,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-experimental-spec-lru"
+version = "0.1.0"
+dependencies = [
+ "aptos-experimental-layered-map",
+]
+
+[[package]]
 name = "aptos-fallible"
 version = "0.1.0"
 dependencies = [
