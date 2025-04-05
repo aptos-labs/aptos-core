@@ -3,7 +3,7 @@
 
 use crate::transaction::{
     signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction, Transaction,
-    TransactionPayload,
+    TransactionExecutableRef, TransactionPayload,
 };
 use move_core_types::account_address::AccountAddress;
 
@@ -39,12 +39,10 @@ impl UseCaseAwareTransaction for SignedTransaction {
     }
 
     fn parse_use_case(&self) -> UseCaseKey {
-        use crate::transaction::TransactionPayload::*;
         use UseCaseKey::*;
 
-        match self.payload() {
-            Script(_) | ModuleBundle(_) | Multisig(_) => Others,
-            EntryFunction(entry_fun) => {
+        match self.payload().executable_ref() {
+            Ok(TransactionExecutableRef::EntryFunction(entry_fun)) => {
                 let module_id = entry_fun.module();
                 if module_id.address().is_special() {
                     Platform
@@ -52,6 +50,7 @@ impl UseCaseAwareTransaction for SignedTransaction {
                     ContractAddress(*module_id.address())
                 }
             },
+            _ => Others,
         }
     }
 }
@@ -63,7 +62,6 @@ impl UseCaseAwareTransaction for SignatureVerifiedTransaction {
     }
 
     fn parse_use_case(&self) -> UseCaseKey {
-        use crate::transaction::TransactionPayload::*;
         use UseCaseKey::*;
 
         let payload: Option<&TransactionPayload> = match self {
@@ -83,9 +81,8 @@ impl UseCaseAwareTransaction for SignatureVerifiedTransaction {
         let payload =
             payload.expect("No payload found for SignatureVerifiedTransaction in parse_use_case");
 
-        match payload {
-            Script(_) | ModuleBundle(_) | Multisig(_) => Others,
-            EntryFunction(entry_fun) => {
+        match payload.executable_ref() {
+            Ok(TransactionExecutableRef::EntryFunction(entry_fun)) => {
                 let module_id = entry_fun.module();
                 if module_id.address().is_special() {
                     Platform
@@ -93,6 +90,7 @@ impl UseCaseAwareTransaction for SignatureVerifiedTransaction {
                     ContractAddress(*module_id.address())
                 }
             },
+            _ => Others,
         }
     }
 }
