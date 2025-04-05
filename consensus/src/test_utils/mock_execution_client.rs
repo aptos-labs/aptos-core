@@ -131,10 +131,7 @@ impl TExecutionClient for MockExecutionClient {
         for block in blocks {
             self.block_cache.lock().insert(
                 block.id(),
-                block
-                    .payload()
-                    .unwrap_or(&Payload::empty(false, true))
-                    .clone(),
+                block.payload().unwrap_or(&Payload::empty(false)).clone(),
             );
         }
 
