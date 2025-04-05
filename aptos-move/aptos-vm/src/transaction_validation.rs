@@ -14,8 +14,11 @@ use crate::{
 };
 use aptos_gas_algebra::Gas;
 use aptos_types::{
-    account_config::constants::CORE_CODE_ADDRESS, fee_statement::FeeStatement,
-    move_utils::as_move_value::AsMoveValue, on_chain_config::Features, transaction::Multisig,
+    account_config::constants::CORE_CODE_ADDRESS,
+    fee_statement::FeeStatement,
+    move_utils::as_move_value::AsMoveValue,
+    on_chain_config::Features,
+    transaction::{MultisigTransactionPayload, TransactionExecutableRef},
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
@@ -101,7 +104,10 @@ pub(crate) fn run_script_prologue(
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> Result<(), VMStatus> {
-    let txn_sequence_number = txn_data.sequence_number();
+    let txn_sequence_number = txn_data
+        .replay_protector()
+        .get_sequence_number()
+        .unwrap_or(0);
     let txn_authentication_key = txn_data.authentication_proof().optional_auth_key();
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
@@ -350,21 +356,33 @@ pub(crate) fn run_multisig_prologue(
     session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     txn_data: &TransactionMetadata,
-    payload: &Multisig,
+    executable: TransactionExecutableRef,
+    multisig_address: AccountAddress,
     features: &Features,
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
 ) -> Result<(), VMStatus> {
     let unreachable_error = VMStatus::error(StatusCode::UNREACHABLE, None);
-    let provided_payload = if let Some(payload) = &payload.transaction_payload {
-        bcs::to_bytes(&payload).map_err(|_| unreachable_error.clone())?
-    } else {
-        // Default to empty bytes if payload is not provided.
-        if features.is_abort_if_multisig_payload_mismatch_enabled() {
-            vec![]
-        } else {
-            bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| unreachable_error)?
-        }
+    // Note[Orderless]: Earlier the `provided_payload` was being calculated as bcs::to_bytes(MultisigTransactionPayload::EntryFunction(entry_function)).
+    // So, converting the executable to this format.
+    let provided_payload = match executable {
+        TransactionExecutableRef::EntryFunction(entry_function) => bcs::to_bytes(
+            &MultisigTransactionPayload::EntryFunction(entry_function.clone()),
+        )
+        .map_err(|_| unreachable_error.clone())?,
+        TransactionExecutableRef::Empty => {
+            if features.is_abort_if_multisig_payload_mismatch_enabled() {
+                vec![]
+            } else {
+                bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| unreachable_error.clone())?
+            }
+        },
+        TransactionExecutableRef::Script(_) => {
+            return Err(VMStatus::error(
+                StatusCode::FEATURE_UNDER_GATING,
+                Some("Script payload not supported for multisig transactions".to_string()),
+            ));
+        },
     };
 
     session
@@ -374,7 +392,7 @@ pub(crate) fn run_multisig_prologue(
             vec![],
             serialize_values(&vec![
                 MoveValue::Signer(txn_data.sender),
-                MoveValue::Address(payload.multisig_address),
+                MoveValue::Address(multisig_address),
                 MoveValue::vector_u8(provided_payload),
             ]),
             &mut UnmeteredGasMeter,

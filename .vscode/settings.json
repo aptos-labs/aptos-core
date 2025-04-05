@@ -2,5 +2,33 @@
     "rust-analyzer.rustfmt.extraArgs": [
         "+nightly"
     ],
-    "rust-analyzer.showUnlinkedFileNotification": false
+    "rust-analyzer.showUnlinkedFileNotification": false,
+    "rust-analyzer.server.extraEnv": {
+        "RUSTC_WRAPPER": "sccache",
+        "SCCACHE_CACHE_SIZE": "4G",
+        "SCCACHE_DIR": "/tmp/sccache",
+        "SCCACHE_GCS_BUCKET": "",
+        "SCCACHE_GCS_RW_MODE": "READ_WRITE",
+        "SCCACHE_GCS_CREDENTIALS_URL": "",
+        "CARGO_BUILD_JOBS": "14",
+        "RUST_TEST_THREADS": "14",
+        "RUST_MIN_STACK": 5000000,
+        "SCCACHE_CACHE_MODE": "readwrite"
+    },
+    "rust-analyzer.cargo.parallel": true,
+    "rust-analyzer.cargo.maxParallelInstances": 14,
+    "rust-analyzer.cachePriming.enable": true,
+    "rust-analyzer.cachePriming.numThreads": 14,
+    "rust-analyzer.cargo.buildScripts.enable": true,
+    "rust-analyzer.cargo.runBuildScripts": true,
+    "rust-analyzer.cargo.allFeatures": true,
+    "rust-analyzer.cargo.loadOutDirsFromCheck": true,
+    "rust-analyzer.server.extraArgs": [
+        "--log=info",
+        "--memory-limit=16384",
+        "--threads=14"
+    ],
+    "rust-analyzer.checkOnSave": true,
+    "rust-analyzer.check.command": "clippy",
+    "rust-analyzer.check.extraArgs": ["--all-targets"]
 }

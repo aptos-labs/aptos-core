@@ -24,7 +24,7 @@ use aptos_logger::{prelude::*, Level};
 use aptos_types::{
     account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},
-    transaction::SignedTransaction,
+    transaction::{ReplayProtector, SignedTransaction},
 };
 use std::{
     cmp::max,
@@ -50,40 +50,50 @@ pub fn sender_bucket(
 /// TransactionStore is in-memory storage for all transactions in mempool.
 pub struct TransactionStore {
     // main DS
-    transactions: HashMap<AccountAddress, AccountTransactions>,
+    pub(crate) transactions: HashMap<AccountAddress, AccountTransactions>,
 
     // Sequence numbers for accounts with transactions
-    sequence_numbers: HashMap<AccountAddress, u64>,
+    pub(crate) account_sequence_numbers: HashMap<AccountAddress, u64>,
 
     // indexes
-    priority_index: PriorityIndex,
+
+    // Transactions in this index are "ready" for broadcast to consensus, i.e., quorum store
+    // can pull these transactions and create batches.
+    pub(crate) priority_index: PriorityIndex,
     // TTLIndex based on client-specified expiration time
     expiration_time_index: TTLIndex,
     // TTLIndex based on system expiration time
     // we keep it separate from `expiration_time_index` so Mempool can't be clogged
     //  by old transactions even if it hasn't received commit callbacks for a while
     system_ttl_index: TTLIndex,
-    // Broadcast-ready transactions.
+    // Transactions in this index are "ready" for broadcast to shared mempool, i.e., other nodes in the network.
+    // In order to support load balancing the shared mempool broadcasts, we divide the transactions in to buckets
+    // based on the sender address of the transaction.
     // For each sender bucket, we maintain a timeline per txn fee range.
     timeline_index: HashMap<MempoolSenderBucket, MultiBucketTimelineIndex>,
     // We divide the senders into buckets and maintain a separate set of timelines for each sender bucket.
     // This is the number of sender buckets.
     num_sender_buckets: MempoolSenderBucket,
-    // keeps track of "non-ready" txns (transactions that can't be included in next block)
+    // Keeps track of "non-ready" txns (transactions that can't be included in next block).
+    // Orderless transactions (transactions with nonce replay protector) are always "ready", and are not
+    // stored in the parking lot.
     parking_lot_index: ParkingLotIndex,
     // Index for looking up transaction by hash.
-    // Transactions are stored by AccountAddress + sequence number.
-    // This index stores map of transaction committed hash to (AccountAddress, sequence number) pair.
+    // Transactions are stored by AccountAddress + replay protector.
+    // This index stores map of transaction committed hash to (AccountAddress, replay protector) pair.
     // Using transaction commited hash because from end user's point view, a transaction should only have
     // one valid hash.
-    hash_index: HashMap<HashValue, (AccountAddress, u64)>,
+    hash_index: HashMap<HashValue, (AccountAddress, ReplayProtector)>,
     // estimated size in bytes
     size_bytes: usize,
 
     // configuration
     capacity: usize,
     capacity_bytes: usize,
+    // Maximum number of sequence number transactions allowed in the Mempool per user
     capacity_per_user: usize,
+    // Maximum number of orderless transactions allowed in the Mempool per user
+    orderless_txn_capacity_per_user: usize,
     max_batch_bytes: u64,
 
     // eager expiration
@@ -103,7 +113,7 @@ impl TransactionStore {
         Self {
             // main DS
             transactions: HashMap::new(),
-            sequence_numbers: HashMap::new(),
+            account_sequence_numbers: HashMap::new(),
 
             // various indexes
             system_ttl_index: TTLIndex::new(Box::new(|t: &MempoolTransaction| t.expiration_time)),
@@ -122,6 +132,7 @@ impl TransactionStore {
             capacity: config.capacity,
             capacity_bytes: config.capacity_bytes,
             capacity_per_user: config.capacity_per_user,
+            orderless_txn_capacity_per_user: config.orderless_txn_capacity_per_user,
             max_batch_bytes: config.shared_mempool_max_batch_bytes,
 
             // eager expiration
@@ -134,32 +145,32 @@ impl TransactionStore {
     fn get_mempool_txn(
         &self,
         address: &AccountAddress,
-        sequence_number: u64,
+        replay_protector: ReplayProtector,
     ) -> Option<&MempoolTransaction> {
         self.transactions
             .get(address)
-            .and_then(|txns| txns.get(&sequence_number))
+            .and_then(|txns| txns.get(&replay_protector))
     }
 
-    /// Fetch transaction by account address + sequence_number.
+    /// Fetch transaction by account address + replay_protector.
     pub(crate) fn get(
         &self,
         address: &AccountAddress,
-        sequence_number: u64,
+        replay_protector: ReplayProtector,
     ) -> Option<SignedTransaction> {
-        if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
+        if let Some(txn) = self.get_mempool_txn(address, replay_protector) {
             return Some(txn.txn.clone());
         }
         None
     }
 
-    /// Fetch transaction by account address + sequence_number, including ranking score
+    /// Fetch transaction by account address + replay_protector, including ranking score
     pub(crate) fn get_with_ranking_score(
         &self,
         address: &AccountAddress,
-        sequence_number: u64,
+        replay_protector: ReplayProtector,
     ) -> Option<(SignedTransaction, u64)> {
-        if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
+        if let Some(txn) = self.get_mempool_txn(address, replay_protector) {
             return Some((txn.txn.clone(), txn.ranking_score));
         }
         None
@@ -167,7 +178,7 @@ impl TransactionStore {
 
     pub(crate) fn get_by_hash(&self, hash: HashValue) -> Option<SignedTransaction> {
         match self.hash_index.get(&hash) {
-            Some((address, seq)) => self.get(address, *seq),
+            Some((address, replay_protector)) => self.get(address, *replay_protector),
             None => None,
         }
     }
@@ -175,9 +186,9 @@ impl TransactionStore {
     pub(crate) fn get_insertion_info_and_bucket(
         &self,
         address: &AccountAddress,
-        sequence_number: u64,
+        replay_protector: ReplayProtector,
     ) -> Option<(&InsertionInfo, String, String)> {
-        if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
+        if let Some(txn) = self.get_mempool_txn(address, replay_protector) {
             return Some((
                 &txn.insertion_info,
                 self.get_bucket(txn.ranking_score, address),
@@ -192,9 +203,9 @@ impl TransactionStore {
     pub(crate) fn get_ranking_score(
         &self,
         address: &AccountAddress,
-        sequence_number: u64,
+        replay_protector: ReplayProtector,
     ) -> Option<u64> {
-        if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
+        if let Some(txn) = self.get_mempool_txn(address, replay_protector) {
             return Some(txn.ranking_score);
         }
         None
@@ -212,8 +223,8 @@ impl TransactionStore {
         format!("{}_{}", sender_bucket, bucket)
     }
 
-    pub(crate) fn get_sequence_number(&self, address: &AccountAddress) -> Option<&u64> {
-        self.sequence_numbers.get(address)
+    pub(crate) fn get_account_sequence_number(&self, address: &AccountAddress) -> Option<&u64> {
+        self.account_sequence_numbers.get(address)
     }
 
     pub(crate) fn num_sender_buckets(&self) -> MempoolSenderBucket {
@@ -224,14 +235,21 @@ impl TransactionStore {
     pub(crate) fn insert(
         &mut self,
         txn: MempoolTransaction,
-        db_sequence_number: u64,
+        // For orderless transactions, account_sequence_number is None
+        // For sequence number transactions, account_sequence_number is Some(u64)
+        account_sequence_number: Option<u64>,
     ) -> MempoolStatus {
         let address = txn.get_sender();
-        let txn_seq_num = txn.get_sequence_number();
-        let acc_seq_num = max(
-            db_sequence_number,
-            self.get_sequence_number(&address).map_or(0, |v| *v),
-        );
+        let txn_replay_protector = txn.get_replay_protector();
+
+        let account_sequence_number = account_sequence_number.map(|seq_num| {
+            max(
+                seq_num,
+                self.get_account_sequence_number(&address)
+                    .copied()
+                    .unwrap_or(0),
+            )
+        });
 
         // If the transaction is already in Mempool, we only allow the user to
         // increase the gas unit price to speed up a transaction, but not the max gas.
@@ -239,7 +257,7 @@ impl TransactionStore {
         // Transactions with all the same inputs (but possibly signed differently) are idempotent
         // since the raw transaction is the same
         if let Some(txns) = self.transactions.get_mut(&address) {
-            if let Some(current_version) = txns.get_mut(&txn_seq_num) {
+            if let Some(current_version) = txns.get_mut(&txn_replay_protector) {
                 if current_version.txn.payload() != txn.txn.payload() {
                     return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
                         "Transaction already in mempool with a different payload".to_string(),
@@ -258,7 +276,7 @@ impl TransactionStore {
                     );
                 } else if current_version.get_gas_price() < txn.get_gas_price() {
                     // Update txn if gas unit price is a larger value than before
-                    if let Some(txn) = txns.remove(&txn_seq_num) {
+                    if let Some(txn) = txns.remove(&txn_replay_protector) {
                         self.index_remove(&txn);
                     };
                     counters::CORE_MEMPOOL_GAS_UPGRADED_TXNS.inc();
@@ -270,22 +288,30 @@ impl TransactionStore {
                     // If the transaction is the same, it's an idempotent call
                     // Updating signers is not supported, the previous submission must fail
                     counters::CORE_MEMPOOL_IDEMPOTENT_TXNS.inc();
-                    self.process_ready_transactions(&address, acc_seq_num);
+                    if let Some(acc_seq_num) = account_sequence_number {
+                        self.process_ready_seq_num_based_transactions(&address, acc_seq_num);
+                    }
                     return MempoolStatus::new(MempoolStatusCode::Accepted);
                 }
             }
         }
 
-        self.clean_committed_transactions(&address, acc_seq_num);
-
-        if txn_seq_num < acc_seq_num {
-            return MempoolStatus::new(MempoolStatusCode::InvalidSeqNumber).with_message(format!(
-                "transaction sequence number is {}, current sequence number is  {}",
-                txn_seq_num, acc_seq_num,
-            ));
+        if let ReplayProtector::SequenceNumber(txn_seq_num) = txn.get_replay_protector() {
+            let acc_seq_num = account_sequence_number.expect(
+                "Account sequence number is always provided for transactions with sequence number",
+            );
+            self.clean_committed_transactions_below_account_seq_num(&address, acc_seq_num);
+            if txn_seq_num < acc_seq_num {
+                return MempoolStatus::new(MempoolStatusCode::InvalidSeqNumber).with_message(
+                    format!(
+                        "transaction sequence number is {}, current sequence number is  {}",
+                        txn_seq_num, acc_seq_num,
+                    ),
+                );
+            }
         }
 
-        if self.check_is_full_after_eviction(&txn, acc_seq_num) {
+        if self.check_is_full_after_eviction(&txn, account_sequence_number) {
             return MempoolStatus::new(MempoolStatusCode::MempoolIsFull).with_message(format!(
                 "Mempool is full. Mempool size: {}, Capacity: {}",
                 self.system_ttl_index.size(),
@@ -296,28 +322,51 @@ impl TransactionStore {
         self.transactions.entry(address).or_default();
         if let Some(txns) = self.transactions.get_mut(&address) {
             // capacity check
-            if txns.len() >= self.capacity_per_user {
-                return MempoolStatus::new(MempoolStatusCode::TooManyTransactions).with_message(
-                    format!(
-                        "Mempool over capacity for account. Number of transactions from account: {} Capacity per account: {}",
-                        txns.len(),
-                        self.capacity_per_user,
-                    ),
-                );
+            match txn_replay_protector {
+                ReplayProtector::SequenceNumber(_) => {
+                    if txns.seq_num_txns_len() >= self.capacity_per_user {
+                        return MempoolStatus::new(MempoolStatusCode::TooManyTransactions).with_message(
+                            format!(
+                                "Mempool over capacity for account. Number of seq number transactions from account: {} Capacity per account: {}",
+                                txns.seq_num_txns_len() ,
+                                self.capacity_per_user,
+                            ),
+                        );
+                    }
+                },
+                ReplayProtector::Nonce(_) => {
+                    if txns.orderless_txns_len() >= self.orderless_txn_capacity_per_user {
+                        return MempoolStatus::new(MempoolStatusCode::TooManyTransactions).with_message(
+                            format!(
+                                "Mempool over capacity for account. Number of orderless transactions from account: {} Capacity per account: {}",
+                                txns.orderless_txns_len(),
+                                self.orderless_txn_capacity_per_user,
+                            ),
+                        );
+                    }
+                },
             }
-
             // insert into storage and other indexes
             self.system_ttl_index.insert(&txn);
             self.expiration_time_index.insert(&txn);
             self.hash_index
-                .insert(txn.get_committed_hash(), (address, txn_seq_num));
-
-            self.sequence_numbers.insert(address, acc_seq_num);
+                .insert(txn.get_committed_hash(), (address, txn_replay_protector));
+            if let Some(acc_seq_num) = account_sequence_number {
+                self.account_sequence_numbers.insert(address, acc_seq_num);
+            }
             self.size_bytes += txn.get_estimated_bytes();
-            txns.insert(txn_seq_num, txn);
+            txns.insert(txn);
             self.track_indices();
         }
-        self.process_ready_transactions(&address, acc_seq_num);
+
+        match txn_replay_protector {
+            ReplayProtector::SequenceNumber(_) => {
+                self.process_ready_seq_num_based_transactions(&address, account_sequence_number.expect("Account sequence number is always provided for transactions with sequence number"));
+            },
+            ReplayProtector::Nonce(_) => {
+                self.process_ready_transaction(&address, txn_replay_protector);
+            },
+        }
         MempoolStatus::new(MempoolStatusCode::Accepted)
     }
 
@@ -369,9 +418,9 @@ impl TransactionStore {
     fn check_is_full_after_eviction(
         &mut self,
         txn: &MempoolTransaction,
-        curr_sequence_number: u64,
+        account_sequence_number: Option<u64>,
     ) -> bool {
-        if self.is_full() && self.check_txn_ready(txn, curr_sequence_number) {
+        if self.is_full() && self.check_txn_ready(txn, account_sequence_number) {
             let now = Instant::now();
             // try to free some space in Mempool from ParkingLot by evicting non-ready txns
             let mut evicted_txns = 0;
@@ -380,12 +429,12 @@ impl TransactionStore {
                 if let Some(txn) = self
                     .transactions
                     .get_mut(&txn_pointer.sender)
-                    .and_then(|txns| txns.remove(&txn_pointer.sequence_number))
+                    .and_then(|txns| txns.remove(&txn_pointer.replay_protector))
                 {
                     debug!(
                         LogSchema::new(LogEntry::MempoolFullEvictedTxn).txns(TxnsLog::new_txn(
                             txn.get_sender(),
-                            txn.get_sequence_number()
+                            txn.get_replay_protector()
                         ))
                     );
                     evicted_bytes += txn.get_estimated_bytes() as u64;
@@ -419,44 +468,63 @@ impl TransactionStore {
     /// (this handles both cases where, (1) txn is first possible txn for an account and (2) the
     /// previous txn is committed).
     /// 2. The txn before this is ready for broadcast but not yet committed.
-    fn check_txn_ready(&self, txn: &MempoolTransaction, curr_sequence_number: u64) -> bool {
-        let tx_sequence_number = txn.get_sequence_number();
-        if tx_sequence_number == curr_sequence_number {
-            return true;
-        } else if tx_sequence_number == 0 {
-            // shouldn't really get here because filtering out old txn sequence numbers happens earlier in workflow
-            unreachable!("[mempool] already committed txn detected, cannot be checked for readiness upon insertion");
-        }
+    fn check_txn_ready(
+        &self,
+        txn: &MempoolTransaction,
+        account_sequence_number: Option<u64>,
+    ) -> bool {
+        let tx_replay_protector = txn.get_replay_protector();
+        match tx_replay_protector {
+            ReplayProtector::SequenceNumber(tx_sequence_number) => {
+                if let Some(account_sequence_number) = account_sequence_number {
+                    if tx_sequence_number == account_sequence_number {
+                        return true;
+                    } else if tx_sequence_number == 0 {
+                        // shouldn't really get here because filtering out old txn sequence numbers happens earlier in workflow
+                        unreachable!("[mempool] already committed txn detected, cannot be checked for readiness upon insertion");
+                    }
 
-        // check previous txn in sequence is ready
-        if let Some(account_txns) = self.transactions.get(&txn.get_sender()) {
-            if let Some(prev_txn) = account_txns.get(&(tx_sequence_number - 1)) {
-                if let TimelineState::Ready(_) = prev_txn.timeline_state {
-                    return true;
+                    // check previous txn in sequence is ready
+                    if let Some(account_txns) = self.transactions.get(&txn.get_sender()) {
+                        let prev_seq_number =
+                            ReplayProtector::SequenceNumber(tx_sequence_number - 1);
+                        if let Some(prev_txn) = account_txns.get(&prev_seq_number) {
+                            if let TimelineState::Ready(_) = prev_txn.timeline_state {
+                                return true;
+                            }
+                        }
+                    }
+                    false
+                } else {
+                    unreachable!("Account sequence number is always provided for transactions with sequence number");
                 }
-            }
+            },
+            ReplayProtector::Nonce(_) => {
+                // Nonce based transactions are always ready for broadcast
+                true
+            },
         }
-        false
     }
 
     fn log_ready_transaction(
         ranking_score: u64,
         bucket: &str,
         insertion_info: &mut InsertionInfo,
-        broadcast_ready: bool,
+        ready_for_mempool_broadcast: bool,
         priority: &str,
     ) {
         insertion_info.ready_time = SystemTime::now();
         if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
             let submitted_by = insertion_info.submitted_by_label();
-            if broadcast_ready {
-                counters::core_mempool_txn_commit_latency(
-                    CONSENSUS_READY_LABEL,
-                    submitted_by,
-                    bucket,
-                    time_delta,
-                    priority,
-                );
+            counters::core_mempool_txn_commit_latency(
+                CONSENSUS_READY_LABEL,
+                submitted_by,
+                bucket,
+                time_delta,
+                priority,
+            );
+
+            if ready_for_mempool_broadcast {
                 counters::core_mempool_txn_commit_latency(
                     BROADCAST_READY_LABEL,
                     submitted_by,
@@ -464,18 +532,10 @@ impl TransactionStore {
                     time_delta,
                     priority,
                 );
-            } else {
-                counters::core_mempool_txn_commit_latency(
-                    CONSENSUS_READY_LABEL,
-                    submitted_by,
-                    bucket,
-                    time_delta,
-                    priority,
-                );
             }
         }
 
-        if broadcast_ready {
+        if ready_for_mempool_broadcast {
             counters::core_mempool_txn_ranking_score(
                 BROADCAST_READY_LABEL,
                 BROADCAST_READY_LABEL,
@@ -491,56 +551,75 @@ impl TransactionStore {
         );
     }
 
-    /// Maintains the following invariants:
-    /// - All transactions of a given account that are sequential to the current sequence number
-    ///   should be included in both the PriorityIndex (ordering for Consensus) and
-    ///   TimelineIndex (txns for SharedMempool).
-    /// - Other txns are considered to be "non-ready" and should be added to ParkingLotIndex.
-    fn process_ready_transactions(&mut self, address: &AccountAddress, sequence_num: u64) {
-        let sender_bucket = sender_bucket(address, self.num_sender_buckets);
+    fn process_ready_transaction(
+        &mut self,
+        address: &AccountAddress,
+        txn_replay_protector: ReplayProtector,
+    ) -> bool {
         if let Some(txns) = self.transactions.get_mut(address) {
-            let mut min_seq = sequence_num;
-            while let Some(txn) = txns.get_mut(&min_seq) {
-                let process_ready = !self.priority_index.contains(txn);
+            if let Some(txn) = txns.get_mut(&txn_replay_protector) {
+                let sender_bucket = sender_bucket(address, self.num_sender_buckets);
+                let ready_for_quorum_store = !self.priority_index.contains(txn);
 
                 self.priority_index.insert(txn);
-                let process_broadcast_ready = txn.timeline_state == TimelineState::NotReady;
-                if process_broadcast_ready {
+
+                // If timeline_state is `NonQualified`, then the transaction is never added to the timeline_index,
+                // and never broadcasted to the shared mempool.
+                let ready_for_mempool_broadcast = txn.timeline_state == TimelineState::NotReady;
+                if ready_for_mempool_broadcast {
                     self.timeline_index
                         .get_mut(&sender_bucket)
                         .unwrap()
                         .insert(txn);
                 }
 
-                if process_ready {
+                if ready_for_quorum_store {
                     let bucket = self
                         .timeline_index
                         .get(&sender_bucket)
                         .unwrap()
-                        .get_bucket(txn.ranking_score)
-                        .to_string();
+                        .get_bucket(txn.ranking_score);
                     let bucket = format!("{}_{}", sender_bucket, bucket);
 
                     Self::log_ready_transaction(
                         txn.ranking_score,
                         bucket.as_str(),
                         &mut txn.insertion_info,
-                        process_broadcast_ready,
+                        ready_for_mempool_broadcast,
                         txn.priority_of_sender
                             .clone()
                             .map_or_else(|| "Unknown".to_string(), |priority| priority.to_string())
                             .as_str(),
                     );
                 }
-
                 // Remove txn from parking lot after it has been promoted to
                 // priority_index / timeline_index, i.e., txn status is ready.
                 self.parking_lot_index.remove(txn);
-                min_seq += 1;
-            }
 
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Maintains the following invariants:
+    /// - All transactions of a given account that are sequential to the current sequence number
+    ///   should be included in both the PriorityIndex (ordering for Consensus) and
+    ///   TimelineIndex (txns for SharedMempool).
+    /// - Other txns are considered to be "non-ready" and should be added to ParkingLotIndex.
+    fn process_ready_seq_num_based_transactions(
+        &mut self,
+        address: &AccountAddress,
+        account_sequence_num: u64,
+    ) {
+        let mut min_seq = account_sequence_num;
+        while self.process_ready_transaction(address, ReplayProtector::SequenceNumber(min_seq)) {
+            min_seq += 1;
+        }
+
+        if let Some(txns) = self.transactions.get_mut(address) {
             let mut parking_lot_txns = 0;
-            for (_, txn) in txns.range_mut((Bound::Excluded(min_seq), Bound::Unbounded)) {
+            for (_, txn) in txns.seq_num_range_mut((Bound::Excluded(min_seq), Bound::Unbounded)) {
                 match txn.timeline_state {
                     TimelineState::Ready(_) => {},
                     _ => {
@@ -552,7 +631,7 @@ impl TransactionStore {
 
             trace!(
                 LogSchema::new(LogEntry::ProcessReadyTxns).account(*address),
-                first_ready_seq_num = sequence_num,
+                first_ready_seq_num = account_sequence_num,
                 last_ready_seq_num = min_seq,
                 num_parked_txns = parking_lot_txns,
             );
@@ -560,13 +639,17 @@ impl TransactionStore {
         }
     }
 
-    fn clean_committed_transactions(&mut self, address: &AccountAddress, sequence_number: u64) {
+    fn clean_committed_transactions_below_account_seq_num(
+        &mut self,
+        address: &AccountAddress,
+        account_sequence_number: u64,
+    ) {
         // Remove all previous seq number transactions for this account.
         // This can happen if transactions are sent to multiple nodes and one of the
         // nodes has sent the transaction to consensus but this node still has the
         // transaction sitting in mempool.
         if let Some(txns) = self.transactions.get_mut(address) {
-            let mut active = txns.split_off(&sequence_number);
+            let mut active = txns.seq_num_split_off(account_sequence_number);
             let txns_for_removal = txns.clone();
             txns.clear();
             txns.append(&mut active);
@@ -576,44 +659,75 @@ impl TransactionStore {
                 false => TxnsLog::new_with_max(10),
             };
             for transaction in txns_for_removal.values() {
-                rm_txns.add(transaction.get_sender(), transaction.get_sequence_number());
+                rm_txns.add(transaction.get_sender(), transaction.get_replay_protector());
                 self.index_remove(transaction);
             }
             trace!(
                 LogSchema::new(LogEntry::CleanCommittedTxn).txns(rm_txns),
                 "txns cleaned with committing tx {}:{}",
                 address,
-                sequence_number
+                account_sequence_number
             );
         }
     }
 
     /// Handles transaction commit.
-    /// It includes deletion of all transactions with sequence number <= `account_sequence_number`
+    /// For nonce based transactions, we only delete the committed transaction from the indices.
+    /// For sequence number based transactions, we also delete all transactions with sequence number <= `account_sequence_number`
     /// and potential promotion of sequential txns to PriorityIndex/TimelineIndex.
-    pub fn commit_transaction(&mut self, account: &AccountAddress, sequence_number: u64) {
-        let current_seq_number = self.get_sequence_number(account).map_or(0, |v| *v);
-        let new_seq_number = max(current_seq_number, sequence_number + 1);
-        self.sequence_numbers.insert(*account, new_seq_number);
-        self.clean_committed_transactions(account, new_seq_number);
-        self.process_ready_transactions(account, new_seq_number);
+    pub fn commit_transaction(
+        &mut self,
+        account: &AccountAddress,
+        replay_protector: ReplayProtector,
+    ) {
+        match replay_protector {
+            ReplayProtector::SequenceNumber(txn_sequence_number) => {
+                let current_account_seq_number =
+                    self.get_account_sequence_number(account).map_or(0, |v| *v);
+                let new_account_seq_number =
+                    max(current_account_seq_number, txn_sequence_number + 1);
+                self.account_sequence_numbers
+                    .insert(*account, new_account_seq_number);
+                self.clean_committed_transactions_below_account_seq_num(
+                    account,
+                    new_account_seq_number,
+                );
+                self.process_ready_seq_num_based_transactions(account, new_account_seq_number);
+            },
+            ReplayProtector::Nonce(nonce) => {
+                if let Some(txns) = self.transactions.get_mut(account) {
+                    if let Some(txn) = txns.remove(&ReplayProtector::Nonce(nonce)) {
+                        self.index_remove(&txn);
+                        trace!(
+                            LogSchema::new(LogEntry::CleanCommittedTxn).txns(TxnsLog::new_txn(
+                                txn.get_sender(),
+                                txn.get_replay_protector()
+                            )),
+                            "txns cleaned with committing tx {}:{:?}",
+                            txn.get_sender(),
+                            txn.get_replay_protector()
+                        );
+                    }
+                }
+            },
+        }
     }
 
     pub fn reject_transaction(
         &mut self,
         account: &AccountAddress,
-        sequence_number: u64,
+        replay_protector: ReplayProtector,
         hash: &HashValue,
     ) {
         let mut txn_to_remove = None;
-        if let Some((indexed_account, indexed_sequence_number)) = self.hash_index.get(hash) {
-            if account == indexed_account && sequence_number == *indexed_sequence_number {
-                txn_to_remove = self.get_mempool_txn(account, sequence_number).cloned();
+        if let Some((indexed_account, indexed_replay_protector)) = self.hash_index.get(hash) {
+            if account == indexed_account && replay_protector == *indexed_replay_protector {
+                txn_to_remove = self.get_mempool_txn(account, replay_protector).cloned();
             }
         }
         if let Some(txn_to_remove) = txn_to_remove {
             if let Some(txns) = self.transactions.get_mut(account) {
-                txns.remove(&sequence_number);
+                txns.remove(&replay_protector);
             }
             self.index_remove(&txn_to_remove);
 
@@ -621,7 +735,7 @@ impl TransactionStore {
                 let mut txns_log = TxnsLog::new();
                 txns_log.add(
                     txn_to_remove.get_sender(),
-                    txn_to_remove.get_sequence_number(),
+                    txn_to_remove.get_replay_protector(),
                 );
                 trace!(LogSchema::new(LogEntry::CleanRejectedTxn).txns(txns_log));
             }
@@ -651,9 +765,9 @@ impl TransactionStore {
         // Remove account datastructures if there are no more transactions for the account.
         let address = &txn.get_sender();
         if let Some(txns) = self.transactions.get(address) {
-            if txns.is_empty() {
+            if txns.len() == 0 {
                 self.transactions.remove(address);
-                self.sequence_numbers.remove(address);
+                self.account_sequence_numbers.remove(address);
             }
         }
 
@@ -692,8 +806,8 @@ impl TransactionStore {
             .enumerate()
             .rev()
         {
-            for (address, sequence_number) in bucket {
-                if let Some(txn) = self.get_mempool_txn(address, *sequence_number) {
+            for (address, replay_protector) in bucket {
+                if let Some(txn) = self.get_mempool_txn(address, *replay_protector) {
                     let transaction_bytes = txn.txn.raw_txn_bytes_len() as u64;
                     if batch_total_bytes.saturating_add(transaction_bytes) > self.max_batch_bytes {
                         break; // The batch is full
@@ -745,10 +859,10 @@ impl TransactionStore {
             })
             .timeline_range(start_end_pairs)
             .iter()
-            .filter_map(|(account, sequence_number)| {
+            .filter_map(|(account, replay_protector)| {
                 self.transactions
                     .get(account)
-                    .and_then(|txns| txns.get(sequence_number))
+                    .and_then(|txns| txns.get(replay_protector))
                     .map(|txn| {
                         (
                             txn.txn.clone(),
@@ -775,7 +889,7 @@ impl TransactionStore {
         let mut oldest_insertion_time = None;
         // Limit the worst-case linear search to 20.
         for key in self.system_ttl_index.iter().take(20) {
-            if let Some(txn) = self.get_mempool_txn(&key.address, key.sequence_number) {
+            if let Some(txn) = self.get_mempool_txn(&key.address, key.replay_protector) {
                 if !txn.was_parked {
                     oldest_insertion_time = Some(txn.insertion_info.insertion_time);
                     break;
@@ -822,8 +936,8 @@ impl TransactionStore {
             .inc();
 
         let mut gc_txns = index.gc(now);
-        // sort the expired txns by order of sequence number per account
-        gc_txns.sort_by_key(|key| (key.address, key.sequence_number));
+        // sort the expired txns by order of replay protector per account
+        gc_txns.sort_by_key(|key| (key.address, key.replay_protector));
         let mut gc_iter = gc_txns.iter().peekable();
 
         let mut gc_txns_log = match aptos_logger::enabled!(Level::Trace) {
@@ -832,32 +946,42 @@ impl TransactionStore {
         };
         while let Some(key) = gc_iter.next() {
             if let Some(txns) = self.transactions.get_mut(&key.address) {
-                let park_range_start = Bound::Excluded(key.sequence_number);
-                let park_range_end = gc_iter
-                    .peek()
-                    .filter(|next_key| key.address == next_key.address)
-                    .map_or(Bound::Unbounded, |next_key| {
-                        Bound::Excluded(next_key.sequence_number)
-                    });
-                // mark all following txns as non-ready, i.e. park them
-                for (_, t) in txns.range_mut((park_range_start, park_range_end)) {
-                    self.parking_lot_index.insert(t);
-                    self.priority_index.remove(t);
-                    let sender_bucket = sender_bucket(&t.get_sender(), self.num_sender_buckets);
-                    self.timeline_index
-                        .get_mut(&sender_bucket)
-                        .unwrap_or_else(|| {
-                            panic!(
-                                "Unable to get the timeline index for the sender bucket {}",
-                                sender_bucket
-                            )
-                        })
-                        .remove(t);
-                    if let TimelineState::Ready(_) = t.timeline_state {
-                        t.timeline_state = TimelineState::NotReady;
+                // If a sequence number transaction is garbage collected, then its subsequent transactions are marked as non-ready.
+                // As orderless transactions (transactions with nonce) are always ready, they are not affected by this.
+                if let ReplayProtector::SequenceNumber(seq_num) = key.replay_protector {
+                    let park_range_start = Bound::Excluded(seq_num);
+                    let park_range_end = gc_iter
+                        .peek()
+                        .filter(|next_key| key.address == next_key.address)
+                        .map_or(Bound::Unbounded, |next_key| {
+                            match next_key.replay_protector {
+                                ReplayProtector::SequenceNumber(next_seq_num) => {
+                                    Bound::Excluded(next_seq_num)
+                                },
+                                ReplayProtector::Nonce(_) => Bound::Unbounded,
+                            }
+                        });
+                    // mark all following txns as non-ready, i.e. park them
+                    for (_, t) in txns.seq_num_range_mut((park_range_start, park_range_end)) {
+                        self.parking_lot_index.insert(t);
+                        self.priority_index.remove(t);
+                        let sender_bucket = sender_bucket(&t.get_sender(), self.num_sender_buckets);
+                        self.timeline_index
+                            .get_mut(&sender_bucket)
+                            .unwrap_or_else(|| {
+                                panic!(
+                                    "Unable to get the timeline index for the sender bucket {}",
+                                    sender_bucket
+                                )
+                            })
+                            .remove(t);
+                        if let TimelineState::Ready(_) = t.timeline_state {
+                            t.timeline_state = TimelineState::NotReady;
+                        }
                     }
                 }
-                if let Some(txn) = txns.remove(&key.sequence_number) {
+
+                if let Some(txn) = txns.remove(&key.replay_protector) {
                     let is_active = self.priority_index.contains(&txn);
                     let status = if is_active {
                         counters::GC_ACTIVE_TXN_LABEL
@@ -865,8 +989,7 @@ impl TransactionStore {
                         counters::GC_PARKED_TXN_LABEL
                     };
                     let account = txn.get_sender();
-                    let txn_sequence_number = txn.get_sequence_number();
-                    gc_txns_log.add_with_status(account, txn_sequence_number, status);
+                    gc_txns_log.add_with_status(account, txn.get_replay_protector(), status);
                     if let Ok(time_delta) =
                         SystemTime::now().duration_since(txn.insertion_info.insertion_time)
                     {
@@ -896,19 +1019,24 @@ impl TransactionStore {
     pub(crate) fn gen_snapshot(&self) -> TxnsLog {
         let mut txns_log = TxnsLog::new();
         for (account, txns) in self.transactions.iter() {
-            for (seq_num, txn) in txns.iter() {
-                let status =
-                    if self
-                        .parking_lot_index
-                        .contains(account, *seq_num, txn.get_committed_hash())
-                    {
-                        "parked"
-                    } else {
-                        "ready"
-                    };
+            for txn in txns.values() {
+                let status = match txn.get_replay_protector() {
+                    ReplayProtector::SequenceNumber(_) => {
+                        if self.parking_lot_index.contains(
+                            account,
+                            txn.get_replay_protector(),
+                            txn.get_committed_hash(),
+                        ) {
+                            "parked"
+                        } else {
+                            "ready"
+                        }
+                    },
+                    ReplayProtector::Nonce(_) => "ready",
+                };
                 txns_log.add_full_metadata(
                     *account,
-                    *seq_num,
+                    txn.get_replay_protector(),
                     status,
                     txn.insertion_info.insertion_time,
                 );

@@ -32,7 +32,7 @@ use aptos_storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
 use aptos_types::{
     mempool_status::MempoolStatusCode,
     on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload},
-    transaction::SignedTransaction,
+    transaction::{ReplayProtector, SignedTransaction},
 };
 use aptos_vm_validator::{
     mocks::mock_vm_validator::MockVMValidator, vm_validator::TransactionValidation,
@@ -178,11 +178,15 @@ impl MockSharedMempool {
         {
             let mut pool = self.mempool.lock();
             for txn in txns {
+                let account_sequence_number = match txn.replay_protector() {
+                    ReplayProtector::SequenceNumber(_) => Some(0),
+                    ReplayProtector::Nonce(_) => None,
+                };
                 if pool
                     .add_txn(
                         txn.clone(),
                         txn.gas_unit_price(),
-                        0,
+                        account_sequence_number,
                         TimelineState::NotReady,
                         false,
                         None,
@@ -206,7 +210,7 @@ impl MockSharedMempool {
 
     pub fn remove_txn(&self, txn: &SignedTransaction) {
         let mut pool = self.mempool.lock();
-        pool.commit_transaction(&txn.sender(), txn.sequence_number())
+        pool.commit_transaction(&txn.sender(), txn.replay_protector())
     }
 }
 
