@@ -28,6 +28,15 @@ module aptos_framework::auth_data {
     // separate authenticator and derivable_authenticator - to not allow accidental mixing
     // in user authentication code
 
+    #[test_only]
+    public fun create_derivable_auth_data(
+        digest: vector<u8>,
+        abstract_signature: vector<u8>,
+        abstract_public_key: vector<u8>
+    ): AbstractionAuthData {
+        AbstractionAuthData::DerivableV1 { digest, abstract_signature, abstract_public_key }
+    }
+
     public fun authenticator(self: &AbstractionAuthData): &vector<u8> {
         assert!(self is V1, error::invalid_argument(ENOT_REGULAR_AUTH_DATA));
         &self.authenticator
