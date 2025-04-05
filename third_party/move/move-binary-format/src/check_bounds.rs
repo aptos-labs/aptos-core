@@ -9,12 +9,13 @@ use crate::{
         PartialVMError, PartialVMResult,
     },
     file_format::{
-        Bytecode, CodeOffset, CodeUnit, CompiledModule, CompiledScript, Constant, FieldDefinition,
-        FieldHandle, FieldInstantiation, FunctionDefinition, FunctionDefinitionIndex,
-        FunctionHandle, FunctionInstantiation, LocalIndex, ModuleHandle, Signature, SignatureIndex,
-        SignatureToken, StructDefInstantiation, StructDefinition, StructFieldInformation,
-        StructHandle, StructVariantHandle, StructVariantInstantiation, TableIndex,
-        TypeParameterIndex, VariantFieldHandle, VariantFieldInstantiation, VariantIndex,
+        AccessSpecifier, AddressSpecifier, Bytecode, CodeOffset, CodeUnit, CompiledModule,
+        CompiledScript, Constant, FieldDefinition, FieldHandle, FieldInstantiation,
+        FunctionDefinition, FunctionDefinitionIndex, FunctionHandle, FunctionInstantiation,
+        LocalIndex, ModuleHandle, ResourceSpecifier, Signature, SignatureIndex, SignatureToken,
+        StructDefInstantiation, StructDefinition, StructFieldInformation, StructHandle,
+        StructVariantHandle, StructVariantInstantiation, TableIndex, TypeParameterIndex,
+        VariantFieldHandle, VariantFieldInstantiation, VariantIndex,
     },
     internals::ModuleIndex,
     IndexKind,
@@ -244,6 +245,66 @@ impl<'a> BoundsChecker<'a> {
         let type_param_count = function_handle.type_parameters.len();
         self.check_type_parameters_in_signature(function_handle.parameters, type_param_count)?;
         self.check_type_parameters_in_signature(function_handle.return_, type_param_count)?;
+        // access specifiers must be in bounds
+        if let Some(specs) = &function_handle.access_specifiers {
+            for spec in specs {
+                self.check_access_specifier(function_handle, spec)?
+            }
+        }
+        Ok(())
+    }
+
+    fn check_access_specifier(
+        &self,
+        function: &FunctionHandle,
+        spec: &AccessSpecifier,
+    ) -> PartialVMResult<()> {
+        let AccessSpecifier {
+            kind: _,
+            negated: _,
+            resource,
+            address,
+        } = spec;
+        match resource {
+            ResourceSpecifier::Any => {},
+            ResourceSpecifier::DeclaredAtAddress(addr_idx) => {
+                check_bounds_impl(self.view.address_identifiers(), *addr_idx)?
+            },
+            ResourceSpecifier::DeclaredInModule(mod_idx) => {
+                check_bounds_impl(self.view.module_handles(), *mod_idx)?
+            },
+            ResourceSpecifier::Resource(stu_idx) => {
+                check_bounds_impl(self.view.struct_handles(), *stu_idx)?
+            },
+            ResourceSpecifier::ResourceInstantiation(stu_idx, sig_idx) => {
+                check_bounds_impl(self.view.struct_handles(), *stu_idx)?;
+                check_bounds_impl(self.view.signatures(), *sig_idx)?;
+            },
+        }
+        match address {
+            AddressSpecifier::Any => {},
+            AddressSpecifier::Literal(addr_idx) => {
+                check_bounds_impl(self.view.address_identifiers(), *addr_idx)?
+            },
+            AddressSpecifier::Parameter(loc_idx, fun_opt) => {
+                let sign = self.view.signature_at(function.parameters);
+                if *loc_idx as usize >= sign.len() {
+                    return Err(bounds_error(
+                        StatusCode::INDEX_OUT_OF_BOUNDS,
+                        IndexKind::LocalPool,
+                        *loc_idx as TableIndex,
+                        sign.len(),
+                    )
+                    .append_message_with_separator(
+                        '.',
+                        " Access specifier: parameter index out of bound".to_string(),
+                    ));
+                }
+                if let Some(fun_inst) = fun_opt {
+                    check_bounds_impl(self.view.function_instantiations(), *fun_inst)?
+                }
+            },
+        }
         Ok(())
     }
 
