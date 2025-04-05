@@ -8,7 +8,10 @@ use super::*;
 use crate::{ledger_db::transaction_db_test::init_db, AptosDB};
 use aptos_proptest_helpers::Index;
 use aptos_temppath::TempPath;
-use aptos_types::proptest_types::{AccountInfoUniverse, SignatureCheckedTransactionGen};
+use aptos_types::{
+    proptest_types::{AccountInfoUniverse, SignatureCheckedTransactionGen},
+    transaction::ReplayProtector,
+};
 use proptest::{collection::vec, prelude::*};
 use std::collections::BTreeMap;
 
@@ -33,16 +36,18 @@ proptest! {
             let user_txn = txn
                 .try_as_signed_user_txn()
                 .expect("All should be user transactions here.");
-            prop_assert_eq!(
-                store
-                    .get_account_ordered_transaction_version(
-                        user_txn.sender(),
-                        user_txn.sequence_number(),
-                        ledger_version
-                    )
-                    .unwrap(),
-                Some(ver as Version)
-            );
+            if let ReplayProtector::SequenceNumber(seq_num) = user_txn.replay_protector() {
+                prop_assert_eq!(
+                    store
+                        .get_account_ordered_transaction_version(
+                            user_txn.sender(),
+                            seq_num,
+                            ledger_version
+                        )
+                        .unwrap(),
+                    Some(ver as Version)
+                );
+            }
         }
     }
 
@@ -71,21 +76,23 @@ proptest! {
         // can we just get all the account transaction versions individually
 
         for (version, txn) in &txns {
-            let mut iter = store.get_account_ordered_transactions_iter(
-                txn.sender(),
-                txn.sequence_number(),
-                1, /* num_versions */
-                ledger_version,
-            ).unwrap();
+            if let ReplayProtector::SequenceNumber(seq_num) = txn.replay_protector() {
+                let mut iter = store.get_account_ordered_transactions_iter(
+                    txn.sender(),
+                    seq_num,
+                    1, /* num_versions */
+                    ledger_version,
+                ).unwrap();
 
-            if *version <= ledger_version {
-                let (actual_seq_num, actual_version) = iter.next().unwrap().unwrap();
-                prop_assert!(iter.next().is_none());
+                if *version <= ledger_version {
+                    let (actual_seq_num, actual_version) = iter.next().unwrap().unwrap();
+                    prop_assert!(iter.next().is_none());
 
-                prop_assert_eq!(*version, actual_version);
-                prop_assert_eq!(txn.sequence_number(), actual_seq_num);
-            } else {
-                prop_assert!(iter.next().is_none());
+                    prop_assert_eq!(*version, actual_version);
+                    prop_assert_eq!(txn.sequence_number(), actual_seq_num);
+                } else {
+                    prop_assert!(iter.next().is_none());
+                }
             }
         }
 
@@ -94,11 +101,12 @@ proptest! {
         // what does the expected view look like
         let mut expected_scan = BTreeMap::<AccountAddress, Vec<(u64, Version)>>::new();
         for (version, txn) in &txns {
-            let seq_num = txn.sequence_number();
-            if *version <= ledger_version && seq_num >= seq_num_offset {
-                let txn_metadatas = expected_scan.entry(txn.sender()).or_default();
-                if (txn_metadatas.len() as u64) < num_versions {
-                    txn_metadatas.push((seq_num, *version));
+            if let ReplayProtector::SequenceNumber(seq_num) = txn.replay_protector() {
+                if *version <= ledger_version && seq_num >= seq_num_offset {
+                    let txn_metadatas = expected_scan.entry(txn.sender()).or_default();
+                    if (txn_metadatas.len() as u64) < num_versions {
+                        txn_metadatas.push((seq_num, *version));
+                    }
                 }
             }
         }

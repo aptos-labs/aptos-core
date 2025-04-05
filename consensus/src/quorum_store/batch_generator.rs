@@ -138,7 +138,7 @@ impl BatchGenerator {
                 (
                     TransactionSummary::new(
                         txn.sender(),
-                        txn.sequence_number(),
+                        txn.replay_protector(),
                         txn.committed_hash(),
                     ),
                     TransactionInProgress::new(txn.gas_unit_price()),

@@ -142,6 +142,8 @@ pub enum FeatureFlag {
     DerivableAccountAbstraction,
     EnableFunctionValues,
     NewAccountsDefaultToFaStore,
+    TransactionPayloadV2,
+    OrderlessTransactions,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -379,6 +381,8 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::NewAccountsDefaultToFaStore => {
                 AptosFeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE
             },
+            FeatureFlag::TransactionPayloadV2 => AptosFeatureFlag::TRANSACTION_PAYLOAD_V2,
+            FeatureFlag::OrderlessTransactions => AptosFeatureFlag::ORDERLESS_TRANSACTIONS,
         }
     }
 }
@@ -543,6 +547,8 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE => {
                 FeatureFlag::NewAccountsDefaultToFaStore
             },
+            AptosFeatureFlag::TRANSACTION_PAYLOAD_V2 => FeatureFlag::TransactionPayloadV2,
+            AptosFeatureFlag::ORDERLESS_TRANSACTIONS => FeatureFlag::OrderlessTransactions,
         }
     }
 }

@@ -60,7 +60,7 @@ pub struct BatchProofQueue {
     author_to_batches: HashMap<PeerId, BTreeMap<BatchSortKey, BatchInfo>>,
     // Map of Batch key to QueueItem containing Batch data and proofs
     items: HashMap<BatchKey, QueueItem>,
-    // Number of unexpired and uncommitted proofs in which the txn_summary = (sender, sequence number, hash, expiration)
+    // Number of unexpired and uncommitted proofs in which the txn_summary = (sender, replay protector, hash, expiration)
     // has been included. We only count those batches that are in both author_to_batches and items along with proofs.
     txn_summary_num_occurrences: HashMap<TxnSummaryWithExpiration, u64>,
     // Expiration index
