@@ -1,5 +1,5 @@
 {
-  "resource_version": 38,
+  "resource_version": 10000,
   "metadata": {
     "version": 3,
     "sources": [
@@ -792,6 +792,57 @@
                   "filter": {},
                   "limit": 100
                 }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "ledger_infos",
+              "schema": "processor_metadata"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "ledger_infos",
+              "custom_root_fields": {}
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "chain_id"
+                  ],
+                  "filter": {}
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "processor_status",
+              "schema": "processor_metadata"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "processor_status",
+              "custom_root_fields": {}
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "last_success_version",
+                    "processor",
+                    "last_transaction_timestamp",
+                    "last_updated"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                },
+                "comment": ""
               }
             ]
           },
@@ -2081,23 +2132,6 @@
           },
           {
             "table": {
-              "name": "ledger_infos",
-              "schema": "public"
-            },
-            "select_permissions": [
-              {
-                "role": "anonymous",
-                "permission": {
-                  "columns": [
-                    "chain_id"
-                  ],
-                  "filter": {}
-                }
-              }
-            ]
-          },
-          {
-            "table": {
               "name": "num_active_delegator_per_pool",
               "schema": "public"
             },
@@ -2108,27 +2142,6 @@
                   "columns": [
                     "num_active_delegator",
                     "pool_address"
-                  ],
-                  "filter": {},
-                  "limit": 100
-                }
-              }
-            ]
-          },
-          {
-            "table": {
-              "name": "processor_status",
-              "schema": "public"
-            },
-            "select_permissions": [
-              {
-                "role": "anonymous",
-                "permission": {
-                  "columns": [
-                    "last_success_version",
-                    "last_transaction_timestamp",
-                    "last_updated",
-                    "processor"
                   ],
                   "filter": {},
                   "limit": 100
@@ -2314,6 +2327,12 @@
                 }
               }
             ]
+          },
+          {
+            "table": {
+              "name": "token_datas_v2",
+              "schema": "public"
+            }
           },
           {
             "table": {
