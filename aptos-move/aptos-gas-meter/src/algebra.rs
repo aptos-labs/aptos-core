@@ -213,6 +213,10 @@ where
             self.execution_gas_used += amount;
         }
         if self.feature_version >= 7 && self.execution_gas_used > self.max_execution_gas {
+            // println!(
+            //     "self.execution_gas_used:{}, self.max_execution_gas:{}",
+            //     self.execution_gas_used, self.max_execution_gas
+            // );
             Err(PartialVMError::new(StatusCode::EXECUTION_LIMIT_REACHED))
         } else {
             Ok(())
