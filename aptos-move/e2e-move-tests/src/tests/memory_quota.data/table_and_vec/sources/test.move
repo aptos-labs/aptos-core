@@ -1,4 +1,4 @@
-module 0xbeef::test {
+module publisher::test {
     use std::vector;
     use aptos_std::table_with_length as table;
 

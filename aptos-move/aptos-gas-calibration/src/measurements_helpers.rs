@@ -128,7 +128,8 @@ pub fn record_gas_usage(
     iterations: u64,
 ) -> GasMeasurements {
     // publish test-package under module address
-    let creator = executor.new_account_at(address);
+    // TODO[Orderless]: Check if this needs to udpated to accommodate stateless accounts
+    let creator = executor.new_account_at(address, Some(0));
 
     let mut gas_measurement = GasMeasurements {
         regular_meter: Vec::new(),

@@ -5,3 +5,6 @@ version = "0.0.0"
 [dependencies]
 AptosFramework = { local = "../../../../framework/aptos-framework" }
 AptosStdlib = { local = "../../../../framework/aptos-stdlib" }
+
+[addresses]
+publisher = "_"

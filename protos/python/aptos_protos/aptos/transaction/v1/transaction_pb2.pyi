@@ -766,6 +766,7 @@ class TransactionPayload(_message.Message):
         "script_payload",
         "write_set_payload",
         "multisig_payload",
+        "extra_config_v1",
     ]
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
@@ -785,11 +786,13 @@ class TransactionPayload(_message.Message):
     SCRIPT_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     WRITE_SET_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     MULTISIG_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
+    EXTRA_CONFIG_V1_FIELD_NUMBER: _ClassVar[int]
     type: TransactionPayload.Type
     entry_function_payload: EntryFunctionPayload
     script_payload: ScriptPayload
     write_set_payload: WriteSetPayload
     multisig_payload: MultisigPayload
+    extra_config_v1: ExtraConfigV1
     def __init__(
         self,
         type: _Optional[_Union[TransactionPayload.Type, str]] = ...,
@@ -797,6 +800,19 @@ class TransactionPayload(_message.Message):
         script_payload: _Optional[_Union[ScriptPayload, _Mapping]] = ...,
         write_set_payload: _Optional[_Union[WriteSetPayload, _Mapping]] = ...,
         multisig_payload: _Optional[_Union[MultisigPayload, _Mapping]] = ...,
+        extra_config_v1: _Optional[_Union[ExtraConfigV1, _Mapping]] = ...,
+    ) -> None: ...
+
+class ExtraConfigV1(_message.Message):
+    __slots__ = ["multisig_address", "replay_protection_nonce"]
+    MULTISIG_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    REPLAY_PROTECTION_NONCE_FIELD_NUMBER: _ClassVar[int]
+    multisig_address: str
+    replay_protection_nonce: int
+    def __init__(
+        self,
+        multisig_address: _Optional[str] = ...,
+        replay_protection_nonce: _Optional[int] = ...,
     ) -> None: ...
 
 class EntryFunctionPayload(_message.Message):
