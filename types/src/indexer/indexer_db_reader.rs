@@ -10,14 +10,27 @@ use crate::{
         state_value::StateValue,
         table::{TableHandle, TableInfo},
     },
-    transaction::{AccountOrderedTransactionsWithProof, Version},
+    transaction::{AccountOrderedTransactionsWithProof, ReplayProtector, Version},
 };
 use anyhow::Result;
+use aptos_crypto::HashValue;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum Order {
     Ascending,
     Descending,
+}
+
+// Question[Orderless]: Do we need any more information here? How about gas_used and block timestamp?
+// Question[Orderless]: As this struct is stored in the DB, do changes to this struct break the DB?
+// Question[Orderless]: What's the right file to define this struct?
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IndexedTransactionSummary {
+    pub sender: AccountAddress,
+    pub version: Version,
+    pub transaction_hash: HashValue,
+    pub replay_protector: ReplayProtector,
 }
 
 pub trait IndexerReader: Send + Sync {
