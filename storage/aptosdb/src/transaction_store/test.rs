@@ -35,7 +35,7 @@ proptest! {
                 .expect("All should be user transactions here.");
             prop_assert_eq!(
                 store
-                    .get_account_transaction_version(
+                    .get_account_ordered_transaction_version(
                         user_txn.sender(),
                         user_txn.sequence_number(),
                         ledger_version
@@ -71,7 +71,7 @@ proptest! {
         // can we just get all the account transaction versions individually
 
         for (version, txn) in &txns {
-            let mut iter = store.get_account_transaction_version_iter(
+            let mut iter = store.get_account_ordered_transactions_iter(
                 txn.sender(),
                 txn.sequence_number(),
                 1, /* num_versions */
@@ -113,7 +113,7 @@ proptest! {
             .keys()
             .map(|address| {
                 let txn_metadatas = store
-                    .get_account_transaction_version_iter(
+                    .get_account_ordered_transactions_iter(
                         *address,
                         seq_num_offset,
                         num_versions,
