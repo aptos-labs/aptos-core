@@ -3001,6 +3001,8 @@ pub struct CompiledScript {
     pub type_parameters: Vec<AbilitySet>,
 
     pub parameters: SignatureIndex,
+
+    pub access_specifiers: Option<Vec<AccessSpecifier>>,
 }
 
 impl CompiledScript {
@@ -3121,6 +3123,8 @@ impl Arbitrary for CompiledScript {
                         metadata: vec![],
                         type_parameters,
                         parameters,
+                        // TODO(#16278): access specifiers
+                        access_specifiers: None,
                         code,
                     }
                 },
@@ -3403,6 +3407,7 @@ pub fn empty_script() -> CompiledScript {
 
         type_parameters: vec![],
         parameters: SignatureIndex(0),
+        access_specifiers: None,
         code: CodeUnit {
             locals: SignatureIndex(0),
             code: vec![Bytecode::Ret],
