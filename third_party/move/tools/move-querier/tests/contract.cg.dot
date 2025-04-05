@@ -1,0 +1,62 @@
+
+digraph G {
+    label = "Module: 67b7a2f50e0a592beb5e3aab9780f11cece6ba25ae7de78fc91e22a658ef1a4e::contract
+    use 0000000000000000000000000000000000000000000000000000000000000001::coin;
+    use 0000000000000000000000000000000000000000000000000000000000000001::signer;
+    use 190d44266241744264b964a37b8f09863167a12d3e70cda39376cfb4e3561e12::router;
+    use c7efb4076dbe143cbcd98cfaaa929ecfc8f299203dfff63b95ccb6bfe19850fa::router as 0router;";
+    labelloc = "t";
+    labeljust = "l";
+    fontsize = 36;
+
+    graph [
+	rankdir=LR,
+	ranksep=1.0,
+	nodesep=0.75,
+	splines=true,
+	concentrate=false
+    ];
+
+    node [
+	shape=ellipse,
+	fontsize=24
+    ];
+
+    edge [
+	arrowsize=1.5
+    ];
+
+    0 [label="0router::swap_exact_input<T0, T1>(&signer, u64, u64)"];
+    1 [label="coin::balance<T0>(address) -> u64"];
+    2 [label="coin::deposit<T0>(address, Coin<T0>)"];
+    3 [label="coin::value<T0>(&Coin<T0>) -> u64"];
+    4 [label="coin::withdraw<T0>(&signer, u64) -> Coin<T0>"];
+    5 [label="entry public abx<T0, T1, T2>(&signer, u64, u8, u8, u64)"];
+    6 [label="public internal_abx<T0, T1, T2>(&signer, Coin<T0>, u8, u8, u64)"];
+    7 [label="public internal_buy_x<T0, T1, T2>(&signer, Coin<T1>, u8) -> Coin<T0>"];
+    8 [label="public internal_sell_x<T0, T1, T2>(&signer, Coin<T0>, u8) -> Coin<T1>"];
+    9 [label="router::swap_exact_coin_for_coin<T0, T1, T2>(Coin<T0>, u64) -> Coin<T1>"];
+    10 [label="signer::address_of(&signer) -> address"];
+    5 -> 4 [label="[T0 as T0]", fontsize=24];
+    5 -> 6 [label="[T0 as T0, T1 as T1, T2 as T2]", fontsize=24];
+    6 -> 1 [label="[T0 as T0]", fontsize=24];
+    6 -> 2 [label="[T0 as T0]", fontsize=24];
+    6 -> 3 [label="[T0 as T0]", fontsize=24];
+    6 -> 7 [label="[T0 as T0, T1 as T1, T2 as T2]", fontsize=24];
+    6 -> 8 [label="[T0 as T0, T1 as T1, T2 as T2]", fontsize=24];
+    6 -> 10 [label="", fontsize=24];
+    7 -> 0 [label="[T1 as T0, T0 as T1]", fontsize=24];
+    7 -> 1 [label="[T0 as T0]", fontsize=24];
+    7 -> 2 [label="[T1 as T0]", fontsize=24];
+    7 -> 3 [label="[T1 as T0]", fontsize=24];
+    7 -> 4 [label="[T0 as T0]", fontsize=24];
+    7 -> 9 [label="[T1 as T0, T0 as T1, T2 as T2]", fontsize=24];
+    7 -> 10 [label="", fontsize=24];
+    8 -> 0 [label="[T0 as T0, T1 as T1]", fontsize=24];
+    8 -> 1 [label="[T1 as T0]", fontsize=24];
+    8 -> 2 [label="[T0 as T0]", fontsize=24];
+    8 -> 3 [label="[T0 as T0]", fontsize=24];
+    8 -> 4 [label="[T1 as T0]", fontsize=24];
+    8 -> 9 [label="[T0 as T0, T1 as T1, T2 as T2]", fontsize=24];
+    8 -> 10 [label="", fontsize=24];
+}

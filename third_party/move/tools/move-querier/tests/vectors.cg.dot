@@ -1,0 +1,32 @@
+
+digraph G {
+    label = "Module: bae0f22a5e4d77d04d4c68d3f89d853885b131ecf6991b75b858c8929fc6e9cf::vectors
+    use 0000000000000000000000000000000000000000000000000000000000000001::option;";
+    labelloc = "t";
+    labeljust = "l";
+    fontsize = 36;
+
+    graph [
+	rankdir=LR,
+	ranksep=1.0,
+	nodesep=0.75,
+	splines=true,
+	concentrate=false
+    ];
+
+    node [
+	shape=ellipse,
+	fontsize=24
+    ];
+
+    edge [
+	arrowsize=1.5
+    ];
+
+    0 [label="option::none<T0>() -> Option<T0>"];
+    1 [label="option::some<T0>(T0) -> Option<T0>"];
+    2 [label="public to_option<T0: copy>(&vector<T0>) -> Option<T0>"];
+    3 [label="public zeros(u64) -> vector<u64>"];
+    2 -> 0 [label="[T0 as T0]", fontsize=24];
+    2 -> 1 [label="[T0 as T0]", fontsize=24];
+}

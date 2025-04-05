@@ -28,6 +28,7 @@ use move_coverage::coverage_map::CoverageMap;
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
 use move_model::metadata::{CompilationMetadata, CompilerVersion, LanguageVersion};
+use move_querier::querier::{Querier, QuerierOptions};
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
@@ -63,6 +64,18 @@ pub struct Decompile {
     pub command: BytecodeCommand,
 }
 
+/// Query the Move bytecode for info like call graph and bytecode type
+///
+/// For example, if you want to generate the call graphs for bytecode `example.mv`:
+/// run `aptos move query [query comamnd] --bytecode-path /path/to/example.mv`.  Available query commands include:
+/// (1) `--dump-call-graph`: constructing the call graph(s) for the bytecode;
+/// (2) `--check-bytecode-type`: checking the type of the bytecode (`module`, `script`, or `unknown`)
+#[derive(Debug, Parser)]
+pub struct Query {
+    #[clap(flatten)]
+    pub command: BytecodeCommand,
+}
+
 #[derive(Debug, Args)]
 pub struct BytecodeCommand {
     /// Treat input file as a script (default is to treat file as a module)
@@ -91,6 +104,10 @@ pub struct BytecodeCommand {
     /// only print out the metadata and bytecode version of the target bytecode
     #[clap(long)]
     pub print_metadata_only: bool,
+
+    /// Secondary, optional options passed to different tools (e.g., `dump-call-graph` for `query`)
+    #[clap(flatten)]
+    secondary_options: SecondaryOption,
 }
 
 /// Allows to ensure that either one of both is selected (via  the `group` attribute).
@@ -110,10 +127,20 @@ pub struct BytecodeCommandInput {
     pub bytecode_path: Option<PathBuf>,
 }
 
+/// Secondary, optionl, tool-specific sub-sub-commands
+#[derive(Debug, Args)]
+pub struct SecondaryOption {
+    /// Commands to run when `query` a bytecode file.
+    /// Mandated for the `query` tool, not needed for others.
+    #[clap(flatten)]
+    query_option: QuerierOptions,
+}
+
 #[derive(Debug, Clone, Copy)]
 enum BytecodeCommandType {
     Disassemble,
     Decompile,
+    Query,
 }
 
 #[async_trait]
@@ -135,6 +162,17 @@ impl CliCommand<String> for Decompile {
 
     async fn execute(mut self) -> CliTypedResult<String> {
         self.command.execute(BytecodeCommandType::Decompile).await
+    }
+}
+
+#[async_trait]
+impl CliCommand<String> for Query {
+    fn command_name(&self) -> &'static str {
+        "Query"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<String> {
+        self.command.execute(BytecodeCommandType::Query).await
     }
 }
 
@@ -183,6 +221,10 @@ impl BytecodeCommand {
                 },
                 BytecodeCommandType::Decompile => {
                     (self.decompile(bytecode_path)?, DECOMPILER_EXTENSION)
+                },
+                BytecodeCommandType::Query => {
+                    let (output, extension) = self.query(bytecode_path)?;
+                    (output, extension)
                 },
             };
 
@@ -380,6 +422,24 @@ impl BytecodeCommand {
                 String::from_utf8(out.stderr).unwrap_or_default()
             )))
         }
+    }
+
+    fn query(&self, bytecode_path: &Path) -> Result<(String, &'static str), CliError> {
+        // Check if query command is provided
+        let query_option = self.secondary_options.query_option.clone();
+        if !query_option.has_any_true() {
+            return Err(CliError::CommandArgumentError(
+                "No desired command (e.g., --dump-call-graph | --check-bytecode-type) is provided"
+                    .to_string(),
+            ));
+        }
+        // Get a proper extension for saving the query results
+        let extension = query_option.extension();
+        // Query with specified command
+        let bytecode_bytes = read_from_file(bytecode_path)?;
+        let querier = Querier::new(query_option, bytecode_bytes);
+        let res = querier.query()?;
+        Ok((res, extension))
     }
 
     fn downgrade_to_v6(&self, file_path: &Path) -> Result<Option<NamedTempFile>, CliError> {
