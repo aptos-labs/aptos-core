@@ -1,0 +1,563 @@
+{
+  "timestamp": {
+    "seconds": "1738221494",
+    "nanos": 554632000
+  },
+  "version": "2296149225",
+  "info": {
+    "hash": "OJ6ZgbLo54vRkSXu/HW9TSPcEJcv2J3No/QXJ61yAqc=",
+    "stateChangeHash": "m2TbtUaYHUeNIOVPEbwMyNl4Oaot5Plg0ByCeGWXd2k=",
+    "eventRootHash": "1/GgkNvnRhzWMm4Zlix9gCwymUWyvkfmjJZGKOwiKZY=",
+    "gasUsed": "20",
+    "success": true,
+    "vmStatus": "Executed successfully",
+    "accumulatorRootHash": "FuRYWYl0VFKM06JIyTxT7kvYYKsvdt7PmlAcOqCU9FU=",
+    "changes": [
+      {
+        "type": "TYPE_DELETE_RESOURCE",
+        "deleteResource": {
+          "address": "0x23eac30752bcdfdc610896e50abc56237234634802b8b7b8b7ba21dfe5390e6",
+          "stateKeyHash": "ffy8nV+QK9NSrAwf9ZJH0IfI1dwSfi1QKNmSxDW3HEw=",
+          "type": {
+            "address": "0x1",
+            "module": "object",
+            "name": "ObjectGroup"
+          },
+          "typeStr": "0x1::object::ObjectGroup"
+        }
+      },
+      {
+        "type": "TYPE_DELETE_RESOURCE",
+        "deleteResource": {
+          "address": "0x142d4aaf554ebbebb41d6fab20964a6a64b5d9396f6bdacd2533479e589c4963",
+          "stateKeyHash": "fzQAjY06qXuGkbnQDXZ+5g/JWscXSTpFn85NenANg+s=",
+          "type": {
+            "address": "0x1",
+            "module": "object",
+            "name": "ObjectGroup"
+          },
+          "typeStr": "0x1::object::ObjectGroup"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x43d8f99000e4be09b1145832e9b1a98725fc7b4f63fd1ba3726b6266365fc39e",
+          "stateKeyHash": "dOhExhE4nIEDqCFvENbEAIdihmjZWeY5MadZ5Jo/wug=",
+          "type": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "CoinStore",
+            "genericTypeParams": [
+              {
+                "type": "MOVE_TYPES_STRUCT",
+                "struct": {
+                  "address": "0x1",
+                  "module": "aptos_coin",
+                  "name": "AptosCoin"
+                }
+              }
+            ]
+          },
+          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "data": "{\"coin\":{\"value\":\"80374668\"},\"deposit_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0x43d8f99000e4be09b1145832e9b1a98725fc7b4f63fd1ba3726b6266365fc39e\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"7\",\"guid\":{\"id\":{\"addr\":\"0x43d8f99000e4be09b1145832e9b1a98725fc7b4f63fd1ba3726b6266365fc39e\",\"creation_num\":\"3\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x43d8f99000e4be09b1145832e9b1a98725fc7b4f63fd1ba3726b6266365fc39e",
+          "stateKeyHash": "sozZnJkSai2ZVg5q+PwY61kth8RVENG9+8at9WjitQo=",
+          "type": {
+            "address": "0x1",
+            "module": "account",
+            "name": "Account"
+          },
+          "typeStr": "0x1::account::Account",
+          "data": "{\"authentication_key\":\"0x43d8f99000e4be09b1145832e9b1a98725fc7b4f63fd1ba3726b6266365fc39e\",\"coin_register_events\":{\"counter\":\"2\",\"guid\":{\"id\":{\"addr\":\"0x43d8f99000e4be09b1145832e9b1a98725fc7b4f63fd1ba3726b6266365fc39e\",\"creation_num\":\"0\"}}},\"guid_creation_num\":\"11\",\"key_rotation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x43d8f99000e4be09b1145832e9b1a98725fc7b4f63fd1ba3726b6266365fc39e\",\"creation_num\":\"1\"}}},\"rotation_capability_offer\":{\"for\":{\"vec\":[]}},\"sequence_number\":\"13\",\"signer_capability_offer\":{\"for\":{\"vec\":[]}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x6a03eb973cd9385d62fc2842d02a4dd6b70e52f5da77a0689e57e48d93fae1b4",
+          "stateKeyHash": "ia5CJAqvJ4lnS7nWhVMNNxhYGforZgoP0qtHcM/2+OM=",
+          "type": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "CoinStore",
+            "genericTypeParams": [
+              {
+                "type": "MOVE_TYPES_STRUCT",
+                "struct": {
+                  "address": "0x1",
+                  "module": "aptos_coin",
+                  "name": "AptosCoin"
+                }
+              }
+            ]
+          },
+          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "data": "{\"coin\":{\"value\":\"10863232439\"},\"deposit_events\":{\"counter\":\"149335\",\"guid\":{\"id\":{\"addr\":\"0x6a03eb973cd9385d62fc2842d02a4dd6b70e52f5da77a0689e57e48d93fae1b4\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"23\",\"guid\":{\"id\":{\"addr\":\"0x6a03eb973cd9385d62fc2842d02a4dd6b70e52f5da77a0689e57e48d93fae1b4\",\"creation_num\":\"3\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x9d9ae026d65ad917bffcc6984370468e751ec3e9cd7a69f114c8a58c34d408b7",
+          "stateKeyHash": "e3BUygmgtbbu9RwYj5qaEWzxrbT3Ynu8up05xX4yDTY=",
+          "type": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "CoinStore",
+            "genericTypeParams": [
+              {
+                "type": "MOVE_TYPES_STRUCT",
+                "struct": {
+                  "address": "0x1",
+                  "module": "aptos_coin",
+                  "name": "AptosCoin"
+                }
+              }
+            ]
+          },
+          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "data": "{\"coin\":{\"value\":\"12368271121\"},\"deposit_events\":{\"counter\":\"26238\",\"guid\":{\"id\":{\"addr\":\"0x9d9ae026d65ad917bffcc6984370468e751ec3e9cd7a69f114c8a58c34d408b7\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"8\",\"guid\":{\"id\":{\"addr\":\"0x9d9ae026d65ad917bffcc6984370468e751ec3e9cd7a69f114c8a58c34d408b7\",\"creation_num\":\"3\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d",
+          "stateKeyHash": "ONRyFv1LAFKMA5VH4tL7lV3lruUBZ/3Catz0W/6ZysM=",
+          "type": {
+            "address": "0x1",
+            "module": "object",
+            "name": "ObjectCore"
+          },
+          "typeStr": "0x1::object::ObjectCore",
+          "data": "{\"allow_ungated_transfer\":true,\"guid_creation_num\":\"1125899906842626\",\"owner\":\"0x36f08a98302079f5bd60d811c0187171a7edaa352ae9907ae21a7014ff2dbc60\",\"transfer_events\":{\"counter\":\"10\",\"guid\":{\"id\":{\"addr\":\"0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d\",\"creation_num\":\"1125899906842624\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d",
+          "stateKeyHash": "ONRyFv1LAFKMA5VH4tL7lV3lruUBZ/3Catz0W/6ZysM=",
+          "type": {
+            "address": "0x4",
+            "module": "property_map",
+            "name": "PropertyMap"
+          },
+          "typeStr": "0x4::property_map::PropertyMap",
+          "data": "{\"inner\":{\"data\":[{\"key\":\"elemental\",\"value\":{\"type\":9,\"value\":\"0x0446495245\"}},{\"key\":\"category\",\"value\":{\"type\":9,\"value\":\"0x03646f67\"}},{\"key\":\"grade\",\"value\":{\"type\":9,\"value\":\"0x06436f6d6d6f6e\"}}]}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d",
+          "stateKeyHash": "ONRyFv1LAFKMA5VH4tL7lV3lruUBZ/3Catz0W/6ZysM=",
+          "type": {
+            "address": "0x4",
+            "module": "royalty",
+            "name": "Royalty"
+          },
+          "typeStr": "0x4::royalty::Royalty",
+          "data": "{\"denominator\":\"100\",\"numerator\":\"5\",\"payee_address\":\"0x9d9ae026d65ad917bffcc6984370468e751ec3e9cd7a69f114c8a58c34d408b7\"}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d",
+          "stateKeyHash": "ONRyFv1LAFKMA5VH4tL7lV3lruUBZ/3Catz0W/6ZysM=",
+          "type": {
+            "address": "0x4",
+            "module": "token",
+            "name": "Token"
+          },
+          "typeStr": "0x4::token::Token",
+          "data": "{\"collection\":{\"inner\":\"0x9d9ae026d65ad917bffcc6984370468e751ec3e9cd7a69f114c8a58c34d408b7\"},\"description\":\"I am a Sidekick, always standing by my Villain. When the bond between a Villain and me deepens, something special could happen!\",\"index\":\"0\",\"mutation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d\",\"creation_num\":\"1125899906842625\"}}},\"name\":\"\",\"uri\":\"https://public.vir.supervlabs.io/virweb/nft/sidekicks/shiba.png\"}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d",
+          "stateKeyHash": "ONRyFv1LAFKMA5VH4tL7lV3lruUBZ/3Catz0W/6ZysM=",
+          "type": {
+            "address": "0x4",
+            "module": "token",
+            "name": "TokenIdentifiers"
+          },
+          "typeStr": "0x4::token::TokenIdentifiers",
+          "data": "{\"index\":{\"value\":\"157156\"},\"name\":{\"padding\":\"0x000000000000000000\",\"value\":\"Shiba #7141\"}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d",
+          "stateKeyHash": "ONRyFv1LAFKMA5VH4tL7lV3lruUBZ/3Catz0W/6ZysM=",
+          "type": {
+            "address": "0x9d518b9b84f327eafc5f6632200ea224a818a935ffd6be5d78ada250bbc44a6",
+            "module": "gacha_rounds",
+            "name": "GachaRoundLog"
+          },
+          "typeStr": "0x9d518b9b84f327eafc5f6632200ea224a818a935ffd6be5d78ada250bbc44a6::gacha_rounds::GachaRoundLog",
+          "data": "{\"current_round\":\"117\",\"selected_round\":\"0\",\"updated_at\":\"1718721391549743\"}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d",
+          "stateKeyHash": "ONRyFv1LAFKMA5VH4tL7lV3lruUBZ/3Catz0W/6ZysM=",
+          "type": {
+            "address": "0x9d518b9b84f327eafc5f6632200ea224a818a935ffd6be5d78ada250bbc44a6",
+            "module": "random",
+            "name": "RandOutputLog"
+          },
+          "typeStr": "0x9d518b9b84f327eafc5f6632200ea224a818a935ffd6be5d78ada250bbc44a6::random::RandOutputLog",
+          "data": "{\"list\":[{\"max\":\"100000000\",\"min\":\"0\",\"result\":\"41967892\"},{\"max\":\"13\",\"min\":\"1\",\"result\":\"1\"}]}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d",
+          "stateKeyHash": "ONRyFv1LAFKMA5VH4tL7lV3lruUBZ/3Catz0W/6ZysM=",
+          "type": {
+            "address": "0x9d518b9b84f327eafc5f6632200ea224a818a935ffd6be5d78ada250bbc44a6",
+            "module": "sidekick",
+            "name": "Sidekick"
+          },
+          "typeStr": "0x9d518b9b84f327eafc5f6632200ea224a818a935ffd6be5d78ada250bbc44a6::sidekick::Sidekick",
+          "data": "{\"salt\":\"9588\",\"updated_at\":\"1718721391\"}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d",
+          "stateKeyHash": "ONRyFv1LAFKMA5VH4tL7lV3lruUBZ/3Catz0W/6ZysM=",
+          "type": {
+            "address": "0xfacedd48d64a2ee04cbdf5c17608bd7a5ea9144fa1fe65320c588fffea131de3",
+            "module": "orm_object",
+            "name": "OrmObject"
+          },
+          "typeStr": "0xfacedd48d64a2ee04cbdf5c17608bd7a5ea9144fa1fe65320c588fffea131de3::orm_object::OrmObject",
+          "data": "{\"class\":{\"inner\":\"0x9d9ae026d65ad917bffcc6984370468e751ec3e9cd7a69f114c8a58c34d408b7\"},\"creator\":{\"inner\":\"0x9d518b9b84f327eafc5f6632200ea224a818a935ffd6be5d78ada250bbc44a6\"},\"delete_ref\":{\"vec\":[{\"self\":\"0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d\"}]},\"extend_ref\":{\"vec\":[{\"self\":\"0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d\"}]},\"transfer_ref\":{\"vec\":[{\"self\":\"0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d\"}]}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d",
+          "stateKeyHash": "ONRyFv1LAFKMA5VH4tL7lV3lruUBZ/3Catz0W/6ZysM=",
+          "type": {
+            "address": "0xfacedd48d64a2ee04cbdf5c17608bd7a5ea9144fa1fe65320c588fffea131de3",
+            "module": "orm_object",
+            "name": "OrmToken"
+          },
+          "typeStr": "0xfacedd48d64a2ee04cbdf5c17608bd7a5ea9144fa1fe65320c588fffea131de3::orm_object::OrmToken",
+          "data": "{\"burn_ref\":{\"vec\":[{\"inner\":{\"vec\":[{\"self\":\"0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d\"}]},\"self\":{\"vec\":[]}}]},\"mutator_ref\":{\"vec\":[{\"self\":\"0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d\"}]},\"property_mutator_ref\":{\"vec\":[{\"self\":\"0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d\"}]},\"royalty_mutator_ref\":{\"vec\":[{\"inner\":{\"self\":\"0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d\"}}]}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26",
+          "stateKeyHash": "YyxEM2ISNprB8ZNNbepmRFb5Yl7G+bHX/jJlJ/MnbD8=",
+          "type": {
+            "address": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26",
+            "module": "biddings_v2",
+            "name": "BidStore"
+          },
+          "typeStr": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26::biddings_v2::BidStore",
+          "data": "{\"accept_collection_bid_events\":{\"counter\":\"30363\",\"guid\":{\"id\":{\"addr\":\"0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26\",\"creation_num\":\"23\"}}},\"accept_token_bid_events\":{\"counter\":\"627\",\"guid\":{\"id\":{\"addr\":\"0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26\",\"creation_num\":\"20\"}}},\"delete_collection_bid_events\":{\"counter\":\"40618\",\"guid\":{\"id\":{\"addr\":\"0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26\",\"creation_num\":\"22\"}}},\"delete_token_bid_events\":{\"counter\":\"3852\",\"guid\":{\"id\":{\"addr\":\"0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26\",\"creation_num\":\"19\"}}},\"insert_collection_bid_events\":{\"counter\":\"113573\",\"guid\":{\"id\":{\"addr\":\"0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26\",\"creation_num\":\"21\"}}},\"insert_token_bid_events\":{\"counter\":\"11661\",\"guid\":{\"id\":{\"addr\":\"0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26\",\"creation_num\":\"18\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26",
+          "stateKeyHash": "GziPDIxPViVKmcTdIO/LNrfAEGOLVL1z45HHLE9Rf8g=",
+          "type": {
+            "address": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26",
+            "module": "listings_v2",
+            "name": "ListingStore"
+          },
+          "typeStr": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26::listings_v2::ListingStore",
+          "data": "{\"buy_events\":{\"counter\":\"60919\",\"guid\":{\"id\":{\"addr\":\"0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26\",\"creation_num\":\"17\"}}},\"delete_listing_events\":{\"counter\":\"45632\",\"guid\":{\"id\":{\"addr\":\"0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26\",\"creation_num\":\"16\"}}},\"insert_listing_events\":{\"counter\":\"133182\",\"guid\":{\"id\":{\"addr\":\"0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26\",\"creation_num\":\"15\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_TABLE_ITEM",
+        "writeTableItem": {
+          "stateKeyHash": "bkso1A+YoQamUWNTCSTA3LQME0nTqpFdEItNbPwd2xk=",
+          "handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+          "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+          "data": {
+            "key": "\"0x619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935\"",
+            "keyType": "address",
+            "value": "\"113819573377132500\"",
+            "valueType": "u128"
+          }
+        }
+      }
+    ]
+  },
+  "epoch": "10140",
+  "blockHeight": "283774916",
+  "type": "TRANSACTION_TYPE_USER",
+  "sizeInfo": {
+    "transactionBytes": 306,
+    "eventSizeInfo": [
+      {
+        "typeTagBytes": 55,
+        "totalBytes": 199
+      },
+      {
+        "typeTagBytes": 65,
+        "totalBytes": 225
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 108
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 108
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 108
+      },
+      {
+        "typeTagBytes": 55,
+        "totalBytes": 199
+      },
+      {
+        "typeTagBytes": 66,
+        "totalBytes": 258
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 103
+      }
+    ],
+    "writeOpSizeInfo": [
+      {
+        "keyBytes": 87
+      },
+      {
+        "keyBytes": 87
+      },
+      {
+        "keyBytes": 138,
+        "valueBytes": 105
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 147
+      },
+      {
+        "keyBytes": 138,
+        "valueBytes": 105
+      },
+      {
+        "keyBytes": 138,
+        "valueBytes": 105
+      },
+      {
+        "keyBytes": 87,
+        "valueBytes": 1427
+      },
+      {
+        "keyBytes": 89,
+        "valueBytes": 288
+      },
+      {
+        "keyBytes": 93,
+        "valueBytes": 144
+      },
+      {
+        "keyBytes": 66,
+        "valueBytes": 16
+      }
+    ]
+  },
+  "user": {
+    "request": {
+      "sender": "0x43d8f99000e4be09b1145832e9b1a98725fc7b4f63fd1ba3726b6266365fc39e",
+      "sequenceNumber": "12",
+      "maxGasAmount": "40",
+      "gasUnitPrice": "100",
+      "expirationTimestampSecs": {
+        "seconds": "1738221583"
+      },
+      "payload": {
+        "type": "TYPE_ENTRY_FUNCTION_PAYLOAD",
+        "entryFunctionPayload": {
+          "function": {
+            "module": {
+              "address": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26",
+              "name": "biddings_v2"
+            },
+            "name": "unlist_and_accept_token_bid"
+          },
+          "arguments": [
+            "{\"inner\":\"0x23eac30752bcdfdc610896e50abc56237234634802b8b7b8b7ba21dfe5390e6\"}",
+            "{\"inner\":\"0x142d4aaf554ebbebb41d6fab20964a6a64b5d9396f6bdacd2533479e589c4963\"}"
+          ],
+          "entryFunctionIdStr": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26::biddings_v2::unlist_and_accept_token_bid"
+        }
+      },
+      "signature": {
+        "type": "TYPE_ED25519",
+        "ed25519": {
+          "publicKey": "wT6+JAv+YgeoKCF1m7bIRaOXGxfZ1koNm8GRbNTrwEE=",
+          "signature": "cC2td9GtpSUZKQW6z7LHzOPGzNrh4OHheFAaK1oz/tD8mSeoxZhfumwmSP1duLYd+iDk40QgK6KHNcbaIMfWDw=="
+        }
+      }
+    },
+    "events": [
+      {
+        "key": {
+          "creationNumber": "1125899906842624",
+          "accountAddress": "0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d"
+        },
+        "sequenceNumber": "8",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "object",
+            "name": "TransferEvent"
+          }
+        },
+        "typeStr": "0x1::object::TransferEvent",
+        "data": "{\"from\":\"0x23eac30752bcdfdc610896e50abc56237234634802b8b7b8b7ba21dfe5390e6\",\"object\":\"0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d\",\"to\":\"0x43d8f99000e4be09b1145832e9b1a98725fc7b4f63fd1ba3726b6266365fc39e\"}"
+      },
+      {
+        "key": {
+          "creationNumber": "16",
+          "accountAddress": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26"
+        },
+        "sequenceNumber": "45631",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26",
+            "module": "listings_v2",
+            "name": "DeleteListingEvent"
+          }
+        },
+        "typeStr": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26::listings_v2::DeleteListingEvent",
+        "data": "{\"listing\":{\"inner\":\"0x23eac30752bcdfdc610896e50abc56237234634802b8b7b8b7ba21dfe5390e6\"},\"price\":\"9000000\",\"seller\":\"0x43d8f99000e4be09b1145832e9b1a98725fc7b4f63fd1ba3726b6266365fc39e\",\"timestamp\":\"1738221494554632\",\"token\":{\"inner\":\"0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d\"}}"
+      },
+      {
+        "key": {
+          "creationNumber": "2",
+          "accountAddress": "0x9d9ae026d65ad917bffcc6984370468e751ec3e9cd7a69f114c8a58c34d408b7"
+        },
+        "sequenceNumber": "26237",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "DepositEvent"
+          }
+        },
+        "typeStr": "0x1::coin::DepositEvent",
+        "data": "{\"amount\":\"150000\"}"
+      },
+      {
+        "key": {
+          "creationNumber": "2",
+          "accountAddress": "0x6a03eb973cd9385d62fc2842d02a4dd6b70e52f5da77a0689e57e48d93fae1b4"
+        },
+        "sequenceNumber": "149334",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "DepositEvent"
+          }
+        },
+        "typeStr": "0x1::coin::DepositEvent",
+        "data": "{\"amount\":\"75000\"}"
+      },
+      {
+        "key": {
+          "creationNumber": "2",
+          "accountAddress": "0x43d8f99000e4be09b1145832e9b1a98725fc7b4f63fd1ba3726b6266365fc39e"
+        },
+        "sequenceNumber": "4",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "DepositEvent"
+          }
+        },
+        "typeStr": "0x1::coin::DepositEvent",
+        "data": "{\"amount\":\"2775000\"}"
+      },
+      {
+        "key": {
+          "creationNumber": "1125899906842624",
+          "accountAddress": "0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d"
+        },
+        "sequenceNumber": "9",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "object",
+            "name": "TransferEvent"
+          }
+        },
+        "typeStr": "0x1::object::TransferEvent",
+        "data": "{\"from\":\"0x43d8f99000e4be09b1145832e9b1a98725fc7b4f63fd1ba3726b6266365fc39e\",\"object\":\"0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d\",\"to\":\"0x36f08a98302079f5bd60d811c0187171a7edaa352ae9907ae21a7014ff2dbc60\"}"
+      },
+      {
+        "key": {
+          "creationNumber": "20",
+          "accountAddress": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26"
+        },
+        "sequenceNumber": "626",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26",
+            "module": "biddings_v2",
+            "name": "AcceptTokenBidEvent"
+          }
+        },
+        "typeStr": "0xe11c12ec495f3989c35e1c6a0af414451223305b579291fc8f3d9d0575a23c26::biddings_v2::AcceptTokenBidEvent",
+        "data": "{\"bid\":{\"inner\":\"0x142d4aaf554ebbebb41d6fab20964a6a64b5d9396f6bdacd2533479e589c4963\"},\"bid_buyer\":\"0x36f08a98302079f5bd60d811c0187171a7edaa352ae9907ae21a7014ff2dbc60\",\"bid_seller\":\"0x43d8f99000e4be09b1145832e9b1a98725fc7b4f63fd1ba3726b6266365fc39e\",\"price\":\"3000000\",\"timestamp\":\"1738221494554632\",\"token\":{\"inner\":\"0xdb3751353dd2d7edda6a3443a71a2656c2c477caebb3bce0ae50941741fcf12d\"}}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "transaction_fee",
+            "name": "FeeStatement"
+          }
+        },
+        "typeStr": "0x1::transaction_fee::FeeStatement",
+        "data": "{\"execution_gas_units\":\"8\",\"io_gas_units\":\"13\",\"storage_fee_octas\":\"0\",\"storage_fee_refund_octas\":\"112160\",\"total_charge_gas_units\":\"20\"}"
+      }
+    ]
+  }
+}
