@@ -332,8 +332,9 @@ fn handle_committed_blocks(
     root: Arc<Mutex<LedgerInfoWithSignatures>>,
     ledger_info: LedgerInfoWithSignatures,
 ) {
-    // grab the lock for whole section to avoid inconsistent views
+    // Lock the root for the entire callback (to avoid inconsistent views across stores)
     let mut root = root.lock();
+
     // Remove the committed blocks from the payload and pending stores
     block_payload_store
         .lock()
