@@ -33,10 +33,10 @@ struct PackageOverride {
 
 impl PackageOverride {
     /// Uses the provided build options to build multiple packages from the specified paths.
-    fn new(package_paths: Vec<String>, build_options: BuildOptions) -> anyhow::Result<Self> {
+    fn new(package_paths: Vec<PathBuf>, build_options: BuildOptions) -> anyhow::Result<Self> {
         let packages = package_paths
             .into_iter()
-            .map(|path| BuiltPackage::build(PathBuf::from(&path), build_options.clone()))
+            .map(|path| BuiltPackage::build(path, build_options.clone()))
             .collect::<anyhow::Result<_>>()?;
         Ok(Self {
             packages,
@@ -62,9 +62,11 @@ impl OverrideConfig {
         additional_enabled_features: Vec<FeatureFlag>,
         additional_disabled_features: Vec<FeatureFlag>,
         gas_feature_version: Option<u64>,
-        override_packages: Vec<String>,
+        override_packages: Vec<PathBuf>,
+        experimental_features: Vec<String>,
     ) -> anyhow::Result<Self> {
-        let build_options = BuildOptions::move_2();
+        let mut build_options = BuildOptions::move_2();
+        build_options.experiments = experimental_features;
         let package_override = PackageOverride::new(override_packages, build_options)?;
 
         if !additional_enabled_features

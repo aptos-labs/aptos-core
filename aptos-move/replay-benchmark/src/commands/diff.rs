@@ -6,7 +6,7 @@ use crate::{
     diff::TransactionDiffBuilder,
     execution::execute_workload,
     state_view::ReadSet,
-    workload::{TransactionBlock, Workload},
+    workload::{BlockIndex, TransactionBlock, Workload},
 };
 use anyhow::{anyhow, bail};
 use aptos_logger::Level;
@@ -28,6 +28,12 @@ pub struct DiffCommand {
     #[clap(long, help = "File where the input states are saved")]
     inputs_file: String,
 
+    #[clap(
+        long,
+        help = "Path to the folder where transactions_file and inputs_file are saved"
+    )]
+    input_dir: Option<PathBuf>,
+
     #[clap(long, help = "File where the other input states are saved")]
     other_inputs_file: String,
 
@@ -44,15 +50,37 @@ pub struct DiffCommand {
         help = "If true, when comparing output diffs changes related to gas usage are ignored"
     )]
     allow_different_gas_usage: bool,
+
+    #[clap(long, help = "Transaction data contains source code information")]
+    with_source_code: bool,
 }
 
 impl DiffCommand {
     pub async fn diff_outputs(self) -> anyhow::Result<()> {
         init_logger_and_metrics(self.log_level);
 
-        let txn_blocks_bytes = fs::read(PathBuf::from(&self.transactions_file)).await?;
-        let txn_blocks: Vec<TransactionBlock> = bcs::from_bytes(&txn_blocks_bytes)
-            .map_err(|err| anyhow!("Error when deserializing blocks of transactions: {:?}", err))?;
+        let input = if let Some(path) = self.input_dir.clone() {
+            path
+        } else {
+            PathBuf::from(".")
+        };
+        let txn_blocks_bytes = fs::read(input.join(self.transactions_file.clone())).await?;
+
+        let txn_blocks: Vec<TransactionBlock> = if !self.with_source_code {
+            bcs::from_bytes(&txn_blocks_bytes).map_err(|err| {
+                anyhow!("Error when deserializing blocks of transactions: {:?}", err)
+            })?
+        } else {
+            let block_index: Vec<BlockIndex> =
+                bcs::from_bytes(&txn_blocks_bytes).map_err(|err| {
+                    anyhow!("Error when deserializing blocks of transactions: {:?}", err)
+                })?;
+            block_index
+                .into_iter()
+                .map(|block_index| block_index.transaction_block)
+                .collect()
+        };
+
         if txn_blocks.is_empty() {
             bail!("There must be at least one transaction to execute");
         }

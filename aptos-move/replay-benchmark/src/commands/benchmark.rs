@@ -5,7 +5,7 @@ use crate::{
     commands::init_logger_and_metrics,
     runner::{BenchmarkRunner, ReplayBlock},
     state_view::ReadSet,
-    workload::TransactionBlock,
+    workload::{BlockIndex, TransactionBlock},
 };
 use anyhow::{anyhow, bail};
 use aptos_logger::Level;
@@ -30,6 +30,12 @@ pub struct BenchmarkCommand {
 
     #[clap(long, help = "File where the input states are saved")]
     inputs_file: String,
+
+    #[clap(
+        long,
+        help = "Optional path to the folder where the downloaded transactions is saved"
+    )]
+    input_dir: Option<PathBuf>,
 
     #[clap(
         long,
@@ -69,6 +75,9 @@ pub struct BenchmarkCommand {
         help = "If false, Move VM runs in paranoid mode, if true, paranoid mode is not used"
     )]
     disable_paranoid_mode: bool,
+
+    #[clap(long, help = "Transaction data contains source code information")]
+    with_source_code: bool,
 }
 
 impl BenchmarkCommand {
@@ -83,9 +92,27 @@ impl BenchmarkCommand {
             bail!("Number of repeats must be at least {}", MIN_NUM_REPEATS,);
         }
 
-        let txn_blocks_bytes = fs::read(PathBuf::from(&self.transactions_file)).await?;
-        let txn_blocks: Vec<TransactionBlock> = bcs::from_bytes(&txn_blocks_bytes)
-            .map_err(|err| anyhow!("Error when deserializing blocks of transactions: {:?}", err))?;
+        let input = if let Some(path) = self.input_dir {
+            path
+        } else {
+            PathBuf::from(".")
+        };
+        let txn_blocks_bytes = fs::read(input.join(self.transactions_file)).await?;
+
+        let txn_blocks: Vec<TransactionBlock> = if !self.with_source_code {
+            bcs::from_bytes(&txn_blocks_bytes).map_err(|err| {
+                anyhow!("Error when deserializing blocks of transactions: {:?}", err)
+            })?
+        } else {
+            let block_index: Vec<BlockIndex> =
+                bcs::from_bytes(&txn_blocks_bytes).map_err(|err| {
+                    anyhow!("Error when deserializing blocks of transactions: {:?}", err)
+                })?;
+            block_index
+                .into_iter()
+                .map(|block_index| block_index.transaction_block)
+                .collect()
+        };
 
         let inputs_read_set_bytes = fs::read(PathBuf::from(&self.inputs_file)).await?;
         let inputs_read_set: Vec<ReadSet> = bcs::from_bytes(&inputs_read_set_bytes)

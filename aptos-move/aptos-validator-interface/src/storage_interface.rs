@@ -95,6 +95,32 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         unimplemented!();
     }
 
+    async fn get_full_committed_transactions_with_source_code(
+        &self,
+        _start: Version,
+        _limit: u64,
+        _package_cache: &mut HashMap<
+            ModuleId,
+            (
+                AccountAddress,
+                String,
+                HashMap<(AccountAddress, String), PackageMetadata>,
+            ),
+        >,
+    ) -> Result<
+        Vec<(
+            u64,
+            Transaction,
+            Option<(
+                AccountAddress,
+                String,
+                HashMap<(AccountAddress, String), PackageMetadata>,
+            )>,
+        )>,
+    > {
+        unimplemented!();
+    }
+
     async fn get_latest_ledger_info_version(&self) -> Result<Version> {
         self.0.get_latest_ledger_info_version().map_err(Into::into)
     }
