@@ -9,7 +9,9 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_consensus_types::{
-    block::Block, pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
+    block::Block,
+    pipelined_block::{OrderedBlockWindow, PipelinedBlock},
+    quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
@@ -31,6 +33,7 @@ pub trait StateComputer: Send + Sync {
         &self,
         // The block that will be computed.
         _block: &Block,
+        _block_window: Option<&OrderedBlockWindow>,
         // The parent block root hash.
         _parent_block_id: HashValue,
         _randomness: Option<Randomness>,
@@ -72,6 +75,7 @@ pub trait StateComputer: Send + Sync {
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
+        execution_pool_enabled: bool,
     );
 
     // Reconfigure to clear epoch state at end of epoch.
