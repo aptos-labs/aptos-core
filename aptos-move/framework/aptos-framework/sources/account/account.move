@@ -1112,7 +1112,7 @@ module aptos_framework::account {
     #[test_only]
     public fun create_account_for_test(new_address: address): signer {
         // Make this easier by just allowing the account to be created again in a test
-        if (!exists_at(new_address)) {
+        if (!resource_exists_at(new_address)) {
             create_account_unchecked(new_address)
         } else {
             create_signer_for_test(new_address)
@@ -1245,12 +1245,14 @@ module aptos_framework::account {
 
     #[test_only]
     public fun set_signer_capability_offer(offerer: address, receiver: address) acquires Account {
+        ensure_resource_exists(offerer);
         let account_resource = &mut Account[offerer];
         account_resource.signer_capability_offer.for.swap_or_fill(receiver);
     }
 
     #[test_only]
     public fun set_rotation_capability_offer(offerer: address, receiver: address) acquires Account {
+        ensure_resource_exists(offerer);
         let account_resource = &mut Account[offerer];
         account_resource.rotation_capability_offer.for.swap_or_fill(receiver);
     }

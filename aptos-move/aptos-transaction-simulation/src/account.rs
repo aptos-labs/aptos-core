@@ -330,7 +330,7 @@ impl TransactionBuilder {
             self.sequence_number.expect("sequence number not set"),
             self.program.clone().expect("transaction payload not set"),
             self.max_gas_amount.unwrap_or(500_000),
-            self.gas_unit_price.unwrap_or(0),
+            self.gas_unit_price.unwrap_or(1),
             self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),
             self.chain_id.unwrap_or_else(ChainId::test), //ChainId::test(),
         )
