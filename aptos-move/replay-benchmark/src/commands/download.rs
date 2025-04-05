@@ -3,13 +3,18 @@
 
 use crate::{
     commands::{build_debugger, RestAPI},
-    workload::TransactionBlock,
+    workload::{BlockIndex, TransactionBlock, CompilationCache, IndexWriter, APTOS_COMMONS, dump_and_check_src, prepare_aptos_packages},
 };
 use anyhow::{anyhow, bail};
 use aptos_types::transaction::{Transaction, Version};
 use clap::Parser;
 use std::path::PathBuf;
 use tokio::fs;
+use move_core_types::account_address::AccountAddress;
+use std::collections::HashMap;
+use aptos_framework::{
+    natives::code::PackageMetadata,
+};
 
 #[derive(Parser)]
 #[command(about = "Downloads transactions and saves them locally")]
@@ -23,6 +28,12 @@ pub struct DownloadCommand {
     )]
     transactions_file: String,
 
+    #[clap(
+        long,
+        help = "Optional path to the folder where the downloaded transactions will be saved"
+    )]
+    output_dir: Option<PathBuf>,
+
     #[clap(long, help = "Version of the first transaction to benchmark")]
     begin_version: Version,
 
@@ -33,9 +44,11 @@ pub struct DownloadCommand {
     end_version: Version,
 }
 
+
 impl DownloadCommand {
     /// Downloads a range of transactions, and saves them locally.
     pub async fn download_transactions(self) -> anyhow::Result<()> {
+
         if self.begin_version >= self.end_version {
             bail!(
                 "Transaction versions should be a valid semi-open interval [b, e).\
@@ -45,22 +58,42 @@ impl DownloadCommand {
             );
         }
 
+        let output = if let Some(path) = self.output_dir {
+            path
+        } else {
+            PathBuf::from(".")
+        };
+        if !output.exists() {
+            std::fs::create_dir_all(output.as_path()).unwrap();
+        }
+
+        prepare_aptos_packages(output.clone().join(APTOS_COMMONS)).await;
+        let mut index_writer = IndexWriter::new(&output);
+
         let debugger = build_debugger(self.rest_api.rest_endpoint, self.rest_api.api_key)?;
 
         // Explicitly get transaction corresponding to the end, so we can verify that blocks are
         // fully selected.
-        let limit = self.end_version - self.begin_version + 1;
-        let (mut txns, _) = debugger
-            .get_committed_transactions(self.begin_version, limit)
-            .await?;
+        let limit: u64 = self.end_version - self.begin_version + 1;
+        // let (mut txns, _) = debugger
+        //     .get_committed_transactions(self.begin_version, limit)
+        //     .await?;
 
-        if !txns[0].is_block_start() {
+
+        let mut txns_vec = debugger
+            .get_full_committed_transactions_with_source_code(self.begin_version, limit, &mut HashMap::new())
+            .await?;
+        // let (mut txns, _) = debugger
+        //     .get_and_filter_committed_transactions(self.begin_version, limit)
+        //     .await?;
+
+        if !txns_vec[0].1.is_block_start() {
             bail!(
                 "First transaction {} must be a block start, but it is not",
                 self.begin_version
             );
         }
-        if !txns.pop().unwrap().is_block_start() {
+        if !txns_vec.pop().unwrap().1.is_block_start() {
             bail!(
                 "All transactions in the block must be selected, transaction {} is not a block \
                 end",
@@ -68,7 +101,7 @@ impl DownloadCommand {
             );
         }
 
-        let txn_blocks = partition(self.begin_version, txns);
+        let txn_blocks = partition_with_source_code(output.clone(), &mut index_writer, self.begin_version, txns_vec);
         println!(
             "Downloaded {} blocks with {} transactions in total: versions [{}, {})",
             txn_blocks.len(),
@@ -79,13 +112,15 @@ impl DownloadCommand {
 
         let bytes = bcs::to_bytes(&txn_blocks)
             .map_err(|err| anyhow!("Error when serializing blocks of transactions: {:?}", err))?;
-        fs::write(PathBuf::from(&self.transactions_file), &bytes).await?;
+        fs::write(output.join(self.transactions_file), &bytes).await?;
+        index_writer.dump_version();
+        index_writer.flush_writer();
         Ok(())
     }
 }
 
 /// Partitions a sequence of transactions into blocks.
-fn partition(begin_version: Version, txns: Vec<Transaction>) -> Vec<TransactionBlock> {
+fn _partition(begin_version: Version, txns: Vec<Transaction>) -> Vec<TransactionBlock> {
     let mut begin_versions_and_blocks = Vec::with_capacity(txns.len());
 
     let mut curr_begin = begin_version;
@@ -107,6 +142,87 @@ fn partition(begin_version: Version, txns: Vec<Transaction>) -> Vec<TransactionB
             begin_version: curr_begin,
             transactions: curr_block,
         });
+    }
+
+    begin_versions_and_blocks
+}
+
+
+fn partition_with_source_code(current_dir: PathBuf, index_writer: &mut IndexWriter, begin_version: Version, txns:
+    Vec<(
+        u64,
+        Transaction,
+        Option<(
+            AccountAddress,
+            String,
+            HashMap<(AccountAddress, String), PackageMetadata>,
+        )>,
+    )>) -> Vec<BlockIndex> {
+    let mut begin_versions_and_blocks = Vec::with_capacity(txns.len());
+
+    let mut curr_begin = begin_version;
+    let mut curr_block = Vec::with_capacity(txns.len());
+    let mut curr_package_info = HashMap::new();
+    let mut compilation_cache = CompilationCache::default();
+    let mut package_info_map: HashMap<(AccountAddress, String), Option<u64>> = HashMap::new();
+    let mut current_parallel_flag = true;
+
+    for (version, txn, source_code_data) in txns {
+        if txn.is_block_start() && !curr_block.is_empty() {
+            let block_size = curr_block.len();
+            let txn_block = TransactionBlock {
+                begin_version: curr_begin,
+                transactions: std::mem::take(&mut curr_block),
+            };
+            let block_idx = BlockIndex {
+                transaction_block: txn_block,
+                package_info: std::mem::take(&mut curr_package_info),
+                parallel_execution: std::mem::take(&mut current_parallel_flag),
+            };
+            begin_versions_and_blocks.push(block_idx);
+            index_writer.add_version(curr_begin);
+            curr_begin += block_size as Version;
+            package_info_map.clear();
+        }
+        curr_block.push(txn);
+        if let Some((address, package_name, map)) = source_code_data {
+            let package_info_opt = dump_and_check_src(
+                version,
+                address,
+                package_name.clone(),
+                map,
+                &mut compilation_cache,
+                current_dir.clone(),
+            );
+            // populate curr_package_info
+            if package_info_opt.is_some() {
+                let package_info = package_info_opt.unwrap();
+                let address_package_name = (address, package_name);
+                if package_info_map.contains_key(&address_package_name) &&
+                *package_info_map.get(&address_package_name).unwrap() != package_info.upgrade_number {
+                    current_parallel_flag = false;
+                } else {
+                    package_info_map.insert(address_package_name, package_info.upgrade_number);
+                }
+                curr_package_info.insert(version, package_info);
+                // if there is a package with the same address and package name, and the upgrade number is different,
+                //then set parallel_execution to false
+
+            }
+        }
+    }
+    if !curr_block.is_empty() {
+        index_writer.add_version(curr_begin);
+        let txn_block = TransactionBlock {
+            begin_version: curr_begin,
+            transactions: std::mem::take(&mut curr_block),
+        };
+        let block_idx = BlockIndex {
+            transaction_block: txn_block,
+            package_info: std::mem::take(&mut curr_package_info),
+            parallel_execution: std::mem::take(&mut current_parallel_flag),
+        };
+        begin_versions_and_blocks.push(block_idx);
     }
 
     begin_versions_and_blocks

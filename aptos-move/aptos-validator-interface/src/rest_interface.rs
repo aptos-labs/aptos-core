@@ -194,6 +194,92 @@ async fn check_and_obtain_source_code(
     Ok(())
 }
 
+async fn check_and_obtain_source_code_optional(
+    client: &Client,
+    m: &ModuleId,
+    addr: &AccountAddress,
+    version: Version,
+    transaction: &Transaction,
+    package_cache: &mut HashMap<
+        ModuleId,
+        (
+            AccountAddress,
+            String,
+            HashMap<(AccountAddress, String), PackageMetadata>,
+        ),
+    >,
+    txns: &mut Vec<(
+        u64,
+        Transaction,
+        Option<(
+            AccountAddress,
+            String,
+            HashMap<(AccountAddress, String), PackageMetadata>,
+        )>,
+    )>,
+) -> Result<()> {
+    let locate_package_with_src =
+        |module: &ModuleId, packages: &[PackageMetadata]| -> Option<PackageMetadata> {
+            for package in packages {
+                for module_metadata in &package.modules {
+                    if module_metadata.name == module.name().as_str() {
+                        if module_metadata.source.is_empty() || package.upgrade_policy.policy == 0 {
+                            return None;
+                        } else {
+                            return Some(package.clone());
+                        }
+                    }
+                }
+            }
+            None
+        };
+    let mut package_registry_cache: HashMap<AccountAddress, PackageRegistry> = HashMap::new();
+    let package_registry =
+        get_or_update_package_registry(client, version, addr, &mut package_registry_cache).await?;
+    let target_package_opt = locate_package_with_src(m, &package_registry.packages);
+    if let Some(target_package) = target_package_opt {
+        let mut map = HashMap::new();
+        if APTOS_PACKAGES.contains(&target_package.name.as_str()) {
+            package_cache.insert(
+                m.clone(),
+                (
+                    AccountAddress::ONE,
+                    target_package.name.clone(), // all aptos packages are stored under 0x1
+                    HashMap::new(),
+                ),
+            );
+            txns.push((
+                version,
+                transaction.clone(),
+                Some((
+                    AccountAddress::ONE,
+                    target_package.name, // all aptos packages are stored under 0x1
+                    HashMap::new(),
+                )), // do not need to store the package registry for aptos packages
+            ));
+        } else if let Ok(()) = retrieve_dep_packages_with_src(
+            client,
+            version,
+            &target_package,
+            &mut map,
+            &mut package_registry_cache,
+        )
+        .await
+        {
+            map.insert((*addr, target_package.clone().name), target_package.clone());
+            package_cache.insert(m.clone(), (*addr, target_package.name.clone(), map.clone()));
+            txns.push((
+                version,
+                transaction.clone(),
+                Some((*addr, target_package.name, map)),
+            ));
+        }
+    } else {
+        txns.push((version, transaction.clone(), None));
+    }
+    Ok(())
+}
+
 #[async_trait::async_trait]
 impl AptosValidatorInterface for RestDebuggerInterface {
     async fn get_state_value_by_version(
@@ -243,6 +329,91 @@ impl AptosValidatorInterface for RestDebuggerInterface {
         }
 
         Ok((txns, txn_infos))
+    }
+
+    async fn get_full_committed_transactions_with_source_code(
+        &self,
+        start: Version,
+        limit: u64,
+        package_cache: &mut HashMap<
+            ModuleId,
+            (
+                AccountAddress,
+                String,
+                HashMap<(AccountAddress, String), PackageMetadata>,
+            ),
+        >,
+    ) -> Result<
+        Vec<(
+            u64,
+            Transaction,
+            Option<(
+                AccountAddress,
+                String,
+                HashMap<(AccountAddress, String), PackageMetadata>,
+            )>,
+        )>,
+    > {
+        let mut txns = Vec::with_capacity(limit as usize);
+        let (tns, infos) = self.get_committed_transactions(start, limit).await?;
+        let temp_txns = tns
+            .iter()
+            .zip(infos)
+            .enumerate()
+            .map(|(idx, (txn, txn_info))| {
+                let version = start + idx as u64;
+                (version, txn, txn_info)
+            });
+        let extract_entry_fun = |payload: &TransactionPayload| -> Option<EntryFunction> {
+            match payload {
+                TransactionPayload::Multisig(multi_sig)
+                    if multi_sig.transaction_payload.is_some() =>
+                {
+                    let aptos_types::transaction::MultisigTransactionPayload::EntryFunction(e) =
+                        multi_sig.transaction_payload.clone().unwrap();
+                    Some(e.clone())
+                },
+                TransactionPayload::EntryFunction(e) => Some(e.clone()),
+                _ => None,
+            }
+        };
+        for (version, txn, _) in temp_txns {
+            if let Transaction::UserTransaction(signed_trans) = txn.clone() {
+                let payload = signed_trans.payload();
+                if let Some(entry_function) = extract_entry_fun(payload) {
+                    let m = entry_function.module();
+                    let addr = m.address();
+                    if entry_function.function().as_str() == "publish_package_txn" {
+                        // For publish txn, we remove all items in the package_cache where module_id.address is the sender of this txn
+                        // to update the new package in the cache.
+                        package_cache.retain(|k, _| k.address != signed_trans.sender());
+                    }
+                    if package_cache.contains_key(m) {
+                        txns.push((
+                            version,
+                            txn.clone(),
+                            Some(package_cache.get(m).unwrap().clone()),
+                        ));
+                    } else {
+                        check_and_obtain_source_code_optional(
+                            &self.0,
+                            m,
+                            addr,
+                            version,
+                            txn,
+                            package_cache,
+                            &mut txns,
+                        )
+                        .await?;
+                    }
+                } else {
+                    txns.push((version, txn.clone(), None));
+                }
+            } else {
+                txns.push((version, txn.clone(), None));
+            }
+        }
+        return Ok(txns);
     }
 
     async fn get_and_filter_committed_transactions(
