@@ -165,6 +165,7 @@ impl PipelineOpt {
             num_generator_workers: self.num_generator_workers,
             partitioner_config: self.sharding_opt.partitioner_config(),
             num_sig_verify_threads: self.num_sig_verify_threads,
+            print_transactions: false,
         }
     }
 }
