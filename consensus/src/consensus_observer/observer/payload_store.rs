@@ -12,6 +12,7 @@ use crate::consensus_observer::{
 };
 use aptos_config::config::ConsensusObserverConfig;
 use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
+use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::{error, warn};
 use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
@@ -219,8 +220,9 @@ impl BlockPayloadStore {
     }
 
     /// Verifies the block payload signatures against the given epoch state.
-    /// If verification is successful, blocks are marked as verified.
-    pub fn verify_payload_signatures(&mut self, epoch_state: &EpochState) -> Vec<Round> {
+    /// Payloads that are successfully verified are marked as verified in the store.
+    /// This method returns the block hashes (IDs) of all payloads that were verified.
+    pub fn verify_payload_signatures(&mut self, epoch_state: &EpochState) -> Vec<HashValue> {
         // Get the current epoch
         let current_epoch = epoch_state.epoch;
 
@@ -263,20 +265,19 @@ impl BlockPayloadStore {
             }
         }
 
-        // Collect the rounds of all newly verified blocks
-        let verified_payload_rounds: Vec<Round> = verified_payloads_to_update
+        // Collect the hashes of all newly verified payloads
+        let verified_payload_hashes: Vec<HashValue> = verified_payloads_to_update
             .iter()
-            .map(|block_payload| block_payload.round())
+            .map(|block_payload| block_payload.block().id())
             .collect();
 
-        // Update the verified block payloads. Note: this will cause
-        // notifications to be sent to any listeners that are waiting.
+        // Update the verified block payloads
         for verified_payload in verified_payloads_to_update {
             self.insert_block_payload(verified_payload, true);
         }
 
-        // Return the newly verified payload rounds
-        verified_payload_rounds
+        // Return the newly verified payload hashes
+        verified_payload_hashes
     }
 }
 
@@ -1045,7 +1046,7 @@ mod test {
         let epoch_state = EpochState::new(next_epoch, ValidatorVerifier::new(vec![]));
 
         // Verify the block payload signatures
-        let verified_rounds = block_payload_store.verify_payload_signatures(&epoch_state);
+        let verified_hashes = block_payload_store.verify_payload_signatures(&epoch_state);
 
         // Verify the unverified payloads were moved to the verified store
         assert!(block_payload_store.all_payloads_exist(&unverified_blocks));
@@ -1058,12 +1059,12 @@ mod test {
             num_future_blocks
         );
 
-        // Check the rounds of the newly verified payloads
-        let expected_verified_rounds = unverified_blocks
+        // Check the hashes of the newly verified payloads
+        let expected_verified_hashes = unverified_blocks
             .iter()
-            .map(|block| block.round())
+            .map(|block| block.id())
             .collect::<Vec<_>>();
-        assert_eq!(verified_rounds, expected_verified_rounds);
+        assert_eq!(verified_hashes, expected_verified_hashes);
 
         // Create a commit ledger info for the last block in the current epoch
         let verified_ordered_block = unverified_blocks.last().unwrap();
@@ -1079,7 +1080,7 @@ mod test {
         let epoch_state = EpochState::new(future_epoch, ValidatorVerifier::new(vec![]));
 
         // Verify the block payload signatures for a future epoch
-        let verified_rounds = block_payload_store.verify_payload_signatures(&epoch_state);
+        let verified_hashes = block_payload_store.verify_payload_signatures(&epoch_state);
 
         // Verify the future unverified payloads were moved to the verified store
         assert!(block_payload_store.all_payloads_exist(&future_unverified_blocks));
@@ -1089,12 +1090,12 @@ mod test {
         );
         assert_eq!(get_num_unverified_payloads(&block_payload_store), 0);
 
-        // Check the rounds of the newly verified payloads
-        let expected_verified_rounds = future_unverified_blocks
+        // Check the hashes of the newly verified payloads
+        let expected_verified_hashes = future_unverified_blocks
             .iter()
-            .map(|block| block.round())
+            .map(|block| block.id())
             .collect::<Vec<_>>();
-        assert_eq!(verified_rounds, expected_verified_rounds);
+        assert_eq!(verified_hashes, expected_verified_hashes);
     }
 
     #[test]
