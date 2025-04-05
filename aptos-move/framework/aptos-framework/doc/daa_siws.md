@@ -16,8 +16,7 @@ To execute transaction <entry_function_name> on Aptos blockchain
 Nonce: <digest>
 
 2. The abstract public key is a BCS serialized <code>SIWSAbstractPublicKey</code>.
-3. The abstract signature is the signature in raw bytes. The first byte is
-the message format
+3. The abstract signature is a BCS serialized <code><a href="daa_siws.md#0x1_daa_siws_SIWSAbstractSignature">SIWSAbstractSignature</a></code>.
 4. This module has been tested for the following wallets:
 - Phantom
 

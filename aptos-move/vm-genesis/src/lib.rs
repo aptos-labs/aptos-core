@@ -626,9 +626,7 @@ fn initialize_account_abstraction(
         serialize_values(&vec![
             MoveValue::Signer(CORE_CODE_ADDRESS),
             MoveValue::Address(AccountAddress::ONE),
-            "daa_siws"
-                .to_string()
-                .as_move_value(),
+            "daa_siws".to_string().as_move_value(),
             "authenticate".to_string().as_move_value(),
         ]),
     );
