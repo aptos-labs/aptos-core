@@ -31,6 +31,10 @@ Nonce: <digest>
 -  [Function `entry_function_name`](#0x1_daa_siws_entry_function_name)
 -  [Function `authenticate_auth_data`](#0x1_daa_siws_authenticate_auth_data)
 -  [Function `authenticate`](#0x1_daa_siws_authenticate)
+-  [Specification](#@Specification_1)
+    -  [Function `to_public_key_bytes`](#@Specification_1_to_public_key_bytes)
+    -  [Function `authenticate_auth_data`](#@Specification_1_authenticate_auth_data)
+    -  [Function `authenticate`](#@Specification_1_authenticate)
 
 
 <pre><code><b>use</b> <a href="auth_data.md#0x1_auth_data">0x1::auth_data</a>;
@@ -90,6 +94,25 @@ Nonce: <digest>
 ## Constants
 
 
+<a id="0x1_daa_siws_PUBLIC_KEY_NUM_BYTES"></a>
+
+
+
+<pre><code><b>const</b> <a href="daa_siws.md#0x1_daa_siws_PUBLIC_KEY_NUM_BYTES">PUBLIC_KEY_NUM_BYTES</a>: u64 = 32;
+</code></pre>
+
+
+
+<a id="0x1_daa_siws_EINVALID_PUBLIC_KEY"></a>
+
+Invalid public key.
+
+
+<pre><code><b>const</b> <a href="daa_siws.md#0x1_daa_siws_EINVALID_PUBLIC_KEY">EINVALID_PUBLIC_KEY</a>: u64 = 5;
+</code></pre>
+
+
+
 <a id="0x1_daa_siws_BASE_58_ALPHABET"></a>
 
 
@@ -105,6 +128,16 @@ Non base58 character found in public key.
 
 
 <pre><code><b>const</b> <a href="daa_siws.md#0x1_daa_siws_EINVALID_BASE_58_PUBLIC_KEY">EINVALID_BASE_58_PUBLIC_KEY</a>: u64 = 2;
+</code></pre>
+
+
+
+<a id="0x1_daa_siws_EINVALID_PUBLIC_KEY_LENGTH"></a>
+
+Invalid public key length.
+
+
+<pre><code><b>const</b> <a href="daa_siws.md#0x1_daa_siws_EINVALID_PUBLIC_KEY_LENGTH">EINVALID_PUBLIC_KEY_LENGTH</a>: u64 = 6;
 </code></pre>
 
 
@@ -172,8 +205,8 @@ the raw bytes version to do signature verification.
 <pre><code><b>fun</b> <a href="daa_siws.md#0x1_daa_siws_deserialize_abstract_public_key">deserialize_abstract_public_key</a>(abstract_public_key: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;):
 (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
     <b>let</b> stream = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_new">bcs_stream::new</a>(*abstract_public_key);
-    <b>let</b> base58_public_key = *<a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_string">bcs_stream::deserialize_string</a>(&<b>mut</b> stream).bytes();
-    <b>let</b> domain = *<a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_string">bcs_stream::deserialize_string</a>(&<b>mut</b> stream).bytes();
+    <b>let</b> base58_public_key = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
+    <b>let</b> domain = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
     (base58_public_key, domain)
 }
 </code></pre>
@@ -310,28 +343,29 @@ Returns a tuple of the signature type and the signature.
 
 <pre><code><b>fun</b> <a href="daa_siws.md#0x1_daa_siws_to_public_key_bytes">to_public_key_bytes</a>(base58_public_key: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <b>let</b> bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[0u8];
-    <b>let</b> base: u64 = 58;
+    <b>let</b> base = 58u16;
 
-    <b>let</b> i: u64 = 0;
-    <b>while</b> (i &lt; (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(base58_public_key) <b>as</b> u64)) {
-        <b>let</b> char = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(base58_public_key, (i <b>as</b> u64));
-        <b>let</b> (found, char_index) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_index_of">vector::index_of</a>(&<a href="daa_siws.md#0x1_daa_siws_BASE_58_ALPHABET">BASE_58_ALPHABET</a>, &char);
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; base58_public_key.length()) {
+        <b>let</b> char = base58_public_key[i];
+        <b>let</b> (found, char_index) = <a href="daa_siws.md#0x1_daa_siws_BASE_58_ALPHABET">BASE_58_ALPHABET</a>.index_of(&char);
         <b>assert</b>!(found, <a href="daa_siws.md#0x1_daa_siws_EINVALID_BASE_58_PUBLIC_KEY">EINVALID_BASE_58_PUBLIC_KEY</a>);
 
-        <b>let</b> mut_bytes = &<b>mut</b> bytes;
-        <b>let</b> j: u64 = 0;
-        <b>let</b> carry: u64 = (char_index <b>as</b> u64);
+        <b>let</b> j = 0;
+        <b>let</b> carry = (char_index <b>as</b> u16);
 
-        <b>while</b> (j &lt; (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(mut_bytes) <b>as</b> u64)) {
-            <b>let</b> current: u64 = (*<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(mut_bytes, (j <b>as</b> u64)) <b>as</b> u64);
-            <b>let</b> new_carry: u64 = current * base + carry;
-            *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(mut_bytes, (j <b>as</b> u64)) = ((new_carry & 0xff) <b>as</b> u8);
+        // For each existing byte, multiply by 58 and add carry
+        <b>while</b> (j &lt; bytes.length()) {
+            <b>let</b> current = (bytes[j] <b>as</b> u16);
+            <b>let</b> new_carry = current * base + carry;
+            bytes[j] = ((new_carry & 0xff) <b>as</b> u8);
             carry = new_carry &gt;&gt; 8;
             j = j + 1;
         };
 
+        // Add <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> remaining carry <b>as</b> new bytes
         <b>while</b> (carry &gt; 0) {
-            <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(mut_bytes, ((carry & 0xff) <b>as</b> u8));
+            bytes.push_back((carry & 0xff) <b>as</b> u8);
             carry = carry &gt;&gt; 8;
         };
 
@@ -339,14 +373,14 @@ Returns a tuple of the signature type and the signature.
     };
 
     // Handle leading zeros (1's in Base58)
-    <b>let</b> i: u64 = 0;
-    <b>while</b> (i &lt; (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(base58_public_key) <b>as</b> u64) &&
-           *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(base58_public_key, (i <b>as</b> u64)) == 49) { // '1' is 49 in ASCII
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> bytes, 0);
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; base58_public_key.length() && base58_public_key[i] == 49) { // '1' is 49 in ASCII
+        bytes.push_back(0);
         i = i + 1;
     };
 
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_reverse">vector::reverse</a>(&<b>mut</b> bytes);
+    <b>assert</b>!(bytes.length() == <a href="daa_siws.md#0x1_daa_siws_PUBLIC_KEY_NUM_BYTES">PUBLIC_KEY_NUM_BYTES</a>, <a href="daa_siws.md#0x1_daa_siws_EINVALID_PUBLIC_KEY_LENGTH">EINVALID_PUBLIC_KEY_LENGTH</a>);
     bytes
 }
 </code></pre>
@@ -418,7 +452,8 @@ Returns a tuple of the signature type and the signature.
     <b>let</b> message = <a href="daa_siws.md#0x1_daa_siws_construct_message">construct_message</a>(&base58_public_key, &domain, entry_function_name, digest_utf8);
 
     <b>let</b> public_key_bytes = <a href="daa_siws.md#0x1_daa_siws_to_public_key_bytes">to_public_key_bytes</a>(&base58_public_key);
-    <b>let</b> public_key = new_unvalidated_public_key_from_bytes(public_key_bytes);
+    <b>let</b> public_key = new_validated_public_key_from_bytes(public_key_bytes);
+    <b>assert</b>!(public_key.is_some(), <a href="daa_siws.md#0x1_daa_siws_EINVALID_PUBLIC_KEY">EINVALID_PUBLIC_KEY</a>);
     <b>let</b> abstract_signature = <a href="daa_siws.md#0x1_daa_siws_deserialize_abstract_signature">deserialize_abstract_signature</a>(aa_auth_data.derivable_abstract_signature());
     match (abstract_signature) {
         SIWSAbstractSignature::RawSignature { signature: signature_bytes } =&gt; {
@@ -426,7 +461,7 @@ Returns a tuple of the signature type and the signature.
             <b>assert</b>!(
                 <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_signature_verify_strict">ed25519::signature_verify_strict</a>(
                     &signature,
-                    &public_key,
+                    &public_key_into_unvalidated(public_key.destroy_some()),
                     message,
                 ),
                 <a href="daa_siws.md#0x1_daa_siws_EINVALID_SIGNATURE">EINVALID_SIGNATURE</a>
@@ -472,6 +507,57 @@ Authorization function for domain account abstraction.
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+<a id="@Specification_1_to_public_key_bytes"></a>
+
+### Function `to_public_key_bytes`
+
+
+<pre><code><b>fun</b> <a href="daa_siws.md#0x1_daa_siws_to_public_key_bytes">to_public_key_bytes</a>(base58_public_key: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>ensures</b> result.length() == <a href="daa_siws.md#0x1_daa_siws_PUBLIC_KEY_NUM_BYTES">PUBLIC_KEY_NUM_BYTES</a>;
+</code></pre>
+
+
+
+<a id="@Specification_1_authenticate_auth_data"></a>
+
+### Function `authenticate_auth_data`
+
+
+<pre><code><b>fun</b> <a href="daa_siws.md#0x1_daa_siws_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_authenticate"></a>
+
+### Function `authenticate`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="daa_siws.md#0x1_daa_siws_authenticate">authenticate</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY
