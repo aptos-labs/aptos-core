@@ -234,6 +234,7 @@ fn test_db_indexer_data() {
         ident_str!("vesting"),
         ident_str!("bls12381"),
         ident_str!("chain_id"),
+        ident_str!("daa_siws"),
         ident_str!("features"),
         ident_str!("from_bcs"),
         ident_str!("pool_u64"),
