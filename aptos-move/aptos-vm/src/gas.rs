@@ -181,11 +181,10 @@ pub(crate) fn check_gas(
         ));
     }
 
-    // If this is a sponsored transaction for a potentially new account, ensure there's enough
-    // gas to cover storage, execution, and IO costs.
+    // If this is for a potentially new account, ensure there's enough gas to cover storage, execution, and IO costs.
     // TODO: This isn't the cleaning code, thus we localize it just here and will remove it
     // once accountv2 is available and we no longer need to create accounts.
-    if crate::aptos_vm::is_account_init_for_sponsored_transaction(
+    if crate::aptos_vm::should_create_account_resource(
         txn_metadata,
         features,
         resolver,

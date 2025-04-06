@@ -142,6 +142,7 @@ pub enum FeatureFlag {
     DerivableAccountAbstraction,
     EnableFunctionValues,
     NewAccountsDefaultToFaStore,
+    DefaultAccountResource,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -379,6 +380,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::NewAccountsDefaultToFaStore => {
                 AptosFeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE
             },
+            FeatureFlag::DefaultAccountResource => AptosFeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
         }
     }
 }
@@ -543,6 +545,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE => {
                 FeatureFlag::NewAccountsDefaultToFaStore
             },
+            AptosFeatureFlag::DEFAULT_ACCOUNT_RESOURCE => FeatureFlag::DefaultAccountResource,
         }
     }
 }
