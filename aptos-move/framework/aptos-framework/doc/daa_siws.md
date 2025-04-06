@@ -310,28 +310,26 @@ Returns a tuple of the signature type and the signature.
 
 <pre><code><b>fun</b> <a href="daa_siws.md#0x1_daa_siws_to_public_key_bytes">to_public_key_bytes</a>(base58_public_key: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <b>let</b> bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[0u8];
-    <b>let</b> base = 58u16;  // Using u16 <b>to</b> handle multiplication without overflow
+    <b>let</b> base: u64 = 58;
 
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(base58_public_key)) {
-        <b>let</b> char = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(base58_public_key, i);
+    <b>let</b> i: u64 = 0;
+    <b>while</b> (i &lt; (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(base58_public_key) <b>as</b> u64)) {
+        <b>let</b> char = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(base58_public_key, (i <b>as</b> u64));
         <b>let</b> (found, char_index) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_index_of">vector::index_of</a>(&<a href="daa_siws.md#0x1_daa_siws_BASE_58_ALPHABET">BASE_58_ALPHABET</a>, &char);
         <b>assert</b>!(found, <a href="daa_siws.md#0x1_daa_siws_EINVALID_BASE_58_PUBLIC_KEY">EINVALID_BASE_58_PUBLIC_KEY</a>);
 
         <b>let</b> mut_bytes = &<b>mut</b> bytes;
-        <b>let</b> j = 0;
-        <b>let</b> carry = (char_index <b>as</b> u16);
+        <b>let</b> j: u64 = 0;
+        <b>let</b> carry: u64 = (char_index <b>as</b> u64);
 
-        // For each existing byte, multiply by 58 and add carry
-        <b>while</b> (j &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(mut_bytes)) {
-            <b>let</b> current = (*<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(mut_bytes, j) <b>as</b> u16);
-            <b>let</b> new_carry = current * base + carry;
-            *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(mut_bytes, j) = ((new_carry & 0xff) <b>as</b> u8);
+        <b>while</b> (j &lt; (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(mut_bytes) <b>as</b> u64)) {
+            <b>let</b> current: u64 = (*<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(mut_bytes, (j <b>as</b> u64)) <b>as</b> u64);
+            <b>let</b> new_carry: u64 = current * base + carry;
+            *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(mut_bytes, (j <b>as</b> u64)) = ((new_carry & 0xff) <b>as</b> u8);
             carry = new_carry &gt;&gt; 8;
             j = j + 1;
         };
 
-        // Add <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> remaining carry <b>as</b> new bytes
         <b>while</b> (carry &gt; 0) {
             <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(mut_bytes, ((carry & 0xff) <b>as</b> u8));
             carry = carry &gt;&gt; 8;
@@ -341,8 +339,9 @@ Returns a tuple of the signature type and the signature.
     };
 
     // Handle leading zeros (1's in Base58)
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(base58_public_key) && *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(base58_public_key, i) == 49) { // '1' is 49 in ASCII
+    <b>let</b> i: u64 = 0;
+    <b>while</b> (i &lt; (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(base58_public_key) <b>as</b> u64) &&
+           *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(base58_public_key, (i <b>as</b> u64)) == 49) { // '1' is 49 in ASCII
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> bytes, 0);
         i = i + 1;
     };

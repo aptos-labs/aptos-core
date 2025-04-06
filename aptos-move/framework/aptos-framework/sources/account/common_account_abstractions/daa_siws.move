@@ -19,7 +19,8 @@ module aptos_framework::daa_siws {
     use aptos_std::ed25519::{
         Self,
         new_signature_from_bytes,
-        new_unvalidated_public_key_from_bytes,
+        new_validated_public_key_from_bytes,
+        public_key_into_unvalidated,
     };
     use std::bcs_stream::{Self, deserialize_u8};
     use std::chain_id;
@@ -35,11 +36,16 @@ module aptos_framework::daa_siws {
     const EMISSING_ENTRY_FUNCTION_PAYLOAD: u64 = 3;
     /// Invalid signature type.
     const EINVALID_SIGNATURE_TYPE: u64 = 4;
+    /// Invalid public key.
+    const EINVALID_PUBLIC_KEY: u64 = 5;
+    /// Invalid public key length.
+    const EINVALID_PUBLIC_KEY_LENGTH: u64 = 6;
 
     // a 58-character alphabet consisting of numbers (1-9) and almost all (A-Z, a-z) letters,
     // excluding 0, O, I, and l to avoid confusion between similar-looking characters.
     const BASE_58_ALPHABET: vector<u8> = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
     const HEX_ALPHABET: vector<u8> = b"0123456789abcdef";
+    const PUBLIC_KEY_NUM_BYTES: u64 = 32;
 
     enum SIWSAbstractSignature has drop {
         RawSignature {
@@ -56,8 +62,8 @@ module aptos_framework::daa_siws {
     fun deserialize_abstract_public_key(abstract_public_key: &vector<u8>):
     (vector<u8>, vector<u8>) {
         let stream = bcs_stream::new(*abstract_public_key);
-        let base58_public_key = *bcs_stream::deserialize_string(&mut stream).bytes();
-        let domain = *bcs_stream::deserialize_string(&mut stream).bytes();
+        let base58_public_key = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+        let domain = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
         (base58_public_key, domain)
     }
 
@@ -112,32 +118,35 @@ module aptos_framework::daa_siws {
         *message
     }
 
+    spec to_public_key_bytes {
+        ensures result.length() == PUBLIC_KEY_NUM_BYTES;
+    }
+
     fun to_public_key_bytes(base58_public_key: &vector<u8>): vector<u8> {
         let bytes = vector[0u8];
-        let base = 58u16;  // Using u16 to handle multiplication without overflow
+        let base = 58u16;
 
         let i = 0;
-        while (i < vector::length(base58_public_key)) {
-            let char = *vector::borrow(base58_public_key, i);
-            let (found, char_index) = vector::index_of(&BASE_58_ALPHABET, &char);
+        while (i < base58_public_key.length()) {
+            let char = base58_public_key[i];
+            let (found, char_index) = BASE_58_ALPHABET.index_of(&char);
             assert!(found, EINVALID_BASE_58_PUBLIC_KEY);
 
-            let mut_bytes = &mut bytes;
             let j = 0;
             let carry = (char_index as u16);
 
             // For each existing byte, multiply by 58 and add carry
-            while (j < vector::length(mut_bytes)) {
-                let current = (*vector::borrow(mut_bytes, j) as u16);
+            while (j < bytes.length()) {
+                let current = (bytes[j] as u16);
                 let new_carry = current * base + carry;
-                *vector::borrow_mut(mut_bytes, j) = ((new_carry & 0xff) as u8);
+                bytes[j] = ((new_carry & 0xff) as u8);
                 carry = new_carry >> 8;
                 j = j + 1;
             };
 
             // Add any remaining carry as new bytes
             while (carry > 0) {
-                vector::push_back(mut_bytes, ((carry & 0xff) as u8));
+                bytes.push_back((carry & 0xff) as u8);
                 carry = carry >> 8;
             };
 
@@ -146,12 +155,13 @@ module aptos_framework::daa_siws {
 
         // Handle leading zeros (1's in Base58)
         let i = 0;
-        while (i < vector::length(base58_public_key) && *vector::borrow(base58_public_key, i) == 49) { // '1' is 49 in ASCII
-            vector::push_back(&mut bytes, 0);
+        while (i < base58_public_key.length() && base58_public_key[i] == 49) { // '1' is 49 in ASCII
+            bytes.push_back(0);
             i = i + 1;
         };
 
         vector::reverse(&mut bytes);
+        assert!(bytes.length() == PUBLIC_KEY_NUM_BYTES, EINVALID_PUBLIC_KEY_LENGTH);
         bytes
     }
 
@@ -173,6 +183,12 @@ module aptos_framework::daa_siws {
         *entry_function_name
     }
 
+    spec authenticate_auth_data {
+        // TODO: Issue with `cannot appear in both arithmetic and bitwise
+        // operation`
+        pragma verify = false;
+    }
+
     fun authenticate_auth_data(
         aa_auth_data: AbstractionAuthData,
         entry_function_name: &vector<u8>
@@ -183,7 +199,8 @@ module aptos_framework::daa_siws {
         let message = construct_message(&base58_public_key, &domain, entry_function_name, digest_utf8);
 
         let public_key_bytes = to_public_key_bytes(&base58_public_key);
-        let public_key = new_unvalidated_public_key_from_bytes(public_key_bytes);
+        let public_key = new_validated_public_key_from_bytes(public_key_bytes);
+        assert!(public_key.is_some(), EINVALID_PUBLIC_KEY);
         let abstract_signature = deserialize_abstract_signature(aa_auth_data.derivable_abstract_signature());
         match (abstract_signature) {
             SIWSAbstractSignature::RawSignature { signature: signature_bytes } => {
@@ -191,13 +208,18 @@ module aptos_framework::daa_siws {
                 assert!(
                     ed25519::signature_verify_strict(
                         &signature,
-                        &public_key,
+                        &public_key_into_unvalidated(public_key.destroy_some()),
                         message,
                     ),
                     EINVALID_SIGNATURE
                 );
             },
         };
+    }
+
+    spec authenticate {
+        // TODO: Issue with spec for authenticate_auth_data
+        pragma verify = false;
     }
 
     /// Authorization function for domain account abstraction.
