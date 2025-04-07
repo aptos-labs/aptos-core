@@ -1192,6 +1192,9 @@ def create_forge_command(
     Forge Cli args get passed to forge before the test command (i.e. test suite)
     Test args get passed to the test subcommand (i.e. image tag)
     """
+    if "framework-upgrade" in forge_namespace or "compat" in forge_namespace:
+        image_tag = "306106805ec6165affa957720fed3ad8972c1771" # Your tag here
+
     if forge_runner_mode == "local":
         forge_args = [
             "cargo",
