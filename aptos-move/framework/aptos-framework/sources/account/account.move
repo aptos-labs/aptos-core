@@ -550,7 +550,7 @@ module aptos_framework::account {
     entry fun replace_ed25519_backup_key_on_keyless_account(account: &signer, keyless_public_key: vector<u8>, cur_backup_key: vector<u8>, new_backup_key: vector<u8>, new_backup_key_proof: vector<u8>) acquires Account {
         // Check that the main public key is a keyless public key by checking the scheme
         // encoded in the first byte of the single key public key
-        let public_key_type = *std::vector::borrow(&keyless_public_key, 0);
+        let public_key_type = keyless_public_key[0];
         assert!(public_key_type == 3 || public_key_type == 4, std::error::invalid_argument(ENOT_A_KEYLESS_PUBLIC_KEY));
 
         let addr = signer::address_of(account);
