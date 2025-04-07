@@ -56,9 +56,6 @@ static RUST_LOG_FIELD_MAX_LEN: Lazy<usize> = Lazy::new(|| {
         .unwrap_or(TruncatedLogString::DEFAULT_MAX_LEN)
 });
 
-const GIT_HASH_ENV_VAR: &str = "GIT_HASH";
-static GIT_HASH: Lazy<Option<String>> = Lazy::new(|| env::var(GIT_HASH_ENV_VAR).ok());
-
 struct TruncatedLogString(String);
 
 impl TruncatedLogString {
@@ -246,7 +243,7 @@ impl LogEntry {
             schema.visit(&mut JsonVisitor(&mut data));
         }
 
-        let git_hash = GIT_HASH.clone();
+        let git_hash = Some(aptos_build_info::get_git_hash());
 
         Self {
             metadata,
