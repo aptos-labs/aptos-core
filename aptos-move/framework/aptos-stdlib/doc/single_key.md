@@ -220,7 +220,7 @@ the public key bytes.
     <b>let</b> pk_bytes = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     pk_bytes.push_back(<a href="single_key.md#0x1_single_key_ED25519_PUBLIC_KEY_TYPE">ED25519_PUBLIC_KEY_TYPE</a>);
     pk_bytes.push_back(0x20);
-    std::vector::append(&<b>mut</b> pk_bytes, <a href="ed25519.md#0x1_ed25519_unvalidated_public_key_to_bytes">ed25519::unvalidated_public_key_to_bytes</a>(pk));
+    pk_bytes.append(<a href="ed25519.md#0x1_ed25519_unvalidated_public_key_to_bytes">ed25519::unvalidated_public_key_to_bytes</a>(pk));
     <a href="single_key.md#0x1_single_key_UnvalidatedPublicKey">UnvalidatedPublicKey</a> {
         bytes: pk_bytes
     }

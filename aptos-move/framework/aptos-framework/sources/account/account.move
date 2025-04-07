@@ -469,8 +469,8 @@ module aptos_framework::account {
     entry fun add_ed25519_backup_key_on_keyless_account(account: &signer, keyless_public_key: vector<u8>, backup_key: vector<u8>, backup_key_proof: vector<u8>) acquires Account {
         // Check that the public key is a keyless public key by checking the scheme
         // encoded in the first byte of the single key public key
-        let public_key_type = *std::vector::borrow(&keyless_public_key, 0);
-        assert!(public_key_type == 3 || public_key_type == 4, std::error::invalid_argument(ENOT_A_KEYLESS_PUBLIC_KEY));
+        let public_key_type = keyless_public_key[0];
+        assert!(public_key_type == 3 || public_key_type == 4, error::invalid_argument(ENOT_A_KEYLESS_PUBLIC_KEY));
         let addr = signer::address_of(account);
         let account_resource = &mut Account[addr];
 
@@ -486,7 +486,7 @@ module aptos_framework::account {
         // its authentication key to the account address.
         assert!(
             bcs::to_bytes(&addr) == auth_key,
-            std::error::invalid_argument(ENOT_THE_ORIGINAL_PUBLIC_KEY)
+            error::invalid_argument(ENOT_THE_ORIGINAL_PUBLIC_KEY)
         );
         let curr_auth_key_as_address = from_bcs::to_address(account_resource.authentication_key);
         let challenge = RotationProofChallenge {
@@ -509,11 +509,11 @@ module aptos_framework::account {
         let backup_key_as_single_key = single_key::from_ed25519_public_key_unvalidated(&backup_key_ed25519);
 
         // Construct the multi key public key which should be the current public key of the account
-        let new_public_key_bytes = std::vector::empty();
-        std::vector::push_back(&mut new_public_key_bytes, 0x02); // Number of keys in the multi key
-        std::vector::append(&mut new_public_key_bytes, keyless_public_key);  // Add the current key which is the keyless public key
-        std::vector::append(&mut new_public_key_bytes, single_key::unvalidated_public_key_to_bytes(&backup_key_as_single_key));
-        std::vector::push_back(&mut new_public_key_bytes, 0x01); // Signatures required
+        let new_public_key_bytes = vector[];
+        new_public_key_bytes.push_back(0x02); // Number of keys in the multi key
+        new_public_key_bytes.append(keyless_public_key);  // Add the current key which is the keyless public key
+        new_public_key_bytes.append(single_key::unvalidated_public_key_to_bytes(&backup_key_as_single_key));
+        new_public_key_bytes.push_back(0x01); // Signatures required
 
         // Rotate the authentication key to the new multi key public key
         rotate_authentication_key_call_to_public_key(account, MULTI_KEY_SCHEME, new_public_key_bytes);
@@ -561,11 +561,11 @@ module aptos_framework::account {
         let backup_key_as_single_key = single_key::from_ed25519_public_key_unvalidated(&backup_key_ed25519);
 
         // Construct the multi key public key which should be the current public key of the account
-        let account_public_key_bytes = std::vector::empty();
-        std::vector::push_back(&mut account_public_key_bytes, 0x02); // Number of keys in the multi key
-        std::vector::append(&mut account_public_key_bytes, keyless_public_key);  // Add the current key which is a single key
-        std::vector::append(&mut account_public_key_bytes, single_key::unvalidated_public_key_to_bytes(&backup_key_as_single_key));
-        std::vector::push_back(&mut account_public_key_bytes, 0x01); // Signatures required
+        let account_public_key_bytes = vector[];
+        account_public_key_bytes.push_back(0x02); // Number of keys in the multi key
+        account_public_key_bytes.append(keyless_public_key);  // Add the current key which is a single key
+        account_public_key_bytes.append(single_key::unvalidated_public_key_to_bytes(&backup_key_as_single_key));
+        account_public_key_bytes.push_back(0x01); // Signatures required
 
         // Check that constructed multi key public key is the current public key of the account by comparing
         // its authentication key to the account's authentication key
@@ -580,7 +580,7 @@ module aptos_framework::account {
         let auth_key_for_original_public_key = get_authentication_key_from_scheme_and_public_key_bytes(SINGLE_KEY_SCHEME, keyless_public_key);
         assert!(
             bcs::to_bytes(&addr) == auth_key_for_original_public_key,
-            std::error::invalid_argument(ENOT_THE_ORIGINAL_PUBLIC_KEY)
+            error::invalid_argument(ENOT_THE_ORIGINAL_PUBLIC_KEY)
         );
 
         let curr_auth_key_as_address = from_bcs::to_address(account_resource.authentication_key);
@@ -603,11 +603,11 @@ module aptos_framework::account {
         let new_backup_key_as_single_key = single_key::from_ed25519_public_key_unvalidated(&new_backup_key_ed25519);
 
         // Construct the new multi key public key which contains the keyless public key and the new backup key
-        let new_public_key_bytes = std::vector::empty();
-        std::vector::push_back(&mut new_public_key_bytes, 0x02); // Number of keys in the multi key
-        std::vector::append(&mut new_public_key_bytes, keyless_public_key);  // Add the current key which is a single key
-        std::vector::append(&mut new_public_key_bytes, single_key::unvalidated_public_key_to_bytes(&new_backup_key_as_single_key));
-        std::vector::push_back(&mut new_public_key_bytes, 0x01); // Signatures required
+        let new_public_key_bytes = vector[];
+        new_public_key_bytes.push_back(0x02); // Number of keys in the multi key
+        new_public_key_bytes.append(keyless_public_key);  // Add the current key which is a single key
+        new_public_key_bytes.append(single_key::unvalidated_public_key_to_bytes(&new_backup_key_as_single_key));
+        new_public_key_bytes.push_back(0x01); // Signatures required
 
         // Rotate the authentication key to the new multi key public key
         rotate_authentication_key_call_to_public_key(account, MULTI_KEY_SCHEME, new_public_key_bytes);

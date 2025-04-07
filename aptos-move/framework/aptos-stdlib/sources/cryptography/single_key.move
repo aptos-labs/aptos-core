@@ -69,7 +69,7 @@ module aptos_std::single_key {
         let pk_bytes = vector[];
         pk_bytes.push_back(ED25519_PUBLIC_KEY_TYPE);
         pk_bytes.push_back(0x20);
-        std::vector::append(&mut pk_bytes, ed25519::unvalidated_public_key_to_bytes(pk));
+        pk_bytes.append(ed25519::unvalidated_public_key_to_bytes(pk));
         UnvalidatedPublicKey {
             bytes: pk_bytes
         }
