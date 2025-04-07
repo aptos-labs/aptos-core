@@ -48,6 +48,7 @@ k8s-openapi = { version = "0.13.1", default-features = false, features = [
     "v1_22",
 ] }
 kube = { version = "0.65.0", default-features = false, features = ["jsonpatch", "client", "rustls-tls", "derive"] }
+log = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
 prometheus-http-query = { workspace = true }

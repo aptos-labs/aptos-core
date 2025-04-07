@@ -25,6 +25,7 @@ aptos-testcases = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
+env_logger = { workspace = true }
 futures = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }

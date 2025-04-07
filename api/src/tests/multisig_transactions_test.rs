@@ -478,9 +478,14 @@ async fn test_multisig_transaction_simulation() {
     let withdraw_event = &simulation_resp["events"].as_array().unwrap()[0];
     assert_eq!(
         withdraw_event["type"].as_str().unwrap(),
-        "0x1::fungible_asset::Withdraw"
+        "0x1::coin::WithdrawEvent"
     );
+    let withdraw_from_account = AccountAddress::from_hex_literal(
+        withdraw_event["guid"]["account_address"].as_str().unwrap(),
+    )
+    .unwrap();
     let withdrawn_amount = withdraw_event["data"]["amount"].as_str().unwrap();
+    assert_eq!(withdraw_from_account, multisig_account);
     assert_eq!(withdrawn_amount, "1000");
 }
 
@@ -526,9 +531,14 @@ async fn test_multisig_transaction_simulation_2_of_3() {
     let withdraw_event = &simulation_resp["events"].as_array().unwrap()[0];
     assert_eq!(
         withdraw_event["type"].as_str().unwrap(),
-        "0x1::fungible_asset::Withdraw"
+        "0x1::coin::WithdrawEvent"
     );
+    let withdraw_from_account = AccountAddress::from_hex_literal(
+        withdraw_event["guid"]["account_address"].as_str().unwrap(),
+    )
+    .unwrap();
     let withdrawn_amount = withdraw_event["data"]["amount"].as_str().unwrap();
+    assert_eq!(withdraw_from_account, multisig_account);
     assert_eq!(withdrawn_amount, "1000");
 }
 

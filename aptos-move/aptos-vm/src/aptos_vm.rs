@@ -76,8 +76,8 @@ use aptos_types::{
     },
     vm::module_metadata::{
         get_compilation_metadata_from_compiled_module,
-        get_compilation_metadata_from_compiled_script, get_metadata, get_metadata_v0,
-        verify_module_metadata, RuntimeModuleMetadataV1,
+        get_compilation_metadata_from_compiled_script, get_metadata, verify_module_metadata,
+        RuntimeModuleMetadataV1,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
@@ -573,97 +573,91 @@ impl AptosVM {
         // Storage refund is zero since no slots are deleted in aborted transactions.
         const ZERO_STORAGE_REFUND: u64 = 0;
 
-        let is_account_init_for_sponsored_transaction = is_account_init_for_sponsored_transaction(
-            txn_data,
-            self.features(),
-            resolver,
-            module_storage,
-        )?;
+        let should_create_account_resource =
+            should_create_account_resource(txn_data, self.features(), resolver, module_storage)?;
 
-        let (previous_session_change_set, fee_statement) =
-            if is_account_init_for_sponsored_transaction {
-                let mut abort_hook_session =
-                    AbortHookSession::new(self, txn_data, resolver, prologue_session_change_set);
+        let (previous_session_change_set, fee_statement) = if should_create_account_resource {
+            let mut abort_hook_session =
+                AbortHookSession::new(self, txn_data, resolver, prologue_session_change_set);
 
-                abort_hook_session.execute(|session| {
+            abort_hook_session.execute(|session| {
+                create_account_if_does_not_exist(
+                    session,
+                    module_storage,
+                    gas_meter,
+                    txn_data.sender(),
+                    traversal_context,
+                )
+                // If this fails, it is likely due to out of gas, so we try again without metering
+                // and then validate below that we charged sufficiently.
+                .or_else(|_err| {
                     create_account_if_does_not_exist(
                         session,
                         module_storage,
-                        gas_meter,
+                        &mut UnmeteredGasMeter,
                         txn_data.sender(),
                         traversal_context,
                     )
-                    // If this fails, it is likely due to out of gas, so we try again without metering
-                    // and then validate below that we charged sufficiently.
-                    .or_else(|_err| {
-                        create_account_if_does_not_exist(
-                            session,
-                            module_storage,
-                            &mut UnmeteredGasMeter,
-                            txn_data.sender(),
-                            traversal_context,
-                        )
-                    })
-                    .map_err(expect_no_verification_errors)
-                    .or_else(|err| {
-                        expect_only_successful_execution(
-                            err,
-                            &format!("{:?}::{}", ACCOUNT_MODULE, CREATE_ACCOUNT_IF_DOES_NOT_EXIST),
-                            log_context,
-                        )
-                    })
-                })?;
-
-                let mut abort_hook_session_change_set =
-                    abort_hook_session.finish(change_set_configs, module_storage)?;
-                if let Err(err) = self.charge_change_set(
-                    &mut abort_hook_session_change_set,
-                    gas_meter,
-                    txn_data,
-                    resolver,
-                    module_storage,
-                ) {
-                    info!(
-                        *log_context,
-                        "Failed during charge_change_set: {:?}. Most likely exceeded gas limited.",
-                        err,
-                    );
-                };
-
-                let fee_statement =
-                    AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
-
-                // Verify we charged sufficiently for creating an account slot
-                let gas_params = self.gas_params(log_context)?;
-                let gas_unit_price = u64::from(txn_data.gas_unit_price());
-                let gas_used = fee_statement.gas_used();
-                let storage_fee = fee_statement.storage_fee_used();
-                let storage_refund = fee_statement.storage_fee_refund();
-
-                let actual = gas_used * gas_unit_price + storage_fee - storage_refund;
-                let expected = u64::from(
-                    gas_meter
-                        .disk_space_pricing()
-                        .hack_account_creation_fee_lower_bound(&gas_params.vm.txn),
-                );
-                if actual < expected {
+                })
+                .map_err(expect_no_verification_errors)
+                .or_else(|err| {
                     expect_only_successful_execution(
-                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                            .with_message(
-                                "Insufficient fee for storing account for sponsored transaction"
-                                    .to_string(),
-                            )
-                            .finish(Location::Undefined),
+                        err,
                         &format!("{:?}::{}", ACCOUNT_MODULE, CREATE_ACCOUNT_IF_DOES_NOT_EXIST),
                         log_context,
-                    )?;
-                }
-                (abort_hook_session_change_set, fee_statement)
-            } else {
-                let fee_statement =
-                    AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
-                (prologue_session_change_set, fee_statement)
+                    )
+                })
+            })?;
+
+            let mut abort_hook_session_change_set =
+                abort_hook_session.finish(change_set_configs, module_storage)?;
+            if let Err(err) = self.charge_change_set(
+                &mut abort_hook_session_change_set,
+                gas_meter,
+                txn_data,
+                resolver,
+                module_storage,
+            ) {
+                info!(
+                    *log_context,
+                    "Failed during charge_change_set: {:?}. Most likely exceeded gas limited.", err,
+                );
             };
+
+            let fee_statement =
+                AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
+
+            // Verify we charged sufficiently for creating an account slot
+            let gas_params = self.gas_params(log_context)?;
+            let gas_unit_price = u64::from(txn_data.gas_unit_price());
+            let gas_used = fee_statement.gas_used();
+            let storage_fee = fee_statement.storage_fee_used();
+            let storage_refund = fee_statement.storage_fee_refund();
+
+            let actual = gas_used * gas_unit_price + storage_fee - storage_refund;
+            let expected = u64::from(
+                gas_meter
+                    .disk_space_pricing()
+                    .hack_account_creation_fee_lower_bound(&gas_params.vm.txn),
+            );
+            if actual < expected {
+                expect_only_successful_execution(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "Insufficient fee for storing account for sponsored transaction"
+                                .to_string(),
+                        )
+                        .finish(Location::Undefined),
+                    &format!("{:?}::{}", ACCOUNT_MODULE, CREATE_ACCOUNT_IF_DOES_NOT_EXIST),
+                    log_context,
+                )?;
+            }
+            (abort_hook_session_change_set, fee_statement)
+        } else {
+            let fee_statement =
+                AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
+            (prologue_session_change_set, fee_statement)
+        };
 
         let mut epilogue_session = EpilogueSession::on_user_session_failure(
             self,
@@ -815,15 +809,8 @@ impl AptosVM {
             },
         };
 
-        // Check that unstable bytecode cannot be executed on mainnet
-        if self
-            .features()
-            .is_enabled(FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT)
-        {
-            self.reject_unstable_bytecode_for_script(script)?;
-        }
-
-        // TODO(Gerardo): consolidate the extended validation to verifier.
+        // Check that unstable bytecode cannot be executed on mainnet and verify events.
+        self.reject_unstable_bytecode_for_script(script)?;
         verifier::event_validation::verify_no_event_emission_in_compiled_script(script)?;
 
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
@@ -877,11 +864,7 @@ impl AptosVM {
         )?;
 
         // Native entry function is forbidden.
-        if self
-            .features()
-            .is_enabled(FeatureFlag::DISALLOW_USER_NATIVES)
-            && function.is_native()
-        {
+        if function.is_native() {
             return Err(
                 PartialVMError::new(StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED)
                     .with_message(
@@ -1433,16 +1416,11 @@ impl AptosVM {
             // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
         }
 
-        if self
-            .timed_features()
-            .is_enabled(TimedFeatureFlag::ModuleComplexityCheck)
-        {
-            for (module, blob) in modules.iter().zip(bundle.iter()) {
-                // TODO(Gas): Make budget configurable.
-                let budget = 2048 + blob.code().len() as u64 * 20;
-                move_binary_format::check_complexity::check_module_complexity(module, budget)
-                    .map_err(|err| err.finish(Location::Undefined))?;
-            }
+        for (module, blob) in modules.iter().zip(bundle.iter()) {
+            // TODO(Gas): Make budget configurable.
+            let budget = 2048 + blob.code().len() as u64 * 20;
+            move_binary_format::check_complexity::check_module_complexity(module, budget)
+                .map_err(|err| err.finish(Location::Undefined))?;
         }
 
         self.validate_publish_request(module_storage, modules, expected_modules, allowed_deps)?;
@@ -1480,19 +1458,8 @@ impl AptosVM {
         mut expected_modules: BTreeSet<String>,
         allowed_deps: Option<BTreeMap<AccountAddress, BTreeSet<String>>>,
     ) -> VMResult<()> {
-        if self
-            .features()
-            .is_enabled(FeatureFlag::REJECT_UNSTABLE_BYTECODE)
-        {
-            self.reject_unstable_bytecode(modules)?;
-        }
-
-        if self
-            .features()
-            .is_enabled(FeatureFlag::DISALLOW_USER_NATIVES)
-        {
-            verifier::native_validation::validate_module_natives(modules)?;
-        }
+        self.reject_unstable_bytecode(modules)?;
+        verifier::native_validation::validate_module_natives(modules)?;
 
         for m in modules {
             if !expected_modules.remove(m.self_id().name().as_str()) {
@@ -1517,7 +1484,7 @@ impl AptosVM {
                     }
                 }
             }
-            verify_module_metadata(m, self.features(), self.timed_features())
+            verify_module_metadata(m, self.features())
                 .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
         }
 
@@ -1556,9 +1523,9 @@ impl AptosVM {
     }
 
     /// Check whether the script can be run on mainnet based on the unstable tag in the metadata
-    pub fn reject_unstable_bytecode_for_script(&self, module: &CompiledScript) -> VMResult<()> {
+    pub fn reject_unstable_bytecode_for_script(&self, script: &CompiledScript) -> VMResult<()> {
         if self.chain_id().is_mainnet() {
-            if let Some(metadata) = get_compilation_metadata_from_compiled_script(module) {
+            if let Some(metadata) = get_compilation_metadata_from_compiled_script(script) {
                 if metadata.unstable {
                     return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
                         .with_message("script marked unstable cannot be run on mainnet".to_string())
@@ -1791,16 +1758,15 @@ impl AptosVM {
         let (prologue_change_set, mut user_session) = unwrap_or_discard!(prologue_session
             .into_user_session(self, &txn_data, resolver, change_set_configs, code_storage,));
 
-        let account_init_for_sponsored_transaction_timer =
-            VM_TIMER.timer_with_label("AptosVM::account_init_for_sponsored_transaction");
-        let is_account_init_for_sponsored_transaction =
-            unwrap_or_discard!(is_account_init_for_sponsored_transaction(
-                &txn_data,
-                self.features(),
-                resolver,
-                code_storage
-            ));
-        if is_account_init_for_sponsored_transaction {
+        let should_create_account_resource_timer =
+            VM_TIMER.timer_with_label("AptosVM::create_account_resource_lazily");
+        let should_create_account_resource = unwrap_or_discard!(should_create_account_resource(
+            &txn_data,
+            self.features(),
+            resolver,
+            code_storage
+        ));
+        if should_create_account_resource {
             unwrap_or_discard!(
                 user_session.execute(|session| create_account_if_does_not_exist(
                     session,
@@ -1811,7 +1777,7 @@ impl AptosVM {
                 ))
             );
         }
-        drop(account_init_for_sponsored_transaction_timer);
+        drop(should_create_account_resource_timer);
 
         let payload_timer =
             VM_TIMER.timer_with_label("AptosVM::execute_user_transaction_impl [payload]");
@@ -2281,11 +2247,7 @@ impl AptosVM {
         let metadata = module_storage
             .fetch_module_metadata(module_id.address(), module_id.name())
             .ok()??;
-        if self.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
-            get_metadata(&metadata)
-        } else {
-            get_metadata_v0(&metadata)
-        }
+        get_metadata(&metadata)
     }
 
     pub fn execute_view_function(
@@ -2957,20 +2919,25 @@ fn dispatchable_authenticate(
         })
 }
 
-/// Signals that the transaction should trigger the flow for creating an account as part of a
-/// sponsored transaction. This occurs when:
-/// * The feature gate is enabled SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION
-/// * There is fee payer
-/// * The sequence number is 0
-/// * There is no account resource for the account
-pub(crate) fn is_account_init_for_sponsored_transaction(
+/// Determines if an account should be automatically created as part of a sponsored transaction.
+/// This function checks several conditions that must all be met:
+///
+/// 1. Feature flag check: Either DEFAULT_ACCOUNT_RESOURCE or SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION is enabled
+/// 2. For SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION: Transaction has a fee payer (for sponsored transactions)
+/// 3. Transaction sequence number is 0 (indicating a new account)
+/// 4. Account resource does not already exist for the sender address
+///
+/// This is used to support automatic account creation for sponsored transactions or after enabling default account
+/// resource feature, allowing new accounts to be created without requiring an explicit account creation transaction.
+pub(crate) fn should_create_account_resource(
     txn_data: &TransactionMetadata,
     features: &Features,
     resolver: &impl AptosMoveResolver,
     module_storage: &impl ModuleStorage,
 ) -> VMResult<bool> {
-    if features.is_enabled(FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION)
-        && txn_data.fee_payer.is_some()
+    if (features.is_enabled(FeatureFlag::DEFAULT_ACCOUNT_RESOURCE)
+        || (features.is_enabled(FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION)
+            && txn_data.fee_payer.is_some()))
         && txn_data.sequence_number == 0
     {
         let account_tag = AccountResource::struct_tag();

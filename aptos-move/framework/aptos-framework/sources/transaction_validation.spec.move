@@ -84,7 +84,7 @@ spec aptos_framework::transaction_validation {
 
         aborts_if (
             !features::spec_is_enabled(features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
-                || account::exists_at(transaction_sender)
+                || account::spec_exists_at(transaction_sender)
                 || transaction_sender == gas_payer_addr
                 || txn_sequence_number > 0
         ) && (
@@ -92,14 +92,14 @@ spec aptos_framework::transaction_validation {
                 || !(option::spec_is_none(txn_authentication_key) || option::spec_borrow(
                 txn_authentication_key
             ) == global<Account>(transaction_sender).authentication_key)
-                || !account::exists_at(transaction_sender)
+                || !account::spec_exists_at(transaction_sender)
                 || !(txn_sequence_number == global<Account>(transaction_sender).sequence_number)
         );
 
         aborts_if features::spec_is_enabled(features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
             && transaction_sender != gas_payer_addr
             && txn_sequence_number == 0
-            && !account::exists_at(transaction_sender)
+            && !account::spec_exists_at(transaction_sender)
             && (option::spec_is_none(txn_authentication_key) || option::spec_borrow(
             txn_authentication_key
         ) != bcs::to_bytes(transaction_sender));
@@ -176,21 +176,21 @@ spec aptos_framework::transaction_validation {
         // property 2: All secondary signer addresses are verified to be authentic through a validation process.
         /// [high-level-req-2]
         aborts_if exists i in 0..num_secondary_signers:
-            !account::exists_at(secondary_signer_addresses[i]);
+            !account::spec_exists_at(secondary_signer_addresses[i]);
         aborts_if exists i in 0..num_secondary_signers:
             !can_skip(features::spec_simulation_enhancement_enabled(), is_simulation, secondary_signer_public_key_hashes[i]) &&
                 option::spec_is_some(secondary_signer_public_key_hashes[i]) && option::spec_borrow(
                 secondary_signer_public_key_hashes[i]
             ) !=
-                    account::get_authentication_key(secondary_signer_addresses[i]);
+                    account::spec_get_authentication_key(secondary_signer_addresses[i]);
         // By the end, all secondary signers account should exist and public key hash should match.
         ensures forall i in 0..num_secondary_signers:
-            account::exists_at(secondary_signer_addresses[i]);
+            account::spec_exists_at(secondary_signer_addresses[i]);
         ensures forall i in 0..num_secondary_signers:
             option::spec_is_none(secondary_signer_public_key_hashes[i]) || option::spec_borrow(
                 secondary_signer_public_key_hashes[i]
             ) ==
-                account::get_authentication_key(secondary_signer_addresses[i])
+                account::spec_get_authentication_key(secondary_signer_addresses[i])
                 || can_skip(features::spec_simulation_enhancement_enabled(), is_simulation, secondary_signer_public_key_hashes[i]);
     }
 
@@ -286,8 +286,8 @@ spec aptos_framework::transaction_validation {
         //     is_simulation,
         // };
 
-        aborts_if !account::exists_at(fee_payer_address);
-        aborts_if !(fee_payer_public_key_hash == account::get_authentication_key(fee_payer_address));
+        aborts_if !account::spec_exists_at(fee_payer_address);
+        aborts_if !(fee_payer_public_key_hash == account::spec_get_authentication_key(fee_payer_address));
         aborts_if !features::spec_fee_payer_enabled();
     }
 

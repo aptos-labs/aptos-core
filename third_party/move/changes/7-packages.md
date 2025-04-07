@@ -195,7 +195,7 @@ understand.
 A named address `N` in a package `P` is in scope if:
 1. It declares a named address `N`; or
 2. A package in one of `P`'s transitive dependencies declares the named address
-  `N` and there is a dependency path in the package graph between between `P` and the
+  `N` and there is a dependency path in the package graph between `P` and the
   declaring package of `N` with no renaming of `N`.
 
 Additionally, every named address in a package is exported. Because of this and
@@ -235,7 +235,7 @@ It is important to note that _renaming is not local_: once a named address `N`
 has been renamed to `N2` in a package `P` all packages that import `P` will not
 see `N` but only `N2` unless `N` is reintroduced from outside of `P`. This is
 why rule (2) in the scoping rules at the start of this section specifies a
-"dependency path in the package graph between between `P` and the declaring
+"dependency path in the package graph between `P` and the declaring
 package of `N` with no renaming of `N`."
 
 ### Instantiation

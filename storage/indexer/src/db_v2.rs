@@ -79,17 +79,11 @@ impl IndexerAsyncV2 {
         db_reader: Arc<dyn DbReader>,
         first_version: Version,
         write_sets: &[&WriteSet],
-        end_early_if_pending_on_empty: bool,
     ) -> Result<()> {
         let last_version = first_version + write_sets.len() as Version;
         let state_view = db_reader.state_view_at_version(Some(last_version))?;
         let annotator = AptosValueAnnotator::new(&state_view);
-        self.index_with_annotator(
-            &annotator,
-            first_version,
-            write_sets,
-            end_early_if_pending_on_empty,
-        )
+        self.index_with_annotator(&annotator, first_version, write_sets)
     }
 
     /// Index write sets with the move annotator to parse obscure table handle and key value types
@@ -99,17 +93,12 @@ impl IndexerAsyncV2 {
         annotator: &AptosValueAnnotator<R>,
         first_version: Version,
         write_sets: &[&WriteSet],
-        end_early_if_pending_on_empty: bool,
     ) -> Result<()> {
         let end_version = first_version + write_sets.len() as Version;
         let mut table_info_parser = TableInfoParser::new(self, annotator, &self.pending_on);
-        'outer_loop: for write_set in write_sets {
+        for write_set in write_sets {
             for (state_key, write_op) in write_set.iter() {
                 table_info_parser.parse_write_op(state_key, write_op)?;
-                // In the second sequential retry to parse write sets, we will end early if all pending on items are parsed
-                if end_early_if_pending_on_empty && self.is_indexer_async_v2_pending_on_empty() {
-                    break 'outer_loop; // This breaks out of both loops
-                }
             }
         }
         let mut batch = SchemaBatch::new();
@@ -154,29 +143,6 @@ impl IndexerAsyncV2 {
         Ok(())
     }
 
-    /// After multiple threads have processed batches of write sets, clean up the pending on items to
-    /// remove any handles that have already been successfully parsed
-    /// ideally pending on items should be empty after threads join, meaning that all batches have done the work
-    pub fn cleanup_pending_on_items(&self) -> Result<()> {
-        let pending_keys: Vec<TableHandle> =
-            self.pending_on.iter().map(|entry| *entry.key()).collect();
-
-        for handle in pending_keys.iter() {
-            if self.get_table_info(*handle)?.is_some() {
-                self.pending_on.remove(handle);
-            }
-        }
-
-        if !self.pending_on.is_empty() {
-            aptos_logger::warn!(
-                "There are still pending table items to parse due to unknown table info for table handles: {:?}",
-                pending_keys
-            );
-        }
-
-        Ok(())
-    }
-
     pub fn next_version(&self) -> Version {
         self.db
             .get::<IndexerMetadataSchema>(&MetadataKey::LatestVersion)
@@ -205,7 +171,21 @@ impl IndexerAsyncV2 {
     }
 
     pub fn is_indexer_async_v2_pending_on_empty(&self) -> bool {
-        self.pending_on.is_empty()
+        if !self.pending_on.is_empty() {
+            let pending_keys: Vec<TableHandle> =
+                self.pending_on.iter().map(|entry| *entry.key()).collect();
+            aptos_logger::warn!(
+                "There are still pending table items to parse due to unknown table info for table handles: {:?}",
+                pending_keys
+            );
+            false
+        } else {
+            true
+        }
+    }
+
+    pub fn clear_pending_on(&self) {
+        self.pending_on.clear()
     }
 
     pub fn create_checkpoint(&self, path: &PathBuf) -> Result<()> {

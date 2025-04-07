@@ -232,12 +232,19 @@ impl LazyLoadedFunction {
                         "captured argument count does not match declared parameters".to_string(),
                     ));
             }
+
+            let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
             for (actual_arg_ty, serialized_layout) in
                 captured_arg_types.into_iter().zip(captured_layouts)
             {
                 // Note that the below call returns a runtime layout, so we can directly
                 // compare it without desugaring.
-                let actual_arg_layout = converter.type_to_type_layout(actual_arg_ty)?;
+                let actual_arg_layout = if ty_args.is_empty() {
+                    converter.type_to_type_layout(actual_arg_ty)?
+                } else {
+                    let actual_arg_ty = ty_builder.create_ty_with_subst(actual_arg_ty, &ty_args)?;
+                    converter.type_to_type_layout(&actual_arg_ty)?
+                };
                 if !serialized_layout.is_compatible_with(&actual_arg_layout) {
                     return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                         .with_message(

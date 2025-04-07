@@ -175,7 +175,7 @@ fn test_db_indexer_data() {
 
     let x = internal_indexer_db.get_event_by_key_iter().unwrap();
     let res: Vec<_> = x.collect();
-    assert_eq!(res.len(), 4);
+    assert_eq!(res.len(), 16);
 
     let core_kv_iter = db_indexer
         .get_prefixed_state_value_iterator(
@@ -185,7 +185,7 @@ fn test_db_indexer_data() {
         )
         .unwrap();
     let core_kv_res: Vec<_> = core_kv_iter.collect();
-    assert_eq!(core_kv_res.len(), 4);
+    assert_eq!(core_kv_res.len(), 5);
     let address_one_kv_iter = db_indexer
         .get_prefixed_state_value_iterator(
             &StateKeyPrefix::from(AccountAddress::from_hex_literal("0x1").unwrap()),
@@ -234,6 +234,7 @@ fn test_db_indexer_data() {
         ident_str!("vesting"),
         ident_str!("bls12381"),
         ident_str!("chain_id"),
+        ident_str!("daa_siws"),
         ident_str!("features"),
         ident_str!("from_bcs"),
         ident_str!("pool_u64"),

@@ -237,6 +237,8 @@ fn main() -> Result<()> {
     logger.channel_size(1000).is_async(false).level(Level::Info);
     logger.build();
 
+    env_logger::init();
+
     let args = Args::parse();
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
