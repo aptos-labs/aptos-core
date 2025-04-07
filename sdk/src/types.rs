@@ -501,7 +501,7 @@ impl LocalAccount {
                 AnyKeylessPublicKey::Federated(federated_keyless_account.public_key().clone())
             },
             LocalAccountAuthenticator::Abstraction(..) => todo!(),
-            LocalAccountAuthenticator::DomainAbstraction(..) => todo!(),
+            LocalAccountAuthenticator::DerivableAbstraction(..) => todo!(),
         }
     }
 
