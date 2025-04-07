@@ -18,7 +18,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::Features,
-    transaction::{MultisigTransactionPayload, TransactionExecutableRef},
+    transaction::{MultisigTransactionPayload, ReplayProtector, TransactionExecutableRef},
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
@@ -444,7 +444,6 @@ pub(crate) fn run_multisig_prologue(
             ));
         },
     };
-
 
     session
         .execute_function_bypass_visibility(
