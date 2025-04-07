@@ -1,6 +1,5 @@
 module aptos_std::multi_key {
     use std::hash;
-    use std::vector;
 
     //
     // Error codes
