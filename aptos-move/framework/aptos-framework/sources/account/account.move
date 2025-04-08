@@ -764,8 +764,8 @@ module aptos_framework::account {
             new_auth_key
         );
         if (new_scheme == MULTI_ED25519_SCHEME) {
-            let len = std::vector::length(&cap_update_table);
-            let signature_bitmap = std::vector::slice(&cap_update_table, len - 4, len);
+            let len = vector::length(&cap_update_table);
+            let signature_bitmap = vector::slice(&cap_update_table, len - 4, len);
             event::emit(KeyRotationToMultiPublicKey {
                 account: rotation_cap_offerer_address,
                 verified_public_key_bit_map: signature_bitmap,
