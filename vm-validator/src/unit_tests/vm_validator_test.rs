@@ -317,10 +317,7 @@ fn test_validate_account_doesnt_exist() {
         None,
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
-    assert_eq!(
-        ret.status().unwrap(),
-        StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST
-    );
+    assert_eq!(ret.status().unwrap(), StatusCode::INVALID_AUTH_KEY);
 }
 
 #[test]

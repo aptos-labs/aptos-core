@@ -630,27 +630,29 @@ impl AptosVM {
             // Verify we charged sufficiently for creating an account slot
             let gas_params = self.gas_params(log_context)?;
             let gas_unit_price = u64::from(txn_data.gas_unit_price());
-            let gas_used = fee_statement.gas_used();
-            let storage_fee = fee_statement.storage_fee_used();
-            let storage_refund = fee_statement.storage_fee_refund();
+            if gas_unit_price != 0 || !self.features().is_default_account_resource_enabled() {
+                let gas_used = fee_statement.gas_used();
+                let storage_fee = fee_statement.storage_fee_used();
+                let storage_refund = fee_statement.storage_fee_refund();
 
-            let actual = gas_used * gas_unit_price + storage_fee - storage_refund;
-            let expected = u64::from(
-                gas_meter
-                    .disk_space_pricing()
-                    .hack_account_creation_fee_lower_bound(&gas_params.vm.txn),
-            );
-            if actual < expected {
-                expect_only_successful_execution(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(
-                            "Insufficient fee for storing account for sponsored transaction"
-                                .to_string(),
-                        )
-                        .finish(Location::Undefined),
-                    &format!("{:?}::{}", ACCOUNT_MODULE, CREATE_ACCOUNT_IF_DOES_NOT_EXIST),
-                    log_context,
-                )?;
+                let actual = gas_used * gas_unit_price + storage_fee - storage_refund;
+                let expected = u64::from(
+                    gas_meter
+                        .disk_space_pricing()
+                        .hack_account_creation_fee_lower_bound(&gas_params.vm.txn),
+                );
+                if actual < expected {
+                    expect_only_successful_execution(
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .with_message(
+                                "Insufficient fee for storing account for lazy account creation"
+                                    .to_string(),
+                            )
+                            .finish(Location::Undefined),
+                        &format!("{:?}::{}", ACCOUNT_MODULE, CREATE_ACCOUNT_IF_DOES_NOT_EXIST),
+                        log_context,
+                    )?;
+                }
             }
             (abort_hook_session_change_set, fee_statement)
         } else {

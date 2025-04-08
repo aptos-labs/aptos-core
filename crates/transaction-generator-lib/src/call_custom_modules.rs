@@ -215,7 +215,7 @@ impl CustomModulesDelegationGeneratorCreator {
         let mut packages = Vec::new();
 
         let publisher_balance = publisher_balance.unwrap_or(
-            2 * init_txn_factory.get_gas_unit_price() * init_txn_factory.get_max_gas_amount(),
+            4 * init_txn_factory.get_gas_unit_price() * init_txn_factory.get_max_gas_amount(),
         );
         let total_funds = (num_modules as u64) * publisher_balance;
         root_account
