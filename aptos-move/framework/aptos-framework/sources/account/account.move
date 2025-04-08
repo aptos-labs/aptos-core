@@ -36,10 +36,15 @@ module aptos_framework::account {
 
     #[event]
     struct KeyRotationToMultiPublicKey has drop, store {
+        // The account that is rotating its key
         account: address,
+        // The bitmap of verified public keys.  This indicates which public keys have been verified by the account owner.
         verified_public_key_bit_map: vector<u8>,
+        // The scheme of the multi public key, can be MultiEd25519 or MultiKey
         multi_public_key_scheme: u8,
+        // The byte representation of the public key
         multi_public_key: vector<u8>,
+        // The new authentication key which is the hash of [multi_public_key, multi_public_key_scheme]
         authentication_key: vector<u8>,
     }
 
@@ -462,10 +467,10 @@ module aptos_framework::account {
     /// # Events
     /// * Emits a `KeyRotationToMultiPublicKey` event with the new multi-key configuration
     entry fun add_ed25519_backup_key_on_keyless_account(account: &signer, keyless_public_key: vector<u8>, backup_key: vector<u8>, backup_key_proof: vector<u8>) acquires Account {
-        // Check that the public key is a keyless public key by checking the scheme
-        // encoded in the first byte of the single key public key
-        let public_key_type = keyless_public_key[0];
-        assert!(public_key_type == 3 || public_key_type == 4, error::invalid_argument(ENOT_A_KEYLESS_PUBLIC_KEY));
+        // Check that the main public key is a keyless public key
+        let keyless_single_key = single_key::new_unvalidated_public_key_from_bytes(keyless_public_key);
+        assert!(single_key::is_keyless_or_federated_keyless_public_key(&keyless_single_key), error::invalid_argument(ENOT_A_KEYLESS_PUBLIC_KEY));
+
         let addr = signer::address_of(account);
         let account_resource = &mut Account[addr];
 
@@ -503,23 +508,21 @@ module aptos_framework::account {
         let backup_key_ed25519 = ed25519::new_unvalidated_public_key_from_bytes(backup_key);
         let backup_key_as_single_key = single_key::from_ed25519_public_key_unvalidated(&backup_key_ed25519);
 
-        // Construct the multi key public key which should be the current public key of the account
-        let new_public_key_bytes = vector[];
-        new_public_key_bytes.push_back(0x02); // Number of keys in the multi key
-        new_public_key_bytes.append(keyless_public_key);  // Add the current key which is the keyless public key
-        new_public_key_bytes.append(single_key::unvalidated_public_key_to_bytes(&backup_key_as_single_key));
-        new_public_key_bytes.push_back(0x01); // Signatures required
-
-        let new_auth_key = get_authentication_key_from_scheme_and_public_key_bytes(MULTI_KEY_SCHEME, new_public_key_bytes);
+        let new_public_key = multi_key::new_unvalidated_public_key_from_single_keys(vector[keyless_single_key, backup_key_as_single_key], 1);
+        let new_auth_key = multi_key::unvalidated_public_key_to_authentication_key(&new_public_key);
 
         // Rotate the authentication key to the new multi key public key
         rotate_authentication_key_call(account, new_auth_key);
 
         event::emit(KeyRotationToMultiPublicKey {
             account: addr,
+            // This marks that both the keyless public key and the new backup key are verified
+            // The keyless public key is the original public key of the account and the new backup key
+            // has been validated via verifying the challenge signed by the new backup key.
+            // Represents the bitmap 0b11000000000000000000000000000000
             verified_public_key_bit_map: vector[0xC0, 0x00, 0x00, 0x00],
             multi_public_key_scheme: MULTI_KEY_SCHEME,
-            multi_public_key: new_public_key_bytes,
+            multi_public_key: multi_key::unvalidated_public_key_to_bytes(&new_public_key),
             authentication_key: new_auth_key,
         });
     }
@@ -544,10 +547,9 @@ module aptos_framework::account {
     /// # Events
     /// * Emits a `KeyRotationToMultiPublicKey` event with the updated multi-key configuration
     entry fun replace_ed25519_backup_key_on_keyless_account(account: &signer, keyless_public_key: vector<u8>, cur_backup_key: vector<u8>, new_backup_key: vector<u8>, new_backup_key_proof: vector<u8>) acquires Account {
-        // Check that the main public key is a keyless public key by checking the scheme
-        // encoded in the first byte of the single key public key
-        let public_key_type = keyless_public_key[0];
-        assert!(public_key_type == 3 || public_key_type == 4, std::error::invalid_argument(ENOT_A_KEYLESS_PUBLIC_KEY));
+        // Check that the main public key is a keyless public key
+        let keyless_single_key = single_key::new_unvalidated_public_key_from_bytes(keyless_public_key);
+        assert!(single_key::is_keyless_or_federated_keyless_public_key(&keyless_single_key), error::invalid_argument(ENOT_A_KEYLESS_PUBLIC_KEY));
 
         let addr = signer::address_of(account);
         let account_resource = &mut Account[addr];
@@ -557,15 +559,11 @@ module aptos_framework::account {
         let backup_key_as_single_key = single_key::from_ed25519_public_key_unvalidated(&backup_key_ed25519);
 
         // Construct the multi key public key which should be the current public key of the account
-        let account_public_key_bytes = vector[];
-        account_public_key_bytes.push_back(0x02); // Number of keys in the multi key
-        account_public_key_bytes.append(keyless_public_key);  // Add the current key which is a single key
-        account_public_key_bytes.append(single_key::unvalidated_public_key_to_bytes(&backup_key_as_single_key));
-        account_public_key_bytes.push_back(0x01); // Signatures required
+        let account_public_key = multi_key::new_unvalidated_public_key_from_single_keys(vector[keyless_single_key, backup_key_as_single_key], 1);
+        let auth_key = multi_key::unvalidated_public_key_to_authentication_key(&account_public_key);
 
         // Check that constructed multi key public key is the current public key of the account by comparing
         // its authentication key to the account's authentication key
-        let auth_key = get_authentication_key_from_scheme_and_public_key_bytes(MULTI_KEY_SCHEME, account_public_key_bytes);
         assert!(
             auth_key == account_resource.authentication_key,
             error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY)
@@ -598,14 +596,8 @@ module aptos_framework::account {
         let new_backup_key_ed25519 = ed25519::new_unvalidated_public_key_from_bytes(new_backup_key);
         let new_backup_key_as_single_key = single_key::from_ed25519_public_key_unvalidated(&new_backup_key_ed25519);
 
-        // Construct the new multi key public key which contains the keyless public key and the new backup key
-        let new_public_key_bytes = vector[];
-        new_public_key_bytes.push_back(0x02); // Number of keys in the multi key
-        new_public_key_bytes.append(keyless_public_key);  // Add the current key which is a single key
-        new_public_key_bytes.append(single_key::unvalidated_public_key_to_bytes(&new_backup_key_as_single_key));
-        new_public_key_bytes.push_back(0x01); // Signatures required
-
-        let new_auth_key = get_authentication_key_from_scheme_and_public_key_bytes(MULTI_KEY_SCHEME, new_public_key_bytes);
+        let new_public_key = multi_key::new_unvalidated_public_key_from_single_keys(vector[keyless_single_key, new_backup_key_as_single_key], 1);
+        let new_auth_key = multi_key::unvalidated_public_key_to_authentication_key(&new_public_key);
 
         // Rotate the authentication key to the new multi key public key
         rotate_authentication_key_call(account, new_auth_key);
@@ -617,7 +609,7 @@ module aptos_framework::account {
             // has been validated via verifying the challenge signed by the new backup key.
             verified_public_key_bit_map: vector[0xC0, 0x00, 0x00, 0x00],
             multi_public_key_scheme: MULTI_KEY_SCHEME,
-            multi_public_key: new_public_key_bytes,
+            multi_public_key: multi_key::unvalidated_public_key_to_bytes(&new_public_key),
             authentication_key: new_auth_key,
         });
     }
@@ -710,8 +702,8 @@ module aptos_framework::account {
         update_auth_key_and_originating_address_table(addr, account_resource, new_auth_key);
 
         if (to_scheme == MULTI_ED25519_SCHEME) {
-            let len = std::vector::length(&cap_update_table);
-            let signature_bitmap = std::vector::slice(&cap_update_table, len - 4, len);
+            let len = cap_update_table.length();
+            let signature_bitmap = cap_update_table.slice(len - 4, len);
             event::emit(KeyRotationToMultiPublicKey {
                 account: addr,
                 verified_public_key_bit_map: signature_bitmap,

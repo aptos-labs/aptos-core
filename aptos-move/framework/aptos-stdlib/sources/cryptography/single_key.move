@@ -1,3 +1,6 @@
+/// This module implements Single Key representations of public keys.
+/// It is used to represent public keys for the Ed25519, SECP256K1, WebAuthn, and Keyless schemes in a unified way.
+
 module aptos_std::single_key {
     use aptos_std::ed25519;
     use std::hash;
@@ -7,12 +10,6 @@ module aptos_std::single_key {
 
     /// Wrong number of bytes were given as input when deserializing an Ed25519 public key.
     const E_INVALID_PUBLIC_KEY_TYPE: u64 = 1;
-
-    /// Failed to deserialize the public key.
-    const E_FAILED_TO_DESERIALIZE: u64 = 2;
-
-    /// Wrong number of bytes were given as input when deserializing an Ed25519 signature.
-    const E_INVALID_SIGNATURE_SCHEME: u64 = 3;
 
     //
     // Constants
@@ -50,7 +47,7 @@ module aptos_std::single_key {
     // Functions
     //
 
-    /// Parses the input bytes as an *unvalidated* single key.  It does check that the first byte is a valid scheme identifier.
+    /// Parses the input bytes as an *unvalidated* single key. It does check that the first byte is a valid scheme identifier.
     public fun new_unvalidated_public_key_from_bytes(bytes: vector<u8>): UnvalidatedPublicKey {
         let first_byte = bytes[0];
         assert!(first_byte <= 4, std::error::invalid_argument(E_INVALID_PUBLIC_KEY_TYPE));
@@ -62,13 +59,16 @@ module aptos_std::single_key {
         pk.bytes
     }
 
+    /// Returns true if the public key is a keyless or federated keyless public key.
+    public fun is_keyless_or_federated_keyless_public_key(pk: &UnvalidatedPublicKey): bool {
+        pk.bytes[0] == KEYLESS_PUBLIC_KEY_TYPE || pk.bytes[0] == FEDERATED_KEYLESS_PUBLIC_KEY_TYPE
+    }
+
     /// Converts an unvalidated Ed25519 public key to an unvalidated single key public key.
     /// We do this by prepending the scheme identifier and the length of the public key (32 bytes or 0x20 in hex) to
     /// the public key bytes.
     public fun from_ed25519_public_key_unvalidated(pk: &ed25519::UnvalidatedPublicKey): UnvalidatedPublicKey {
-        let pk_bytes = vector[];
-        pk_bytes.push_back(ED25519_PUBLIC_KEY_TYPE);
-        pk_bytes.push_back(0x20);
+        let pk_bytes = vector[ED25519_PUBLIC_KEY_TYPE, 0x20];
         pk_bytes.append(ed25519::unvalidated_public_key_to_bytes(pk));
         UnvalidatedPublicKey {
             bytes: pk_bytes
@@ -84,5 +84,15 @@ module aptos_std::single_key {
     fun public_key_bytes_to_authentication_key(pk_bytes: vector<u8>): vector<u8> {
         pk_bytes.push_back(SIGNATURE_SCHEME_ID);
         hash::sha3_256(pk_bytes)
+    }
+
+    #[test]
+    fun test_get_authentication_key() {
+        let pk_bytes: vector<u8> = x"031b68747470733a2f2f6163636f756e74732e676f6f676c652e636f6d2086bc0a0a825eb6337ca1e8a3157e490eac8df23d5cef25d9641ad5e7edc1d514";
+        let pk = new_unvalidated_public_key_from_bytes(pk_bytes);
+        assert!(
+            unvalidated_public_key_to_authentication_key(&pk) == x"69d542afebf0387b5e4fcb447b79e3fa9b9aaadba4697b51b90b8d7b9649d159",
+            std::error::invalid_state(1)
+        );
     }
 }

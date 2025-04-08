@@ -1728,10 +1728,10 @@ creating a multi-key that requires 1 signature from either key to authenticate.
 
 
 <pre><code>entry <b>fun</b> <a href="account.md#0x1_account_add_ed25519_backup_key_on_keyless_account">add_ed25519_backup_key_on_keyless_account</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, keyless_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, backup_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, backup_key_proof: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
-    // Check that the <b>public</b> key is a keyless <b>public</b> key by checking the scheme
-    // encoded in the first byte of the single key <b>public</b> key
-    <b>let</b> public_key_type = keyless_public_key[0];
-    <b>assert</b>!(public_key_type == 3 || public_key_type == 4, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_ENOT_A_KEYLESS_PUBLIC_KEY">ENOT_A_KEYLESS_PUBLIC_KEY</a>));
+    // Check that the main <b>public</b> key is a keyless <b>public</b> key
+    <b>let</b> keyless_single_key = <a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_new_unvalidated_public_key_from_bytes">single_key::new_unvalidated_public_key_from_bytes</a>(keyless_public_key);
+    <b>assert</b>!(<a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_is_keyless_or_federated_keyless_public_key">single_key::is_keyless_or_federated_keyless_public_key</a>(&keyless_single_key), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_ENOT_A_KEYLESS_PUBLIC_KEY">ENOT_A_KEYLESS_PUBLIC_KEY</a>));
+
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>let</b> account_resource = &<b>mut</b> <a href="account.md#0x1_account_Account">Account</a>[addr];
 
@@ -1769,23 +1769,21 @@ creating a multi-key that requires 1 signature from either key to authenticate.
     <b>let</b> backup_key_ed25519 = <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_new_unvalidated_public_key_from_bytes">ed25519::new_unvalidated_public_key_from_bytes</a>(backup_key);
     <b>let</b> backup_key_as_single_key = <a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_from_ed25519_public_key_unvalidated">single_key::from_ed25519_public_key_unvalidated</a>(&backup_key_ed25519);
 
-    // Construct the multi key <b>public</b> key which should be the current <b>public</b> key of the <a href="account.md#0x1_account">account</a>
-    <b>let</b> new_public_key_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-    new_public_key_bytes.push_back(0x02); // Number of keys in the multi key
-    new_public_key_bytes.append(keyless_public_key);  // Add the current key which is the keyless <b>public</b> key
-    new_public_key_bytes.append(<a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_unvalidated_public_key_to_bytes">single_key::unvalidated_public_key_to_bytes</a>(&backup_key_as_single_key));
-    new_public_key_bytes.push_back(0x01); // Signatures required
-
-    <b>let</b> new_auth_key = <a href="account.md#0x1_account_get_authentication_key_from_scheme_and_public_key_bytes">get_authentication_key_from_scheme_and_public_key_bytes</a>(<a href="account.md#0x1_account_MULTI_KEY_SCHEME">MULTI_KEY_SCHEME</a>, new_public_key_bytes);
+    <b>let</b> new_public_key = <a href="../../aptos-stdlib/doc/multi_key.md#0x1_multi_key_new_unvalidated_public_key_from_single_keys">multi_key::new_unvalidated_public_key_from_single_keys</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[keyless_single_key, backup_key_as_single_key], 1);
+    <b>let</b> new_auth_key = <a href="../../aptos-stdlib/doc/multi_key.md#0x1_multi_key_unvalidated_public_key_to_authentication_key">multi_key::unvalidated_public_key_to_authentication_key</a>(&new_public_key);
 
     // Rotate the authentication key <b>to</b> the new multi key <b>public</b> key
     <a href="account.md#0x1_account_rotate_authentication_key_call">rotate_authentication_key_call</a>(<a href="account.md#0x1_account">account</a>, new_auth_key);
 
     <a href="event.md#0x1_event_emit">event::emit</a>(<a href="account.md#0x1_account_KeyRotationToMultiPublicKey">KeyRotationToMultiPublicKey</a> {
         <a href="account.md#0x1_account">account</a>: addr,
+        // This marks that both the keyless <b>public</b> key and the new backup key are verified
+        // The keyless <b>public</b> key is the original <b>public</b> key of the <a href="account.md#0x1_account">account</a> and the new backup key
+        // <b>has</b> been validated via verifying the challenge signed by the new backup key.
+        // Represents the bitmap 0b11000000000000000000000000000000
         verified_public_key_bit_map: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[0xC0, 0x00, 0x00, 0x00],
         multi_public_key_scheme: <a href="account.md#0x1_account_MULTI_KEY_SCHEME">MULTI_KEY_SCHEME</a>,
-        multi_public_key: new_public_key_bytes,
+        multi_public_key: <a href="../../aptos-stdlib/doc/multi_key.md#0x1_multi_key_unvalidated_public_key_to_bytes">multi_key::unvalidated_public_key_to_bytes</a>(&new_public_key),
         authentication_key: new_auth_key,
     });
 }
@@ -1842,10 +1840,9 @@ maintaining the multi-key configuration that requires 1 signature from either ke
 
 
 <pre><code>entry <b>fun</b> <a href="account.md#0x1_account_replace_ed25519_backup_key_on_keyless_account">replace_ed25519_backup_key_on_keyless_account</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, keyless_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, cur_backup_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, new_backup_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, new_backup_key_proof: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
-    // Check that the main <b>public</b> key is a keyless <b>public</b> key by checking the scheme
-    // encoded in the first byte of the single key <b>public</b> key
-    <b>let</b> public_key_type = keyless_public_key[0];
-    <b>assert</b>!(public_key_type == 3 || public_key_type == 4, std::error::invalid_argument(<a href="account.md#0x1_account_ENOT_A_KEYLESS_PUBLIC_KEY">ENOT_A_KEYLESS_PUBLIC_KEY</a>));
+    // Check that the main <b>public</b> key is a keyless <b>public</b> key
+    <b>let</b> keyless_single_key = <a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_new_unvalidated_public_key_from_bytes">single_key::new_unvalidated_public_key_from_bytes</a>(keyless_public_key);
+    <b>assert</b>!(<a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_is_keyless_or_federated_keyless_public_key">single_key::is_keyless_or_federated_keyless_public_key</a>(&keyless_single_key), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_ENOT_A_KEYLESS_PUBLIC_KEY">ENOT_A_KEYLESS_PUBLIC_KEY</a>));
 
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>let</b> account_resource = &<b>mut</b> <a href="account.md#0x1_account_Account">Account</a>[addr];
@@ -1855,15 +1852,11 @@ maintaining the multi-key configuration that requires 1 signature from either ke
     <b>let</b> backup_key_as_single_key = <a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_from_ed25519_public_key_unvalidated">single_key::from_ed25519_public_key_unvalidated</a>(&backup_key_ed25519);
 
     // Construct the multi key <b>public</b> key which should be the current <b>public</b> key of the <a href="account.md#0x1_account">account</a>
-    <b>let</b> account_public_key_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-    account_public_key_bytes.push_back(0x02); // Number of keys in the multi key
-    account_public_key_bytes.append(keyless_public_key);  // Add the current key which is a single key
-    account_public_key_bytes.append(<a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_unvalidated_public_key_to_bytes">single_key::unvalidated_public_key_to_bytes</a>(&backup_key_as_single_key));
-    account_public_key_bytes.push_back(0x01); // Signatures required
+    <b>let</b> account_public_key = <a href="../../aptos-stdlib/doc/multi_key.md#0x1_multi_key_new_unvalidated_public_key_from_single_keys">multi_key::new_unvalidated_public_key_from_single_keys</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[keyless_single_key, backup_key_as_single_key], 1);
+    <b>let</b> auth_key = <a href="../../aptos-stdlib/doc/multi_key.md#0x1_multi_key_unvalidated_public_key_to_authentication_key">multi_key::unvalidated_public_key_to_authentication_key</a>(&account_public_key);
 
     // Check that constructed multi key <b>public</b> key is the current <b>public</b> key of the <a href="account.md#0x1_account">account</a> by comparing
     // its authentication key <b>to</b> the <a href="account.md#0x1_account">account</a>'s authentication key
-    <b>let</b> auth_key = <a href="account.md#0x1_account_get_authentication_key_from_scheme_and_public_key_bytes">get_authentication_key_from_scheme_and_public_key_bytes</a>(<a href="account.md#0x1_account_MULTI_KEY_SCHEME">MULTI_KEY_SCHEME</a>, account_public_key_bytes);
     <b>assert</b>!(
         auth_key == account_resource.authentication_key,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_EWRONG_CURRENT_PUBLIC_KEY">EWRONG_CURRENT_PUBLIC_KEY</a>)
@@ -1896,14 +1889,8 @@ maintaining the multi-key configuration that requires 1 signature from either ke
     <b>let</b> new_backup_key_ed25519 = <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_new_unvalidated_public_key_from_bytes">ed25519::new_unvalidated_public_key_from_bytes</a>(new_backup_key);
     <b>let</b> new_backup_key_as_single_key = <a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_from_ed25519_public_key_unvalidated">single_key::from_ed25519_public_key_unvalidated</a>(&new_backup_key_ed25519);
 
-    // Construct the new multi key <b>public</b> key which contains the keyless <b>public</b> key and the new backup key
-    <b>let</b> new_public_key_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-    new_public_key_bytes.push_back(0x02); // Number of keys in the multi key
-    new_public_key_bytes.append(keyless_public_key);  // Add the current key which is a single key
-    new_public_key_bytes.append(<a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_unvalidated_public_key_to_bytes">single_key::unvalidated_public_key_to_bytes</a>(&new_backup_key_as_single_key));
-    new_public_key_bytes.push_back(0x01); // Signatures required
-
-    <b>let</b> new_auth_key = <a href="account.md#0x1_account_get_authentication_key_from_scheme_and_public_key_bytes">get_authentication_key_from_scheme_and_public_key_bytes</a>(<a href="account.md#0x1_account_MULTI_KEY_SCHEME">MULTI_KEY_SCHEME</a>, new_public_key_bytes);
+    <b>let</b> new_public_key = <a href="../../aptos-stdlib/doc/multi_key.md#0x1_multi_key_new_unvalidated_public_key_from_single_keys">multi_key::new_unvalidated_public_key_from_single_keys</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[keyless_single_key, new_backup_key_as_single_key], 1);
+    <b>let</b> new_auth_key = <a href="../../aptos-stdlib/doc/multi_key.md#0x1_multi_key_unvalidated_public_key_to_authentication_key">multi_key::unvalidated_public_key_to_authentication_key</a>(&new_public_key);
 
     // Rotate the authentication key <b>to</b> the new multi key <b>public</b> key
     <a href="account.md#0x1_account_rotate_authentication_key_call">rotate_authentication_key_call</a>(<a href="account.md#0x1_account">account</a>, new_auth_key);
@@ -1915,7 +1902,7 @@ maintaining the multi-key configuration that requires 1 signature from either ke
         // <b>has</b> been validated via verifying the challenge signed by the new backup key.
         verified_public_key_bit_map: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[0xC0, 0x00, 0x00, 0x00],
         multi_public_key_scheme: <a href="account.md#0x1_account_MULTI_KEY_SCHEME">MULTI_KEY_SCHEME</a>,
-        multi_public_key: new_public_key_bytes,
+        multi_public_key: <a href="../../aptos-stdlib/doc/multi_key.md#0x1_multi_key_unvalidated_public_key_to_bytes">multi_key::unvalidated_public_key_to_bytes</a>(&new_public_key),
         authentication_key: new_auth_key,
     });
 }
@@ -2028,8 +2015,8 @@ to rotate his address to Alice's address in the first place.
     <a href="account.md#0x1_account_update_auth_key_and_originating_address_table">update_auth_key_and_originating_address_table</a>(addr, account_resource, new_auth_key);
 
     <b>if</b> (to_scheme == <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a>) {
-        <b>let</b> len = std::vector::length(&cap_update_table);
-        <b>let</b> signature_bitmap = std::vector::slice(&cap_update_table, len - 4, len);
+        <b>let</b> len = cap_update_table.length();
+        <b>let</b> signature_bitmap = cap_update_table.slice(len - 4, len);
         <a href="event.md#0x1_event_emit">event::emit</a>(<a href="account.md#0x1_account_KeyRotationToMultiPublicKey">KeyRotationToMultiPublicKey</a> {
             <a href="account.md#0x1_account">account</a>: addr,
             verified_public_key_bit_map: signature_bitmap,
