@@ -1252,7 +1252,9 @@ module aptos_framework::vesting {
 
         vector::for_each_ref(accounts, |addr| {
             let addr: address = *addr;
-            create_account(addr);
+            if (!account::exists_at(addr)) {
+                create_account(addr);
+            }
         });
 
         // In the test environment, the periodical_reward_rate_decrease feature is initially turned off.

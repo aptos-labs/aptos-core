@@ -32,7 +32,8 @@ module aptos_framework::account {
         new_authentication_key: vector<u8>,
     }
 
-    /// Resource representing an account.
+    /// Resource representing an account. Contains core account state including authentication key,
+    /// sequence number, GUID creation counter, and event handles for coin registration and key rotation.
     struct Account has key, store {
         authentication_key: vector<u8>,
         sequence_number: u64,
@@ -237,7 +238,7 @@ module aptos_framework::account {
     }
 
     public fun create_account_if_does_not_exist(account_address: address) {
-        if (!resource_exists_at(account_address)) {
+        if (!exists_at(account_address)) {
             assert!(
                 account_address != @vm_reserved && account_address != @aptos_framework && account_address != @aptos_token,
                 error::invalid_argument(ECANNOT_RESERVED_ADDRESS)
@@ -298,43 +299,18 @@ module aptos_framework::account {
     }
 
     #[view]
-    /// Returns whether an account exists at `addr`.
-    ///
-    /// When the `default_account_resource` feature flag is enabled:
-    /// - Always returns true, indicating that any address can be treated as a valid account
-    /// - This reflects a change in the account model where accounts are now considered to exist implicitly
-    /// - The sequence number and other account properties will return default values (0) for addresses without an Account resource
-    ///
-    /// When the feature flag is disabled:
-    /// - Returns true only if an Account resource exists at `addr`
-    /// - This is the legacy behavior where accounts must be explicitly created
+    /// Checks if an account exists at the given address by checking for the presence of an Account resource.
+    /// Returns true if the Account resource exists, false otherwise.
     public fun exists_at(addr: address): bool {
-        features::is_default_account_resource_enabled() || exists<Account>(addr)
-    }
-
-    /// Returns whether an Account resource exists at `addr`.
-    ///
-    /// Unlike `exists_at`, this function strictly checks for the presence of the Account resource,
-    /// regardless of the `default_account_resource` feature flag.
-    ///
-    /// This is useful for operations that specifically need to know if the Account resource
-    /// has been created, rather than just whether the address can be treated as an account.
-    inline fun resource_exists_at(addr: address): bool {
         exists<Account>(addr)
     }
 
     #[view]
-    /// Returns the next GUID creation number for `addr`.
-    ///
-    /// When the `default_account_resource` feature flag is enabled:
-    /// - Returns 0 for addresses without an Account resource
-    /// - This allows GUID creation for previously non-existent accounts
-    /// - The first GUID created will start the sequence from 0
-    ///
-    /// When the feature flag is disabled:
-    /// - Aborts if no Account resource exists at `addr`
+    /// Returns the next GUID creation number for the account at `addr`.
+    /// When the `default_account_resource` feature flag is enabled, returns 0 for non-existent accounts.
+    /// Otherwise, aborts if no Account resource exists.
     public fun get_guid_next_creation_num(addr: address): u64 acquires Account {
-        if (resource_exists_at(addr)) {
+        if (exists_at(addr)) {
             Account[addr].guid_creation_num
         } else if (features::is_default_account_resource_enabled()) {
             0
@@ -344,8 +320,11 @@ module aptos_framework::account {
     }
 
     #[view]
+    /// Returns the sequence number for the account at `addr`.
+    /// When the `default_account_resource` feature flag is enabled, returns 0 for non-existent accounts.
+    /// Otherwise, aborts if no Account resource exists.
     public fun get_sequence_number(addr: address): u64 acquires Account {
-        if (resource_exists_at(addr)) {
+        if (exists_at(addr)) {
             Account[addr].sequence_number
         } else if (features::is_default_account_resource_enabled()) {
             0
@@ -355,6 +334,9 @@ module aptos_framework::account {
     }
 
     #[view]
+    /// Returns the originating address for a given authentication key.
+    /// Used during wallet recovery to find the original account address after key rotation.
+    /// Returns Some(originating_address) if mapped, None otherwise.
     public fun originating_address(auth_key: address): Option<address> acquires OriginatingAddress {
         let address_map_ref = &OriginatingAddress[@aptos_framework].address_map;
         if (address_map_ref.contains(auth_key)) {
@@ -384,9 +366,17 @@ module aptos_framework::account {
         *sequence_number = *sequence_number + 1;
     }
 
+    /// Returns the authentication key for the account at `addr`.
+    ///
+    /// When the `default_account_resource` feature flag is enabled:
+    /// - Returns the stored authentication key if an Account resource exists
+    /// - Returns the address converted to bytes if no Account resource exists
+    ///
+    /// When the feature flag is disabled:
+    /// - Aborts if no Account resource exists at `addr`
     #[view]
     public fun get_authentication_key(addr: address): vector<u8> acquires Account {
-        if (resource_exists_at(addr)) {
+        if (exists_at(addr)) {
             Account[addr].authentication_key
         } else if (features::is_default_account_resource_enabled()) {
             bcs::to_bytes(&addr)
@@ -520,7 +510,7 @@ module aptos_framework::account {
         cap_update_table: vector<u8>
     ) acquires Account, OriginatingAddress {
         check_rotation_permission(delegate_signer);
-        assert!(resource_exists_at(rotation_cap_offerer_address), error::not_found(EOFFERER_ADDRESS_DOES_NOT_EXIST));
+        assert!(exists_at(rotation_cap_offerer_address), error::not_found(EOFFERER_ADDRESS_DOES_NOT_EXIST));
 
         // Check that there exists a rotation capability offer at the offerer's account resource for the delegate.
         let delegate_address = signer::address_of(delegate_signer);
@@ -662,7 +652,7 @@ module aptos_framework::account {
     /// Returns true if the account at `account_addr` has a rotation capability offer.
     public fun is_rotation_capability_offered(account_addr: address): bool acquires Account {
         if (features::is_default_account_resource_enabled()) {
-            if (!resource_exists_at(account_addr)) {
+            if (!exists_at(account_addr)) {
                 return false;
             }
         } else {
@@ -746,7 +736,7 @@ module aptos_framework::account {
     /// Returns true if the account at `account_addr` has a signer capability offer.
     public fun is_signer_capability_offered(account_addr: address): bool acquires Account {
         if (features::is_default_account_resource_enabled()) {
-            if (!resource_exists_at(account_addr)) {
+            if (!exists_at(account_addr)) {
                 return false;
             }
         } else {
@@ -811,7 +801,7 @@ module aptos_framework::account {
     inline fun assert_account_resource_with_error(account: address, error_code: u64) {
         if (features::is_default_account_resource_enabled()) {
             assert!(
-                resource_exists_at(account),
+                exists_at(account),
                 error::not_found(error_code),
             );
         } else {
@@ -935,7 +925,7 @@ module aptos_framework::account {
     public fun create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) acquires Account {
         let resource_addr = create_resource_address(&signer::address_of(source), seed);
         let resource = if (exists_at(resource_addr)) {
-            if (resource_exists_at(resource_addr)) {
+            if (exists_at(resource_addr)) {
             let account = &Account[resource_addr];
             assert!(
                 account.signer_capability_offer.for.is_none(),
@@ -1112,7 +1102,7 @@ module aptos_framework::account {
     #[test_only]
     public fun create_account_for_test(new_address: address): signer {
         // Make this easier by just allowing the account to be created again in a test
-        if (!resource_exists_at(new_address)) {
+        if (!exists_at(new_address)) {
             create_account_unchecked(new_address)
         } else {
             create_signer_for_test(new_address)

@@ -30,7 +30,6 @@
 -  [Function `create_account`](#0x1_account_create_account)
 -  [Function `create_account_unchecked`](#0x1_account_create_account_unchecked)
 -  [Function `exists_at`](#0x1_account_exists_at)
--  [Function `resource_exists_at`](#0x1_account_resource_exists_at)
 -  [Function `get_guid_next_creation_num`](#0x1_account_get_guid_next_creation_num)
 -  [Function `get_sequence_number`](#0x1_account_get_sequence_number)
 -  [Function `originating_address`](#0x1_account_originating_address)
@@ -172,7 +171,8 @@
 
 ## Resource `Account`
 
-Resource representing an account.
+Resource representing an account. Contains core account state including authentication key,
+sequence number, GUID creation counter, and event handles for coin registration and key rotation.
 
 
 <pre><code><b>struct</b> <a href="account.md#0x1_account_Account">Account</a> <b>has</b> store, key
@@ -1147,7 +1147,7 @@ Only called during genesis to initialize system resources for this module.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_create_account_if_does_not_exist">create_account_if_does_not_exist</a>(account_address: <b>address</b>) {
-    <b>if</b> (!<a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(account_address)) {
+    <b>if</b> (!<a href="account.md#0x1_account_exists_at">exists_at</a>(account_address)) {
         <b>assert</b>!(
             account_address != @vm_reserved && account_address != @aptos_framework && account_address != @aptos_token,
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_ECANNOT_RESERVED_ADDRESS">ECANNOT_RESERVED_ADDRESS</a>)
@@ -1255,16 +1255,8 @@ is returned. This way, the caller of this function can publish additional resour
 
 ## Function `exists_at`
 
-Returns whether an account exists at <code>addr</code>.
-
-When the <code>default_account_resource</code> feature flag is enabled:
-- Always returns true, indicating that any address can be treated as a valid account
-- This reflects a change in the account model where accounts are now considered to exist implicitly
-- The sequence number and other account properties will return default values (0) for addresses without an Account resource
-
-When the feature flag is disabled:
-- Returns true only if an Account resource exists at <code>addr</code>
-- This is the legacy behavior where accounts must be explicitly created
+Checks if an account exists at the given address by checking for the presence of an Account resource.
+Returns true if the Account resource exists, false otherwise.
 
 
 <pre><code>#[view]
@@ -1278,37 +1270,6 @@ When the feature flag is disabled:
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_exists_at">exists_at</a>(addr: <b>address</b>): bool {
-    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_default_account_resource_enabled">features::is_default_account_resource_enabled</a>() || <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_account_resource_exists_at"></a>
-
-## Function `resource_exists_at`
-
-Returns whether an Account resource exists at <code>addr</code>.
-
-Unlike <code>exists_at</code>, this function strictly checks for the presence of the Account resource,
-regardless of the <code>default_account_resource</code> feature flag.
-
-This is useful for operations that specifically need to know if the Account resource
-has been created, rather than just whether the address can be treated as an account.
-
-
-<pre><code><b>fun</b> <a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(addr: <b>address</b>): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code>inline <b>fun</b> <a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(addr: <b>address</b>): bool {
     <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr)
 }
 </code></pre>
@@ -1321,15 +1282,9 @@ has been created, rather than just whether the address can be treated as an acco
 
 ## Function `get_guid_next_creation_num`
 
-Returns the next GUID creation number for <code>addr</code>.
-
-When the <code>default_account_resource</code> feature flag is enabled:
-- Returns 0 for addresses without an Account resource
-- This allows GUID creation for previously non-existent accounts
-- The first GUID created will start the sequence from 0
-
-When the feature flag is disabled:
-- Aborts if no Account resource exists at <code>addr</code>
+Returns the next GUID creation number for the account at <code>addr</code>.
+When the <code>default_account_resource</code> feature flag is enabled, returns 0 for non-existent accounts.
+Otherwise, aborts if no Account resource exists.
 
 
 <pre><code>#[view]
@@ -1343,7 +1298,7 @@ When the feature flag is disabled:
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_guid_next_creation_num">get_guid_next_creation_num</a>(addr: <b>address</b>): u64 <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
-    <b>if</b> (<a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(addr)) {
+    <b>if</b> (<a href="account.md#0x1_account_exists_at">exists_at</a>(addr)) {
         <a href="account.md#0x1_account_Account">Account</a>[addr].guid_creation_num
     } <b>else</b> <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_default_account_resource_enabled">features::is_default_account_resource_enabled</a>()) {
         0
@@ -1361,6 +1316,9 @@ When the feature flag is disabled:
 
 ## Function `get_sequence_number`
 
+Returns the sequence number for the account at <code>addr</code>.
+When the <code>default_account_resource</code> feature flag is enabled, returns 0 for non-existent accounts.
+Otherwise, aborts if no Account resource exists.
 
 
 <pre><code>#[view]
@@ -1374,7 +1332,7 @@ When the feature flag is disabled:
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_sequence_number">get_sequence_number</a>(addr: <b>address</b>): u64 <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
-    <b>if</b> (<a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(addr)) {
+    <b>if</b> (<a href="account.md#0x1_account_exists_at">exists_at</a>(addr)) {
         <a href="account.md#0x1_account_Account">Account</a>[addr].sequence_number
     } <b>else</b> <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_default_account_resource_enabled">features::is_default_account_resource_enabled</a>()) {
         0
@@ -1392,6 +1350,9 @@ When the feature flag is disabled:
 
 ## Function `originating_address`
 
+Returns the originating address for a given authentication key.
+Used during wallet recovery to find the original account address after key rotation.
+Returns Some(originating_address) if mapped, None otherwise.
 
 
 <pre><code>#[view]
@@ -1495,7 +1456,7 @@ When the feature flag is disabled:
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_authentication_key">get_authentication_key</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
-    <b>if</b> (<a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(addr)) {
+    <b>if</b> (<a href="account.md#0x1_account_exists_at">exists_at</a>(addr)) {
         <a href="account.md#0x1_account_Account">Account</a>[addr].authentication_key
     } <b>else</b> <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_default_account_resource_enabled">features::is_default_account_resource_enabled</a>()) {
         <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&addr)
@@ -1709,7 +1670,7 @@ to rotate his address to Alice's address in the first place.
     cap_update_table: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 ) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a>, <a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a> {
     <a href="account.md#0x1_account_check_rotation_permission">check_rotation_permission</a>(delegate_signer);
-    <b>assert</b>!(<a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(rotation_cap_offerer_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EOFFERER_ADDRESS_DOES_NOT_EXIST">EOFFERER_ADDRESS_DOES_NOT_EXIST</a>));
+    <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(rotation_cap_offerer_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EOFFERER_ADDRESS_DOES_NOT_EXIST">EOFFERER_ADDRESS_DOES_NOT_EXIST</a>));
 
     // Check that there <b>exists</b> a rotation <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> offer at the offerer's <a href="account.md#0x1_account">account</a> resource for the delegate.
     <b>let</b> delegate_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegate_signer);
@@ -1911,7 +1872,7 @@ Returns true if the account at <code>account_addr</code> has a rotation capabili
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_is_rotation_capability_offered">is_rotation_capability_offered</a>(account_addr: <b>address</b>): bool <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_default_account_resource_enabled">features::is_default_account_resource_enabled</a>()) {
-        <b>if</b> (!<a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(account_addr)) {
+        <b>if</b> (!<a href="account.md#0x1_account_exists_at">exists_at</a>(account_addr)) {
             <b>return</b> <b>false</b>;
         }
     } <b>else</b> {
@@ -2095,7 +2056,7 @@ Returns true if the account at <code>account_addr</code> has a signer capability
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_is_signer_capability_offered">is_signer_capability_offered</a>(account_addr: <b>address</b>): bool <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_default_account_resource_enabled">features::is_default_account_resource_enabled</a>()) {
-        <b>if</b> (!<a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(account_addr)) {
+        <b>if</b> (!<a href="account.md#0x1_account_exists_at">exists_at</a>(account_addr)) {
             <b>return</b> <b>false</b>;
         }
     } <b>else</b> {
@@ -2260,7 +2221,7 @@ at the offerer's address.
 <pre><code>inline <b>fun</b> <a href="account.md#0x1_account_assert_account_resource_with_error">assert_account_resource_with_error</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, error_code: u64) {
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_default_account_resource_enabled">features::is_default_account_resource_enabled</a>()) {
         <b>assert</b>!(
-            <a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(<a href="account.md#0x1_account">account</a>),
+            <a href="account.md#0x1_account_exists_at">exists_at</a>(<a href="account.md#0x1_account">account</a>),
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(error_code),
         );
     } <b>else</b> {
@@ -2459,7 +2420,7 @@ than <code>(1/2)^(256)</code>.
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_create_resource_account">create_resource_account</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="account.md#0x1_account_SignerCapability">SignerCapability</a>) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
     <b>let</b> resource_addr = <a href="account.md#0x1_account_create_resource_address">create_resource_address</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source), seed);
     <b>let</b> resource = <b>if</b> (<a href="account.md#0x1_account_exists_at">exists_at</a>(resource_addr)) {
-        <b>if</b> (<a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(resource_addr)) {
+        <b>if</b> (<a href="account.md#0x1_account_exists_at">exists_at</a>(resource_addr)) {
         <b>let</b> <a href="account.md#0x1_account">account</a> = &<a href="account.md#0x1_account_Account">Account</a>[resource_addr];
         <b>assert</b>!(
             <a href="account.md#0x1_account">account</a>.signer_capability_offer.for.is_none(),
@@ -2880,17 +2841,6 @@ Capability based functions for efficient use.
 
 
 
-
-<a id="0x1_account_spec_get_authentication_key"></a>
-
-
-<pre><code><b>fun</b> <a href="account.md#0x1_account_spec_get_authentication_key">spec_get_authentication_key</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-   <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).authentication_key
-}
-</code></pre>
-
-
-
 <a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
@@ -3122,6 +3072,17 @@ The sequence_number of the Account is up to MAX_U64.
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
 <b>ensures</b> result == <a href="account.md#0x1_account_spec_get_authentication_key">spec_get_authentication_key</a>(addr);
+</code></pre>
+
+
+
+
+<a id="0x1_account_spec_get_authentication_key"></a>
+
+
+<pre><code><b>fun</b> <a href="account.md#0x1_account_spec_get_authentication_key">spec_get_authentication_key</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+   <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).authentication_key
+}
 </code></pre>
 
 
