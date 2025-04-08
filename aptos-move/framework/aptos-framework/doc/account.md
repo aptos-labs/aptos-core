@@ -1869,7 +1869,7 @@ maintaining the multi-key configuration that requires 1 signature from either ke
 <pre><code>entry <b>fun</b> <a href="account.md#0x1_account_replace_ed25519_backup_key_on_keyless_account">replace_ed25519_backup_key_on_keyless_account</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, keyless_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, cur_backup_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, new_backup_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, new_backup_key_proof: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
     // Check that the main <b>public</b> key is a keyless <b>public</b> key by checking the scheme
     // encoded in the first byte of the single key <b>public</b> key
-    <b>let</b> public_key_type = *std::vector::borrow(&keyless_public_key, 0);
+    <b>let</b> public_key_type = keyless_public_key[0];
     <b>assert</b>!(public_key_type == 3 || public_key_type == 4, std::error::invalid_argument(<a href="account.md#0x1_account_ENOT_A_KEYLESS_PUBLIC_KEY">ENOT_A_KEYLESS_PUBLIC_KEY</a>));
 
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);

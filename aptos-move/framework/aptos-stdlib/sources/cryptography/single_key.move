@@ -20,7 +20,7 @@ module aptos_std::single_key {
 
     /// The identifier of the Single Key signature scheme, which is used when deriving Aptos authentication keys by hashing
     /// it together with an Single Key public key.
-    const SIGNATURE_SCHEME_ID: u8 = 3;
+    const SIGNATURE_SCHEME_ID: u8 = 2;
 
     /// Scheme identifier for Ed25519 single keys.
     const ED25519_PUBLIC_KEY_TYPE: u8 = 0;
