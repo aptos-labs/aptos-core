@@ -1,9 +1,10 @@
 /// This module implements MultiKey type of public key.
-
+/// A MultiKey public key is a collection of single key public keys and a number representing the number of signatures required to authenticate a transaction.
+/// Unlike MultiEd25519, the individual single keys can be of different schemes.
 module aptos_std::multi_key {
+    use aptos_std::single_key;
     use std::hash;
     use std::error;
-    use aptos_std::single_key;
     //
     // Error codes
     //
@@ -59,9 +60,7 @@ module aptos_std::multi_key {
             error::invalid_argument(E_INVALID_MULTI_KEY_SIGNATURES_REQUIRED)
         );
         let bytes = vector[num_keys as u8];
-        for (i in 0..single_keys.length()) {
-            bytes.append(single_key::unvalidated_public_key_to_bytes(&single_keys[i]));
-        };
+        single_keys.for_each_ref(|key| bytes.append(single_key::unvalidated_public_key_to_bytes(key)));
         bytes.push_back(signatures_required);
         UnvalidatedPublicKey { bytes }
     }

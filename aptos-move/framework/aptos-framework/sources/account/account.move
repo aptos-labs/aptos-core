@@ -700,18 +700,6 @@ module aptos_framework::account {
 
         // Update the `OriginatingAddress` table.
         update_auth_key_and_originating_address_table(addr, account_resource, new_auth_key);
-
-        if (to_scheme == MULTI_ED25519_SCHEME) {
-            let len = cap_update_table.length();
-            let signature_bitmap = cap_update_table.slice(len - 4, len);
-            event::emit(KeyRotationToMultiPublicKey {
-                account: addr,
-                verified_public_key_bit_map: signature_bitmap,
-                multi_public_key_scheme: to_scheme,
-                multi_public_key: to_public_key_bytes,
-                authentication_key: new_auth_key,
-            });
-        }
     }
 
     public entry fun rotate_authentication_key_with_rotation_capability(

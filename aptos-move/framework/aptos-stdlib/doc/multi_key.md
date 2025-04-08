@@ -4,6 +4,8 @@
 # Module `0x1::multi_key`
 
 This module implements MultiKey type of public key.
+A MultiKey public key is a collection of single key public keys and a number representing the number of signatures required to authenticate a transaction.
+Unlike MultiEd25519, the individual single keys can be of different schemes.
 
 
 -  [Struct `UnvalidatedPublicKey`](#0x1_multi_key_UnvalidatedPublicKey)
@@ -164,9 +166,7 @@ The number of keys provided is greater than the maximum allowed.
         <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multi_key.md#0x1_multi_key_E_INVALID_MULTI_KEY_SIGNATURES_REQUIRED">E_INVALID_MULTI_KEY_SIGNATURES_REQUIRED</a>)
     );
     <b>let</b> bytes = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[num_keys <b>as</b> u8];
-    for (i in 0..single_keys.length()) {
-        bytes.append(<a href="single_key.md#0x1_single_key_unvalidated_public_key_to_bytes">single_key::unvalidated_public_key_to_bytes</a>(&single_keys[i]));
-    };
+    single_keys.for_each_ref(|key| bytes.append(<a href="single_key.md#0x1_single_key_unvalidated_public_key_to_bytes">single_key::unvalidated_public_key_to_bytes</a>(key)));
     bytes.push_back(signatures_required);
     <a href="multi_key.md#0x1_multi_key_UnvalidatedPublicKey">UnvalidatedPublicKey</a> { bytes }
 }

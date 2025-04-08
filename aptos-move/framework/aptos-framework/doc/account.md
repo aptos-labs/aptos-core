@@ -2013,18 +2013,6 @@ to rotate his address to Alice's address in the first place.
 
     // Update the `<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>` <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>.
     <a href="account.md#0x1_account_update_auth_key_and_originating_address_table">update_auth_key_and_originating_address_table</a>(addr, account_resource, new_auth_key);
-
-    <b>if</b> (to_scheme == <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a>) {
-        <b>let</b> len = cap_update_table.length();
-        <b>let</b> signature_bitmap = cap_update_table.slice(len - 4, len);
-        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="account.md#0x1_account_KeyRotationToMultiPublicKey">KeyRotationToMultiPublicKey</a> {
-            <a href="account.md#0x1_account">account</a>: addr,
-            verified_public_key_bit_map: signature_bitmap,
-            multi_public_key_scheme: to_scheme,
-            multi_public_key: to_public_key_bytes,
-            authentication_key: new_auth_key,
-        });
-    }
 }
 </code></pre>
 
@@ -3275,6 +3263,15 @@ Capability based functions for efficient use.
 
 
 
+
+<a id="0x1_account_spec_assert_valid_rotation_proof_signature_and_get_auth_key"></a>
+
+
+<pre><code><b>fun</b> <a href="account.md#0x1_account_spec_assert_valid_rotation_proof_signature_and_get_auth_key">spec_assert_valid_rotation_proof_signature_and_get_auth_key</a>(scheme: u8, public_key_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, signature: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, challenge: <a href="account.md#0x1_account_RotationProofChallenge">RotationProofChallenge</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
 <a id="@Specification_7_initialize"></a>
 
 ### Function `initialize`
@@ -3563,15 +3560,6 @@ The length of new_auth_key is 32.
 <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(new_auth_key) != 32;
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
 <b>ensures</b> account_resource.authentication_key == new_auth_key;
-</code></pre>
-
-
-
-
-<a id="0x1_account_spec_assert_valid_rotation_proof_signature_and_get_auth_key"></a>
-
-
-<pre><code><b>fun</b> <a href="account.md#0x1_account_spec_assert_valid_rotation_proof_signature_and_get_auth_key">spec_assert_valid_rotation_proof_signature_and_get_auth_key</a>(scheme: u8, public_key_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, signature: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, challenge: <a href="account.md#0x1_account_RotationProofChallenge">RotationProofChallenge</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
