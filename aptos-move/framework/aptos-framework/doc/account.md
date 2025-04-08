@@ -2102,8 +2102,8 @@ to rotate his address to Alice's address in the first place.
         new_auth_key
     );
     <b>if</b> (new_scheme == <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a>) {
-        <b>let</b> len = std::vector::length(&cap_update_table);
-        <b>let</b> signature_bitmap = std::vector::slice(&cap_update_table, len - 4, len);
+        <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&cap_update_table);
+        <b>let</b> signature_bitmap = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(&cap_update_table, len - 4, len);
         <a href="event.md#0x1_event_emit">event::emit</a>(<a href="account.md#0x1_account_KeyRotationToMultiPublicKey">KeyRotationToMultiPublicKey</a> {
             <a href="account.md#0x1_account">account</a>: rotation_cap_offerer_address,
             verified_public_key_bit_map: signature_bitmap,
