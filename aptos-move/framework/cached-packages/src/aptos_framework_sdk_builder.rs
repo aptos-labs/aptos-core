@@ -193,11 +193,6 @@ pub enum EntryFunctionCall {
         new_auth_key: Vec<u8>,
     },
 
-    AccountRotateAuthenticationKeyCallToPublicKey {
-        to_scheme: u8,
-        to_public_key_bytes: Vec<u8>,
-    },
-
     AccountRotateAuthenticationKeyWithRotationCapability {
         rotation_cap_offerer_address: AccountAddress,
         new_scheme: u8,
@@ -1341,12 +1336,6 @@ impl EntryFunctionCall {
             AccountRotateAuthenticationKeyCall { new_auth_key } => {
                 account_rotate_authentication_key_call(new_auth_key)
             },
-            AccountRotateAuthenticationKeyCallToPublicKey {
-                to_scheme,
-                to_public_key_bytes,
-            } => {
-                account_rotate_authentication_key_call_to_public_key(to_scheme, to_public_key_bytes)
-            },
             AccountRotateAuthenticationKeyWithRotationCapability {
                 rotation_cap_offerer_address,
                 new_scheme,
@@ -2319,27 +2308,6 @@ pub fn account_rotate_authentication_key_call(new_auth_key: Vec<u8>) -> Transact
         ident_str!("rotate_authentication_key_call").to_owned(),
         vec![],
         vec![bcs::to_bytes(&new_auth_key).unwrap()],
-    ))
-}
-
-pub fn account_rotate_authentication_key_call_to_public_key(
-    to_scheme: u8,
-    to_public_key_bytes: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("account").to_owned(),
-        ),
-        ident_str!("rotate_authentication_key_call_to_public_key").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&to_scheme).unwrap(),
-            bcs::to_bytes(&to_public_key_bytes).unwrap(),
-        ],
     ))
 }
 
@@ -5674,21 +5642,6 @@ mod decoder {
         }
     }
 
-    pub fn account_rotate_authentication_key_call_to_public_key(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(
-                EntryFunctionCall::AccountRotateAuthenticationKeyCallToPublicKey {
-                    to_scheme: bcs::from_bytes(script.args().get(0)?).ok()?,
-                    to_public_key_bytes: bcs::from_bytes(script.args().get(1)?).ok()?,
-                },
-            )
-        } else {
-            None
-        }
-    }
-
     pub fn account_rotate_authentication_key_with_rotation_capability(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -7593,10 +7546,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "account_rotate_authentication_key_call".to_string(),
             Box::new(decoder::account_rotate_authentication_key_call),
-        );
-        map.insert(
-            "account_rotate_authentication_key_call_to_public_key".to_string(),
-            Box::new(decoder::account_rotate_authentication_key_call_to_public_key),
         );
         map.insert(
             "account_rotate_authentication_key_with_rotation_capability".to_string(),

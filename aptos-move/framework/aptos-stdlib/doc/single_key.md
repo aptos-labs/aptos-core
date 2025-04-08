@@ -61,7 +61,7 @@ The identifier of the Single Key signature scheme, which is used when deriving A
 it together with an Single Key public key.
 
 
-<pre><code><b>const</b> <a href="single_key.md#0x1_single_key_SIGNATURE_SCHEME_ID">SIGNATURE_SCHEME_ID</a>: u8 = 3;
+<pre><code><b>const</b> <a href="single_key.md#0x1_single_key_SIGNATURE_SCHEME_ID">SIGNATURE_SCHEME_ID</a>: u8 = 2;
 </code></pre>
 
 

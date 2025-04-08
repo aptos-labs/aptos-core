@@ -443,11 +443,6 @@ module aptos_framework::account {
         rotate_authentication_key_internal(account, new_auth_key);
     }
 
-    entry fun rotate_authentication_key_call_to_public_key(account: &signer, to_scheme: u8, to_public_key_bytes: vector<u8>) acquires Account {
-        let new_auth_key = get_authentication_key_from_scheme_and_public_key_bytes(to_scheme, to_public_key_bytes);
-        rotate_authentication_key_internal(account, new_auth_key);
-    }
-
     /// Adds an ED25519 backup key to a keyless account by converting the account's authentication key to a multi-key.
     /// This function takes a keyless account (identified by having a keyless public key scheme) and adds an ED25519 backup key,
     /// creating a multi-key that requires 1 signature from either key to authenticate.
@@ -515,10 +510,11 @@ module aptos_framework::account {
         new_public_key_bytes.append(single_key::unvalidated_public_key_to_bytes(&backup_key_as_single_key));
         new_public_key_bytes.push_back(0x01); // Signatures required
 
-        // Rotate the authentication key to the new multi key public key
-        rotate_authentication_key_call_to_public_key(account, MULTI_KEY_SCHEME, new_public_key_bytes);
-
         let new_auth_key = get_authentication_key_from_scheme_and_public_key_bytes(MULTI_KEY_SCHEME, new_public_key_bytes);
+
+        // Rotate the authentication key to the new multi key public key
+        rotate_authentication_key_call(account, new_auth_key);
+
         event::emit(KeyRotationToMultiPublicKey {
             account: addr,
             verified_public_key_bit_map: vector[0xC0, 0x00, 0x00, 0x00],
@@ -609,10 +605,11 @@ module aptos_framework::account {
         new_public_key_bytes.append(single_key::unvalidated_public_key_to_bytes(&new_backup_key_as_single_key));
         new_public_key_bytes.push_back(0x01); // Signatures required
 
-        // Rotate the authentication key to the new multi key public key
-        rotate_authentication_key_call_to_public_key(account, MULTI_KEY_SCHEME, new_public_key_bytes);
-
         let new_auth_key = get_authentication_key_from_scheme_and_public_key_bytes(MULTI_KEY_SCHEME, new_public_key_bytes);
+
+        // Rotate the authentication key to the new multi key public key
+        rotate_authentication_key_call(account, new_auth_key);
+
         event::emit(KeyRotationToMultiPublicKey {
             account: addr,
             // This marks that both the keyless public key and the new backup key are verified

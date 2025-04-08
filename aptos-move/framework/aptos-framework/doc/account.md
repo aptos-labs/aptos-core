@@ -40,7 +40,6 @@
 -  [Function `get_authentication_key`](#0x1_account_get_authentication_key)
 -  [Function `rotate_authentication_key_internal`](#0x1_account_rotate_authentication_key_internal)
 -  [Function `rotate_authentication_key_call`](#0x1_account_rotate_authentication_key_call)
--  [Function `rotate_authentication_key_call_to_public_key`](#0x1_account_rotate_authentication_key_call_to_public_key)
 -  [Function `add_ed25519_backup_key_on_keyless_account`](#0x1_account_add_ed25519_backup_key_on_keyless_account)
     -  [Arguments](#@Arguments_1)
     -  [Aborts](#@Aborts_2)
@@ -1683,31 +1682,6 @@ If you'd like to followup with updating the <code><a href="account.md#0x1_accoun
 
 </details>
 
-<a id="0x1_account_rotate_authentication_key_call_to_public_key"></a>
-
-## Function `rotate_authentication_key_call_to_public_key`
-
-
-
-<pre><code>entry <b>fun</b> <a href="account.md#0x1_account_rotate_authentication_key_call_to_public_key">rotate_authentication_key_call_to_public_key</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, to_scheme: u8, to_public_key_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code>entry <b>fun</b> <a href="account.md#0x1_account_rotate_authentication_key_call_to_public_key">rotate_authentication_key_call_to_public_key</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, to_scheme: u8, to_public_key_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
-    <b>let</b> new_auth_key = <a href="account.md#0x1_account_get_authentication_key_from_scheme_and_public_key_bytes">get_authentication_key_from_scheme_and_public_key_bytes</a>(to_scheme, to_public_key_bytes);
-    <a href="account.md#0x1_account_rotate_authentication_key_internal">rotate_authentication_key_internal</a>(<a href="account.md#0x1_account">account</a>, new_auth_key);
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_account_add_ed25519_backup_key_on_keyless_account"></a>
 
 ## Function `add_ed25519_backup_key_on_keyless_account`
@@ -1802,10 +1776,11 @@ creating a multi-key that requires 1 signature from either key to authenticate.
     new_public_key_bytes.append(<a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_unvalidated_public_key_to_bytes">single_key::unvalidated_public_key_to_bytes</a>(&backup_key_as_single_key));
     new_public_key_bytes.push_back(0x01); // Signatures required
 
-    // Rotate the authentication key <b>to</b> the new multi key <b>public</b> key
-    <a href="account.md#0x1_account_rotate_authentication_key_call_to_public_key">rotate_authentication_key_call_to_public_key</a>(<a href="account.md#0x1_account">account</a>, <a href="account.md#0x1_account_MULTI_KEY_SCHEME">MULTI_KEY_SCHEME</a>, new_public_key_bytes);
-
     <b>let</b> new_auth_key = <a href="account.md#0x1_account_get_authentication_key_from_scheme_and_public_key_bytes">get_authentication_key_from_scheme_and_public_key_bytes</a>(<a href="account.md#0x1_account_MULTI_KEY_SCHEME">MULTI_KEY_SCHEME</a>, new_public_key_bytes);
+
+    // Rotate the authentication key <b>to</b> the new multi key <b>public</b> key
+    <a href="account.md#0x1_account_rotate_authentication_key_call">rotate_authentication_key_call</a>(<a href="account.md#0x1_account">account</a>, new_auth_key);
+
     <a href="event.md#0x1_event_emit">event::emit</a>(<a href="account.md#0x1_account_KeyRotationToMultiPublicKey">KeyRotationToMultiPublicKey</a> {
         <a href="account.md#0x1_account">account</a>: addr,
         verified_public_key_bit_map: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[0xC0, 0x00, 0x00, 0x00],
@@ -1928,10 +1903,11 @@ maintaining the multi-key configuration that requires 1 signature from either ke
     new_public_key_bytes.append(<a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_unvalidated_public_key_to_bytes">single_key::unvalidated_public_key_to_bytes</a>(&new_backup_key_as_single_key));
     new_public_key_bytes.push_back(0x01); // Signatures required
 
-    // Rotate the authentication key <b>to</b> the new multi key <b>public</b> key
-    <a href="account.md#0x1_account_rotate_authentication_key_call_to_public_key">rotate_authentication_key_call_to_public_key</a>(<a href="account.md#0x1_account">account</a>, <a href="account.md#0x1_account_MULTI_KEY_SCHEME">MULTI_KEY_SCHEME</a>, new_public_key_bytes);
-
     <b>let</b> new_auth_key = <a href="account.md#0x1_account_get_authentication_key_from_scheme_and_public_key_bytes">get_authentication_key_from_scheme_and_public_key_bytes</a>(<a href="account.md#0x1_account_MULTI_KEY_SCHEME">MULTI_KEY_SCHEME</a>, new_public_key_bytes);
+
+    // Rotate the authentication key <b>to</b> the new multi key <b>public</b> key
+    <a href="account.md#0x1_account_rotate_authentication_key_call">rotate_authentication_key_call</a>(<a href="account.md#0x1_account">account</a>, new_auth_key);
+
     <a href="event.md#0x1_event_emit">event::emit</a>(<a href="account.md#0x1_account_KeyRotationToMultiPublicKey">KeyRotationToMultiPublicKey</a> {
         <a href="account.md#0x1_account">account</a>: addr,
         // This marks that both the keyless <b>public</b> key and the new backup key are verified
