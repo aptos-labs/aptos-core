@@ -21,7 +21,6 @@ pub mod string_utils;
 pub mod transaction_context;
 pub mod type_info;
 pub mod util;
-pub mod rlp;
 
 use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory, aggregator_v2};
@@ -60,7 +59,6 @@ pub fn all_natives(
     add_natives_from_module!("bls12381", cryptography::bls12381::make_all(builder));
     add_natives_from_module!("eth_trie", cryptography::eth_trie::make_all(builder));
     add_natives_from_module!("secp256k1", cryptography::secp256k1::make_all(builder));
-    add_natives_from_module!("rlp", rlp::make_all(builder));
     add_natives_from_module!("aptos_hash", hash::make_all(builder));
     add_natives_from_module!(
         "ristretto255",

@@ -1793,7 +1793,6 @@ dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",
  "ripemd",
- "rlp",
  "serde",
  "serde_bytes",
  "sha2 0.10.8",
