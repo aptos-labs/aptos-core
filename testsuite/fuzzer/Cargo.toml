@@ -17,3 +17,5 @@ hex = { workspace = true }
 move-binary-format = { workspace = true, features = ["fuzzing"] }
 move-core-types = { workspace = true, features = ["fuzzing"] }
 sha2 = { workspace = true }
+rayon = { workspace = true }
+walkdir = { workspace = true }
