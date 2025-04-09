@@ -14,4 +14,4 @@ module poc::write_module_event_to_store {
     fun a(owner:&signer){
         main(owner);
     }
-} 
+}

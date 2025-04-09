@@ -14,4 +14,4 @@ module poc::point_equals {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

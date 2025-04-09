@@ -67,4 +67,4 @@ module poc::native_format {
   fun a(owner:&signer){
      main(owner);
    }
-} 
+}

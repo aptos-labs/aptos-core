@@ -10,4 +10,4 @@ module poc::destroy_empty {
   fun a(owner:&signer){
      main(owner);
    }
-} 
+}

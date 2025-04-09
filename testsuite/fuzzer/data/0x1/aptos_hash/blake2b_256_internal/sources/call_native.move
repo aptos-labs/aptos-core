@@ -9,4 +9,4 @@ module poc::blake2b_256_internal {
   fun a(owner:&signer){
      main(owner);
    }
-} 
+}

@@ -19,4 +19,4 @@ module poc::type_of {
   fun a(owner:&signer){
      main(owner);
    }
-} 
+}

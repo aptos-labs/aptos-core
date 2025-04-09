@@ -11,4 +11,4 @@ module poc::internal_is_char_boundary {
   fun a(owner:&signer){
      main(owner);
    }
-} 
+}

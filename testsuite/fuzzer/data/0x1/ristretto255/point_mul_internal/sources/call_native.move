@@ -11,4 +11,4 @@ module poc::point_mul_internal {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

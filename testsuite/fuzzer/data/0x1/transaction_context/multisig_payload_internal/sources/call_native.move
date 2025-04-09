@@ -10,4 +10,4 @@ module poc::multisig_payload_internal {
     fun a(owner:&signer){
         main(owner);
     }
-} 
+}

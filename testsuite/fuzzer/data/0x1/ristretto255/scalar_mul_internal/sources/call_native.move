@@ -7,8 +7,8 @@ module poc::scalar_mul_internal {
         let _result_scalar = ristretto255::scalar_mul(&s1, &s2);
     }
 
-    #[test(owner=@0x123)] 
+    #[test(owner=@0x123)]
     fun a(owner:&signer){
        main(owner);
     }
-} 
+}

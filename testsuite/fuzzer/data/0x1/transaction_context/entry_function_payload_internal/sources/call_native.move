@@ -10,4 +10,4 @@ module poc::entry_function_payload_internal {
     fun a(owner:&signer){
         main(owner);
     }
-} 
+}

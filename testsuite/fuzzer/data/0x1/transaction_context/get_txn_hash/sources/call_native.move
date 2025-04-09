@@ -9,4 +9,4 @@ module poc::get_txn_hash {
     fun a(owner:&signer){
         main(owner);
     }
-} 
+}

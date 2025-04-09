@@ -8,8 +8,8 @@ module poc::scalar_from_sha512_internal {
         let _scalar = ristretto255::new_scalar_from_sha512(hash_digest);
     }
 
-    #[test(owner=@0x123)] 
+    #[test(owner=@0x123)]
     fun a(owner:&signer){
        main(owner);
     }
-} 
+}

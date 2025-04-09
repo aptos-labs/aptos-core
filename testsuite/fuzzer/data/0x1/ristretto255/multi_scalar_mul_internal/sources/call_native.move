@@ -19,8 +19,8 @@ module poc::multi_scalar_mul_internal {
         let _result_point = ristretto255::multi_scalar_mul(&points, &scalars);
     }
 
-    #[test(owner=@0x123)] 
+    #[test(owner=@0x123)]
     fun a(owner:&signer){
        main(owner);
     }
-} 
+}

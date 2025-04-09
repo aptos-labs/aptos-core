@@ -21,4 +21,4 @@ module poc::downcast_internal {
     fun a(owner: &signer) {
         main(owner);
     }
-} 
+}

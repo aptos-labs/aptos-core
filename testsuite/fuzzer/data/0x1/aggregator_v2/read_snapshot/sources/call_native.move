@@ -10,4 +10,4 @@ module poc::read_snapshot {
     fun a(owner:&signer){
         main(owner);
     }
-} 
+}

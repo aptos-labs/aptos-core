@@ -9,4 +9,4 @@ module poc::point_identity_internal {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

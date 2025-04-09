@@ -12,4 +12,4 @@ module poc::sub_internal {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

@@ -17,4 +17,4 @@ module poc::one_internal {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

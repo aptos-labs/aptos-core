@@ -18,4 +18,4 @@ module poc::ecdsa_recover_internal {
     fun a() {
         main()
     }
-} 
+}

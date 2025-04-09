@@ -11,4 +11,4 @@ module poc::internal_sub_string {
   fun a(owner:&signer){
      main(owner);
    }
-} 
+}

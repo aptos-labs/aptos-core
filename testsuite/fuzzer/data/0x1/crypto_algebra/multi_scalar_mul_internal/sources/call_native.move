@@ -28,4 +28,4 @@ module poc::multi_scalar_mul_internal {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

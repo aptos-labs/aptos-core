@@ -10,4 +10,4 @@ module poc::point_neg_internal {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

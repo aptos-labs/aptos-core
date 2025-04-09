@@ -10,4 +10,4 @@ module poc::gas_payer_internal {
     fun a(owner:&signer){
         main(owner);
     }
-} 
+}

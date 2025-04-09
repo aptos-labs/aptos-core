@@ -21,4 +21,4 @@ module poc::aggregate_signatures_internal {
     fun a(owner: &signer) {
         main(owner);
     }
-} 
+}

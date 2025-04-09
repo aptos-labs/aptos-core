@@ -10,4 +10,4 @@ module poc::sha2_256 {
   fun a(owner:&signer){
      main(owner);
    }
-} 
+}

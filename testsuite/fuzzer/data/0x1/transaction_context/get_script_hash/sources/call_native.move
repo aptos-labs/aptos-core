@@ -9,4 +9,4 @@ module poc::get_script_hash {
     fun a(owner:&signer){
         main(owner);
     }
-} 
+}

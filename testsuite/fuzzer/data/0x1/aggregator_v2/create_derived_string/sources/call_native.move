@@ -10,4 +10,4 @@ module poc::create_derived_string {
     fun a(owner:&signer){
         main(owner);
     }
-} 
+}

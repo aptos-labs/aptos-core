@@ -16,4 +16,4 @@ module poc::scalar_uniform_from_64_bytes_internal {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

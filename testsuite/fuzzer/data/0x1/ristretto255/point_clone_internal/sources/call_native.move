@@ -11,8 +11,8 @@ module poc::point_clone_internal {
         assert!(ristretto255::point_equals(&p, &decompressed_p), 1);
     }
 
-    #[test(owner=@0x123)] 
+    #[test(owner=@0x123)]
     fun a(owner:&signer){
        main(owner);
     }
-} 
+}

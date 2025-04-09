@@ -3,7 +3,7 @@ module poc::upcast_internal {
     use aptos_std::bls12381_algebra::{Gt, Fq12};
 
     public entry fun main(_owner:&signer) {
-        let gt_element: Element<Gt> = crypto_algebra::one<Gt>(); 
+        let gt_element: Element<Gt> = crypto_algebra::one<Gt>();
         let _fq12_element: Element<Fq12> = crypto_algebra::upcast<Gt, Fq12>(&gt_element);
     }
 
@@ -11,4 +11,4 @@ module poc::upcast_internal {
     fun a(owner:&signer){
         main(owner);
     }
-} 
+}

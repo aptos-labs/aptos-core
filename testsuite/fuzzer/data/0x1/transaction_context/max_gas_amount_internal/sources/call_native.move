@@ -10,4 +10,4 @@ module poc::max_gas_amount_internal {
     fun a(owner:&signer){
         main(owner);
     }
-} 
+}

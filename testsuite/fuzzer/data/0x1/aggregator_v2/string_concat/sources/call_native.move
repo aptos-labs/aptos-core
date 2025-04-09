@@ -14,4 +14,4 @@ module poc::string_concat {
     fun a(owner:&signer){
         main(owner);
     }
-} 
+}

@@ -9,4 +9,4 @@ module poc::create_aggregator {
     fun a(owner:&signer){
         main(owner);
     }
-} 
+}

@@ -22,4 +22,4 @@ module poc::native_format_list {
   fun a(owner:&signer){
      main(owner);
    }
-} 
+}

@@ -10,4 +10,4 @@ module poc::empty {
   fun a(owner:&signer){
      main(owner);
    }
-} 
+}

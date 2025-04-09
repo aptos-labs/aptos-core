@@ -11,4 +11,4 @@ module poc::scalar_add_internal {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

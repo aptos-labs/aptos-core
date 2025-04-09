@@ -11,4 +11,4 @@ module poc::sqr_internal {
     fun a(owner:&signer){
         main(owner);
     }
-} 
+}

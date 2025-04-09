@@ -10,4 +10,4 @@ module poc::basepoint_mul_internal {
     fun a(owner:&signer){
         main(owner);
     }
-} 
+}

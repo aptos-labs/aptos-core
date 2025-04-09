@@ -9,4 +9,4 @@ module poc::is_permissioned_signer_impl {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

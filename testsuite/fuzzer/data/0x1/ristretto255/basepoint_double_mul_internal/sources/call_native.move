@@ -13,4 +13,4 @@ module poc::basepoint_double_mul_internal {
     fun a(owner:&signer){
         main(owner);
     }
-} 
+}

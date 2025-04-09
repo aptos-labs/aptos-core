@@ -12,4 +12,4 @@ module poc::is_identifier {
    fun a(owner:&signer){
       main(owner);
     }
-} 
+}

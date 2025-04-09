@@ -12,4 +12,4 @@ module poc::internal_index_of {
   fun a(owner:&signer){
      main(owner);
    }
-} 
+}

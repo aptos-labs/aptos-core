@@ -11,4 +11,4 @@ module poc::public_key_validate_internal {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

@@ -16,4 +16,4 @@ module poc::scalar_invert_internal {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

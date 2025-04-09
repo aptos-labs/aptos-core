@@ -21,4 +21,4 @@ module poc::verify_proof_of_possession_internal {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

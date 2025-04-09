@@ -10,4 +10,4 @@ module poc::serialized_size {
   fun a(owner:&signer){
      main(owner);
    }
-} 
+}

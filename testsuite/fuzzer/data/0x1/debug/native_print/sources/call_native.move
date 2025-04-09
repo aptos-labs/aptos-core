@@ -10,4 +10,4 @@ module poc::native_print {
   fun a(owner:&signer){
      main(owner);
    }
-} 
+}

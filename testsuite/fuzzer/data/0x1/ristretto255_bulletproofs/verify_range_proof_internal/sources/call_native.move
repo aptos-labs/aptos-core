@@ -29,8 +29,8 @@ module poc::verify_range_proof_internal {
         assert!(result_ok, 2);
     }
 
-   #[test(owner=@0x123)] 
+   #[test(owner=@0x123)]
    fun a(owner:&signer){
       main(owner);
     }
-} 
+}

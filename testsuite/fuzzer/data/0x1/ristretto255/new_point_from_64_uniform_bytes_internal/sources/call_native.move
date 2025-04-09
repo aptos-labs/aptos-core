@@ -16,4 +16,4 @@ module poc::new_point_from_64_uniform_bytes_internal {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

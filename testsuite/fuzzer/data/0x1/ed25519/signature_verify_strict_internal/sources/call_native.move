@@ -17,4 +17,4 @@ module poc::signature_verify_strict_internal {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

@@ -16,4 +16,4 @@ module poc::scalar_reduced_from_32_bytes_internal {
     fun a(owner:&signer){
         main(owner);
     }
-} 
+}

@@ -47,4 +47,4 @@ module poc::verify_batch_range_proof_internal {
    fun a(owner:&signer){
       main(owner);
     }
-} 
+}

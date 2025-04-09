@@ -9,4 +9,4 @@ module poc::sha2_512_internal {
   fun a(owner:&signer){
      main(owner);
    }
-} 
+}

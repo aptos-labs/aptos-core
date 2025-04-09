@@ -3,7 +3,7 @@ module poc::point_add_internal {
 
     public entry fun main(_owner: &signer) {
         let point1: RistrettoPoint = ristretto255::basepoint();
-        let point2: RistrettoPoint = ristretto255::basepoint(); 
+        let point2: RistrettoPoint = ristretto255::basepoint();
         let _result_point: RistrettoPoint = ristretto255::point_add(&point1, &point2);
     }
 
@@ -11,4 +11,4 @@ module poc::point_add_internal {
     fun a(owner:&signer){
         main(owner);
     }
-} 
+}

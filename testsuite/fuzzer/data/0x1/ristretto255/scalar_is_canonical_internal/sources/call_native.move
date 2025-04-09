@@ -7,7 +7,7 @@ module poc::scalar_is_canonical_internal {
         let maybe_scalar_ok = ristretto255::new_scalar_from_bytes(canonical_bytes);
         assert!(option::is_some(&maybe_scalar_ok), 1);
 
-        let non_canonical_bytes = x"edd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010"; 
+        let non_canonical_bytes = x"edd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010";
         let maybe_scalar_fail = ristretto255::new_scalar_from_bytes(non_canonical_bytes);
         assert!(option::is_none(&maybe_scalar_fail), 2);
     }
@@ -16,4 +16,4 @@ module poc::scalar_is_canonical_internal {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

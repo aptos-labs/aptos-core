@@ -12,4 +12,4 @@ module poc::fetch_and_increment_txn_counter {
         randomness::initialize_for_testing(owner);
         main(owner);
     }
-} 
+}

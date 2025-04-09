@@ -10,4 +10,4 @@ module poc::new_point_from_sha512_internal {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

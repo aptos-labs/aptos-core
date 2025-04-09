@@ -9,4 +9,4 @@ module poc::native_stack_trace {
   fun a(owner:&signer){
      main(owner);
    }
-} 
+}

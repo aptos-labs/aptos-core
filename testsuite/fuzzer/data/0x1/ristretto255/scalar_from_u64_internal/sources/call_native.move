@@ -10,4 +10,4 @@ module poc::scalar_from_u64_internal {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

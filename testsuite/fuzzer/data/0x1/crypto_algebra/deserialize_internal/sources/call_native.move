@@ -9,8 +9,8 @@ module poc::deserialize_internal {
       assert!(_deserialized_option.is_some());
    }
 
-  #[test(owner=@0x123)] 
+  #[test(owner=@0x123)]
   fun a(owner:&signer){
      main(owner);
    }
-} 
+}

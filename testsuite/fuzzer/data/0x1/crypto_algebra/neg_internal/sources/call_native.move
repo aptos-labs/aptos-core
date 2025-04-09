@@ -16,4 +16,4 @@ module poc::neg_internal {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

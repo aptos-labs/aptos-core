@@ -11,4 +11,4 @@ module poc::compare {
   fun a(owner:&signer){
      main(owner);
    }
-} 
+}

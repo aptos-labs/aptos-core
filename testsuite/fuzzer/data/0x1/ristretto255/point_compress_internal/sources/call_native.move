@@ -16,4 +16,4 @@ module poc::point_compress_internal {
     fun a(owner: &signer){
         main(owner);
     }
-} 
+}

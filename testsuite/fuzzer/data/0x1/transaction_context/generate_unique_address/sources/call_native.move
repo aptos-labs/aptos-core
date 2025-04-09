@@ -10,4 +10,4 @@ module poc::generate_unique_address {
     fun a(owner:&signer){
         main(owner);
     }
-} 
+}

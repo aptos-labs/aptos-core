@@ -11,4 +11,4 @@ module poc::create_user_derived_object_address_impl {
     fun a(owner:&signer){
         main(owner);
     }
-} 
+}
