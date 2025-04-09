@@ -1063,7 +1063,7 @@ install_libudev-dev
 install_python3
 if [[ "$SKIP_PRE_COMMIT" == "false" ]]; then
   if [[ "$PACKAGE_MANAGER" != "pacman" ]]; then
-    pip3 install pre-commit
+    install_pkg pre-commit "$PACKAGE_MANAGER" # pip3 install pre-commit
   else
     install_pkg python-pre-commit "$PACKAGE_MANAGER"
   fi

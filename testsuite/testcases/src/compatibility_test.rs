@@ -23,7 +23,7 @@ impl Test for SimpleValidatorUpgrade {
     }
 }
 
-fn upgrade(
+async fn upgrade(
     ctxa: NetworkContextSynchronizer,
     // upgrade args
     validators_to_update: &[PeerId],
@@ -33,15 +33,14 @@ fn upgrade(
     max_wait: Duration,
 ) -> Result<()> {
     info!("upgrade_and_gather_stats upgrade thread start");
-    let rt = Runtime::new().unwrap();
-    let upgrade_result = rt.block_on(batch_update_gradually(
+    let upgrade_result = batch_update_gradually(
         ctxa,
         validators_to_update,
         version,
         wait_until_healthy,
         delay,
         max_wait,
-    ));
+    ).await;
     info!("upgrade_and_gather_stats upgrade thread 1");
     upgrade_result?;
     Ok(())
@@ -141,7 +140,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
             upgrade_wait_for_healthy,
             upgrade_node_delay,
             upgrade_max_wait,
-        )?;
+        ).await?;
         // Generate some traffic
         let mut ctx_locker = ctxa.ctx.lock().await;
         let ctx = ctx_locker.deref_mut();
@@ -167,7 +166,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
             upgrade_wait_for_healthy,
             upgrade_node_delay,
             upgrade_max_wait,
-        )?;
+        ).await?;
         let mut ctx_locker = ctxa.ctx.lock().await;
         let ctx = ctx_locker.deref_mut();
 
@@ -191,7 +190,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
             upgrade_wait_for_healthy,
             upgrade_node_delay,
             upgrade_max_wait,
-        )?;
+        ).await?;
         let mut ctx_locker = ctxa.ctx.lock().await;
         let ctx = ctx_locker.deref_mut();
 
