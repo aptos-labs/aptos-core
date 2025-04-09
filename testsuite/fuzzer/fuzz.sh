@@ -75,15 +75,15 @@ function usage() {
         "build-oss-fuzz")
             echo "Usage: $0 build-oss-fuzz <target_dir>"
             ;;
+        "clean-coverage")
+            echo "Usage: $0 clean-coverage <fuzz_target>"
+            ;;
         "cmin")
             echo "Usage: $0 cmin <fuzz_target> [corpus_dir]"
             ;;
         "coverage")
             echo "Usage: $0 coverage <fuzz_target>"
             ;;
-        "clean-coverage")
-            echo "Usage: $0 clean-coverage <fuzz_target>"
-            ;;        
         "debug")
             echo "Usage: $0 debug <fuzz_target> <testcase>"
             ;;
@@ -93,34 +93,34 @@ function usage() {
         "list")
             echo "Usage: $0 list"
             ;;
+        "monitor-coverage")
+            echo "Usage: $0 monitor-coverage <fuzz_target>"
+            ;;
         "run")
             echo "Usage: $0 run <fuzz_target> [testcase]"
             ;;
         "test")
             echo "Usage: $0 test"
             ;;
-        "monitor-coverage")
-            echo "Usage: $0 monitor-coverage <fuzz_target>"
-            ;;
         "tmin")
             echo "Usage: $0 tmin <fuzz_target> <crashing_input>"
             ;;
         *)
-            echo "Usage: $0 <add|block-builder|block-builder-recursive|build|build-oss-fuzz|coverage|clean-coverage|flamegraph|list|run|debug|test|monitor-coverage|tmin>"
+            echo "Usage: $0 <add|block-builder|block-builder-recursive|build|build-oss-fuzz|clean-coverage|cmin|coverage|debug|flamegraph|list|monitor-coverage|run|test|tmin>"
             echo "    add                   adds a new fuzz target"
             echo "    block-builder         runs rust tool to help build fuzzers"
             echo "    block-builder-recursive runs block-builder on all Move.toml files in directory"
             echo "    build                 builds fuzz targets"
             echo "    build-oss-fuzz        builds fuzz targets for oss-fuzz"
+            echo "    clean-coverage        clean coverage for a fuzz target"
             echo "    cmin                  minimizes a corpus for a target"
             echo "    coverage              generates coverage for a fuzz target"
-            echo "    clean-coverage        clean coverage for a fuzz target"
             echo "    debug                 debugs a fuzz target with a testcase"
             echo "    flamegraph           generates a flamegraph for a fuzz target with a testcase"
             echo "    list                 lists existing fuzz targets"
+            echo "    monitor-coverage     monitors coverage for a fuzz target"
             echo "    run                  runs a fuzz target"
             echo "    test                 tests all fuzz targets"
-            echo "    monitor-coverage     monitors coverage for a fuzz target"
             echo "    tmin                 minimizes a crashing input for a target"
             ;;
     esac
@@ -258,9 +258,7 @@ function coverage() {
     clean-coverage $fuzz_target
     local corpus_dir="fuzz/corpus/$fuzz_target"
     local coverage_dir="./fuzz/coverage/$fuzz_target/report"
-    local text_coverage_dir="./fuzz/coverage/$fuzz_target/txt_report"
     mkdir -p $coverage_dir
-    mkdir -p $text_coverage_dir
     
     if [ ! -d "fuzz/coverage/$fuzz_target/raw" ]; then
         cargo_fuzz coverage $fuzz_target $corpus_dir
@@ -281,16 +279,6 @@ function coverage() {
         --instr-profile=fuzz/coverage/$fuzz_target/coverage.profdata \
         --show-directory-coverage \
         --output-dir=$coverage_dir \
-        -Xdemangler=rustfilt \
-        --show-branches=count \
-        --ignore-filename-regex='rustc/.*/library|\.cargo'
-
-
-    cargo +$NIGHTLY_VERSION cov -- show $fuzz_target_bin \
-        --format=text \
-        --instr-profile=fuzz/coverage/$fuzz_target/coverage.profdata \
-        --show-directory-coverage \
-        --output-dir=$text_coverage_dir \
         -Xdemangler=rustfilt \
         --show-branches=count \
         --ignore-filename-regex='rustc/.*/library|\.cargo'
