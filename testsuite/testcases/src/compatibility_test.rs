@@ -5,14 +5,13 @@
 use crate::{batch_update_gradually, generate_traffic};
 use anyhow::bail;
 use aptos_forge::{
-    EmitJobRequest, NetworkContextSynchronizer, NetworkTest, Result, SwarmExt, Test, TxnEmitter,
-    TxnStats, Version,
+    NetworkContextSynchronizer, NetworkTest, Result, SwarmExt, Test, Version,
 };
-use aptos_sdk::types::{LocalAccount, PeerId};
+use aptos_sdk::types::{PeerId};
 use async_trait::async_trait;
 use log::info;
-use rand::SeedableRng;
 use std::ops::DerefMut;
+use tokio::runtime::Runtime;
 use tokio::time::Duration;
 
 pub struct SimpleValidatorUpgrade;
