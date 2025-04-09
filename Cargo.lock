@@ -8500,7 +8500,9 @@ dependencies = [
  "hex",
  "move-binary-format",
  "move-core-types",
+ "rayon",
  "sha2 0.9.9",
+ "walkdir",
 ]
 
 [[package]]
