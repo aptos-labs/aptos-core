@@ -107,6 +107,8 @@ const IMAGES_TO_RELEASE = {
 };
 
 
+// These are lazy globals
+let crane;
 
 async function main() {
   const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO", "AWS_ACCOUNT_ID", "IMAGE_TAG_PREFIX"];
