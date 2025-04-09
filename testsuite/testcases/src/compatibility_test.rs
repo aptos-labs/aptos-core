@@ -9,7 +9,7 @@ use aptos_sdk::types::PeerId;
 use async_trait::async_trait;
 use log::info;
 use std::ops::DerefMut;
-use tokio::{runtime::Runtime, time::Duration};
+use tokio::time::Duration;
 
 pub struct SimpleValidatorUpgrade;
 
@@ -24,7 +24,7 @@ impl Test for SimpleValidatorUpgrade {
 }
 
 async fn upgrade(
-    ctxa: NetworkContextSynchronizer,
+    ctxa: NetworkContextSynchronizer<'_>,
     // upgrade args
     validators_to_update: &[PeerId],
     version: &Version,
