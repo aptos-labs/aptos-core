@@ -40,7 +40,8 @@ async fn upgrade(
         wait_until_healthy,
         delay,
         max_wait,
-    ).await;
+    )
+    .await;
     info!("upgrade_and_gather_stats upgrade thread 1");
     upgrade_result?;
     Ok(())
@@ -140,7 +141,8 @@ impl NetworkTest for SimpleValidatorUpgrade {
             upgrade_wait_for_healthy,
             upgrade_node_delay,
             upgrade_max_wait,
-        ).await?;
+        )
+        .await?;
         // Generate some traffic
         let mut ctx_locker = ctxa.ctx.lock().await;
         let ctx = ctx_locker.deref_mut();
@@ -166,7 +168,8 @@ impl NetworkTest for SimpleValidatorUpgrade {
             upgrade_wait_for_healthy,
             upgrade_node_delay,
             upgrade_max_wait,
-        ).await?;
+        )
+        .await?;
         let mut ctx_locker = ctxa.ctx.lock().await;
         let ctx = ctx_locker.deref_mut();
 
@@ -190,7 +193,8 @@ impl NetworkTest for SimpleValidatorUpgrade {
             upgrade_wait_for_healthy,
             upgrade_node_delay,
             upgrade_max_wait,
-        ).await?;
+        )
+        .await?;
         let mut ctx_locker = ctxa.ctx.lock().await;
         let ctx = ctx_locker.deref_mut();
 
