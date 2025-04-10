@@ -119,6 +119,7 @@ pub struct LogEntry {
     message: Option<String>,
     peer_id: Option<&'static str>,
     chain_id: Option<u8>,
+    git_hash: Option<String>,
 }
 
 // implement custom serializer for LogEntry since we want to promote the `metadata.level` field into a top-level `level` field
@@ -152,6 +153,9 @@ impl Serialize for LogEntry {
         }
         if let Some(peer_id) = &self.peer_id {
             state.serialize_field("peer_id", peer_id)?;
+        }
+        if let Some(git_hash) = &self.git_hash {
+            state.serialize_field("git_hash", git_hash)?;
         }
         state.end()
     }
@@ -237,6 +241,8 @@ impl LogEntry {
             schema.visit(&mut JsonVisitor(&mut data));
         }
 
+        let git_hash = Some(aptos_build_info::get_git_hash());
+
         Self {
             metadata,
             thread_name,
@@ -248,6 +254,7 @@ impl LogEntry {
             message,
             peer_id,
             chain_id,
+            git_hash,
         }
     }
 
@@ -289,6 +296,10 @@ impl LogEntry {
 
     pub fn chain_id(&self) -> Option<u8> {
         self.chain_id
+    }
+
+    pub fn git_hash(&self) -> Option<&str> {
+        self.git_hash.as_deref()
     }
 }
 
