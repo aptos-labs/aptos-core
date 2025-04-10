@@ -368,19 +368,27 @@ where
 /// For example "0xaceface" or "d00d".
 pub fn generate_vanity_account_ed25519(
     vanity_prefix_ref: &str,
+    vanity_postfix_ref: &str,
     multisig: bool,
 ) -> CliTypedResult<Ed25519PrivateKey> {
     let vanity_prefix_ref = vanity_prefix_ref
         .strip_prefix("0x")
         .unwrap_or(vanity_prefix_ref); // Optionally strip leading 0x from input string.
-    let mut to_check_if_is_hex = String::from(vanity_prefix_ref);
+    if vanity_prefix_ref.starts_with('0') {
+        // because of `AccountAddress::short_str_lossless()` `...trim_start_matches('0')...`
+        return Err(CliError::CommandArgumentError(
+            "The vanity prefix must not start with 0".to_owned(),
+        ));
+    }
+
+    let mut to_check_if_is_hex = String::from(vanity_prefix_ref) + vanity_postfix_ref;
     // If an odd number of characters append a 0 for verifying that prefix contains valid hex.
     if to_check_if_is_hex.len() % 2 != 0 {
         to_check_if_is_hex += "0"
     };
     hex::decode(to_check_if_is_hex).  // Check that the vanity prefix can be decoded into hex.
         map_err(|error| CliError::CommandArgumentError(format!(
-            "The vanity prefix could not be decoded to hex: {}", error)))?;
+            "The vanity prefix/postfix could not be decoded to hex: {}", error)))?;
     let mut key_generator = KeyGen::from_os_rng(); // Get random key generator.
     loop {
         // Generate new keys until finding a match against the vanity prefix.
@@ -390,10 +398,8 @@ pub fn generate_vanity_account_ed25519(
         if multisig {
             account_address = create_multisig_account_address(account_address, 0)
         };
-        if account_address
-            .short_str_lossless()
-            .starts_with(vanity_prefix_ref)
-        {
+        let addr = account_address.short_str_lossless();
+        if addr.starts_with(vanity_prefix_ref) && addr.ends_with(vanity_postfix_ref) {
             return Ok(private_key);
         };
     }
