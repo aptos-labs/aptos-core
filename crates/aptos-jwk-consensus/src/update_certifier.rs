@@ -2,15 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    observation_aggregation::ObservationAggregationState,
-    types::{JWKConsensusMsg, ObservedUpdateRequest},
+    mode::TConsensusMode, observation_aggregation::ObservationAggregationState,
+    types::JWKConsensusMsg,
 };
+use anyhow::Context;
 use aptos_channels::aptos_channel;
-use aptos_logger::info;
+use aptos_logger::error;
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
     epoch_state::EpochState,
-    jwks::{Issuer, ProviderJWKs, QuorumCertifiedUpdate},
+    jwks::{ProviderJWKs, QuorumCertifiedUpdate},
 };
 use futures_util::future::{AbortHandle, Abortable};
 use std::sync::Arc;
@@ -20,13 +21,16 @@ use tokio_retry::strategy::ExponentialBackoff;
 /// Once invoked by `JWKConsensusManager` to `start_produce`,
 /// it starts producing a `QuorumCertifiedUpdate` and returns an abort handle.
 /// Once an `QuorumCertifiedUpdate` is available, it is sent back via a channel given earlier.
-pub trait TUpdateCertifier: Send + Sync {
+pub trait TUpdateCertifier<ConsensusMode: TConsensusMode>: Send + Sync {
     fn start_produce(
         &self,
         epoch_state: Arc<EpochState>,
         payload: ProviderJWKs,
-        qc_update_tx: aptos_channel::Sender<Issuer, QuorumCertifiedUpdate>,
-    ) -> AbortHandle;
+        qc_update_tx: aptos_channel::Sender<
+            ConsensusMode::ConsensusSessionKey,
+            QuorumCertifiedUpdate,
+        >,
+    ) -> anyhow::Result<AbortHandle>;
 }
 
 pub struct UpdateCertifier {
@@ -41,40 +45,40 @@ impl UpdateCertifier {
     }
 }
 
-impl TUpdateCertifier for UpdateCertifier {
+impl<ConsensusMode: TConsensusMode> TUpdateCertifier<ConsensusMode> for UpdateCertifier {
     fn start_produce(
         &self,
         epoch_state: Arc<EpochState>,
         payload: ProviderJWKs,
-        qc_update_tx: aptos_channel::Sender<Issuer, QuorumCertifiedUpdate>,
-    ) -> AbortHandle {
-        let version = payload.version;
-        info!(
-            epoch = epoch_state.epoch,
-            issuer = String::from_utf8(payload.issuer.clone()).ok(),
-            version = version,
-            "Start certifying update."
-        );
+        qc_update_tx: aptos_channel::Sender<
+            ConsensusMode::ConsensusSessionKey,
+            QuorumCertifiedUpdate,
+        >,
+    ) -> anyhow::Result<AbortHandle> {
+        ConsensusMode::log_certify_start(epoch_state.epoch, &payload);
         let rb = self.reliable_broadcast.clone();
         let epoch = epoch_state.epoch;
-        let issuer = payload.issuer.clone();
-        let req = ObservedUpdateRequest {
-            epoch: epoch_state.epoch,
-            issuer: issuer.clone(),
-        };
-        let agg_state = Arc::new(ObservationAggregationState::new(epoch_state, payload));
+        let req = ConsensusMode::new_rb_request(epoch, &payload)
+            .context("UpdateCertifier::start_produce failed at rb request construction")?;
+        let agg_state = Arc::new(ObservationAggregationState::<ConsensusMode>::new(
+            epoch_state,
+            payload,
+        ));
         let task = async move {
             let qc_update = rb.broadcast(req, agg_state).await.expect("cannot fail");
-            info!(
-                epoch = epoch,
-                issuer = String::from_utf8(issuer.clone()).ok(),
-                version = version,
-                "Certified update obtained."
-            );
-            let _ = qc_update_tx.push(issuer, qc_update);
+            ConsensusMode::log_certify_done(epoch, &qc_update);
+            let session_key = ConsensusMode::session_key_from_qc(&qc_update);
+            match session_key {
+                Ok(key) => {
+                    let _ = qc_update_tx.push(key, qc_update);
+                },
+                Err(e) => {
+                    error!("JWK update QCed but could not identify the session key: {e}");
+                },
+            }
         };
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         tokio::spawn(Abortable::new(task, abort_registration));
-        abort_handle
+        Ok(abort_handle)
     }
 }
