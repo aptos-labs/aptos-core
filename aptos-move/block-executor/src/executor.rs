@@ -834,7 +834,7 @@ where
         let resource_writes_to_materialize = resource_writes_to_materialize!(
             resource_write_set,
             last_input_output,
-            versioned_cache.data(),
+            last_input_output,
             txn_idx
         )?;
         let materialized_resource_write_set =
