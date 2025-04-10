@@ -18,6 +18,16 @@ pub fn ensure_slice_len_eq(data: &[u8], len: usize) -> Result<()> {
     Ok(())
 }
 
+pub fn ensure_slice_len_gt(data: &[u8], len: usize) -> Result<()> {
+    ensure!(
+        data.len() > len,
+        "Unexpected data len {}, expected to be greater than {}.",
+        data.len(),
+        len,
+    );
+    Ok(())
+}
+
 pub const MAX_REQUEST_LIMIT: u64 = 10_000;
 
 pub fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<()> {
