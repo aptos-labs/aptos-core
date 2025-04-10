@@ -10,6 +10,7 @@ module aptos_std::single_key {
     use aptos_std::bcs;
     use aptos_std::federated_keyless;
     use std::hash;
+
     // Error codes
     //
 
@@ -45,7 +46,7 @@ module aptos_std::single_key {
     //
     // Structs
     //
-    
+
     enum AnyPublicKey has copy, drop, store {
         Ed25519{pk: ed25519::UnvalidatedPublicKey},
         Secp256k1Ecdsa{pk: secp256k1::ECDSARawPublicKey},
@@ -58,7 +59,7 @@ module aptos_std::single_key {
     // Functions
     //
 
-    /// Parses the input bytes as a AnyPublicKey. The public key bytes are not guaranteed to be a valid 
+    /// Parses the input bytes as a AnyPublicKey. The public key bytes are not guaranteed to be a valid
     /// representation of a point on its corresponding curve if applicable.
     /// It does check that the bytes deserialize into a well-formed public key for the given scheme.
     public fun new_public_key_from_bytes(bytes: vector<u8>): AnyPublicKey {

@@ -7,7 +7,6 @@ module aptos_std::keyless {
     use std::bcs;
     friend aptos_std::federated_keyless;
 
-    
     // Error codes
     //
 
