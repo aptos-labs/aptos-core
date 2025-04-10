@@ -60,6 +60,7 @@ pub struct SpecFunDecl {
     pub is_recursive: RefCell<Option<bool>>,
     /// The instantiations for which this function is known to use generic type reflection.
     pub insts_using_generic_type_reflection: RefCell<BTreeMap<Vec<Type>, bool>>,
+    pub spec: RefCell<Spec>,
 }
 
 // =================================================================================================
@@ -163,6 +164,15 @@ impl ConditionKind {
         matches!(
             self,
             Assert | Assume | Decreases | LoopInvariant | LetPost(..) | LetPre(..) | Update
+        )
+    }
+
+    pub fn allowed_on_lambda_spec(&self) -> bool {
+        // TODO(#16256): support all conditions allowed in `allowed_on_fun_decl`
+        use ConditionKind::*;
+        matches!(
+            self,
+            Requires | AbortsIf | Ensures | FunctionInvariant | LetPre(..)
         )
     }
 
@@ -450,6 +460,8 @@ pub enum SpecBlockTarget {
     FunctionCode(ModuleId, FunId, usize),
     /// The block is associated with a specification schema.
     Schema(ModuleId, SchemaId, Vec<TypeParameter>),
+    /// The block is associated with a specification function.
+    SpecFunction(ModuleId, SpecFunId),
     /// The block is inline in an expression.
     Inline,
 }
@@ -663,7 +675,14 @@ pub enum ExpData {
     /// Represents an invocation of a function value, as a lambda.
     Invoke(NodeId, Exp, Vec<Exp>),
     /// Represents a lambda.
-    Lambda(NodeId, Pattern, Exp, LambdaCaptureKind),
+    Lambda(
+        NodeId,
+        Pattern,
+        Exp,
+        LambdaCaptureKind,
+        /// Optional spec block for lambda
+        Option<Exp>,
+    ),
     /// Represents a quantified formula over multiple variables and ranges.
     Quant(
         NodeId,
@@ -813,6 +832,11 @@ impl ExpData {
             self,
             LocalVar(..) | Temporary(..) | Call(_, Operation::Select(..), _)
         )
+    }
+
+    pub fn is_temporary(&self) -> bool {
+        use ExpData::*;
+        matches!(self, Temporary(..))
     }
 
     /// Checks for different ways how an unit (void) value is represented. This
@@ -1463,7 +1487,12 @@ impl ExpData {
                     exp.visit_positions_impl(visitor)?;
                 }
             },
-            Lambda(_, _, body, _) => body.visit_positions_impl(visitor)?,
+            Lambda(_, _, body, _, spec_opt) => {
+                body.visit_positions_impl(visitor)?;
+                if let Some(spec) = spec_opt {
+                    spec.visit_positions_impl(visitor)?;
+                }
+            },
             Quant(_, _, ranges, triggers, condition, body) => {
                 for (_, range) in ranges {
                     range.visit_positions_impl(visitor)?;
@@ -3252,7 +3281,7 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     self.fmt_exps(args)
                 )
             },
-            Lambda(id, pat, body, capture_kind) => {
+            Lambda(id, pat, body, capture_kind, spec_opt) => {
                 if self.verbose {
                     write!(
                         f,
@@ -3280,6 +3309,9 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                         pat.display_for_exp(self),
                         body.display_cont(self)
                     )?;
+                }
+                if let Some(spec) = spec_opt {
+                    write!(f, "{}", spec.display_cont(self))?;
                 }
                 Ok(())
             },
