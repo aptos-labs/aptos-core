@@ -25,7 +25,6 @@ use tokio::time::sleep;
 
 /// Validators should be able to reach consensus on key-level diffs
 /// even if providers are equivocating on the full key list.
-#[ignore]
 #[tokio::test]
 async fn jwk_consensus_per_key() {
     let epoch_duration_secs = 30;
