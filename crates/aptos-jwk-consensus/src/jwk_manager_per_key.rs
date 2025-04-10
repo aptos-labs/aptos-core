@@ -37,8 +37,7 @@ use std::{
 };
 use tokio_retry::strategy::ExponentialBackoff;
 
-/// `JWKManager` executes per-issuer JWK consensus sessions
-/// and updates validator txn pool with quorum-certified JWK updates.
+/// Similar to `JWKManager`, but executing per-key JWK consensus.
 pub struct KeyLevelConsensusManager {
     /// Some useful metadata.
     my_addr: AccountAddress,
@@ -53,7 +52,9 @@ pub struct KeyLevelConsensusManager {
     /// When a quorum-certified JWK update is available, use this to put it into the validator transaction pool.
     vtxn_pool: VTxnPoolState,
 
+    /// The last seen on-chain JWKs are cached here.
     onchain_jwks: HashMap<Issuer, ProviderJWKsIndexed>,
+
     /// The JWK consensus states of all (issuer,kid)s.
     states_by_key: HashMap<(Issuer, KID), ConsensusState<ObservedKeyLevelUpdate>>,
 
