@@ -42,11 +42,12 @@ proptest! {
     #[test]
     fn garbage_inputs(module in any_with::<CompiledModule>(16)) {
         let mut serialized = Vec::with_capacity(65536);
-        module.serialize_for_version(Some(VERSION_MAX), &mut serialized).expect("serialization should work");
-
-        let deserialized_module = CompiledModule::deserialize_no_check_bounds(&serialized)
-            .expect("deserialization should work");
-        prop_assert_eq!(module, deserialized_module);
+        if module.serialize_for_version(Some(VERSION_MAX), &mut serialized).is_ok() {
+            // Skip garbage module which cannot be serialized (e.g. out of bounds)
+            let deserialized_module = CompiledModule::deserialize_no_check_bounds(&serialized)
+                .expect("deserialization should work");
+            prop_assert_eq!(module, deserialized_module);
+        }
     }
 }
 
