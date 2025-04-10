@@ -24,4 +24,4 @@ pub trait TConsensusMode: Send + Sync + 'static {
 }
 
 pub mod per_issuer;
-// pub mod per_key;
+pub mod per_key;
