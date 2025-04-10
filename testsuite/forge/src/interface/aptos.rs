@@ -343,7 +343,7 @@ pub async fn submit_and_wait_reconfig(
     let result = client.submit_and_wait(&last_txn).await;
     if let Err(e) = result {
         let last_transactions = client
-            .get_account_transactions(last_txn.sender(), None, None)
+            .get_account_ordered_transactions(last_txn.sender(), None, None)
             .await
             .map(|result| {
                 result

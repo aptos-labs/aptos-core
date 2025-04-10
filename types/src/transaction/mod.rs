@@ -1940,13 +1940,13 @@ fn verify_events_against_root_hash(
     Ok(())
 }
 
-/// A list of transactions under an account that are contiguous by sequence number
-/// and include proofs.
+/// A list of ordered transactions (seq number based transactions) under an account
+/// that are contiguous by sequence number and include proofs.
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct AccountTransactionsWithProof(pub Vec<TransactionWithProof>);
+pub struct AccountOrderedTransactionsWithProof(pub Vec<TransactionWithProof>);
 
-impl AccountTransactionsWithProof {
+impl AccountOrderedTransactionsWithProof {
     pub fn new(txns_with_proofs: Vec<TransactionWithProof>) -> Self {
         Self(txns_with_proofs)
     }
