@@ -74,6 +74,11 @@ It is possible to increase your quota by creating an API key in Aptos Build. In 
 follow instructions here: https://developers.aptoslabs.com/docs/api-access/api-keys. Then, when
 using the tool the key can be specified using `--api-key K` flag.
 
+Finally, users of the tool can pass `--assert-no-out-of-gas` flag to the initialization command.
+It ensures that the range of transactions that are benchmarked do not run out of gas. This is
+particularly useful when benchmarking transactions with gas metering disabled: if historical
+transaction ran out of gas, not metering it changes the execution behavior.
+
 #### Example
 
 ```shell
@@ -216,7 +221,8 @@ for the first few blocks. By specifying `--num-block-to-skip N`, the tool will i
 for the first `N` blocks (the blocks will still be executed as a "warm-up").
 
 Execution can also be configured. By using `--disable-paranoid-mode`, the Move VM will not use
-runtime type checks, possible making execution faster.
+runtime type checks, possibly making execution faster. By using `--disable-gas-metering` flag,
+execution will run with a no-op gas meter.
 
 #### Example
 
