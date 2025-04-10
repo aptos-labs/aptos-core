@@ -38,7 +38,7 @@ fn upgrade(
     tokio_scoped::scope(|scopev| {
         // do upgrade
         scopev.spawn(async {
-            info!("upgrade_and_gather_stats upgrade thread start");
+            info!("upgrade thread start");
             upgrade_result = batch_update_gradually(
                 ctxa,
                 validators_to_update,
@@ -48,7 +48,7 @@ fn upgrade(
                 max_wait,
             )
             .await;
-            info!("upgrade_and_gather_stats upgrade thread done");
+            info!("upgrade thread done");
         });
     });
 
