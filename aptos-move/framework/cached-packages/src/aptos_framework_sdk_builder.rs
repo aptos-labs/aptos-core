@@ -848,6 +848,10 @@ pub enum EntryFunctionCall {
         approved: bool,
     },
 
+    NonceValidationAddNonceBucket {},
+
+    NonceValidationInitializeNonceTable {},
+
     /// Entry function that can be used to transfer, if allow_ungated_transfer is set true.
     ObjectTransferCall {
         object: AccountAddress,
@@ -1700,6 +1704,8 @@ impl EntryFunctionCall {
                 sequence_number,
                 approved,
             } => multisig_account_vote_transanction(multisig_account, sequence_number, approved),
+            NonceValidationAddNonceBucket {} => nonce_validation_add_nonce_bucket(),
+            NonceValidationInitializeNonceTable {} => nonce_validation_initialize_nonce_table(),
             ObjectTransferCall { object, to } => object_transfer_call(object, to),
             ObjectCodeDeploymentPublish {
                 metadata_serialized,
@@ -4140,6 +4146,36 @@ pub fn multisig_account_vote_transanction(
             bcs::to_bytes(&sequence_number).unwrap(),
             bcs::to_bytes(&approved).unwrap(),
         ],
+    ))
+}
+
+pub fn nonce_validation_add_nonce_bucket() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("nonce_validation").to_owned(),
+        ),
+        ident_str!("add_nonce_bucket").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn nonce_validation_initialize_nonce_table() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("nonce_validation").to_owned(),
+        ),
+        ident_str!("initialize_nonce_table").to_owned(),
+        vec![],
+        vec![],
     ))
 }
 
@@ -6588,6 +6624,26 @@ mod decoder {
         }
     }
 
+    pub fn nonce_validation_add_nonce_bucket(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::NonceValidationAddNonceBucket {})
+        } else {
+            None
+        }
+    }
+
+    pub fn nonce_validation_initialize_nonce_table(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::NonceValidationInitializeNonceTable {})
+        } else {
+            None
+        }
+    }
+
     pub fn object_transfer_call(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ObjectTransferCall {
@@ -7704,6 +7760,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "multisig_account_vote_transanction".to_string(),
             Box::new(decoder::multisig_account_vote_transanction),
+        );
+        map.insert(
+            "nonce_validation_add_nonce_bucket".to_string(),
+            Box::new(decoder::nonce_validation_add_nonce_bucket),
+        );
+        map.insert(
+            "nonce_validation_initialize_nonce_table".to_string(),
+            Box::new(decoder::nonce_validation_initialize_nonce_table),
         );
         map.insert(
             "object_transfer_call".to_string(),

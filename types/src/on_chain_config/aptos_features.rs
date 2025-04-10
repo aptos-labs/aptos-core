@@ -227,9 +227,9 @@ impl FeatureFlag {
             FeatureFlag::VM_BINARY_FORMAT_V8,
             FeatureFlag::ENABLE_FUNCTION_VALUES,
             FeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
-            // TODO[Orderless]: Remove these from deafult features before landing the PR.
-            // FeatureFlag::TRANSACTION_PAYLOAD_V2,
-            // FeatureFlag::ORDERLESS_TRANSACTIONS,
+            // TODO[Orderless]: Add these flags to default features only when the nonce table code lands 
+            FeatureFlag::TRANSACTION_PAYLOAD_V2,
+            FeatureFlag::ORDERLESS_TRANSACTIONS,
         ]
     }
 }
