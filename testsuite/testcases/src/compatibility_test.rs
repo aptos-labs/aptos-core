@@ -4,9 +4,7 @@
 
 use crate::{batch_update_gradually, generate_traffic};
 use anyhow::bail;
-use aptos_forge::{
-    EmitJobRequest, NetworkContextSynchronizer, NetworkTest, Result, SwarmExt, Test, Version,
-};
+use aptos_forge::{NetworkContextSynchronizer, NetworkTest, Result, SwarmExt, Test, Version};
 use aptos_sdk::types::PeerId;
 use async_trait::async_trait;
 use log::info;
