@@ -1605,7 +1605,7 @@ async fn submit_chunked_publish_transactions(
     let payloads_length = payloads.len() as u64;
     let mut tx_hashes = vec![];
 
-    let account_address = txn_options.profile_options.account_address()?;
+    let (_, account_address) = txn_options.get_public_key_and_address()?;
 
     if !is_staging_area_empty(txn_options, large_packages_module_address).await? {
         let message = format!(
@@ -1674,9 +1674,10 @@ async fn is_staging_area_empty(
     let url = txn_options.rest_options.url(&txn_options.profile_options)?;
     let client = Client::new(url);
 
+    let (_, account_address) = txn_options.get_public_key_and_address()?;
     let staging_area_response = client
         .get_account_resource(
-            txn_options.profile_options.account_address()?,
+            account_address,
             &format!(
                 "{}::large_packages::StagingArea",
                 large_packages_module_address
@@ -1716,10 +1717,12 @@ impl CliCommand<TransactionSummary> for ClearStagingArea {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        let (_, account_address) = self.txn_options.get_public_key_and_address()?;
+
         println!(
             "Cleaning up resource {}::large_packages::StagingArea under account {}.",
             &self.large_packages_module_address,
-            self.txn_options.profile_options.account_address()?
+            account_address,
         );
         let payload = large_packages_cleanup_staging_area(self.large_packages_module_address);
         self.txn_options
