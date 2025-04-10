@@ -2,23 +2,15 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{batch_update_gradually, create_emitter_and_request, generate_traffic};
+use crate::{batch_update_gradually, generate_traffic};
 use anyhow::bail;
 use aptos_forge::{
-    EmitJobRequest, NetworkContextSynchronizer, NetworkTest, Result, SwarmExt, Test, TxnEmitter,
-    TxnStats, Version,
+    EmitJobRequest, NetworkContextSynchronizer, NetworkTest, Result, SwarmExt, Test, Version,
 };
-use aptos_sdk::types::{LocalAccount, PeerId};
+use aptos_sdk::types::PeerId;
 use async_trait::async_trait;
 use log::info;
-use rand::SeedableRng;
-use std::{
-    ops::DerefMut,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
+use std::ops::DerefMut;
 use tokio::time::Duration;
 
 pub struct SimpleValidatorUpgrade;
@@ -33,7 +25,6 @@ impl Test for SimpleValidatorUpgrade {
     }
 }
 
-
 fn upgrade(
     ctxa: NetworkContextSynchronizer,
     // upgrade args
@@ -42,8 +33,6 @@ fn upgrade(
     wait_until_healthy: bool,
     delay: Duration,
     max_wait: Duration,
-    // traffic args
-    nodes: &[PeerId],
 ) -> Result<()> {
     let mut upgrade_result: Result<()> = Ok(());
     tokio_scoped::scope(|scopev| {
@@ -161,7 +150,6 @@ impl NetworkTest for SimpleValidatorUpgrade {
             upgrade_wait_for_healthy,
             upgrade_node_delay,
             upgrade_max_wait,
-            &[first_node],
         )?;
         // Generate some traffic
         {
@@ -190,7 +178,6 @@ impl NetworkTest for SimpleValidatorUpgrade {
             upgrade_wait_for_healthy,
             upgrade_node_delay,
             upgrade_max_wait,
-            &first_batch,
         )?;
         {
             let mut ctx_locker = ctxa.ctx.lock().await;
@@ -210,14 +197,13 @@ impl NetworkTest for SimpleValidatorUpgrade {
             info!("{}", msg);
             ctx.report.report_text(msg);
         }
-         upgrade(
+        upgrade(
             ctxa.clone(),
             &second_batch,
             &new_version,
             upgrade_wait_for_healthy,
             upgrade_node_delay,
             upgrade_max_wait,
-            &second_batch,
         )?;
         {
             let mut ctx_locker = ctxa.ctx.lock().await;
