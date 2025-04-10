@@ -3,10 +3,11 @@
 
 module aptos_std::federated_keyless {
     use aptos_std::bcs_stream;
-    use aptos_std::bcs;
     use aptos_std::keyless;
-    use std::string::{utf8};
 
+    #[test_only]
+    use aptos_std::bcs;
+    use std::string::{utf8};
 
     //
     // Error codes

@@ -3,9 +3,14 @@
 
 module aptos_std::keyless {
     use aptos_std::bcs_stream::{Self, deserialize_u8};
-    use std::string::{String, utf8};
-    use std::bcs;
+    use std::string::String;
     friend aptos_std::federated_keyless;
+
+    #[test_only]
+    use std::string::{utf8};
+    #[test_only]
+    use std::bcs;
+
 
     // Error codes
     //
@@ -50,12 +55,12 @@ module aptos_std::keyless {
     }
 
     /// Returns the issuer string of the public key
-    public fun get_iss(self: &PublicKey): String {
+    fun get_iss(self: &PublicKey): String {
         self.iss
     }
 
     /// Returns the identifier bytes of the public key
-    public fun get_idc(self: &PublicKey): vector<u8> {
+    fun get_idc(self: &PublicKey): vector<u8> {
         self.idc
     }
 
