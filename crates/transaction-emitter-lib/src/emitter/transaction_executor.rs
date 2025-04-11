@@ -174,7 +174,7 @@ async fn warn_detailed_error(
                 // TODO[Orderless]: Fetch previous sequence numbers doesn't make sense for orderless transactions.
                 // What's the alternative?
                 rest_client
-                    .get_account_transactions_bcs(
+                    .get_account_ordered_transactions_bcs(
                         sender,
                         Some(inner.sequence_number().saturating_sub(1)),
                         Some(5),
