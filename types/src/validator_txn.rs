@@ -32,15 +32,6 @@ impl ValidatorTransaction {
         bcs::serialized_size(self).unwrap()
     }
 
-    pub fn topic(&self) -> Topic {
-        match self {
-            ValidatorTransaction::DKGResult(_) => Topic::DKG,
-            ValidatorTransaction::ObservedJWKUpdate(update) => {
-                Topic::JWK_CONSENSUS(update.update.issuer.clone())
-            },
-        }
-    }
-
     pub fn type_name(&self) -> &'static str {
         match self {
             ValidatorTransaction::DKGResult(_) => "validator_transaction__dkg_result",
@@ -56,4 +47,8 @@ impl ValidatorTransaction {
 pub enum Topic {
     DKG,
     JWK_CONSENSUS(jwks::Issuer),
+    JWK_CONSENSUS_PER_KEY_MODE {
+        issuer: jwks::Issuer,
+        kid: jwks::KID,
+    },
 }
