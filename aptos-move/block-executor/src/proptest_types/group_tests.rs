@@ -104,6 +104,7 @@ fn non_empty_group_transaction_tests(
                 block_stm_v2,
                 &txn_provider,
                 &data_view,
+                None,
             );
 
             BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)

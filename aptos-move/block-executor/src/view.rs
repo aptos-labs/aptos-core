@@ -464,7 +464,7 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
             start_counter: start_shared_counter,
             counter: shared_counter,
             incarnation,
-            captured_reads: RefCell::new(CapturedReads::new(block_stm_v2)),
+            captured_reads: RefCell::new(CapturedReads::new(block_stm_v2.then_some(incarnation))),
         }
     }
 
@@ -1968,7 +1968,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new(false));
+        >::new(None));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2113,7 +2113,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new(false));
+        >::new(None));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2258,7 +2258,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new(false));
+        >::new(None));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2403,7 +2403,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new(false));
+        >::new(None));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;

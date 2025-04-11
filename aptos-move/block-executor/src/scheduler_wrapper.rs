@@ -27,6 +27,13 @@ impl SchedulerWrapper<'_> {
         matches!(self, SchedulerWrapper::V2(_))
     }
 
+    pub(crate) fn min_not_scheduled_idx(&self) -> Result<Option<TxnIndex>, PanicError> {
+        match self {
+            SchedulerWrapper::V1(_, _) => Ok(None),
+            SchedulerWrapper::V2(scheduler) => Ok(Some(scheduler.min_not_scheduled_idx()?)),
+        }
+    }
+
     pub(crate) fn wake_dependencies_and_decrease_validation_idx(
         &self,
         txn_idx: TxnIndex,
@@ -64,17 +71,6 @@ impl SchedulerWrapper<'_> {
                 skip_module_reads_validation.store(false, Ordering::Relaxed);
             },
             SchedulerWrapper::V2(_) => {},
-        }
-    }
-
-    pub(crate) fn skip_module_reads_validation(&self) -> bool {
-        match self {
-            SchedulerWrapper::V1(_, skip_module_reads_validation) => {
-                // Relaxed suffices as syncronization (reading validation index) occurs before
-                // getting the module read validation flag.
-                skip_module_reads_validation.load(Ordering::Relaxed)
-            },
-            SchedulerWrapper::V2(_) => false,
         }
     }
 

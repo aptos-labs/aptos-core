@@ -195,13 +195,15 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn module_write_set(&self) -> BTreeMap<StateKey, ModuleWrite<WriteOp>> {
+    fn module_write_set(&self) -> Vec<ModuleWrite<WriteOp>> {
         self.vm_output
             .lock()
             .as_ref()
             .expect("Output must be set to get module writes")
             .module_write_set()
-            .clone()
+            .iter()
+            .map(|(_, write)| write.clone())
+            .collect()
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.

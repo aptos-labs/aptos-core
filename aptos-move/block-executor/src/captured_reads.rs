@@ -9,8 +9,7 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::{
     types::{
-        MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion, TxnIndex,
-        ValueWithLayout, Version,
+        Incarnation, MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion, TxnIndex, ValueWithLayout, Version
     },
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
@@ -347,6 +346,7 @@ pub enum CacheRead<T> {
 /// If not possible, then after proper resolution from MVHashMap/storage, they should be
 /// captured. This enforces an invariant that 'capture_read' will never be called with a
 /// read that has a kind <= already captured read (for that key / tag).
+/// BlockSTMv2 adds incarnation to the CapturedReads, for now it's inside the v2 flag.
 pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
     data_reads: HashMap<T::Key, DataRead<T::Value>>,
     group_reads: HashMap<T::Key, GroupRead<T>>,
@@ -368,18 +368,18 @@ pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
     /// and sequential execution fallback.
     incorrect_use: bool,
 
-    block_stm_v2: bool,
+    block_stm_v2_incarnation: Option<Incarnation>,
 }
 
 impl<T: Transaction, K, DC, VC, S> Default for CapturedReads<T, K, DC, VC, S> {
     fn default() -> Self {
-        Self::new(false)
+        Self::new(None)
     }
 }
 
 impl<T: Transaction, K, DC, VC, S> CapturedReads<T, K, DC, VC, S> {
     #[allow(deprecated)]
-    pub(crate) fn new(block_stm_v2: bool) -> Self {
+    pub(crate) fn new(block_stm_v2_incarnation: Option<Incarnation>) -> Self {
         Self {
             data_reads: HashMap::new(),
             group_reads: HashMap::new(),
@@ -390,7 +390,7 @@ impl<T: Transaction, K, DC, VC, S> CapturedReads<T, K, DC, VC, S> {
             delayed_field_speculative_failure: false,
             non_delayed_field_speculative_failure: false,
             incorrect_use: false,
-            block_stm_v2,
+            block_stm_v2_incarnation,
         }
     }
 }
@@ -649,13 +649,13 @@ where
             match data_map.fetch_data(key, idx_to_validate) {
                 Ok(Versioned(version, value)) => {
                     matches!(
-                        DataRead::from_value_with_layout(version, value).contains(read, self.block_stm_v2),
+                        DataRead::from_value_with_layout(version, value).contains(read, self.block_stm_v2_incarnation.is_some()),
                         DataReadComparison::Contains
                     )
                 },
                 Ok(Resolved(value)) => {
                     matches!(
-                        DataRead::Resolved(value).contains(read, self.block_stm_v2),
+                        DataRead::Resolved(value).contains(read, self.block_stm_v2_incarnation.is_some()),
                         DataReadComparison::Contains
                     )
                 },
@@ -753,27 +753,46 @@ where
         }
     }
 
-    /// For every module read that was captured, checks if the reads are still the same:
-    ///   1. Entries read from the global module cache are not overridden.
-    ///   2. Entries that were not in per-block cache before are still not there.
-    ///   3. Entries that were in per-block cache have the same commit index.
     pub(crate) fn validate_module_reads(
         &self,
         global_module_cache: &GlobalModuleCache<K, DC, VC, S>,
         per_block_module_cache: &SyncModuleCache<K, DC, VC, S, Option<TxnIndex>>,
+        maybe_updated_module_keys: Option<&BTreeSet<K>>,
     ) -> bool {
         if self.non_delayed_field_speculative_failure {
             return false;
         }
 
-        self.module_reads.iter().all(|(key, read)| match read {
+        let validate = |key: &K, read: &ModuleRead<DC, VC, S>| match read {
             ModuleRead::GlobalCache(_) => global_module_cache.contains_not_overridden(key),
             ModuleRead::PerBlockCache(previous) => {
                 let current_version = per_block_module_cache.get_module_version(key);
                 let previous_version = previous.as_ref().map(|(_, version)| *version);
                 current_version == previous_version
             },
-        })
+        };
+
+        match maybe_updated_module_keys {
+            Some(updated_module_keys) if updated_module_keys.len() <= self.module_reads.len() => {
+                // When updated_module_keys is smaller, iterate over it and lookup in module_reads
+                updated_module_keys
+                    .iter()
+                    .filter(|&k| self.module_reads.contains_key(k))
+                    .all(|key| validate(key, self.module_reads.get(key).unwrap()))
+            },
+            Some(updated_module_keys) => {
+                // When module_reads is smaller, iterate over it and filter by updated_module_keys
+                self.module_reads
+                    .iter()
+                    .filter(|(k, _)| updated_module_keys.contains(k))
+                    .all(|(key, read)| validate(key, read))
+            },
+            None => self.module_reads.iter().all(|(key, read)| validate(key, read)),
+        }
+    }
+
+    pub(crate) fn block_stm_v2_incarnation(&self) -> Option<Incarnation> {
+        self.block_stm_v2_incarnation
     }
 
     pub(crate) fn validate_group_reads(
@@ -798,7 +817,7 @@ where
                     Ok((version, v)) => {
                         matches!(
                             DataRead::from_value_with_layout(version, v)
-                                .contains(r, self.block_stm_v2),
+                                .contains(r, self.block_stm_v2_incarnation.is_some()),
                             DataReadComparison::Contains
                         )
                     },
@@ -808,7 +827,7 @@ where
                         assert!(sentinel_deletion.is_deletion());
                         matches!(
                             DataRead::Versioned(Err(StorageVersion), sentinel_deletion, None)
-                                .contains(r, self.block_stm_v2),
+                                .contains(r, self.block_stm_v2_incarnation.is_some()),
                             DataReadComparison::Contains
                         )
                     },
@@ -1416,7 +1435,7 @@ mod test {
             MockDeserializedCode,
             MockVerifiedCode,
             MockExtension,
-        >::new(false);
+        >::new(None);
         let legacy_reads = legacy_reads_by_kind();
         let deletion_reads = deletion_reads_by_kind();
         let with_metadata_reads = with_metadata_reads_by_kind();
@@ -1450,7 +1469,7 @@ mod test {
             MockDeserializedCode,
             MockVerifiedCode,
             MockExtension,
-        >::new(false);
+        >::new(None);
         captured_reads.get_by_kind(&KeyType::<u32>(21), Some(&10), ReadKind::Metadata);
     }
 
@@ -1478,7 +1497,7 @@ mod test {
             MockDeserializedCode,
             MockVerifiedCode,
             MockExtension,
-        >::new(false);
+        >::new(None);
         let legacy_reads = legacy_reads_by_kind();
         let deletion_reads = deletion_reads_by_kind();
         let with_metadata_reads = with_metadata_reads_by_kind();
@@ -1540,7 +1559,7 @@ mod test {
             MockDeserializedCode,
             MockVerifiedCode,
             MockExtension,
-        >::new(false);
+        >::new(None);
         let versioned_legacy = DataRead::Versioned(
             Err(StorageVersion),
             Arc::new(ValueType::with_len_and_metadata(
@@ -1596,7 +1615,7 @@ mod test {
             MockDeserializedCode,
             MockVerifiedCode,
             MockExtension,
-        >::new(false);
+        >::new(None);
         captured_reads.non_delayed_field_speculative_failure = false;
         captured_reads.delayed_field_speculative_failure = false;
         captured_reads.mark_failure(true);
@@ -1630,16 +1649,16 @@ mod test {
             MockDeserializedCode,
             MockVerifiedCode,
             MockExtension,
-        >::new(false);
+        >::new(None);
         let global_module_cache = GlobalModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 
-        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
+        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache, None));
         captured_reads.mark_failure(true);
-        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
+        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache, None));
         captured_reads.mark_failure(false);
         assert!(
-            !captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache)
+            !captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache, None)
         );
     }
 
@@ -1651,7 +1670,7 @@ mod test {
             MockDeserializedCode,
             MockVerifiedCode,
             MockExtension,
-        >::new(false);
+        >::new(None);
         let mut global_module_cache = GlobalModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 
@@ -1663,23 +1682,23 @@ mod test {
         global_module_cache.insert(1, module_1.clone());
         captured_reads.capture_global_cache_read(1, module_1);
 
-        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
+        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache, None));
 
         // Now, mark one of the entries in invalid. Validations should fail!
         global_module_cache.mark_overridden(&1);
         let valid =
-            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache);
+            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache, None);
         assert!(!valid);
 
         // Without invalid module (and if it is not captured), validation should pass.
         assert!(global_module_cache.remove(&1));
         captured_reads.module_reads.remove(&1);
-        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
+        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache, None));
 
         // Validation fails if we captured a cross-block module which does not exist anymore.
         assert!(global_module_cache.remove(&0));
         let valid =
-            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache);
+            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache, None);
         assert!(!valid);
     }
 
@@ -1691,7 +1710,7 @@ mod test {
             MockDeserializedCode,
             MockVerifiedCode,
             MockExtension,
-        >::new(false);
+        >::new(None);
         let per_block_module_cache: SyncModuleCache<u32, _, MockVerifiedCode, _, _> =
             SyncModuleCache::empty();
 
@@ -1730,7 +1749,7 @@ mod test {
             MockDeserializedCode,
             MockVerifiedCode,
             MockExtension,
-        >::new(false);
+        >::new(None);
         let global_module_cache = GlobalModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 
@@ -1746,7 +1765,7 @@ mod test {
         captured_reads.capture_per_block_cache_read(0, Some((a, Some(10))));
         captured_reads.capture_per_block_cache_read(1, None);
 
-        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
+        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache, None));
 
         let b = mock_deserialized_code(1, MockExtension::new(8));
         per_block_module_cache
@@ -1760,11 +1779,11 @@ mod test {
 
         // Entry did not exist before and now exists.
         let valid =
-            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache);
+            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache, None);
         assert!(!valid);
 
         captured_reads.module_reads.remove(&1);
-        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
+        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache, None));
 
         // Version has been republished, with a higher transaction index. Should fail validation.
         let a = mock_deserialized_code(0, MockExtension::new(8));
@@ -1778,7 +1797,7 @@ mod test {
             .unwrap();
 
         let valid =
-            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache);
+            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache, None);
         assert!(!valid);
     }
 
@@ -1790,7 +1809,7 @@ mod test {
             MockDeserializedCode,
             MockVerifiedCode,
             MockExtension,
-        >::new(false);
+        >::new(None);
         let mut global_module_cache = GlobalModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 
@@ -1798,7 +1817,7 @@ mod test {
         let m = mock_verified_code(0, MockExtension::new(8));
         global_module_cache.insert(0, m.clone());
         captured_reads.capture_global_cache_read(0, m);
-        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
+        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache, None));
 
         // Assume we republish this module: validation must fail.
         let a = mock_deserialized_code(100, MockExtension::new(8));
@@ -1813,12 +1832,12 @@ mod test {
             .unwrap();
 
         let valid =
-            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache);
+            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache, None);
         assert!(!valid);
 
         // Assume we re-read the new correct version. Then validation should pass again.
         captured_reads.capture_per_block_cache_read(0, Some((a, Some(10))));
-        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
+        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache, None));
         assert!(!global_module_cache.contains_not_overridden(&0));
     }
 }
