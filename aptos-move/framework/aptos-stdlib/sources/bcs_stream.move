@@ -36,6 +36,10 @@ module aptos_std::bcs_stream {
         }
     }
 
+    public fun has_remaining(stream: &mut BCSStream): bool {
+        stream.cur < stream.data.length()
+    }
+
     /// Deserializes a ULEB128-encoded integer from the stream.
     /// In the BCS format, lengths of vectors are represented using ULEB128 encoding.
     public fun deserialize_uleb128(stream: &mut BCSStream): u64 {
