@@ -2,39 +2,46 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Result};
-use processor::processors::{
-    objects_processor::ObjectsProcessorConfig, stake_processor::StakeProcessorConfig,
-    token_v2_processor::TokenV2ProcessorConfig, ProcessorConfig, ProcessorName,
+use processor::{
+    config::processor_config::{ProcessorConfig, ProcessorName},
+    processors::{
+        objects::objects_processor::ObjectsProcessorConfig,
+        stake::stake_processor::StakeProcessorConfig,
+        token_v2::token_v2_processor::TokenV2ProcessorConfig,
+    },
 };
 
 pub fn get_processor_config(processor_name: &ProcessorName) -> Result<ProcessorConfig> {
     Ok(match processor_name {
         ProcessorName::AccountTransactionsProcessor => {
-            ProcessorConfig::AccountTransactionsProcessor
+            ProcessorConfig::AccountTransactionsProcessor(Default::default())
+        },
+        ProcessorName::AccountRestorationProcessor => {
+            bail!("AccountRestorationProcessor is not supported in the localnet")
         },
         ProcessorName::AnsProcessor => {
             bail!("ANS processor is not supported in the localnet")
         },
-        ProcessorName::DefaultProcessor => ProcessorConfig::DefaultProcessor,
-        ProcessorName::EventsProcessor => ProcessorConfig::EventsProcessor,
-        ProcessorName::FungibleAssetProcessor => ProcessorConfig::FungibleAssetProcessor,
+        ProcessorName::DefaultProcessor => ProcessorConfig::DefaultProcessor(Default::default()),
+        ProcessorName::EventsProcessor => ProcessorConfig::EventsProcessor(Default::default()),
+        ProcessorName::FungibleAssetProcessor => {
+            ProcessorConfig::FungibleAssetProcessor(Default::default())
+        },
+        ProcessorName::GasFeeProcessor => {
+            bail!("GasFeeProcessor is not supported in the localnet")
+        },
         ProcessorName::MonitoringProcessor => {
             bail!("Monitoring processor is not supported in the localnet")
         },
-        ProcessorName::NftMetadataProcessor => {
-            bail!("NFT Metadata processor is not supported in the localnet")
-        },
         ProcessorName::ObjectsProcessor => {
             ProcessorConfig::ObjectsProcessor(ObjectsProcessorConfig {
+                default_config: Default::default(),
                 query_retries: Default::default(),
                 query_retry_delay_ms: Default::default(),
             })
         },
         ProcessorName::ParquetDefaultProcessor => {
             bail!("ParquetDefaultProcessor is not supported in the localnet")
-        },
-        ProcessorName::ParquetFungibleAssetActivitiesProcessor => {
-            bail!("ParquetFungibleAssetActivitiesProcessor is not supported in the localnet")
         },
         ProcessorName::ParquetFungibleAssetProcessor => {
             bail!("ParquetFungibleAssetProcessor is not supported in the localnet")
@@ -51,22 +58,32 @@ pub fn get_processor_config(processor_name: &ProcessorName) -> Result<ProcessorC
         ProcessorName::ParquetTokenV2Processor => {
             bail!("ParquetTokenV2Processor is not supported in the localnet")
         },
-        ProcessorName::ParquetUserTransactionsProcessor => {
-            bail!("ParquetUserTransactionsProcessor is not supported in the localnet")
+        ProcessorName::ParquetUserTransactionProcessor => {
+            bail!("ParquetUserTransactionProcessor is not supported in the localnet")
+        },
+        ProcessorName::ParquetObjectsProcessor => {
+            bail!("ParquetObjectsProcessor is not supported in the localnet")
+        },
+        ProcessorName::ParquetAccountTransactionsProcessor => {
+            bail!("ParquetAccountTransactionsProcessor is not supported in the localnet")
+        },
+        ProcessorName::ParquetStakeProcessor => {
+            bail!("ParquetStakeProcessor is not supported in the localnet")
         },
         ProcessorName::StakeProcessor => ProcessorConfig::StakeProcessor(StakeProcessorConfig {
+            default_config: Default::default(),
             query_retries: Default::default(),
             query_retry_delay_ms: Default::default(),
         }),
         ProcessorName::TokenV2Processor => {
             ProcessorConfig::TokenV2Processor(TokenV2ProcessorConfig {
+                default_config: Default::default(),
                 query_retries: Default::default(),
                 query_retry_delay_ms: Default::default(),
             })
         },
-        ProcessorName::TransactionMetadataProcessor => {
-            ProcessorConfig::TransactionMetadataProcessor
+        ProcessorName::UserTransactionProcessor => {
+            ProcessorConfig::UserTransactionProcessor(Default::default())
         },
-        ProcessorName::UserTransactionProcessor => ProcessorConfig::UserTransactionProcessor,
     })
 }
