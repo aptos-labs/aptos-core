@@ -19,21 +19,21 @@ pub struct AccountAddress([u8; AccountAddress::LENGTH]);
 
 impl AccountAddress {
     /// Hex address: 0x4
-    pub const FOUR: Self = Self::get_hex_address_four();
+    pub const FOUR: Self = Self::from_u64(0x4);
     /// The number of bytes in an address.
     pub const LENGTH: usize = 32;
     /// Max address: 0xff....
     pub const MAX_ADDRESS: Self = Self([0xFF; Self::LENGTH]);
     /// Hex address: 0x1
-    pub const ONE: Self = Self::get_hex_address_one();
+    pub const ONE: Self = Self::from_u64(0x1);
     /// Hex address: 0x7
-    pub const SEVEN: Self = Self::get_hex_address_seven();
+    pub const SEVEN: Self = Self::from_u64(0x7);
     /// Hex address: 0xA
-    pub const TEN: Self = Self::get_hex_address_ten();
+    pub const TEN: Self = Self::from_u64(0x10);
     /// Hex address: 0x3
-    pub const THREE: Self = Self::get_hex_address_three();
+    pub const THREE: Self = Self::from_u64(0x3);
     /// Hex address: 0x2
-    pub const TWO: Self = Self::get_hex_address_two();
+    pub const TWO: Self = Self::from_u64(0x2);
     /// Hex address: 0x0
     pub const ZERO: Self = Self([0u8; Self::LENGTH]);
 
@@ -41,39 +41,19 @@ impl AccountAddress {
         Self(address)
     }
 
-    const fn get_hex_address_one() -> Self {
+    pub const fn from_u64(v: u64) -> Self {
         let mut addr = [0u8; AccountAddress::LENGTH];
-        addr[AccountAddress::LENGTH - 1] = 1u8;
-        Self(addr)
-    }
-
-    const fn get_hex_address_two() -> Self {
-        let mut addr = [0u8; AccountAddress::LENGTH];
-        addr[AccountAddress::LENGTH - 1] = 2u8;
-        Self(addr)
-    }
-
-    const fn get_hex_address_ten() -> Self {
-        let mut addr = [0u8; AccountAddress::LENGTH];
-        addr[AccountAddress::LENGTH - 1] = 10u8;
-        Self(addr)
-    }
-
-    const fn get_hex_address_three() -> Self {
-        let mut addr = [0u8; AccountAddress::LENGTH];
-        addr[AccountAddress::LENGTH - 1] = 3u8;
-        Self(addr)
-    }
-
-    const fn get_hex_address_four() -> Self {
-        let mut addr = [0u8; AccountAddress::LENGTH];
-        addr[AccountAddress::LENGTH - 1] = 4u8;
-        Self(addr)
-    }
-
-    const fn get_hex_address_seven() -> Self {
-        let mut addr = [0u8; AccountAddress::LENGTH];
-        addr[AccountAddress::LENGTH - 1] = 7u8;
+        let v = v.to_be_bytes();
+        // TODO: const_copy_from_slice requires Rust v1.87.0 or newer
+        // addr[AccountAddress::LENGTH - v.len()..].copy_from_slice(v.as_slice());
+        let mut i = 0;
+        loop {
+            addr[AccountAddress::LENGTH - v.len() + i] = v[i];
+            i += 1;
+            if i >= v.len() {
+                break;
+            }
+        }
         Self(addr)
     }
 
@@ -878,6 +858,17 @@ mod tests {
         assert!(AccountAddress::from_str("0x").is_err());
         assert!(AccountAddress::from_str_strict("").is_err());
         assert!(AccountAddress::from_str_strict("0x").is_err());
+    }
+
+    #[test]
+    fn test_address_from_u64() {
+        const fn get_hex_address_seven() -> AccountAddress {
+            let mut addr = [0u8; AccountAddress::LENGTH];
+            addr[AccountAddress::LENGTH - 1] = 7u8;
+            AccountAddress(addr)
+        }
+
+        assert_eq!(AccountAddress::from_u64(0x7), get_hex_address_seven());
     }
 
     proptest! {
