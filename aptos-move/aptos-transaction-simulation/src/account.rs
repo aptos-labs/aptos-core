@@ -128,6 +128,18 @@ impl Account {
         }
     }
 
+    pub fn new_from_addr_with_new_keypair_from_seed(
+        addr: AccountAddress,
+        seed: &mut KeyGen,
+    ) -> Self {
+        let (privkey, pubkey) = seed.generate_ed25519_keypair();
+        Self {
+            addr,
+            privkey,
+            pubkey: AccountPublicKey::Ed25519(pubkey),
+        }
+    }
+
     /// Creates a new account with the given keypair.
     ///
     /// Like with [`Account::new`], the account returned by this constructor is a purely logical
