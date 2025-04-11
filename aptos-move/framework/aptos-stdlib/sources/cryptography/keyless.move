@@ -73,11 +73,11 @@ module aptos_std::keyless {
             std::error::invalid_state(1)
         );
         assert!(
-            pk.iss == utf8(b"https://accounts.google.com"),
+            get_iss(&pk) == utf8(b"https://accounts.google.com"),
             std::error::invalid_state(2)
         );
         assert!(
-            pk.idc == x"86bc0a0a825eb6337ca1e8a3157e490eac8df23d5cef25d9641ad5e7edc1d514",
+            get_idc(&pk) == x"86bc0a0a825eb6337ca1e8a3157e490eac8df23d5cef25d9641ad5e7edc1d514",
             std::error::invalid_state(3)
         );
     }
