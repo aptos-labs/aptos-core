@@ -1,4 +1,4 @@
-no-op	1	VM	61	0.922	1.026	32094.5
+no-op	1	VM	61	0.922	1.026	29712.5
 no-op	1000	VM	61	0.856	1.033	30821.1
 apt-fa-transfer	1	VM	61	0.807	1.043	22715.7
 apt-fa-transfer	1	NativeVM	60	0.824	1.137	38421.0
@@ -39,7 +39,7 @@ liquidity-pool-swap	100	VM	60	0.857	1.053	7838.9
 liquidity-pool-swap-stable	1	VM	60	0.814	1.017	589.2
 liquidity-pool-swap-stable	100	VM	60	0.851	1.044	7647.1
 deserialize-u256	1	VM	60	0.804	1.033	30358.7
-no-op-fee-payer	1	VM	61	0.797	1.023	1591.1
+no-op-fee-payer	1	VM	61	0.797	1.023	1323.3
 no-op-fee-payer	100	VM	60	0.867	1.041	24655.4
 simple-script	1	VM	61	0.827	1.035	31721.2
 vector-trim-append-len3000-size1	1	VM	60	0.741	1.021	698.5

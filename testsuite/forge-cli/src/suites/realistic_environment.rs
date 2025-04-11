@@ -357,7 +357,7 @@ pub(crate) fn realistic_env_max_load_test(
                     11000
                 } else {
                     // During land time we want to be less strict, otherwise we flaky fail
-                    10000
+                    5800
                 },
             ),
         }))

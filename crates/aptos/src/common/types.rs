@@ -1943,6 +1943,7 @@ impl TransactionOptions {
             let adjusted_max_gas =
                 adjust_gas_headroom(gas_used, simulated_txn.request.max_gas_amount.0);
 
+            println!("adjusted_max_gas: {}", adjusted_max_gas);
             // Ask if you want to accept the estimate amount
             let upper_cost_bound = adjusted_max_gas * gas_unit_price;
             let lower_cost_bound = gas_used * gas_unit_price;
