@@ -24,7 +24,7 @@ use aptos_vm_types::{
     change_set::{randomly_check_layout_matches, VMChangeSet},
     resolver::{
         ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TResourceGroupView,
-        TResourceView,
+        TResourceView, UnknownOrLayout,
     },
 };
 use bytes::Bytes;
@@ -183,7 +183,7 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
     fn get_resource_state_value(
         &self,
         state_key: &Self::Key,
-        maybe_layout: Option<&Self::Layout>,
+        maybe_layout: UnknownOrLayout<&Self::Layout>,
     ) -> PartialVMResult<Option<StateValue>> {
         match self.change_set.resource_write_set().get(state_key) {
             Some(
@@ -267,7 +267,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         &self,
         group_key: &Self::GroupKey,
         resource_tag: &Self::ResourceTag,
-        maybe_layout: Option<&Self::Layout>,
+        maybe_layout: UnknownOrLayout<&Self::Layout>,
     ) -> PartialVMResult<Option<Bytes>> {
         use AbstractResourceWriteOp::*;
 
@@ -352,7 +352,7 @@ mod test {
     }
 
     fn read_resource(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {
-        bcs::from_bytes(&view.get_resource_bytes(&key(s), None).unwrap().unwrap()).unwrap()
+        bcs::from_bytes(&view.get_resource_bytes(&key(s), UnknownOrLayout::Known(None)).unwrap().unwrap()).unwrap()
     }
 
     fn read_aggregator(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {
@@ -366,7 +366,7 @@ mod test {
     ) -> u128 {
         bcs::from_bytes(
             &view
-                .get_resource_from_group(&key(s), tag, None)
+                .get_resource_from_group(&key(s), tag, UnknownOrLayout::Known(None))
                 .unwrap()
                 .unwrap(),
         )

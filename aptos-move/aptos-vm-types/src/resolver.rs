@@ -19,6 +19,19 @@ use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_sta
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::collections::{BTreeMap, HashMap};
 
+/// UnknownOrLayout is used to process the value upon a storage read, and e.g. replace delayed 
+/// field values with unique identifiers. To use as intended, when Known(Some(L)) is provided, 
+/// then the value must really require an exchange. Otherwise, providing Known(None) allows an 
+/// optimization for values that do not require an exchange (the caller knows that no delayed
+/// fields are contained). Finally, Unknown is for the cases when the layout / exchange
+/// are not needed to answer the query and the caller need not provide it. For example, whether
+/// a resource exists, or its size / metadata may not require the layout.
+#[derive(Clone, Copy, Debug)]
+pub enum UnknownOrLayout<L> {
+    Unknown,
+    Known(Option<L>),
+}
+
 /// Allows requesting an immediate interrupt to ongoing transaction execution. For example, this
 /// allows an early return from a useless speculative execution when block execution has already
 /// halted (e.g. due to gas limit, committing only a block prefix).
@@ -46,13 +59,13 @@ pub trait TResourceView {
     fn get_resource_state_value(
         &self,
         state_key: &Self::Key,
-        maybe_layout: Option<&Self::Layout>,
+        maybe_layout: UnknownOrLayout<&Self::Layout>,
     ) -> PartialVMResult<Option<StateValue>>;
 
     fn get_resource_bytes(
         &self,
         state_key: &Self::Key,
-        maybe_layout: Option<&Self::Layout>,
+        maybe_layout: UnknownOrLayout<&Self::Layout>,
     ) -> PartialVMResult<Option<Bytes>> {
         let maybe_state_value = self.get_resource_state_value(state_key, maybe_layout)?;
         Ok(maybe_state_value.map(|state_value| state_value.bytes().clone()))
@@ -63,18 +76,18 @@ pub trait TResourceView {
         state_key: &Self::Key,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
         // For metadata, layouts are not important.
-        self.get_resource_state_value(state_key, None)
+        self.get_resource_state_value(state_key, UnknownOrLayout::Unknown)
             .map(|maybe_state_value| maybe_state_value.map(StateValue::into_metadata))
     }
 
     fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<Option<u64>> {
-        self.get_resource_state_value(state_key, None)
+        self.get_resource_state_value(state_key, UnknownOrLayout::Unknown)
             .map(|maybe_state_value| maybe_state_value.map(|state_value| state_value.size() as u64))
     }
 
     fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
         // For existence, layouts are not important.
-        self.get_resource_state_value(state_key, None)
+        self.get_resource_state_value(state_key, UnknownOrLayout::Unknown)
             .map(|maybe_state_value| maybe_state_value.is_some())
     }
 }
@@ -113,7 +126,7 @@ pub trait TResourceGroupView {
         &self,
         group_key: &Self::GroupKey,
         resource_tag: &Self::ResourceTag,
-        maybe_layout: Option<&Self::Layout>,
+        maybe_layout: UnknownOrLayout<&Self::Layout>,
     ) -> PartialVMResult<Option<Bytes>>;
 
     /// Needed for charging storage fees for a resource group write, as that requires knowing
@@ -127,7 +140,7 @@ pub trait TResourceGroupView {
         resource_tag: &Self::ResourceTag,
     ) -> PartialVMResult<usize> {
         Ok(self
-            .get_resource_from_group(group_key, resource_tag, None)?
+            .get_resource_from_group(group_key, resource_tag, UnknownOrLayout::Unknown)?
             .map_or(0, |bytes| bytes.len()))
     }
 
@@ -146,7 +159,7 @@ pub trait TResourceGroupView {
         group_key: &Self::GroupKey,
         resource_tag: &Self::ResourceTag,
     ) -> PartialVMResult<bool> {
-        self.get_resource_from_group(group_key, resource_tag, None)
+        self.get_resource_from_group(group_key, resource_tag, UnknownOrLayout::Unknown)
             .map(|maybe_bytes| maybe_bytes.is_some())
     }
 
@@ -225,7 +238,7 @@ where
     fn get_resource_state_value(
         &self,
         state_key: &Self::Key,
-        _maybe_layout: Option<&Self::Layout>,
+        _maybe_layout: UnknownOrLayout<&Self::Layout>,
     ) -> PartialVMResult<Option<StateValue>> {
         self.get_state_value(state_key).map_err(|e| {
             PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
