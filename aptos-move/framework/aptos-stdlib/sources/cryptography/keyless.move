@@ -55,12 +55,12 @@ module aptos_std::keyless {
     }
 
     /// Returns the issuer string of the public key
-    fun get_iss(self: &PublicKey): String {
+    friend fun get_iss(self: &PublicKey): String {
         self.iss
     }
 
     /// Returns the identifier bytes of the public key
-    fun get_idc(self: &PublicKey): vector<u8> {
+    friend fun get_idc(self: &PublicKey): vector<u8> {
         self.idc
     }
 
