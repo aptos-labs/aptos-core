@@ -19,6 +19,7 @@ use crate::{
     },
 };
 use aptos_aggregator::delta_change_set::serialize;
+use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     contract_event::TransactionEvent, state_store::state_value::StateValueMetadata,
     transaction::BlockOutput, write_set::TransactionWrite,
@@ -27,6 +28,7 @@ use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use bytes::Bytes;
 use claims::{assert_gt, assert_matches, assert_none, assert_some, assert_some_eq};
 use itertools::izip;
+use move_core_types::language_storage::ModuleId;
 use std::{collections::HashMap, fmt::Debug, hash::Hash, result::Result, sync::atomic::Ordering};
 
 // TODO: extend to derived values, and code.
@@ -91,6 +93,7 @@ pub(crate) struct BaselineOutput<K> {
     read_values: Vec<Result<Vec<BaselineValue>, ()>>,
     resolved_deltas: Vec<Result<HashMap<K, u128>, ()>>,
     group_reads: Vec<Result<Vec<(K, u32)>, ()>>,
+    module_reads: Vec<Result<Vec<Option<TxnIndex>>, ()>>,
 }
 
 impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
@@ -101,12 +104,14 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
         maybe_block_gas_limit: Option<u64>,
     ) -> Self {
         let mut current_world = HashMap::<K, BaselineValue>::new();
+        let mut module_world = HashMap::<ModuleId, TxnIndex>::new();
         let mut accumulated_gas = 0;
 
         let mut status = BaselineStatus::Success;
         let mut read_values = vec![];
         let mut resolved_deltas = vec![];
         let mut group_reads = vec![];
+        let mut module_reads = vec![];
 
         for (txn_idx, txn) in txns.iter().enumerate() {
             match txn {
@@ -180,6 +185,12 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                                 })
                                 .collect()));
 
+                            module_reads.push(Ok(incarnation_behaviors[last_incarnation]
+                                .module_reads
+                                .iter()
+                                .map(|module_id| module_world.get(module_id).cloned())
+                                .collect()));
+
                             resolved_deltas.push(Ok(txn_resolved_deltas
                                 .into_iter()
                                 .map(|(k, v)| {
@@ -195,6 +206,12 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                             for (k, v, _) in incarnation_behaviors[last_incarnation].writes.iter() {
                                 current_world
                                     .insert(k.clone(), BaselineValue::GenericWrite(v.clone()));
+                            }
+                            for module_write in
+                                incarnation_behaviors[last_incarnation].module_writes.iter()
+                            {
+                                module_world
+                                    .insert(module_write.module_id().clone(), txn_idx as TxnIndex);
                             }
 
                             group_reads.push(Ok(incarnation_behaviors[last_incarnation]
@@ -215,6 +232,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                             read_values.push(Err(()));
                             resolved_deltas.push(Err(()));
                             group_reads.push(Err(()));
+                            module_reads.push(Err(()));
                         },
                     }
                 },
@@ -227,6 +245,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
             read_values,
             resolved_deltas,
             group_reads,
+            module_reads,
         }
     }
 
@@ -246,135 +265,164 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
             self.read_values.iter(),
             self.resolved_deltas.iter(),
             self.group_reads.iter(),
+            self.module_reads.iter(),
         )
-        .for_each(|(idx, output, reads, resolved_deltas, group_reads)| {
-            // Compute group read results.
-            let group_read_results: Vec<Option<Bytes>> = group_reads
-                .as_ref()
-                .unwrap()
-                .iter()
-                .map(|(group_key, resource_tag)| {
-                    let group_map = group_world.entry(group_key).or_insert(base_map.clone());
-
-                    group_map.get(resource_tag).cloned()
-                })
-                .collect();
-            // Test group read results.
-            let read_len = reads.as_ref().unwrap().len();
-
-            assert_eq!(
-                group_read_results.len(),
-                output.read_results.len() - read_len
-            );
-            izip!(
-                output.read_results.iter().skip(read_len),
-                group_read_results.into_iter()
-            )
-            .for_each(|(result_group_read, baseline_group_read)| {
-                assert!(result_group_read.clone().map(Into::<Bytes>::into) == baseline_group_read);
-            });
-
-            for (group_key, size_or_metadata) in output.read_group_size_or_metadata.iter() {
-                let group_map = group_world.entry(group_key).or_insert(base_map.clone());
-
-                match size_or_metadata {
-                    GroupSizeOrMetadata::Size(size) => {
-                        let baseline_size =
-                            group_size_as_sum(group_map.iter().map(|(t, v)| (t, v.len())))
-                                .unwrap()
-                                .get();
-
-                        assert_eq!(
-                            baseline_size, *size,
-                            "ERR: idx = {} group_key {:?}, baseline size {} != output_size {}",
-                            idx, group_key, baseline_size, size
-                        );
-                    },
-                    GroupSizeOrMetadata::Metadata(metadata) => {
-                        if !group_metadata.contains_key(group_key) {
-                            assert_eq!(
-                                *metadata,
-                                Some(raw_metadata(5)) /* default metadata */
-                            );
-                        } else {
-                            let baseline_metadata =
-                                group_metadata.get(group_key).cloned().flatten();
-                            assert_eq!(*metadata, baseline_metadata);
-                        }
-                    },
-                }
-            }
-
-            // Test normal reads.
-            izip!(
-                reads
+        .for_each(
+            |(idx, output, reads, resolved_deltas, group_reads, module_reads)| {
+                // Compute group read results.
+                let group_read_results: Vec<Option<Bytes>> = group_reads
                     .as_ref()
-                    .expect("Aggregator failures not yet tested")
-                    .iter(),
-                output.read_results.iter().take(read_len)
-            )
-            .for_each(|(baseline_read, result_read)| baseline_read.assert_read_result(result_read));
+                    .unwrap()
+                    .iter()
+                    .map(|(group_key, resource_tag)| {
+                        let group_map = group_world.entry(group_key).or_insert(base_map.clone());
 
-            // Update group world.
-            for (group_key, v, group_size, updates) in output.group_writes.iter() {
-                group_metadata.insert(group_key.clone(), v.as_state_value_metadata());
+                        group_map.get(resource_tag).cloned()
+                    })
+                    .collect();
+                // Test group read results.
+                let read_len = reads.as_ref().unwrap().len();
 
-                let group_map = group_world.entry(group_key).or_insert(base_map.clone());
-                for (tag, v) in updates {
-                    if v.is_deletion() {
-                        assert_some!(group_map.remove(tag));
-                    } else {
-                        let existed = group_map
-                            .insert(*tag, v.extract_raw_bytes().unwrap())
-                            .is_some();
-                        assert_eq!(existed, v.is_modification());
-                    }
-                }
-                let computed_size =
-                    group_size_as_sum(group_map.iter().map(|(t, v)| (t, v.len()))).unwrap();
-                assert_eq!(computed_size, *group_size);
-            }
-
-            // Test recorded finalized group writes: it should contain the whole group, and
-            // as such, correspond to the contents of the group_world.
-            // TODO: figure out what can still be tested here, e.g. RESERVED_TAG
-            // let groups_tested =
-            //     (output.group_writes.len() + group_reads.as_ref().unwrap().len()) > 0;
-            // for (group_key, _, finalized_updates) in output.recorded_groups.get().unwrap() {
-            //     let baseline_group_map =
-            //         group_world.entry(group_key).or_insert(base_map.clone());
-            //     assert_eq!(finalized_updates.len(), baseline_group_map.len());
-            //     if groups_tested {
-            //         // RESERVED_TAG should always be contained.
-            //         assert_ge!(finalized_updates.len(), 1);
-
-            //         for (tag, v) in finalized_updates.iter() {
-            //             assert_eq!(
-            //                 v.bytes().unwrap(),
-            //                 baseline_group_map.get(tag).unwrap(),
-            //             );
-            //         }
-            //     }
-            // }
-
-            let baseline_deltas = resolved_deltas
-                .as_ref()
-                .expect("Aggregator failures not yet tested");
-            output
-                .materialized_delta_writes
-                .get()
-                .expect("Delta writes must be set")
-                .iter()
-                .for_each(|(k, result_delta_write)| {
+                assert_eq!(
+                    group_read_results.len(),
+                    output.read_results.len() - read_len
+                );
+                izip!(
+                    output.read_results.iter().skip(read_len),
+                    group_read_results.into_iter()
+                )
+                .for_each(|(result_group_read, baseline_group_read)| {
                     assert_eq!(
-                        *baseline_deltas.get(k).expect("Baseline must contain delta"),
-                        result_delta_write
-                            .as_u128()
-                            .expect("Baseline must contain delta")
-                            .expect("Must deserialize aggregator write value")
+                        result_group_read.clone().map(Into::<Bytes>::into),
+                        baseline_group_read
                     );
                 });
-        });
+
+                izip!(
+                    output.module_read_results.iter(),
+                    module_reads
+                        .as_ref()
+                        .expect("No delta failures")
+                        .into_iter()
+                )
+                .for_each(|(module_read, baseline_module_read)| {
+                    assert_eq!(
+                        module_read
+                            .as_ref()
+                            .map(|m| m.creation_time_usecs())
+                            .unwrap(),
+                        baseline_module_read
+                            .map(|i| i as u64)
+                            .unwrap_or(u32::MAX as u64),
+                        "for txn_idx = {}",
+                        idx
+                    );
+                });
+
+                for (group_key, size_or_metadata) in output.read_group_size_or_metadata.iter() {
+                    let group_map = group_world.entry(group_key).or_insert(base_map.clone());
+
+                    match size_or_metadata {
+                        GroupSizeOrMetadata::Size(size) => {
+                            let baseline_size =
+                                group_size_as_sum(group_map.iter().map(|(t, v)| (t, v.len())))
+                                    .unwrap()
+                                    .get();
+
+                            assert_eq!(
+                                baseline_size, *size,
+                                "ERR: idx = {} group_key {:?}, baseline size {} != output_size {}",
+                                idx, group_key, baseline_size, size
+                            );
+                        },
+                        GroupSizeOrMetadata::Metadata(metadata) => {
+                            if !group_metadata.contains_key(group_key) {
+                                assert_eq!(
+                                    *metadata,
+                                    Some(raw_metadata(5)) /* default metadata */
+                                );
+                            } else {
+                                let baseline_metadata =
+                                    group_metadata.get(group_key).cloned().flatten();
+                                assert_eq!(*metadata, baseline_metadata);
+                            }
+                        },
+                    }
+                }
+
+                // Test normal reads.
+                izip!(
+                    reads
+                        .as_ref()
+                        .expect("Aggregator failures not yet tested")
+                        .iter(),
+                    output.read_results.iter().take(read_len)
+                )
+                .for_each(|(baseline_read, result_read)| {
+                    baseline_read.assert_read_result(result_read)
+                });
+
+                // Update group world.
+                for (group_key, v, group_size, updates) in output.group_writes.iter() {
+                    group_metadata.insert(group_key.clone(), v.as_state_value_metadata());
+
+                    let group_map = group_world.entry(group_key).or_insert(base_map.clone());
+                    for (tag, v) in updates {
+                        if v.is_deletion() {
+                            assert_some!(group_map.remove(tag));
+                        } else {
+                            let existed = group_map
+                                .insert(*tag, v.extract_raw_bytes().unwrap())
+                                .is_some();
+                            assert_eq!(existed, v.is_modification());
+                        }
+                    }
+                    let computed_size =
+                        group_size_as_sum(group_map.iter().map(|(t, v)| (t, v.len()))).unwrap();
+                    assert_eq!(computed_size, *group_size);
+                }
+
+                // Test recorded finalized group writes: it should contain the whole group, and
+                // as such, correspond to the contents of the group_world.
+                // TODO: figure out what can still be tested here, e.g. RESERVED_TAG
+                // let groups_tested =
+                //     (output.group_writes.len() + group_reads.as_ref().unwrap().len()) > 0;
+                // for (group_key, _, finalized_updates) in output.recorded_groups.get().unwrap() {
+                //     let baseline_group_map =
+                //         group_world.entry(group_key).or_insert(base_map.clone());
+                //     assert_eq!(finalized_updates.len(), baseline_group_map.len());
+                //     if groups_tested {
+                //         // RESERVED_TAG should always be contained.
+                //         assert_ge!(finalized_updates.len(), 1);
+
+                //         for (tag, v) in finalized_updates.iter() {
+                //             assert_eq!(
+                //                 v.bytes().unwrap(),
+                //                 baseline_group_map.get(tag).unwrap(),
+                //             );
+                //         }
+                //     }
+                // }
+
+                let baseline_deltas = resolved_deltas
+                    .as_ref()
+                    .expect("Aggregator failures not yet tested");
+                output
+                    .materialized_delta_writes
+                    .get()
+                    .expect("Delta writes must be set")
+                    .iter()
+                    .for_each(|(k, result_delta_write)| {
+                        assert_eq!(
+                            *baseline_deltas.get(k).expect("Baseline must contain delta"),
+                            result_delta_write
+                                .as_u128()
+                                .expect("Baseline must contain delta")
+                                .expect("Must deserialize aggregator write value")
+                        );
+                    });
+            },
+        );
 
         results.iter().skip(committed).for_each(|output| {
             // Ensure the transaction is skipped based on the output.

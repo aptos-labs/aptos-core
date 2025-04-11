@@ -4,7 +4,7 @@
 use crate::{
     counters,
     scheduler::{ArmedLock, DependencyCondvar, DependencyStatus},
-    scheduler_status::{DependencyInstruction, DependencyResolution, ExecutionStatus},
+    scheduler_status::{DependencyInstruction, DependencyResolution, ExecutionStatus, StatusEnum},
 };
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
@@ -24,6 +24,15 @@ use std::{
         Arc,
     },
 };
+
+pub(crate) enum ValidationPass {
+    // No specialized validation needed.
+    None,
+    // Need to wait for the transaction to finish executing before validation.
+    Wait,
+    // Need to validate the transaction
+    Validate,
+}
 
 /**
 A transaction may be (re-)executed multiple times, each time with an incremented
@@ -260,9 +269,12 @@ pub(crate) enum TaskKind {
 }
 
 pub(crate) struct SchedulerProxy {
-    /// First executed_idx many transctions have all finished their first incarnation (i.e. have
-    /// been executed at least once).
+    /// The first executed_idx many transctions have all finished their first incarnation (i.e.
+    /// have been executed at least once).
+    /// Transactions below min_not_scheduled_idx have all been scheduled for execution, i.e.
+    /// have been returned from a pop_next call.
     executed_idx: CachePadded<AtomicU32>,
+    min_not_scheduled_idx: CachePadded<AtomicU32>,
     /// Queue for scheduling transactions for execution. TODO: alternative implementations
     /// (e.g. packed ints, intervals w. locks, CachePadded<ConcurrentQueue<TxnIndex>>).
     execution_queue: Mutex<BTreeSet<TxnIndex>>,
@@ -272,12 +284,22 @@ impl SchedulerProxy {
     fn new(num_txns: TxnIndex) -> Self {
         Self {
             executed_idx: CachePadded::new(AtomicU32::new(0)),
+            min_not_scheduled_idx: CachePadded::new(AtomicU32::new(0)),
             execution_queue: Mutex::new((0..num_txns).collect()),
         }
     }
 
     fn pop_next(&self) -> Option<TxnIndex> {
-        self.execution_queue.lock().pop_first()
+        let ret = self.execution_queue.lock().pop_first();
+        if let Some(idx) = ret {
+            self.min_not_scheduled_idx
+                .fetch_max(idx + 1, Ordering::Relaxed);
+        }
+        ret
+    }
+
+    fn min_not_scheduled_idx(&self) -> TxnIndex {
+        self.min_not_scheduled_idx.load(Ordering::Relaxed)
     }
 
     // is_first_reexecution must be determined and the method must be performed while holding
@@ -301,6 +323,7 @@ impl SchedulerProxy {
     pub(crate) fn new_for_test(executed_idx: u32) -> Self {
         Self {
             executed_idx: CachePadded::new(AtomicU32::new(executed_idx)),
+            min_not_scheduled_idx: CachePadded::new(AtomicU32::new(0)),
             execution_queue: Mutex::new(BTreeSet::new()),
         }
     }
@@ -337,6 +360,7 @@ pub(crate) struct SchedulerV2 {
     next_to_commit_idx: CachePadded<AtomicU32>,
     is_done: CachePadded<AtomicBool>,
     is_halted: CachePadded<AtomicBool>,
+    blocked_for_commit: Vec<CachePadded<AtomicU32>>,
     /// Tasks queue for post commit tasks with a fixed capacity of number of transactions.
     queueing_commits_lock: CachePadded<ArmedLock>,
     post_commit_processing_queue: CachePadded<ConcurrentQueue<TxnIndex>>,
@@ -364,6 +388,9 @@ impl SchedulerV2 {
             next_to_commit_idx: CachePadded::new(AtomicU32::new(0)),
             is_done: CachePadded::new(AtomicBool::new(false)),
             is_halted: CachePadded::new(AtomicBool::new(false)),
+            blocked_for_commit: (0..(num_txns + 1))
+                .map(|_| CachePadded::new(AtomicU32::new(0)))
+                .collect(),
             queueing_commits_lock: CachePadded::new(ArmedLock::new()),
             post_commit_processing_queue: CachePadded::new(ConcurrentQueue::<TxnIndex>::bounded(
                 num_txns as usize,
@@ -375,9 +402,47 @@ impl SchedulerV2 {
         }
     }
 
+    // When block_commit_for_idx is called, the scheduler will not commit the transaction
+    // at txn_idx until unblock_commit_for_idx is called.
+    // TODO(BlockSTMv2): Unit tests for this and unblock.
+    pub(crate) fn block_commit_for_idx(&self, txn_idx: TxnIndex) -> Result<(), PanicError> {
+        let next_to_commit_idx = self.next_to_commit_idx.load(Ordering::Relaxed);
+        if next_to_commit_idx > txn_idx {
+            return Err(code_invariant_error(format!(
+                "Asking to block commit for an already committed txn {}, next to commit idx = {}",
+                txn_idx, next_to_commit_idx
+            )));
+        }
+
+        self.blocked_for_commit[txn_idx as usize].fetch_add(1, Ordering::Relaxed);
+        Ok(())
+    }
+
+    pub(crate) fn unblock_commit_for_idx(&self, txn_idx: TxnIndex) -> Result<(), PanicError> {
+        let next_to_commit_idx = self.next_to_commit_idx.load(Ordering::Relaxed);
+        if next_to_commit_idx > txn_idx {
+            return Err(code_invariant_error(format!(
+                "Asking to unblock commit for an already committed txn {}, next to commit idx = {}",
+                txn_idx, next_to_commit_idx
+            )));
+        } else if next_to_commit_idx == txn_idx {
+            self.queueing_commits_lock.arm();
+        }
+
+        let prev_blocked_count =
+            self.blocked_for_commit[txn_idx as usize].fetch_sub(1, Ordering::Relaxed);
+        if prev_blocked_count == 0 {
+            return Err(code_invariant_error(format!(
+                "Asking to unblock commit for a txn {} that is not blocked",
+                txn_idx
+            )));
+        }
+        Ok(())
+    }
+
     // Marks the transaction as (fully) committed, i.e. indicates that the caller (executor) has
-    // successfully performed the sequential (clint-side) commit hook logic. The transaction index
-    // must have previously been obtained via try_sequential_commit_hook method call, while
+    // successfully performed the sequential (client-side) commit hook logic. The transaction
+    // index must have previously been obtained via try_sequential_commit_hook method call, while
     // holding the lock (commit_hooks_try_lock / commit_hooks_unlock).
     //
     // Also schedules the corresponding task for parallel post-processing of the transaction.
@@ -425,6 +490,10 @@ impl SchedulerV2 {
     ) -> Result<Option<(TxnIndex, Incarnation)>, PanicError> {
         // Relaxed ordering due to armed lock acq-rel.
         let next_to_commit_idx = self.next_to_commit_idx.load(Ordering::Relaxed) as usize;
+
+        if self.blocked_for_commit[next_to_commit_idx].load(Ordering::Relaxed) > 0 {
+            return Ok(None);
+        }
 
         assert!(next_to_commit_idx <= self.num_txns as usize);
         if next_to_commit_idx > 0 {
@@ -489,6 +558,18 @@ impl SchedulerV2 {
 
     pub(crate) fn post_commit_processing_queue_is_empty(&self) -> bool {
         self.post_commit_processing_queue.is_empty()
+    }
+
+    // Returns an upper bound on transactions that may ever have been scheduled / started executing.
+    pub(crate) fn min_not_scheduled_idx(&self) -> Result<TxnIndex, PanicError> {
+        let ret = self.proxy.min_not_scheduled_idx();
+        if ret > self.num_txns {
+            return Err(code_invariant_error(format!(
+                "min_not_scheduled_idx: {} > num_txns: {}",
+                ret, self.num_txns
+            )));
+        }
+        Ok(ret)
     }
 
     // TODO: take worker ID, dedicate some workers to scan high priority tasks (can use armed lock).
@@ -639,7 +720,7 @@ impl SchedulerV2 {
                     if incarnation > 0 && matches!(ret, DependencyResolution::None) {
                         // Change the inner status to aborted so finishing execution will make the
                         // transaction eligible for re-execution by some other worker.
-                        self.self_abort(txn_idx, incarnation, false)?;
+                        self.direct_abort(txn_idx, incarnation, false)?;
 
                         // The current logic is to just ask caller to speculatively abort.
                         // TODO(BlockSTMv2): complex handling (e.g. scheduler maintenance), revisit Wait.
@@ -739,9 +820,20 @@ impl SchedulerV2 {
         self.txn_status[txn_idx as usize].already_try_aborted(incarnation)
     }
 
-    // An interface for a particular transaction to be aborted outside of push invalidation
-    // (e.g. via abort manager's try abort followed by finish_execution's finish abort flow).
-    // This is currently used in two scenarios:
+    pub(crate) fn validation_pass_for_txn(&self, txn_idx: TxnIndex) -> ValidationPass {
+        match self.txn_status[txn_idx as usize].status() {
+            StatusEnum::PendingScheduling | StatusEnum::Aborted => ValidationPass::None,
+            StatusEnum::Executing => ValidationPass::Wait,
+            StatusEnum::Executed => ValidationPass::Validate,
+        }
+    }
+
+    // An interface for a particular transaction to be aborted directly, without abort manager.
+    // Abort manager is used with finish_execution ATPI, which is a part of push invalidation
+    // flow and a core logic of BlockSTMv2. The direct_abort API below is targeted for other
+    // scenarios in which direct access to the abort functionality is helpful.
+    //
+    // This is currently used in three scenarios:
     // (1) when processing dependencies (if the heuristics determines the txn is better to be
     // speculatively aborted, e.g. since it is low priority and likely to be invalidated.
     // Since the status must be Executing, we do not bother with propagating add / remove stall.
@@ -749,7 +841,9 @@ impl SchedulerV2 {
     // the sequential commit hook - in this case, the immediate re-execution is about to follow.
     // However, we need to distinguish the case to make sure in case (2) an execution task
     // is not added to the scheduler's execution queue (the caller will re-execute itself).
-    pub(crate) fn self_abort(
+    // In this case, caller_reexecuting is true.
+    // (3) The module validation pass can cause invalidation and require aborting.
+    pub(crate) fn direct_abort(
         &self,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
@@ -774,8 +868,7 @@ impl SchedulerV2 {
         if caller_reexecuting {
             return Err(code_invariant_error(format!(
                 "SchedulerV2: self-abort with caller reexecuting failed for {} {}",
-                txn_idx,
-                incarnation
+                txn_idx, incarnation
             )));
         }
 

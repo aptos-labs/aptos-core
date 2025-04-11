@@ -16,7 +16,7 @@ use crate::{
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
-    scheduler_v2::{AbortManager, SchedulerV2, TaskKind},
+    scheduler_v2::{AbortManager, SchedulerV2, TaskKind, ValidationPass},
     scheduler_wrapper::SchedulerWrapper,
     task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
@@ -73,6 +73,45 @@ use std::{
         Arc,
     },
 };
+
+struct CustomValidationPass {
+    from_incl: TxnIndex,
+    to_excl: TxnIndex,
+    updated_module_keys: BTreeSet<ModuleId>,
+}
+
+impl CustomValidationPass {
+    fn new() -> Self {
+        Self {
+            from_incl: 0,
+            to_excl: 0,
+            updated_module_keys: BTreeSet::new(),
+        }
+    }
+
+    // set must be called after all appropriate state for the pass has been set.
+    fn set(&mut self, from_incl: TxnIndex, to_excl: TxnIndex) {
+        self.from_incl = from_incl;
+        self.to_excl = to_excl;
+    }
+
+    fn is_set(&self) -> bool {
+        self.from_incl != 0 && self.to_excl != 0
+    }
+
+    // Returns the state of the validation pass if it is set, and unsets the pass.
+    // The unset is shallow (e.g. for here and is_set() purposes), hence any other state
+    // for custom pass information is not cleared.
+    fn take_validation_pass(&mut self) -> Option<(TxnIndex, TxnIndex, &BTreeSet<ModuleId>)> {
+        self.is_set().then(|| {
+            (
+                std::mem::replace(&mut self.from_incl, 0),
+                std::mem::replace(&mut self.to_excl, 0),
+                &self.updated_module_keys,
+            )
+        })
+    }
+}
 
 pub struct BlockExecutor<T, E, S, L, TP> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
@@ -379,10 +418,14 @@ where
                 },
                 Group(tags) => {
                     abort_manager.invalidate_dependencies(
-                        versioned_cache.data().remove_v2::<true>(&key, idx_to_execute)
+                        versioned_cache
+                            .data()
+                            .remove_v2::<true>(&key, idx_to_execute),
                     )?;
                     abort_manager.invalidate_dependencies(
-                        versioned_cache.group_data().remove_v2(&key, idx_to_execute, tags)?
+                        versioned_cache
+                            .group_data()
+                            .remove_v2(&key, idx_to_execute, tags)?,
                     )?;
                 },
             };
@@ -624,6 +667,50 @@ where
         Ok(needs_suffix_validation)
     }
 
+    // Returns true if the module access verification pass has been completed.
+    // False means that the read set had not been recorded yet, and the caller
+    // should try again later.
+    fn module_access_verification_v2(
+        idx_to_validate: TxnIndex,
+        scheduler: &SchedulerV2,
+        updated_module_keys: &BTreeSet<ModuleId>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        global_module_cache: &GlobalModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+    ) -> Result<bool, PanicError> {
+        match scheduler.validation_pass_for_txn(idx_to_validate) {
+            ValidationPass::None => Ok(true),
+            ValidationPass::Wait => Ok(false),
+            ValidationPass::Validate => {
+                let read_set = last_input_output.read_set(idx_to_validate).ok_or_else(|| {
+                    code_invariant_error(format!(
+                        "Prior read-set of txn {} not recorded for module verification",
+                        idx_to_validate
+                    ))
+                })?;
+                if !read_set.validate_module_reads(
+                    global_module_cache,
+                    versioned_cache.module_cache(),
+                    Some(updated_module_keys),
+                ) {
+                    scheduler.direct_abort(
+                        idx_to_validate,
+                        read_set
+                            .block_stm_v2_incarnation()
+                            .expect("BlockSTMv2 must be enabled in CapturedReads"),
+                        false,
+                    )?;
+                }
+                Ok(true)
+            },
+        }
+    }
+
     fn validate(
         idx_to_validate: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
@@ -656,8 +743,11 @@ where
         read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
             && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate)
             && (skip_module_reads_validation
-                || read_set
-                    .validate_module_reads(global_module_cache, versioned_cache.module_cache()))
+                || read_set.validate_module_reads(
+                    global_module_cache,
+                    versioned_cache.module_cache(),
+                    None,
+                ))
     }
 
     fn update_transaction_on_abort(
@@ -776,6 +866,9 @@ where
     /// in outputs, which is heavier (due to serialization / deserialization, copies, etc). Moreover,
     /// since prepare_and_queue_commit_ready_txns takes care of synchronization in the flag-combining
     /// way, the materialization can be almost embarrassingly parallelizable.
+    ///
+    /// Return value is ignored for BlockSTMv1, while in V2 it contains an upper bound on the custom
+    /// validation wave (to be performed by the caller to check the module writes).
     #[allow(clippy::too_many_arguments)]
     fn prepare_and_queue_commit_ready_txn(
         &self,
@@ -801,7 +894,9 @@ where
         executor: &E,
         block: &TP,
         num_workers: usize,
-    ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
+        v2_module_keys: &mut BTreeSet<ModuleId>,
+    ) -> Result<Option<TxnIndex>, PanicOr<ParallelBlockExecutionError>> {
+        let mut ret = None;
         let mut shared_commit_state = shared_commit_state.acquire();
         if scheduler.is_v2() {
             last_input_output.process_aggregator_v1_keys(
@@ -849,7 +944,7 @@ where
                     )?;
                 },
                 Some(scheduler) => {
-                    scheduler.self_abort(txn_idx, incarnation, true)?;
+                    scheduler.direct_abort(txn_idx, incarnation, true)?;
                     Self::execute_v2(
                         txn_idx,
                         incarnation + 1,
@@ -890,6 +985,14 @@ where
             // TODO: v2 push validation for module writes - part of normal V2 flow, nothing here.
             commit_side_effects = true;
 
+            if scheduler.is_v2() {
+                v2_module_keys.extend(
+                    module_write_set
+                        .iter()
+                        .map(|write| write.module_id().clone()),
+                );
+            }
+
             Self::publish_module_writes(
                 txn_idx,
                 module_write_set,
@@ -897,6 +1000,8 @@ where
                 versioned_cache,
                 runtime_environment,
             )?;
+            // Important: the call must happen after the module writes are published.
+            ret = scheduler.min_not_scheduled_idx()?;
 
             scheduler.set_module_read_validation();
         }
@@ -980,12 +1085,12 @@ where
             }
         }
 
-        Ok(())
+        Ok(ret)
     }
 
     fn publish_module_writes(
         txn_idx: TxnIndex,
-        module_write_set: BTreeMap<T::Key, ModuleWrite<T::Value>>,
+        module_write_set: Vec<ModuleWrite<T::Value>>,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
             CompiledModule,
@@ -995,7 +1100,7 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         runtime_environment: &RuntimeEnvironment,
     ) -> Result<(), PanicError> {
-        for (_, write) in module_write_set {
+        for write in module_write_set {
             Self::add_module_write_to_module_cache(
                 write,
                 txn_idx,
@@ -1084,7 +1189,12 @@ where
             last_input_output,
             global_module_cache,
             versioned_cache,
-            scheduler.skip_module_reads_validation(),
+            // Module cache is not versioned (published at commit), so validation after
+            // commit might observe later publishes (higher txn index) and be incorrect.
+            // Hence, we skip the paranoid module validation after commit.
+            // TODO(BlockSTMv2): consider doing it within the sequential commit hook
+            // (if modules were published).
+            true,
         ) {
             return Err(code_invariant_error(format!(
                 "Final Validation in post-processing failed for txn {}",
@@ -1253,6 +1363,7 @@ where
             }
 
             while scheduler.should_coordinate_commits() {
+                let mut empty_v2_module_keys = BTreeSet::new();
                 while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
                     self.prepare_and_queue_commit_ready_txn(
                         txn_idx,
@@ -1272,6 +1383,7 @@ where
                         &executor,
                         block,
                         num_workers,
+                        &mut empty_v2_module_keys,
                     )?;
                 }
                 scheduler.queueing_commits_mark_done();
@@ -1370,16 +1482,19 @@ where
         let base_view = shared_sync_params.base_view;
         let last_input_output = shared_sync_params.last_input_output;
         let versioned_cache = shared_sync_params.versioned_cache;
+        let global_module_cache = shared_sync_params.global_module_cache;
         let delayed_field_id_counter = shared_sync_params.delayed_field_id_counter;
         let scheduler_wrapper = SchedulerWrapper::V2(scheduler);
 
+        let mut custom_validation_pass = CustomValidationPass::new();
         loop {
-            while scheduler.commit_hooks_try_lock() {
+            // TODO(BlockSTMv2): refactor commit & custom validation pass to a helper method.
+            while !custom_validation_pass.is_set() && scheduler.commit_hooks_try_lock() {
                 // Perform sequential commit hooks.
                 while let Some((txn_idx, incarnation)) =
                     scheduler.try_get_sequential_commit_hook()?
                 {
-                    self.prepare_and_queue_commit_ready_txn(
+                    if let Some(upper_bound) = self.prepare_and_queue_commit_ready_txn(
                         txn_idx,
                         incarnation,
                         num_txns,
@@ -1390,16 +1505,80 @@ where
                         last_input_output,
                         shared_sync_params.shared_commit_state,
                         base_view,
-                        shared_sync_params.global_module_cache,
+                        global_module_cache,
                         runtime_environment,
                         start_delayed_field_id_counter,
                         delayed_field_id_counter,
                         &executor,
                         block,
                         num_workers as usize,
-                    )?;
+                        &mut custom_validation_pass.updated_module_keys,
+                    )? {
+                        if txn_idx + 1 < upper_bound {
+                            if Self::module_access_verification_v2(
+                                txn_idx + 1,
+                                scheduler,
+                                &custom_validation_pass.updated_module_keys,
+                                last_input_output,
+                                global_module_cache,
+                                versioned_cache,
+                            )? {
+                                // txn_idx + 1 verification pass has been completed.
+                                custom_validation_pass.set(txn_idx + 2, upper_bound);
+                            } else {
+                                // txn_idx + 1 module accesses have not been verified
+                                // (read set not ready) - do it later.
+                                custom_validation_pass.set(txn_idx + 1, upper_bound);
+                                // breaking here ensures committing idx gets blocked below before
+                                // the next iteration of the loop would happen.
+                                break;
+                            };
+                        }
+                    }
+                }
+                if custom_validation_pass.is_set() {
+                    scheduler.block_commit_for_idx(custom_validation_pass.from_incl)?;
                 }
                 scheduler.commit_hooks_unlock();
+            }
+
+            if let Some((from_incl, to_excl, updated_module_keys)) =
+                custom_validation_pass.take_validation_pass()
+            {
+                // Custom validation pass is prioritized over attempting to commit (since the
+                // other workers can still be committing).
+
+                // Currently custom pass includes only module validation due to an earlier
+                // publish in sequential post-commit hook (prepare_and_queue_commit_ready_txn)
+                // by the same worker (the other arm of match). TODO: When there are different
+                // types of custom passes, this invariant should be removed.
+                if updated_module_keys.is_empty() {
+                    return Err(code_invariant_error(
+                        "Module validation pass with empty updated_module_keys",
+                    )
+                    .into());
+                }
+                for idx_to_validate in from_incl..to_excl {
+                    if !Self::module_access_verification_v2(
+                        idx_to_validate,
+                        scheduler,
+                        updated_module_keys,
+                        last_input_output,
+                        global_module_cache,
+                        versioned_cache,
+                    )? {
+                        if idx_to_validate > from_incl {
+                            scheduler.block_commit_for_idx(idx_to_validate)?;
+                            scheduler.unblock_commit_for_idx(from_incl)?;
+                        }
+                        custom_validation_pass.set(idx_to_validate, to_excl);
+                        break;
+                    }
+                }
+                if !custom_validation_pass.is_set() {
+                    custom_validation_pass.updated_module_keys.clear();
+                    scheduler.unblock_commit_for_idx(from_incl)?;
+                } 
             }
 
             // TODO: pass worker_id to next_task.
@@ -1528,9 +1707,8 @@ where
                         &shared_sync_params,
                         start_delayed_field_id_counter,
                     ) {
-                        // If there are multiple errors, they all get logged:
-                        // ModulePathReadWriteError and FatalVMError variant is logged at construction,
-                        // and below we log CodeInvariantErrors.
+                        // If there are multiple errors, they all get logged: FatalVMError is
+                        // logged at construction, below we log CodeInvariantErrors.
                         if let PanicOr::CodeInvariantError(err_msg) = err {
                             alert!(
                                 "[BlockSTMv2] worker loop: CodeInvariantError({:?})",
@@ -1749,7 +1927,6 @@ where
             })?;
         let extension = Arc::new(AptosModuleExtension::new(state_value));
 
-        global_module_cache.mark_overridden(&id);
         per_block_module_cache
             .insert_deserialized_module(id.clone(), compiled_module, extension, Some(txn_idx))
             .map_err(|err| {
@@ -1762,6 +1939,7 @@ where
                 );
                 PanicError::CodeInvariantError(msg)
             })?;
+        global_module_cache.mark_overridden(&id);
         Ok(())
     }
 
@@ -1793,7 +1971,7 @@ where
             unsync_map.write(key, Arc::new(write_op), None);
         }
 
-        for (_, write) in output.module_write_set().into_iter() {
+        for write in output.module_write_set().into_iter() {
             Self::add_module_write_to_module_cache(
                 write,
                 txn_idx,

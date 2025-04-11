@@ -38,8 +38,9 @@ use aptos_vm_types::{
 };
 use bytes::Bytes;
 use claims::{assert_ge, assert_le, assert_ok};
-use move_core_types::{identifier::IdentStr, value::MoveTypeLayout};
+use move_core_types::{identifier::IdentStr, language_storage::ModuleId, value::MoveTypeLayout};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use move_vm_runtime::Module;
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
@@ -266,9 +267,9 @@ impl TransactionWrite for ValueType {
 
 #[derive(Clone, Copy)]
 pub(crate) struct TransactionGenParams {
-    /// Each transaction's read-set consists of between 1 and read_size-1 many reads.
+    /// Each transaction's read-set consists of between 1 and read_size many reads.
     read_size: usize,
-    /// Each mock execution will produce between 1 and output_size-1 many writes and deltas.
+    /// Each mock execution will produce between 1 and output_size many writes and deltas.
     output_size: usize,
     /// The number of different incarnation behaviors that a mock execution of the transaction
     /// may exhibit. For instance, incarnation_alternatives = 1 corresponds to a "static"
@@ -282,13 +283,13 @@ pub(crate) struct TransactionGenParams {
 pub(crate) struct TransactionGen<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + 'static> {
     /// Generate keys for possible read-sets of the transaction based on the above parameters.
     #[proptest(
-        strategy = "vec(vec(any::<Index>(), 1..params.read_size), params.incarnation_alternatives)"
+        strategy = "vec(vec(any::<Index>(), 1..=params.read_size), params.incarnation_alternatives)"
     )]
     reads: Vec<Vec<Index>>,
     /// Generate keys and values for possible write-sets based on above transaction gen parameters.
     /// Based on how the test is configured, some of these "writes" will convert to deltas.
     #[proptest(
-        strategy = "vec(vec((any::<Index>(), any::<V>()), 1..params.output_size), \
+        strategy = "vec(vec((any::<Index>(), any::<V>()), 1..=params.output_size), \
 		    params.incarnation_alternatives)"
     )]
     modifications: Vec<Vec<(Index, V)>>,
@@ -325,6 +326,9 @@ pub(crate) struct MockIncarnation<K, E> {
     pub(crate) writes: Vec<(K, ValueType, bool)>,
     pub(crate) group_reads: Vec<(K, u32)>,
     pub(crate) group_writes: Vec<(K, StateValueMetadata, HashMap<u32, ValueType>)>,
+    // For testing get_module_or_build_with and insert_verified_module interfaces.
+    pub(crate) module_reads: Vec<ModuleId>,
+    pub(crate) module_writes: Vec<ModuleWrite<ValueType>>,
     /// Keys to query group size for - false is querying size, true is querying metadata.
     pub(crate) group_queries: Vec<(K, bool)>,
     /// A vector of keys and corresponding deltas to be produced during mock incarnation execution.
@@ -354,6 +358,8 @@ impl<K, E> MockIncarnation<K, E> {
             group_reads: vec![],
             group_writes: vec![],
             group_queries: vec![],
+            module_reads: vec![],
+            module_writes: vec![],
             deltas,
             events,
             metadata_seeds,
@@ -374,6 +380,8 @@ impl<K, E> MockIncarnation<K, E> {
             group_reads: vec![],
             group_writes: vec![],
             group_queries: vec![],
+            module_reads: vec![],
+            module_writes: vec![],
             deltas,
             events,
             metadata_seeds: [0; 3],
@@ -459,13 +467,31 @@ impl TransactionGenParams {
             incarnation_alternatives: 5,
         }
     }
+
+    // The read and write will be converted to a module read and write.
+    pub fn new_dynamic_modules_only() -> Self {
+        TransactionGenParams {
+            read_size: 1,
+            output_size: 1,
+            incarnation_alternatives: 5,
+        }
+    }
+
+    // Last read and write will be converted to module reads and writes.
+    pub fn new_dynamic_with_modules() -> Self {
+        TransactionGenParams {
+            read_size: 3,
+            output_size: 3,
+            incarnation_alternatives: 5,
+        }
+    }
 }
 
 impl Default for TransactionGenParams {
     fn default() -> Self {
         TransactionGenParams {
             read_size: 10,
-            output_size: 5,
+            output_size: 1,
             incarnation_alternatives: 1,
         }
     }
@@ -621,6 +647,39 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
 
         self.new_mock_write_txn(universe, &is_delta, true, None)
+    }
+
+    pub(crate) fn materialize_modules<
+        K: Clone + Hash + Debug + Eq + Ord,
+        E: Send + Sync + Debug + Clone + TransactionEvent,
+    >(
+        self,
+        universe: &[K],
+    ) -> MockTransaction<KeyType<K>, E> {
+        let universe_len = universe.len();
+        assert_ge!(universe_len, 3, "Universe must have size >= 3");
+
+        let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
+        let mut behaviors = self.new_mock_write_txn(universe, &is_delta, false, None).into_behaviors();
+
+        behaviors.iter_mut().for_each(|behavior| {
+            // Handle writes
+            let (key_to_convert, mut value, _) = behavior.writes.pop().unwrap();
+            let module_id = key_to_module_id(&key_to_convert, universe_len);
+            
+            // Serialize a module and store it in bytes so deserialization can succeed.
+            let mut serialized_bytes = Vec::new();
+            Module::new_for_test(module_id.clone()).serialize(&mut serialized_bytes).expect("Failed to serialize compiled module");
+            value.bytes = Some(serialized_bytes.into());
+            
+            behavior.module_writes = vec![ModuleWrite::new(module_id, value)];
+
+            // Handle reads
+            let (key_to_convert, _) = behavior.reads.pop().unwrap();
+            behavior.module_reads = vec![key_to_module_id(&key_to_convert, universe_len)];
+        });
+
+        MockTransaction::from_behaviors(behaviors)
     }
 
     // Generates a mock txn without group reads/writes and converts it to have group
@@ -812,6 +871,11 @@ where
                 let behavior = &incarnation_behaviors[idx % incarnation_behaviors.len()];
 
                 // Reads
+                let mut module_read_results = vec![];
+                for module_id in behavior.module_reads.iter() {
+                    module_read_results.push(view.fetch_state_value_metadata(&module_id.address(), &module_id.name()).unwrap());
+                }
+
                 let mut read_results = vec![];
                 for (key, not_aggregagor_v1) in behavior.reads.iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
@@ -999,9 +1063,11 @@ where
                         .filter_map(|(k, v, w)| (!w).then_some((k, v)))
                         .collect(),
                     group_writes,
+                    module_writes: behavior.module_writes.clone(),
                     deltas: behavior.deltas.clone(),
                     events: behavior.events.to_vec(),
                     read_results,
+                    module_read_results,
                     read_group_size_or_metadata,
                     materialized_delta_writes: OnceCell::new(),
                     total_gas: behavior.gas,
@@ -1042,9 +1108,11 @@ pub(crate) struct MockOutput<K, E> {
     pub(crate) aggregator_v1_writes: Vec<(K, ValueType)>,
     // Key, metadata_op, inner_ops
     pub(crate) group_writes: Vec<(K, ValueType, ResourceGroupSize, HashMap<u32, ValueType>)>,
+    pub(crate) module_writes: Vec<ModuleWrite<ValueType>>,
     pub(crate) deltas: Vec<(K, DeltaOp)>,
     pub(crate) events: Vec<E>,
     pub(crate) read_results: Vec<Option<Vec<u8>>>,
+    pub(crate) module_read_results: Vec<Option<StateValueMetadata>>,
     pub(crate) read_group_size_or_metadata: Vec<(K, GroupSizeOrMetadata)>,
     pub(crate) materialized_delta_writes: OnceCell<Vec<(K, WriteOp)>>,
     pub(crate) total_gas: u64,
@@ -1068,8 +1136,8 @@ where
             .collect()
     }
 
-    fn module_write_set(&self) -> BTreeMap<K, ModuleWrite<ValueType>> {
-        BTreeMap::new()
+    fn module_write_set(&self) -> Vec<ModuleWrite<ValueType>> {
+        self.module_writes.clone()
     }
 
     // Aggregator v1 writes are included in resource_write_set for tests (writes are produced
@@ -1139,9 +1207,11 @@ where
             writes: vec![],
             aggregator_v1_writes: vec![],
             group_writes: vec![],
+            module_writes: vec![],
             deltas: vec![],
             events: vec![],
             read_results: vec![],
+            module_read_results: vec![],
             read_group_size_or_metadata: vec![],
             materialized_delta_writes: OnceCell::new(),
             total_gas: 0,
@@ -1154,9 +1224,11 @@ where
             writes: vec![],
             aggregator_v1_writes: vec![],
             group_writes: vec![],
+            module_writes: vec![],
             deltas: vec![],
             events: vec![],
             read_results: vec![],
+            module_read_results: vec![],
             read_group_size_or_metadata: vec![],
             materialized_delta_writes: OnceCell::new(),
             total_gas: 0,
@@ -1249,4 +1321,18 @@ impl TransactionEvent for MockEvent {
     fn set_event_data(&mut self, event_data: Vec<u8>) {
         self.event_data = event_data;
     }
+}
+
+// Utility function to convert a key to a module ID
+pub(crate) fn key_to_module_id<K: Clone + Hash + Debug + Ord>(key: &KeyType<K>, universe_len: usize) -> ModuleId {
+    let mut hasher = DefaultHasher::new();
+    key.hash(&mut hasher);
+    let idx = (hasher.finish() % universe_len as u64) as usize;
+    let mut addr = [0u8; AccountAddress::LENGTH];
+    addr[AccountAddress::LENGTH - 1] = idx as u8;
+    addr[AccountAddress::LENGTH - 2] = (idx >> 8) as u8;
+    ModuleId::new(
+        AccountAddress::new(addr),
+        IdentStr::new("test").unwrap().into(),
+    )
 }

@@ -18,9 +18,12 @@ use crate::{
 };
 use aptos_types::{
     block_executor::config::BlockExecutorConfig,
-    state_store::{MockStateView, TStateView},
-    transaction::{BlockExecutableTransaction as Transaction, BlockOutput},
+    state_store::{state_value::StateValue, MockStateView, TStateView},
+    transaction::{BlockExecutableTransaction as Transaction, BlockOutput}, vm::modules::AptosModuleExtension,
 };
+use move_vm_runtime::Module;
+use move_vm_types::code::ModuleCode;
+use move_core_types::language_storage::ModuleId;
 use num_cpus;
 use proptest::{
     collection::vec,
@@ -56,12 +59,45 @@ pub(crate) fn create_executor_thread_pool() -> Arc<rayon::ThreadPool> {
     )
 }
 
+/// Populates a module cache manager guard with empty modules for testing.
+/// This function creates empty modules for each ModuleId in the provided list and adds them to the guard's module cache.
+///
+/// # Arguments
+/// * `guard` - The AptosModuleCacheManagerGuard to populate with empty modules
+/// * `module_ids` - A slice of ModuleIds to create empty modules for
+///
+/// # Returns
+/// The number of modules successfully added to the cache
+pub(crate) fn populate_guard_with_modules(
+    guard: &mut AptosModuleCacheManagerGuard<'_>,
+    module_ids: &[ModuleId],
+) {
+    for module_id in module_ids {
+        // Create an empty module for testing with Module::new_for_test
+        let module = Module::new_for_test(module_id.clone());
+        
+        // Serialize the module
+        let mut serialized_bytes = Vec::new();
+        module.serialize(&mut serialized_bytes).expect("Failed to serialize compiled module");
+        
+        // Create a ModuleCode::verified instance with the module
+        let module_code = Arc::new(ModuleCode::from_arced_verified(
+            Arc::new(module), 
+            Arc::new(AptosModuleExtension::new(StateValue::new_legacy(serialized_bytes.into())))
+        ));
+        
+        // Add the module to the cache
+        guard.module_cache_mut().insert(module_id.clone(), module_code);
+    }
+}
+
 pub(crate) fn execute_block_parallel<TxnType, ViewType, Provider>(
     executor_thread_pool: Arc<rayon::ThreadPool>,
     block_gas_limit: Option<u64>,
     block_stm_v2: bool,
     txn_provider: &Provider,
     data_view: &ViewType,
+    all_module_ids: Option<&[ModuleId]>,
 ) -> Result<BlockOutput<MockOutput<KeyType<[u8; 32]>, MockEvent>>, ()>
 where
     TxnType: Transaction + Debug + Clone + Send + Sync + 'static,
@@ -70,6 +106,12 @@ where
     MockTask<KeyType<[u8; 32]>, MockEvent>: ExecutorTask<Txn = TxnType>,
 {
     let mut guard = AptosModuleCacheManagerGuard::none();
+    
+    // If all_module_ids is provided, populate the guard with empty modules
+    if let Some(module_ids) = all_module_ids {
+        populate_guard_with_modules(&mut guard, module_ids);
+    }
+    
     let mut config = BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), block_gas_limit);
     config.local.block_stm_v2 = block_stm_v2;
 
@@ -111,7 +153,7 @@ pub(crate) fn generate_universe_and_transactions(
     (universe, transaction_gen)
 }
 
-fn run_transactions_resources(
+pub(crate) fn run_transactions_resources(
     universe_size: usize,
     transaction_count: usize,
     abort_count: usize,
@@ -180,6 +222,7 @@ fn run_transactions_resources(
                     block_stm_v2,
                     &txn_provider,
                     &state_view,
+                    None,
                 );
 
                 BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)

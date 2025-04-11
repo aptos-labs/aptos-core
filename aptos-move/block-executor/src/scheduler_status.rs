@@ -141,7 +141,7 @@ pub(crate) enum DependencyResolution {
     None,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum StatusEnum {
     PendingScheduling,
     Executing,
@@ -636,6 +636,10 @@ impl ExecutionStatus {
 
     pub(crate) fn last_incarnation(&self) -> Incarnation {
         self.inner_status.lock().incarnation()
+    }
+
+    pub(crate) fn status(&self) -> StatusEnum {
+        self.inner_status.lock().status.clone()
     }
 
     // Check that can be invoked during an ongoing execution, of whether a try_abort for its

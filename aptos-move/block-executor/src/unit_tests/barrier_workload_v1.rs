@@ -140,8 +140,8 @@ impl TransactionOutput for TestOutput {
             .collect()
     }
 
-    fn module_write_set(&self) -> BTreeMap<TestKey, ModuleWrite<TestValue>> {
-        BTreeMap::new()
+    fn module_write_set(&self) -> Vec<ModuleWrite<TestValue>> {
+        Vec::new()
     }
 
     fn aggregator_v1_write_set(&self) -> BTreeMap<TestKey, TestValue> {
