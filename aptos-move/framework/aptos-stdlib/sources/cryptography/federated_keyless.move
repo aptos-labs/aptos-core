@@ -7,6 +7,7 @@ module aptos_std::federated_keyless {
 
     #[test_only]
     use aptos_std::bcs;
+    #[test_only]
     use std::string::{utf8};
 
     //
