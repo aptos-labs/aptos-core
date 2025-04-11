@@ -82,7 +82,7 @@ pub struct ConsensusObserver {
     // The ordered block store (containing ordered blocks that are ready for execution)
     ordered_block_store: Arc<Mutex<OrderedBlockStore>>,
 
-    // The pending block store (containing pending blocks that are without payloads)
+    // The pending block store (containing pending blocks not yet committed)
     pending_block_store: Arc<Mutex<PendingBlockStore>>,
 
     // The execution client to the buffer manager
@@ -165,6 +165,50 @@ impl ConsensusObserver {
         }
     }
 
+    /// Returns true iff all block dependencies are satisfied for the observed
+    /// ordered block. If the block is part of an execution pool window, this will
+    /// require all blocks and payloads in the window to be available. Otherwise,
+    /// it will just require the payload for the ordered block to be available.
+    fn all_block_dependencies_satisfied(
+        &self,
+        observed_ordered_block: &ObservedOrderedBlock,
+    ) -> bool {
+        match observed_ordered_block {
+            ObservedOrderedBlock::Ordered(ordered_block) => {
+                if self.get_execution_pool_window_size().is_some() {
+                    // Log an error and return false (execution pool is enabled)
+                    error!(
+                            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                                "Execution pool is enabled, but found a block without an execution window: {:?}",
+                                ordered_block.proof_block_info()
+                            ))
+                        );
+                    false
+                } else {
+                    self.all_payloads_exist(ordered_block)
+                }
+            },
+            ObservedOrderedBlock::OrderedWithWindow(ordered_block_with_window) => {
+                match self.get_execution_pool_window_size() {
+                    Some(window_size) => self.all_blocks_and_payloads_exist(
+                        ordered_block_with_window.ordered_block(),
+                        window_size,
+                    ),
+                    None => {
+                        // Log an error and return false (execution pool is disabled)
+                        error!(
+                                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                                    "Execution pool is disabled, but found a block with an execution window: {:?}",
+                                    ordered_block_with_window.ordered_block().proof_block_info()
+                                ))
+                            );
+                        false
+                    },
+                }
+            },
+        }
+    }
+
     /// Returns true iff all blocks and payloads exist for the ordered block with window
     fn all_blocks_and_payloads_exist(
         &self,
@@ -218,6 +262,33 @@ impl ConsensusObserver {
         self.block_payload_store
             .lock()
             .all_payloads_exist(ordered_block.blocks())
+    }
+
+    /// Checks if the block dependencies are satisfied for the given ordered
+    /// block, and if so, processes the block based on the ordered block type.
+    async fn check_and_process_ordered_block(
+        &mut self,
+        pending_block_with_metadata: Arc<PendingBlockWithMetadata>,
+    ) {
+        // If the block dependencies are not satisfied, return early
+        let observed_ordered_block = pending_block_with_metadata.observed_ordered_block();
+        if !self
+            .all_block_dependencies_satisfied(pending_block_with_metadata.observed_ordered_block())
+        {
+            return; // Block dependencies are not satisfied
+        }
+
+        // Otherwise, process the block based on the ordered block type
+        match observed_ordered_block {
+            ObservedOrderedBlock::Ordered(_) => {
+                self.process_ordered_block(pending_block_with_metadata)
+                    .await;
+            },
+            ObservedOrderedBlock::OrderedWithWindow(_) => {
+                self.process_ordered_block_with_window(pending_block_with_metadata)
+                    .await;
+            },
+        }
     }
 
     /// Checks the progress of the consensus observer
@@ -276,7 +347,7 @@ impl ConsensusObserver {
         self.block_payload_store.lock().clear_all_payloads();
 
         // Clear the pending blocks
-        self.pending_block_store.lock().clear_missing_blocks();
+        self.pending_block_store.lock().clear_pending_blocks();
 
         // Clear the ordered blocks
         self.ordered_block_store.lock().clear_all_ordered_blocks();
@@ -317,23 +388,27 @@ impl ConsensusObserver {
             ))
         );
 
+        // If the new pipeline is enabled, build the pipeline for the ordered blocks
         if self.pipeline_enabled() {
             let block = ordered_block.first_block();
             let mut parent_fut = if let Some(futs) = self.get_parent_pipeline_futs(&block) {
                 Some(futs)
             } else {
                 warn!(
-                            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                                "Parent block's pipeline futures for ordered block is missing! Ignoring: {:?}",
-                                ordered_block.proof_block_info()
-                            ))
-                        );
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "Parent block's pipeline futures for ordered block is missing! Ignoring: {:?}",
+                        ordered_block.proof_block_info()
+                    ))
+                );
                 return;
             };
+
             for block in ordered_block.blocks() {
                 let commit_callback = self.active_observer_state.create_commit_callback(
-                    self.ordered_block_store.clone(),
                     self.block_payload_store.clone(),
+                    self.pending_block_store.clone(),
+                    self.ordered_block_store.clone(),
+                    self.get_execution_pool_window_size(),
                 );
                 self.pipeline_builder().build(
                     block,
@@ -343,12 +418,15 @@ impl ConsensusObserver {
                 parent_fut = Some(block.pipeline_futs().expect("pipeline futures just built"));
             }
         }
+
         // Create the commit callback (to be called after the execution pipeline)
         let commit_callback = self
             .active_observer_state
             .create_commit_callback_deprecated(
-                self.ordered_block_store.clone(),
                 self.block_payload_store.clone(),
+                self.pending_block_store.clone(),
+                self.ordered_block_store.clone(),
+                self.get_execution_pool_window_size(),
             );
 
         // Send the ordered block to the execution pipeline
@@ -451,22 +529,6 @@ impl ConsensusObserver {
         }
     }
 
-    /// Orders any ready pending blocks for the given epoch and round
-    async fn order_ready_pending_block(&mut self, block_epoch: u64, block_round: Round) {
-        // Get any ready ordered block
-        let pending_block_with_metadata = self.pending_block_store.lock().remove_ready_block(
-            block_epoch,
-            block_round,
-            self.block_payload_store.clone(),
-        );
-
-        // Process the ready ordered block (if it exists)
-        if let Some(pending_block_with_metadata) = pending_block_with_metadata {
-            self.process_ordered_block(pending_block_with_metadata)
-                .await;
-        }
-    }
-
     /// Processes the block payload message
     async fn process_block_payload_message(
         &mut self,
@@ -539,16 +601,25 @@ impl ConsensusObserver {
             metrics::BLOCK_PAYLOAD_LABEL,
         );
 
-        // Update the payload store with the payload
+        // Insert the block payload into the payload store
+        let block_payload_hash = block_payload.block().id();
         self.block_payload_store
             .lock()
             .insert_block_payload(block_payload, verified_payload);
 
-        // Check if there are blocks that were missing payloads but are
-        // now ready because of the new payload. Note: this should only
-        // be done if the payload has been verified correctly.
-        if verified_payload {
-            self.order_ready_pending_block(block_epoch, block_round)
+        // If the payload has not been verified, we can't process it yet
+        if !verified_payload {
+            return;
+        }
+
+        // Otherwise, fetch and process any pending block for the payload
+        let maybe_pending_block_with_metadata = self
+            .pending_block_store
+            .lock()
+            .get_pending_block_by_hash(block_payload_hash)
+            .clone();
+        if let Some(pending_block_with_metadata) = maybe_pending_block_with_metadata {
+            self.check_and_process_ordered_block(pending_block_with_metadata)
                 .await;
         }
     }
@@ -630,12 +701,7 @@ impl ConsensusObserver {
             // Update the root and clear the pending blocks (up to the commit).
             self.active_observer_state
                 .update_root(commit_decision.commit_proof().clone());
-            self.block_payload_store
-                .lock()
-                .remove_blocks_for_epoch_round(commit_epoch, commit_round);
-            self.ordered_block_store
-                .lock()
-                .remove_blocks_for_commit(commit_decision.commit_proof());
+            self.update_block_stores_for_commit(&commit_decision);
 
             // Start state syncing to the commit decision
             self.state_sync_manager
@@ -647,52 +713,15 @@ impl ConsensusObserver {
     /// the commit decision was successfully processed. Note: this function
     /// assumes the commit decision has already been verified.
     fn process_commit_decision_for_pending_block(&self, commit_decision: &CommitDecision) -> bool {
-        // Get the pending block for the commit decision
-        let pending_block = self
+        // Get the observed ordered block for the commit decision
+        let maybe_observed_ordered_block = self
             .ordered_block_store
             .lock()
             .get_observed_ordered_block(commit_decision.epoch(), commit_decision.round());
 
-        // Process the pending block
-        if let Some(pending_block) = pending_block {
-            // Check if all block dependencies exist for the pending block
-            let block_dependencies_exist = match pending_block {
-                ObservedOrderedBlock::Ordered(ordered) => {
-                    if self.get_execution_pool_window_size().is_some() {
-                        // Log an error and return false (execution pool is enabled)
-                        error!(
-                            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                                "Execution pool is enabled, but found a pending ordered block: {:?}",
-                                ordered.proof_block_info()
-                            ))
-                        );
-                        false
-                    } else {
-                        self.all_payloads_exist(&ordered)
-                    }
-                },
-                ObservedOrderedBlock::OrderedWithWindow(ordered_with_window) => {
-                    match self.get_execution_pool_window_size() {
-                        Some(window_size) => self.all_blocks_and_payloads_exist(
-                            ordered_with_window.ordered_block(),
-                            window_size,
-                        ),
-                        None => {
-                            // Log an error and return false (execution pool is disabled)
-                            error!(
-                                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                                    "Execution pool is disabled, but found a pending ordered block with window: {:?}",
-                                    ordered_with_window.ordered_block().proof_block_info()
-                                ))
-                            );
-                            false
-                        },
-                    }
-                },
-            };
-
-            // If all dependencies exist, add the commit decision to the pending blocks
-            if block_dependencies_exist {
+        // Process the observed ordered block (if all dependencies are satisfied)
+        if let Some(observed_ordered_block) = maybe_observed_ordered_block {
+            if self.all_block_dependencies_satisfied(&observed_ordered_block) {
                 debug!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                         "Adding decision to pending block: {}",
@@ -850,19 +879,17 @@ impl ConsensusObserver {
         let pending_block_with_metadata = PendingBlockWithMetadata::new_with_arc(
             peer_network_id,
             message_received_time,
-            observed_ordered_block,
+            observed_ordered_block.clone(),
         );
 
-        // If all payloads exist, process the block. Otherwise, store it
-        // in the pending block store and wait for the payloads to arrive.
-        if self.all_payloads_exist(pending_block_with_metadata.ordered_block()) {
-            self.process_ordered_block(pending_block_with_metadata)
-                .await;
-        } else {
-            self.pending_block_store
-                .lock()
-                .insert_pending_block(pending_block_with_metadata);
-        }
+        // Insert the pending block into the pending block store
+        self.pending_block_store
+            .lock()
+            .insert_pending_block(pending_block_with_metadata.clone());
+
+        // Process the pending block with metadata
+        self.check_and_process_ordered_block(pending_block_with_metadata)
+            .await
     }
 
     /// Processes the ordered block. This assumes the ordered block
@@ -1073,19 +1100,14 @@ impl ConsensusObserver {
             observed_ordered_block,
         );
 
-        // If all blocks and payloads exist, process the block. Otherwise, store it
-        // in the pending block store and wait for the blocks and payloads to arrive.
-        if self.all_blocks_and_payloads_exist(
-            pending_block_with_metadata.ordered_block(),
-            execution_pool_window_size,
-        ) {
-            self.process_ordered_block_with_window(pending_block_with_metadata)
-                .await;
-        } else {
-            self.pending_block_store
-                .lock()
-                .insert_pending_block(pending_block_with_metadata);
-        }
+        // Insert the pending block into the pending block store
+        self.pending_block_store
+            .lock()
+            .insert_pending_block(pending_block_with_metadata.clone());
+
+        // Process the pending block with metadata
+        self.check_and_process_ordered_block(pending_block_with_metadata)
+            .await
     }
 
     /// Processes the ordered block with window. This assumes the ordered block
@@ -1219,15 +1241,22 @@ impl ConsensusObserver {
 
             // Verify the block payloads for the new epoch
             let new_epoch_state = self.get_epoch_state();
-            let verified_payload_rounds = self
+            let verified_payload_hashes = self
                 .block_payload_store
                 .lock()
                 .verify_payload_signatures(&new_epoch_state);
 
             // Order all the pending blocks that are now ready (these were buffered during state sync)
-            for payload_round in verified_payload_rounds {
-                self.order_ready_pending_block(new_epoch_state.epoch, payload_round)
-                    .await;
+            for block_payload_hash in verified_payload_hashes {
+                let maybe_pending_block_with_metadata = self
+                    .pending_block_store
+                    .lock()
+                    .get_pending_block_by_hash(block_payload_hash)
+                    .clone();
+                if let Some(pending_block_with_metadata) = maybe_pending_block_with_metadata {
+                    self.check_and_process_ordered_block(pending_block_with_metadata)
+                        .await;
+                }
             }
         };
 
@@ -1246,6 +1275,25 @@ impl ConsensusObserver {
                 self.forward_commit_decision(commit_decision.clone());
             }
         }
+    }
+
+    /// Updates all block stores (i.e., payload store, pending block store,
+    /// and the ordered block store) for the given commit decision.
+    fn update_block_stores_for_commit(&mut self, commit_decision: &CommitDecision) {
+        // Get the execution pool window size and commit proof
+        let execution_pool_window_size = self.get_execution_pool_window_size();
+        let commit_proof = commit_decision.commit_proof();
+
+        // Update all block stores up to the commit decision
+        self.block_payload_store
+            .lock()
+            .remove_block_payloads_for_commit(commit_proof, execution_pool_window_size);
+        self.pending_block_store
+            .lock()
+            .remove_blocks_for_commit(commit_proof, execution_pool_window_size);
+        self.ordered_block_store
+            .lock()
+            .remove_blocks_for_commit(commit_proof);
     }
 
     /// Updates the metrics for the processed blocks
