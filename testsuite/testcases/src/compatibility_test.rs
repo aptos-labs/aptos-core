@@ -4,8 +4,7 @@
 
 use crate::{batch_update_gradually, generate_traffic};
 use anyhow::bail;
-use aptos_forge::{NetworkContextSynchronizer, NetworkTest, Result, SwarmExt, Test, Version};
-use aptos_sdk::types::PeerId;
+use aptos_forge::{NetworkContextSynchronizer, NetworkTest, Result, SwarmExt, Test};
 use async_trait::async_trait;
 use log::info;
 use std::ops::DerefMut;
@@ -23,42 +22,11 @@ impl Test for SimpleValidatorUpgrade {
     }
 }
 
-fn upgrade(
-    ctxa: NetworkContextSynchronizer,
-    // upgrade args
-    validators_to_update: &[PeerId],
-    version: &Version,
-    wait_until_healthy: bool,
-    delay: Duration,
-    max_wait: Duration,
-) -> Result<()> {
-    let mut upgrade_result: Result<()> = Ok(());
-    tokio_scoped::scope(|scopev| {
-        // do upgrade
-        scopev.spawn(async {
-            info!("upgrade thread start");
-            upgrade_result = batch_update_gradually(
-                ctxa,
-                validators_to_update,
-                version,
-                wait_until_healthy,
-                delay,
-                max_wait,
-            )
-            .await;
-            info!("upgrade thread done");
-        });
-    });
-
-    upgrade_result?;
-    Ok(())
-}
-
 #[async_trait]
 impl NetworkTest for SimpleValidatorUpgrade {
     async fn run<'a>(&self, ctxa: NetworkContextSynchronizer<'a>) -> Result<()> {
         let upgrade_wait_for_healthy = true;
-        let upgrade_node_delay = Duration::from_secs(10);
+        let upgrade_node_delay = Duration::from_secs(60);
         let upgrade_max_wait = Duration::from_secs(40);
 
         let epoch_duration = Duration::from_secs(Self::EPOCH_DURATION_SECS);
@@ -141,14 +109,15 @@ impl NetworkTest for SimpleValidatorUpgrade {
         );
         info!("{}", msg);
         ctxa.report_text(msg).await;
-        upgrade(
+        batch_update_gradually(
             ctxa.clone(),
             &[first_node],
             &new_version,
             upgrade_wait_for_healthy,
             upgrade_node_delay,
             upgrade_max_wait,
-        )?;
+        )
+        .await?;
         // Generate some traffic
         {
             let mut ctx_locker = ctxa.ctx.lock().await;
@@ -169,14 +138,15 @@ impl NetworkTest for SimpleValidatorUpgrade {
         }
 
         // upgrade the rest of the first half
-        upgrade(
+        batch_update_gradually(
             ctxa.clone(),
             &first_batch,
             &new_version,
             upgrade_wait_for_healthy,
             upgrade_node_delay,
             upgrade_max_wait,
-        )?;
+        )
+        .await?;
         {
             let mut ctx_locker = ctxa.ctx.lock().await;
             let ctx = ctx_locker.deref_mut();
@@ -195,14 +165,15 @@ impl NetworkTest for SimpleValidatorUpgrade {
             info!("{}", msg);
             ctx.report.report_text(msg);
         }
-        upgrade(
+        batch_update_gradually(
             ctxa.clone(),
             &second_batch,
             &new_version,
             upgrade_wait_for_healthy,
             upgrade_node_delay,
             upgrade_max_wait,
-        )?;
+        )
+        .await?;
         {
             let mut ctx_locker = ctxa.ctx.lock().await;
             let ctx = ctx_locker.deref_mut();
