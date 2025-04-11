@@ -3,7 +3,6 @@
 
 use crate::{
     consensus_observer::{
-        network::observer_message::ConsensusObserverMessage,
         observer::payload_store::BlockPayloadStatus,
         publisher::consensus_publisher::ConsensusPublisher,
     },
@@ -59,11 +58,10 @@ async fn get_transactions_for_observer(
     // If the payload is valid, publish it to any downstream observers
     let transaction_payload = block_payload.transaction_payload();
     if let Some(consensus_publisher) = consensus_publisher {
-        let message = ConsensusObserverMessage::new_block_payload_message(
+        consensus_publisher.publish_block_payload(
             block.gen_block_info(HashValue::zero(), 0, None),
             transaction_payload.clone(),
         );
-        consensus_publisher.publish_message(message);
     }
 
     // Return the transactions and the transaction limit

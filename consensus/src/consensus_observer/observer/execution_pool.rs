@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(test)]
-use crate::consensus_observer::network::observer_message::ExecutionPoolWindow;
 use crate::{
     consensus_observer::{
         common::error::Error,
@@ -44,10 +42,7 @@ impl ObservedOrderedBlock {
         if OsRng.gen::<u8>() % 2 == 0 {
             ObservedOrderedBlock::new(ordered_block.clone())
         } else {
-            let ordered_block_with_window = OrderedBlockWithWindow::new(
-                ordered_block.clone(),
-                ExecutionPoolWindow::new(vec![]),
-            );
+            let ordered_block_with_window = OrderedBlockWithWindow::new(ordered_block.clone());
             ObservedOrderedBlock::new_with_window(ordered_block_with_window)
         }
     }
@@ -57,8 +52,7 @@ impl ObservedOrderedBlock {
         match self {
             Self::Ordered(ordered_block) => ordered_block,
             Self::OrderedWithWindow(ordered_block_with_window) => {
-                let (ordered_block, _) = ordered_block_with_window.into_parts();
-                ordered_block
+                ordered_block_with_window.consume_ordered_block()
             },
         }
     }
@@ -683,8 +677,7 @@ mod tests {
         ordered_block: &OrderedBlock,
     ) {
         // Create an observed ordered block
-        let ordered_block_with_window =
-            OrderedBlockWithWindow::new(ordered_block.clone(), ExecutionPoolWindow::new(vec![]));
+        let ordered_block_with_window = OrderedBlockWithWindow::new(ordered_block.clone());
         let observed_ordered_block =
             ObservedOrderedBlock::new_with_window(ordered_block_with_window);
 

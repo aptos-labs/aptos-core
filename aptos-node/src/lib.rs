@@ -722,6 +722,7 @@ pub fn setup_environment_and_start_node(
         mut event_subscription_service,
         mempool_reconfig_subscription,
         consensus_observer_reconfig_subscription,
+        consensus_publisher_reconfig_subscription,
         consensus_reconfig_subscription,
         dkg_subscriptions,
         jwk_consensus_subscriptions,
@@ -829,6 +830,7 @@ pub fn setup_environment_and_start_node(
             consensus_to_mempool_sender.clone(),
             db_rw.clone(),
             consensus_observer_reconfig_subscription,
+            consensus_publisher_reconfig_subscription,
         );
 
     // Create the consensus runtime (if enabled)
