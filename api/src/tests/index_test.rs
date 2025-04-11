@@ -2,13 +2,14 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use super::new_test_context;
 use aptos_api_test_context::current_function_name;
 use serde_json::json;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_index() {
-    let mut context = new_test_context(current_function_name!());
+    let mut context = new_test_context(current_function_name!()).await;
     let resp = context.get("/").await;
     context.check_golden_output(resp);
 }
@@ -17,7 +18,7 @@ async fn test_get_index() {
 #[ignore]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_returns_not_found_for_the_invalid_path() {
-    let mut context = new_test_context(current_function_name!());
+    let mut context = new_test_context(current_function_name!()).await;
     let resp = context.expect_status_code(404).get("/invalid_path").await;
     context.check_golden_output(resp);
 }
@@ -26,7 +27,7 @@ async fn test_returns_not_found_for_the_invalid_path() {
 #[ignore]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_return_bad_request_if_method_not_allowed() {
-    let mut context = new_test_context(current_function_name!());
+    let mut context = new_test_context(current_function_name!()).await;
     let resp = context
         .expect_status_code(405)
         .post("/accounts/0x1/resources", json!({}))
@@ -36,7 +37,7 @@ async fn test_return_bad_request_if_method_not_allowed() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_health_check() {
-    let context = new_test_context(current_function_name!());
+    let context = new_test_context(current_function_name!()).await;
     let resp = context
         .reply(warp::test::request().method("GET").path("/v1/-/healthy"))
         .await;
@@ -45,7 +46,7 @@ async fn test_health_check() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_openapi_spec() {
-    let context = new_test_context(current_function_name!());
+    let context = new_test_context(current_function_name!()).await;
     let paths = ["/spec.yaml", "/spec.json", "/spec"];
     for path in paths {
         let req = warp::test::request()
@@ -58,7 +59,7 @@ async fn test_openapi_spec() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_cors() {
-    let context = new_test_context(current_function_name!());
+    let context = new_test_context(current_function_name!()).await;
     let paths = ["/spec.yaml", "/spec", "/", "/transactions"];
     for path in paths {
         let req = warp::test::request()
@@ -76,7 +77,7 @@ async fn test_cors() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_cors_forbidden() {
-    let mut context = new_test_context(current_function_name!());
+    let mut context = new_test_context(current_function_name!()).await;
     let paths = ["/spec.yaml", "/spec", "/", "/transactions"];
     for path in paths {
         let req = warp::test::request()
@@ -94,7 +95,7 @@ async fn test_cors_forbidden() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_cors_on_non_200_responses() {
-    let context = new_test_context(current_function_name!());
+    let context = new_test_context(current_function_name!()).await;
     // Preflight must work no matter what
     let preflight_req = warp::test::request()
         .header("origin", "test")
@@ -126,7 +127,7 @@ async fn test_cors_on_non_200_responses() {
 /// Verifies gzip compression is applied when accept-encoding header is present
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_compression_middleware() {
-    let context = new_test_context(current_function_name!());
+    let context = new_test_context(current_function_name!()).await;
 
     let req = warp::test::request()
         .header("accept-encoding", "gzip")

@@ -172,10 +172,13 @@ fn verify_txn_not_in_store(
     assert!(transaction_store.get_transaction(index).is_err());
     // Ensure that transaction by account store has been pruned
     if let Some(txn) = txns.get(index as usize).unwrap().try_as_signed_user_txn() {
-        assert!(transaction_store
-            .get_account_transaction_version(txn.sender(), txn.sequence_number(), ledger_version,)
-            .unwrap()
-            .is_none());
+        if let ReplayProtector::SequenceNumber(seq_num) = txn.replay_protector() {
+            assert!(transaction_store
+                .get_account_ordered_transaction_version(txn.sender(), seq_num, ledger_version)
+                .unwrap()
+                .is_none()
+            );
+        }
     }
 }
 
@@ -192,13 +195,15 @@ fn verify_txn_in_store(
         index,
     );
     if let Some(txn) = txns.get(index as usize).unwrap().try_as_signed_user_txn() {
-        verify_transaction_in_account_txn_by_version_index(
-            transaction_store,
-            index,
-            txn.sender(),
-            txn.sequence_number(),
-            ledger_version,
-        );
+        if let ReplayProtector::SequenceNumber(seq_num) = txn.replay_protector() {
+            verify_transaction_in_account_txn_by_version_index(
+                transaction_store,
+                index,
+                txn.sender(),
+                txn.sequence_number(),
+                ledger_version,
+            );
+        }
     }
     // Ensure that transaction accumulator is in DB. This can be done by trying
     // to read transaction proof
@@ -288,7 +293,7 @@ fn verify_transaction_in_account_txn_by_version_index(
     ledger_version: Version,
 ) {
     let transaction = transaction_store
-        .get_account_transaction_version(address, sequence_number, ledger_version)
+        .get_account_ordered_transaction_version(address, sequence_number, ledger_version)
         .unwrap()
         .unwrap();
     assert_eq!(transaction, expected_value)

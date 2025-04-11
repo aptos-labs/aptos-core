@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_success, build_package, tests::common, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::BuildOptions;
@@ -10,6 +11,7 @@ use aptos_types::{
     transaction::{EntryFunction, TransactionPayload},
 };
 use move_core_types::{ident_str, language_storage::ModuleId, parser::parse_struct_tag};
+use rstest::rstest;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
@@ -21,23 +23,44 @@ struct ModuleData {
 }
 
 const APTOS_COIN_STRUCT_STRING: &str = "0x1::aptos_coin::AptosCoin";
-const CHLOE_COIN_STRUCT_STRING: &str =
-    "0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5::simple_defi::ChloesCoin";
 const EXCHANGE_FROM_FUNCTION: &str = "exchange_from_entry";
 const EXCHANGE_TO_FUNCTION: &str = "exchange_to_entry";
 
-#[test]
-fn exchange_e2e_test() {
-    let mut h = MoveHarness::new();
+#[rstest(
+    origin_stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn exchange_e2e_test(
+    origin_stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
     // create an origin account and create a resource address from it
-    let origin_account = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let origin_account = h.new_account_with_key_pair(
+        if origin_stateless_account {
+            None
+        } else {
+            Some(0)
+        },
+    );
     let resource_address = create_resource_address(*origin_account.address(), vec![].as_slice());
 
     let mut build_options = BuildOptions::default();
     build_options
         .named_addresses
         .insert("resource_account".to_string(), resource_address);
+    build_options
+        .named_addresses
+        .insert("source_addr".to_string(), *origin_account.address());
     let package = build_package(
         common::test_dir_path("../../../move-examples/resource_account"),
         build_options,
@@ -74,7 +97,9 @@ fn exchange_e2e_test() {
     );
 
     // verify that exchange_to() and exchange_from() are working properly
-    let test_user_account = h.new_account_with_balance_and_sequence_number(20, 10);
+    // We are not testing with `test_user_account` being a stateless account, as the account creation costs
+    // then need to be factored into the below assertion statements.
+    let test_user_account = h.new_account_with_balance_and_sequence_number(20, Some(0));
     assert_coin_balance(
         &mut h,
         test_user_account.address(),
@@ -83,24 +108,46 @@ fn exchange_e2e_test() {
     );
 
     // swap from 5 aptos coins to 5 chloe's coins
-    run_exchange_function(&mut h, &test_user_account, EXCHANGE_TO_FUNCTION, 5, 10);
+    run_exchange_function(
+        &mut h,
+        resource_address,
+        &test_user_account,
+        EXCHANGE_TO_FUNCTION,
+        5,
+        0,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     assert_coin_balance(
         &mut h,
         test_user_account.address(),
         APTOS_COIN_STRUCT_STRING,
         15,
     );
+
+    let chloe_coin_struct_string: &str =
+        &format!("0x{}::simple_defi::ChloesCoin", resource_address.to_hex());
+
     assert_coin_balance(
         &mut h,
         test_user_account.address(),
-        CHLOE_COIN_STRUCT_STRING,
+        chloe_coin_struct_string,
         5,
     );
     assert_coin_balance(&mut h, &resource_address, APTOS_COIN_STRUCT_STRING, 5);
-    assert_coin_balance(&mut h, &resource_address, CHLOE_COIN_STRUCT_STRING, 0);
+    assert_coin_balance(&mut h, &resource_address, chloe_coin_struct_string, 0);
 
     // swap to 3 aptos coins from 3 chloe's aptos coins
-    run_exchange_function(&mut h, &test_user_account, EXCHANGE_FROM_FUNCTION, 3, 11);
+    run_exchange_function(
+        &mut h,
+        resource_address,
+        &test_user_account,
+        EXCHANGE_FROM_FUNCTION,
+        3,
+        1,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     assert_coin_balance(
         &mut h,
         test_user_account.address(),
@@ -110,11 +157,11 @@ fn exchange_e2e_test() {
     assert_coin_balance(
         &mut h,
         test_user_account.address(),
-        CHLOE_COIN_STRUCT_STRING,
+        chloe_coin_struct_string,
         2,
     );
     assert_coin_balance(&mut h, &resource_address, APTOS_COIN_STRUCT_STRING, 2);
-    assert_coin_balance(&mut h, &resource_address, CHLOE_COIN_STRUCT_STRING, 0);
+    assert_coin_balance(&mut h, &resource_address, chloe_coin_struct_string, 0);
 }
 
 /// check the coin store balance of `struct_tag_string` CoinType at the given `address` is the same as the `expected_coin_amount`
@@ -141,19 +188,16 @@ fn assert_coin_balance(
 /// run the specified exchange function and check if it runs successfully
 fn run_exchange_function(
     h: &mut MoveHarness,
+    resource_address: AccountAddress,
     account: &Account,
     function: &'static str,
     amount: u64,
     sequence_number: u64,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) {
     let exchange_payload = TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            create_resource_address(
-                AccountAddress::from_hex_literal("0xcafe").unwrap(),
-                vec![].as_slice(),
-            ),
-            ident_str!("simple_defi").to_owned(),
-        ),
+        ModuleId::new(resource_address, ident_str!("simple_defi").to_owned()),
         ident_str!(function).to_owned(),
         vec![],
         vec![bcs::to_bytes::<u64>(&amount).unwrap()],
@@ -161,13 +205,14 @@ fn run_exchange_function(
 
     // set the transaction gas unit price to 0 for testing purpose,
     // so we'd know for sure how many remaining coins are in the user's CoinStore
-    assert_success!(h.run(
-        account
-            .transaction()
-            .sequence_number(sequence_number)
-            .max_gas_amount(100_000)
-            .gas_unit_price(0)
-            .payload(exchange_payload)
-            .sign()
-    ));
+    let txn = account
+        .transaction()
+        .sequence_number(sequence_number)
+        .max_gas_amount(100_000)
+        .gas_unit_price(0)
+        .payload(exchange_payload)
+        .current_time(h.executor.get_block_time_seconds())
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
+        .sign();
+    assert_success!(h.run(txn));
 }

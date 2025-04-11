@@ -4,7 +4,7 @@
   "sequence_number": "0",
   "max_gas_amount": "100000000",
   "gas_unit_price": "0",
-  "expiration_timestamp_secs": "18446744073709551615",
+  "expiration_timestamp_secs": "59",
   "payload": {
     "function": "0x1::aptos_account::create_account",
     "type_arguments": [],
@@ -15,7 +15,8 @@
   },
   "signature": {
     "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-    "signature": "0x95915d42cd822b6195581e9be3c164b70afeb9228ebb68c2e3f14240e3f43a164caabae8096163c6a341fc3830b36618b4619b7d5f2edcd603690e91a62fdb05",
+    "signature": "0x6345f2757047aa9a5b8e870d300deccb6ec827811666cbabaac728d798fe4564f89143c28c7a76d945ed65bb2ac91474a0939dd51d81d37df78d1388c9b65f0a",
     "type": "ed25519_signature"
-  }
+  },
+  "replay_protection_nonce": null
 }
