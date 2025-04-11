@@ -14,13 +14,13 @@ use crate::{
 };
 use anyhow::Context as anyhowContext;
 use aptos_api_types::{
-    AptosErrorCode, AsConverter, MoveValue, ViewFunction, ViewRequest, MAX_RECURSIVE_TYPES_ALLOWED,
-    U64,
+    AptosErrorCode, AsConverter, MoveType, MoveValue, ViewFunction, ViewRequest,
+    MAX_RECURSIVE_TYPES_ALLOWED, U64,
 };
 use aptos_bcs_utils::serialize_uleb128;
 use aptos_vm::AptosVM;
 use itertools::Itertools;
-use move_core_types::language_storage::TypeTag;
+use move_core_types::language_storage::{StructTag, TypeTag};
 use poem_openapi::{param::Query, payload::Json, ApiRequest, OpenApi};
 use std::sync::Arc;
 
@@ -169,11 +169,7 @@ fn view_request(
             let return_types = state_view
                 .as_converter(context.db.clone(), context.indexer_reader.clone())
                 .function_return_types(&view_function)
-                .and_then(|tys| {
-                    tys.iter()
-                        .map(TypeTag::try_from)
-                        .collect::<anyhow::Result<Vec<_>>>()
-                })
+                .and_then(|tys| convert_return_types(&view_function, tys))
                 .map_err(|err| {
                     BasicErrorWith404::bad_request_with_code(
                         err,
@@ -207,4 +203,41 @@ fn view_request(
         output.gas_used,
     );
     result.map(|r| r.with_gas_used(Some(output.gas_used)))
+}
+
+fn convert_return_types(
+    view_function: &ViewFunction,
+    types: Vec<MoveType>,
+) -> anyhow::Result<Vec<TypeTag>> {
+    types
+        .into_iter()
+        .map(|ty| convert_return_type(ty, &view_function.ty_args))
+        .collect()
+}
+
+fn convert_return_type(ty: MoveType, type_args: &[TypeTag]) -> anyhow::Result<TypeTag> {
+    // TryInto cannot be used directly here,
+    // because in TryInto, generics are replaced by address.
+    // But in the return value, we need to know the true type.
+    Ok(match ty {
+        // Types that may contain generics are containers or generics themselves.
+        MoveType::Vector { items } => {
+            TypeTag::Vector(Box::new(convert_return_type(*items, type_args)?))
+        },
+        MoveType::Struct(v) => TypeTag::Struct(Box::new(StructTag {
+            address: v.address.into(),
+            module: v.module.into(),
+            name: v.name.into(),
+            type_args: v
+                .generic_type_params
+                .into_iter()
+                .map(|ty| convert_return_type(ty, type_args))
+                .collect::<anyhow::Result<Vec<_>>>()?,
+        })),
+        MoveType::GenericTypeParam { index } => type_args
+            .get(index as usize)
+            .cloned()
+            .ok_or(anyhow::anyhow!("GenericTypeParam index out of bounds"))?,
+        _ => (&ty).try_into()?,
+    })
 }

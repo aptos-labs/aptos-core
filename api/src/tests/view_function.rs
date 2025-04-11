@@ -5,7 +5,14 @@ use super::{new_test_context, new_test_context_with_config};
 use aptos_api_test_context::{current_function_name, TestContext};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::{NodeConfig, ViewFilter, ViewFunctionId};
-use aptos_types::account_address::AccountAddress;
+use aptos_types::{
+    account_address::AccountAddress,
+    transaction::{EntryFunction, TransactionPayload},
+};
+use move_core_types::{
+    ident_str,
+    language_storage::{ModuleId, TypeTag},
+};
 use serde_json::{json, Value};
 use std::{path::PathBuf, str::FromStr};
 
@@ -251,4 +258,70 @@ async fn test_view_aggregator() {
         )
         .await;
     context.check_golden_output_no_prune(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_return_generics() {
+    let mut context = new_test_context(current_function_name!());
+    let account = context.root_account().await;
+
+    // Publish packages
+    let named_addresses = vec![("addr".to_string(), account.address())];
+    let path =
+        PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("src/tests/move/pack_return_generics");
+    let payload = TestContext::build_package(path, named_addresses);
+    let deploy_txn =
+        account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
+
+    // Call set function
+    let set_payload = TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(account.address(), ident_str!("return_generics").to_owned()),
+        ident_str!("set").to_owned(),
+        vec![TypeTag::U64],
+        vec![bcs::to_bytes(&123u64).unwrap()],
+    ));
+    let set_txn =
+        account.sign_with_transaction_builder(context.transaction_factory().payload(set_payload));
+
+    context.commit_block(&vec![deploy_txn, set_txn]).await;
+
+    // View
+    let arguments = [account.address().to_string()];
+    let type_arguments = ["u64"];
+    let get1_function = format!("{}::return_generics::get1", account.address());
+    let get2_function = format!("{}::return_generics::get2", account.address());
+    let get3_function = format!("{}::return_generics::get3", account.address());
+    let resp1 = context
+        .post(
+            "/view",
+            json!({
+                "function": get1_function,
+                "arguments": arguments,
+                "type_arguments": type_arguments,
+            }),
+        )
+        .await;
+
+    let resp2 = context
+        .post(
+            "/view",
+            json!({
+                "function": get2_function,
+                "arguments": arguments,
+                "type_arguments": type_arguments,
+            }),
+        )
+        .await;
+
+    let resp3 = context
+        .post(
+            "/view",
+            json!({
+                "function": get3_function,
+                "arguments": arguments,
+                "type_arguments": type_arguments,
+            }),
+        )
+        .await;
+    context.check_golden_output_no_prune(json!(vec![resp1, resp2, resp3]));
 }
