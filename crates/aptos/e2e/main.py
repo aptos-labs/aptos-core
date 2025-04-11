@@ -48,6 +48,8 @@ from cases.move import (
     test_move_publish,
     test_move_run,
     test_move_view,
+    test_move_clean,
+    test_move_clean_with_output_dir,
 )
 from cases.node import (
     test_node_show_validator_set,
@@ -163,6 +165,8 @@ async def run_tests(run_helper):
     test_move_publish(run_helper)
     test_move_run(run_helper)
     test_move_view(run_helper)
+    test_move_clean(run_helper)
+    test_move_clean_with_output_dir(run_helper)
 
     # Run stake subcommand group tests.
     """

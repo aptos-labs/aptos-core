@@ -2042,7 +2042,12 @@ impl CliCommand<&'static str> for CleanPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        let path = self.move_options.get_package_path()?;
+        let path = if let Some(output_dir) = self.move_options.output_dir.clone() {
+            output_dir
+        } else {
+            self.move_options.get_package_path()?
+        };
+
         let build_dir = path.join("build");
         // Only remove the build dir if it exists, allowing for users to still clean their cache
         if build_dir.exists() {

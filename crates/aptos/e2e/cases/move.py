@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
+import os
+import shutil
+import logging
 
 from common import TestError
 from test_helpers import RunHelper
@@ -311,3 +314,118 @@ def test_move_view(run_helper: RunHelper, test_name=None):
     response = json.loads(response.stdout)
     if response["Result"] == None or len(response["Result"]) != 9:
         raise TestError(f"View function [test_vector] did not return correct result")
+
+@test_case
+def test_move_clean(run_helper: RunHelper, test_name=None):
+    package_dir = f"move/cli-e2e-tests/{run_helper.base_network}"
+    account_info = run_helper.get_account_info()
+
+    # Get absolute path for package directory
+    abs_package_dir = os.path.join(run_helper.host_working_directory, package_dir)
+    default_build_dir = os.path.join(abs_package_dir, "build")
+
+    # Clean up any existing build directory
+    if os.path.exists(default_build_dir):
+        shutil.rmtree(default_build_dir)
+
+    # Compile without output_dir option
+    run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "move",
+            "compile",
+            "--package-dir",
+            package_dir,
+            "--named-addresses",
+            f"addr={account_info.account_address}",
+        ],
+    )
+
+    if not os.path.exists(default_build_dir):
+        raise TestError(f"Build directory was not created in the default location")
+
+    # Clean without output_dir option
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "move",
+            "clean",
+            "--package-dir",
+            package_dir,
+            "--assume-yes",
+        ],
+    )
+
+    # Verify clean was successful
+    if "succeeded" not in response.stdout:
+        raise TestError("Clean command did not succeed")
+
+    if os.path.exists(default_build_dir):
+        raise TestError(f"Default build directory was not removed by clean command")
+
+
+@test_case
+def test_move_clean_with_output_dir(run_helper: RunHelper, test_name=None):
+    package_dir = f"move/cli-e2e-tests/{run_helper.base_network}"
+    account_info = run_helper.get_account_info()
+    output_dir = "custom_output_dir"
+
+    # Get absolute paths for working with files
+    abs_package_dir = os.path.join(run_helper.host_working_directory, package_dir)
+    abs_output_dir = os.path.join(run_helper.host_working_directory, output_dir)
+    custom_build_dir = os.path.join(abs_output_dir, "build")
+
+    # Clean up any existing build directory
+    if os.path.exists(custom_build_dir):
+        shutil.rmtree(custom_build_dir)
+
+    # Compile with output_dir
+    run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "move",
+            "compile",
+            "--package-dir",
+            package_dir,
+            "--named-addresses",
+            f"addr={account_info.account_address}",
+            "--output-dir",
+            output_dir,
+        ],
+    )
+
+    custom_build_content = os.listdir(abs_output_dir)
+
+    if not os.path.exists(custom_build_dir):
+        raise TestError(f"Build artifacts were not created in the custom output directory")
+
+    # Clean with output_dir
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "move",
+            "clean",
+            "--package-dir",
+            package_dir,
+            "--output-dir",
+            output_dir,
+            "--assume-yes",
+        ],
+    )
+
+    # Verify clean was successful
+    if "succeeded" not in response.stdout:
+        raise TestError("Clean command did not succeed")
+
+    if os.path.exists(custom_build_dir):
+        raise TestError(f"Build directory in custom output was not removed by clean command")
+
+    # Check if any .mv files still exist directly in the output directory
+    remaining_files = [f for f in os.listdir(abs_output_dir) if f.endswith('.mv')]
+    if remaining_files:
+        raise TestError(f"Build artifacts were not cleaned from custom output directory")
+
