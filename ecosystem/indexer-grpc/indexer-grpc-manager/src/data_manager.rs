@@ -5,8 +5,8 @@ use crate::{
     config::CacheConfig,
     metadata_manager::MetadataManager,
     metrics::{
-        CACHE_END_VERSION, CACHE_SIZE, CACHE_START_VERSION, IS_FILE_STORE_LAGGING, MAX_CACHE_SIZE,
-        TARGET_CACHE_SIZE,
+        CACHE_END_VERSION, CACHE_SIZE, CACHE_START_VERSION, FILE_STORE_VERSION_IN_CACHE,
+        IS_FILE_STORE_LAGGING, MAX_CACHE_SIZE, TARGET_CACHE_SIZE, TIMER,
     },
 };
 use anyhow::{bail, ensure, Result};
@@ -29,7 +29,7 @@ use std::{
     },
     time::Duration,
 };
-use tokio::sync::{mpsc::channel, RwLock, RwLockReadGuard};
+use tokio::sync::{mpsc::channel, oneshot::Receiver, RwLock, RwLockReadGuard};
 use tracing::{debug, error, info, trace, warn};
 
 struct Cache {
@@ -125,8 +125,12 @@ impl Cache {
             }
         }
         if update_file_store_version {
-            self.file_store_version
+            let old_version = self
+                .file_store_version
                 .fetch_add(transactions.len() as u64, Ordering::SeqCst);
+            let new_version = old_version + transactions.len() as u64;
+            FILE_STORE_VERSION_IN_CACHE.set(new_version as i64);
+            info!("Updated file_store_version in cache to {new_version}.");
         } else {
             trace!(
                 "Returned {} transactions from Cache, total {size_bytes} bytes.",
@@ -162,13 +166,38 @@ impl DataManager {
         }
     }
 
-    pub(crate) async fn start(&self, watch_file_store_version: bool) {
+    pub(crate) async fn start(
+        &self,
+        is_master: bool,
+        file_store_uploader_recover_rx: Receiver<()>,
+    ) {
+        let watch_file_store_version = !is_master;
+
+        if is_master {
+            // For master, we need to wait for the FileStoreUploader to finish the recover to get
+            // the true file_store_version.
+            info!("Waiting for FileStoreUploader recovering.");
+            match file_store_uploader_recover_rx.await {
+                Ok(_) => {},
+                Err(_) => panic!("Should not happen!"),
+            };
+            let cache = self.cache.read().await;
+            self.update_file_store_version_in_cache(&cache, /*version_can_go_backward=*/ true)
+                .await;
+        }
+
         info!("Starting DataManager loop.");
 
         'out: loop {
+            let _timer = TIMER
+                .with_label_values(&["data_manager_main_loop"])
+                .start_timer();
             let cache = self.cache.read().await;
             if watch_file_store_version {
-                self.update_file_store_version_in_cache(&cache).await;
+                self.update_file_store_version_in_cache(
+                    &cache, /*version_can_go_backward=*/ false,
+                )
+                .await;
             }
             let request = GetTransactionsFromNodeRequest {
                 starting_version: Some(cache.start_version + cache.transactions.len() as u64),
@@ -208,7 +237,10 @@ impl DataManager {
                           self.metadata_manager.get_known_latest_version());
                     tokio::time::sleep(Duration::from_millis(100)).await;
                     if watch_file_store_version {
-                        self.update_file_store_version_in_cache(&cache).await;
+                        self.update_file_store_version_in_cache(
+                            &cache, /*version_can_go_backward=*/ false,
+                        )
+                        .await;
                     }
                 }
                 match response_item {
@@ -351,13 +383,19 @@ impl DataManager {
         )
     }
 
-    async fn update_file_store_version_in_cache(&self, cache: &RwLockReadGuard<'_, Cache>) {
+    async fn update_file_store_version_in_cache(
+        &self,
+        cache: &RwLockReadGuard<'_, Cache>,
+        version_can_go_backward: bool,
+    ) {
         let file_store_version = self.file_store_reader.get_latest_version().await;
         if let Some(file_store_version) = file_store_version {
             let file_store_version_before_update = cache
                 .file_store_version
                 .fetch_max(file_store_version, Ordering::SeqCst);
-            if file_store_version_before_update > file_store_version {
+            FILE_STORE_VERSION_IN_CACHE.set(file_store_version as i64);
+            info!("Updated file_store_version in cache to {file_store_version}.");
+            if !version_can_go_backward && file_store_version_before_update > file_store_version {
                 panic!("File store version is going backward, data might be corrupted. {file_store_version_before_update} v.s. {file_store_version}");
             };
         }

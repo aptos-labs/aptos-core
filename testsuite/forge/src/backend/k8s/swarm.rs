@@ -14,7 +14,6 @@ use crate::{
     FullNode, K8sApi, Node, Result, Swarm, SwarmChaos, Validator, Version, HAPROXY_SERVICE_SUFFIX,
     REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT,
 };
-use ::aptos_logger::*;
 use anyhow::{anyhow, bail, format_err};
 use aptos_config::config::{NodeConfig, OverrideNodeConfig};
 use aptos_retrier::fixed_retry_strategy;
@@ -31,6 +30,7 @@ use kube::{
     api::{Api, ListParams},
     client::Client as K8sClient,
 };
+use log::{debug, info, warn};
 use prometheus_http_query::{
     response::{PromqlResult, Sample},
     Client as PrometheusClient,
@@ -39,7 +39,7 @@ use regex::Regex;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     convert::TryFrom,
-    env, str,
+    str,
     sync::{atomic::AtomicU32, Arc},
 };
 use tokio::{

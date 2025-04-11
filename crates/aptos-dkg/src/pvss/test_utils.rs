@@ -29,7 +29,7 @@ pub struct DealingArgs<T: Transcript> {
     pub dpk: T::DealtPubKey,
 }
 
-/// Helper function that, given a sharing configuration for `n` players, returns an a tuple of:
+/// Helper function that, given a sharing configuration for `n` players, returns a tuple of:
 ///  - public parameters
 ///  - a vector of `n` signing SKs
 ///  - a vector of `n` signing PKs

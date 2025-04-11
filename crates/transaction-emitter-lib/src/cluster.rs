@@ -7,10 +7,10 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     test_utils::KeyPair,
 };
-use aptos_logger::{info, warn};
 use aptos_rest_client::{Client as RestClient, State};
 use aptos_sdk::types::{chain_id::ChainId, AccountKey, LocalAccount};
 use futures::{stream::FuturesUnordered, StreamExt};
+use log::{info, warn};
 use rand::seq::SliceRandom;
 use std::convert::TryFrom;
 use url::Url;

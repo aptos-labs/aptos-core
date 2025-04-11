@@ -30,6 +30,7 @@ clap = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
+log = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
 rand_core = { workspace = true }

@@ -216,7 +216,7 @@ understand.
 A named address `N` in a package `P` is in scope if:
 1. It declares a named address `N`; or
 2. A package in one of `P`'s transitive dependencies declares the named address
-  `N` and there is a dependency path in the package graph between between `P` and the
+  `N` and there is a dependency path in the package graph between `P` and the
   declaring package of `N` with no renaming of `N`.
 
 在包`P`中的命名地址`N`如果满足以下条件，则在作用域内：
@@ -263,7 +263,7 @@ It is important to note that _renaming is not local_: once a named address `N`
 has been renamed to `N2` in a package `P` all packages that import `P` will not
 see `N` but only `N2` unless `N` is reintroduced from outside of `P`. This is
 why rule (2) in the scoping rules at the start of this section specifies a
-"dependency path in the package graph between between `P` and the declaring
+"dependency path in the package graph between `P` and the declaring
 package of `N` with no renaming of `N`."
 
 重要的是要注意 _重命名不是局部的_：一旦一个命名地址`N`在一个包`P`中被重命名为`N2`，所有导入`P`的包都不会看到`N`但只会看到`N2`，除非`N`是从`P`外引入的。这就是为什么本节开头的范围规则中的规则 (2) 特别说明了“在`P`和没有重命名的声明包`N` 的封装图中的依赖路径” 。

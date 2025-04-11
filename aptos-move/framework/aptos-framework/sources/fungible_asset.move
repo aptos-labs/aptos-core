@@ -1424,11 +1424,10 @@ module aptos_framework::fungible_asset {
         )
     }
 
+    #[deprecated]
     /// Removing permissions from permissioned signer.
     public fun revoke_permission(permissioned: &signer, token_type: Object<Metadata>) {
-        permissioned_signer::revoke_permission(permissioned, WithdrawPermission::ByStore {
-            store_address: object::object_address(&token_type),
-        })
+        abort 0
     }
 
     #[test_only]

@@ -20,10 +20,7 @@ use aptos_storage_interface::{
     DbReaderWriter,
 };
 use aptos_types::{
-    account_config::{
-        aptos_test_root_address, primary_apt_store, AccountResource, FungibleStoreResource,
-        ObjectGroupResource,
-    },
+    account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     ledger_info::LedgerInfo,
@@ -38,9 +35,9 @@ use aptos_types::{
     },
     trusted_state::{TrustedState, TrustedStateChange},
     waypoint::Waypoint,
+    AptosCoinType,
 };
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
-use move_core_types::move_resource::MoveStructType;
 use rand::SeedableRng;
 use std::{path::Path, sync::Arc};
 
@@ -403,13 +400,9 @@ pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
 }
 
 pub fn get_account_balance(state_view: &dyn StateView, address: &AccountAddress) -> u64 {
-    FungibleStoreResource::fetch_move_resource_from_group(
-        state_view,
-        &primary_apt_store(*address),
-        &ObjectGroupResource::struct_tag(),
-    )
-    .unwrap()
-    .map_or(0, |fa_store| fa_store.balance())
+    CoinStoreResource::<AptosCoinType>::fetch_move_resource(state_view, address)
+        .unwrap()
+        .map_or(0, |coin_store| coin_store.coin())
 }
 
 pub fn verify_account_balance<F>(balance: u64, f: F) -> Result<()>

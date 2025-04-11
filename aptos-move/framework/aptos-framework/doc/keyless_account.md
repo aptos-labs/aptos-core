@@ -710,7 +710,7 @@ is no longer possible.
 
 ## Function `add_override_aud_for_next_epoch`
 
-Convenience method to queue up an append to to the set of override <code>aud</code>'s. The change will only be effective
+Convenience method to queue up an append to the set of override <code>aud</code>'s. The change will only be effective
 after reconfiguration. Only callable via governance proposal.
 
 WARNING: If a malicious override <code>aud</code> is set, this *could* lead to stolen funds.

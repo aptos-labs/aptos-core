@@ -535,7 +535,7 @@ fun add(x: u64, y: u64): u64 {
 }
 ```
 
-[As mentioned above](#function-body), the function's body is an [expression block](./variables.md). The expression block can sequence various statements, and the final expression in the block will be be the value of that block
+[As mentioned above](#function-body), the function's body is an [expression block](./variables.md). The expression block can sequence various statements, and the final expression in the block will be the value of that block
 
 [如上所述](#function-body)，函数体是一个[表达式块](./variables.md)。表达式块中可以有各种各种语句，块中最后一个表达式将是该表达式块的值。
 
