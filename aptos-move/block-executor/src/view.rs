@@ -3,6 +3,8 @@
 
 #[cfg(test)]
 use crate::types::InputOutputKey;
+#[cfg(feature = "blockstm-profiling")]
+use crate::view_profiler::{ViewKind, ViewProfiler, ViewProfilerGuard};
 use crate::{
     captured_reads::{
         CapturedReads, DataRead, DelayedFieldRead, DelayedFieldReadKind, GroupRead, ReadKind,
@@ -10,7 +12,8 @@ use crate::{
     },
     code_cache_global::GlobalModuleCache,
     counters,
-    scheduler::{DependencyResult, DependencyStatus, Scheduler, TWaitForDependency},
+    scheduler::{DependencyResult, DependencyStatus, TWaitForDependency},
+    scheduler_wrapper::SchedulerWrapper,
     value_exchange::TemporaryValueToIdentifierMapping,
 };
 use aptos_aggregator::{
@@ -23,8 +26,8 @@ use aptos_aggregator::{
 use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{
-        GroupReadResult, MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError,
-        StorageVersion, TxnIndex, UnknownOrLayout, UnsyncGroupError, ValueWithLayout,
+        GroupReadResult, Incarnation, MVDataError, MVDataOutput, MVDelayedFieldsError,
+        MVGroupError, StorageVersion, TxnIndex, UnknownOrLayout, UnsyncGroupError, ValueWithLayout,
     },
     unsync_map::UnsyncMap,
     versioned_delayed_fields::TVersionedDelayedFieldView,
@@ -133,6 +136,7 @@ trait ResourceState<T: Transaction> {
     fn read_cached_data_by_kind(
         &self,
         txn_idx: TxnIndex,
+        incarnation: Incarnation,
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
@@ -159,9 +163,10 @@ trait ResourceGroupState<T: Transaction> {
 
 pub(crate) struct ParallelState<'a, T: Transaction> {
     pub(crate) versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
-    scheduler: &'a Scheduler,
+    scheduler: SchedulerWrapper<'a>,
     start_counter: u32,
     counter: &'a AtomicU32,
+    incarnation: Incarnation,
     pub(crate) captured_reads:
         RefCell<CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>>,
 }
@@ -447,16 +452,19 @@ fn wait_for_dependency(
 impl<'a, T: Transaction> ParallelState<'a, T> {
     pub(crate) fn new(
         shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
-        shared_scheduler: &'a Scheduler,
+        shared_scheduler: SchedulerWrapper<'a>,
         start_shared_counter: u32,
         shared_counter: &'a AtomicU32,
+        incarnation: Incarnation,
     ) -> Self {
+        let block_stm_v2 = shared_scheduler.is_v2();
         Self {
             versioned_map: shared_map,
             scheduler: shared_scheduler,
             start_counter: start_shared_counter,
             counter: shared_counter,
-            captured_reads: RefCell::new(CapturedReads::new()),
+            incarnation,
+            captured_reads: RefCell::new(CapturedReads::new(block_stm_v2.then_some(incarnation))),
         }
     }
 
@@ -474,6 +482,7 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
         &self,
         group_key: &T::Key,
         txn_idx: TxnIndex,
+        incarnation: Incarnation,
     ) -> PartialVMResult<GroupReadResult> {
         use MVGroupError::*;
 
@@ -482,10 +491,15 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
         }
 
         loop {
-            match self
-                .versioned_map
-                .group_data()
-                .get_group_size(group_key, txn_idx)
+            let group_size = if self.scheduler.is_v2() {
+                self.versioned_map
+                    .group_data()
+                    .get_group_size_v2(group_key, txn_idx, incarnation)
+            } else {
+                self.versioned_map.group_data().get_group_size(group_key, txn_idx)
+            };
+
+            match group_size
             {
                 Ok(group_size) => {
                     assert_ok!(
@@ -504,7 +518,7 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
                     unreachable!("Reading group size does not require a specific tag look-up");
                 },
                 Err(Dependency(dep_idx)) => {
-                    if !wait_for_dependency(self.scheduler, txn_idx, dep_idx)? {
+                    if !wait_for_dependency(&self.scheduler, txn_idx, dep_idx)? {
                         return Err(PartialVMError::new(
                             StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                         )
@@ -526,6 +540,7 @@ impl<'a, T: Transaction> ResourceState<T> for ParallelState<'a, T> {
     fn read_cached_data_by_kind(
         &self,
         txn_idx: TxnIndex,
+        incarnation: Incarnation,
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
@@ -543,7 +558,15 @@ impl<'a, T: Transaction> ResourceState<T> for ParallelState<'a, T> {
         }
 
         loop {
-            match self.versioned_map.data().fetch_data(key, txn_idx) {
+            let data = if self.scheduler.is_v2() {
+                self.versioned_map
+                    .data()
+                    .fetch_data_v2(key, txn_idx, incarnation)
+            } else {
+                self.versioned_map.data().fetch_data(key, txn_idx)
+            };
+
+            match data {
                 Ok(Versioned(version, value)) => {
                     // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                     if let UnknownOrLayout::Known(layout) = layout {
@@ -626,7 +649,7 @@ impl<'a, T: Transaction> ResourceState<T> for ParallelState<'a, T> {
                     return ReadResult::Uninitialized;
                 },
                 Err(Dependency(dep_idx)) => {
-                    match wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
+                    match wait_for_dependency(&self.scheduler, txn_idx, dep_idx) {
                         Err(e) => {
                             error!("Error {:?} in wait for dependency", e);
                             self.captured_reads.borrow_mut().mark_incorrect_use();
@@ -693,11 +716,15 @@ impl<'a, T: Transaction> ResourceGroupState<T> for ParallelState<'a, T> {
         }
 
         loop {
-            match self.versioned_map.group_data().fetch_tagged_data(
-                group_key,
-                resource_tag,
-                txn_idx,
-            ) {
+            let data = if self.scheduler.is_v2() {
+                self.versioned_map
+                    .group_data()
+                    .fetch_tagged_data_v2(group_key, resource_tag, txn_idx, self.incarnation)
+            } else {
+                self.versioned_map.group_data().fetch_tagged_data(group_key, resource_tag, txn_idx)
+            };
+
+            match data {
                 Ok((version, value_with_layout)) => {
                     // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                     match value_with_layout {
@@ -736,24 +763,31 @@ impl<'a, T: Transaction> ResourceGroupState<T> for ParallelState<'a, T> {
                     return Ok(GroupReadResult::Uninitialized);
                 },
                 Err(TagNotFound) => {
-                    let data_read = DataRead::Versioned(
-                        Err(StorageVersion),
-                        Arc::<T::Value>::new(TransactionWrite::from_state_value(None)),
+                    self.versioned_map.group_data().update_tagged_base_value_with_layout(
+                        group_key.clone(),
+                        resource_tag.clone(),
+                        TransactionWrite::from_state_value(None),
                         None,
                     );
-                    assert_ok!(
-                        self.captured_reads.borrow_mut().capture_read(
-                            group_key.clone(),
-                            Some(resource_tag.clone()),
-                            data_read
-                        ),
-                        "Resource read in group recorded once: may not be inconsistent"
-                    );
+                    continue;
+                    // let data_read = DataRead::Versioned(
+                    //     Err(StorageVersion),
+                    //     Arc::<T::Value>::new(TransactionWrite::from_state_value(None)),
+                    //     None,
+                    // );
+                    // assert_ok!(
+                    //     self.captured_reads.borrow_mut().capture_read(
+                    //         group_key.clone(),
+                    //         Some(resource_tag.clone()),
+                    //         data_read
+                    //     ),
+                    //     "Resource read in group recorded once: may not be inconsistent"
+                    // );
 
-                    return Ok(GroupReadResult::Value(None, None));
+                    // return Ok(GroupReadResult::Value(None, None));
                 },
                 Err(Dependency(dep_idx)) => {
-                    if !wait_for_dependency(self.scheduler, txn_idx, dep_idx)? {
+                    if !wait_for_dependency(&self.scheduler, txn_idx, dep_idx)? {
                         // TODO[agg_v2](cleanup): consider changing from PartialVMResult<GroupReadResult> to GroupReadResult
                         // like in ReadResult for resources.
                         return Err(PartialVMError::new(
@@ -812,6 +846,7 @@ impl<'a, T: Transaction> ResourceState<T> for SequentialState<'a, T> {
     fn read_cached_data_by_kind(
         &self,
         _txn_idx: TxnIndex,
+        _incarnation: Incarnation,
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
@@ -966,6 +1001,13 @@ impl<'a, T: Transaction> ViewState<'a, T> {
             ViewState::Unsync(state) => state,
         }
     }
+
+    fn incarnation(&self) -> Incarnation {
+        match self {
+            ViewState::Sync(state) => state.incarnation,
+            ViewState::Unsync(_) => 0,
+        }
+    }
 }
 
 /// A struct that represents a single block execution worker thread's view into the state,
@@ -980,6 +1022,8 @@ pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>> {
     pub(crate) runtime_environment: &'a RuntimeEnvironment,
     pub(crate) latest_view: ViewState<'a, T>,
     pub(crate) txn_idx: TxnIndex,
+    #[cfg(feature = "blockstm-profiling")]
+    pub(crate) view_profiler: RefCell<ViewProfiler>,
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
@@ -1001,7 +1045,27 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             runtime_environment,
             latest_view,
             txn_idx,
+            #[cfg(feature = "blockstm-profiling")]
+            view_profiler: RefCell::new(ViewProfiler::new()),
         }
+    }
+
+    #[cfg(feature = "blockstm-profiling")]
+    pub(crate) fn get_profiler_guard(&self, kind: ViewKind) -> ViewProfilerGuard {
+        ViewProfilerGuard::new(&self.view_profiler, kind)
+    }
+
+    #[cfg(feature = "blockstm-profiling")]
+    pub(crate) fn view_profiler_log_info(&self, incarnation: Incarnation, worker_id: usize) {
+        if let ViewState::Sync(state) = &self.latest_view {
+            assert_eq!(
+                incarnation, state.incarnation,
+                "Incarnations provided by executor must match"
+            );
+        }
+        self.view_profiler
+            .borrow()
+            .log_info(self.txn_idx, incarnation, worker_id);
     }
 
     #[cfg(test)]
@@ -1248,7 +1312,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
                 }
 
                 match self.get_resource_state_value_metadata(&key)? {
-                    Some(metadata) => match parallel_state.read_group_size(&key, self.txn_idx)? {
+                    Some(metadata) => match parallel_state.read_group_size(&key, self.txn_idx, parallel_state.incarnation)? {
                         GroupReadResult::Size(group_size) => {
                             Ok(Some((key, (metadata, group_size.get()))))
                         },
@@ -1351,6 +1415,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
 
         let mut ret = state.read_cached_data_by_kind(
             self.txn_idx,
+            self.latest_view.incarnation(),
             state_key,
             kind.clone(),
             layout.clone(),
@@ -1368,6 +1433,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             // but need to fetch it from versioned_map again.
             ret = state.read_cached_data_by_kind(
                 self.txn_idx,
+                self.latest_view.incarnation(),
                 state_key,
                 kind,
                 layout.clone(),
@@ -1435,7 +1501,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> BlockSynchronizationKillSw
 {
     fn interrupt_requested(&self) -> bool {
         match &self.latest_view {
-            ViewState::Sync(state) => state.scheduler.has_halted(),
+            ViewState::Sync(state) => state
+                .scheduler
+                .interrupt_requested(self.txn_idx, state.incarnation),
             ViewState::Unsync(_) => false,
         }
     }
@@ -1450,6 +1518,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestVi
         state_key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
     ) -> PartialVMResult<Option<StateValue>> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::ResourceView);
+
         self.get_resource_state_value_impl(
             state_key,
             UnknownOrLayout::Known(maybe_layout),
@@ -1462,6 +1533,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestVi
         &self,
         state_key: &Self::Key,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::ResourceView);
+
         self.get_resource_state_value_impl(state_key, UnknownOrLayout::Unknown, ReadKind::Metadata)
             .map(|res| {
                 if let ReadResult::Metadata(v) = res {
@@ -1473,6 +1547,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestVi
     }
 
     fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::ResourceView);
+
         self.get_resource_state_value_impl(state_key, UnknownOrLayout::Unknown, ReadKind::Exists)
             .map(|res| {
                 if let ReadResult::Exists(v) = res {
@@ -1493,8 +1570,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for Lat
         &self,
         group_key: &Self::GroupKey,
     ) -> PartialVMResult<ResourceGroupSize> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::GroupView);
+
         let mut group_read = match &self.latest_view {
-            ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
+            ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx, state.incarnation)?,
             ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key),
         };
 
@@ -1502,7 +1582,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for Lat
             self.initialize_mvhashmap_base_group_contents(group_key)?;
 
             group_read = match &self.latest_view {
-                ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
+                ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx, state.incarnation)?,
                 ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key),
             }
         };
@@ -1516,6 +1596,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for Lat
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
     ) -> PartialVMResult<Option<Bytes>> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::GroupView);
+
         let mut group_read = self
             .latest_view
             .get_resource_group_state()
@@ -1552,10 +1635,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for Lat
     }
 
     fn is_resource_groups_split_in_change_set_capable(&self) -> bool {
-        match &self.latest_view {
-            ViewState::Sync(_) => true,
-            ViewState::Unsync(_) => true,
-        }
+        true
     }
 }
 
@@ -1583,6 +1663,20 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TAggregatorV1View for Late
         &self,
         state_key: &Self::Identifier,
     ) -> PartialVMResult<Option<StateValue>> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::AggregatorV1View);
+
+        if let ViewState::Sync(parallel_state) = &self.latest_view {
+            parallel_state
+                .captured_reads
+                .borrow_mut()
+                .aggregator_v1_reads
+                .insert(state_key.clone());
+        }
+
+        // TODO: in BlockSTMv2, record the keys here separately in captured reads
+        // Then during commit sequential hook, we can also validate AggregatorV1.
+
         // TODO[agg_v1](cleanup):
         // Integrate aggregators V1. That is, we can lift the u128 value
         // from the state item by passing the right layout here. This can
@@ -1601,11 +1695,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for Late
         &self,
         id: &Self::Identifier,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::DelayedFieldView);
+
         match &self.latest_view {
             ViewState::Sync(state) => get_delayed_field_value_impl(
                 &state.captured_reads,
                 state.versioned_map.delayed_fields(),
-                state.scheduler,
+                &state.scheduler,
                 id,
                 self.txn_idx,
             ),
@@ -1625,11 +1722,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for Late
         delta: &SignedU128,
         max_value: u128,
     ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::DelayedFieldView);
+
         match &self.latest_view {
             ViewState::Sync(state) => delayed_field_try_add_delta_outcome_impl(
                 &state.captured_reads,
                 state.versioned_map.delayed_fields(),
-                state.scheduler,
+                &state.scheduler,
                 id,
                 base_delta,
                 delta,
@@ -1656,6 +1756,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for Late
     }
 
     fn generate_delayed_field_id(&self, width: u32) -> Self::Identifier {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::DelayedFieldView);
+
         let index = match &self.latest_view {
             ViewState::Sync(state) => state.counter.fetch_add(1, Ordering::SeqCst),
             ViewState::Unsync(state) => {
@@ -1670,6 +1773,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for Late
     }
 
     fn validate_delayed_field_id(&self, id: &Self::Identifier) -> Result<(), PanicError> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::DelayedFieldView);
+
         let unique_index = id.extract_unique_index();
 
         let start_counter = match &self.latest_view {
@@ -1700,6 +1806,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for Late
         BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
         PanicError,
     > {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::DelayedFieldView);
+
         match &self.latest_view {
             ViewState::Sync(state) => state
                 .captured_reads
@@ -1722,6 +1831,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for Late
         delayed_write_set_ids: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
     ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::DelayedFieldView);
+
         match &self.latest_view {
             ViewState::Sync(state) => {
                 self.get_group_reads_needing_exchange_parallel(state, delayed_write_set_ids, skip)
@@ -1778,7 +1890,11 @@ mod test {
         },
         values::{Struct, Value},
     };
-    use std::{cell::RefCell, collections::HashMap, sync::atomic::AtomicU32};
+    use std::{
+        cell::RefCell,
+        collections::HashMap,
+        sync::atomic::{AtomicBool, AtomicU32},
+    };
     use test_case::test_case;
 
     #[derive(Default)]
@@ -1852,7 +1968,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new());
+        >::new(None));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -1997,7 +2113,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new());
+        >::new(None));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2142,7 +2258,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new());
+        >::new(None));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2287,7 +2403,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new());
+        >::new(None));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2678,6 +2794,7 @@ mod test {
         empty_global_module_cache:
             GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
         runtime_environment: RuntimeEnvironment,
+        skip_module_validation: AtomicBool,
     }
 
     impl Holder {
@@ -2686,12 +2803,14 @@ mod test {
             let counter = RefCell::new(start_counter);
             let base_view = MockStateView::new(data);
             let runtime_environment = RuntimeEnvironment::new(vec![]);
+            let skip_module_validation = AtomicBool::new(true);
             Self {
                 unsync_map,
                 counter,
                 base_view,
                 empty_global_module_cache: GlobalModuleCache::empty(),
                 runtime_environment,
+                skip_module_validation,
             }
         }
     }
@@ -2750,9 +2869,10 @@ mod test {
                     &self.runtime_environment,
                     ViewState::Sync(ParallelState::new(
                         &self.versioned_map,
-                        &self.scheduler,
+                        SchedulerWrapper::V1(&self.scheduler, &self.holder.skip_module_validation),
                         self.start_counter,
                         &self.counter,
+                        0,
                     )),
                     1,
                 );
@@ -2872,14 +2992,14 @@ mod test {
         let views = holder.new_view();
 
         assert_ok_eq!(
-            views.get_resource_state_value(&KeyType::<u32>(1, false), None),
+            views.get_resource_state_value(&KeyType::<u32>(1,), None),
             None
         );
 
-        assert_ok_eq!(views.resource_exists(&KeyType::<u32>(1, false)), false,);
+        assert_ok_eq!(views.resource_exists(&KeyType::<u32>(1)), false);
 
         assert_ok_eq!(
-            views.get_resource_state_value_metadata(&KeyType::<u32>(1, false)),
+            views.get_resource_state_value_metadata(&KeyType::<u32>(1)),
             None,
         );
     }
@@ -2887,14 +3007,14 @@ mod test {
     #[test]
     fn test_non_value_reads_not_recorded() {
         let state_value = create_state_value(&Value::u64(12321), &MoveTypeLayout::U64);
-        let data = HashMap::from([(KeyType::<u32>(1, false), state_value.clone())]);
+        let data = HashMap::from([(KeyType::<u32>(1), state_value.clone())]);
 
         let holder = ComparisonHolder::new(data, 1000);
         let views = holder.new_view();
 
-        assert_ok_eq!(views.resource_exists(&KeyType::<u32>(1, false)), true,);
+        assert_ok_eq!(views.resource_exists(&KeyType::<u32>(1)), true,);
         assert!(views
-            .get_resource_state_value_metadata(&KeyType::<u32>(1, false))
+            .get_resource_state_value_metadata(&KeyType::<u32>(1))
             .unwrap()
             .is_some(),);
 
@@ -2929,13 +3049,13 @@ mod test {
     #[test]
     fn test_regular_read_operations() {
         let state_value = create_state_value(&Value::u64(12321), &MoveTypeLayout::U64);
-        let data = HashMap::from([(KeyType::<u32>(1, false), state_value.clone())]);
+        let data = HashMap::from([(KeyType::<u32>(1), state_value.clone())]);
 
         let holder = ComparisonHolder::new(data, 1000);
         let views = holder.new_view();
 
         assert_ok_eq!(
-            views.get_resource_state_value(&KeyType::<u32>(1, false), None),
+            views.get_resource_state_value(&KeyType::<u32>(1), None),
             Some(state_value.clone())
         );
 
@@ -2943,7 +3063,7 @@ mod test {
             holder
                 .holder
                 .unsync_map
-                .fetch_data(&KeyType::<u32>(1, false)),
+                .fetch_data(&KeyType::<u32>(1)),
             Some(TransactionWrite::from_state_value(Some(state_value))),
             None,
         );
@@ -2957,7 +3077,7 @@ mod test {
             create_struct_layout(create_aggregator_storage_layout(MoveTypeLayout::U64));
         let value = create_struct_value(create_aggregator_value_u64(25, 30));
         let state_value = create_state_value(&value, &storage_layout);
-        let data = HashMap::from([(KeyType::<u32>(1, false), state_value.clone())]);
+        let data = HashMap::from([(KeyType::<u32>(1), state_value.clone())]);
 
         let start_counter = 1000;
         let id = DelayedFieldID::new_with_width(start_counter, 8);
@@ -2971,29 +3091,29 @@ mod test {
         match check_metadata {
             Some(true) => {
                 views
-                    .get_resource_state_value_metadata(&KeyType::<u32>(1, false))
+                    .get_resource_state_value_metadata(&KeyType::<u32>(1))
                     .unwrap();
             },
             Some(false) => {
-                assert_ok_eq!(views.resource_exists(&KeyType::<u32>(1, false)), true,);
+                assert_ok_eq!(views.resource_exists(&KeyType::<u32>(1)), true,);
             },
             None => {},
         };
 
         let layout = create_struct_layout(create_aggregator_layout_u64());
         assert_ok_eq!(
-            views.get_resource_state_value(&KeyType::<u32>(1, false), Some(&layout)),
+            views.get_resource_state_value(&KeyType::<u32>(1), Some(&layout)),
             Some(patched_state_value.clone())
         );
         assert!(views
             .get_reads_needing_exchange(&HashSet::from([id]), &HashSet::new())
             .unwrap()
-            .contains_key(&KeyType(1, false)));
+            .contains_key(&KeyType(1)));
         assert_fetch_eq(
             holder
                 .holder
                 .unsync_map
-                .fetch_data(&KeyType::<u32>(1, false)),
+                .fetch_data(&KeyType::<u32>(1)),
             Some(TransactionWrite::from_state_value(Some(
                 patched_state_value,
             ))),
@@ -3005,12 +3125,12 @@ mod test {
     fn test_read_operations() {
         let state_value_3 = create_state_value(&Value::u64(12321), &MoveTypeLayout::U64);
         let mut data = HashMap::new();
-        data.insert(KeyType::<u32>(3, false), state_value_3.clone());
+        data.insert(KeyType::<u32>(3), state_value_3.clone());
         let storage_layout =
             create_struct_layout(create_aggregator_storage_layout(MoveTypeLayout::U64));
         let value = create_struct_value(create_aggregator_value_u64(25, 30));
         let state_value_4 = create_state_value(&value, &storage_layout);
-        data.insert(KeyType::<u32>(4, false), state_value_4);
+        data.insert(KeyType::<u32>(4), state_value_4);
 
         let start_counter = 1000;
         let id = DelayedFieldID::new_with_width(start_counter, 8);
@@ -3019,39 +3139,29 @@ mod test {
 
         assert_eq!(
             views
-                .get_resource_state_value(&KeyType::<u32>(1, false), None)
+                .get_resource_state_value(&KeyType::<u32>(1), None)
                 .unwrap(),
             None
         );
         let layout = create_struct_layout(create_aggregator_layout_u64());
         assert_eq!(
             views
-                .get_resource_state_value(&KeyType::<u32>(2, false), Some(&layout))
+                .get_resource_state_value(&KeyType::<u32>(2), Some(&layout))
                 .unwrap(),
             None
         );
         assert_eq!(
             views
-                .get_resource_state_value(&KeyType::<u32>(3, false), None)
+                .get_resource_state_value(&KeyType::<u32>(3), None)
                 .unwrap(),
             Some(state_value_3.clone())
-        );
-
-        // TODO[agg_v2](test): This is printing Ok(Versioned(Err(StorageVersion), ValueType { bytes: Some(b"!0\0\0\0\0\0\0"), metadata: None }, None))
-        // Is Err(StorageVersion) expected here?
-        println!(
-            "data: {:?}",
-            holder
-                .versioned_map
-                .data()
-                .fetch_data(&KeyType::<u32>(3, false), 1)
         );
 
         let patched_value = create_struct_value(create_aggregator_value_u64(id.as_u64(), 30));
         let state_value_4 = create_state_value(&patched_value, &storage_layout);
         assert_eq!(
             views
-                .get_resource_state_value(&KeyType::<u32>(4, false), Some(&layout))
+                .get_resource_state_value(&KeyType::<u32>(4), Some(&layout))
                 .unwrap(),
             Some(state_value_4.clone())
         );

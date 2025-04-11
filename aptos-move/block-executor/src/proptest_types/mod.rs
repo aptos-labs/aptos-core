@@ -5,5 +5,8 @@
 pub(crate) mod baseline;
 pub mod bencher;
 #[cfg(test)]
-mod tests;
+mod delta_tests;
+mod group_tests;
+mod module_tests;
+mod resource_tests;
 pub(crate) mod types;

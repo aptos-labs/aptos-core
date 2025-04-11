@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(feature = "blockstm-profiling")]
+use crate::view_profiler::ViewKind;
 use crate::{
     captured_reads::CacheRead,
     counters::GLOBAL_MODULE_CACHE_MISS_SECONDS,
@@ -10,11 +12,13 @@ use ambassador::delegate_to_methods;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     executable::ModulePath,
+    on_chain_config::CurrentTimeMicroseconds,
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
     vm::modules::AptosModuleExtension,
 };
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
+use fail::fail_point;
 use move_binary_format::{
     errors::{Location, PartialVMResult, VMResult},
     file_format::CompiledScript,
@@ -48,6 +52,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCodeBuilder for Late
         &self,
         key: &Self::Key,
     ) -> VMResult<Option<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::ModuleView);
+
         let key = T::Key::from_address_and_module_name(key.address(), key.name());
         self.get_raw_base_value(&key)
             .map_err(|err| err.finish(Location::Undefined))?
@@ -76,6 +83,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView
         extension: Arc<Self::Extension>,
         version: Self::Version,
     ) -> VMResult<Arc<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::ModuleView);
+
         self.as_module_cache().insert_deserialized_module(
             key,
             deserialized_code,
@@ -91,6 +101,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView
         extension: Arc<Self::Extension>,
         version: Self::Version,
     ) -> VMResult<Arc<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::ModuleView);
+
         match &self.latest_view {
             ViewState::Sync(state) => {
                 // For parallel execution, if we insert a verified module, we might need to also
@@ -133,6 +146,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView
             Self::Version,
         )>,
     > {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::ModuleView);
+
         match &self.latest_view {
             ViewState::Sync(state) => {
                 // Check the transaction-level cache with already read modules first.
@@ -140,7 +156,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView
                     return Ok(read);
                 }
 
-                // Otherwise, it is a miss. Check global cache.
+                // Otherwise, it is a miss. Check global cache. Overriden modules 
+                // (published within the block) are not returned from this call.
                 if let Some(module) = self.global_module_cache.get(key) {
                     state
                         .captured_reads
@@ -179,6 +196,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView
     }
 
     fn num_modules(&self) -> usize {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::ModuleView);
+
         self.as_module_cache().num_modules()
     }
 }
@@ -189,12 +209,25 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> AptosModuleStorage for Lat
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
+        #[cfg(feature = "blockstm-profiling")]
+        let _view_profiler = self.get_profiler_guard(ViewKind::ModuleView);
+
         let id = ModuleId::new(*address, module_name.to_owned());
-        let state_value_metadata = self
+        let result = self
             .get_module_or_build_with(&id, self)
-            .map_err(|err| err.to_partial())?
-            .map(|(module, _)| module.extension().state_value_metadata().clone());
-        Ok(state_value_metadata)
+            .map_err(|err| err.to_partial())?;
+
+        // In order to test the module cache with combinatorial tests, we embed the version
+        // information into the state value metadata (execute_transaction has access via
+        // AptosModuleStorage trait only).
+        fail_point!("module_test", |_| {
+            Ok(result.clone().map(|(_, version)| {
+                let v = version.unwrap_or(u32::MAX) as u64;
+                StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
+            }))
+        });
+
+        Ok(result.map(|(module, _)| module.extension().state_value_metadata().clone()))
     }
 }
 
