@@ -1,0 +1,29 @@
+
+digraph G {
+    label = "Module: b50ca8ec448fc67e541697f07084782dd4b1a0f82941ce8fa73762370d821069::tree
+    use 0000000000000000000000000000000000000000000000000000000000000001::managed_coin;";
+    labelloc = "t";
+    labeljust = "l";
+    fontsize = 36;
+
+    graph [
+	rankdir=LR,
+	ranksep=1.0,
+	nodesep=0.75,
+	splines=true,
+	concentrate=false
+    ];
+
+    node [
+	shape=ellipse,
+	fontsize=24
+    ];
+
+    edge [
+	arrowsize=1.5
+    ];
+
+    0 [label="init_module(&signer)"];
+    1 [label="managed_coin::initialize<T0>(&signer, vector<u8>, vector<u8>, u8, bool)"];
+    0 -> 1 [label="[Tree as T0]", fontsize=24];
+}
