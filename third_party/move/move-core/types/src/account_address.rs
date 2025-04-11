@@ -151,7 +151,7 @@ impl AccountAddress {
         self.0.to_vec()
     }
 
-    pub fn into_bytes(self) -> [u8; Self::LENGTH] {
+    pub const fn into_bytes(self) -> [u8; Self::LENGTH] {
         self.0
     }
 
