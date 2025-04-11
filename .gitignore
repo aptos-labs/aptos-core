@@ -135,3 +135,6 @@ ecosystem/indexer-grpc/indexer-transaction-generator/*.yaml
 *.dot
 *.bytecode
 !third_party/move/move-prover/tests/xsources/design/*.bytecode
+
+# proptest regressions
+storage/aptosdb/proptest-regressions/*

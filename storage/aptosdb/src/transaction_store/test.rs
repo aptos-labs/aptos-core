@@ -8,10 +8,7 @@ use super::*;
 use crate::{ledger_db::transaction_db_test::init_db, AptosDB};
 use aptos_proptest_helpers::Index;
 use aptos_temppath::TempPath;
-use aptos_types::{
-    proptest_types::{AccountInfoUniverse, SignatureCheckedTransactionGen},
-    transaction::ReplayProtector,
-};
+use aptos_types::proptest_types::{AccountInfoUniverse, SignatureCheckedTransactionGen};
 use proptest::{collection::vec, prelude::*};
 use std::collections::BTreeMap;
 

@@ -19,7 +19,6 @@ pub enum Order {
     Ascending,
     Descending,
 }
-
 pub trait IndexerReader: Send + Sync {
     fn is_internal_indexer_enabled(&self) -> bool;
 
