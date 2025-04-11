@@ -155,6 +155,10 @@ impl AccountAddress {
         self.0
     }
 
+    pub const fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+
     /// NOTE: Where possible use from_str_strict or from_str instead.
     pub fn from_hex_literal(literal: &str) -> Result<Self, AccountAddressParseError> {
         if !literal.starts_with("0x") {
