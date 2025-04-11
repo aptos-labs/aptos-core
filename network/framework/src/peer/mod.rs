@@ -421,7 +421,7 @@ where
         fn drop_message(message: &NetworkMessage) -> bool {
             let round = crate::counters::NETWORK_CURRENT_ROUND.get() as Round;
             let self_peer = crate::counters::SELF_PEER.get();
-            if round > 1500 && self_peer < 5 {
+            if round > 1500 && self_peer < 100 {
                 let pct = thread_rng().next_u32() % 100;
                 return pct < 1;
             }
