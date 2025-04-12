@@ -54,8 +54,7 @@ const EXECUTION_TIME_GAS_RATIO: u8 = 50;
 
 #[inline(always)]
 fn is_coverage_enabled() -> bool {
-    cfg!(coverage_enabled) ||
-    std::env::var("LLVM_PROFILE_FILE").is_ok()
+    cfg!(coverage_enabled) || std::env::var("LLVM_PROFILE_FILE").is_ok()
 }
 
 fn check_for_invariant_violation_vmerror(e: VMError) {
@@ -383,7 +382,8 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     // EXPERIMENTAL: This very sensible to excution enviroment, e.g. local run, OSS-Fuzz. It may cause false positive. Real data from production does not apply to this ratio.
     // We only want to catch big unexpected gas usage.
     if ((elapsed.as_millis() / (fee.execution_gas_used() + fee.io_gas_used()) as u128)
-        > EXECUTION_TIME_GAS_RATIO as u128) && !is_coverage_enabled()
+        > EXECUTION_TIME_GAS_RATIO as u128)
+        && !is_coverage_enabled()
     {
         if std::env::var("DEBUG").is_ok() {
             tdbg!(
