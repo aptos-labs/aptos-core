@@ -157,7 +157,7 @@ Parses the input bytes into a keyless public key.
 Returns the issuer string of the public key
 
 
-<pre><code><b>fun</b> <a href="keyless.md#0x1_keyless_get_iss">get_iss</a>(self: &<a href="keyless.md#0x1_keyless_PublicKey">keyless::PublicKey</a>): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="keyless.md#0x1_keyless_get_iss">get_iss</a>(self: &<a href="keyless.md#0x1_keyless_PublicKey">keyless::PublicKey</a>): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -166,7 +166,7 @@ Returns the issuer string of the public key
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="keyless.md#0x1_keyless_get_iss">get_iss</a>(self: &<a href="keyless.md#0x1_keyless_PublicKey">PublicKey</a>): String {
+<pre><code><b>friend</b> <b>fun</b> <a href="keyless.md#0x1_keyless_get_iss">get_iss</a>(self: &<a href="keyless.md#0x1_keyless_PublicKey">PublicKey</a>): String {
     self.iss
 }
 </code></pre>
@@ -182,7 +182,7 @@ Returns the issuer string of the public key
 Returns the identifier bytes of the public key
 
 
-<pre><code><b>fun</b> <a href="keyless.md#0x1_keyless_get_idc">get_idc</a>(self: &<a href="keyless.md#0x1_keyless_PublicKey">keyless::PublicKey</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="keyless.md#0x1_keyless_get_idc">get_idc</a>(self: &<a href="keyless.md#0x1_keyless_PublicKey">keyless::PublicKey</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -191,7 +191,7 @@ Returns the identifier bytes of the public key
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="keyless.md#0x1_keyless_get_idc">get_idc</a>(self: &<a href="keyless.md#0x1_keyless_PublicKey">PublicKey</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+<pre><code><b>friend</b> <b>fun</b> <a href="keyless.md#0x1_keyless_get_idc">get_idc</a>(self: &<a href="keyless.md#0x1_keyless_PublicKey">PublicKey</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     self.idc
 }
 </code></pre>
