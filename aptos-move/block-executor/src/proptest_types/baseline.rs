@@ -14,8 +14,8 @@
 use crate::{
     errors::{BlockExecutionError, BlockExecutionResult},
     proptest_types::types::{
-        raw_metadata, GroupSizeOrMetadata, MockOutput, MockTransaction, ValueType, RESERVED_TAG,
-        STORAGE_AGGREGATOR_VALUE,
+        default_group_map, raw_metadata, GroupSizeOrMetadata, MockOutput, MockTransaction,
+        ValueType, STORAGE_AGGREGATOR_VALUE,
     },
 };
 use aptos_aggregator::delta_change_set::serialize;
@@ -92,7 +92,7 @@ pub(crate) struct BaselineOutput<K> {
     status: BaselineStatus,
     read_values: Vec<Result<Vec<BaselineValue>, ()>>,
     resolved_deltas: Vec<Result<HashMap<K, u128>, ()>>,
-    group_reads: Vec<Result<Vec<(K, u32)>, ()>>,
+    group_reads: Vec<Result<Vec<(K, u32, bool)>, ()>>,
     module_reads: Vec<Result<Vec<Option<TxnIndex>>, ()>>,
 }
 
@@ -134,6 +134,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                 MockTransaction::Write {
                     incarnation_counter,
                     incarnation_behaviors,
+                    delayed_fields_or_aggregator_v1,
                 } => {
                     // Determine the behavior of the latest incarnation of the transaction. The index
                     // is based on the value of the incarnation counter prior to the fetch_add during
@@ -250,7 +251,6 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
     }
 
     fn assert_success<E: Debug>(&self, block_output: &BlockOutput<MockOutput<K, E>>) {
-        let base_map: HashMap<u32, Bytes> = HashMap::from([(RESERVED_TAG, vec![0].into())]);
         let mut group_world = HashMap::new();
         let mut group_metadata: HashMap<K, Option<StateValueMetadata>> = HashMap::new();
 
@@ -274,8 +274,11 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                     .as_ref()
                     .unwrap()
                     .iter()
-                    .map(|(group_key, resource_tag)| {
-                        let group_map = group_world.entry(group_key).or_insert(base_map.clone());
+                    .map(|(group_key, resource_tag, has_delayed_field)| {
+                        // TODO: handle delayed fields.
+                        let group_map = group_world
+                            .entry(group_key)
+                            .or_insert_with(default_group_map);
 
                         group_map.get(resource_tag).cloned()
                     })
@@ -320,7 +323,9 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                 });
 
                 for (group_key, size_or_metadata) in output.read_group_size_or_metadata.iter() {
-                    let group_map = group_world.entry(group_key).or_insert(base_map.clone());
+                    let group_map = group_world
+                        .entry(group_key)
+                        .or_insert_with(default_group_map);
 
                     match size_or_metadata {
                         GroupSizeOrMetadata::Size(size) => {
@@ -366,7 +371,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                 for (group_key, v, group_size, updates) in output.group_writes.iter() {
                     group_metadata.insert(group_key.clone(), v.as_state_value_metadata());
 
-                    let group_map = group_world.entry(group_key).or_insert(base_map.clone());
+                    let group_map = group_world.entry(group_key).or_insert_with(default_group_map);
                     for (tag, v) in updates {
                         if v.is_deletion() {
                             assert_some!(group_map.remove(tag));

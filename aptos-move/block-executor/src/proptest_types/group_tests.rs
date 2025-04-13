@@ -22,6 +22,96 @@ use aptos_types::block_executor::config::BlockExecutorConfig;
 use num_cpus;
 use proptest::{collection::vec, prelude::*, test_runner::TestRunner, strategy::ValueTree};
 use test_case::test_case;
+use std::{sync::Arc, hash::Hash, fmt::Debug};
+
+/// Create a vector of mock transactions from transaction generators
+pub(crate) fn create_mock_transactions<K: Clone + Hash + Debug + Eq + Ord>(
+    transaction_gen: Vec<TransactionGen<[u8; 32]>>,
+    key_universe: &[[u8; 32]],
+    group_size_pcts: [Option<u8>; 3],
+    delta_threshold: Option<usize>,
+) -> Vec<MockTransaction<KeyType<[u8; 32]>, MockEvent>> {
+    transaction_gen
+        .into_iter()
+        .map(|txn_gen| {
+            txn_gen.materialize_groups::<[u8; 32], MockEvent>(key_universe, group_size_pcts, delta_threshold)
+        })
+        .collect()
+}
+
+/// Create a data view for testing with non-empty groups
+pub(crate) fn create_non_empty_group_data_view(
+    key_universe: &[[u8; 32]],
+    universe_size: usize,
+) -> NonEmptyGroupDataView<KeyType<[u8; 32]>> {
+    NonEmptyGroupDataView::<KeyType<[u8; 32]>> {
+        group_keys: key_universe[(universe_size - 3)..universe_size]
+            .iter()
+            .map(|k| KeyType(*k))
+            .collect(),
+    }
+}
+
+/// Run both parallel and sequential execution tests for a transaction provider
+pub(crate) fn run_tests_with_groups(
+    executor_thread_pool: Arc<rayon::ThreadPool>,
+    gas_limits: Vec<Option<u64>>,
+    block_stm_v2: bool,
+    transactions: Vec<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
+    data_view: &NonEmptyGroupDataView<KeyType<[u8; 32]>>,
+    num_executions_parallel: usize,
+    num_executions_sequential: usize,
+) {
+    let txn_provider = DefaultTxnProvider::new(transactions);
+    
+    // Run parallel execution tests
+    for maybe_block_gas_limit in gas_limits {
+        for _ in 0..num_executions_parallel {
+            let output = execute_block_parallel::<
+                MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+                NonEmptyGroupDataView<KeyType<[u8; 32]>>,
+                DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
+            >(
+                executor_thread_pool.clone(),
+                maybe_block_gas_limit,
+                block_stm_v2,
+                &txn_provider,
+                data_view,
+                None,
+            );
+
+            BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)
+                .assert_parallel_output(&output);
+        }
+    }
+
+    // Run sequential execution tests
+    for _ in 0..num_executions_sequential {
+        let mut guard = AptosModuleCacheManagerGuard::none();
+
+        let output = BlockExecutor::<
+            MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+            MockTask<KeyType<[u8; 32]>, MockEvent>,
+            NonEmptyGroupDataView<KeyType<[u8; 32]>>,
+            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
+            DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
+        >::new(
+            BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+            executor_thread_pool.clone(),
+            None,
+        )
+        .execute_transactions_sequential(&txn_provider, data_view, &mut guard, false);
+
+        BaselineOutput::generate(txn_provider.get_txns(), None).assert_output(&output.map_err(
+            |e| match e {
+                SequentialBlockExecutionError::ResourceGroupSerializationError => {
+                    panic!("Unexpected error")
+                },
+                SequentialBlockExecutionError::ErrorToReturn(err) => err,
+            },
+        ));
+    }
+}
 
 // TODO: Change some tests (e.g. second and fifth) to use gas limit: needs to handle error in mock executor.
 #[test_case(50, 100, None, None, None, false, false, 30, 15 ; "basic group test_v1")]
@@ -73,70 +163,19 @@ fn non_empty_group_transaction_tests(
 
     // Group size percentages for 3 groups
     let group_size_pcts = [group_size_pct1, group_size_pct2, group_size_pct3];
+    let transactions = create_mock_transactions::<KeyType<[u8; 32]>>(transaction_gen, &key_universe, group_size_pcts, None);
 
-    let transactions: Vec<_> = transaction_gen
-        .into_iter()
-        .map(|txn_gen| {
-            txn_gen.materialize_groups::<[u8; 32], MockEvent>(&key_universe, group_size_pcts)
-        })
-        .collect();
-    let txn_provider = DefaultTxnProvider::new(transactions);
-
-    let data_view = NonEmptyGroupDataView::<KeyType<[u8; 32]>> {
-        group_keys: key_universe[(universe_size - 3)..universe_size]
-            .iter()
-            .map(|k| KeyType(*k))
-            .collect(),
-    };
-
+    let data_view = create_non_empty_group_data_view(&key_universe, universe_size);
     let executor_thread_pool = create_executor_thread_pool();
-
     let gas_limits = get_gas_limit_variants(use_gas_limit, transaction_count);
-    for maybe_block_gas_limit in gas_limits {
-        for _ in 0..num_executions_parallel {
-            let output = execute_block_parallel::<
-                MockTransaction<KeyType<[u8; 32]>, MockEvent>,
-                NonEmptyGroupDataView<KeyType<[u8; 32]>>,
-                DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
-            >(
-                executor_thread_pool.clone(),
-                maybe_block_gas_limit,
-                block_stm_v2,
-                &txn_provider,
-                &data_view,
-                None,
-            );
-
-            BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)
-                .assert_parallel_output(&output);
-        }
-    }
-
-    // Sequential execution doesn't use gas limits
-    for _ in 0..num_executions_sequential {
-        let mut guard = AptosModuleCacheManagerGuard::none();
-
-        let output = BlockExecutor::<
-            MockTransaction<KeyType<[u8; 32]>, MockEvent>,
-            MockTask<KeyType<[u8; 32]>, MockEvent>,
-            NonEmptyGroupDataView<KeyType<[u8; 32]>>,
-            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
-            DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
-        >::new(
-            BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
-            executor_thread_pool.clone(),
-            None,
-        )
-        .execute_transactions_sequential(&txn_provider, &data_view, &mut guard, false);
-        // TODO: test dynamic disabled as well.
-
-        BaselineOutput::generate(txn_provider.get_txns(), None).assert_output(&output.map_err(
-            |e| match e {
-                SequentialBlockExecutionError::ResourceGroupSerializationError => {
-                    panic!("Unexpected error")
-                },
-                SequentialBlockExecutionError::ErrorToReturn(err) => err,
-            },
-        ));
-    }
+    
+    run_tests_with_groups(
+        executor_thread_pool,
+        gas_limits,
+        block_stm_v2,
+        transactions,
+        &data_view,
+        num_executions_parallel,
+        num_executions_sequential,
+    );
 }
