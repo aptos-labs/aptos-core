@@ -309,6 +309,7 @@ fn compute_delayed_field_try_add_delta_outcome_first_time(
         inner_aggregator_value: base_aggregator_value,
     }))
 }
+
 // TODO[agg_v2](cleanup): see about the split with CapturedReads,
 // and whether anything should be moved there.
 fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
@@ -350,7 +351,7 @@ fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
                 );
             }
 
-            let (result, udpated_delayed_read) =
+            let (result, updated_delayed_read) =
                 compute_delayed_field_try_add_delta_outcome_from_history(
                     base_delta,
                     delta,
@@ -362,7 +363,7 @@ fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
             captured_reads.borrow_mut().capture_delayed_field_read(
                 *id,
                 true,
-                udpated_delayed_read,
+                updated_delayed_read,
             )?;
             Ok(result)
         },

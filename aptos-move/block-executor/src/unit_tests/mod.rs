@@ -51,7 +51,7 @@ fn test_resource_group_deletion() {
     group_creation.group_writes.push((
         KeyType::<u32>(100),
         StateValueMetadata::none(),
-        HashMap::from([(101, ValueType::from_value(vec![5], true))]),
+        HashMap::from([(101, (ValueType::from_value(vec![5], true), false))]),
     ));
     let mut group_deletion: MockIncarnation<KeyType<u32>, MockEvent> =
         MockIncarnation::new(vec![(KeyType::<u32>(1), true)], vec![], vec![], vec![], 10);
@@ -60,7 +60,7 @@ fn test_resource_group_deletion() {
         StateValueMetadata::none(),
         HashMap::from([(
             101,
-            ValueType::new(None, StateValueMetadata::none(), WriteOpKind::Deletion),
+            (ValueType::new(None, StateValueMetadata::none(), WriteOpKind::Deletion), false)
         )]),
     ));
     let t_0 = MockTransaction::from_behavior(group_creation);
@@ -109,7 +109,7 @@ fn resource_group_bcs_fallback() {
         vec![(
             KeyType::<u32>(2),
             ValueType::from_value(vec![5], true),
-            true,
+            false,
         )],
         vec![],
         vec![],
@@ -120,7 +120,7 @@ fn resource_group_bcs_fallback() {
         vec![(
             KeyType::<u32>(1),
             ValueType::from_value(vec![5], true),
-            true,
+            false,
         )],
         vec![],
         vec![],
@@ -134,7 +134,7 @@ fn resource_group_bcs_fallback() {
     group_incarnation.group_writes.push((
         KeyType::<u32>(100),
         StateValueMetadata::none(),
-        HashMap::from([(101, ValueType::from_value(vec![5], true))]),
+        HashMap::from([(101, (ValueType::from_value(vec![5], true), false))]),
     ));
     let t_2 = MockTransaction::from_behavior(group_incarnation);
     let transactions = Vec::from([t_1, t_2, t_3]);

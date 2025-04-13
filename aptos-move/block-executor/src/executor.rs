@@ -129,7 +129,7 @@ where
     gas_limit_processor: BlockGasLimitProcessor<T>,
     // The reason of tracking BTreeSet is to guard against misusing APIs, i.e. in BlockSTMv2,
     // it is far more dangerous to use direct APIs for AggregatorV1 - as push validation is
-    // disabled and correctness relies on validation performed at commit time, much like for
+    // disabled and correctness relies on validation performed at commit time, like for
     // the delayed fields. However, the set of reads for AggregatorV1 is derived from the
     // TAggregatorView interface, which simply forwards to normal resource resolution.
     aggregator_write_keys: BTreeSet<T::Key>,
