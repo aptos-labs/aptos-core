@@ -1099,8 +1099,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 self.check_language_version(
                     &loc,
                     "read/write access specifiers.",
-                    // TODO: should we move this into 2.3?
-                    LanguageVersion::V2_2,
+                    LanguageVersion::V2_3,
                 )?;
             },
         }
