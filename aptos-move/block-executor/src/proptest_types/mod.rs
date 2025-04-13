@@ -6,6 +6,8 @@ pub(crate) mod baseline;
 pub mod bencher;
 #[cfg(test)]
 mod delta_tests;
+#[cfg(test)]
+mod delayed_field_tests;
 mod group_tests;
 mod module_tests;
 mod resource_tests;

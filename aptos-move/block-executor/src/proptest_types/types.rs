@@ -7,6 +7,7 @@ use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
     resolver::TAggregatorV1View,
+    types::DelayedFieldValue,
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
@@ -38,9 +39,13 @@ use aptos_vm_types::{
 };
 use bytes::Bytes;
 use claims::{assert_ge, assert_le, assert_ok};
-use move_core_types::{identifier::IdentStr, language_storage::ModuleId, value::MoveTypeLayout};
-use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use move_core_types::{
+    identifier::IdentStr,
+    language_storage::ModuleId,
+    value::{MoveStructLayout, MoveTypeLayout},
+};
 use move_vm_runtime::Module;
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
@@ -93,6 +98,10 @@ pub(crate) struct NonEmptyGroupDataView<K> {
     pub(crate) group_keys: HashSet<K>,
 }
 
+pub(crate) fn default_group_map() -> BTreeMap<u32, Bytes> {
+    BTreeMap::from([(RESERVED_TAG, serialize(&STORAGE_AGGREGATOR_VALUE).into())])
+}
+
 impl<K> TStateView for NonEmptyGroupDataView<K>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
@@ -101,17 +110,12 @@ where
 
     // Contains mock storage value with a non-empty group (w. value at RESERVED_TAG).
     fn get_state_value(&self, key: &K) -> Result<Option<StateValue>, StateViewError> {
-        if self.group_keys.contains(key) {
-            let group: BTreeMap<u32, Bytes> = BTreeMap::from([(RESERVED_TAG, vec![0].into())]);
-
-            let bytes = bcs::to_bytes(&group).unwrap();
-            Ok(Some(StateValue::new_with_metadata(
-                bytes.into(),
+        Ok(self.group_keys.contains(key).then(|| {
+            StateValue::new_with_metadata(
+                bcs::to_bytes(&default_group_map()).unwrap().into(),
                 raw_metadata(5),
-            )))
-        } else {
-            Ok(None)
-        }
+            )
+        }))
     }
 
     fn id(&self) -> StateViewId {
@@ -319,13 +323,13 @@ pub(crate) struct TransactionGen<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + 
 #[derive(Clone, Debug)]
 pub(crate) struct MockIncarnation<K, E> {
     /// A vector of keys to be read during mock incarnation execution.
-    /// bool being false means that the read should be considered as an AggregatorV1 read.
+    /// bool indicates that the path may contain deltas, i.e. AggregatorV1 or DelayedFields.
     pub(crate) reads: Vec<(K, bool)>,
     /// A vector of keys and corresponding values to be written during mock incarnation execution.
-    /// bool being false means that the write should be considered as an AggregatorV1 write.
+    /// bool indicates that the path may contain deltas, i.e. AggregatorV1 or DelayedFields.
     pub(crate) writes: Vec<(K, ValueType, bool)>,
-    pub(crate) group_reads: Vec<(K, u32)>,
-    pub(crate) group_writes: Vec<(K, StateValueMetadata, HashMap<u32, ValueType>)>,
+    pub(crate) group_reads: Vec<(K, u32, bool)>,
+    pub(crate) group_writes: Vec<(K, StateValueMetadata, HashMap<u32, (ValueType, bool)>)>,
     // For testing get_module_or_build_with and insert_verified_module interfaces.
     pub(crate) module_reads: Vec<ModuleId>,
     pub(crate) module_writes: Vec<ModuleWrite<ValueType>>,
@@ -406,6 +410,8 @@ pub(crate) enum MockTransaction<K, E> {
         /// A vector of mock behaviors prescribed for each incarnation of the transaction, chosen
         /// round robin depending on the incarnation counter value).
         incarnation_behaviors: Vec<MockIncarnation<K, E>>,
+        /// If we are testing with deltas, are we testing delayed_fields? (or AggregatorV1).
+        delayed_fields_or_aggregator_v1: bool,
     },
     /// Skip the execution of trailing transactions.
     SkipRest(u64),
@@ -418,6 +424,7 @@ impl<K, E> MockTransaction<K, E> {
         Self::Write {
             incarnation_counter: Arc::new(AtomicUsize::new(0)),
             incarnation_behaviors: vec![behavior],
+            delayed_fields_or_aggregator_v1: false,
         }
     }
 
@@ -425,7 +432,19 @@ impl<K, E> MockTransaction<K, E> {
         Self::Write {
             incarnation_counter: Arc::new(AtomicUsize::new(0)),
             incarnation_behaviors: behaviors,
+            delayed_fields_or_aggregator_v1: false,
         }
+    }
+
+    pub(crate) fn with_delayed_fields_testing(mut self) -> Self {
+        if let Self::Write {
+            delayed_fields_or_aggregator_v1,
+            ..
+        } = &mut self
+        {
+            *delayed_fields_or_aggregator_v1 = true;
+        }
+        self
     }
 
     pub(crate) fn into_behaviors(self) -> Vec<MockIncarnation<K, E>> {
@@ -497,23 +516,75 @@ impl Default for TransactionGenParams {
     }
 }
 
-// TODO: move generation to separate file.
-// TODO: consider adding writes to reads (read-before-write). Similar behavior to the Move-VM
-// and may force more testing (since we check read results).
+/// TODO: move generation to separate file.
+/// A simple enum to represent either a write or a delta operation result
+enum WriteDeltaVariant<W, D> {
+    Write(W),
+    Delta(D),
+}
+
+fn is_delta_on(index: usize, delta_threshold: Option<usize>) -> bool {
+    delta_threshold.is_some_and(|threshold| threshold <= index)
+}
+
 impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> TransactionGen<V> {
+    /// Determines whether to generate a delta operation or a write operation based on parameters
+    ///
+    /// # Arguments
+    /// * `is_delta_path` - attempt to generate a delta value first
+    /// * `value` - The value to process
+    /// * `delta_threshold` - All indices below this threshold will be writes (not deltas)
+    /// * `allow_deletes` - Whether deletion operations are allowed
+    ///
+    /// # Returns
+    /// Either a delta operation or a write operation with its is_aggregator_v1 flag
+    fn generate_write_or_delta<KeyType>(
+        is_delta_path: bool,
+        value: &V,
+        key: KeyType,
+        allow_deletes: bool,
+    ) -> WriteDeltaVariant<(KeyType, ValueType), (KeyType, DeltaOp)> {
+        // First check if this should be a delta
+        if is_delta_path {
+            let val_u128 = ValueType::from_value(value.clone(), true)
+                .as_u128()
+                .unwrap()
+                .unwrap();
+
+            // Not all values become deltas - some remain as normal writes
+            if val_u128 % 10 != 0 {
+                let delta = if val_u128 % 10 < 5 {
+                    delta_sub(val_u128 % 100, u128::MAX)
+                } else {
+                    delta_add(val_u128 % 100, u128::MAX)
+                };
+                return WriteDeltaVariant::Delta((key, delta));
+            }
+        }
+
+        // Otherwise create a normal write
+        let val_u128 = ValueType::from_value(value.clone(), true)
+            .as_u128()
+            .unwrap()
+            .unwrap();
+        let is_deletion = allow_deletes && val_u128 % 23 == 0;
+        let mut write_value = ValueType::from_value(value.clone(), !is_deletion);
+        write_value.metadata = raw_metadata((val_u128 >> 64) as u64);
+
+        WriteDeltaVariant::Write((key, write_value))
+    }
+
     fn writes_and_deltas_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
         // TODO: disentangle writes and deltas.
         universe: &[K],
         gen: Vec<Vec<(Index, V)>>,
-        delta_fn: &dyn Fn(usize, &V) -> Option<DeltaOp>,
         allow_deletes: bool,
         delta_threshold: Option<usize>,
     ) -> Vec<(
         /* writes = */ Vec<(KeyType<K>, ValueType, bool)>,
         /* deltas = */ Vec<(KeyType<K>, DeltaOp)>,
     )> {
-        let delta_threshold = delta_threshold.unwrap_or(universe.len() + 1);
-        let mut ret = vec![];
+        let mut ret = Vec::with_capacity(gen.len());
         for write_gen in gen.into_iter() {
             let mut keys_modified = BTreeSet::new();
             let mut incarnation_writes = vec![];
@@ -523,18 +594,19 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 let key = universe[i].clone();
                 if !keys_modified.contains(&key) {
                     keys_modified.insert(key.clone());
-                    match delta_fn(i, &value) {
-                        Some(delta) => incarnation_deltas.push((KeyType(key), delta)),
-                        None => {
-                            // One out of 23 writes will be a deletion
-                            let val_u128 = ValueType::from_value(value.clone(), true)
-                                .as_u128()
-                                .unwrap()
-                                .unwrap();
-                            let is_deletion = allow_deletes && val_u128 % 23 == 0;
-                            let mut value = ValueType::from_value(value.clone(), !is_deletion);
-                            value.metadata = raw_metadata((val_u128 >> 64) as u64);
-                            incarnation_writes.push((KeyType(key), value, i < delta_threshold));
+
+                    let is_delta_path = is_delta_on(i, delta_threshold);
+                    match Self::generate_write_or_delta(
+                        is_delta_path,
+                        &value,
+                        KeyType(key),
+                        allow_deletes,
+                    ) {
+                        WriteDeltaVariant::Write((key, value)) => {
+                            incarnation_writes.push((key, value, is_delta_path));
+                        },
+                        WriteDeltaVariant::Delta((key, delta)) => {
+                            incarnation_deltas.push((key, delta));
                         },
                     }
                 }
@@ -549,14 +621,13 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         gen: Vec<Vec<Index>>,
         delta_threshold: Option<usize>,
     ) -> Vec<Vec<(KeyType<K>, bool)>> {
-        let delta_threshold = delta_threshold.unwrap_or(universe.len() + 1);
         let mut ret = vec![];
         for read_gen in gen.into_iter() {
             let mut incarnation_reads: Vec<(KeyType<K>, bool)> = vec![];
             for idx in read_gen.into_iter() {
                 let i = idx.index(universe.len());
                 let key = universe[i].clone();
-                incarnation_reads.push((KeyType(key), i < delta_threshold));
+                incarnation_reads.push((KeyType(key), is_delta_on(i, delta_threshold)));
             }
             ret.push(incarnation_reads);
         }
@@ -592,7 +663,6 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
     >(
         self,
         universe: &[K],
-        delta_fn: &dyn Fn(usize, &V) -> Option<DeltaOp>,
         allow_deletes: bool,
         delta_threshold: Option<usize>,
     ) -> MockTransaction<KeyType<K>, E> {
@@ -602,7 +672,6 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         let behaviors = Self::writes_and_deltas_from_gen(
             universe,
             self.modifications,
-            &delta_fn,
             allow_deletes,
             delta_threshold,
         )
@@ -643,10 +712,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         self,
         universe: &[K],
     ) -> MockTransaction<KeyType<K>, E> {
-        // TODO(BlockSTMv2): different testing for modules.
-        let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
-
-        self.new_mock_write_txn(universe, &is_delta, true, None)
+        self.new_mock_write_txn(universe, true, None)
     }
 
     pub(crate) fn materialize_modules<
@@ -659,19 +725,22 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         let universe_len = universe.len();
         assert_ge!(universe_len, 3, "Universe must have size >= 3");
 
-        let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
-        let mut behaviors = self.new_mock_write_txn(universe, &is_delta, false, None).into_behaviors();
+        let mut behaviors = self
+            .new_mock_write_txn(universe, false, None)
+            .into_behaviors();
 
         behaviors.iter_mut().for_each(|behavior| {
             // Handle writes
             let (key_to_convert, mut value, _) = behavior.writes.pop().unwrap();
             let module_id = key_to_module_id(&key_to_convert, universe_len);
-            
+
             // Serialize a module and store it in bytes so deserialization can succeed.
             let mut serialized_bytes = Vec::new();
-            Module::new_for_test(module_id.clone()).serialize(&mut serialized_bytes).expect("Failed to serialize compiled module");
+            Module::new_for_test(module_id.clone())
+                .serialize(&mut serialized_bytes)
+                .expect("Failed to serialize compiled module");
             value.bytes = Some(serialized_bytes.into());
-            
+
             behavior.module_writes = vec![ModuleWrite::new(module_id, value)];
 
             // Handle reads
@@ -691,19 +760,18 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         self,
         universe: &[K],
         group_size_query_pcts: [Option<u8>; 3],
+        delta_threshold: Option<usize>,
     ) -> MockTransaction<KeyType<K>, E> {
         let universe_len = universe.len();
         assert_ge!(universe_len, 3, "Universe must have size >= 3");
 
-        let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
-
         let group_size_query_indicators =
             Self::group_size_indicator_from_gen(self.group_size_indicators.clone());
         let mut behaviors = self
-            .new_mock_write_txn(&universe[0..universe.len() - 3], &is_delta, false, None)
+            .new_mock_write_txn(&universe[0..universe.len() - 3], false, delta_threshold)
             .into_behaviors();
 
-        let key_to_group = |key: &KeyType<K>| -> Option<(usize, u32)> {
+        let key_to_group = |key: &KeyType<K>| -> Option<(usize, u32, bool)> {
             let mut hasher = DefaultHasher::new();
             key.hash(&mut hasher);
             let bytes = hasher.finish().to_be_bytes();
@@ -712,35 +780,48 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
             let group_key_idx = bytes[1] % 4;
 
-            (group_key_idx < 3).then_some((group_key_idx as usize, tag))
+            // 3/4 of the time key will map to group - rest are normal resource accesses.
+            // 2/3 groups are tested with delayed fields.
+            (group_key_idx < 3).then_some((group_key_idx as usize, tag, group_key_idx > 0))
         };
 
         for (behavior_idx, behavior) in behaviors.iter_mut().enumerate() {
             let mut reads = vec![];
             let mut group_reads = vec![];
-            for read_key in behavior.reads.clone() {
-                assert!(read_key.0 != KeyType(universe[universe_len - 1].clone()));
-                assert!(read_key.0 != KeyType(universe[universe_len - 2].clone()));
-                assert!(read_key.0 != KeyType(universe[universe_len - 3].clone()));
-                match key_to_group(&read_key.0) {
-                    Some((idx, tag)) => {
-                        group_reads.push((KeyType(universe[universe_len - 1 - idx].clone()), tag))
+            for (read_key, has_delayed_field) in behavior.reads.clone() {
+                assert!(read_key != KeyType(universe[universe_len - 1].clone()));
+                assert!(read_key != KeyType(universe[universe_len - 2].clone()));
+                assert!(read_key != KeyType(universe[universe_len - 3].clone()));
+                match key_to_group(&read_key) {
+                    Some((idx, tag, has_delayed_field)) => {
+                        // Custom logic for has_delayed_fields for groups: shadowing
+                        // the flag of the original read.
+                        group_reads.push((
+                            KeyType(universe[universe_len - 1 - idx].clone()),
+                            tag,
+                            // Reserved tag is configured to have delayed fields.
+                            has_delayed_field && tag == RESERVED_TAG,
+                        ))
                     },
-                    None => reads.push(read_key),
+                    None => reads.push((read_key, has_delayed_field)),
                 }
             }
 
             let mut writes = vec![];
             let mut group_writes = vec![];
             let mut inner_ops = vec![HashMap::new(); 3];
-            for (write_key, value, _) in behavior.writes.clone() {
+            for (write_key, value, has_delayed_field) in behavior.writes.clone() {
                 match key_to_group(&write_key) {
-                    Some((key_idx, tag)) => {
+                    Some((key_idx, tag, has_delayed_field)) => {
+                        // Same shadowing of has_delayed_field variable and logic as above.
                         if tag != RESERVED_TAG || !value.is_deletion() {
-                            inner_ops[key_idx].insert(tag, value);
+                            inner_ops[key_idx]
+                                .insert(tag, (value, has_delayed_field && tag == RESERVED_TAG));
                         }
                     },
-                    None => writes.push((write_key, value, true)),
+                    None => {
+                        writes.push((write_key, value, has_delayed_field));
+                    },
                 }
             }
             for (idx, inner_ops) in inner_ops.into_iter().enumerate() {
@@ -753,7 +834,8 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 }
             }
 
-            // Group test does not handle deltas (different view, no default storage value).
+            // Group test does not handle deltas for aggregator v1(different view, no default
+            // storage value). However, it does handle deltas (added below) for delayed fields.
             assert!(behavior.deltas.is_empty());
             behavior.reads = reads;
             behavior.writes = writes;
@@ -785,7 +867,13 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 .collect();
         }
 
-        MockTransaction::from_behaviors(behaviors)
+        // When delayed fields are not enabled, the flag is ignored, so we can always
+        // set with_delayed_fields here.
+        if delta_threshold.is_some() {
+            MockTransaction::from_behaviors(behaviors).with_delayed_fields_testing()
+        } else {
+            MockTransaction::from_behaviors(behaviors)
+        }
     }
 
     pub(crate) fn materialize_with_deltas<
@@ -797,25 +885,8 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         delta_threshold: usize,
         allow_deletes: bool,
     ) -> MockTransaction<KeyType<K>, E> {
-        let is_delta = |i, v: &V| -> Option<DeltaOp> {
-            if i >= delta_threshold {
-                let val = ValueType::from_value(v.clone(), true)
-                    .as_u128()
-                    .unwrap()
-                    .unwrap();
-                if val % 10 == 0 {
-                    None
-                } else if val % 10 < 5 {
-                    Some(delta_sub(val % 100, u128::MAX))
-                } else {
-                    Some(delta_add(val % 100, u128::MAX))
-                }
-            } else {
-                None
-            }
-        };
-
-        self.new_mock_write_txn(universe, &is_delta, allow_deletes, Some(delta_threshold))
+        // Enable delta generation for this specific method
+        self.new_mock_write_txn(universe, allow_deletes, Some(delta_threshold))
     }
 }
 
@@ -861,6 +932,7 @@ where
             MockTransaction::Write {
                 incarnation_counter,
                 incarnation_behaviors,
+                delayed_fields_or_aggregator_v1,
             } => {
                 // Use incarnation counter value as an index to determine the read-
                 // and write-sets of the execution. Increment incarnation counter to
@@ -870,84 +942,135 @@ where
 
                 let behavior = &incarnation_behaviors[idx % incarnation_behaviors.len()];
 
+                let speculative_abort_ret = ExecutionStatus::Success(MockOutput::skip_output());
+                // TODO: generate group_writes.
+                let mut ret = MockOutput {
+                    writes: behavior
+                        .writes
+                        .clone()
+                        .into_iter()
+                        .filter_map(|(k, v, w)| (!w).then_some((k, v)))
+                        .collect(),
+                    aggregator_v1_writes: behavior
+                        .writes
+                        .clone()
+                        .into_iter()
+                        .filter_map(|(k, v, w)| (w && !*delayed_fields_or_aggregator_v1).then_some((k, v)))
+                        .collect(),
+                    group_writes: Vec::with_capacity(behavior.group_writes.len()),
+                    module_writes: behavior.module_writes.clone(),
+                    deltas: behavior.deltas.clone(),
+                    events: behavior.events.to_vec(),
+                    read_results: Vec::with_capacity(behavior.reads.len()),
+                    // First reads, then group reads, following a read of exchanged delayed field id.
+                    delayed_field_reads: vec![],
+                    module_read_results: Vec::with_capacity(behavior.module_reads.len()),
+                    read_group_size_or_metadata: Vec::with_capacity(behavior.group_queries.len()),
+                    materialized_delta_writes: OnceCell::new(),
+                    total_gas: behavior.gas,
+                    skipped: false,
+                };
+
                 // Reads
-                let mut module_read_results = vec![];
                 for module_id in behavior.module_reads.iter() {
-                    module_read_results.push(view.fetch_state_value_metadata(&module_id.address(), &module_id.name()).unwrap());
+                    ret.module_read_results.push(
+                        view.fetch_state_value_metadata(&module_id.address(), &module_id.name())
+                            .unwrap(),
+                    );
                 }
 
-                let mut read_results = vec![];
-                for (key, not_aggregagor_v1) in behavior.reads.iter() {
+                for (key, has_deltas) in behavior.reads.iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
-                    // TODO: also prop test modules
+                    match (has_deltas, *delayed_fields_or_aggregator_v1) {
+                        (false, false) | (false, true) => {
+                            match view.get_resource_bytes(key, None) {
+                                Ok(v) => ret.read_results.push(v.map(Into::into)),
+                                Err(_) => {
+                                    return speculative_abort_ret;
+                                },
+                            }
+                        },
+                        (true, false) => match view.get_aggregator_v1_state_value(key) {
+                            Ok(v) => ret
+                                .read_results
+                                .push(v.map(|state_value| state_value.bytes().clone().into())),
+                            Err(_) => {
+                                return speculative_abort_ret;
+                            },
+                        },
+                        (true, true) => {
+                            let bytes = match view.get_resource_bytes(
+                                key,
+                                Some(&MoveTypeLayout::Struct(MoveStructLayout::new(vec![]))),
+                            ) {
+                                Ok(v) => v,
+                                Err(_) => return speculative_abort_ret,
+                            };
 
-                    let maybe_bytes = if *not_aggregagor_v1 {
-                        view.get_resource_bytes(key, None)
-                    } else {
-                        view.get_aggregator_v1_state_value(key)
-                            .map(|maybe_state_value| {
-                                maybe_state_value.map(|state_value| state_value.bytes().clone())
-                            })
+                            match bcs::from_bytes::<u32>(
+                                &bytes
+                                    .as_ref()
+                                    .expect("bytes should be Some for delayed fields"),
+                            ) {
+                                Ok(id) => {
+                                    ret.read_results.push(bytes.map(Into::into));
+
+                                    let id = DelayedFieldID::new_with_width(id, 8);
+                                    match view.get_delayed_field_value(&id) {
+                                        Ok(v) => ret.delayed_field_reads.push(Some(v)),
+                                        Err(_) => return speculative_abort_ret,
+                                    }
+                                },
+                                Err(_) => return speculative_abort_ret,
+                            }
+                        },
                     };
-
-                    match maybe_bytes {
-                        Ok(v) => read_results.push(v.map(Into::into)),
-                        Err(_) => read_results.push(None),
-                    }
                 }
                 // Read from groups.
-                // TODO: also read group sizes (if there are any group reads).
-                for (group_key, resource_tag) in behavior.group_reads.iter() {
-                    match view.get_resource_from_group(group_key, resource_tag, None) {
-                        Ok(v) => read_results.push(v.map(Into::into)),
-                        Err(_) => read_results.push(None),
+                for (group_key, resource_tag, has_delta) in behavior.group_reads.iter() {
+                    let maybe_layout = (*has_delta && *delayed_fields_or_aggregator_v1)
+                        .then(|| MoveTypeLayout::Struct(MoveStructLayout::new(vec![])));
+                    match view.get_resource_from_group(group_key, resource_tag, maybe_layout.as_ref()) {
+                        Ok(v) => ret.read_results.push(v.map(Into::into)),
+                        Err(_) => return speculative_abort_ret,
                     }
                 }
 
-                let read_group_size_or_metadata = behavior
-                    .group_queries
-                    .iter()
-                    .flat_map(|(group_key, query_metadata)| {
-                        let res = if *query_metadata {
-                            GroupSizeOrMetadata::Metadata(
-                                match view.get_resource_state_value_metadata(group_key) {
-                                    Ok(v) => v,
-                                    Err(_) => return None,
-                                }
-                            )
-                        } else {
-                            GroupSizeOrMetadata::Size(
-                                match view.resource_group_size(group_key) {
-                                    Ok(v) => v.get(),
-                                    Err(_) => return None,
-                                }
-                            )
-                        };
+                for (group_key, query_metadata) in behavior.group_queries.iter() {
+                    let res = if *query_metadata {
+                        GroupSizeOrMetadata::Metadata(
+                            match view.get_resource_state_value_metadata(group_key) {
+                                Ok(v) => v,
+                                Err(_) => return speculative_abort_ret,
+                            },
+                        )
+                    } else {
+                        GroupSizeOrMetadata::Size(match view.resource_group_size(group_key) {
+                            Ok(v) => v.get(),
+                            Err(_) => return speculative_abort_ret,
+                        })
+                    };
 
-                        Some((group_key.clone(), res))
-                    })
-                    .collect();
+                    ret.read_group_size_or_metadata
+                        .push((group_key.clone(), res));
+                }
 
-                let mut group_writes = vec![];
                 for (key, metadata, inner_ops) in behavior.group_writes.iter() {
                     let mut new_inner_ops = HashMap::new();
 
                     let mut new_group_size = match view.resource_group_size(key) {
                         Ok(size) => size,
-                        Err(_) => break,
+                        Err(_) => return speculative_abort_ret,
                     };
                     let group_size = new_group_size.clone();
 
-                    let mut speculative_abort = false;
-                    for (tag, inner_op) in inner_ops.iter() {
-                        let exists = match view
-                            .get_resource_from_group(key, tag, None) {
-                                Ok(v) => v.is_some(),
-                                Err(_) => {
-                                    speculative_abort = true;
-                                    break;
-                                }
-                            };
+                    for (tag, (inner_op, has_delta)) in inner_ops.iter() {
+                        let exists = match view.get_resource_from_group(key, tag, None) {
+                            Ok(v) => v.is_some(),
+                            Err(_) => {
+                                return speculative_abort_ret;
+                            },
+                        };
                         assert!(
                             *tag != RESERVED_TAG || exists,
                             "RESERVED_TAG must always be present in groups in tests"
@@ -956,6 +1079,7 @@ where
                         // inner op is either deletion or creation.
                         assert!(!inner_op.is_modification());
 
+                        // TODO: has_delta && *delayed_fields_or_aggregator_v1: ID and index.
                         let maybe_op = if exists {
                             Some(
                                 if inner_op.is_creation()
@@ -992,7 +1116,7 @@ where
                                 {
                                     // Check it only happens for speculative executions that may not
                                     // commit by returning incorrect (empty) output.
-                                    return ExecutionStatus::Success(MockOutput::skip_output());
+                                    return speculative_abort_ret;
                                 }
                             }
                             if !new_inner_op.is_deletion() {
@@ -1006,16 +1130,12 @@ where
                                 {
                                     // Check it only happens for speculative executions that may not
                                     // commit by returning incorrect (empty) output.
-                                    return ExecutionStatus::Success(MockOutput::skip_output());
+                                    return speculative_abort_ret;
                                 }
                             }
 
                             new_inner_ops.insert(*tag, new_inner_op);
                         }
-                    }
-
-                    if speculative_abort {
-                        break;
                     }
 
                     if !new_inner_ops.is_empty() {
@@ -1024,7 +1144,7 @@ where
                         {
                             // TODO: reserved tag currently prevents this code from being run.
                             // Group got deleted.
-                            group_writes.push((
+                            ret.group_writes.push((
                                 key.clone(),
                                 ValueType::new(None, metadata.clone(), WriteOpKind::Deletion),
                                 new_group_size,
@@ -1038,7 +1158,7 @@ where
                             };
 
                             // Not testing metadata_op here, always modification.
-                            group_writes.push((
+                            ret.group_writes.push((
                                 key.clone(),
                                 ValueType::new(Some(Bytes::new()), metadata.clone(), op_kind),
                                 new_group_size,
@@ -1048,31 +1168,7 @@ where
                     }
                 }
 
-                // generate group_writes.
-                ExecutionStatus::Success(MockOutput {
-                    writes: behavior
-                        .writes
-                        .clone()
-                        .into_iter()
-                        .filter_map(|(k, v, w)| w.then_some((k, v)))
-                        .collect(),
-                    aggregator_v1_writes: behavior
-                        .writes
-                        .clone()
-                        .into_iter()
-                        .filter_map(|(k, v, w)| (!w).then_some((k, v)))
-                        .collect(),
-                    group_writes,
-                    module_writes: behavior.module_writes.clone(),
-                    deltas: behavior.deltas.clone(),
-                    events: behavior.events.to_vec(),
-                    read_results,
-                    module_read_results,
-                    read_group_size_or_metadata,
-                    materialized_delta_writes: OnceCell::new(),
-                    total_gas: behavior.gas,
-                    skipped: false,
-                })
+                ExecutionStatus::Success(ret)
             },
             MockTransaction::SkipRest(gas) => {
                 let mut mock_output = MockOutput::skip_output();
@@ -1112,6 +1208,7 @@ pub(crate) struct MockOutput<K, E> {
     pub(crate) deltas: Vec<(K, DeltaOp)>,
     pub(crate) events: Vec<E>,
     pub(crate) read_results: Vec<Option<Vec<u8>>>,
+    pub(crate) delayed_field_reads: Vec<Option<DelayedFieldValue>>,
     pub(crate) module_read_results: Vec<Option<StateValueMetadata>>,
     pub(crate) read_group_size_or_metadata: Vec<(K, GroupSizeOrMetadata)>,
     pub(crate) materialized_delta_writes: OnceCell<Vec<(K, WriteOp)>>,
@@ -1151,7 +1248,7 @@ where
     }
 
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
-        // TODO[agg_v2](tests): add aggregators V2 to the proptest?
+        // TODO(BlockSTMv2): When we do delayed field deltas in execute, they are queried here.
         BTreeMap::new()
     }
 
@@ -1162,14 +1259,14 @@ where
         StateValueMetadata,
         Arc<MoveTypeLayout>,
     )> {
-        // TODO[agg_v2](tests): add aggregators V2 to the proptest?
+        // TODO(BlockSTMv2): should implement this.
         Vec::new()
     }
 
     fn group_reads_needing_delayed_field_exchange(
         &self,
     ) -> Vec<(<Self::Txn as Transaction>::Key, StateValueMetadata)> {
-        // TODO[agg_v2](tests): add aggregators V2 to the proptest?
+        // TODO(BlockSTMv2): should implement this.
         Vec::new()
     }
 
@@ -1211,6 +1308,7 @@ where
             deltas: vec![],
             events: vec![],
             read_results: vec![],
+            delayed_field_reads: vec![],
             module_read_results: vec![],
             read_group_size_or_metadata: vec![],
             materialized_delta_writes: OnceCell::new(),
@@ -1228,6 +1326,7 @@ where
             deltas: vec![],
             events: vec![],
             read_results: vec![],
+            delayed_field_reads: vec![],
             module_read_results: vec![],
             read_group_size_or_metadata: vec![],
             materialized_delta_writes: OnceCell::new(),
@@ -1324,7 +1423,10 @@ impl TransactionEvent for MockEvent {
 }
 
 // Utility function to convert a key to a module ID
-pub(crate) fn key_to_module_id<K: Clone + Hash + Debug + Ord>(key: &KeyType<K>, universe_len: usize) -> ModuleId {
+pub(crate) fn key_to_module_id<K: Clone + Hash + Debug + Ord>(
+    key: &KeyType<K>,
+    universe_len: usize,
+) -> ModuleId {
     let mut hasher = DefaultHasher::new();
     key.hash(&mut hasher);
     let idx = (hasher.finish() % universe_len as u64) as usize;

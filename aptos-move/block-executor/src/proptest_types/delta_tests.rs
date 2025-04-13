@@ -28,8 +28,8 @@ fn run_transactions_deltas(
 ) {
     let executor_thread_pool = create_executor_thread_pool();
 
-    // The delta threshold controls how many keys / paths are guaranteed r/w resources even in the
-    // presence of deltas.
+    // The delta threshold controls how many keys / paths are guaranteed r/w resources even 
+    // in the presence of deltas.
     let delta_threshold = std::cmp::min(15, universe_size / 2);
 
     for _ in 0..num_random_generations {
