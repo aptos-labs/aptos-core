@@ -43,12 +43,14 @@ pub(crate) fn create_mock_transactions<K: Clone + Hash + Debug + Eq + Ord>(
 pub(crate) fn create_non_empty_group_data_view(
     key_universe: &[[u8; 32]],
     universe_size: usize,
+    delayed_field_testing: bool,
 ) -> NonEmptyGroupDataView<KeyType<[u8; 32]>> {
     NonEmptyGroupDataView::<KeyType<[u8; 32]>> {
         group_keys: key_universe[(universe_size - 3)..universe_size]
             .iter()
             .map(|k| KeyType(*k))
             .collect(),
+        delayed_field_testing,
     }
 }
 
@@ -165,7 +167,7 @@ fn non_empty_group_transaction_tests(
     let group_size_pcts = [group_size_pct1, group_size_pct2, group_size_pct3];
     let transactions = create_mock_transactions::<KeyType<[u8; 32]>>(transaction_gen, &key_universe, group_size_pcts, None);
 
-    let data_view = create_non_empty_group_data_view(&key_universe, universe_size);
+    let data_view = create_non_empty_group_data_view(&key_universe, universe_size, false);
     let executor_thread_pool = create_executor_thread_pool();
     let gas_limits = get_gas_limit_variants(use_gas_limit, transaction_count);
     

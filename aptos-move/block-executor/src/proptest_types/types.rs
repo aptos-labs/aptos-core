@@ -7,7 +7,6 @@ use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
     resolver::TAggregatorV1View,
-    types::DelayedFieldValue,
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
@@ -43,9 +42,10 @@ use move_core_types::{
     identifier::IdentStr,
     language_storage::ModuleId,
     value::{MoveStructLayout, MoveTypeLayout},
+    vm_status::StatusCode,
 };
 use move_vm_runtime::Module;
-use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use move_vm_types::delayed_values::delayed_field_id::{DelayedFieldID, ExtractUniqueIndex};
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
@@ -96,10 +96,22 @@ where
 
 pub(crate) struct NonEmptyGroupDataView<K> {
     pub(crate) group_keys: HashSet<K>,
+    // When we are testing with delayed fields, currently deletion is not supported,
+    // so we need to return for each key that can contain a delayed field. for groups,
+    // the reserved tag is the only such key, and we simply return a value for all
+    // non-group keys to ensure the test runs.
+    pub(crate) delayed_field_testing: bool,
 }
 
 pub(crate) fn default_group_map() -> BTreeMap<u32, Bytes> {
-    BTreeMap::from([(RESERVED_TAG, serialize(&STORAGE_AGGREGATOR_VALUE).into())])
+    BTreeMap::from([(
+        RESERVED_TAG,
+        serialize_delayed_field_tuple(&(
+            STORAGE_AGGREGATOR_VALUE,
+            // u32::MAX represents storage version.
+            u32::MAX,
+        )),
+    )])
 }
 
 impl<K> TStateView for NonEmptyGroupDataView<K>
@@ -110,12 +122,24 @@ where
 
     // Contains mock storage value with a non-empty group (w. value at RESERVED_TAG).
     fn get_state_value(&self, key: &K) -> Result<Option<StateValue>, StateViewError> {
-        Ok(self.group_keys.contains(key).then(|| {
-            StateValue::new_with_metadata(
-                bcs::to_bytes(&default_group_map()).unwrap().into(),
-                raw_metadata(5),
-            )
-        }))
+        Ok(self
+            .group_keys
+            .contains(key)
+            .then(|| {
+                StateValue::new_with_metadata(
+                    bcs::to_bytes(&default_group_map()).unwrap().into(),
+                    raw_metadata(5),
+                )
+            })
+            .or_else(|| {
+                self.delayed_field_testing.then(|| {
+                    StateValue::new_legacy(serialize_delayed_field_tuple(&(
+                        STORAGE_AGGREGATOR_VALUE,
+                        // u32::MAX represents storage version.
+                        u32::MAX,
+                    )))
+                })
+            }))
     }
 
     fn id(&self) -> StateViewId {
@@ -265,7 +289,7 @@ impl TransactionWrite for ValueType {
     }
 
     fn set_bytes(&mut self, bytes: Bytes) {
-        self.bytes = bytes.into();
+        self.bytes = Some(bytes);
     }
 }
 
@@ -836,7 +860,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
             // Group test does not handle deltas for aggregator v1(different view, no default
             // storage value). However, it does handle deltas (added below) for delayed fields.
-            assert!(behavior.deltas.is_empty());
+            assert!(delta_threshold.is_some() || behavior.deltas.is_empty());
             behavior.reads = reads;
             behavior.writes = writes;
             behavior.group_reads = group_reads;
@@ -942,97 +966,101 @@ where
 
                 let behavior = &incarnation_behaviors[idx % incarnation_behaviors.len()];
 
-                let speculative_abort_ret = ExecutionStatus::Success(MockOutput::skip_output());
-                // TODO: generate group_writes.
-                let mut ret = MockOutput {
-                    writes: behavior
-                        .writes
-                        .clone()
-                        .into_iter()
-                        .filter_map(|(k, v, w)| (!w).then_some((k, v)))
-                        .collect(),
-                    aggregator_v1_writes: behavior
-                        .writes
-                        .clone()
-                        .into_iter()
-                        .filter_map(|(k, v, w)| (w && !*delayed_fields_or_aggregator_v1).then_some((k, v)))
-                        .collect(),
-                    group_writes: Vec::with_capacity(behavior.group_writes.len()),
-                    module_writes: behavior.module_writes.clone(),
-                    deltas: behavior.deltas.clone(),
-                    events: behavior.events.to_vec(),
-                    read_results: Vec::with_capacity(behavior.reads.len()),
-                    // First reads, then group reads, following a read of exchanged delayed field id.
-                    delayed_field_reads: vec![],
-                    module_read_results: Vec::with_capacity(behavior.module_reads.len()),
-                    read_group_size_or_metadata: Vec::with_capacity(behavior.group_queries.len()),
-                    materialized_delta_writes: OnceCell::new(),
-                    total_gas: behavior.gas,
-                    skipped: false,
-                };
-
+                // Using a function to generate Error with specific message
+                let abort_with_error =
+                    |msg: &str| ExecutionStatus::Success(MockOutput::with_error(msg));
+                    
+                // Initialize the builder
+                let mut builder = MockOutputBuilder::from_behavior(behavior, *delayed_fields_or_aggregator_v1);
+                
                 // Reads
                 for module_id in behavior.module_reads.iter() {
-                    ret.module_read_results.push(
+                    builder.output.module_read_results.push(
                         view.fetch_state_value_metadata(&module_id.address(), &module_id.name())
                             .unwrap(),
                     );
                 }
+                let mock_layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![]));
 
                 for (key, has_deltas) in behavior.reads.iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
                     match (has_deltas, *delayed_fields_or_aggregator_v1) {
                         (false, false) | (false, true) => {
                             match view.get_resource_bytes(key, None) {
-                                Ok(v) => ret.read_results.push(v.map(Into::into)),
-                                Err(_) => {
-                                    return speculative_abort_ret;
+                                Ok(v) => builder.add_read_result(v.map(Into::into)),
+                                Err(e) => {
+                                    return abort_with_error(&format!(
+                                        "Failed to get resource bytes: {:?}",
+                                        e
+                                    ));
                                 },
                             }
                         },
                         (true, false) => match view.get_aggregator_v1_state_value(key) {
-                            Ok(v) => ret
-                                .read_results
-                                .push(v.map(|state_value| state_value.bytes().clone().into())),
-                            Err(_) => {
-                                return speculative_abort_ret;
+                            Ok(v) => builder.add_read_result(v.map(|state_value| state_value.bytes().clone().into())),
+                            Err(e) => {
+                                return abort_with_error(&format!(
+                                    "Failed to get aggregator v1 state value: {:?}",
+                                    e
+                                ));
                             },
                         },
                         (true, true) => {
-                            let bytes = match view.get_resource_bytes(
-                                key,
-                                Some(&MoveTypeLayout::Struct(MoveStructLayout::new(vec![]))),
-                            ) {
-                                Ok(v) => v,
-                                Err(_) => return speculative_abort_ret,
+                            let bytes = match view.get_resource_bytes(key, Some(&mock_layout)) {
+                                Ok(v) => v.expect(
+                                    "In current tests, delayed field is always initialized",
+                                ),
+                                Err(e) => {
+                                    return abort_with_error(&format!(
+                                        "Failed to get resource bytes with layout: {:?}",
+                                        e
+                                    ))
+                                },
                             };
 
-                            match bcs::from_bytes::<u32>(
-                                &bytes
-                                    .as_ref()
-                                    .expect("bytes should be Some for delayed fields"),
-                            ) {
-                                Ok(id) => {
-                                    ret.read_results.push(bytes.map(Into::into));
+                            // Add bytes to read_results first 
+                            builder.add_read_result(Some(bytes.to_vec()));
 
-                                    let id = DelayedFieldID::new_with_width(id, 8);
-                                    match view.get_delayed_field_value(&id) {
-                                        Ok(v) => ret.delayed_field_reads.push(Some(v)),
-                                        Err(_) => return speculative_abort_ret,
-                                    }
-                                },
-                                Err(_) => return speculative_abort_ret,
+                            // Then perform delayed field read if bytes were returned
+                            if let Err(status) = builder.add_delayed_field_from_read_result(view, key, bytes.as_ref()) {
+                                return status;
                             }
                         },
                     };
                 }
                 // Read from groups.
                 for (group_key, resource_tag, has_delta) in behavior.group_reads.iter() {
-                    let maybe_layout = (*has_delta && *delayed_fields_or_aggregator_v1)
-                        .then(|| MoveTypeLayout::Struct(MoveStructLayout::new(vec![])));
-                    match view.get_resource_from_group(group_key, resource_tag, maybe_layout.as_ref()) {
-                        Ok(v) => ret.read_results.push(v.map(Into::into)),
-                        Err(_) => return speculative_abort_ret,
+                    let maybe_layout = (*has_delta
+                        && *delayed_fields_or_aggregator_v1
+                        && *resource_tag == RESERVED_TAG)
+                        .then(|| mock_layout.clone());
+                    match view.get_resource_from_group(
+                        group_key,
+                        resource_tag,
+                        maybe_layout.as_ref(),
+                    ) {
+                        // TODO(BlockSTMv2): perform delayed field read as well.
+                        Ok(v) => {
+                            builder.add_read_result(v.clone().map(Into::into));
+                            
+                            // Perform delayed field read if needed
+                            if *has_delta && *delayed_fields_or_aggregator_v1 {
+                                assert_eq!(*resource_tag, RESERVED_TAG);
+                                if let Err(status) = builder.add_delayed_field_from_read_result(
+                                    view, 
+                                    group_key, 
+                                    v.expect("In current tests, reserved tag always has a value").as_ref(), 
+                                ) {
+                                    return status;
+                                }
+                            }
+                        },
+                        Err(e) => {
+                            return abort_with_error(&format!(
+                                "Failed to get resource from group: {:?}",
+                                e
+                            ))
+                        },
                     }
                 }
 
@@ -1041,17 +1069,27 @@ where
                         GroupSizeOrMetadata::Metadata(
                             match view.get_resource_state_value_metadata(group_key) {
                                 Ok(v) => v,
-                                Err(_) => return speculative_abort_ret,
+                                Err(e) => {
+                                    return abort_with_error(&format!(
+                                        "Failed to get resource state value metadata: {:?}",
+                                        e
+                                    ))
+                                },
                             },
                         )
                     } else {
                         GroupSizeOrMetadata::Size(match view.resource_group_size(group_key) {
                             Ok(v) => v.get(),
-                            Err(_) => return speculative_abort_ret,
+                            Err(e) => {
+                                return abort_with_error(&format!(
+                                    "Failed to get resource group size: {:?}",
+                                    e
+                                ))
+                            },
                         })
                     };
 
-                    ret.read_group_size_or_metadata
+                    builder.output.read_group_size_or_metadata
                         .push((group_key.clone(), res));
                 }
 
@@ -1060,15 +1098,30 @@ where
 
                     let mut new_group_size = match view.resource_group_size(key) {
                         Ok(size) => size,
-                        Err(_) => return speculative_abort_ret,
+                        Err(e) => {
+                            return abort_with_error(&format!(
+                                "Failed to get resource group size: {:?}",
+                                e
+                            ))
+                        },
                     };
                     let group_size = new_group_size.clone();
 
-                    for (tag, (inner_op, has_delta)) in inner_ops.iter() {
-                        let exists = match view.get_resource_from_group(key, tag, None) {
+                    for (tag, (inner_op, has_delayed_field)) in inner_ops.iter() {
+                        let exists = match view.get_resource_from_group(
+                            key,
+                            tag,
+                            (*has_delayed_field
+                                && *delayed_fields_or_aggregator_v1
+                                && *tag == RESERVED_TAG)
+                                .then(|| &mock_layout),
+                        ) {
                             Ok(v) => v.is_some(),
-                            Err(_) => {
-                                return speculative_abort_ret;
+                            Err(e) => {
+                                return abort_with_error(&format!(
+                                    "Failed to get resource from group: {:?}",
+                                    e
+                                ));
                             },
                         };
                         assert!(
@@ -1079,15 +1132,39 @@ where
                         // inner op is either deletion or creation.
                         assert!(!inner_op.is_modification());
 
-                        // TODO: has_delta && *delayed_fields_or_aggregator_v1: ID and index.
+                        let mut new_inner_op = inner_op.clone();
+                        if *has_delayed_field && *delayed_fields_or_aggregator_v1 && new_inner_op.bytes().is_some() {
+                            // For groups, delayed_fields_or_aggregator_v1 should  always be
+                            // true when has_delta is true & tag is RESERVED_TAG.
+                            assert!(*tag == RESERVED_TAG);
+                            let prev_id =
+                                match view.get_resource_from_group(key, tag, Some(&mock_layout)) {
+                                    Ok(bytes) => deserialize_to_delayed_field_id(&bytes.expect(
+                                        "In current tests, reserved tag always has a value",
+                                    ))
+                                    .expect(
+                                        "Mock deserialization failed in group delayed field test.",
+                                    )
+                                    .0,
+                                    Err(e) => {
+                                        return abort_with_error(&format!(
+                                            "Failed to get resource from group: {:?}",
+                                            e
+                                        ))
+                                    },
+                                };
+                            new_inner_op
+                                .set_bytes(serialize_from_delayed_field_id(prev_id, txn_idx));
+                        }
+
                         let maybe_op = if exists {
                             Some(
-                                if inner_op.is_creation()
-                                    && (inner_op.bytes().unwrap()[0] % 4 < 3
+                                if new_inner_op.is_creation()
+                                    && (new_inner_op.bytes().unwrap()[0] % 4 < 3
                                         || *tag == RESERVED_TAG)
                                 {
                                     ValueType::new(
-                                        inner_op.bytes.clone(),
+                                        new_inner_op.bytes.clone(),
                                         StateValueMetadata::none(),
                                         WriteOpKind::Modification,
                                     )
@@ -1100,7 +1177,7 @@ where
                                 },
                             )
                         } else {
-                            inner_op.is_creation().then(|| inner_op.clone())
+                            new_inner_op.is_creation().then(|| new_inner_op.clone())
                         };
 
                         if let Some(new_inner_op) = maybe_op {
@@ -1116,13 +1193,15 @@ where
                                 {
                                     // Check it only happens for speculative executions that may not
                                     // commit by returning incorrect (empty) output.
-                                    return speculative_abort_ret;
+                                    return abort_with_error(
+                                        "Failed to decrement resource group size",
+                                    );
                                 }
                             }
                             if !new_inner_op.is_deletion() {
                                 let new_size = group_tagged_resource_size(
                                     tag,
-                                    inner_op.bytes.as_ref().unwrap().len(),
+                                    new_inner_op.bytes.as_ref().unwrap().len(),
                                 )
                                 .unwrap();
                                 if increment_size_for_add_tag(&mut new_group_size, new_size)
@@ -1130,7 +1209,9 @@ where
                                 {
                                     // Check it only happens for speculative executions that may not
                                     // commit by returning incorrect (empty) output.
-                                    return speculative_abort_ret;
+                                    return abort_with_error(
+                                        "Failed to increment resource group size",
+                                    );
                                 }
                             }
 
@@ -1144,7 +1225,7 @@ where
                         {
                             // TODO: reserved tag currently prevents this code from being run.
                             // Group got deleted.
-                            ret.group_writes.push((
+                            builder.output.group_writes.push((
                                 key.clone(),
                                 ValueType::new(None, metadata.clone(), WriteOpKind::Deletion),
                                 new_group_size,
@@ -1158,7 +1239,7 @@ where
                             };
 
                             // Not testing metadata_op here, always modification.
-                            ret.group_writes.push((
+                            builder.output.group_writes.push((
                                 key.clone(),
                                 ValueType::new(Some(Bytes::new()), metadata.clone(), op_kind),
                                 new_group_size,
@@ -1168,7 +1249,36 @@ where
                     }
                 }
 
-                ExecutionStatus::Success(ret)
+                for (k, mut new_value, has_delta) in behavior.writes.clone().into_iter() {
+                    if has_delta && !*delayed_fields_or_aggregator_v1 {
+                        // Already handled by aggregator_v1_writes.
+                        continue;
+                    }
+                    
+                    if has_delta && *delayed_fields_or_aggregator_v1 && new_value.bytes().is_some()
+                    {
+                        let prev_id = match view.get_resource_bytes(&k, Some(&mock_layout)) {
+                            Ok(bytes) => {
+                                deserialize_to_delayed_field_id(&bytes.expect(
+                                    "In current tests, delayed field is always initialized",
+                                ))
+                                .expect("Mock deserialization failed in delayed field test.")
+                                .0
+                            },
+                            Err(e) => {
+                                return abort_with_error(&format!(
+                                    "Failed to get resource bytes: {:?}",
+                                    e
+                                ))
+                            },
+                        };
+                        new_value.set_bytes(serialize_from_delayed_field_id(prev_id, txn_idx));
+                    }
+
+                    builder.output.writes.push((k, new_value));
+                }
+
+                ExecutionStatus::Success(builder.build())
             },
             MockTransaction::SkipRest(gas) => {
                 let mut mock_output = MockOutput::skip_output();
@@ -1208,12 +1318,124 @@ pub(crate) struct MockOutput<K, E> {
     pub(crate) deltas: Vec<(K, DeltaOp)>,
     pub(crate) events: Vec<E>,
     pub(crate) read_results: Vec<Option<Vec<u8>>>,
-    pub(crate) delayed_field_reads: Vec<Option<DelayedFieldValue>>,
+    pub(crate) delayed_field_reads: Vec<(DelayedFieldID, u128, K)>,
     pub(crate) module_read_results: Vec<Option<StateValueMetadata>>,
     pub(crate) read_group_size_or_metadata: Vec<(K, GroupSizeOrMetadata)>,
     pub(crate) materialized_delta_writes: OnceCell<Vec<(K, WriteOp)>>,
     pub(crate) total_gas: u64,
     pub(crate) skipped: bool,
+    pub(crate) maybe_error_msg: Option<String>,
+}
+
+/// A builder for incrementally constructing MockOutput instances for cleaner code.
+pub(crate) struct MockOutputBuilder<K, E> {
+    output: MockOutput<K, E>,
+}
+
+impl<K: Clone + Debug, E: Clone> MockOutputBuilder<K, E> {
+    /// Create a new builder from behavior
+    pub(crate) fn from_behavior(
+        behavior: &MockIncarnation<K, E>,
+        delayed_fields_or_aggregator_v1: bool,
+    ) -> Self {
+        let output = MockOutput {
+            writes: Vec::with_capacity(behavior.writes.len()),
+            aggregator_v1_writes: behavior
+                .writes
+                .clone()
+                .into_iter()
+                .filter_map(|(k, v, has_delta)| {
+                    (has_delta && !delayed_fields_or_aggregator_v1).then_some((k, v))
+                })
+                .collect(),
+            group_writes: Vec::with_capacity(behavior.group_writes.len()),
+            module_writes: behavior.module_writes.clone(),
+            deltas: if !delayed_fields_or_aggregator_v1 {
+                behavior.deltas.clone()
+            } else {
+                Vec::new()
+            },
+            events: behavior.events.to_vec(),
+            read_results: Vec::with_capacity(behavior.reads.len()),
+            delayed_field_reads: vec![],
+            module_read_results: Vec::with_capacity(behavior.module_reads.len()),
+            read_group_size_or_metadata: Vec::with_capacity(behavior.group_queries.len()),
+            materialized_delta_writes: OnceCell::new(),
+            total_gas: behavior.gas,
+            skipped: false,
+            maybe_error_msg: None,
+        };
+
+        Self { output }
+    }
+
+    /// Perform a delayed field read and update the output accordingly.
+    /// Returns an error ExecutionStatus if the read fails.
+    pub(crate) fn add_delayed_field_from_read_result(
+        &mut self,
+        view: &impl TExecutorView<K, u32, MoveTypeLayout, ValueType>,
+        key: &K,
+        bytes: &[u8],
+    ) -> Result<(), ExecutionStatus<MockOutput<K, E>, usize>> {
+        let id = deserialize_to_delayed_field_id(bytes)
+            .expect("Must deserialize delayed field tuple")
+            .0;
+
+        match view.get_delayed_field_value(&id) {
+            Ok(v) => {
+                let value = v.into_aggregator_value().unwrap();
+                self.output.delayed_field_reads.push((id, value, key.clone()));
+                Ok(())
+            },
+            Err(e) => {
+                Err(ExecutionStatus::Success(MockOutput::with_error(&format!(
+                    "Failed to get delayed field value: {:?}", e
+                ))))
+            }
+        }
+    }
+
+    /// Add a normal read result
+    pub(crate) fn add_read_result(&mut self, result: Option<Vec<u8>>) {
+        self.output.read_results.push(result);
+    }
+
+    /// Build and return the final MockOutput
+    pub(crate) fn build(self) -> MockOutput<K, E> {
+        self.output
+    }
+}
+
+impl<K, E> MockOutput<K, E> {
+    // Helper method to create an empty MockOutput with common settings
+    fn empty_output(skipped: bool, error_msg: Option<String>) -> Self {
+        Self {
+            writes: vec![],
+            aggregator_v1_writes: vec![],
+            group_writes: vec![],
+            module_writes: vec![],
+            deltas: vec![],
+            events: vec![],
+            read_results: vec![],
+            delayed_field_reads: vec![],
+            module_read_results: vec![],
+            read_group_size_or_metadata: vec![],
+            materialized_delta_writes: OnceCell::new(),
+            total_gas: 0,
+            skipped,
+            maybe_error_msg: error_msg,
+        }
+    }
+
+    // Helper method to create a MockOutput with an error message
+    fn with_error(error: impl std::fmt::Display) -> Self {
+        Self::empty_output(true, Some(format!("{}", error)))
+    }
+
+    // Helper method to create a MockOutput with a discard code
+    fn with_discard_code(code: StatusCode) -> Self {
+        Self::empty_output(true, Some(format!("Discarded with code: {:?}", code)))
+    }
 }
 
 impl<K, E> TransactionOutput for MockOutput<K, E>
@@ -1270,12 +1492,6 @@ where
         Vec::new()
     }
 
-    // TODO[agg_v2](tests): Currently, appending None to all events, which means none of the
-    // events have aggregators. Test it with aggregators as well.
-    fn get_events(&self) -> Vec<(E, Option<MoveTypeLayout>)> {
-        self.events.iter().map(|e| (e.clone(), None)).collect()
-    }
-
     // TODO[agg_v2](cleanup) Using the concrete type layout here. Should we find a way to use generics?
     fn resource_group_write_set(
         &self,
@@ -1300,47 +1516,11 @@ where
     }
 
     fn skip_output() -> Self {
-        Self {
-            writes: vec![],
-            aggregator_v1_writes: vec![],
-            group_writes: vec![],
-            module_writes: vec![],
-            deltas: vec![],
-            events: vec![],
-            read_results: vec![],
-            delayed_field_reads: vec![],
-            module_read_results: vec![],
-            read_group_size_or_metadata: vec![],
-            materialized_delta_writes: OnceCell::new(),
-            total_gas: 0,
-            skipped: true,
-        }
+        Self::empty_output(true, None)
     }
 
-    fn discard_output(_discard_code: move_core_types::vm_status::StatusCode) -> Self {
-        Self {
-            writes: vec![],
-            aggregator_v1_writes: vec![],
-            group_writes: vec![],
-            module_writes: vec![],
-            deltas: vec![],
-            events: vec![],
-            read_results: vec![],
-            delayed_field_reads: vec![],
-            module_read_results: vec![],
-            read_group_size_or_metadata: vec![],
-            materialized_delta_writes: OnceCell::new(),
-            total_gas: 0,
-            skipped: true,
-        }
-    }
-
-    fn materialize_agg_v1(
-        &self,
-        _view: &impl TAggregatorV1View<Identifier = <Self::Txn as Transaction>::Key>,
-    ) {
-        // TODO[agg_v2](tests): implement this method and compare
-        // against sequential execution results v. aggregator v1.
+    fn discard_output(discard_code: StatusCode) -> Self {
+        Self::with_discard_code(discard_code)
     }
 
     fn incorporate_materialized_txn_output(
@@ -1405,6 +1585,20 @@ where
     > {
         HashSet::new()
     }
+
+    fn materialize_agg_v1(
+        &self,
+        _view: &impl TAggregatorV1View<Identifier = <Self::Txn as Transaction>::Key>,
+    ) {
+        // TODO[agg_v2](tests): implement this method and compare
+        // against sequential execution results v. aggregator v1.
+    }
+
+    // TODO[agg_v2](tests): Currently, appending None to all events, which means none of the
+    // events have aggregators. Test it with aggregators as well.
+    fn get_events(&self) -> Vec<(E, Option<MoveTypeLayout>)> {
+        self.events.iter().map(|e| (e.clone(), None)).collect()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -1437,4 +1631,81 @@ pub(crate) fn key_to_module_id<K: Clone + Hash + Debug + Ord>(
         AccountAddress::new(addr),
         IdentStr::new("test").unwrap().into(),
     )
+}
+
+// ID is just the unique index as u128.
+pub(crate) fn serialize_from_delayed_field_u128(value_or_id: u128, version: u32) -> Bytes {
+    let tuple = (value_or_id, version);
+    serialize_delayed_field_tuple(&tuple)
+}
+
+pub(crate) fn serialize_from_delayed_field_id(
+    delayed_field_id: DelayedFieldID,
+    version: u32,
+) -> Bytes {
+    let tuple = (delayed_field_id.extract_unique_index() as u128, version);
+    serialize_delayed_field_tuple(&tuple)
+}
+
+/// Serializes a (u128, u32) tuple into Bytes using BCS serialization
+fn serialize_delayed_field_tuple(value: &(u128, u32)) -> Bytes {
+    bcs::to_bytes(value)
+        .expect("Failed to serialize (u128, u32) tuple")
+        .into()
+}
+
+/// The width of the delayed field is not used in the tests, and fixed as 8 for
+/// all delayed field constructions. However, only the real ID is actually
+/// serialized and deserialized (together with the version).
+pub(crate) fn deserialize_to_delayed_field_u128(bytes: &[u8]) -> Result<(u128, u32), bcs::Error> {
+    bcs::from_bytes::<(u128, u32)>(bytes)
+}
+
+pub(crate) fn deserialize_to_delayed_field_id(
+    bytes: &[u8],
+) -> Result<(DelayedFieldID, u32), bcs::Error> {
+    let (id, version) = bcs::from_bytes::<(u128, u32)>(bytes)?;
+    Ok((DelayedFieldID::from((id as u32, 8)), version))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_case::test_case;
+
+    #[test_case((0u128, 0u32) ; "zero values")]
+    #[test_case((1u128, 42u32) ; "small values")]
+    #[test_case((u128::MAX, u32::MAX) ; "maximum values")]
+    #[test_case((12345678u128, 87654321u32) ; "large values")]
+    fn test_serialize_deserialize_delayed_field_tuple(tuple: (u128, u32)) {
+        // Serialize and then deserialize
+        let serialized = serialize_delayed_field_tuple(&tuple);
+        let deserialized =
+            deserialize_to_delayed_field_u128(&serialized).expect("Deserialization failed");
+
+        assert_eq!(
+            tuple, deserialized,
+            "Serialization/deserialization failed for tuple ({}, {})",
+            tuple.0, tuple.1
+        );
+    }
+
+    #[test]
+    fn test_deserialize_delayed_field_tuple_invalid_data() {
+        // Test with invalid data that's too short
+        let invalid_data = vec![1, 2, 3];
+        let result = deserialize_to_delayed_field_u128(&invalid_data);
+        assert!(
+            result.is_err(),
+            "Expected deserialization to fail with too short data"
+        );
+
+        // Test with empty data
+        let empty_data: Vec<u8> = vec![];
+        let result = deserialize_to_delayed_field_u128(&empty_data);
+        assert!(
+            result.is_err(),
+            "Expected deserialization to fail with empty data"
+        );
+    }
 }

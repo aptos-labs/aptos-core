@@ -14,6 +14,7 @@ use aptos_types::{
 use aptos_vm_logging::{alert, prelude::*};
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
+#[cfg(test)]
 use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
 use rand::{thread_rng, Rng};
@@ -150,6 +151,7 @@ pub(crate) fn serialize_groups<T: Transaction>(
         ResourceGroupSize,
     )>,
 ) -> Result<Vec<(T::Key, T::Value)>, ResourceGroupSerializationError> {
+    #[cfg(test)]
     fail_point!(
         "fail-point-resource-group-serialization",
         !finalized_groups.is_empty(),
