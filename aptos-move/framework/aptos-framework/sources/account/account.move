@@ -32,6 +32,20 @@ module aptos_framework::account {
         new_authentication_key: vector<u8>,
     }
 
+    #[event]
+    struct KeyRotationToPublicKey has drop, store {
+        // The account that is rotating its key
+        account: address,
+        // The bitmap of verified public keys.  This indicates which public keys have been verified by the account owner.
+        verified_public_key_bit_map: vector<u8>,
+        // The scheme of the public key.
+        public_key_scheme: u8,
+        // The byte representation of the public key.
+        public_key: vector<u8>,
+        // The new authentication key which is the hash of [public_key, public_key_scheme]
+        authentication_key: vector<u8>,
+    }
+
     /// Resource representing an account.
     struct Account has key, store {
         authentication_key: vector<u8>,
@@ -510,6 +524,18 @@ module aptos_framework::account {
 
         // Update the `OriginatingAddress` table.
         update_auth_key_and_originating_address_table(addr, account_resource, new_auth_key);
+
+        if (to_scheme == MULTI_ED25519_SCHEME) {
+            let len = vector::length(&cap_update_table);
+            let signature_bitmap = vector::slice(&cap_update_table, len - 4, len);
+            event::emit(KeyRotationToPublicKey {
+                account: addr,
+                verified_public_key_bit_map: signature_bitmap,
+                public_key_scheme: to_scheme,
+                public_key: to_public_key_bytes,
+                authentication_key: new_auth_key,
+            });
+        }
     }
 
     public entry fun rotate_authentication_key_with_rotation_capability(
@@ -553,6 +579,18 @@ module aptos_framework::account {
             offerer_account_resource,
             new_auth_key
         );
+
+        if (new_scheme == MULTI_ED25519_SCHEME) {
+            let len = vector::length(&cap_update_table);
+            let signature_bitmap = vector::slice(&cap_update_table, len - 4, len);
+            event::emit(KeyRotationToPublicKey {
+                account: rotation_cap_offerer_address,
+                verified_public_key_bit_map: signature_bitmap,
+                public_key_scheme: new_scheme,
+                public_key: new_public_key_bytes,
+                authentication_key: new_auth_key,
+            });
+        }
     }
 
     /// Offers rotation capability on behalf of `account` to the account at address `recipient_address`.
