@@ -6,9 +6,7 @@ module aptos_std::federated_keyless {
     use aptos_std::error;
 
     #[test_only]
-    use aptos_std::bcs;
-    #[test_only]
-    use std::string::{utf8};
+    friend aptos_std::federated_keyless_tests;
 
     //
     // Error codes
@@ -55,30 +53,13 @@ module aptos_std::federated_keyless {
         PublicKey { keyless_public_key, jwk_address }
     }
 
-    #[test]
-    fun test_deserialize_public_key() {
-        // The bytes below represent a Federated Keyless public key that looks like
-        // federated_keyless::PublicKey {
-        //     jwk_address: @0xaa9b5e7acc48169fdc3809b614532a5a675cf7d4c80cd4aea732b47e328bda1a,
-        //     keyless_public_key: keyless::PublicKey {
-        //         iss: "https://accounts.google.com",
-        //         idc: "0x86bc0a0a825eb6337ca1e8a3157e490eac8df23d5cef25d9641ad5e7edc1d514"
-        //     }
-        // }
-        //
-        let bytes = x"aa9b5e7acc48169fdc3809b614532a5a675cf7d4c80cd4aea732b47e328bda1a1b68747470733a2f2f6163636f756e74732e676f6f676c652e636f6d2086bc0a0a825eb6337ca1e8a3157e490eac8df23d5cef25d9641ad5e7edc1d514";
-        let pk = new_public_key_from_bytes(bytes);
-        assert!(
-            bcs::to_bytes(&pk) == bytes,
-        );
-        assert!(
-            pk.keyless_public_key.get_iss() == utf8(b"https://accounts.google.com"),
-        );
-        assert!(
-            pk.keyless_public_key.get_idc() == x"86bc0a0a825eb6337ca1e8a3157e490eac8df23d5cef25d9641ad5e7edc1d514",
-        );
-        assert!(
-            pk.jwk_address == @0xaa9b5e7acc48169fdc3809b614532a5a675cf7d4c80cd4aea732b47e328bda1a,
-        );
+    /// Returns the identifier bytes of the public key
+    friend fun get_jwk_address(self: &PublicKey): address {
+        self.jwk_address
+    }
+
+    /// Returns the keyless public key of the public key
+    friend fun get_keyless_public_key(self: &PublicKey): keyless::PublicKey {
+        self.keyless_public_key
     }
 }

@@ -7,10 +7,9 @@ module aptos_std::keyless {
     friend aptos_std::federated_keyless;
 
     #[test_only]
-    use std::string::{utf8};
+    friend aptos_std::keyless_tests;
     #[test_only]
-    use std::bcs;
-
+    friend aptos_std::federated_keyless_tests;
 
     // Error codes
     //
@@ -78,20 +77,5 @@ module aptos_std::keyless {
     /// Returns the identifier bytes of the public key
     friend fun get_idc(self: &PublicKey): vector<u8> {
         self.idc
-    }
-
-    #[test]
-    fun test_deserialize_public_key() {
-        let bytes: vector<u8> = x"1b68747470733a2f2f6163636f756e74732e676f6f676c652e636f6d2086bc0a0a825eb6337ca1e8a3157e490eac8df23d5cef25d9641ad5e7edc1d514";
-        let pk = new_public_key_from_bytes(bytes);
-        assert!(
-            bcs::to_bytes(&pk) == bytes,
-        );
-        assert!(
-            get_iss(&pk) == utf8(b"https://accounts.google.com"),
-        );
-        assert!(
-            get_idc(&pk) == x"86bc0a0a825eb6337ca1e8a3157e490eac8df23d5cef25d9641ad5e7edc1d514",
-        );
     }
 }

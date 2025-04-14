@@ -24,14 +24,4 @@ module aptos_std::secp256r1 {
     public fun ecdsa_raw_public_key_to_bytes(pk: &ECDSARawPublicKey): vector<u8> {
         pk.bytes
     }
-
-    //
-    // Tests
-    //
-
-    #[test]
-    #[expected_failure(abort_code = 0x10001, location = Self)]
-    fun test_ecdsa_raw_public_key_from_64_bytes_bad_input() {
-        let _pk = ecdsa_raw_public_key_from_64_bytes(x"11");
-    }
 }
