@@ -10,14 +10,16 @@ use crate::{
 };
 use ambassador::delegate_to_methods;
 use aptos_mvhashmap::types::TxnIndex;
+#[cfg(test)]
+use aptos_types::on_chain_config::CurrentTimeMicroseconds;
 use aptos_types::{
     executable::ModulePath,
-    on_chain_config::CurrentTimeMicroseconds,
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
     vm::modules::AptosModuleExtension,
 };
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
+#[cfg(test)]
 use fail::fail_point;
 use move_binary_format::{
     errors::{Location, PartialVMResult, VMResult},
@@ -220,6 +222,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> AptosModuleStorage for Lat
         // In order to test the module cache with combinatorial tests, we embed the version
         // information into the state value metadata (execute_transaction has access via
         // AptosModuleStorage trait only).
+        #[cfg(test)]
         fail_point!("module_test", |_| {
             Ok(result.clone().map(|(_, version)| {
                 let v = version.unwrap_or(u32::MAX) as u64;

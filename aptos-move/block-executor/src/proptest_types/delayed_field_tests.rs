@@ -66,7 +66,7 @@ fn delayed_field_transaction_tests(
         Some(delta_threshold),
     );
 
-    let data_view = create_non_empty_group_data_view(&key_universe, universe_size);
+    let data_view = create_non_empty_group_data_view(&key_universe, universe_size, true);
 
     let executor_thread_pool = create_executor_thread_pool();
 
