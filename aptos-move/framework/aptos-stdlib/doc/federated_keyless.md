@@ -88,7 +88,7 @@ Parses the input bytes into a keyless public key.
 <pre><code><b>public</b> <b>fun</b> <a href="federated_keyless.md#0x1_federated_keyless_new_public_key_from_bytes">new_public_key_from_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="federated_keyless.md#0x1_federated_keyless_PublicKey">PublicKey</a> {
     <b>let</b> stream = <a href="bcs_stream.md#0x1_bcs_stream_new">bcs_stream::new</a>(bytes);
     <b>let</b> pk = <a href="federated_keyless.md#0x1_federated_keyless_deserialize_public_key">deserialize_public_key</a>(&<b>mut</b> stream);
-    <b>assert</b>!(<a href="bcs_stream.md#0x1_bcs_stream_has_remaining">bcs_stream::has_remaining</a>(&<b>mut</b> stream) == <b>false</b>, std::error::invalid_argument(<a href="federated_keyless.md#0x1_federated_keyless_E_INVALID_FEDERATED_KEYLESS_PUBLIC_KEY_EXTRA_BYTES">E_INVALID_FEDERATED_KEYLESS_PUBLIC_KEY_EXTRA_BYTES</a>));
+    <b>assert</b>!(!<a href="bcs_stream.md#0x1_bcs_stream_has_remaining">bcs_stream::has_remaining</a>(&<b>mut</b> stream), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="federated_keyless.md#0x1_federated_keyless_E_INVALID_FEDERATED_KEYLESS_PUBLIC_KEY_EXTRA_BYTES">E_INVALID_FEDERATED_KEYLESS_PUBLIC_KEY_EXTRA_BYTES</a>));
     pk
 }
 </code></pre>
@@ -101,6 +101,7 @@ Parses the input bytes into a keyless public key.
 
 ## Function `deserialize_public_key`
 
+Deserializes a Federated Keyless public key from a BCS stream.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="federated_keyless.md#0x1_federated_keyless_deserialize_public_key">deserialize_public_key</a>(stream: &<b>mut</b> <a href="bcs_stream.md#0x1_bcs_stream_BCSStream">bcs_stream::BCSStream</a>): <a href="federated_keyless.md#0x1_federated_keyless_PublicKey">federated_keyless::PublicKey</a>
@@ -127,6 +128,7 @@ Parses the input bytes into a keyless public key.
 
 ## Function `new`
 
+Creates a new Federated Keyless public key from a keyless public key and a JWK address.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="federated_keyless.md#0x1_federated_keyless_new">new</a>(keyless_public_key: <a href="keyless.md#0x1_keyless_PublicKey">keyless::PublicKey</a>, jwk_address: <b>address</b>): <a href="federated_keyless.md#0x1_federated_keyless_PublicKey">federated_keyless::PublicKey</a>

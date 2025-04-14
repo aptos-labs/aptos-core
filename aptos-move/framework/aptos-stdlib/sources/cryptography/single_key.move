@@ -9,6 +9,7 @@ module aptos_std::single_key {
     use aptos_std::secp256r1;
     use aptos_std::bcs;
     use aptos_std::federated_keyless;
+    use std::error;
     use std::hash;
 
     // Error codes
@@ -65,10 +66,11 @@ module aptos_std::single_key {
     public fun new_public_key_from_bytes(bytes: vector<u8>): AnyPublicKey {
         let stream = bcs_stream::new(bytes);
         let pk = deserialize_any_public_key(&mut stream);
-        assert!(bcs_stream::has_remaining(&mut stream) == false, std::error::invalid_argument(E_INVALID_SINGLE_KEY_EXTRA_BYTES));
+        assert!(!bcs_stream::has_remaining(&mut stream), error::invalid_argument(E_INVALID_SINGLE_KEY_EXTRA_BYTES));
         pk
     }
 
+    /// Deserializes a Single Key public key from a BCS stream.
     public fun deserialize_any_public_key(stream: &mut bcs_stream::BCSStream): AnyPublicKey {
         let scheme_id = bcs_stream::deserialize_u8(stream);
         let pk: AnyPublicKey;
@@ -86,7 +88,7 @@ module aptos_std::single_key {
         } else if (scheme_id == FEDERATED_KEYLESS_PUBLIC_KEY_TYPE) {
             pk = AnyPublicKey::FederatedKeyless{pk: federated_keyless::deserialize_public_key(stream)}
         } else {
-            abort std::error::invalid_argument(E_INVALID_PUBLIC_KEY_TYPE);
+            abort error::invalid_argument(E_INVALID_PUBLIC_KEY_TYPE);
         };
         pk
     }

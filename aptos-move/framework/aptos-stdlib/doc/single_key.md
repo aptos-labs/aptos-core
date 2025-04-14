@@ -263,7 +263,7 @@ It does check that the bytes deserialize into a well-formed public key for the g
 <pre><code><b>public</b> <b>fun</b> <a href="single_key.md#0x1_single_key_new_public_key_from_bytes">new_public_key_from_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="single_key.md#0x1_single_key_AnyPublicKey">AnyPublicKey</a> {
     <b>let</b> stream = <a href="bcs_stream.md#0x1_bcs_stream_new">bcs_stream::new</a>(bytes);
     <b>let</b> pk = <a href="single_key.md#0x1_single_key_deserialize_any_public_key">deserialize_any_public_key</a>(&<b>mut</b> stream);
-    <b>assert</b>!(<a href="bcs_stream.md#0x1_bcs_stream_has_remaining">bcs_stream::has_remaining</a>(&<b>mut</b> stream) == <b>false</b>, std::error::invalid_argument(<a href="single_key.md#0x1_single_key_E_INVALID_SINGLE_KEY_EXTRA_BYTES">E_INVALID_SINGLE_KEY_EXTRA_BYTES</a>));
+    <b>assert</b>!(!<a href="bcs_stream.md#0x1_bcs_stream_has_remaining">bcs_stream::has_remaining</a>(&<b>mut</b> stream), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="single_key.md#0x1_single_key_E_INVALID_SINGLE_KEY_EXTRA_BYTES">E_INVALID_SINGLE_KEY_EXTRA_BYTES</a>));
     pk
 }
 </code></pre>
@@ -276,6 +276,7 @@ It does check that the bytes deserialize into a well-formed public key for the g
 
 ## Function `deserialize_any_public_key`
 
+Deserializes a Single Key public key from a BCS stream.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="single_key.md#0x1_single_key_deserialize_any_public_key">deserialize_any_public_key</a>(stream: &<b>mut</b> <a href="bcs_stream.md#0x1_bcs_stream_BCSStream">bcs_stream::BCSStream</a>): <a href="single_key.md#0x1_single_key_AnyPublicKey">single_key::AnyPublicKey</a>
@@ -304,7 +305,7 @@ It does check that the bytes deserialize into a well-formed public key for the g
     } <b>else</b> <b>if</b> (scheme_id == <a href="single_key.md#0x1_single_key_FEDERATED_KEYLESS_PUBLIC_KEY_TYPE">FEDERATED_KEYLESS_PUBLIC_KEY_TYPE</a>) {
         pk = AnyPublicKey::FederatedKeyless{pk: <a href="federated_keyless.md#0x1_federated_keyless_deserialize_public_key">federated_keyless::deserialize_public_key</a>(stream)}
     } <b>else</b> {
-        <b>abort</b> std::error::invalid_argument(<a href="single_key.md#0x1_single_key_E_INVALID_PUBLIC_KEY_TYPE">E_INVALID_PUBLIC_KEY_TYPE</a>);
+        <b>abort</b> <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="single_key.md#0x1_single_key_E_INVALID_PUBLIC_KEY_TYPE">E_INVALID_PUBLIC_KEY_TYPE</a>);
     };
     pk
 }

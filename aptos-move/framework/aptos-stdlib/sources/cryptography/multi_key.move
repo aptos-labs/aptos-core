@@ -47,13 +47,15 @@ module aptos_std::multi_key {
     // Functions
     //
 
+    /// Parses the input bytes into a MultiKey public key.
     public fun new_public_key_from_bytes(bytes: vector<u8>): MultiKey {
         let stream = bcs_stream::new(bytes);
         let pk = deserialize_multi_key(&mut stream);
-        assert!(bcs_stream::has_remaining(&mut stream) == false, std::error::invalid_argument(E_INVALID_MULTI_KEY_EXTRA_BYTES));
+        assert!(!bcs_stream::has_remaining(&mut stream), error::invalid_argument(E_INVALID_MULTI_KEY_EXTRA_BYTES));
         pk
     }
 
+    /// Creates a new MultiKey public key from a vector of single key public keys and a number representing the number of signatures required to authenticate a transaction.
     public fun new_multi_key_from_single_keys(single_keys: vector<single_key::AnyPublicKey>, signatures_required: u8): MultiKey {
         let num_keys = single_keys.length();
         assert!(
@@ -71,12 +73,14 @@ module aptos_std::multi_key {
         MultiKey { public_keys: single_keys, signatures_required }
     }
 
+    /// Deserializes a MultiKey public key from a BCS stream.
     public fun deserialize_multi_key(stream: &mut bcs_stream::BCSStream): MultiKey {
         let public_keys = bcs_stream::deserialize_vector(stream, |x| single_key::deserialize_any_public_key(x));
         let signatures_required = bcs_stream::deserialize_u8(stream);
         MultiKey { public_keys, signatures_required }
     }
 
+    /// Returns the authentication key for a MultiKey public key.
     public fun to_authentication_key(self: &MultiKey): vector<u8> {
         let pk_bytes = bcs::to_bytes(self);
         pk_bytes.push_back(SIGNATURE_SCHEME_ID);
@@ -89,7 +93,7 @@ module aptos_std::multi_key {
         let pk2 = single_key::new_public_key_from_bytes(x"0020bd182d6e3f4ad1daf0d94e53daaece63ebd571d8a8e0098a02a4c0b4ecc7c99e");
         let multi_key = new_multi_key_from_single_keys(vector[pk1, pk2], 1);
         let mk_bytes: vector<u8> = x"020020aa9b5e7acc48169fdc3809b614532a5a675cf7d4c80cd4aea732b47e328bda1a0020bd182d6e3f4ad1daf0d94e53daaece63ebd571d8a8e0098a02a4c0b4ecc7c99e01";
-        assert!(bcs::to_bytes(&multi_key) == mk_bytes, std::error::invalid_state(1));
+        assert!(bcs::to_bytes(&multi_key) == mk_bytes);
     }
 
     #[test]
@@ -127,7 +131,6 @@ module aptos_std::multi_key {
         let multi_key = new_public_key_from_bytes(mk_bytes);
         assert!(
             multi_key.to_authentication_key() == x"c7ab91daf558b00b1f81207b702349a74029dddfbf0e99d54b3d7675714a61de",
-            std::error::invalid_state(1)
         );
     }
 }

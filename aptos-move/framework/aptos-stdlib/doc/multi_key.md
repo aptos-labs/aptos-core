@@ -132,6 +132,7 @@ The number of keys provided is greater than the maximum allowed.
 
 ## Function `new_public_key_from_bytes`
 
+Parses the input bytes into a MultiKey public key.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="multi_key.md#0x1_multi_key_new_public_key_from_bytes">new_public_key_from_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="multi_key.md#0x1_multi_key_MultiKey">multi_key::MultiKey</a>
@@ -146,7 +147,7 @@ The number of keys provided is greater than the maximum allowed.
 <pre><code><b>public</b> <b>fun</b> <a href="multi_key.md#0x1_multi_key_new_public_key_from_bytes">new_public_key_from_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="multi_key.md#0x1_multi_key_MultiKey">MultiKey</a> {
     <b>let</b> stream = <a href="bcs_stream.md#0x1_bcs_stream_new">bcs_stream::new</a>(bytes);
     <b>let</b> pk = <a href="multi_key.md#0x1_multi_key_deserialize_multi_key">deserialize_multi_key</a>(&<b>mut</b> stream);
-    <b>assert</b>!(<a href="bcs_stream.md#0x1_bcs_stream_has_remaining">bcs_stream::has_remaining</a>(&<b>mut</b> stream) == <b>false</b>, std::error::invalid_argument(<a href="multi_key.md#0x1_multi_key_E_INVALID_MULTI_KEY_EXTRA_BYTES">E_INVALID_MULTI_KEY_EXTRA_BYTES</a>));
+    <b>assert</b>!(!<a href="bcs_stream.md#0x1_bcs_stream_has_remaining">bcs_stream::has_remaining</a>(&<b>mut</b> stream), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multi_key.md#0x1_multi_key_E_INVALID_MULTI_KEY_EXTRA_BYTES">E_INVALID_MULTI_KEY_EXTRA_BYTES</a>));
     pk
 }
 </code></pre>
@@ -159,6 +160,7 @@ The number of keys provided is greater than the maximum allowed.
 
 ## Function `new_multi_key_from_single_keys`
 
+Creates a new MultiKey public key from a vector of single key public keys and a number representing the number of signatures required to authenticate a transaction.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="multi_key.md#0x1_multi_key_new_multi_key_from_single_keys">new_multi_key_from_single_keys</a>(single_keys: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="single_key.md#0x1_single_key_AnyPublicKey">single_key::AnyPublicKey</a>&gt;, signatures_required: u8): <a href="multi_key.md#0x1_multi_key_MultiKey">multi_key::MultiKey</a>
@@ -196,6 +198,7 @@ The number of keys provided is greater than the maximum allowed.
 
 ## Function `deserialize_multi_key`
 
+Deserializes a MultiKey public key from a BCS stream.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="multi_key.md#0x1_multi_key_deserialize_multi_key">deserialize_multi_key</a>(stream: &<b>mut</b> <a href="bcs_stream.md#0x1_bcs_stream_BCSStream">bcs_stream::BCSStream</a>): <a href="multi_key.md#0x1_multi_key_MultiKey">multi_key::MultiKey</a>
@@ -222,6 +225,7 @@ The number of keys provided is greater than the maximum allowed.
 
 ## Function `to_authentication_key`
 
+Returns the authentication key for a MultiKey public key.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="multi_key.md#0x1_multi_key_to_authentication_key">to_authentication_key</a>(self: &<a href="multi_key.md#0x1_multi_key_MultiKey">multi_key::MultiKey</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;

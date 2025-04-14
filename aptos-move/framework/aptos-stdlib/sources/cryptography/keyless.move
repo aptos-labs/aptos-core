@@ -2,7 +2,8 @@
 
 module aptos_std::keyless {
     use aptos_std::bcs_stream::{Self, deserialize_u8};
-    use std::string::String;
+    use std::error;
+    use std::string::{Self, String};
     friend aptos_std::federated_keyless;
 
     #[test_only]
@@ -17,9 +18,21 @@ module aptos_std::keyless {
     /// There are extra bytes in the input when deserializing a Keyless public key.
     const E_INVALID_KEYLESS_PUBLIC_KEY_EXTRA_BYTES: u64 = 1;
 
+    /// The length of the identifier commitment bytes in a Keyless public key is invalid.
+    const E_INVALID_ID_COMMITMENT_BYTES_LENGTH: u64 = 2;
+
+    /// The length of the issuer string in a Keyless public key is invalid.
+    const E_INVALID_ISSUER_UTF8_BYTES_LENGTH: u64 = 3;
+
     //
     // Constants
     //
+
+    /// The length of the identifier commitment bytes in a Keyless public key.
+    const ID_COMMITMENT_BYTES_LENGTH: u64 = 32;
+
+    /// The maximum length of the issuer string in bytes in a Keyless public key.
+    const MAX_ISSUER_UTF8_BYTES_LENGTH: u64 = 120;
 
     //
     // Structs
@@ -39,17 +52,21 @@ module aptos_std::keyless {
     public fun new_public_key_from_bytes(bytes: vector<u8>): PublicKey {
         let stream = bcs_stream::new(bytes);
         let key = deserialize_public_key(&mut stream);
-        assert!(bcs_stream::has_remaining(&mut stream) == false, std::error::invalid_argument(E_INVALID_KEYLESS_PUBLIC_KEY_EXTRA_BYTES));
+        assert!(!bcs_stream::has_remaining(&mut stream), error::invalid_argument(E_INVALID_KEYLESS_PUBLIC_KEY_EXTRA_BYTES));
         key
     }
 
+    /// Deserializes a keyless public key from a BCS stream.
     public fun deserialize_public_key(stream: &mut bcs_stream::BCSStream): PublicKey {
         let iss = bcs_stream::deserialize_string(stream);
         let idc = bcs_stream::deserialize_vector(stream, |x| deserialize_u8(x));
-        PublicKey { iss, idc }
+        new(iss, idc)
     }
 
+    /// Creates a new keyless public key from an issuer string and an identifier bytes.
     public fun new(iss: String, idc: vector<u8>): PublicKey {
+        assert!(string::bytes(&iss).length() <= MAX_ISSUER_UTF8_BYTES_LENGTH, error::invalid_argument(E_INVALID_ISSUER_UTF8_BYTES_LENGTH));
+        assert!(idc.length() == ID_COMMITMENT_BYTES_LENGTH, error::invalid_argument(E_INVALID_ID_COMMITMENT_BYTES_LENGTH));
         PublicKey { iss, idc }
     }
 
@@ -69,15 +86,12 @@ module aptos_std::keyless {
         let pk = new_public_key_from_bytes(bytes);
         assert!(
             bcs::to_bytes(&pk) == bytes,
-            std::error::invalid_state(1)
         );
         assert!(
             get_iss(&pk) == utf8(b"https://accounts.google.com"),
-            std::error::invalid_state(2)
         );
         assert!(
             get_idc(&pk) == x"86bc0a0a825eb6337ca1e8a3157e490eac8df23d5cef25d9641ad5e7edc1d514",
-            std::error::invalid_state(3)
         );
     }
 }
