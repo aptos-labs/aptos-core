@@ -10,8 +10,6 @@ This module implements ECDSA signatures based on the prime-order secp256r1 ellpt
 -  [Constants](#@Constants_0)
 -  [Function `ecdsa_raw_public_key_from_64_bytes`](#0x1_secp256r1_ecdsa_raw_public_key_from_64_bytes)
 -  [Function `ecdsa_raw_public_key_to_bytes`](#0x1_secp256r1_ecdsa_raw_public_key_to_bytes)
--  [Specification](#@Specification_1)
-    -  [Function `ecdsa_raw_public_key_from_64_bytes`](#@Specification_1_ecdsa_raw_public_key_from_64_bytes)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -122,26 +120,6 @@ Serializes an ECDSARawPublicKey struct to 64-bytes.
 
 
 </details>
-
-<a id="@Specification_1"></a>
-
-## Specification
-
-
-<a id="@Specification_1_ecdsa_raw_public_key_from_64_bytes"></a>
-
-### Function `ecdsa_raw_public_key_from_64_bytes`
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="secp2561r.md#0x1_secp256r1_ecdsa_raw_public_key_from_64_bytes">ecdsa_raw_public_key_from_64_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="secp2561r.md#0x1_secp256r1_ECDSARawPublicKey">secp256r1::ECDSARawPublicKey</a>
-</code></pre>
-
-
-
-
-<pre><code><b>aborts_if</b> len(bytes) != <a href="secp2561r.md#0x1_secp256r1_RAW_PUBLIC_KEY_NUM_BYTES">RAW_PUBLIC_KEY_NUM_BYTES</a>;
-<b>ensures</b> result == <a href="secp2561r.md#0x1_secp256r1_ECDSARawPublicKey">ECDSARawPublicKey</a> { bytes };
-</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY
