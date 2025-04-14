@@ -59,4 +59,3 @@ mod type_too_large;
 mod upgrade_compatibility;
 mod vector_numeric_address;
 mod vm;
-mod vote;
