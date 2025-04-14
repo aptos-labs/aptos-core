@@ -138,7 +138,7 @@ impl ReleaseTarget {
 
     pub fn create_release(self, with_srcs: bool, out: Option<PathBuf>) -> anyhow::Result<()> {
         let options = self.create_release_options(with_srcs, out);
-        #[cfg(unix)]
+        #[cfg(not(windows))]
         {
             options.create_release()
         }

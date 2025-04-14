@@ -540,7 +540,7 @@ impl<'env> Docgen<'env> {
     }
 
     fn path_to_string(&self, path: &Path) -> String {
-        #[cfg(not(unix))]
+        #[cfg(windows)]
         {
             if self.options.ensure_unix_paths {
                 path.to_string_lossy().replace('\\', "/")
@@ -548,7 +548,7 @@ impl<'env> Docgen<'env> {
                 path.to_string_lossy().to_string()
             }
         }
-        #[cfg(unix)]
+        #[cfg(not(windows))]
         path.to_string_lossy().to_string()
     }
 

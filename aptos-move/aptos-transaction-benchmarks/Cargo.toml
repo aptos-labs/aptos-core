@@ -28,9 +28,11 @@ aptos-vm = { workspace = true }
 aptos-vm-logging = { workspace = true }
 clap = { workspace = true }
 criterion = { workspace = true, features = ["html_reports"] }
-criterion-cpu-time = { workspace = true }
 num_cpus = { workspace = true }
 proptest = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+criterion-cpu-time = { workspace = true }
 
 [[bench]]
 name = "transaction_benches"

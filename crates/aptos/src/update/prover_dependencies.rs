@@ -16,13 +16,10 @@ use clap::Parser;
 use move_prover_boogie_backend::options::{
     BoogieOptions, MAX_BOOGIE_VERSION, MAX_Z3_VERSION, MIN_BOOGIE_VERSION, MIN_Z3_VERSION,
 };
-#[cfg(unix)]
-use move_prover_boogie_backend::options::{MAX_CVC5_VERSION, MIN_CVC5_VERSION};
 use std::{
     env,
     path::{Path, PathBuf},
 };
-
 pub(crate) const REPO_NAME: &str = "prover-dependency";
 pub(crate) const REPO_OWNER: &str = "aptos-labs";
 
@@ -153,6 +150,8 @@ impl ProverDependencyInstaller {
 
         #[cfg(unix)]
         {
+            use move_prover_boogie_backend::options::{MAX_CVC5_VERSION, MIN_CVC5_VERSION};
+
             BoogieOptions::check_version_is_compatible(
                 CVC5_BINARY_NAME,
                 TARGET_CVC5_VERSION,

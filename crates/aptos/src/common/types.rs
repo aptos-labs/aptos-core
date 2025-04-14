@@ -62,8 +62,6 @@ use move_model::metadata::{
 };
 use move_package::source_package::std_lib::StdVersion;
 use serde::{Deserialize, Serialize};
-#[cfg(unix)]
-use std::os::unix::fs::OpenOptionsExt;
 use std::{
     collections::BTreeMap,
     convert::TryFrom,
@@ -1076,7 +1074,10 @@ impl SaveFile {
     pub fn save_to_file_confidential(&self, name: &str, bytes: &[u8]) -> CliTypedResult<()> {
         let mut opts = OpenOptions::new();
         #[cfg(unix)]
-        opts.mode(0o600);
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.mode(0o600);
+        }
         write_to_file_with_opts(self.output_file.as_path(), name, bytes, &mut opts)
     }
 }

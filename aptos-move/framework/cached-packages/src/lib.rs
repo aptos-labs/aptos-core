@@ -9,7 +9,7 @@ pub mod aptos_stdlib;
 pub mod aptos_token_objects_sdk_builder;
 pub mod aptos_token_sdk_builder;
 
-#[cfg(unix)]
+#[cfg(not(windows))]
 const HEAD_RELEASE_BUNDLE_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/head.mrb"));
 #[cfg(windows)]
 const HEAD_RELEASE_BUNDLE_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "\\head.mrb"));
