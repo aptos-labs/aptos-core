@@ -38,7 +38,9 @@ fn native_get(
 
     let cost = gas_params.base + gas_params.per_byte * NumBytes::new(type_name.len() as u64);
 
-    Ok(NativeResult::ok(cost, smallvec![type_name_val]))
+    Ok(NativeResult::ok(cost, 0.into(), 0.into(), smallvec![
+        type_name_val
+    ]))
 }
 
 pub fn make_native_get(gas_params: GetGasParameters) -> NativeFunction {

@@ -9,6 +9,8 @@ pub mod code_storage;
 pub mod dependencies_gas_charging;
 pub mod environment;
 pub mod implementations;
+pub mod lazy_code_storage;
+pub mod loader;
 pub mod module_storage;
 pub mod publishing;
 pub mod ty_layout_converter;

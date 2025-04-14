@@ -50,7 +50,9 @@ fn native_create_signers_for_testing(
 
     let cost = gas_params.base_cost + gas_params.unit_cost * NumArgs::new(num_signers);
 
-    Ok(NativeResult::ok(cost, smallvec![signers]))
+    Ok(NativeResult::ok(cost, 0.into(), 0.into(), smallvec![
+        signers
+    ]))
 }
 
 pub fn make_native_create_signers_for_testing(

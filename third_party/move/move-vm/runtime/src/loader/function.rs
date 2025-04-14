@@ -4,15 +4,17 @@
 
 use crate::{
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
+    module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
-    storage::ty_tag_converter::TypeTagConverter,
-    LayoutConverter, ModuleStorage, StorageLayoutConverter,
+    runtime_type_checks::RuntimeTypeCheck,
+    storage::loader::MoveVmLoader,
+    RuntimeEnvironment,
 };
 use better_any::{Tid, TidAble, TidExt};
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
-    errors::{PartialVMError, PartialVMResult},
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
         Bytecode, CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility,
     },
@@ -27,13 +29,14 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
+    gas::GasMeter,
     loaded_data::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
     },
     values::{AbstractFunction, SerializedFunctionData},
 };
-use std::{cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc, sync::Arc};
+use std::{cell::RefCell, cmp::Ordering, fmt::Debug, ops::DerefMut, rc::Rc, sync::Arc};
 
 /// A runtime function definition representation.
 pub struct Function {
@@ -78,6 +81,32 @@ impl LoadedFunction {
     pub fn owner(&self) -> &LoadedFunctionOwner {
         &self.owner
     }
+
+    pub fn expect_script(&self) -> VMResult<&Script> {
+        match &self.owner {
+            LoadedFunctionOwner::Script(script) => Ok(script.as_ref()),
+            LoadedFunctionOwner::Module(_) => {
+                let msg = "Expected function from script, got module instead".to_string();
+                let err = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Undefined);
+                Err(err)
+            },
+        }
+    }
+
+    pub fn expect_module(&self) -> VMResult<&Module> {
+        match &self.owner {
+            LoadedFunctionOwner::Module(module) => Ok(module.as_ref()),
+            LoadedFunctionOwner::Script(_) => {
+                let msg = "Expected function from module, but got script instead".to_string();
+                let err = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Undefined);
+                Err(err)
+            },
+        }
+    }
 }
 
 /// A lazy loaded function, which can either be unresolved (as resulting
@@ -112,14 +141,14 @@ impl LazyLoadedFunction {
     }
 
     pub(crate) fn new_resolved(
-        converter: &TypeTagConverter,
+        runtime_environment: &RuntimeEnvironment,
         fun: Rc<LoadedFunction>,
         mask: ClosureMask,
     ) -> PartialVMResult<Self> {
         let ty_args = fun
             .ty_args
             .iter()
-            .map(|t| converter.ty_to_ty_tag(t))
+            .map(|t| runtime_environment.ty_to_ty_tag(t))
             .collect::<PartialVMResult<Vec<_>>>()?;
         Ok(Self(Rc::new(RefCell::new(
             LazyLoadedFunctionState::Resolved { fun, ty_args, mask },
@@ -160,17 +189,17 @@ impl LazyLoadedFunction {
         }
     }
 
-    /// Executed an action with the resolved loaded function. If the function hasn't been
-    /// loaded yet, it will be loaded now.
-    #[allow(unused)]
-    pub(crate) fn with_resolved_function<T>(
+    /// Loads the function if it has not been resolved. Gas will be charged by this function.
+    pub(crate) fn load_if_unresolved<RTTCheck: RuntimeTypeCheck>(
         &self,
-        storage: &dyn ModuleStorage,
-        action: impl FnOnce(Rc<LoadedFunction>) -> PartialVMResult<T>,
-    ) -> PartialVMResult<T> {
+        loader: &impl MoveVmLoader,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+    ) -> PartialVMResult<(Rc<LoadedFunction>, ModuleId)> {
+        let module_id = loader.charge_before_resolve_closure(gas_meter, traversal_context, self)?;
         let mut state = self.0.borrow_mut();
-        match &mut *state {
-            LazyLoadedFunctionState::Resolved { fun, .. } => action(fun.clone()),
+        let fun = match state.deref_mut() {
+            LazyLoadedFunctionState::Resolved { fun, .. } => fun.clone(),
             LazyLoadedFunctionState::Unresolved {
                 data:
                     SerializedFunctionData {
@@ -182,63 +211,64 @@ impl LazyLoadedFunction {
                         captured_layouts,
                     },
             } => {
-                let fun =
-                    Self::resolve(storage, module_id, fun_id, ty_args, *mask, captured_layouts)?;
-                let result = action(fun.clone());
+                let fun = Rc::new(loader.resolve_closure(
+                    gas_meter,
+                    traversal_context,
+                    module_id,
+                    fun_id,
+                    ty_args,
+                )?);
+                Self::check_layouts_compatible::<RTTCheck>(
+                    loader,
+                    gas_meter,
+                    traversal_context,
+                    &fun,
+                    *mask,
+                    captured_layouts,
+                )?;
                 *state = LazyLoadedFunctionState::Resolved {
-                    fun,
+                    fun: fun.clone(),
                     ty_args: ty_args.clone(),
                     mask: *mask,
                 };
-                result
+                fun
             },
-        }
+        };
+        Ok((fun, module_id))
     }
 
-    /// Resolves a function into a loaded function. This verifies existence of the named
-    /// function as well as whether it has the type used for deserializing the captured values.
-    fn resolve(
-        module_storage: &dyn ModuleStorage,
-        module_id: &ModuleId,
-        fun_id: &IdentStr,
-        ty_args: &[TypeTag],
+    // Note: this function may charge gas and load modules.
+    fn check_layouts_compatible<RTCheck: RuntimeTypeCheck>(
+        loader: &impl MoveVmLoader,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        function: &LoadedFunction,
         mask: ClosureMask,
         captured_layouts: &[MoveTypeLayout],
-    ) -> PartialVMResult<Rc<LoadedFunction>> {
-        let function = module_storage
-            .load_function(module_id, fun_id, ty_args)
-            .map_err(|err| err.to_partial())?;
+    ) -> PartialVMResult<()> {
+        let captured_arg_types = mask.extract(function.param_tys(), true);
+        if captured_arg_types.len() != captured_layouts.len() {
+            return Err(
+                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
+                    "captured argument count does not match declared parameters".to_string(),
+                ),
+            );
+        }
 
-        // Verify that the function argument types match the layouts used for deserialization.
-        // This is only done in paranoid mode. Since integrity of storage
-        // and guarantee of public function, this should not able to fail.
-        if module_storage
-            .runtime_environment()
-            .vm_config()
-            .paranoid_type_checks
+        for (actual_arg_ty, serialized_layout) in
+            captured_arg_types.into_iter().zip(captured_layouts)
         {
-            // TODO(#15664): Determine whether we need to charge gas here.
-            let captured_arg_types = mask.extract(function.param_tys(), true);
-            let converter = StorageLayoutConverter::new(module_storage);
-            if captured_arg_types.len() != captured_layouts.len() {
-                return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                    .with_message(
-                        "captured argument count does not match declared parameters".to_string(),
-                    ));
-            }
+            // Note that the below call returns a runtime layout, so we can directly compare it
+            // without desugaring. Also, gas may be charged here.
+            let actual_arg_layout = if ty_args.is_empty() {
+                loader.load_ty_layout(gas_meter, traversal_context, actual_arg_ty)?
+            } else {
+                let actual_arg_ty = ty_builder.create_ty_with_subst(actual_arg_ty, &ty_args)?;
+                loader.load_ty_layout(gas_meter, traversal_context, &actual_arg_ty)?
+            };
 
-            let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
-            for (actual_arg_ty, serialized_layout) in
-                captured_arg_types.into_iter().zip(captured_layouts)
-            {
-                // Note that the below call returns a runtime layout, so we can directly
-                // compare it without desugaring.
-                let actual_arg_layout = if ty_args.is_empty() {
-                    converter.type_to_type_layout(actual_arg_ty)?
-                } else {
-                    let actual_arg_ty = ty_builder.create_ty_with_subst(actual_arg_ty, &ty_args)?;
-                    converter.type_to_type_layout(&actual_arg_ty)?
-                };
+            #[allow(clippy::collapsible_if)]
+            if RTCheck::should_perform_checks() {
                 if !serialized_layout.is_compatible_with(&actual_arg_layout) {
                     return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                         .with_message(
@@ -248,7 +278,8 @@ impl LazyLoadedFunction {
                 }
             }
         }
-        Ok(Rc::new(function))
+
+        Ok(())
     }
 }
 

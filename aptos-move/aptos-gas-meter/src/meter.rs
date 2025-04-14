@@ -16,7 +16,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    gas_algebra::{InternalGas, NumArgs, NumBytes},
+    gas_algebra::{InternalGas, NumArgs, NumBytes, NumModules},
     identifier::IdentStr,
     language_storage::ModuleId,
     vm_status::StatusCode,
@@ -505,9 +505,36 @@ where
         Ok(())
     }
 
+    fn charge_native_dependencies(
+        &mut self,
+        num_dependencies: NumModules,
+        total_dependency_size: NumBytes,
+    ) -> PartialVMResult<()> {
+        // Execution is charged separately along with other native gas charges.
+        self.algebra
+            .count_native_dependencies(num_dependencies, total_dependency_size)?;
+        Ok(())
+    }
+
     #[inline]
     fn charge_heap_memory(&mut self, _amount: u64) -> PartialVMResult<()> {
         Ok(())
+    }
+
+    fn total_dependency_size(&self) -> NumBytes {
+        self.algebra.total_dependency_size()
+    }
+
+    fn max_total_dependency_size(&self) -> NumBytes {
+        self.algebra.vm_gas_params().txn.max_total_dependency_size
+    }
+
+    fn num_dependencies(&self) -> NumModules {
+        self.algebra.num_dependencies()
+    }
+
+    fn max_num_dependencies(&self) -> NumModules {
+        self.algebra.vm_gas_params().txn.max_num_dependencies
     }
 }
 

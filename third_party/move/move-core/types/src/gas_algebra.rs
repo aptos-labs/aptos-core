@@ -60,6 +60,10 @@ pub struct GasQuantity<U> {
     phantom: PhantomData<U>,
 }
 
+pub enum Module {}
+
+pub type NumModules = GasQuantity<Module>;
+
 pub type InternalGas = GasQuantity<InternalGasUnit>;
 
 pub type NumBytes = GasQuantity<Byte>;

@@ -9,6 +9,7 @@ use crate::{
     errors::{discarded_output, expect_only_successful_execution},
     gas::{check_gas, make_prod_gas_meter, ProdGasMeter},
     keyless_validation,
+    loader::{AptosVmLazyLoader, AptosVmLegacyLoader, AptosVmLoader, AptosVmScriptLoader},
     move_vm_ext::{
         session::user_transaction_sessions::{
             abort_hook::AbortHookSession,
@@ -79,7 +80,7 @@ use aptos_types::{
     },
     vm::module_metadata::{
         get_compilation_metadata, get_metadata, get_randomness_annotation_for_entry_function,
-        verify_module_metadata_for_module_publish, RuntimeModuleMetadataV1,
+        verify_module_metadata_for_module_publish,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
@@ -128,11 +129,10 @@ use move_core_types::{
 };
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_runtime::{
-    check_dependencies_and_charge_gas, check_script_dependencies_and_check_gas,
-    check_type_tag_dependencies_and_charge_gas,
+    check_dependencies_and_charge_gas,
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
-    LoadedFunctionOwner, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
+    ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use num_cpus;
@@ -538,17 +538,30 @@ impl AptosVM {
     fn inject_abort_info_if_available(
         &self,
         module_storage: &impl AptosModuleStorage,
+        traversal_context: &TraversalContext,
         status: ExecutionStatus,
-    ) -> ExecutionStatus {
-        match status {
+    ) -> VMResult<ExecutionStatus> {
+        Ok(match status {
             ExecutionStatus::MoveAbort {
                 location: AbortLocation::Module(module),
                 code,
                 ..
             } => {
-                let info = self
-                    .extract_module_metadata(module_storage, &module)
+                // MODULE LOADING METERING:
+                //  It is fine not to charge gas here: transaction aborted in a module, so it must
+                //  have been loaded and metered. Note that this relies on the fact that the
+                //  location must be set to module only after it has been metered!
+                traversal_context
+                    .check_is_special_or_visited(module.address(), module.name())
+                    .map_err(|err| err.finish(Location::Undefined))?;
+
+                let info = module_storage
+                    .unmetered_get_module_metadata(module.address(), module.name())
+                    .ok()
+                    .flatten()
+                    .and_then(|metadata| get_metadata(&metadata))
                     .and_then(|m| m.extract_abort_info(code));
+
                 ExecutionStatus::MoveAbort {
                     location: AbortLocation::Module(module),
                     code,
@@ -556,7 +569,7 @@ impl AptosVM {
                 }
             },
             _ => status,
-        }
+        })
     }
 
     fn finish_aborted_transaction(
@@ -678,7 +691,8 @@ impl AptosVM {
         // Also, do not move this after we run failure epilogue below, because this will load
         // module, which alters abort info. We have a transaction at version 596888095 which
         // relies on this specific behavior...
-        let status = self.inject_abort_info_if_available(module_storage, status);
+        let status =
+            self.inject_abort_info_if_available(module_storage, traversal_context, status)?;
 
         epilogue_session.execute(|session| {
             transaction_validation::run_failure_epilogue(
@@ -777,43 +791,20 @@ impl AptosVM {
             }
         }
 
-        // Note: Feature gating is needed here because the traversal of the dependencies could
-        //       result in shallow-loading of the modules and therefore subtle changes in
-        //       the error semantics.
-        if self.gas_feature_version() >= RELEASE_V1_10 {
-            check_script_dependencies_and_check_gas(
+        let func = if self.features().is_lazy_loading_enabled() {
+            let loader = AptosVmLazyLoader::new(code_storage)?;
+            loader.load_script(gas_meter, traversal_context, serialized_script)?
+        } else {
+            let loader = AptosVmLegacyLoader::new(
+                self.gas_feature_version() >= RELEASE_V1_10,
+                self.gas_feature_version() >= RELEASE_V1_27,
                 code_storage,
-                gas_meter,
-                traversal_context,
-                serialized_script.code(),
             )?;
-        }
-        if self.gas_feature_version() >= RELEASE_V1_27 {
-            check_type_tag_dependencies_and_charge_gas(
-                code_storage,
-                gas_meter,
-                traversal_context,
-                serialized_script.ty_args(),
-            )?;
-        }
-
-        let func =
-            code_storage.load_script(serialized_script.code(), serialized_script.ty_args())?;
-        let script = match func.owner() {
-            LoadedFunctionOwner::Script(script) => script,
-            LoadedFunctionOwner::Module(_) => {
-                // This should not be reachable because loading a function from the script should
-                // set the owner correctly.
-                let msg = "Function loaded from script cannot come from module".to_string();
-                let err = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(msg)
-                    .finish(Location::Undefined)
-                    .into_vm_status();
-                return Err(err);
-            },
+            loader.load_script(gas_meter, traversal_context, serialized_script)?
         };
 
         // Check that unstable bytecode cannot be executed on mainnet and verify events.
+        let script = func.expect_script()?;
         self.reject_unstable_bytecode_for_script(script)?;
         event_validation::verify_no_event_emission_in_compiled_script(script)?;
 
@@ -839,33 +830,29 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
         entry_fn: &EntryFunction,
     ) -> Result<(), VMStatus> {
-        // Note: Feature gating is needed here because the traversal of the dependencies could
-        //       result in shallow-loading of the modules and therefore subtle changes in
-        //       the error semantics.
-        if self.gas_feature_version() >= RELEASE_V1_10 {
-            let module_id = traversal_context
-                .referenced_module_ids
-                .alloc(entry_fn.module().clone());
-            check_dependencies_and_charge_gas(module_storage, gas_meter, traversal_context, [(
-                module_id.address(),
-                module_id.name(),
-            )])?;
-        }
-
-        if self.gas_feature_version() >= RELEASE_V1_27 {
-            check_type_tag_dependencies_and_charge_gas(
-                module_storage,
+        let function = if self.features().is_lazy_loading_enabled() {
+            let loader = AptosVmLazyLoader::new(module_storage)?;
+            loader.load_function(
                 gas_meter,
                 traversal_context,
+                entry_fn.module(),
+                entry_fn.function(),
                 entry_fn.ty_args(),
+            )?
+        } else {
+            let loader = AptosVmLegacyLoader::new(
+                self.gas_feature_version() >= RELEASE_V1_10,
+                self.gas_feature_version() >= RELEASE_V1_27,
+                module_storage,
             )?;
-        }
-
-        let function = module_storage.load_function(
-            entry_fn.module(),
-            entry_fn.function(),
-            entry_fn.ty_args(),
-        )?;
+            loader.load_function(
+                gas_meter,
+                traversal_context,
+                entry_fn.module(),
+                entry_fn.function(),
+                entry_fn.ty_args(),
+            )?
+        };
 
         // Native entry function is forbidden.
         if function.is_native() {
@@ -880,14 +867,14 @@ impl AptosVM {
         }
 
         // The check below should have been feature-gated in 1.11...
-        if function.is_friend_or_private() {
-            let metadata = module_storage.fetch_existing_module_metadata(
-                entry_fn.module().address(),
-                entry_fn.module().name(),
-            )?;
-            if get_randomness_annotation_for_entry_function(entry_fn, &metadata).is_some() {
-                session.mark_unbiasable();
-            }
+        if function.is_friend_or_private()
+            && get_randomness_annotation_for_entry_function(
+                entry_fn,
+                &function.expect_module()?.metadata,
+            )
+            .is_some()
+        {
+            session.mark_unbiasable();
         }
 
         let struct_constructors_enabled =
@@ -900,7 +887,17 @@ impl AptosVM {
             &function,
             struct_constructors_enabled,
         )?;
-        session.execute_entry_function(
+
+        if !function.is_entry() {
+            let module_id = function.expect_module()?.self_id();
+            return Err(PartialVMError::new(
+                StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION,
+            )
+            .finish(Location::Module(module_id))
+            .into_vm_status());
+        }
+
+        session.execute_loaded_function(
             function,
             args,
             gas_meter,
@@ -1358,9 +1355,8 @@ impl AptosVM {
         let modules: &Vec<CompiledModule> =
             traversal_context.referenced_module_bundles.alloc(modules);
 
-        // Note: Feature gating is needed here because the traversal of the dependencies could
-        //       result in shallow-loading of the modules and therefore subtle changes in
-        //       the error semantics.
+        // Weather loading modules lazily, or as a full transitive closure, we always need to meter
+        // 1) old versions of modules, 2) new modules.
         if self.gas_feature_version() >= RELEASE_V1_10 {
             // Charge old versions of existing modules, in case of upgrades.
             for module in modules.iter() {
@@ -1368,13 +1364,12 @@ impl AptosVM {
                 let name = module.self_name();
 
                 // TODO: Allow the check of special addresses to be customized.
-                if addr.is_special() || traversal_context.visited.insert((addr, name), ()).is_some()
-                {
+                if !traversal_context.visit_if_not_special_address(addr, name) {
                     continue;
                 }
 
                 let size_if_module_exists = module_storage
-                    .fetch_module_size_in_bytes(addr, name)?
+                    .unmetered_get_module_size(addr, name)?
                     .map(|v| v as u64);
                 if let Some(size) = size_if_module_exists {
                     gas_meter
@@ -1387,15 +1382,17 @@ impl AptosVM {
 
             // Charge all modules in the bundle that is about to be published.
             for (module, blob) in modules.iter().zip(bundle.iter()) {
-                let module_id = &module.self_id();
+                let addr = module.self_addr();
+                let name = module.self_name();
                 gas_meter
-                    .charge_dependency(
-                        true,
-                        module_id.address(),
-                        module_id.name(),
-                        NumBytes::new(blob.code().len() as u64),
-                    )
+                    .charge_dependency(true, addr, name, NumBytes::new(blob.code().len() as u64))
                     .map_err(|err| err.finish(Location::Undefined))?;
+
+                // In case of lazy loading: add all modules in a bundle as visited to avoid double
+                // charging during module initialization.
+                if self.features().is_lazy_loading_enabled() {
+                    traversal_context.visit_if_not_special_address(addr, name);
+                }
             }
 
             // Charge all dependencies.
@@ -1407,19 +1404,45 @@ impl AptosVM {
                 .map(|module| (module.self_addr(), module.self_name()))
                 .collect::<BTreeSet<_>>();
 
-            check_dependencies_and_charge_gas(
-                module_storage,
-                gas_meter,
-                traversal_context,
-                modules
+            if self.features().is_lazy_loading_enabled() {
+                // With lazy loading, we will check only immediate dependencies for linking checks,
+                // not the whole dependencies closure, so charge gas here for them. Also, we would
+                // check that friends exist, so we also need to meter those.
+                for (addr, name) in modules
                     .iter()
                     .flat_map(|module| {
                         module
                             .immediate_dependencies_iter()
                             .chain(module.immediate_friends_iter())
                     })
-                    .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
-            )?;
+                    .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name))
+                {
+                    if !traversal_context.visit_if_not_special_address(addr, name) {
+                        continue;
+                    }
+
+                    let size = module_storage
+                        .unmetered_get_existing_module_size(addr, name)
+                        .map(|v| v as u64)?;
+                    gas_meter
+                        .charge_dependency(false, addr, name, NumBytes::new(size))
+                        .map_err(|err| err.finish(Location::Undefined))?;
+                }
+            } else {
+                check_dependencies_and_charge_gas(
+                    module_storage,
+                    gas_meter,
+                    traversal_context,
+                    modules
+                        .iter()
+                        .flat_map(|module| {
+                            module
+                                .immediate_dependencies_iter()
+                                .chain(module.immediate_friends_iter())
+                        })
+                        .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
+                )?;
+            }
 
             // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
         }
@@ -1431,7 +1454,14 @@ impl AptosVM {
                 .map_err(|err| err.finish(Location::Undefined))?;
         }
 
-        self.validate_publish_request(module_storage, modules, expected_modules, allowed_deps)?;
+        self.validate_publish_request(
+            module_storage,
+            gas_meter,
+            traversal_context,
+            modules,
+            expected_modules,
+            allowed_deps,
+        )?;
 
         let check_struct_layout = true;
         let check_friend_linking = !self
@@ -1462,6 +1492,8 @@ impl AptosVM {
     fn validate_publish_request(
         &self,
         module_storage: &impl AptosModuleStorage,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         modules: &[CompiledModule],
         mut expected_modules: BTreeSet<String>,
         allowed_deps: Option<BTreeMap<AccountAddress, BTreeSet<String>>>,
@@ -1498,9 +1530,10 @@ impl AptosVM {
 
         resource_groups::validate_resource_groups(
             module_storage,
+            gas_meter,
+            traversal_context,
             modules,
-            self.features()
-                .is_enabled(FeatureFlag::SAFER_RESOURCE_GROUPS),
+            self.features(),
         )?;
         event_validation::validate_module_events(module_storage, modules)?;
 
@@ -2043,7 +2076,7 @@ impl AptosVM {
         for write in module_write_set.writes().values() {
             // It is sufficient to simply get the size in order to enforce read-before-write.
             module_storage
-                .fetch_module_size_in_bytes(write.module_address(), write.module_name())
+                .unmetered_get_module_size(write.module_address(), write.module_name())
                 .map_err(|e| e.to_partial())?;
         }
         for (state_key, write_op) in change_set.resource_write_set().iter() {
@@ -2247,17 +2280,6 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
-    fn extract_module_metadata(
-        &self,
-        module_storage: &impl AptosModuleStorage,
-        module_id: &ModuleId,
-    ) -> Option<Arc<RuntimeModuleMetadataV1>> {
-        let metadata = module_storage
-            .fetch_module_metadata(module_id.address(), module_id.name())
-            .ok()??;
-        get_metadata(&metadata)
-    }
-
     pub fn execute_view_function(
         state_view: &impl StateView,
         module_id: ModuleId,
@@ -2326,33 +2348,52 @@ impl AptosVM {
         vm: &AptosVM,
         module_id: ModuleId,
         func_name: Identifier,
-        type_args: Vec<TypeTag>,
+        ty_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
         gas_meter: &mut impl AptosGasMeter,
         module_storage: &impl AptosModuleStorage,
     ) -> anyhow::Result<Vec<Vec<u8>>> {
-        let func = module_storage.load_function(&module_id, &func_name, &type_args)?;
-        let metadata = vm.extract_module_metadata(module_storage, &module_id);
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
+
+        let function = if vm.features().is_lazy_loading_enabled() {
+            let loader = AptosVmLazyLoader::new(module_storage)?;
+            loader.load_function(
+                gas_meter,
+                &mut traversal_context,
+                &module_id,
+                &func_name,
+                &ty_args,
+            )?
+        } else {
+            // Note: historically, there was no metering for view functions for loading modules.
+            let loader = AptosVmLegacyLoader::new(false, false, module_storage)?;
+            loader.load_function(
+                gas_meter,
+                &mut traversal_context,
+                &module_id,
+                &func_name,
+                &ty_args,
+            )?
+        };
+        let metadata = get_metadata(&function.expect_module()?.metadata);
+
         let arguments = view_function::validate_view_function(
             session,
             module_storage,
             arguments,
             func_name.as_ident_str(),
-            &func,
+            &function,
             metadata.as_ref().map(Arc::as_ref),
             vm.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
         )?;
 
-        let storage = TraversalStorage::new();
-
         Ok(session
-            .execute_function_bypass_visibility(
-                &module_id,
-                func_name.as_ident_str(),
-                type_args,
+            .execute_loaded_function(
+                function,
                 arguments,
                 gas_meter,
-                &mut TraversalContext::new(&storage),
+                &mut traversal_context,
                 module_storage,
             )
             .map_err(|err| anyhow!("Failed to execute function: {:?}", err))?
@@ -2949,8 +2990,13 @@ pub(crate) fn should_create_account_resource(
         && txn_data.sequence_number == 0
     {
         let account_tag = AccountResource::struct_tag();
+
+        // MODULE LOADING METERING:
+        //   Account resides at 0x1, so we will not be charging for it. Strictly speaking, here we
+        //   do not even need metadata because it is not a resource group.
         let metadata = module_storage
-            .fetch_existing_module_metadata(&account_tag.address, &account_tag.module)?;
+            .unmetered_get_existing_module_metadata(&account_tag.address, &account_tag.module)?;
+
         let (maybe_bytes, _) = resolver
             .get_resource_bytes_with_metadata_and_layout(
                 &txn_data.sender(),

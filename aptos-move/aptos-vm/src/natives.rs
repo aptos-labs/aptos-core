@@ -12,7 +12,7 @@ use aptos_aggregator::{resolver::TDelayedFieldView, types::DelayedFieldValue};
 use aptos_framework::natives::randomness::RandomnessContext;
 #[cfg(feature = "testing")]
 use aptos_framework::natives::{cryptography::algebra::AlgebraContext, event::NativeEventContext};
-use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_gas_schedule::{NativeGasParameters, VMGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_native_interface::SafeNativeBuilder;
 #[cfg(feature = "testing")]
 use aptos_table_natives::{TableHandle, TableResolver};
@@ -144,14 +144,14 @@ static DUMMY_RESOLVER: Lazy<AptosBlankStorage> = Lazy::new(|| AptosBlankStorage:
 pub fn aptos_natives(
     gas_feature_version: u64,
     native_gas_params: NativeGasParameters,
-    misc_gas_params: MiscGasParameters,
+    vm_gas_params: VMGasParameters,
     timed_features: TimedFeatures,
     features: Features,
 ) -> NativeFunctionTable {
     let mut builder = SafeNativeBuilder::new(
         gas_feature_version,
         native_gas_params,
-        misc_gas_params,
+        vm_gas_params,
         timed_features,
         features,
         None,
@@ -165,7 +165,7 @@ pub fn assert_no_test_natives(err_msg: &str) {
         aptos_natives(
             LATEST_GAS_FEATURE_VERSION,
             NativeGasParameters::zeros(),
-            MiscGasParameters::zeros(),
+            VMGasParameters::zeros(),
             TimedFeaturesBuilder::enable_all().build(),
             Features::default()
         )

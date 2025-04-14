@@ -15,20 +15,23 @@ use std::collections::{btree_map, BTreeMap};
 pub trait AptosModuleStorage: ModuleStorage {
     /// Returns the state value metadata associated with this module. The error is returned if
     /// there is a storage error. If the module does not exist, [None] is returned.
-    fn fetch_state_value_metadata(
+    fn unmetered_get_state_value_metadata(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> PartialVMResult<Option<StateValueMetadata>>;
 
-    fn load_function_with_type_arg_inference(
+    fn unmetered_load_function_with_ty_arg_inference(
         &self,
         module_id: &ModuleId,
         function_name: &IdentStr,
         expected_return_ty: &Type,
     ) -> VMResult<LoadedFunction> {
-        let (module, function) =
-            self.fetch_function_definition(module_id.address(), module_id.name(), function_name)?;
+        let (module, function) = self.unmetered_get_function_definition(
+            module_id.address(),
+            module_id.name(),
+            function_name,
+        )?;
 
         if function.return_tys().len() != 1 {
             // For functions that are marked constructor this should not happen.

@@ -20,7 +20,11 @@
 use crate::{loaded_data::runtime_types::Type, values::Value};
 pub use move_binary_format::errors::{PartialVMError, PartialVMResult};
 pub use move_core_types::{gas_algebra::InternalGas, vm_status::StatusCode};
-use move_core_types::{identifier::Identifier, language_storage::ModuleId};
+use move_core_types::{
+    gas_algebra::{NumBytes, NumModules},
+    identifier::Identifier,
+    language_storage::ModuleId,
+};
 use smallvec::{smallvec, SmallVec};
 
 /// Result of a native function execution requires charges for execution cost.
@@ -35,14 +39,20 @@ use smallvec::{smallvec, SmallVec};
 pub enum NativeResult {
     Success {
         cost: InternalGas,
+        num_dependencies: NumModules,
+        total_dependency_size: NumBytes,
         ret_vals: SmallVec<[Value; 1]>,
     },
     Abort {
         cost: InternalGas,
+        num_dependencies: NumModules,
+        total_dependency_size: NumBytes,
         abort_code: u64,
     },
     OutOfGas {
         partial_cost: InternalGas,
+        partial_num_dependencies: NumModules,
+        partial_total_dependency_size: NumBytes,
     },
     /// Instruct the VM to perform a control flow transfer.
     ///
@@ -59,16 +69,21 @@ pub enum NativeResult {
         args: SmallVec<[Value; 1]>,
     },
     /// Instruct the VM to load up a module into the loader and charge dependency for such operation.
-    LoadModule {
-        module_name: ModuleId,
-    },
+    LoadModule { module_name: ModuleId },
 }
 
 impl NativeResult {
     /// Return values of a successful execution.
-    pub fn ok(cost: InternalGas, values: SmallVec<[Value; 1]>) -> Self {
+    pub fn ok(
+        cost: InternalGas,
+        num_dependencies: NumModules,
+        total_dependency_size: NumBytes,
+        values: SmallVec<[Value; 1]>,
+    ) -> Self {
         NativeResult::Success {
             cost,
+            num_dependencies,
+            total_dependency_size,
             ret_vals: values,
         }
     }
@@ -77,8 +92,18 @@ impl NativeResult {
     /// failure of the VM which would raise a `PartialVMError` error directly.
     /// The only thing the funciton can specify is its abort code, as if it had invoked the `Abort`
     /// bytecode instruction
-    pub fn err(cost: InternalGas, abort_code: u64) -> Self {
-        NativeResult::Abort { cost, abort_code }
+    pub fn err(
+        cost: InternalGas,
+        num_dependencies: NumModules,
+        total_dependency_size: NumBytes,
+        abort_code: u64,
+    ) -> Self {
+        NativeResult::Abort {
+            cost,
+            num_dependencies,
+            total_dependency_size,
+            abort_code,
+        }
     }
 
     /// A special variant indicating that the native has determined there is not enough
@@ -90,29 +115,16 @@ impl NativeResult {
     ///
     /// The natives are still required to return a partial cost, which the VM will pass
     /// to the gas meter for proper bookkeeping.
-    pub fn out_of_gas(partial_cost: InternalGas) -> Self {
-        NativeResult::OutOfGas { partial_cost }
-    }
-
-    /// Convert a `PartialVMResult<()>` into a `PartialVMResult<NativeResult>`
-    pub fn map_partial_vm_result_empty(
-        cost: InternalGas,
-        res: PartialVMResult<()>,
-    ) -> PartialVMResult<Self> {
-        let result = match res {
-            Ok(_) => NativeResult::ok(cost, smallvec![]),
-            Err(err) if err.major_status() == StatusCode::ABORTED => {
-                let (_, abort_code, _, _, _, _) = err.all_data();
-                NativeResult::err(
-                    cost,
-                    abort_code.unwrap_or(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR as u64),
-                )
-            },
-            Err(err) => {
-                return Err(err);
-            },
-        };
-        Ok(result)
+    pub fn out_of_gas(
+        partial_cost: InternalGas,
+        partial_num_dependencies: NumModules,
+        partial_total_dependency_size: NumBytes,
+    ) -> Self {
+        NativeResult::OutOfGas {
+            partial_cost,
+            partial_num_dependencies,
+            partial_total_dependency_size,
+        }
     }
 
     /// Convert a `PartialVMResult<Value>` into a `PartialVMResult<NativeResult>`
@@ -121,11 +133,16 @@ impl NativeResult {
         res: PartialVMResult<Value>,
     ) -> PartialVMResult<Self> {
         let result = match res {
-            Ok(val) => NativeResult::ok(cost, smallvec![val]),
+            Ok(val) => NativeResult::ok(cost, 0.into(), 0.into(), smallvec![val]),
             Err(err) if err.major_status() == StatusCode::ABORTED => {
                 let (_, abort_code, _, _, _, _) = err.all_data();
                 NativeResult::err(
                     cost,
+                    // TODO(lazy-loading): double check this is correct, seems like this function
+                    //   is used by third-party only. Also seems like the same pattern is used in
+                    //   other places in third-party natives. For now, 0s are put there.
+                    0.into(),
+                    0.into(),
                     abort_code.unwrap_or(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR as u64),
                 )
             },

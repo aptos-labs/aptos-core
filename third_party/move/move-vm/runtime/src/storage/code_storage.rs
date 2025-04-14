@@ -7,7 +7,7 @@ use crate::{
 };
 use ambassador::delegatable_trait;
 use move_binary_format::{
-    errors::{Location, PartialVMResult, VMResult},
+    errors::{Location, VMResult},
     file_format::CompiledScript,
 };
 use move_core_types::language_storage::TypeTag;
@@ -40,24 +40,19 @@ pub trait CodeStorage: ModuleStorage {
     ///   2. Verifies type arguments (modules that define the type arguments are also loaded).
     /// If both steps are successful, returns a [LoadedFunction] corresponding to the script's
     /// entrypoint.
-    fn load_script(
+    fn unmetered_load_script(
         &self,
         serialized_script: &[u8],
-        ty_tag_args: &[TypeTag],
+        ty_args: &[TypeTag],
     ) -> VMResult<LoadedFunction> {
-        // Step 1: Load script. During the loading process, if script has not been previously
-        // cached, it will be verified.
+        debug_assert!(!self.runtime_environment().vm_config().use_lazy_loading);
+
         let script = self.verify_and_cache_script(serialized_script)?;
-
-        // Step 2: Load & verify types used as type arguments passed to this script. Note that
-        // arguments for scripts are verified on the client side.
-        let ty_args = ty_tag_args
-            .iter()
-            .map(|ty_tag| self.fetch_ty(ty_tag))
-            .collect::<PartialVMResult<Vec<_>>>()
-            .map_err(|err| err.finish(Location::Script))?;
-
         let main = script.entry_point();
+
+        let ty_args = self
+            .unmetered_load_ty_args(ty_args)
+            .map_err(|err| err.finish(Location::Script))?;
         Type::verify_ty_arg_abilities(main.ty_param_abilities(), &ty_args)
             .map_err(|err| err.finish(Location::Script))?;
 
@@ -113,7 +108,7 @@ where
             .immediate_dependencies_iter()
             .map(|(addr, name)| {
                 // Since module is stored on-chain, we should not see any verification errors here.
-                self.fetch_existing_verified_module(addr, name)
+                self.unmetered_get_existing_verified_module(addr, name)
             })
             .collect::<VMResult<Vec<_>>>()?;
         let verified_script = self

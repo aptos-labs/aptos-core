@@ -27,7 +27,7 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
-    LoadedFunction,
+    LoadedFunction, RuntimeEnvironment,
 };
 use move_vm_types::{
     gas::{GasMeter, UnmeteredGasMeter},
@@ -144,7 +144,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     for ty in func.param_tys()[signer_param_cnt..].iter() {
         let subst_res = ty_builder.create_ty_with_subst(ty, func.ty_args());
         let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-        let valid = is_valid_txn_arg(module_storage, &ty, allowed_structs);
+        let valid = is_valid_txn_arg(module_storage.runtime_environment(), &ty, allowed_structs);
         if !valid {
             return Err(VMStatus::error(
                 StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
@@ -199,7 +199,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
 /// references) returns false. An error is returned in cases when a struct type is encountered and
 /// its name cannot be queried for some reason.
 pub(crate) fn is_valid_txn_arg(
-    module_storage: &impl AptosModuleStorage,
+    runtime_environment: &RuntimeEnvironment,
     ty: &Type,
     allowed_structs: &ConstructorMap,
 ) -> bool {
@@ -207,12 +207,11 @@ pub(crate) fn is_valid_txn_arg(
 
     match ty {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
-        Vector(inner) => is_valid_txn_arg(module_storage, inner, allowed_structs),
+        Vector(inner) => is_valid_txn_arg(runtime_environment, inner, allowed_structs),
         Struct { .. } | StructInstantiation { .. } => {
             // Note: Original behavior was to return false even if the module loading fails (e.g.,
             //       if struct does not exist. This preserves it.
-            module_storage
-                .runtime_environment()
+            runtime_environment
                 .get_struct_name(ty)
                 .ok()
                 .flatten()
@@ -464,11 +463,16 @@ fn validate_and_construct(
         *max_invocations -= 1;
     }
 
-    let function = module_storage.load_function_with_type_arg_inference(
+    // MODULE LOADING METERING:
+    //  This will load the constructor function, which we do not need to meter because it should be
+    //  defined at 0x1 only.
+    debug_assert!(constructor.module_id.address().is_special());
+    let function = module_storage.unmetered_load_function_with_ty_arg_inference(
         &constructor.module_id,
         constructor.func_name,
         expected_type,
     )?;
+
     let mut args = vec![];
     let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
     for param_ty in function.param_tys() {
