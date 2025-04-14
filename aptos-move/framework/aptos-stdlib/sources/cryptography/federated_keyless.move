@@ -1,5 +1,4 @@
-/// This module implements Single Key representations of public keys.
-/// It is used to represent public keys for the Ed25519, SECP256K1, WebAuthn, and Keyless schemes in a unified way.
+/// This module implements the Federated Keyless authentication scheme.
 
 module aptos_std::federated_keyless {
     use aptos_std::bcs_stream;

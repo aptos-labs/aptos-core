@@ -3,8 +3,7 @@
 
 # Module `0x1::federated_keyless`
 
-This module implements Single Key representations of public keys.
-It is used to represent public keys for the Ed25519, SECP256K1, WebAuthn, and Keyless schemes in a unified way.
+This module implements the Federated Keyless authentication scheme.
 
 
 -  [Struct `PublicKey`](#0x1_federated_keyless_PublicKey)
