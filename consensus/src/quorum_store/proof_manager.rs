@@ -37,6 +37,7 @@ pub struct ProofManager {
     back_pressure_total_proof_limit: u64,
     remaining_total_proof_num: u64,
     allow_batches_without_pos_in_proposal: bool,
+    max_batches_per_pull: usize,
 }
 
 impl ProofManager {
@@ -61,6 +62,7 @@ impl ProofManager {
             back_pressure_total_proof_limit,
             remaining_total_proof_num: 0,
             allow_batches_without_pos_in_proposal,
+            max_batches_per_pull,
         }
     }
 
@@ -191,6 +193,8 @@ impl ProofManager {
             / (txns_with_proof_size.count() as f64 + opt_batch_txns_size.count() as f64);
         counters::BATCH_PROOF_RATIO.observe(proof_ratio);
 
+        let max_optbatches = self.max_batches_per_pull.saturating_sub(proof_block.len());
+
         let response = if request.maybe_optqs_payload_pull_params.is_some() {
             let mut sub_blocks = SubBlocks::default();
 
@@ -202,7 +206,7 @@ impl ProofManager {
                 }
             }
 
-            let num_chunks = sub_blocks.len();
+            let num_chunks = sub_blocks.len().min(max_optbatches);
             let mut chunks_remaining = num_chunks;
             while chunks_remaining > 0 {
                 let chunk_size = div_ceil(opt_batches.len(), chunks_remaining);
