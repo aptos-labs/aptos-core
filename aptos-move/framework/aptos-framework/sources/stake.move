@@ -567,7 +567,7 @@ module aptos_framework::stake {
             add_stake(owner, initial_stake_amount);
         };
 
-        let account_address = permissioned_signer::address_of(owner);
+        let account_address = signer::address_of(owner);
         if (account_address != operator) {
             set_operator(owner, operator)
         };
@@ -603,7 +603,7 @@ module aptos_framework::stake {
 
     fun initialize_owner(owner: &signer) acquires AllowedValidators {
         check_stake_permission(owner);
-        let owner_address = permissioned_signer::address_of(owner);
+        let owner_address = signer::address_of(owner);
         assert!(is_allowed(owner_address), error::not_found(EINELIGIBLE_VALIDATOR));
         assert!(!stake_pool_exists(owner_address), error::already_exists(EALREADY_REGISTERED));
 
@@ -638,7 +638,7 @@ module aptos_framework::stake {
     /// Extract and return owner capability from the signing account.
     public fun extract_owner_cap(owner: &signer): OwnerCapability acquires OwnerCapability {
         check_stake_permission(owner);
-        let owner_address = permissioned_signer::address_of(owner);
+        let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
         move_from<OwnerCapability>(owner_address)
     }
@@ -659,7 +659,7 @@ module aptos_framework::stake {
     /// Allows an owner to change the operator of the stake pool.
     public entry fun set_operator(owner: &signer, new_operator: address) acquires OwnerCapability, StakePool {
         check_stake_permission(owner);
-        let owner_address = permissioned_signer::address_of(owner);
+        let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
         let ownership_cap = borrow_global<OwnerCapability>(owner_address);
         set_operator_with_cap(ownership_cap, new_operator);
@@ -696,7 +696,7 @@ module aptos_framework::stake {
     /// Allows an owner to change the delegated voter of the stake pool.
     public entry fun set_delegated_voter(owner: &signer, new_voter: address) acquires OwnerCapability, StakePool {
         check_stake_permission(owner);
-        let owner_address = permissioned_signer::address_of(owner);
+        let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
         let ownership_cap = borrow_global<OwnerCapability>(owner_address);
         set_delegated_voter_with_cap(ownership_cap, new_voter);
@@ -713,7 +713,7 @@ module aptos_framework::stake {
     /// Add `amount` of coins from the `account` owning the StakePool.
     public entry fun add_stake(owner: &signer, amount: u64) acquires OwnerCapability, StakePool, ValidatorSet {
         check_stake_permission(owner);
-        let owner_address = permissioned_signer::address_of(owner);
+        let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
         let ownership_cap = borrow_global<OwnerCapability>(owner_address);
         add_stake_with_cap(ownership_cap, coin::withdraw<AptosCoin>(owner, amount));
@@ -776,7 +776,7 @@ module aptos_framework::stake {
     public entry fun reactivate_stake(owner: &signer, amount: u64) acquires OwnerCapability, StakePool {
         check_stake_permission(owner);
         assert_reconfig_not_in_progress();
-        let owner_address = permissioned_signer::address_of(owner);
+        let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
         let ownership_cap = borrow_global<OwnerCapability>(owner_address);
         reactivate_stake_with_cap(ownership_cap, amount);
@@ -828,7 +828,7 @@ module aptos_framework::stake {
         assert_stake_pool_exists(pool_address);
 
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
-        assert!(permissioned_signer::address_of(operator) == stake_pool.operator_address, error::unauthenticated(ENOT_OPERATOR));
+        assert!(signer::address_of(operator) == stake_pool.operator_address, error::unauthenticated(ENOT_OPERATOR));
 
         assert!(exists<ValidatorConfig>(pool_address), error::not_found(EVALIDATOR_CONFIG));
         let validator_info = borrow_global_mut<ValidatorConfig>(pool_address);
@@ -872,7 +872,7 @@ module aptos_framework::stake {
         assert_reconfig_not_in_progress();
         assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
-        assert!(permissioned_signer::address_of(operator) == stake_pool.operator_address, error::unauthenticated(ENOT_OPERATOR));
+        assert!(signer::address_of(operator) == stake_pool.operator_address, error::unauthenticated(ENOT_OPERATOR));
         assert!(exists<ValidatorConfig>(pool_address), error::not_found(EVALIDATOR_CONFIG));
         let validator_info = borrow_global_mut<ValidatorConfig>(pool_address);
         let old_network_addresses = validator_info.network_addresses;
@@ -907,7 +907,7 @@ module aptos_framework::stake {
     /// Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
     public entry fun increase_lockup(owner: &signer) acquires OwnerCapability, StakePool {
         check_stake_permission(owner);
-        let owner_address = permissioned_signer::address_of(owner);
+        let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
         let ownership_cap = borrow_global<OwnerCapability>(owner_address);
         increase_lockup_with_cap(ownership_cap);
@@ -973,7 +973,7 @@ module aptos_framework::stake {
         assert_reconfig_not_in_progress();
         assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
-        assert!(permissioned_signer::address_of(operator) == stake_pool.operator_address, error::unauthenticated(ENOT_OPERATOR));
+        assert!(signer::address_of(operator) == stake_pool.operator_address, error::unauthenticated(ENOT_OPERATOR));
         assert!(
             get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE,
             error::invalid_state(EALREADY_ACTIVE_VALIDATOR),
@@ -1017,7 +1017,7 @@ module aptos_framework::stake {
     public entry fun unlock(owner: &signer, amount: u64) acquires OwnerCapability, StakePool {
         check_stake_permission(owner);
         assert_reconfig_not_in_progress();
-        let owner_address = permissioned_signer::address_of(owner);
+        let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
         let ownership_cap = borrow_global<OwnerCapability>(owner_address);
         unlock_with_cap(amount, ownership_cap);
@@ -1065,7 +1065,7 @@ module aptos_framework::stake {
         withdraw_amount: u64
     ) acquires OwnerCapability, StakePool, ValidatorSet {
         check_stake_permission(owner);
-        let owner_address = permissioned_signer::address_of(owner);
+        let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
         let ownership_cap = borrow_global<OwnerCapability>(owner_address);
         let coins = withdraw_with_cap(ownership_cap, withdraw_amount);
@@ -1891,9 +1891,7 @@ module aptos_framework::stake {
         should_end_epoch: bool,
     ) acquires AllowedValidators, AptosCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
         let validator_address = signer::address_of(validator);
-        if (!account::exists_at(signer::address_of(validator))) {
-            account::create_account_for_test(validator_address);
-        };
+        account::create_account_for_test(validator_address);
 
         let pk_bytes = bls12381::public_key_to_bytes(public_key);
         let pop_bytes = bls12381::proof_of_possession_to_bytes(proof_of_possession);

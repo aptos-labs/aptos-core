@@ -39,7 +39,6 @@ account: address,
 semantics.
 
 <code>borrow_address</code> borrows this inner field
-This function would abort on permissioned signer.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="signer.md#0x1_signer_borrow_address">borrow_address</a>(s: &<a href="signer.md#0x1_signer">signer</a>): &<b>address</b>

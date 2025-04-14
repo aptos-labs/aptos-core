@@ -585,7 +585,7 @@ module aptos_framework::vesting {
         assert!(grant_amount > 0, error::invalid_argument(EZERO_GRANT));
 
         // If this is the first time this admin account has created a vesting contract, initialize the admin store.
-        let admin_address = permissioned_signer::address_of(admin);
+        let admin_address = signer::address_of(admin);
         if (!exists<AdminStore>(admin_address)) {
             move_to(admin, AdminStore {
                 vesting_contracts: vector::empty<address>(),
@@ -601,7 +601,7 @@ module aptos_framework::vesting {
             &contract_signer, operator, voter, grant, commission_percentage, contract_creation_seed);
 
         // Add the newly created vesting contract's address to the admin store.
-        let contract_address = permissioned_signer::address_of(&contract_signer);
+        let contract_address = signer::address_of(&contract_signer);
         let admin_store = borrow_global_mut<AdminStore>(admin_address);
         vector::push_back(&mut admin_store.vesting_contracts, contract_address);
         if (std::features::module_event_migration_enabled()) {
@@ -1075,7 +1075,7 @@ module aptos_framework::vesting {
     ) acquires VestingAccountManagement, VestingContract {
         check_vest_permission(account);
         let vesting_contract = borrow_global_mut<VestingContract>(contract_address);
-        let addr = permissioned_signer::address_of(account);
+        let addr = signer::address_of(account);
         assert!(
             addr == vesting_contract.admin ||
                 addr == get_role_holder(contract_address, utf8(ROLE_BENEFICIARY_RESETTER)),
@@ -1154,8 +1154,8 @@ module aptos_framework::vesting {
         contract_creation_seed: vector<u8>,
     ): (signer, SignerCapability) acquires AdminStore {
         check_vest_permission(admin);
-        let admin_store = borrow_global_mut<AdminStore>(permissioned_signer::address_of(admin));
-        let seed = bcs::to_bytes(&permissioned_signer::address_of(admin));
+        let admin_store = borrow_global_mut<AdminStore>(signer::address_of(admin));
+        let seed = bcs::to_bytes(&signer::address_of(admin));
         vector::append(&mut seed, bcs::to_bytes(&admin_store.nonce));
         admin_store.nonce = admin_store.nonce + 1;
 
@@ -1174,7 +1174,7 @@ module aptos_framework::vesting {
 
     fun verify_admin(admin: &signer, vesting_contract: &VestingContract) {
         check_vest_permission(admin);
-        assert!(permissioned_signer::address_of(admin) == vesting_contract.admin, error::unauthenticated(ENOT_ADMIN));
+        assert!(signer::address_of(admin) == vesting_contract.admin, error::unauthenticated(ENOT_ADMIN));
     }
 
     fun assert_vesting_contract_exists(contract_address: address) {
@@ -1252,9 +1252,7 @@ module aptos_framework::vesting {
 
         vector::for_each_ref(accounts, |addr| {
             let addr: address = *addr;
-            if (!account::exists_at(addr)) {
-                create_account(addr);
-            };
+            create_account(addr);
         });
 
         // In the test environment, the periodical_reward_rate_decrease feature is initially turned off.
@@ -1300,7 +1298,7 @@ module aptos_framework::vesting {
             VESTING_PERIOD,
         );
 
-        let admin_address = permissioned_signer::address_of(admin);
+        let admin_address = signer::address_of(admin);
         let buy_ins = simple_map::create<address, Coin<AptosCoin>>();
         vector::enumerate_ref(shares, |i, share| {
             let shareholder = *vector::borrow(shareholders, i);
@@ -1480,7 +1478,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60001, location = aptos_framework::aptos_account)]
+    #[expected_failure(abort_code = 0x60002, location = aptos_framework::aptos_account)]
     public entry fun test_create_vesting_contract_with_invalid_withdrawal_address_should_fail(
         aptos_framework: &signer,
         admin: &signer,
@@ -1491,7 +1489,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60001, location = aptos_framework::aptos_account)]
+    #[expected_failure(abort_code = 0x60002, location = aptos_framework::aptos_account)]
     public entry fun test_create_vesting_contract_with_missing_withdrawal_account_should_fail(
         aptos_framework: &signer,
         admin: &signer,
@@ -2036,7 +2034,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60001, location = aptos_framework::aptos_account)]
+    #[expected_failure(abort_code = 0x60002, location = aptos_framework::aptos_account)]
     public entry fun test_set_beneficiary_with_missing_account_should_fail(
         aptos_framework: &signer,
         admin: &signer,

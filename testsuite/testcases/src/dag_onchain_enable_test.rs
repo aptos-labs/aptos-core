@@ -5,7 +5,6 @@ use crate::{generate_onchain_config_blob, NetworkLoadTest};
 use anyhow::Ok;
 use aptos::test::CliTestFramework;
 use aptos_forge::{NetworkContextSynchronizer, NetworkTest, NodeExt, SwarmExt, Test};
-use aptos_logger::info;
 use aptos_sdk::bcs;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
@@ -15,6 +14,7 @@ use aptos_types::{
     },
 };
 use async_trait::async_trait;
+use log::info;
 use std::{sync::Arc, time::Duration};
 
 const MAX_NODE_LAG_SECS: u64 = 360;

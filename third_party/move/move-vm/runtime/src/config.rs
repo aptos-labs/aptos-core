@@ -24,10 +24,7 @@ pub struct VMConfig {
     pub type_byte_cost: u64,
     pub delayed_field_optimization_enabled: bool,
     pub ty_builder: TypeBuilder,
-    pub disallow_dispatch_for_native: bool,
-    pub use_compatibility_checker_v2: bool,
     pub use_call_tree_and_instruction_cache: bool,
-    pub abort_on_move_to_with_permissioned_signer: bool,
 }
 
 impl Default for VMConfig {
@@ -43,10 +40,7 @@ impl Default for VMConfig {
             type_byte_cost: 0,
             delayed_field_optimization_enabled: false,
             ty_builder: TypeBuilder::with_limits(128, 20),
-            disallow_dispatch_for_native: true,
-            use_compatibility_checker_v2: true,
             use_call_tree_and_instruction_cache: true,
-            abort_on_move_to_with_permissioned_signer: true,
         }
     }
 }

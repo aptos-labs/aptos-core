@@ -971,7 +971,7 @@ impl InterpreterImpl<'_> {
                         ));
                 }
 
-                if resolver.vm_config().disallow_dispatch_for_native && target_func.is_native() {
+                if target_func.is_native() {
                     return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
                         .with_message("Invoking native function during dispatch".to_string()));
                 }
@@ -2551,11 +2551,6 @@ impl Frame {
                     Bytecode::MoveTo(sd_idx) => {
                         let resource = interpreter.operand_stack.pop()?;
                         let signer_reference = interpreter.operand_stack.pop_as::<SignerRef>()?;
-                        if signer_reference.is_permissioned()? {
-                            return Err(PartialVMError::new(
-                                StatusCode::MOVE_TO_WITH_PERMISSIONED_SIGNER,
-                            ));
-                        }
                         let addr = signer_reference
                             .borrow_signer()?
                             .value_as::<Reference>()?

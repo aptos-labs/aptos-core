@@ -114,25 +114,8 @@ pub fn aptos_prod_vm_config(
         !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
     let paranoid_type_checks = get_paranoid_type_checks();
 
-    let mut type_max_cost = 0;
-    let mut type_base_cost = 0;
-    let mut type_byte_cost = 0;
-    if timed_features.is_enabled(TimedFeatureFlag::LimitTypeTagSize) {
-        // 5000 limits type tag total size < 5000 bytes and < 50 nodes
-        type_max_cost = 5000;
-        type_base_cost = 100;
-        type_byte_cost = 1;
-    }
-
     let deserializer_config = aptos_prod_deserializer_config(features);
     let verifier_config = aptos_prod_verifier_config(features);
-
-    // Compatibility checker v2 is enabled either by its own flag or if enum types are enabled.
-    let use_compatibility_checker_v2 = verifier_config.enable_enum_types
-        || features.is_enabled(FeatureFlag::USE_COMPATIBILITY_CHECKER_V2);
-
-    let abort_on_move_to_with_permissioned_signer =
-        features.is_enabled(FeatureFlag::PERMISSIONED_SIGNER);
 
     VMConfig {
         verifier_config,
@@ -140,18 +123,16 @@ pub fn aptos_prod_vm_config(
         paranoid_type_checks,
         check_invariant_in_swap_loc,
         max_value_nest_depth: Some(128),
-        type_max_cost,
-        type_base_cost,
-        type_byte_cost,
+        // 5000 limits type tag total size < 5000 bytes and < 50 nodes.
+        type_max_cost: 5000,
+        type_base_cost: 100,
+        type_byte_cost: 1,
         // By default, do not use delayed field optimization. Instead, clients should enable it
         // manually where applicable.
         delayed_field_optimization_enabled: false,
         ty_builder,
-        disallow_dispatch_for_native: features.is_enabled(FeatureFlag::DISALLOW_USER_NATIVES),
-        use_compatibility_checker_v2,
         use_call_tree_and_instruction_cache: features
             .is_call_tree_and_instruction_vm_cache_enabled(),
-        abort_on_move_to_with_permissioned_signer,
     }
 }
 

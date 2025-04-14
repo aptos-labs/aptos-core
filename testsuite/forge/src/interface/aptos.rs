@@ -9,7 +9,6 @@ use aptos_logger::info;
 use aptos_rest_client::{Client as RestClient, PendingTransaction, State, Transaction};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PublicKey,
-    move_types::identifier::Identifier,
     transaction_builder::TransactionFactory,
     types::{
         account_address::AccountAddress,
@@ -250,24 +249,13 @@ impl AptosPublicInfo {
     }
 
     pub async fn get_balance(&self, address: AccountAddress) -> Option<u64> {
-        let module = Identifier::new("coin".to_string()).unwrap();
-        let name = Identifier::new("CoinStore".to_string()).unwrap();
-        self.rest_client
-            .get_account_resources(address)
+        let balance = self
+            .rest_client
+            .get_account_balance(address, "0x1::aptos_coin::AptosCoin")
             .await
             .unwrap()
-            .into_inner()
-            .into_iter()
-            .find(|r| r.resource_type.name == name && r.resource_type.module == module)
-            .and_then(|coin| {
-                coin.data
-                    .get("coin")
-                    .unwrap()
-                    .get("value")
-                    .unwrap()
-                    .as_str()
-                    .and_then(|s| s.parse::<u64>().ok())
-            })
+            .into_inner();
+        Some(balance)
     }
 
     pub async fn account_exists(&self, address: AccountAddress) -> Result<()> {

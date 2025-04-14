@@ -123,24 +123,3 @@ jobs:
           fi
           eval $CMD
           echo "Cleanup completed"
-      # List all disks in the project that are not in use and finished creating. There is a rare chance that the disk is being created and won't be used in future due to csi retry errors
-      # But this disk will be deleted in the next workflow run since its status is READY then
-      - name: Delete all unsed disks in the project
-        env:
-          GOOGLE_CLOUD_PROJECT: aptos-devinfra-0
-        if: ${{ always() }}
-        run: |
-          
-          DISK_URIS=$(gcloud compute disks list --filter="-users:* AND status=READY" --format "value(uri())")  
-          echo "Disks to be deleted:"  
-          echo "$DISK_URIS"
-            
-          if [ -n "$DISK_URIS" ]; then  
-            gcloud compute disks delete $DISK_URIS
-          else  
-            echo "No unused disks found."  
-          fi  
-
-          
-          
-          

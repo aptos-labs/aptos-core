@@ -32,15 +32,12 @@ module aptos_framework::object_code_deployment {
     use std::bcs;
     use std::error;
     use std::features;
-    use aptos_std::type_info;
-    use aptos_std::type_info::TypeInfo;
+    use std::signer;
+    use aptos_std::type_info::{Self, TypeInfo};
     use aptos_framework::account;
-    use aptos_framework::code;
-    use aptos_framework::code::PackageRegistry;
+    use aptos_framework::code::{Self, PackageRegistry};
     use aptos_framework::event;
-    use aptos_framework::object;
-    use aptos_framework::object::{ExtendRef, Object};
-    use aptos_framework::permissioned_signer;
+    use aptos_framework::object::{Self, ExtendRef, Object};
 
     /// Object code deployment feature not supported.
     const EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED: u64 = 1;
@@ -107,13 +104,13 @@ module aptos_framework::object_code_deployment {
             error::unavailable(EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED),
         );
 
-        let publisher_address = permissioned_signer::address_of(publisher);
+        let publisher_address = signer::address_of(publisher);
         let object_seed = object_seed(publisher_address);
         let constructor_ref = &object::create_named_object(publisher, object_seed);
         let code_signer = &object::generate_signer(constructor_ref);
         code::publish_package_txn(code_signer, metadata_serialized, code);
 
-        event::emit(Publish { object_address: permissioned_signer::address_of(code_signer), });
+        event::emit(Publish { object_address: signer::address_of(code_signer), });
 
         move_to(code_signer, ManagingRefs {
             extend_ref: object::generate_extend_ref(constructor_ref),
@@ -139,7 +136,7 @@ module aptos_framework::object_code_deployment {
         code_object: Object<PackageRegistry>,
     ) acquires ManagingRefs {
         code::check_code_publishing_permission(publisher);
-        let publisher_address = permissioned_signer::address_of(publisher);
+        let publisher_address = signer::address_of(publisher);
         assert!(
             object::is_owner(code_object, publisher_address),
             error::permission_denied(ENOT_CODE_OBJECT_OWNER),
@@ -152,7 +149,7 @@ module aptos_framework::object_code_deployment {
         let code_signer = &object::generate_signer_for_extending(extend_ref);
         code::publish_package_txn(code_signer, metadata_serialized, code);
 
-        event::emit(Upgrade { object_address: permissioned_signer::address_of(code_signer), });
+        event::emit(Upgrade { object_address: signer::address_of(code_signer), });
     }
 
     /// Make an existing upgradable package immutable. Once this is called, the package cannot be made upgradable again.
@@ -178,7 +175,7 @@ module aptos_framework::object_code_deployment {
         // Disallow registering a capability proof for an object that is not a code object.
         assert_is_code_object(code_object_address);
 
-        let caller_addr = permissioned_signer::address_of(owner_or_package);
+        let caller_addr = signer::address_of(owner_or_package);
         let is_code_object_owner =
             object::is_owner(object::address_to_object<PackageRegistry>(code_object_address), caller_addr);
         let is_package_itself = caller_addr == code_object_address;

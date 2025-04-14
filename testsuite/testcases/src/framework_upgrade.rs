@@ -8,12 +8,12 @@ use aptos_forge::{
     FORGE_KEY_SEED,
 };
 use aptos_keygen::KeyGen;
-use aptos_logger::info;
 use aptos_release_builder::ReleaseConfig;
 use aptos_sdk::crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use aptos_temppath::TempPath;
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use async_trait::async_trait;
+use log::info;
 use std::{ops::DerefMut, path::Path};
 use tokio::{fs, time::Duration};
 
@@ -88,17 +88,6 @@ impl NetworkTest for FrameworkUpgrade {
             format!("{}::full-framework-upgrade", self.name()),
             &txn_stat,
         );
-
-        {
-            ctx.swarm.read().await.fork_check(epoch_duration).await?;
-        }
-
-        // Upgrade the rest
-        let second_half = &all_validators[all_validators.len() / 2..];
-        let msg = format!("Upgrade the remaining nodes to version: {}", new_version);
-        info!("{}", msg);
-        ctx.report.report_text(msg);
-        batch_update(ctx, second_half, &new_version).await?;
 
         {
             ctx.swarm.read().await.fork_check(epoch_duration).await?;
@@ -208,6 +197,13 @@ impl NetworkTest for FrameworkUpgrade {
             "Compatibility test for {} ==> {} passed",
             old_version, new_version
         ));
+
+        // Upgrade the rest
+        let second_half = &all_validators[all_validators.len() / 2..];
+        let msg = format!("Upgrade the remaining nodes to version: {}", new_version);
+        info!("{}", msg);
+        ctx.report.report_text(msg);
+        batch_update(ctx, second_half, &new_version).await?;
 
         let duration = Duration::from_secs(30);
         let txn_stat = generate_traffic(ctx, &all_validators, duration).await?;

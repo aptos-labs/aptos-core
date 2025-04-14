@@ -39,6 +39,7 @@
 <b>use</b> <a href="create_signer.md#0x1_create_signer">0x1::create_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs">0x1::from_bcs</a>;
 <b>use</b> <a href="function_info.md#0x1_function_info">0x1::function_info</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">0x1::hash</a>;
@@ -271,6 +272,15 @@ source is defined in Scheme enum in types/src/transaction/authenticator.rs
 
 
 
+<a id="0x1_account_abstraction_EACCOUNT_ABSTRACTION_NOT_ENABLED"></a>
+
+
+
+<pre><code><b>const</b> <a href="account_abstraction.md#0x1_account_abstraction_EACCOUNT_ABSTRACTION_NOT_ENABLED">EACCOUNT_ABSTRACTION_NOT_ENABLED</a>: u64 = 8;
+</code></pre>
+
+
+
 <a id="0x1_account_abstraction_EAUTH_FUNCTION_SIGNATURE_MISMATCH"></a>
 
 
@@ -293,7 +303,16 @@ source is defined in Scheme enum in types/src/transaction/authenticator.rs
 
 
 
-<pre><code><b>const</b> <a href="account_abstraction.md#0x1_account_abstraction_EDERIVABLE_AA_NOT_INITIALIZED">EDERIVABLE_AA_NOT_INITIALIZED</a>: u64 = 6;
+<pre><code><b>const</b> <a href="account_abstraction.md#0x1_account_abstraction_EDERIVABLE_AA_NOT_INITIALIZED">EDERIVABLE_AA_NOT_INITIALIZED</a>: u64 = 7;
+</code></pre>
+
+
+
+<a id="0x1_account_abstraction_EDERIVABLE_ACCOUNT_ABSTRACTION_NOT_ENABLED"></a>
+
+
+
+<pre><code><b>const</b> <a href="account_abstraction.md#0x1_account_abstraction_EDERIVABLE_ACCOUNT_ABSTRACTION_NOT_ENABLED">EDERIVABLE_ACCOUNT_ABSTRACTION_NOT_ENABLED</a>: u64 = 9;
 </code></pre>
 
 
@@ -474,6 +493,7 @@ Note: it is a private entry function that can only be called directly from trans
     module_name: String,
     function_name: String,
 ) <b>acquires</b> <a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a> {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_account_abstraction_enabled">features::is_account_abstraction_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account_abstraction.md#0x1_account_abstraction_EACCOUNT_ABSTRACTION_NOT_ENABLED">EACCOUNT_ABSTRACTION_NOT_ENABLED</a>));
     <b>assert</b>!(!is_permissioned_signer(<a href="account.md#0x1_account">account</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="account_abstraction.md#0x1_account_abstraction_ENOT_MASTER_SIGNER">ENOT_MASTER_SIGNER</a>));
     <a href="account_abstraction.md#0x1_account_abstraction_update_dispatchable_authenticator_impl">update_dispatchable_authenticator_impl</a>(
         <a href="account.md#0x1_account">account</a>,
@@ -591,6 +611,7 @@ only be obtained as a part of the governance script.
     module_name: String,
     function_name: String,
 ) <b>acquires</b> <a href="account_abstraction.md#0x1_account_abstraction_DerivableDispatchableAuthenticator">DerivableDispatchableAuthenticator</a> {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_derivable_account_abstraction_enabled">features::is_derivable_account_abstraction_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account_abstraction.md#0x1_account_abstraction_EDERIVABLE_ACCOUNT_ABSTRACTION_NOT_ENABLED">EDERIVABLE_ACCOUNT_ABSTRACTION_NOT_ENABLED</a>));
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
 
     <a href="account_abstraction.md#0x1_account_abstraction_DerivableDispatchableAuthenticator">DerivableDispatchableAuthenticator</a>[@aptos_framework].auth_functions.add(
@@ -806,11 +827,14 @@ only be obtained as a part of the governance script.
     <b>let</b> master_signer_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
 
     <b>if</b> (signing_data.is_derivable()) {
+        <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_derivable_account_abstraction_enabled">features::is_derivable_account_abstraction_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account_abstraction.md#0x1_account_abstraction_EDERIVABLE_ACCOUNT_ABSTRACTION_NOT_ENABLED">EDERIVABLE_ACCOUNT_ABSTRACTION_NOT_ENABLED</a>));
         <b>assert</b>!(master_signer_addr == <a href="account_abstraction.md#0x1_account_abstraction_derive_account_address">derive_account_address</a>(func_info, signing_data.derivable_abstract_public_key()), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account_abstraction.md#0x1_account_abstraction_EINCONSISTENT_SIGNER_ADDRESS">EINCONSISTENT_SIGNER_ADDRESS</a>));
 
         <b>let</b> func_infos = <a href="account_abstraction.md#0x1_account_abstraction_dispatchable_derivable_authenticator_internal">dispatchable_derivable_authenticator_internal</a>();
         <b>assert</b>!(func_infos.contains(&func_info), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account_abstraction.md#0x1_account_abstraction_EFUNCTION_INFO_EXISTENCE">EFUNCTION_INFO_EXISTENCE</a>));
     } <b>else</b> {
+        <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_account_abstraction_enabled">features::is_account_abstraction_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account_abstraction.md#0x1_account_abstraction_EACCOUNT_ABSTRACTION_NOT_ENABLED">EACCOUNT_ABSTRACTION_NOT_ENABLED</a>));
+
         <b>let</b> func_infos = <a href="account_abstraction.md#0x1_account_abstraction_dispatchable_authenticator_internal">dispatchable_authenticator_internal</a>(master_signer_addr);
         <b>assert</b>!(func_infos.contains(&func_info), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account_abstraction.md#0x1_account_abstraction_EFUNCTION_INFO_EXISTENCE">EFUNCTION_INFO_EXISTENCE</a>));
     };
@@ -819,7 +843,7 @@ only be obtained as a part of the governance script.
     <b>let</b> returned_signer = <a href="account_abstraction.md#0x1_account_abstraction_dispatchable_authenticate">dispatchable_authenticate</a>(<a href="account.md#0x1_account">account</a>, signing_data, &func_info);
     // Returned <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> MUST represent the same <a href="account.md#0x1_account">account</a> <b>address</b>. Otherwise, it may <b>break</b> the <b>invariant</b> of Aptos blockchain!
     <b>assert</b>!(
-        master_signer_addr == <a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(&returned_signer),
+        master_signer_addr == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&returned_signer),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account_abstraction.md#0x1_account_abstraction_EINCONSISTENT_SIGNER_ADDRESS">EINCONSISTENT_SIGNER_ADDRESS</a>)
     );
     returned_signer

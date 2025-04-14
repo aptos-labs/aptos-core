@@ -653,10 +653,15 @@ module std::features {
     /// Whether the account abstraction is enabled.
     ///
     /// Lifetime: transient
-    const DOMAIN_ACCOUNT_ABSTRACTION: u64 = 88;
+    const DERIVABLE_ACCOUNT_ABSTRACTION: u64 = 88;
 
-    public fun is_domain_account_abstraction_enabled(): bool acquires Features {
-        is_enabled(DOMAIN_ACCOUNT_ABSTRACTION)
+    public fun is_derivable_account_abstraction_enabled(): bool acquires Features {
+        is_enabled(DERIVABLE_ACCOUNT_ABSTRACTION)
+    }
+
+    #[deprecated]
+    public fun is_domain_account_abstraction_enabled(): bool {
+        false
     }
 
     /// Whether function values are enabled.
@@ -665,6 +670,24 @@ module std::features {
     /// We do not expect use from Move, so for now only for documentation purposes here
     const ENABLE_FUNCTION_VALUES: u64 = 89;
 
+    /// Whether new accounts default to the Fungible Asset store.
+    /// Lifetime: transient
+    const NEW_ACCOUNTS_DEFAULT_TO_FA_STORE: u64 = 90;
+
+    public fun get_new_accounts_default_to_fa_store_feature(): u64 { NEW_ACCOUNTS_DEFAULT_TO_FA_STORE }
+
+    public fun new_accounts_default_to_fa_store_enabled(): bool acquires Features {
+        is_enabled(NEW_ACCOUNTS_DEFAULT_TO_FA_STORE)
+    }
+
+    /// Lifetime: transient
+    const DEFAULT_ACCOUNT_RESOURCE: u64 = 91;
+
+    public fun get_default_account_resource_feature(): u64 { DEFAULT_ACCOUNT_RESOURCE }
+
+    public fun is_default_account_resource_enabled(): bool acquires Features {
+        is_enabled(DEFAULT_ACCOUNT_RESOURCE)
+    }
 
     // ============================================================================================
     // Feature Flag Implementation
