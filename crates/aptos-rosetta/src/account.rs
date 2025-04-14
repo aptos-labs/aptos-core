@@ -23,9 +23,11 @@ use aptos_rest_client::{
 use aptos_types::{account_address::AccountAddress, account_config::AccountResource};
 use move_core_types::{
     ident_str,
+    identifier::IdentStr,
     language_storage::{ModuleId, StructTag, TypeTag},
     parser::parse_type_tag,
 };
+use serde::de::DeserializeOwned;
 use std::{collections::HashSet, str::FromStr};
 use warp::Filter;
 
@@ -316,30 +318,24 @@ async fn get_base_balances(
                     }),
                 ..
             } => {
-                let response = rest_client
-                    .view_bcs::<Vec<u64>>(
-                        &ViewFunction {
-                            module: ModuleId {
-                                address: AccountAddress::ONE,
-                                name: ident_str!(PRIMARY_FUNGIBLE_STORE_MODULE).into(),
-                            },
-                            function: ident_str!(BALANCE_FUNCTION).into(),
-                            ty_args: vec![TypeTag::Struct(Box::new(StructTag {
-                                address: AccountAddress::ONE,
-                                module: ident_str!(OBJECT_MODULE).into(),
-                                name: ident_str!(OBJECT_CORE_RESOURCE).into(),
-                                type_args: vec![],
-                            }))],
-                            args: vec![
-                                bcs::to_bytes(&owner_address).unwrap(),
-                                bcs::to_bytes(&AccountAddress::from_str(fa_address).unwrap())
-                                    .unwrap(),
-                            ],
-                        },
-                        Some(version),
-                    )
-                    .await?
-                    .into_inner();
+                let response = view::<Vec<u64>>(
+                    rest_client,
+                    version,
+                    AccountAddress::ONE,
+                    ident_str!(PRIMARY_FUNGIBLE_STORE_MODULE),
+                    ident_str!(BALANCE_FUNCTION),
+                    vec![TypeTag::Struct(Box::new(StructTag {
+                        address: AccountAddress::ONE,
+                        module: ident_str!(OBJECT_MODULE).into(),
+                        name: ident_str!(OBJECT_CORE_RESOURCE).into(),
+                        type_args: vec![],
+                    }))],
+                    vec![
+                        bcs::to_bytes(&owner_address).unwrap(),
+                        bcs::to_bytes(&AccountAddress::from_str(fa_address).unwrap()).unwrap(),
+                    ],
+                )
+                .await?;
                 let fa_balance = response.first().copied().unwrap_or(0);
                 balances.push(Amount {
                     value: fa_balance.to_string(),
@@ -356,21 +352,16 @@ async fn get_base_balances(
                 ..
             } => {
                 if let Ok(type_tag) = parse_type_tag(coin_type) {
-                    let response = rest_client
-                        .view_bcs::<Vec<u64>>(
-                            &ViewFunction {
-                                module: ModuleId {
-                                    address: AccountAddress::ONE,
-                                    name: ident_str!(COIN_MODULE).into(),
-                                },
-                                function: ident_str!(BALANCE_FUNCTION).into(),
-                                ty_args: vec![type_tag],
-                                args: vec![bcs::to_bytes(&owner_address).unwrap()],
-                            },
-                            Some(version),
-                        )
-                        .await?
-                        .into_inner();
+                    let response = view::<Vec<u64>>(
+                        rest_client,
+                        version,
+                        AccountAddress::ONE,
+                        ident_str!(COIN_MODULE),
+                        ident_str!(BALANCE_FUNCTION),
+                        vec![type_tag],
+                        vec![bcs::to_bytes(&owner_address)?],
+                    )
+                    .await?;
                     let coin_balance = response.first().copied().unwrap_or(0);
                     balances.push(Amount {
                         value: coin_balance.to_string(),
@@ -385,4 +376,30 @@ async fn get_base_balances(
     }
 
     Ok(balances)
+}
+
+async fn view<T: DeserializeOwned>(
+    rest_client: &Client,
+    version: u64,
+    address: AccountAddress,
+    module: &'static IdentStr,
+    function: &'static IdentStr,
+    type_args: Vec<TypeTag>,
+    args: Vec<Vec<u8>>,
+) -> ApiResult<T> {
+    Ok(rest_client
+        .view_bcs::<T>(
+            &ViewFunction {
+                module: ModuleId {
+                    address,
+                    name: module.into(),
+                },
+                function: function.into(),
+                ty_args: type_args,
+                args,
+            },
+            Some(version),
+        )
+        .await?
+        .into_inner())
 }
