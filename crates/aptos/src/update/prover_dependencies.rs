@@ -27,7 +27,7 @@ pub(crate) const REPO_NAME: &str = "prover-dependency";
 pub(crate) const REPO_OWNER: &str = "aptos-labs";
 
 pub(crate) const BOOGIE_BINARY_NAME: &str = "boogie";
-pub(crate) const TARGET_BOOGIE_VERSION: &str = "3.2.4";
+pub(crate) const TARGET_BOOGIE_VERSION: &str = "3.5.1";
 
 pub(crate) const BOOGIE_EXE_ENV: &str = "BOOGIE_EXE";
 #[cfg(target_os = "windows")]
