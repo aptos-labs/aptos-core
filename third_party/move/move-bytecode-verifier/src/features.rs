@@ -10,7 +10,7 @@ use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
         Bytecode, CompiledModule, CompiledScript, FieldDefinition, SignatureToken,
-        StructFieldInformation,
+        StructFieldInformation, TableIndex,
     },
     IndexKind,
 };
@@ -55,7 +55,11 @@ impl<'a> FeatureVerifier<'a> {
         };
         verifier.verify_signatures()?;
         verifier.verify_function_handles()?;
-        verifier.verify_function_defs()
+        if !config.enable_resource_access_control && script.access_specifiers.is_some() {
+            return Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED)
+                .with_message("resource access control feature not enabled".to_string()));
+        }
+        verifier.verify_code(&script.code.code, None)
     }
 
     fn verify_struct_defs(&self) -> PartialVMResult<()> {
@@ -125,18 +129,27 @@ impl<'a> FeatureVerifier<'a> {
         if !self.config.enable_function_values {
             for (idx, def) in self.code.function_defs().unwrap_or(&[]).iter().enumerate() {
                 if let Some(unit) = &def.code {
-                    for bc in &unit.code {
-                        if matches!(
-                            bc,
-                            Bytecode::PackClosure(..)
-                                | Bytecode::PackClosureGeneric(..)
-                                | Bytecode::CallClosure(..)
-                        ) {
-                            return Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED)
-                                .at_index(IndexKind::FunctionDefinition, idx as u16)
-                                .with_message("function value feature not enabled".to_string()));
-                        }
+                    self.verify_code(&unit.code, Some(idx as TableIndex))?
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn verify_code(&self, code: &[Bytecode], idx: Option<TableIndex>) -> PartialVMResult<()> {
+        if !self.config.enable_function_values {
+            for bc in code {
+                if matches!(
+                    bc,
+                    Bytecode::PackClosure(..)
+                        | Bytecode::PackClosureGeneric(..)
+                        | Bytecode::CallClosure(..)
+                ) {
+                    let mut err = PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED);
+                    if let Some(idx) = idx {
+                        err = err.at_index(IndexKind::FunctionDefinition, idx);
                     }
+                    return Err(err.with_message("function value feature not enabled".to_string()));
                 }
             }
         }

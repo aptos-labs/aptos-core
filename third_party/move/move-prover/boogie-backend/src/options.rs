@@ -11,18 +11,22 @@ use std::process::Command;
 
 /// Default flags passed to boogie. Additional flags will be added to this via the -B option.
 const DEFAULT_BOOGIE_FLAGS: &[&str] = &[
-    "-doModSetAnalysis",
     "-printVerifiedProceduresCount:0",
     "-printModel:1",
     "-enhancedErrorMessages:1",
     "-proverOpt:O:model_validate=true",
 ];
 
+const MOD_SET_ANALYSIS_LEGACY_FLAG: &str = "-doModSetAnalysis";
+
+const MOD_SET_ANALYSIS_NEW_FLAG_SINCE_3_5_1: &str = "-inferModifies";
+
 /// Versions for boogie, z3, and cvc5. The upgrade of boogie and z3 is mostly backward compatible,
 /// but not always. Setting the max version allows Prover to warn users for the higher version of
 /// boogie and z3 because those may be incompatible.
 pub const MIN_BOOGIE_VERSION: Option<&str> = Some("3.0.1.0");
-pub const MAX_BOOGIE_VERSION: Option<&str> = Some("3.2.4.0");
+pub const MAX_BOOGIE_VERSION: Option<&str> = Some("3.5.1.0");
+pub const MIN_BOOGIE_VERSION_NEW_MOD_SET_ANALYSIS: Option<&str> = Some("3.5.1.0");
 
 pub const MIN_Z3_VERSION: Option<&str> = Some("4.11.2");
 pub const MAX_Z3_VERSION: Option<&str> = Some("4.11.2");
@@ -250,6 +254,7 @@ impl BoogieOptions {
 
         let mut add = |sl: &[&str]| result.extend(sl.iter().map(|s| (*s).to_string()));
         add(DEFAULT_BOOGIE_FLAGS);
+        add(&[self.get_mod_analysis_flag()?]);
         if self.use_cvc5 {
             add(&[
                 "-proverOpt:SOLVER=cvc5",
@@ -322,6 +327,28 @@ impl BoogieOptions {
             usize::saturating_add(time, time)
         } else {
             time
+        }
+    }
+
+    /// Get the mod set analysis flag based on the boogie version.
+    pub fn get_mod_analysis_flag(&self) -> anyhow::Result<&str> {
+        let version = Self::get_version(
+            "boogie",
+            &self.boogie_exe,
+            &["/version"],
+            r"version ([0-9.]*)",
+        )?;
+        if Self::check_version_is_compatible(
+            "boogie",
+            &version,
+            MIN_BOOGIE_VERSION_NEW_MOD_SET_ANALYSIS,
+            None,
+        )
+        .is_ok()
+        {
+            Ok(MOD_SET_ANALYSIS_NEW_FLAG_SINCE_3_5_1)
+        } else {
+            Ok(MOD_SET_ANALYSIS_LEGACY_FLAG)
         }
     }
 

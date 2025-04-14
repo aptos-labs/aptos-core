@@ -26,6 +26,7 @@ fn mint_to_new_account() {
             *new_account.address(),
             mint_amount,
         ))
+        .gas_unit_price(0)
         .sequence_number(0)
         .sign();
     let output = executor.execute_transaction(txn);

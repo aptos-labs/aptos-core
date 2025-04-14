@@ -17,7 +17,10 @@ use aptos_indexer_grpc_utils::{
 };
 use aptos_protos::transaction::v1::Transaction;
 use std::{path::PathBuf, sync::Arc, time::Duration};
-use tokio::{sync::mpsc::channel, time::Instant};
+use tokio::{
+    sync::{mpsc::channel, oneshot::Sender},
+    time::Instant,
+};
 use tracing::info;
 
 const NUM_TXNS_PER_FOLDER: u64 = 100000;
@@ -89,6 +92,7 @@ impl FileStoreUploader {
             .get_latest_version()
             .await
             .expect("Latest version must exist.");
+        info!("Starting recovering process, current version in storage: {version}.");
         let mut num_folders_checked = 0;
         let mut buffered_batch_metadata_to_recover = BatchMetadata::default();
         while let Some(batch_metadata) = self.reader.get_batch_metadata(version).await {
@@ -108,10 +112,16 @@ impl FileStoreUploader {
 
         self.update_file_store_metadata(version).await?;
 
+        info!("Finished recovering process, recovered at version: {version}.");
+
         Ok((version, buffered_batch_metadata_to_recover))
     }
 
-    pub(crate) async fn start(&mut self, data_manager: Arc<DataManager>) -> Result<()> {
+    pub(crate) async fn start(
+        &mut self,
+        data_manager: Arc<DataManager>,
+        recover_tx: Sender<()>,
+    ) -> Result<()> {
         let (version, batch_metadata) = self.recover().await?;
 
         let mut file_store_operator = FileStoreOperatorV2::new(
@@ -121,6 +131,9 @@ impl FileStoreUploader {
             batch_metadata,
         )
         .await;
+
+        recover_tx.send(()).expect("Receiver should exist.");
+
         tokio_scoped::scope(|s| {
             let (tx, mut rx) = channel::<(_, BatchMetadata, _)>(5);
             s.spawn(async move {
@@ -137,13 +150,14 @@ impl FileStoreUploader {
                     let _timer = TIMER
                         .with_label_values(&["file_store_uploader_main_loop"])
                         .start_timer();
+                    let next_version = file_store_operator.version();
                     let transactions = {
                         let _timer = TIMER
                             .with_label_values(&["get_transactions_from_cache"])
                             .start_timer();
                         data_manager
                             .get_transactions_from_cache(
-                                file_store_operator.version(),
+                                next_version,
                                 MAX_SIZE_PER_FILE,
                                 /*update_file_store_version=*/ true,
                             )
@@ -157,6 +171,7 @@ impl FileStoreUploader {
                             .unwrap();
                     }
                     if len == 0 {
+                        info!("No transaction was returned from cache, requested version: {next_version}.");
                         tokio::time::sleep(Duration::from_millis(100)).await;
                     }
                 }

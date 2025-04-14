@@ -40,6 +40,7 @@ export async function installCrane() {
     }
     crane = "crane";
   }
+  return crane;
 }
 
 // This is kinda gross but means we can just run the script directly and it will

@@ -4426,7 +4426,8 @@ Master signer grant permissioned signer ability to withdraw a given amount of fu
 Removing permissions from permissioned signer.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_revoke_permission">revoke_permission</a>(permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, token_type: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;)
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_revoke_permission">revoke_permission</a>(permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, token_type: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;)
 </code></pre>
 
 
@@ -4436,9 +4437,7 @@ Removing permissions from permissioned signer.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_revoke_permission">revoke_permission</a>(permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, token_type: Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;) {
-    <a href="permissioned_signer.md#0x1_permissioned_signer_revoke_permission">permissioned_signer::revoke_permission</a>(permissioned, WithdrawPermission::ByStore {
-        store_address: <a href="object.md#0x1_object_object_address">object::object_address</a>(&token_type),
-    })
+    <b>abort</b> 0
 }
 </code></pre>
 

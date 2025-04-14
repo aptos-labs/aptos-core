@@ -1670,6 +1670,14 @@ impl ScriptSerializer {
     fn serialize_main(&mut self, binary: &mut BinaryData, script: &CompiledScript) -> Result<()> {
         serialize_ability_sets(binary, &script.type_parameters)?;
         serialize_signature_index(binary, &script.parameters)?;
+        if self.common.major_version >= VERSION_8 {
+            serialize_access_specifiers(binary, &script.access_specifiers)?
+        } else if script.access_specifiers.is_some() {
+            return Err(anyhow!(
+                "Access specifiers on scripts not supported in bytecode version {}",
+                self.common.major_version
+            ));
+        }
         serialize_code_unit(self.common.major_version(), binary, &script.code)?;
         Ok(())
     }

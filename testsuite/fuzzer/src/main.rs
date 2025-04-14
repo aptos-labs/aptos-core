@@ -24,15 +24,15 @@ fn main() {
                 .about("Generates a runnable state from a Move module and its metadata.")
                 .arg(
                     Arg::new("csv_path")
-                        .help("Path to a csv containing b64 encode modules in third coulmn")
+                        .help("Path to a csv containing b64 encode modules in third column")
                         .required(true)
                         .index(1),
                 )
                 .arg(
                     Arg::new("destination_path")
-                    .help("Path to write the runnable state to")
-                    .required(true)
-                    .index(2),
+                        .help("Path to write the runnable state to")
+                        .required(true)
+                        .index(2),
                 )
         )
         .subcommand(
@@ -51,7 +51,22 @@ fn main() {
                         .index(2),
                 )
         )
-        // Add more subcommands or arguments here
+        .subcommand(
+            Command::new("generate_runnable_states_recursive")
+                .about("Recursively generates runnable states from all Move.toml files in a directory.")
+                .arg(
+                    Arg::new("base_dir")
+                        .help("Base directory to search for Move.toml files")
+                        .required(true)
+                        .index(1),
+                )
+                .arg(
+                    Arg::new("destination_path")
+                        .help("Path to write the runnable states to")
+                        .required(true)
+                        .index(2),
+                )
+        )
         .get_matches();
 
     match matches.subcommand() {
@@ -90,6 +105,20 @@ fn main() {
                 std::process::exit(1);
             } else {
                 println!("Runnable state generated successfully.");
+            }
+        },
+        Some(("generate_runnable_states_recursive", sub_m)) => {
+            let base_dir = sub_m.get_one::<String>("base_dir").unwrap();
+            let destination_path = sub_m.get_one::<String>("destination_path").unwrap();
+
+            // Call the function with the provided arguments
+            if let Err(e) =
+                utils::cli::generate_runnable_states_recursive(base_dir, destination_path)
+            {
+                eprintln!("Error generating runnable states recursively: {}", e);
+                std::process::exit(1);
+            } else {
+                println!("Runnable states generated successfully.");
             }
         },
         // Handle other subcommands or default behavior

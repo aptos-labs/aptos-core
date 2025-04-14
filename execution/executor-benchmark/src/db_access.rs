@@ -5,9 +5,8 @@ use anyhow::Result;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{
-        primary_apt_store, AccountResource, CoinInfoResource, CoinStoreResource,
-        ConcurrentSupplyResource, FungibleStoreResource, ObjectCoreResource, ObjectGroupResource,
-        TypeInfoResource,
+        AccountResource, CoinInfoResource, CoinStoreResource, ConcurrentSupplyResource,
+        FungibleStoreResource, ObjectCoreResource, ObjectGroupResource, TypeInfoResource,
     },
     event::{EventHandle, EventKey},
     state_store::{state_key::StateKey, StateView},
@@ -111,25 +110,11 @@ impl DbAccessUtil {
         Self::get_value(account_key, state_view)
     }
 
-    pub fn get_fungible_store(
-        account: &AccountAddress,
+    pub fn get_fa_store(
+        store_key: &StateKey,
         state_view: &impl StateView,
-    ) -> Result<FungibleStoreResource> {
-        let rg: Option<ObjectGroupResource> = Self::get_value(
-            &StateKey::resource_group(
-                &primary_apt_store(*account),
-                &ObjectGroupResource::struct_tag(),
-            ),
-            state_view,
-        )?;
-        Ok(if let Some(rg) = rg {
-            rg.group
-                .get(&FungibleStoreResource::struct_tag())
-                .map(|bytes| bcs::from_bytes(bytes).unwrap())
-                .unwrap()
-        } else {
-            FungibleStoreResource::new(AccountAddress::TEN, 0, false)
-        })
+    ) -> Result<Option<FungibleStoreResource>> {
+        Self::get_value(store_key, state_view)
     }
 
     pub fn get_apt_coin_store(

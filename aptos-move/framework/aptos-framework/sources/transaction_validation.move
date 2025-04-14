@@ -183,7 +183,7 @@ module aptos_framework::transaction_validation {
                         error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
                     );
                 }
-            }
+            };
         };
 
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;

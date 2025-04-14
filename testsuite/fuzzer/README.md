@@ -16,14 +16,21 @@ The script includes several functions to manage and execute fuzz tests:
     ```bash
     ./fuzz.sh block-builder <utility> [args]
     ```
+- `block-builder-recursive`: Runs block-builder on all Move.toml files in a directory.
+    ```bash
+    ./fuzz.sh block-builder-recursive <search_directory> <destination_directory>
+    ```
 - `build`: Build specified fuzz targets or all targets.
     ```bash
     ./fuzz.sh build <fuzz_target|all> [target_dir]
     ```
-
 - `build-oss-fuzz`: Build fuzz targets specifically for OSS-Fuzz.
     ```bash
     ./fuzz.sh build-oss-fuzz <target_dir>
+    ```
+- `clean-coverage`: Clean coverage artifacts for a specific target or all targets.
+    ```bash
+    ./fuzz.sh clean-coverage <fuzz_target|all>
     ```
 - `cmin`: Distillate corpora
     ```bash
@@ -34,21 +41,21 @@ The script includes several functions to manage and execute fuzz tests:
     ./fuzz.sh coverage <fuzz_target>
     ```
     > rustup +nightly-2024-04-06 component add llvm-tools-preview
-- `coverage-cleanup`:
-    ```bash
-    ./fuzz.sh clean-coverage <fuzz_target|all>
-    ```
-- `degub`: Run fuzzer with GDB and pass test_case as input
+- `debug`: Run fuzzer with GDB and pass test_case as input
     ```bash
     ./fuzz.sh debug <fuzz_target> <test_case>
     ```
 - `flamegraph`: Generates flamegraph report (might requires addition setups on the os)
-    ```
+    ```bash
     ./fuzz.sh flamegraph <fuzz_target> <test_case>
     ```
 - `list`: List all existing fuzz targets.
     ```bash
     ./fuzz.sh list
+    ```
+- `monitor-coverage`: Monitors coverage for a fuzz target, regenerating when the corpus changes.
+    ```bash
+    ./fuzz.sh monitor-coverage <fuzz_target>
     ```
 - `run`: Run a specific fuzz target, optionally with a testcase.
     ```bash
@@ -57,6 +64,10 @@ The script includes several functions to manage and execute fuzz tests:
 - `test`: Test all fuzz targets with predefined parameters.
     ```bash
     ./fuzz.sh test
+    ```
+- `tmin`: Minimize a crashing input for a target.
+    ```bash
+    ./fuzz.sh tmin <fuzz_target> <crashing_input>
     ```
 
 ## Writing Fuzz Targets

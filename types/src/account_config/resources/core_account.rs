@@ -2,7 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{account_address::AccountAddress, event::EventHandle};
+use crate::{
+    account_address::AccountAddress,
+    event::{EventHandle, EventKey},
+};
 use move_core_types::{
     ident_str,
     identifier::IdentStr,
@@ -40,6 +43,18 @@ impl AccountResource {
             guid_creation_num: 0,
             coin_register_events,
             key_rotation_events,
+            rotation_capability_offer: None,
+            signer_capability_offer: None,
+        }
+    }
+
+    pub fn new_stateless(address: AccountAddress) -> Self {
+        AccountResource {
+            authentication_key: bcs::to_bytes(&address).unwrap(),
+            sequence_number: 0,
+            guid_creation_num: 2,
+            coin_register_events: EventHandle::new(EventKey::new(0, address), 0),
+            key_rotation_events: EventHandle::new(EventKey::new(1, address), 0),
             rotation_capability_offer: None,
             signer_capability_offer: None,
         }

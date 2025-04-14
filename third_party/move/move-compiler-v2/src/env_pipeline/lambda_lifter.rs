@@ -232,10 +232,8 @@ impl<'a> LambdaLifter<'a> {
         let mut params = vec![];
         let mut saw_error = false;
 
-        for (used_param_count, (param, var_info)) in
-            mem::take(&mut self.free_params).into_iter().enumerate()
-        {
-            let name = self.fun_env.get_local_name(param);
+        for (used_param_count, (param, var_info)) in self.free_params.iter().enumerate() {
+            let name = self.fun_env.get_local_name(*param);
             let var_node_id = var_info.node_id;
             let ty = env.get_node_type(var_node_id);
             let loc = env.get_node_loc(var_node_id);
@@ -254,12 +252,12 @@ impl<'a> LambdaLifter<'a> {
             if let Some(inst) = env.get_node_instantiation_opt(var_node_id) {
                 env.set_node_instantiation(new_id, inst);
             }
-            closure_args.push(ExpData::Temporary(new_id, param).into_exp());
-            param_index_mapping.insert(param, used_param_count);
+            closure_args.push(ExpData::Temporary(new_id, *param).into_exp());
+            param_index_mapping.insert(*param, used_param_count);
         }
 
         // Add captured LocalVar parameters
-        for (name, var_info) in mem::take(&mut self.free_locals) {
+        for (name, var_info) in self.free_locals.iter() {
             let var_info_id = var_info.node_id;
             let ty = env.get_node_type(var_info_id);
             let loc = env.get_node_loc(var_info_id);
@@ -273,12 +271,12 @@ impl<'a> LambdaLifter<'a> {
                 );
                 saw_error = true;
             }
-            params.push(Parameter(name, ty.clone(), loc.clone()));
+            params.push(Parameter(*name, ty.clone(), loc.clone()));
             let new_id = env.new_node(loc, ty);
             if let Some(inst) = env.get_node_instantiation_opt(var_info_id) {
                 env.set_node_instantiation(new_id, inst);
             }
-            closure_args.push(ExpData::LocalVar(new_id, name).into_exp())
+            closure_args.push(ExpData::LocalVar(new_id, *name).into_exp())
         }
 
         if !saw_error {

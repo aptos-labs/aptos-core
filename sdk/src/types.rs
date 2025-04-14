@@ -134,7 +134,10 @@ pub struct LocalAccount {
 }
 
 pub fn get_apt_primary_store_address(address: AccountAddress) -> AccountAddress {
-    get_paired_fa_primary_store_address(address, *APT_METADATA_ADDRESS)
+    let mut bytes = address.to_vec();
+    bytes.append(&mut AccountAddress::ONE.to_vec());
+    bytes.push(0xFC);
+    AccountAddress::from_bytes(aptos_crypto::hash::HashValue::sha3_256_of(&bytes).to_vec()).unwrap()
 }
 
 pub fn get_paired_fa_primary_store_address(

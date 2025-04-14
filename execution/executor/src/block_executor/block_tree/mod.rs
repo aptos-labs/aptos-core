@@ -47,11 +47,12 @@ impl Block {
         self.children.lock().push(child)
     }
 
-    pub fn num_persisted_transactions(&self) -> LeafCount {
-        self.output
-            .expect_ledger_update_output()
+    pub fn num_persisted_transactions(&self) -> Result<LeafCount> {
+        Ok(self
+            .output
+            .ensure_ledger_update_output()?
             .txn_accumulator()
-            .num_leaves()
+            .num_leaves())
     }
 
     pub fn ensure_has_child(&self, child_id: HashValue) -> Result<()> {
@@ -257,7 +258,7 @@ impl BlockTree {
             last_committed_block
         };
         root.output
-            .expect_state_checkpoint_output()
+            .ensure_state_checkpoint_output()?
             .state_summary
             .global_state_summary
             .log_generation("block_tree_base");

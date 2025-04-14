@@ -91,6 +91,8 @@ pub fn generate_file_format(
                     code,
                     type_parameters,
                     parameters,
+                    // TODO(#16278): support rac
+                    access_specifiers: None,
                 };
                 if options.experiment_on(Experiment::ATTACH_COMPILED_MODULE) {
                     let module_name =

@@ -107,7 +107,6 @@ const IMAGES_TO_RELEASE = {
 };
 
 
-
 async function main() {
   const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO", "AWS_ACCOUNT_ID", "IMAGE_TAG_PREFIX"];
   const OPTIONAL_ARGS = ["WAIT_FOR_IMAGE_SECONDS", "DRY_RUN"];
@@ -115,8 +114,10 @@ async function main() {
   const parsedArgs = parseArgsFromFlagOrEnv(REQUIRED_ARGS, OPTIONAL_ARGS);
 
   await assertExecutingInRepoRoot();
-  await installCrane();
-
+  const crane = await installCrane();
+  const craneVersion = await $`${crane} version`;
+  console.log(`INFO: crane version: ${craneVersion}`);
+  
   const AWS_ECR = `${parsedArgs.AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/aptos`;
   const GCP_ARTIFACT_REPO = parsedArgs.GCP_DOCKER_ARTIFACT_REPO;
   const DOCKERHUB = "docker.io/aptoslabs";

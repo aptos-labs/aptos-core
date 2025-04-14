@@ -366,7 +366,7 @@ fn test_account_not_exist_with_fee_payer_without_create_account() {
     let output = h.run_raw(transaction);
     assert!(transaction_status_eq(
         output.status(),
-        &TransactionStatus::Discard(StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST),
+        &TransactionStatus::Keep(ExecutionStatus::Success),
     ));
 }
 

@@ -6,10 +6,10 @@ use aptos_forge::{
     GroupNetEm, NetworkContext, NetworkContextSynchronizer, NetworkTest, Swarm, SwarmChaos,
     SwarmNetEm, Test,
 };
-use aptos_logger::info;
 use aptos_types::PeerId;
 use async_trait::async_trait;
 use itertools::{self, EitherOrBoth, Itertools};
+use log::info;
 use std::{collections::BTreeMap, sync::Arc};
 
 /// The link stats are obtained from https://github.com/doitintl/intercloud-throughput/blob/master/results_202202/results.csv

@@ -237,7 +237,6 @@ impl TableInfoService {
                 context.clone(),
                 indexer_async_v2.clone(),
                 batch,
-                false, /* end_early_if_pending_on_empty */
             ));
             tasks.push(task);
         }
@@ -246,11 +245,6 @@ impl TableInfoService {
             Ok(res) => {
                 let end_version = last_version;
 
-                // Clean up pending on items across threads
-                self.indexer_async_v2
-                    .cleanup_pending_on_items()
-                    .expect("[Table Info] Failed to clean up the pending on items");
-
                 // If pending on items are not empty, meaning the current loop hasn't fully parsed all table infos
                 // due to the nature of multithreading where instructions used to parse table info might come later,
                 // retry sequentially to ensure parsing is complete
@@ -258,11 +252,11 @@ impl TableInfoService {
                 // Risk of this sequential approach is that it could be slow when the txns to process contain extremely
                 // nested table items, but the risk is bounded by the configuration of the number of txns to process and number of threads
                 if !self.indexer_async_v2.is_indexer_async_v2_pending_on_empty() {
+                    self.indexer_async_v2.clear_pending_on();
                     Self::process_transactions(
                         context.clone(),
                         indexer_async_v2.clone(),
                         transactions,
-                        true, /* end_early_if_pending_on_empty */
                     )
                     .await;
                 }
@@ -295,20 +289,14 @@ impl TableInfoService {
         context: Arc<ApiContext>,
         indexer_async_v2: Arc<IndexerAsyncV2>,
         raw_txns: Vec<TransactionOnChainData>,
-        end_early_if_pending_on_empty: bool,
     ) -> EndVersion {
         let start_time = std::time::Instant::now();
         let start_version = raw_txns[0].version;
         let end_version = raw_txns.last().unwrap().version;
         let num_transactions = raw_txns.len();
 
-        Self::parse_table_info(
-            context.clone(),
-            raw_txns.clone(),
-            indexer_async_v2,
-            end_early_if_pending_on_empty,
-        )
-        .expect("[Table Info] Failed to parse table info");
+        Self::parse_table_info(context.clone(), raw_txns.clone(), indexer_async_v2)
+            .expect("[Table Info] Failed to parse table info");
 
         log_grpc_step(
             SERVICE_TYPE,
@@ -362,13 +350,10 @@ impl TableInfoService {
     }
 
     /// Parse table info from write sets,
-    /// end_early_if_pending_on_empty flag will be true if we couldn't parse all table infos in the first try with multithread,
-    /// in the second try with sequential looping, to make parsing efficient, we end early if all table infos are parsed
     fn parse_table_info(
         context: Arc<ApiContext>,
         raw_txns: Vec<TransactionOnChainData>,
         indexer_async_v2: Arc<IndexerAsyncV2>,
-        end_early_if_pending_on_empty: bool,
     ) -> Result<(), Error> {
         if raw_txns.is_empty() {
             return Ok(());
@@ -379,12 +364,7 @@ impl TableInfoService {
         let write_sets: Vec<WriteSet> = raw_txns.iter().map(|txn| txn.changes.clone()).collect();
         let write_sets_slice: Vec<&WriteSet> = write_sets.iter().collect();
         indexer_async_v2
-            .index_table_info(
-                context.db.clone(),
-                first_version,
-                &write_sets_slice,
-                end_early_if_pending_on_empty,
-            )
+            .index_table_info(context.db.clone(), first_version, &write_sets_slice)
             .expect(
                 "[Table Info] Failed to process write sets and index to the table info rocksdb",
             );

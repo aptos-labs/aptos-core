@@ -5,11 +5,12 @@ use crate::{
     ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator,
     TransactionGeneratorCreator, WorkflowProgress,
 };
-use aptos_logger::{info, sample, sample::SampleRate};
+use aptos_logger::{sample, sample::SampleRate};
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
+use log::info;
 use std::{
     fmt::Debug,
     sync::{

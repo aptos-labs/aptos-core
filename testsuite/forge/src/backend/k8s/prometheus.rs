@@ -4,8 +4,8 @@
 use crate::{create_k8s_client, K8sApi, ReadWrite, Result};
 use again::RetryPolicy;
 use anyhow::{anyhow, bail};
-use aptos_logger::{info, warn};
 use k8s_openapi::api::core::v1::Secret;
+use log::{info, warn};
 use once_cell::sync::Lazy;
 use prometheus_http_query::{
     response::{PromqlResult, Sample},
