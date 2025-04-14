@@ -70,6 +70,7 @@ fn test_resource_group_deletion() {
 
     let data_view = NonEmptyGroupDataView::<KeyType<u32>> {
         group_keys: HashSet::new(),
+        delayed_field_testing: false,
     };
     let executor_thread_pool = Arc::new(
         rayon::ThreadPoolBuilder::new()
@@ -141,6 +142,7 @@ fn resource_group_bcs_fallback() {
 
     let data_view = NonEmptyGroupDataView::<KeyType<u32>> {
         group_keys: HashSet::new(),
+        delayed_field_testing: false,
     };
     let executor_thread_pool = Arc::new(
         rayon::ThreadPoolBuilder::new()
