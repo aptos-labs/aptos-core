@@ -3,8 +3,6 @@
 
 use anyhow::anyhow;
 use aptos_config::config::{NodeConfig, DEFAULT_EXECUTION_CONCURRENCY_LEVEL};
-#[cfg(unix)]
-use aptos_logger::prelude::*;
 use aptos_storage_interface::{
     state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReaderWriter,
 };
@@ -78,12 +76,12 @@ pub fn ensure_max_open_files_limit(_required: u64, _assert_success: bool) {}
 
 #[cfg(unix)]
 pub fn ensure_max_open_files_limit(required: u64, assert_success: bool) {
+    use aptos_logger::prelude::*;
     if required == 0 {
         return;
     }
 
     // Only works on Unix environments
-    #[cfg(unix)]
     {
         if !rlimit::Resource::NOFILE.is_supported() {
             warn!(
