@@ -1035,7 +1035,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let loc = self.to_loc(&ty.loc);
         let ty = self.translate_type(ty);
         for ctr in Constraint::for_fun_parameter() {
-            self.add_constraint_and_report(&loc, &ErrorMessageContext::General, &ty, ctr, None)
+            self.add_constraint_and_report(
+                &loc,
+                &ErrorMessageContext::General,
+                ty.skip_reference(),
+                ctr,
+                None,
+            )
         }
         ty
     }
