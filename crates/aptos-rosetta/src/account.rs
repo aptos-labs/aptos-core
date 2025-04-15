@@ -378,7 +378,7 @@ async fn get_base_balances(
     Ok(balances)
 }
 
-async fn view<T: DeserializeOwned>(
+pub async fn view<T: DeserializeOwned>(
     rest_client: &Client,
     version: u64,
     address: AccountAddress,
