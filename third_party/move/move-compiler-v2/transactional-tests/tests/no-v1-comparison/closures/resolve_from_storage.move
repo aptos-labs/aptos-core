@@ -1,7 +1,7 @@
 //# publish
 module 0x66::test {
     struct Func has key {
-        f: |()|u64 has store + copy,
+        f: ||u64 has store + copy,
     }
 
     public fun identity<T>(x: T): T { x }
