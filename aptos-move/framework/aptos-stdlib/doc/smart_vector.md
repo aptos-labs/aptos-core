@@ -50,6 +50,7 @@
     -  [Struct `SmartVector`](#@Specification_1_SmartVector)
     -  [Function `empty`](#@Specification_1_empty)
     -  [Function `empty_with_config`](#@Specification_1_empty_with_config)
+    -  [Function `singleton`](#@Specification_1_singleton)
     -  [Function `destroy_empty`](#@Specification_1_destroy_empty)
     -  [Function `borrow`](#@Specification_1_borrow)
     -  [Function `append`](#@Specification_1_append)
@@ -1545,6 +1546,22 @@ values without modifying the original vectors.
 
 
 <pre><code><b>aborts_if</b> bucket_size == 0;
+</code></pre>
+
+
+
+<a id="@Specification_1_singleton"></a>
+
+### Function `singleton`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_singleton">singleton</a>&lt;T: store&gt;(element: T): <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 
