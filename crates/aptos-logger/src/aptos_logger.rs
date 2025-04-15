@@ -243,7 +243,12 @@ impl LogEntry {
             schema.visit(&mut JsonVisitor(&mut data));
         }
 
-        let git_hash = Some(aptos_build_info::get_git_hash());
+        let full_git_hash = aptos_build_info::get_git_hash();
+        let short_git_hash = if full_git_hash.len() >= 7 {
+            Some(full_git_hash[..7].to_string())
+        } else {
+            Some(full_git_hash)
+        };
 
         Self {
             metadata,
@@ -256,7 +261,7 @@ impl LogEntry {
             message,
             peer_id,
             chain_id,
-            git_hash,
+            git_hash: short_git_hash,
         }
     }
 
@@ -978,10 +983,11 @@ mod tests {
         let original_timestamp = entry.timestamp;
         entry.timestamp = String::from("2022-07-24T23:42:29.540278Z");
         entry.hostname = Some("test-host");
+        entry.git_hash = Some("1234567".to_string());
         line_num += 1;
         let thread_name = thread::current().name().map(|s| s.to_string()).unwrap();
 
-        let expected = format!("{{\"level\":\"INFO\",\"source\":{{\"package\":\"aptos_logger\",\"file\":\"crates/aptos-logger/src/aptos_logger.rs:{line_num}\"}},\"thread_name\":\"{thread_name}\",\"hostname\":\"test-host\",\"timestamp\":\"2022-07-24T23:42:29.540278Z\",\"message\":\"This is a log\",\"data\":{{\"bar\":\"foo_bar\",\"category\":\"name\",\"display\":\"12345\",\"foo\":5,\"test\":true}}}}");
+        let expected = format!("{{\"level\":\"INFO\",\"source\":{{\"package\":\"aptos_logger\",\"file\":\"crates/aptos-logger/src/aptos_logger.rs:{line_num}\"}},\"thread_name\":\"{thread_name}\",\"hostname\":\"test-host\",\"timestamp\":\"2022-07-24T23:42:29.540278Z\",\"message\":\"This is a log\",\"data\":{{\"bar\":\"foo_bar\",\"category\":\"name\",\"display\":\"12345\",\"foo\":5,\"test\":true}},\"git_hash\":\"1234567\"}}");
 
         assert_eq!(json_format(&entry).unwrap(), expected);
 
