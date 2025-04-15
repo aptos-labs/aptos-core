@@ -744,6 +744,11 @@ impl OverallMeasurement {
             self.elapsed
         );
         info!(
+            "{} effective conflict multiplier: {}",
+            self.prefix,
+            self.delta_gas.effective_block_gas / self.delta_gas.gas
+        );
+        info!(
             "{} speculative aborts: {} aborts/txn ({} aborts over {} txns)",
             self.prefix,
             self.delta_gas.speculative_abort_count as f64 / num_txns,
