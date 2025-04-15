@@ -13,8 +13,8 @@ use crate::{
     sample,
     sample::SampleRate,
     telemetry_log_writer::{TelemetryLog, TelemetryLogWriter},
-    Event, Filter, Key, Level, LevelFilter, Metadata, ERROR_LOG_COUNT, INFO_LOG_COUNT,
-    WARN_LOG_COUNT,
+    Event, Filter, Key, Level, LevelFilter, Metadata, DEBUG_LOG_COUNT, ERROR_LOG_COUNT,
+    INFO_LOG_COUNT, WARN_LOG_COUNT,
 };
 use aptos_infallible::RwLock;
 use backtrace::Backtrace;
@@ -622,6 +622,7 @@ impl LoggerService {
                         Level::Error => ERROR_LOG_COUNT.inc(),
                         Level::Warn => WARN_LOG_COUNT.inc(),
                         Level::Info => INFO_LOG_COUNT.inc(),
+                        Level::Debug => DEBUG_LOG_COUNT.inc(),
                         _ => {},
                     }
 
