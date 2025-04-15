@@ -615,7 +615,7 @@ impl Type {
             val_ty.paranoid_check_assignable(inner_ty)?;
             inner_ty.paranoid_check_has_ability(Ability::Drop)
         } else {
-            let msg = format!("Cannot write type {} to imuutable type {}", val_ty, self);
+            let msg = format!("Cannot write type {} to immutable type {}", val_ty, self);
             paranoid_failure!(msg)
         }
     }
