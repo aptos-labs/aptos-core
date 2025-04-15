@@ -3,6 +3,8 @@
 # Parts of the project are originally copyright © Meta Platforms, Inc.
 # SPDX-License-Identifier: Apache-2.0
 
+# See windows_rust_lint.ps1 for the Windows version
+
 crate=
 retries=
 shouldfail=false

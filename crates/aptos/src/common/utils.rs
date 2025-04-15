@@ -31,8 +31,6 @@ use itertools::Itertools;
 use move_core_types::{account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS};
 use reqwest::Url;
 use serde::{ser::Error, Deserialize, Deserializer, Serialize, Serializer};
-#[cfg(unix)]
-use std::os::unix::fs::OpenOptionsExt;
 use std::{
     collections::BTreeMap,
     env,
@@ -224,7 +222,10 @@ pub fn write_to_file(path: &Path, name: &str, bytes: &[u8]) -> CliTypedResult<()
 pub fn write_to_user_only_file(path: &Path, name: &str, bytes: &[u8]) -> CliTypedResult<()> {
     let mut opts = OpenOptions::new();
     #[cfg(unix)]
-    opts.mode(0o600);
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
+    }
     write_to_file_with_opts(path, name, bytes, &mut opts)
 }
 
