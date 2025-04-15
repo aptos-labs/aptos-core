@@ -40,7 +40,7 @@ module aptos_framework::account {
         account: address,
         // The bitmap of verified public keys.  This indicates which public keys have been verified by the account owner.
         // The bitmap is 4 bytes long, thus representing 32 bits.  Each bit represents whether a public key has been verified.
-        // In the 32 bit representation, if a bit at index i (read left to right) is 1, then the public key at index i has 
+        // In the 32 bit representation, if a bit at index i (read left to right) is 1, then the public key at index i has
         // been verified in the public key.
         //
         // For example: [0x10100000,0x00000000,0x00000000,0x00000000] marks the first and third public keys in the multi-key as verified.
