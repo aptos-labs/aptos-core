@@ -211,7 +211,7 @@
 
 </dd>
 <dt>
-<code>authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>new_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -1732,6 +1732,18 @@ to rotate his address to Alice's address in the first place.
 
     // Update the `<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>` <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>.
     <a href="account.md#0x1_account_update_auth_key_and_originating_address_table">update_auth_key_and_originating_address_table</a>(addr, account_resource, new_auth_key);
+
+    <b>if</b> (to_scheme == <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a>) {
+        <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&cap_update_table);
+        <b>let</b> signature_bitmap = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(&cap_update_table, len - 4, len);
+        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="account.md#0x1_account_KeyRotationToPublicKey">KeyRotationToPublicKey</a> {
+            <a href="account.md#0x1_account">account</a>: addr,
+            verified_public_key_bit_map: signature_bitmap,
+            public_key_scheme: to_scheme,
+            public_key: to_public_key_bytes,
+            new_authentication_key: new_auth_key,
+        });
+    }
 }
 </code></pre>
 
@@ -1795,6 +1807,18 @@ to rotate his address to Alice's address in the first place.
         offerer_account_resource,
         new_auth_key
     );
+
+    <b>if</b> (new_scheme == <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a>) {
+        <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&cap_update_table);
+        <b>let</b> signature_bitmap = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(&cap_update_table, len - 4, len);
+        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="account.md#0x1_account_KeyRotationToPublicKey">KeyRotationToPublicKey</a> {
+            <a href="account.md#0x1_account">account</a>: rotation_cap_offerer_address,
+            verified_public_key_bit_map: signature_bitmap,
+            public_key_scheme: new_scheme,
+            public_key: new_public_key_bytes,
+            new_authentication_key: new_auth_key,
+        });
+    }
 }
 </code></pre>
 

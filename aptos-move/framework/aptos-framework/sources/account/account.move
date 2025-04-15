@@ -42,8 +42,10 @@ module aptos_framework::account {
         public_key_scheme: u8,
         // The byte representation of the public key.
         public_key: vector<u8>,
+        // The old authentication key on the account
+        old_authentication_key: vector<u8>,
         // The new authentication key which is the hash of [public_key, public_key_scheme]
-        authentication_key: vector<u8>,
+        new_authentication_key: vector<u8>,
     }
 
     /// Resource representing an account.
@@ -533,7 +535,8 @@ module aptos_framework::account {
                 verified_public_key_bit_map: signature_bitmap,
                 public_key_scheme: to_scheme,
                 public_key: to_public_key_bytes,
-                authentication_key: new_auth_key,
+                old_authentication_key: account_resource.authentication_key,
+                new_authentication_key: new_auth_key,
             });
         }
     }
@@ -588,7 +591,8 @@ module aptos_framework::account {
                 verified_public_key_bit_map: signature_bitmap,
                 public_key_scheme: new_scheme,
                 public_key: new_public_key_bytes,
-                authentication_key: new_auth_key,
+                old_authentication_key: offerer_account_resource.authentication_key,
+                new_authentication_key: new_auth_key,
             });
         }
     }
