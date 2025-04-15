@@ -13,6 +13,7 @@ This module implements the Keyless authentication scheme.
 -  [Function `new`](#0x1_keyless_new)
 -  [Function `get_iss`](#0x1_keyless_get_iss)
 -  [Function `get_idc`](#0x1_keyless_get_idc)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="bcs_stream.md#0x1_bcs_stream">0x1::bcs_stream</a>;
@@ -242,6 +243,15 @@ Returns the identifier bytes of the public key
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY
