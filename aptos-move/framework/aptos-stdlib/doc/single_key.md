@@ -14,6 +14,7 @@ It is used to represent public keys for the Ed25519, SECP256K1, WebAuthn, and Ke
 -  [Function `is_keyless_or_federated_keyless_public_key`](#0x1_single_key_is_keyless_or_federated_keyless_public_key)
 -  [Function `from_ed25519_public_key_unvalidated`](#0x1_single_key_from_ed25519_public_key_unvalidated)
 -  [Function `to_authentication_key`](#0x1_single_key_to_authentication_key)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -395,6 +396,15 @@ Gets the authentication key for the AnyPublicKey.
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

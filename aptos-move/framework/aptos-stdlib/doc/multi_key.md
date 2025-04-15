@@ -14,6 +14,7 @@ Unlike MultiEd25519, the individual single keys can be of different schemes.
 -  [Function `new_multi_key_from_single_keys`](#0x1_multi_key_new_multi_key_from_single_keys)
 -  [Function `deserialize_multi_key`](#0x1_multi_key_deserialize_multi_key)
 -  [Function `to_authentication_key`](#0x1_multi_key_to_authentication_key)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -247,6 +248,15 @@ Returns the authentication key for a MultiKey public key.
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

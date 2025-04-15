@@ -10,6 +10,7 @@ This module implements ECDSA signatures based on the prime-order secp256r1 ellpt
 -  [Constants](#@Constants_0)
 -  [Function `ecdsa_raw_public_key_from_64_bytes`](#0x1_secp256r1_ecdsa_raw_public_key_from_64_bytes)
 -  [Function `ecdsa_raw_public_key_to_bytes`](#0x1_secp256r1_ecdsa_raw_public_key_to_bytes)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -120,6 +121,15 @@ Serializes an ECDSARawPublicKey struct to 64-bytes.
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

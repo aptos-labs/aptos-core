@@ -11,6 +11,9 @@ This module implements the Federated Keyless authentication scheme.
 -  [Function `new_public_key_from_bytes`](#0x1_federated_keyless_new_public_key_from_bytes)
 -  [Function `deserialize_public_key`](#0x1_federated_keyless_deserialize_public_key)
 -  [Function `new`](#0x1_federated_keyless_new)
+-  [Function `get_jwk_address`](#0x1_federated_keyless_get_jwk_address)
+-  [Function `get_keyless_public_key`](#0x1_federated_keyless_get_keyless_public_key)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="bcs_stream.md#0x1_bcs_stream">0x1::bcs_stream</a>;
@@ -148,6 +151,65 @@ Creates a new Federated Keyless public key from a keyless public key and a JWK a
 
 
 </details>
+
+<a id="0x1_federated_keyless_get_jwk_address"></a>
+
+## Function `get_jwk_address`
+
+Returns the identifier bytes of the public key
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="federated_keyless.md#0x1_federated_keyless_get_jwk_address">get_jwk_address</a>(self: &<a href="federated_keyless.md#0x1_federated_keyless_PublicKey">federated_keyless::PublicKey</a>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>friend</b> <b>fun</b> <a href="federated_keyless.md#0x1_federated_keyless_get_jwk_address">get_jwk_address</a>(self: &<a href="federated_keyless.md#0x1_federated_keyless_PublicKey">PublicKey</a>): <b>address</b> {
+    self.jwk_address
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_federated_keyless_get_keyless_public_key"></a>
+
+## Function `get_keyless_public_key`
+
+Returns the keyless public key of the public key
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="federated_keyless.md#0x1_federated_keyless_get_keyless_public_key">get_keyless_public_key</a>(self: &<a href="federated_keyless.md#0x1_federated_keyless_PublicKey">federated_keyless::PublicKey</a>): <a href="keyless.md#0x1_keyless_PublicKey">keyless::PublicKey</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>friend</b> <b>fun</b> <a href="federated_keyless.md#0x1_federated_keyless_get_keyless_public_key">get_keyless_public_key</a>(self: &<a href="federated_keyless.md#0x1_federated_keyless_PublicKey">PublicKey</a>): <a href="keyless.md#0x1_keyless_PublicKey">keyless::PublicKey</a> {
+    self.keyless_public_key
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY
