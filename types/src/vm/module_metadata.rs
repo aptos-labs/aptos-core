@@ -438,7 +438,7 @@ pub fn is_valid_resource_group_member(
     })
 }
 
-pub fn verify_module_metadata_for_module_publish(
+pub fn verify_module_metadata_for_module_publishing(
     module: &CompiledModule,
     features: &Features,
 ) -> Result<(), MetaDataValidationError> {

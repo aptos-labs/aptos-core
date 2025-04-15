@@ -79,7 +79,7 @@ use aptos_types::{
     },
     vm::module_metadata::{
         get_compilation_metadata, get_metadata, get_randomness_annotation_for_entry_function,
-        verify_module_metadata_for_module_publish, RuntimeModuleMetadataV1,
+        verify_module_metadata_for_module_publishing, RuntimeModuleMetadataV1,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
@@ -1492,7 +1492,7 @@ impl AptosVM {
                     }
                 }
             }
-            verify_module_metadata_for_module_publish(m, self.features())
+            verify_module_metadata_for_module_publishing(m, self.features())
                 .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
         }
 

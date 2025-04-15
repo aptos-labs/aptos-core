@@ -234,10 +234,11 @@ impl LazyLoadedFunction {
             {
                 // Note that the below call returns a runtime layout, so we can directly
                 // compare it without desugaring.
-                let actual_arg_layout = if ty_args.is_empty() {
+                let actual_arg_layout = if function.ty_args().is_empty() {
                     converter.type_to_type_layout(actual_arg_ty)?
                 } else {
-                    let actual_arg_ty = ty_builder.create_ty_with_subst(actual_arg_ty, &ty_args)?;
+                    let actual_arg_ty =
+                        ty_builder.create_ty_with_subst(actual_arg_ty, function.ty_args())?;
                     converter.type_to_type_layout(&actual_arg_ty)?
                 };
                 if !serialized_layout.is_compatible_with(&actual_arg_layout) {
