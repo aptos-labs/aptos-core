@@ -3,14 +3,15 @@
 
 use crate::{
     on_chain_config::{FeatureFlag, Features},
-    transaction::AbortInfo,
+    transaction::{AbortInfo, EntryFunction},
+    vm::code::CompiledCodeMetadata,
 };
 use lru::LruCache;
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        CompiledScript, FunctionDefinition, FunctionHandle, IdentifierIndex, SignatureToken,
-        StructDefinition, StructFieldInformation, StructHandle, TableIndex,
+        FunctionDefinition, FunctionHandle, IdentifierIndex, SignatureToken, StructDefinition,
+        StructFieldInformation, StructHandle, TableIndex,
     },
     CompiledModule,
 };
@@ -31,9 +32,7 @@ use thiserror::Error;
 
 pub mod prelude {
     pub use crate::vm::module_metadata::{
-        get_compilation_metadata_from_compiled_module,
-        get_compilation_metadata_from_compiled_script, get_metadata_from_compiled_module,
-        get_metadata_from_compiled_script, RuntimeModuleMetadataV1,
+        get_compilation_metadata, get_metadata_from_compiled_code, RuntimeModuleMetadataV1,
     };
 }
 
@@ -198,7 +197,7 @@ thread_local! {
 
 /// Extract metadata from the VM, upgrading V0 to V1 representation as needed
 pub fn get_metadata(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> {
-    if let Some(data) = md.iter().find(|md| md.key == APTOS_METADATA_KEY_V1) {
+    if let Some(data) = find_metadata(md, APTOS_METADATA_KEY_V1) {
         V1_METADATA_CACHE.with(|ref_cell| {
             let mut cache = ref_cell.borrow_mut();
             if let Some(meta) = cache.get(&data.value) {
@@ -211,13 +210,7 @@ pub fn get_metadata(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> {
                 meta
             }
         })
-    } else {
-        get_metadata_v0(md)
-    }
-}
-
-pub fn get_metadata_v0(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> {
-    if let Some(data) = md.iter().find(|md| md.key == APTOS_METADATA_KEY) {
+    } else if let Some(data) = find_metadata(md, APTOS_METADATA_KEY) {
         V0_METADATA_CACHE.with(|ref_cell| {
             let mut cache = ref_cell.borrow_mut();
             if let Some(meta) = cache.get(&data.value) {
@@ -234,6 +227,26 @@ pub fn get_metadata_v0(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> 
     } else {
         None
     }
+}
+
+/// For the specified entry function, tries to find randomness attribute in its metadata. If it
+/// does not exist, [None] is returned.
+pub fn get_randomness_annotation_for_entry_function(
+    entry_func: &EntryFunction,
+    metadata: &[Metadata],
+) -> Option<RandomnessAnnotation> {
+    get_metadata(metadata).and_then(|metadata| {
+        metadata
+            .fun_attributes
+            .get(entry_func.function().as_str())
+            .map(|attrs| {
+                attrs
+                    .iter()
+                    .filter_map(KnownAttribute::try_as_randomness_annotation)
+                    .next()
+            })
+            .unwrap_or(None)
+    })
 }
 
 /// Check if the metadata has unknown key/data types
@@ -269,22 +282,23 @@ fn check_metadata_format(module: &CompiledModule) -> Result<(), MalformedError> 
     Ok(())
 }
 
-/// Extract metadata from a compiled module, upgrading V0 to V1 representation as needed.
-pub fn get_metadata_from_compiled_module(
-    module: &CompiledModule,
+/// Extract metadata from a compiled module or a script, upgrading V0 to V1 representation as
+/// needed.
+pub fn get_metadata_from_compiled_code(
+    code: &impl CompiledCodeMetadata,
 ) -> Option<RuntimeModuleMetadataV1> {
-    if let Some(data) = find_metadata(module, APTOS_METADATA_KEY_V1) {
+    if let Some(data) = find_metadata(code.metadata(), APTOS_METADATA_KEY_V1) {
         let mut metadata = bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value).ok();
         // Clear out metadata for v5, since it shouldn't have existed in the first place and isn't
         // being used. Note, this should have been gated in the verify module metadata.
-        if module.version == 5 {
+        if code.version() == 5 {
             if let Some(metadata) = metadata.as_mut() {
                 metadata.struct_attributes.clear();
                 metadata.fun_attributes.clear();
             }
         }
         metadata
-    } else if let Some(data) = find_metadata(module, APTOS_METADATA_KEY) {
+    } else if let Some(data) = find_metadata(code.metadata(), APTOS_METADATA_KEY) {
         // Old format available, upgrade to new one on the fly
         let data_v0 = bcs::from_bytes::<RuntimeModuleMetadata>(&data.value).ok()?;
         Some(data_v0.upgrade())
@@ -293,56 +307,10 @@ pub fn get_metadata_from_compiled_module(
     }
 }
 
-/// Extract compilation metadata from a compiled module
-pub fn get_compilation_metadata_from_compiled_module(
-    module: &CompiledModule,
-) -> Option<CompilationMetadata> {
-    if let Some(data) = find_metadata(module, COMPILATION_METADATA_KEY) {
+/// Extract compilation metadata from a compiled module or script.
+pub fn get_compilation_metadata(code: &impl CompiledCodeMetadata) -> Option<CompilationMetadata> {
+    if let Some(data) = find_metadata(code.metadata(), COMPILATION_METADATA_KEY) {
         bcs::from_bytes::<CompilationMetadata>(&data.value).ok()
-    } else {
-        None
-    }
-}
-
-/// Extract compilation metadata from a compiled script
-pub fn get_compilation_metadata_from_compiled_script(
-    module: &CompiledScript,
-) -> Option<CompilationMetadata> {
-    if let Some(data) = find_metadata_in_script(module, COMPILATION_METADATA_KEY) {
-        bcs::from_bytes::<CompilationMetadata>(&data.value).ok()
-    } else {
-        None
-    }
-}
-
-// This is mostly a copy paste of the existing function
-// get_metadata_from_compiled_module. In the API types there is a unifying trait for
-// modules and scripts called Bytecode that could help eliminate this duplication,
-// since all we need is a common way to access the metadata, but we'd have to move
-// that trait outside of the API types and into somewhere more reasonable for the
-// framework to access. There is currently no other trait that both CompiledModule
-// and CompiledScript implement. This stands as a future improvement, if we end
-// up needing more functions that work similarly for both of these types..
-//
-/// Extract metadata from a compiled module, upgrading V0 to V1 representation as needed.
-pub fn get_metadata_from_compiled_script(
-    script: &CompiledScript,
-) -> Option<RuntimeModuleMetadataV1> {
-    if let Some(data) = find_metadata_in_script(script, APTOS_METADATA_KEY_V1) {
-        let mut metadata = bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value).ok();
-        // Clear out metadata for v5, since it shouldn't have existed in the first place and isn't
-        // being used. Note, this should have been gated in the verify module metadata.
-        if script.version == 5 {
-            if let Some(metadata) = metadata.as_mut() {
-                metadata.struct_attributes.clear();
-                metadata.fun_attributes.clear();
-            }
-        }
-        metadata
-    } else if let Some(data) = find_metadata_in_script(script, APTOS_METADATA_KEY) {
-        // Old format available, upgrade to new one on the fly
-        let data_v0 = bcs::from_bytes::<RuntimeModuleMetadata>(&data.value).ok()?;
-        Some(data_v0.upgrade())
     } else {
         None
     }
@@ -470,7 +438,7 @@ pub fn is_valid_resource_group_member(
     })
 }
 
-pub fn verify_module_metadata(
+pub fn verify_module_metadata_for_module_publishing(
     module: &CompiledModule,
     features: &Features,
 ) -> Result<(), MetaDataValidationError> {
@@ -481,7 +449,7 @@ pub fn verify_module_metadata(
     if features.are_resource_groups_enabled() {
         check_metadata_format(module)?;
     }
-    let metadata = if let Some(metadata) = get_metadata_from_compiled_module(module) {
+    let metadata = if let Some(metadata) = get_metadata_from_compiled_code(module) {
         metadata
     } else {
         return Ok(());
@@ -549,12 +517,8 @@ pub fn verify_module_metadata(
     Ok(())
 }
 
-fn find_metadata<'a>(module: &'a CompiledModule, key: &[u8]) -> Option<&'a Metadata> {
-    module.metadata.iter().find(|md| md.key == key)
-}
-
-fn find_metadata_in_script<'a>(script: &'a CompiledScript, key: &[u8]) -> Option<&'a Metadata> {
-    script.metadata.iter().find(|md| md.key == key)
+fn find_metadata<'a>(metadata: &'a [Metadata], key: &[u8]) -> Option<&'a Metadata> {
+    metadata.iter().find(|md| md.key == key)
 }
 
 impl RuntimeModuleMetadata {
