@@ -474,9 +474,9 @@ pub enum EntryFunctionCall {
         new_beneficiary: AccountAddress,
     },
 
-    /// Allows an owner to change the delegated voter of the underlying stake pool.
+    /// Deprecated. Use the partial governance voting flow instead.
     DelegationPoolSetDelegatedVoter {
-        new_voter: AccountAddress,
+        _new_voter: AccountAddress,
     },
 
     /// Allows an owner to change the operator of the underlying stake pool.
@@ -1480,8 +1480,8 @@ impl EntryFunctionCall {
             DelegationPoolSetBeneficiaryForOperator { new_beneficiary } => {
                 delegation_pool_set_beneficiary_for_operator(new_beneficiary)
             },
-            DelegationPoolSetDelegatedVoter { new_voter } => {
-                delegation_pool_set_delegated_voter(new_voter)
+            DelegationPoolSetDelegatedVoter { _new_voter } => {
+                delegation_pool_set_delegated_voter(_new_voter)
             },
             DelegationPoolSetOperator { new_operator } => {
                 delegation_pool_set_operator(new_operator)
@@ -3176,8 +3176,8 @@ pub fn delegation_pool_set_beneficiary_for_operator(
     ))
 }
 
-/// Allows an owner to change the delegated voter of the underlying stake pool.
-pub fn delegation_pool_set_delegated_voter(new_voter: AccountAddress) -> TransactionPayload {
+/// Deprecated. Use the partial governance voting flow instead.
+pub fn delegation_pool_set_delegated_voter(_new_voter: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -3188,7 +3188,7 @@ pub fn delegation_pool_set_delegated_voter(new_voter: AccountAddress) -> Transac
         ),
         ident_str!("set_delegated_voter").to_owned(),
         vec![],
-        vec![bcs::to_bytes(&new_voter).unwrap()],
+        vec![bcs::to_bytes(&_new_voter).unwrap()],
     ))
 }
 
@@ -6067,7 +6067,7 @@ mod decoder {
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolSetDelegatedVoter {
-                new_voter: bcs::from_bytes(script.args().get(0)?).ok()?,
+                _new_voter: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
