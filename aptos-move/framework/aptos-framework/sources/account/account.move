@@ -530,7 +530,7 @@ module aptos_framework::account {
         ensure_resource_exists(addr);
         check_rotation_permission(account);
         let account_resource = &mut Account[addr];
-
+        let old_auth_key = account_resource.authentication_key;
         // Verify the given `from_public_key_bytes` matches this account's current authentication key.
         if (from_scheme == ED25519_SCHEME) {
             let from_pk = ed25519::new_unvalidated_public_key_from_bytes(from_public_key_bytes);
@@ -591,7 +591,7 @@ module aptos_framework::account {
             verified_public_key_bit_map,
             public_key_scheme: to_scheme,
             public_key: to_public_key_bytes,
-            old_auth_key: account_resource.authentication_key,
+            old_auth_key,
             new_auth_key,
         });
     }
@@ -609,6 +609,7 @@ module aptos_framework::account {
         // Check that there exists a rotation capability offer at the offerer's account resource for the delegate.
         let delegate_address = signer::address_of(delegate_signer);
         let offerer_account_resource = &Account[rotation_cap_offerer_address];
+        let old_auth_key = offerer_account_resource.authentication_key;
         assert!(
             offerer_account_resource.rotation_capability_offer.for.contains(&delegate_address),
             error::not_found(ENO_SUCH_ROTATION_CAPABILITY_OFFER)
@@ -653,8 +654,8 @@ module aptos_framework::account {
             verified_public_key_bit_map,
             public_key_scheme: new_scheme,
             public_key: new_public_key_bytes,
-            old_auth_key: offerer_account_resource.authentication_key,
-            new_auth_key: new_auth_key,
+            old_auth_key,
+            new_auth_key,
         });
     }
 
