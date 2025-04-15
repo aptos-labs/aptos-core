@@ -25,7 +25,7 @@ It is used to represent public keys for the Ed25519, SECP256K1, WebAuthn, and Ke
 <b>use</b> <a href="../../move-stdlib/doc/hash.md#0x1_hash">0x1::hash</a>;
 <b>use</b> <a href="keyless.md#0x1_keyless">0x1::keyless</a>;
 <b>use</b> <a href="secp256k1.md#0x1_secp256k1">0x1::secp256k1</a>;
-<b>use</b> <a href="secp2561r.md#0x1_secp256r1">0x1::secp256r1</a>;
+<b>use</b> <a href="secp256r1.md#0x1_secp256r1">0x1::secp256r1</a>;
 </code></pre>
 
 
@@ -99,7 +99,7 @@ It is used to represent public keys for the Ed25519, SECP256K1, WebAuthn, and Ke
 
 <dl>
 <dt>
-<code>pk: <a href="secp2561r.md#0x1_secp256r1_ECDSARawPublicKey">secp256r1::ECDSARawPublicKey</a></code>
+<code>pk: <a href="secp256r1.md#0x1_secp256r1_ECDSARawPublicKey">secp256r1::ECDSARawPublicKey</a></code>
 </dt>
 <dd>
 
@@ -300,7 +300,7 @@ Deserializes a Single Key public key from a BCS stream.
         pk = AnyPublicKey::Secp256k1Ecdsa{pk: <a href="secp256k1.md#0x1_secp256k1_ecdsa_raw_public_key_from_64_bytes">secp256k1::ecdsa_raw_public_key_from_64_bytes</a>(public_key_bytes)};
     } <b>else</b> <b>if</b> (scheme_id == <a href="single_key.md#0x1_single_key_WEB_AUTHN_PUBLIC_KEY_TYPE">WEB_AUTHN_PUBLIC_KEY_TYPE</a>) {
         <b>let</b> public_key_bytes = <a href="bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>(stream, |x| deserialize_u8(x));
-        pk = AnyPublicKey::Secp256r1Ecdsa{pk: <a href="secp2561r.md#0x1_secp256r1_ecdsa_raw_public_key_from_64_bytes">secp256r1::ecdsa_raw_public_key_from_64_bytes</a>(public_key_bytes)};
+        pk = AnyPublicKey::Secp256r1Ecdsa{pk: <a href="secp256r1.md#0x1_secp256r1_ecdsa_raw_public_key_from_64_bytes">secp256r1::ecdsa_raw_public_key_from_64_bytes</a>(public_key_bytes)};
     } <b>else</b> <b>if</b> (scheme_id == <a href="single_key.md#0x1_single_key_KEYLESS_PUBLIC_KEY_TYPE">KEYLESS_PUBLIC_KEY_TYPE</a>) {
         pk = AnyPublicKey::Keyless{pk: <a href="keyless.md#0x1_keyless_deserialize_public_key">keyless::deserialize_public_key</a>(stream)};
     } <b>else</b> <b>if</b> (scheme_id == <a href="single_key.md#0x1_single_key_FEDERATED_KEYLESS_PUBLIC_KEY_TYPE">FEDERATED_KEYLESS_PUBLIC_KEY_TYPE</a>) {

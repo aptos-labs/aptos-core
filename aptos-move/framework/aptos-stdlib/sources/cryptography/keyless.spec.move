@@ -1,4 +1,4 @@
-spec aptos_std::single_key {
+spec aptos_std::keyless {
     spec module {
         pragma verify = false;
     }

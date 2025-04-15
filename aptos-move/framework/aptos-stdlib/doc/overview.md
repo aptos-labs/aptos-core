@@ -42,7 +42,7 @@ This is the reference documentation of the Aptos standard library.
 -  [`0x1::ristretto255_elgamal`](ristretto255_elgamal.md#0x1_ristretto255_elgamal)
 -  [`0x1::ristretto255_pedersen`](ristretto255_pedersen.md#0x1_ristretto255_pedersen)
 -  [`0x1::secp256k1`](secp256k1.md#0x1_secp256k1)
--  [`0x1::secp256r1`](secp2561r.md#0x1_secp256r1)
+-  [`0x1::secp256r1`](secp256r1.md#0x1_secp256r1)
 -  [`0x1::simple_map`](simple_map.md#0x1_simple_map)
 -  [`0x1::single_key`](single_key.md#0x1_single_key)
 -  [`0x1::smart_table`](smart_table.md#0x1_smart_table)
