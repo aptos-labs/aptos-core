@@ -1783,6 +1783,16 @@ Cannot unlock the accumulated active stake of NULL_SHAREHOLDER(0x0).
 
 
 
+<a id="0x1_delegation_pool_ECAN_NO_LONGER_SET_DELEGATED_VOTER"></a>
+
+Use delegator voting flow instead. Delegation pools can no longer specify a single delegated voter.
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_ECAN_NO_LONGER_SET_DELEGATED_VOTER">ECAN_NO_LONGER_SET_DELEGATED_VOTER</a>: u64 = 29;
+</code></pre>
+
+
+
 <a id="0x1_delegation_pool_ECOMMISSION_RATE_CHANGE_NOT_SUPPORTED"></a>
 
 Changing operator commission rate in delegation pool is not supported.
@@ -2951,7 +2961,6 @@ Ownership over setting the operator/voter is granted to <code>owner</code> who h
     delegation_pool_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     <a href="delegation_pool.md#0x1_delegation_pool_check_delegation_pool_management_permission">check_delegation_pool_management_permission</a>(owner);
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_delegation_pools_enabled">features::delegation_pools_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="delegation_pool.md#0x1_delegation_pool_EDELEGATION_POOLS_DISABLED">EDELEGATION_POOLS_DISABLED</a>));
     <b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
     <b>assert</b>!(!<a href="delegation_pool.md#0x1_delegation_pool_owner_cap_exists">owner_cap_exists</a>(owner_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="delegation_pool.md#0x1_delegation_pool_EOWNER_CAP_ALREADY_EXISTS">EOWNER_CAP_ALREADY_EXISTS</a>));
     <b>assert</b>!(<a href="delegation_pool.md#0x1_delegation_pool_operator_commission_percentage">operator_commission_percentage</a> &lt;= <a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_EINVALID_COMMISSION_PERCENTAGE">EINVALID_COMMISSION_PERCENTAGE</a>));
@@ -2992,10 +3001,7 @@ Ownership over setting the operator/voter is granted to <code>owner</code> who h
     <b>move_to</b>(owner, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a> { pool_address });
 
     // All delegation pool enable partial governance <a href="voting.md#0x1_voting">voting</a> by default once the feature flag is enabled.
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_partial_governance_voting_enabled">features::partial_governance_voting_enabled</a>(
-    ) && <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_delegation_pool_partial_governance_voting_enabled">features::delegation_pool_partial_governance_voting_enabled</a>()) {
-        <a href="delegation_pool.md#0x1_delegation_pool_enable_partial_governance_voting">enable_partial_governance_voting</a>(pool_address);
-    }
+    <a href="delegation_pool.md#0x1_delegation_pool_enable_partial_governance_voting">enable_partial_governance_voting</a>(pool_address);
 }
 </code></pre>
 
@@ -3053,11 +3059,6 @@ The existing voter will be replaced. The function is permissionless.
 <pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_enable_partial_governance_voting">enable_partial_governance_voting</a>(
     pool_address: <b>address</b>,
 ) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_partial_governance_voting_enabled">features::partial_governance_voting_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="delegation_pool.md#0x1_delegation_pool_EDISABLED_FUNCTION">EDISABLED_FUNCTION</a>));
-    <b>assert</b>!(
-        <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_delegation_pool_partial_governance_voting_enabled">features::delegation_pool_partial_governance_voting_enabled</a>(),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="delegation_pool.md#0x1_delegation_pool_EDISABLED_FUNCTION">EDISABLED_FUNCTION</a>)
-    );
     <a href="delegation_pool.md#0x1_delegation_pool_assert_delegation_pool_exists">assert_delegation_pool_exists</a>(pool_address);
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation.
     <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
@@ -4002,9 +4003,6 @@ one for each pool.
     new_beneficiary: <b>address</b>
 ) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a> {
     <a href="delegation_pool.md#0x1_delegation_pool_check_stake_management_permission">check_stake_management_permission</a>(operator);
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operator_beneficiary_change_enabled">features::operator_beneficiary_change_enabled</a>(), std::error::invalid_state(
-        <a href="delegation_pool.md#0x1_delegation_pool_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED">EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED</a>
-    ));
     // The beneficiay <b>address</b> of an operator is stored under the operator's <b>address</b>.
     // So, the operator does not need <b>to</b> be validated <b>with</b> respect <b>to</b> a staking pool.
     <b>let</b> operator_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(operator);
@@ -4048,9 +4046,6 @@ Allows an owner to update the commission percentage for the operator of the unde
     new_commission_percentage: u64
 ) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     <a href="delegation_pool.md#0x1_delegation_pool_check_delegation_pool_management_permission">check_delegation_pool_management_permission</a>(owner);
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_commission_change_delegation_pool_enabled">features::commission_change_delegation_pool_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(
-        <a href="delegation_pool.md#0x1_delegation_pool_ECOMMISSION_RATE_CHANGE_NOT_SUPPORTED">ECOMMISSION_RATE_CHANGE_NOT_SUPPORTED</a>
-    ));
     <b>assert</b>!(new_commission_percentage &lt;= <a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_EINVALID_COMMISSION_PERCENTAGE">EINVALID_COMMISSION_PERCENTAGE</a>));
     <b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
     <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_owned_pool_address">get_owned_pool_address</a>(owner_address);
@@ -4097,10 +4092,11 @@ Allows an owner to update the commission percentage for the operator of the unde
 
 ## Function `set_delegated_voter`
 
-Allows an owner to change the delegated voter of the underlying stake pool.
+Deprecated. Use the partial governance voting flow instead.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_set_delegated_voter">set_delegated_voter</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_voter: <b>address</b>)
+<pre><code>#[deprecated]
+<b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_set_delegated_voter">set_delegated_voter</a>(_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _new_voter: <b>address</b>)
 </code></pre>
 
 
@@ -4110,19 +4106,10 @@ Allows an owner to change the delegated voter of the underlying stake pool.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_set_delegated_voter">set_delegated_voter</a>(
-    owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    new_voter: <b>address</b>
-) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
-    <a href="delegation_pool.md#0x1_delegation_pool_check_delegation_pool_management_permission">check_delegation_pool_management_permission</a>(owner);
-    // No one can change delegated_voter once the partial governance <a href="voting.md#0x1_voting">voting</a> feature is enabled.
-    <b>assert</b>!(
-        !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_delegation_pool_partial_governance_voting_enabled">features::delegation_pool_partial_governance_voting_enabled</a>(),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="delegation_pool.md#0x1_delegation_pool_EDEPRECATED_FUNCTION">EDEPRECATED_FUNCTION</a>)
-    );
-    <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_owned_pool_address">get_owned_pool_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
-    // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation
-    <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
-    <a href="stake.md#0x1_stake_set_delegated_voter">stake::set_delegated_voter</a>(&<a href="delegation_pool.md#0x1_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(<b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address)), new_voter);
+    _owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    _new_voter: <b>address</b>
+) {
+    <b>abort</b> <a href="delegation_pool.md#0x1_delegation_pool_ECAN_NO_LONGER_SET_DELEGATED_VOTER">ECAN_NO_LONGER_SET_DELEGATED_VOTER</a>
 }
 </code></pre>
 
@@ -5281,15 +5268,13 @@ shares pools, assign commission to operator and eventually prepare delegation po
         },
     );
 
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operator_beneficiary_change_enabled">features::operator_beneficiary_change_enabled</a>()) {
-        emit(<a href="delegation_pool.md#0x1_delegation_pool_DistributeCommission">DistributeCommission</a> {
-            pool_address,
-            operator: <a href="stake.md#0x1_stake_get_operator">stake::get_operator</a>(pool_address),
-            beneficiary: <a href="delegation_pool.md#0x1_delegation_pool_beneficiary_for_operator">beneficiary_for_operator</a>(<a href="stake.md#0x1_stake_get_operator">stake::get_operator</a>(pool_address)),
-            commission_active,
-            commission_pending_inactive,
-        })
-    };
+    emit(<a href="delegation_pool.md#0x1_delegation_pool_DistributeCommission">DistributeCommission</a> {
+        pool_address,
+        operator: <a href="stake.md#0x1_stake_get_operator">stake::get_operator</a>(pool_address),
+        beneficiary: <a href="delegation_pool.md#0x1_delegation_pool_beneficiary_for_operator">beneficiary_for_operator</a>(<a href="stake.md#0x1_stake_get_operator">stake::get_operator</a>(pool_address)),
+        commission_active,
+        commission_pending_inactive,
+    });
 
     // advance lockup cycle on delegation pool <b>if</b> already ended on <a href="stake.md#0x1_stake">stake</a> pool (AND <a href="stake.md#0x1_stake">stake</a> explicitly inactivated)
     <b>if</b> (lockup_cycle_ended) {
