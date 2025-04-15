@@ -59,7 +59,7 @@ spec:
         - name: KUBECONFIG
           value: {KUBECONFIG}
         - name: RUST_LOG
-          value: info
+          value: debug
       volumeMounts:
         - name: multiregion-kubeconfig
           readOnly: true
