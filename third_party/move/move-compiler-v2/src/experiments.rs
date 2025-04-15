@@ -203,13 +203,6 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::OPTIMIZE_EXTRA.to_string()),
         },
         Experiment {
-            name: Experiment::GEN_ACCESS_SPECIFIERS.to_string(),
-            description: "Whether to generate access specifiers in the file format if \
-            language version supports them."
-                .to_string(),
-            default: Given(true),
-        },
-        Experiment {
             name: Experiment::ATTACH_COMPILED_MODULE.to_string(),
             description: "Whether to attach the compiled module to the global env.".to_string(),
             default: Given(false),
@@ -282,7 +275,6 @@ impl Experiment {
     pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";
     pub const FAIL_ON_WARNING: &'static str = "fail-on-warning";
     pub const FLUSH_WRITES_OPTIMIZATION: &'static str = "flush-writes-optimization";
-    pub const GEN_ACCESS_SPECIFIERS: &'static str = "gen-access-specifiers";
     pub const INLINING: &'static str = "inlining";
     pub const KEEP_INLINE_FUNS: &'static str = "keep-inline-funs";
     pub const KEEP_UNINIT_ANNOTATIONS: &'static str = "keep-uninit-annotations";
