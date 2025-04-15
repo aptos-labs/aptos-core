@@ -8,7 +8,7 @@ module 0x42::Test {
     }
 
     public fun test_apply(a1: u64, a2: u64) {
-        let r1 = apply(0, |v| v >= 0);
+        let r1 = apply(0, |v| v >= 0 spec { ensures result == (v >= 0); });
         spec {
             assert r1;
         };

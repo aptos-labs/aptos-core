@@ -372,7 +372,7 @@ struct Inliner<'env> {
     env: &'env mut GlobalEnv,
     /// The set of rewrite targets the inliner works on.
     inline_targets: RewriteTargets,
-    /// Flag to indicate whether lift lambda expressions
+    /// Flag to lift lambda expression arguments to inline functions
     lift_inline_funs: bool,
 }
 
@@ -700,7 +700,7 @@ struct InlinedRewriter<'env, 'rewriter> {
     /// Map from parameter position to corresponding spec function
     function_value_spec_map: BTreeMap<usize, (QualifiedId<SpecFunId>, QualifiedId<FunId>)>,
     /// Map from symbol to parameter pos
-    sym_para_map: BTreeMap<Symbol, usize>,
+    sym_param_map: BTreeMap<Symbol, usize>,
     /// Whether to rewrite invoke for spec
     rewrite_invoke_for_spec: bool,
 }
@@ -717,7 +717,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         BTreeMap<usize, (QualifiedId<SpecFunId>, QualifiedId<FunId>)>,
     ) {
         let mut function_value_map: BTreeMap<usize, Exp> = BTreeMap::new();
-        let mut sym_para_map: BTreeMap<Symbol, usize> = BTreeMap::new();
+        let mut sym_param_map: BTreeMap<Symbol, usize> = BTreeMap::new();
         let mut function_value_spec_map = BTreeMap::new();
 
         if lift_inline_funs && target_qualified_fun_id_opt.is_some() {
@@ -741,7 +741,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                 // Only one lift function should be generated.
                 assert_eq!(lifter.lifted_len(), 1);
                 let func_data = lifter.get_lifted_at(0).unwrap().generate_function_data(env);
-                sym_para_map.insert(para.1 .0, para.0);
+                sym_param_map.insert(para.1 .0, para.0);
                 function_value_map.insert(para.0, closure_exp.clone());
                 lifted_lambda_funs.insert(para.0, func_data);
             }
@@ -752,7 +752,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             );
         }
 
-        (function_value_map, sym_para_map, function_value_spec_map)
+        (function_value_map, sym_param_map, function_value_spec_map)
     }
 
     fn new(
@@ -764,7 +764,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         call_site_loc: &'rewriter Loc,
         function_value_map: BTreeMap<usize, Exp>,
         function_value_spec_map: BTreeMap<usize, (QualifiedId<SpecFunId>, QualifiedId<FunId>)>,
-        sym_para_map: BTreeMap<Symbol, usize>,
+        sym_param_map: BTreeMap<Symbol, usize>,
         rewrite_invoke_for_spec: bool,
     ) -> Self {
         let shadow_stack = ShadowStack::new(env, &lambda_free_vars);
@@ -779,7 +779,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             in_spec: 0,
             function_value_map,
             function_value_spec_map,
-            sym_para_map,
+            sym_param_map,
             rewrite_invoke_for_spec,
         }
     }
@@ -824,7 +824,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             .collect();
 
         // Lift lambda expressions and generate corresponding spec functions
-        let (function_value_map, sym_para_map, function_value_spec_map) =
+        let (function_value_map, sym_param_map, function_value_spec_map) =
             Self::lift_lambda_and_generate_spec_fun(
                 env,
                 lift_inline_funs,
@@ -878,7 +878,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             &call_site_loc,
             function_value_map,
             function_value_spec_map,
-            sym_para_map,
+            sym_param_map,
             lift_inline_funs,
         );
 
@@ -1340,7 +1340,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                 }
             };
             if let ExpData::LocalVar(_, sym) = target.as_ref() {
-                if let Some(para_pos) = self.sym_para_map.get(sym) {
+                if let Some(para_pos) = self.sym_param_map.get(sym) {
                     return rewrite_invoke_into_fun(para_pos, self.in_spec > 0);
                 }
             } else if let ExpData::Temporary(_, para_pos) = target.as_ref() {
