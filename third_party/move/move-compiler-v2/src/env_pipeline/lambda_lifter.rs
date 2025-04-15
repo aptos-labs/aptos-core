@@ -566,6 +566,17 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         //      substituted automatically by using the same symbol for the param
         let (mut params, closure_args, param_index_mapping) = self.get_params_for_freevars()?;
 
+        if closure_args.len() > ClosureMask::MAX_ARGS {
+            env.error(
+                &env.get_node_loc(id),
+                &format!(
+                    "too many arguments captured in lambda (can only capture up to a maximum of `{}`, but captured `{}`)",
+                    ClosureMask::MAX_ARGS, closure_args.len()
+                ),
+            );
+            return None;
+        }
+
         // Add lambda args. For dealing with patterns in lambdas (`|S{..}|e`) we need
         // to collect a list of bindings.
         let mut bindings = vec![];
