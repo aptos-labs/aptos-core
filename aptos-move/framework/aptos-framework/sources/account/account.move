@@ -15,6 +15,8 @@ module aptos_framework::account {
     use aptos_std::ed25519;
     use aptos_std::from_bcs;
     use aptos_std::multi_ed25519;
+    use aptos_std::single_key;
+    use aptos_std::multi_key;
     use aptos_std::table::{Self, Table};
     use aptos_std::type_info::{Self, TypeInfo};
 
@@ -130,6 +132,10 @@ module aptos_framework::account {
     const ED25519_SCHEME: u8 = 0;
     /// Scheme identifier for MultiEd25519 signatures used to derive authentication keys for MultiEd25519 public keys.
     const MULTI_ED25519_SCHEME: u8 = 1;
+    /// Scheme identifier for single key public keys used to derive authentication keys for single key public keys.
+    const SINGLE_KEY_SCHEME: u8 = 2;
+    /// Scheme identifier for multi key public keys used to derive authentication keys for multi key public keys.
+    const MULTI_KEY_SCHEME: u8 = 3;
     /// Scheme identifier used when hashing an account's address together with a seed to derive the address (not the
     /// authentication key) of a resource account. This is an abuse of the notion of a scheme identifier which, for now,
     /// serves to domain separate hashes used to derive resource account addresses from hashes used to derive
@@ -183,6 +189,8 @@ module aptos_framework::account {
     const ENEW_AUTH_KEY_SAME_AS_CURRENT: u64 = 22;
     /// Current permissioned signer cannot perform the privilaged operations.
     const ENO_ACCOUNT_PERMISSION: u64 = 23;
+    /// Specified scheme is not recognized. Should be ED25519_SCHEME(0), MULTI_ED25519_SCHEME(1), SINGLE_KEY_SCHEME(2), or MULTI_KEY_SCHEME(3).
+    const EUNRECOGNIZED_SCHEME: u64 = 24;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const MAX_GUID_CREATION_NUM: u64 = 0x4000000000000;
@@ -422,6 +430,28 @@ module aptos_framework::account {
     /// `set_originating_address()`.
     entry fun rotate_authentication_key_call(account: &signer, new_auth_key: vector<u8>) acquires Account {
         rotate_authentication_key_internal(account, new_auth_key);
+    }
+
+    /// Private entry function for key rotation that allows the signer to update their authentication key from a given public key.
+    /// This function will abort if the scheme is not recognized or if new_public_key_bytes is not a valid public key for the given scheme.
+    ///
+    /// Note: This function does not update the `OriginatingAddress` table.
+    entry fun rotate_authentication_key_from_public_key(account: &signer, scheme: u8, new_public_key_bytes: vector<u8>) acquires Account {
+        let auth_key;
+        if (scheme == ED25519_SCHEME) {
+            let from_pk = ed25519::new_unvalidated_public_key_from_bytes(new_public_key_bytes);
+            auth_key = ed25519::unvalidated_public_key_to_authentication_key(&from_pk);
+        } else if (scheme == MULTI_ED25519_SCHEME) {
+            let from_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(new_public_key_bytes);
+            auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&from_pk);
+        } else if (scheme == SINGLE_KEY_SCHEME) {
+            auth_key = single_key::new_public_key_from_bytes(new_public_key_bytes).to_authentication_key();
+        } else if (scheme == MULTI_KEY_SCHEME) {
+            auth_key = multi_key::new_public_key_from_bytes(new_public_key_bytes).to_authentication_key();
+        } else {
+            abort error::invalid_argument(EUNRECOGNIZED_SCHEME)
+        };
+        rotate_authentication_key_call(account, auth_key);
     }
 
     /// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
