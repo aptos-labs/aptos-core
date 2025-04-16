@@ -290,6 +290,7 @@ fn create_entry_function_payload(
         Value::address(entry_function_payload.account_address),
         create_string_value(entry_function_payload.module_name),
         create_string_value(entry_function_payload.function_name),
+        // SAFETY: both type arguments and arguments are homogeneous collections.
         Value::vector_unchecked(ty_args)?,
         Value::vector_unchecked(args)?,
     ])))
@@ -312,8 +313,7 @@ fn native_entry_function_payload_internal(
                     * NumBytes::new(num_bytes as u64),
             )?;
             let payload = create_entry_function_payload(entry_function_payload)?;
-            // SAFETY: payload is a struct, so it is ok to create a vector out of it. Same applies
-            //         for the None option below.
+            // SAFETY: creating a singleton or empty vector is always safe.
             Ok(smallvec![create_option_some_unchecked(payload)])
         } else {
             Ok(smallvec![create_option_none_unchecked()])
@@ -345,6 +345,7 @@ fn native_multisig_payload_internal(
                     )?;
                     let inner_entry_fun_payload =
                         create_entry_function_payload(entry_function_payload)?;
+                    // SAFETY: creating a singleton or empty vector is always safe.
                     create_option_some_unchecked(inner_entry_fun_payload)
                 } else {
                     create_option_none_unchecked()
@@ -353,6 +354,7 @@ fn native_multisig_payload_internal(
                 Value::address(multisig_payload.multisig_address),
                 inner_entry_fun_payload,
             ]));
+            // SAFETY: creating a singleton or empty vector is always safe.
             Ok(smallvec![create_option_some_unchecked(multisig_payload)])
         } else {
             Ok(smallvec![create_option_none_unchecked()])
