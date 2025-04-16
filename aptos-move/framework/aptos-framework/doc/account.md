@@ -1781,7 +1781,7 @@ to rotate his address to Alice's address in the first place.
     <a href="account.md#0x1_account_ensure_resource_exists">ensure_resource_exists</a>(addr);
     <a href="account.md#0x1_account_check_rotation_permission">check_rotation_permission</a>(<a href="account.md#0x1_account">account</a>);
     <b>let</b> account_resource = &<b>mut</b> <a href="account.md#0x1_account_Account">Account</a>[addr];
-
+    <b>let</b> old_auth_key = account_resource.authentication_key;
     // Verify the given `from_public_key_bytes` matches this <a href="account.md#0x1_account">account</a>'s current authentication key.
     <b>if</b> (from_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a>) {
         <b>let</b> from_pk = <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_new_unvalidated_public_key_from_bytes">ed25519::new_unvalidated_public_key_from_bytes</a>(from_public_key_bytes);
@@ -1842,7 +1842,7 @@ to rotate his address to Alice's address in the first place.
         verified_public_key_bit_map,
         public_key_scheme: to_scheme,
         public_key: to_public_key_bytes,
-        old_auth_key: account_resource.authentication_key,
+        old_auth_key,
         new_auth_key,
     });
 }
@@ -1880,6 +1880,7 @@ to rotate his address to Alice's address in the first place.
     // Check that there <b>exists</b> a rotation <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> offer at the offerer's <a href="account.md#0x1_account">account</a> resource for the delegate.
     <b>let</b> delegate_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegate_signer);
     <b>let</b> offerer_account_resource = &<a href="account.md#0x1_account_Account">Account</a>[rotation_cap_offerer_address];
+    <b>let</b> old_auth_key = offerer_account_resource.authentication_key;
     <b>assert</b>!(
         offerer_account_resource.rotation_capability_offer.for.contains(&delegate_address),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SUCH_ROTATION_CAPABILITY_OFFER">ENO_SUCH_ROTATION_CAPABILITY_OFFER</a>)
@@ -1924,8 +1925,8 @@ to rotate his address to Alice's address in the first place.
         verified_public_key_bit_map,
         public_key_scheme: new_scheme,
         public_key: new_public_key_bytes,
-        old_auth_key: offerer_account_resource.authentication_key,
-        new_auth_key: new_auth_key,
+        old_auth_key,
+        new_auth_key,
     });
 }
 </code></pre>
