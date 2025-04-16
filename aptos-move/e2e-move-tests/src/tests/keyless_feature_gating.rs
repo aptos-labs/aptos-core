@@ -4,24 +4,28 @@
 use crate::{assert_success, build_package, tests::common, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{hash::CryptoHash, SigningKey};
-use aptos_language_e2e_tests::account::{Account, AccountPublicKey, TransactionBuilder};
+use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
+use aptos_sdk::types::{
+    EphemeralKeyPair, EphemeralPrivateKey, FederatedKeylessAccount, KeylessAccount, LocalAccount,
+};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     jwks::{rsa::RSA_JWK, secure_test_rsa_jwk},
     keyless::{
         test_utils::{
-            get_groth16_sig_and_pk_for_upgraded_vk, get_random_simulated_groth16_sig_and_pk,
-            get_sample_esk, get_sample_groth16_sig_and_pk, get_sample_iss, get_sample_jwk,
-            get_sample_openid_sig_and_pk, get_upgraded_vk,
+            get_random_simulated_groth16_sig_and_pk, get_sample_epk_blinder, get_sample_esk,
+            get_sample_exp_date, get_sample_groth16_sig_and_pk, get_sample_iss, get_sample_jwk,
+            get_sample_jwt_token, get_sample_openid_sig_and_pk, get_sample_pepper,
+            get_sample_zk_sig, get_sample_zk_sig_for_upgraded_vk, get_upgraded_vk,
         },
-        AnyKeylessPublicKey, Configuration, EphemeralCertificate, FederatedKeylessPublicKey,
-        Groth16VerificationKey, KeylessPublicKey, KeylessSignature, TransactionAndProof,
+        AnyKeylessPublicKey, Configuration, EphemeralCertificate, Groth16VerificationKey,
+        KeylessPublicKey, KeylessSignature, TransactionAndProof, ZeroKnowledgeSig,
         VERIFICATION_KEY_FOR_TESTING,
     },
     on_chain_config::FeatureFlag,
     transaction::{
-        authenticator::{AnyPublicKey, AuthenticationKey, EphemeralSignature},
-        EntryFunction, Script, SignedTransaction, Transaction, TransactionStatus,
+        authenticator::EphemeralSignature, EntryFunction, Script, SignedTransaction, Transaction,
+        TransactionStatus,
     },
 };
 use move_core_types::{
@@ -63,9 +67,9 @@ fn test_feature_gating(
     get_sig_and_pk: fn() -> (KeylessSignature, KeylessPublicKey),
     should_succeed: bool,
 ) {
-    let (sig, pk) = get_sig_and_pk();
+    let (sig, _pk) = get_sig_and_pk();
 
-    let transaction = create_and_spend_keyless_account(h, sig, pk, *recipient.address());
+    let transaction = create_and_spend_keyless_account(h, sig, *recipient.address());
     let output = h.run_raw(transaction);
 
     if !should_succeed {
@@ -105,17 +109,18 @@ fn test_rotate_vk() {
     );
 
     // Old proof for old VK
-    let (old_sig, pk) = get_sample_groth16_sig_and_pk();
-    let account = create_keyless_account(&mut h, pk);
-    let transaction =
-        spend_keyless_account(&mut h, old_sig.clone(), &account, *recipient.address());
+    let account_old_proof =
+        Account::new_from_local_account(get_test_keyless_account(get_sample_zk_sig()));
+    let account_new_proof = Account::new_from_local_account(get_test_keyless_account(
+        get_sample_zk_sig_for_upgraded_vk(),
+    ));
+    h.store_and_fund_account(&account_old_proof, 100000000, 0);
+    let transaction = get_signed_transaction(&mut h, &account_old_proof, *recipient.address());
     let output = h.run_raw(transaction);
     assert_success!(output.status().clone());
 
     // New proof for old VK
-    let (new_sig, _) = get_groth16_sig_and_pk_for_upgraded_vk();
-    let transaction =
-        spend_keyless_account(&mut h, new_sig.clone(), &account, *recipient.address());
+    let transaction = get_signed_transaction(&mut h, &account_new_proof, *recipient.address());
     let output = h.run_raw(transaction);
     //println!("TXN status: {:?}", output.status());
     match output.status() {
@@ -134,12 +139,12 @@ fn test_rotate_vk() {
     );
 
     // New proof for new VK
-    let transaction = spend_keyless_account(&mut h, new_sig, &account, *recipient.address());
+    let transaction = get_signed_transaction(&mut h, &account_new_proof, *recipient.address());
     let output = h.run_raw(transaction);
     assert_success!(output.status().clone());
 
     // Old proof for old VK
-    let transaction = spend_keyless_account(&mut h, old_sig, &account, *recipient.address());
+    let transaction = get_signed_transaction(&mut h, &account_old_proof, *recipient.address());
     let output = h.run_raw(transaction);
     // println!("TXN status: {:?}", output.status());
     match output.status() {
@@ -163,11 +168,21 @@ fn test_proof_simulation() {
         vec![],
     );
 
-    let (sig, pk, pvk) = get_random_simulated_groth16_sig_and_pk();
+    let (sig, _, pvk) = get_random_simulated_groth16_sig_and_pk();
     run_upgrade_vk_script(&mut h, core_resources, Groth16VerificationKey::from(pvk));
     run_jwk_and_config_script(&mut h);
 
-    let transaction = create_and_spend_keyless_account(&mut h, sig, pk, *recipient.address());
+    let zk_sig = match &sig.cert {
+        EphemeralCertificate::ZeroKnowledgeSig(zk) => zk.clone(),
+        EphemeralCertificate::OpenIdSig(_) => panic!("Expected ZeroKnowledgeSig certificate"),
+    };
+    let local_account = get_test_keyless_account(zk_sig);
+    let account = h.store_and_fund_account(
+        &Account::new_from_local_account(local_account),
+        100000000,
+        0,
+    );
+    let transaction = get_signed_transaction(&mut h, &account, *recipient.address());
     let output = h.run_raw(transaction);
 
     assert_success!(
@@ -272,10 +287,13 @@ fn test_federated_keyless_at_jwk_addr() {
     );
 
     // Step 1: Make sure TXN validation fails if JWKs are not installed at jwk_addr.
-    let (sig, pk) = get_sample_groth16_sig_and_pk();
-    let sender = create_federated_keyless_account(&mut h, jwk_addr, pk);
+    let sender = h.store_and_fund_account(
+        &Account::new_from_local_account(get_test_federated_keyless_account(jwk_addr)),
+        100000000,
+        0,
+    );
     let recipient = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
-    let txn = spend_keyless_account(&mut h, sig.clone(), &sender, *recipient.address());
+    let txn = get_signed_transaction(&mut h, &sender, *recipient.address());
     let output = h.run_raw(txn);
 
     match output.status() {
@@ -297,7 +315,7 @@ fn test_federated_keyless_at_jwk_addr() {
     let jwk = get_sample_jwk();
     let _ = install_federated_jwks_and_set_keyless_config(&mut h, jwk_addr, iss, jwk);
 
-    let txn = spend_keyless_account(&mut h, sig, &sender, *recipient.address());
+    let txn = get_signed_transaction(&mut h, &sender, *recipient.address());
     let output = h.run_raw(txn);
 
     assert_success!(
@@ -333,10 +351,13 @@ fn test_federated_keyless_override_at_0x1() {
     );
 
     // Step 1: Make sure the TXN does not validate, since the wrong JWK is installed at JWK addr
-    let (sig, pk) = get_sample_groth16_sig_and_pk();
-    let sender = create_federated_keyless_account(&mut h, jwk_addr, pk);
+    let sender = h.store_and_fund_account(
+        &Account::new_from_local_account(get_test_federated_keyless_account(jwk_addr)),
+        100000000,
+        0,
+    );
     let recipient = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
-    let txn = spend_keyless_account(&mut h, sig.clone(), &sender, *recipient.address());
+    let txn = get_signed_transaction(&mut h, &sender, *recipient.address());
     let output = h.run_raw(txn);
 
     match output.status() {
@@ -355,7 +376,7 @@ fn test_federated_keyless_override_at_0x1() {
 
     // Step 2: Install the correct JWK at 0x1 and resubmit the TXN; it should now validate
     run_jwk_and_config_script(&mut h);
-    let txn = spend_keyless_account(&mut h, sig, &sender, *recipient.address());
+    let txn = get_signed_transaction(&mut h, &sender, *recipient.address());
     let output = h.run_raw(txn);
 
     assert_success!(
@@ -365,24 +386,38 @@ fn test_federated_keyless_override_at_0x1() {
     );
 }
 
-fn create_keyless_account(h: &mut MoveHarness, pk: KeylessPublicKey) -> Account {
-    let addr = AuthenticationKey::any_key(AnyPublicKey::keyless(pk.clone())).account_address();
-    let account = h.store_and_fund_account(
-        &Account::new_from_addr(
-            addr,
-            AccountPublicKey::AnyPublicKey(AnyPublicKey::Keyless { public_key: pk }),
-        ),
-        100000000,
+fn get_test_keyless_account(zk_sig: ZeroKnowledgeSig) -> LocalAccount {
+    let esk = EphemeralPrivateKey::Ed25519 {
+        inner_private_key: get_sample_esk(),
+    };
+
+    let ephemeral_key_pair = EphemeralKeyPair::new_with_keyless_config(
+        &Configuration::new_for_testing(),
+        esk,
+        get_sample_exp_date(),
+        get_sample_epk_blinder(),
+    )
+    .unwrap();
+    let keyless_account = KeylessAccount::new_from_jwt(
+        &get_sample_jwt_token(),
+        ephemeral_key_pair,
+        None,
+        get_sample_pepper(),
+        zk_sig,
+    )
+    .unwrap();
+    let local_account = LocalAccount::new_keyless(
+        keyless_account.authentication_key().account_address(),
+        keyless_account,
         0,
     );
 
-    println!("Actual address: {}", addr.to_hex());
-    println!("Account address: {}", account.address().to_hex());
+    println!("Account address: {}", local_account.address().to_hex());
 
-    account
+    local_account
 }
 
-fn spend_keyless_account(
+fn get_signed_txn_from_keyless_sig(
     h: &mut MoveHarness,
     mut sig: KeylessSignature,
     account: &Account,
@@ -415,7 +450,7 @@ fn spend_keyless_account(
     }
     sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
 
-    let transaction = match account.pubkey.as_keyless().unwrap() {
+    let transaction = match account.account.keyless_public_key() {
         AnyKeylessPublicKey::Normal(pk) => SignedTransaction::new_keyless(raw_txn, pk, sig),
         AnyKeylessPublicKey::Federated(pk) => {
             SignedTransaction::new_federated_keyless(raw_txn, pk, sig)
@@ -428,39 +463,73 @@ fn spend_keyless_account(
     transaction
 }
 
-fn create_federated_keyless_account(
+fn get_signed_transaction(
     h: &mut MoveHarness,
-    jwk_addr: AccountAddress,
-    pk: KeylessPublicKey,
-) -> Account {
-    let fed_pk = FederatedKeylessPublicKey { jwk_addr, pk };
-    let addr = AuthenticationKey::any_key(AnyPublicKey::federated_keyless(fed_pk.clone()))
-        .account_address();
-    let account = h.store_and_fund_account(
-        &Account::new_from_addr(
-            addr,
-            AccountPublicKey::AnyPublicKey(AnyPublicKey::FederatedKeyless { public_key: fed_pk }),
-        ),
-        100000000,
+    account: &Account,
+    recipient: AccountAddress,
+) -> SignedTransaction {
+    let payload = aptos_stdlib::aptos_coin_transfer(recipient, 1);
+    //println!("Payload: {:?}", payload);
+    let raw_txn = TransactionBuilder::new(account.clone())
+        .payload(payload)
+        .sequence_number(h.sequence_number(account.address()))
+        .max_gas_amount(1_000_000)
+        .gas_unit_price(1)
+        .raw();
+
+    let txn = account.account.sign_transaction(raw_txn);
+
+    println!(
+        "Submitted TXN hash: {}",
+        Transaction::UserTransaction(txn.clone()).hash()
+    );
+    txn
+}
+
+fn get_test_federated_keyless_account(jwk_addr: AccountAddress) -> LocalAccount {
+    let esk = EphemeralPrivateKey::Ed25519 {
+        inner_private_key: get_sample_esk(),
+    };
+    let ephemeral_key_pair = EphemeralKeyPair::new_with_keyless_config(
+        &Configuration::new_for_testing(),
+        esk,
+        get_sample_exp_date(),
+        get_sample_epk_blinder(),
+    )
+    .unwrap();
+    let fed_keyless_account = FederatedKeylessAccount::new_from_jwt(
+        &get_sample_jwt_token(),
+        ephemeral_key_pair,
+        jwk_addr,
+        None,
+        get_sample_pepper(),
+        get_sample_zk_sig(),
+    )
+    .unwrap();
+    let local_account = LocalAccount::new_federated_keyless(
+        fed_keyless_account.authentication_key().account_address(),
+        fed_keyless_account,
         0,
     );
 
-    println!("Actual address: {}", addr.to_hex());
-    println!("Account address: {}", account.address().to_hex());
+    println!("Account address: {}", local_account.address().to_hex());
 
-    account
+    local_account
 }
 
 /// Creates and funds a new account at `pk` and sends coins to `recipient`.
 fn create_and_spend_keyless_account(
     h: &mut MoveHarness,
     sig: KeylessSignature,
-    pk: KeylessPublicKey,
     recipient: AccountAddress,
 ) -> SignedTransaction {
-    let account = create_keyless_account(h, pk);
-
-    spend_keyless_account(h, sig, &account, recipient)
+    let local_account = get_test_keyless_account(get_sample_zk_sig());
+    let account = h.store_and_fund_account(
+        &Account::new_from_local_account(local_account),
+        100000000,
+        0,
+    );
+    get_signed_txn_from_keyless_sig(h, sig, &account, recipient)
 }
 
 /// Sets the keyless configuration
