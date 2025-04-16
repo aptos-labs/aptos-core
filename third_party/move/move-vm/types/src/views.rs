@@ -1,7 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{delayed_values::delayed_field_id::DelayedFieldID, values::LEGACY_CLOSURE_SIZE};
+use crate::delayed_values::delayed_field_id::DelayedFieldID;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
     account_address::AccountAddress, gas_algebra::AbstractMemorySize, language_storage::TypeTag,
@@ -32,7 +32,17 @@ pub trait ValueView {
     /// TODO(Gas): Encourage clients to replicate this in their own repo and get this removed once
     ///            they are done.
     fn legacy_abstract_memory_size(&self) -> AbstractMemorySize {
-        use crate::values::{LEGACY_CONST_SIZE, LEGACY_REFERENCE_SIZE, LEGACY_STRUCT_SIZE};
+        /// The size in bytes for a non-string or address constant on the stack
+        const LEGACY_CONST_SIZE: AbstractMemorySize = AbstractMemorySize::new(16);
+
+        /// The size in bytes for a reference on the stack
+        const LEGACY_REFERENCE_SIZE: AbstractMemorySize = AbstractMemorySize::new(8);
+
+        /// The size of a struct in bytes
+        const LEGACY_STRUCT_SIZE: AbstractMemorySize = AbstractMemorySize::new(2);
+
+        /// The size of a closure in bytes
+        const LEGACY_CLOSURE_SIZE: AbstractMemorySize = AbstractMemorySize::new(6);
 
         struct Acc(AbstractMemorySize);
 
