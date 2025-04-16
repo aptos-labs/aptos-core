@@ -57,8 +57,10 @@ impl HealthChecker {
                 Ok(())
             },
             HealthChecker::DataServiceGrpc(url) => {
-                let mut backoff = backoff::ExponentialBackoff::default();
-                backoff.max_elapsed_time = Some(Duration::from_secs(5));
+                let backoff = backoff::ExponentialBackoff {
+                    max_elapsed_time: Some(Duration::from_secs(5)),
+                    ..Default::default()
+                };
                 backoff::future::retry(backoff, || async {
                     let transaction_stream_config = TransactionStreamConfig {
                         indexer_grpc_data_service_address: url.clone(),

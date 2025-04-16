@@ -30,7 +30,6 @@ aptos-genesis = { workspace = true }
 aptos-github-client = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-indexer-grpc-server-framework = { workspace = true }
-aptos-indexer-grpc-utils = { workspace = true }
 aptos-indexer-processor-sdk = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-ledger = { workspace = true }
@@ -39,7 +38,6 @@ aptos-logger = { workspace = true }
 aptos-move-debugger = { workspace = true }
 aptos-network-checker = { workspace = true }
 aptos-node = { workspace = true }
-aptos-protos = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-storage-interface = { workspace = true }
@@ -107,7 +105,6 @@ tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
-tonic = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 url = { workspace = true }
