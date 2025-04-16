@@ -169,7 +169,7 @@ fn run_benchmark(
     options.setup_logging();
 
     let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
-    let env = move_prover::create_move_prover_v2_model(&mut error_writer, options.clone())?;
+    let env = move_prover::create_move_prover_v2_model(&mut error_writer, options.clone(), vec![])?;
     check_errors(&env, &options, &mut error_writer, "unexpected build errors")?;
 
     let config_descr = if let Some(config) = config_file_opt {
