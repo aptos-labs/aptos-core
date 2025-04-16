@@ -2,10 +2,13 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::values::*;
+use crate::{delayed_values::delayed_field_id::DelayedFieldID, values::*};
 use claims::{assert_err, assert_ok};
 use move_binary_format::errors::*;
-use move_core_types::{account_address::AccountAddress, int256::U256};
+use move_core_types::{
+    account_address::AccountAddress,
+    int256::{I256, U256},
+};
 
 #[test]
 fn locals() -> PartialVMResult<()> {
@@ -171,8 +174,18 @@ fn test_mem_swap() -> PartialVMResult<()> {
     locals.store_loc(11, Value::master_signer(AccountAddress::ONE))?;
 
     // -- Container of vector
-    locals.store_loc(12, Value::vector_u64(vec![1, 2]))?;
-    locals.store_loc(13, Value::vector_u64(vec![3, 4]))?;
+    locals.store_loc(
+        12,
+        Value::vector_unchecked(vec![Value::DelayedFieldID {
+            id: DelayedFieldID::from(1),
+        }])?,
+    )?;
+    locals.store_loc(
+        13,
+        Value::vector_unchecked(vec![Value::DelayedFieldID {
+            id: DelayedFieldID::from(2),
+        }])?,
+    )?;
     locals.store_loc(
         14,
         Value::vector_unchecked(vec![Value::master_signer(AccountAddress::ZERO)]).unwrap(),
@@ -216,8 +229,200 @@ fn test_mem_swap() -> PartialVMResult<()> {
     Ok(())
 }
 
+#[test]
+fn test_vector_unchecked() {
+    assert_err!(Value::vector_unchecked(vec![Value::bool(true)]));
+    assert_err!(Value::vector_unchecked(vec![Value::u8(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::u16(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::u32(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::u64(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::u128(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::u256(U256::ONE)]));
+    assert_err!(Value::vector_unchecked(vec![Value::i8(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::i16(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::i32(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::i64(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::i128(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::i256(I256::ONE)]));
+    assert_err!(Value::vector_unchecked(vec![Value::address(
+        AccountAddress::ONE
+    )]));
+
+    assert_ok!(Value::vector_unchecked(vec![Value::delayed_value(
+        DelayedFieldID::from(0)
+    )]));
+    assert_ok!(Value::vector_unchecked(vec![Value::vector_u8(vec![1, 2])]));
+    assert_ok!(Value::vector_unchecked(vec![Value::vector_i8(vec![1, 2])]));
+    assert_ok!(Value::vector_unchecked(vec![Value::struct_(Struct::pack(
+        vec![Value::u128(1), Value::u8(0)]
+    ))]));
+}
+
 #[cfg(test)]
-mod native_values {
+mod indexed_ref_tests {
+    use crate::{
+        delayed_values::delayed_field_id::DelayedFieldID,
+        values::{AbstractFunction, Locals, Struct, StructRef, Value, VectorRef},
+    };
+    use better_any::{Tid, TidAble};
+    use claims::{assert_matches, assert_ok};
+    use move_binary_format::errors::PartialVMResult;
+    use move_core_types::{
+        account_address::AccountAddress,
+        function::ClosureMask,
+        int256::{I256, U256},
+    };
+    use std::cmp::Ordering;
+
+    #[derive(Clone, Tid)]
+    struct MockAbstractFunction;
+
+    impl AbstractFunction for MockAbstractFunction {
+        fn closure_mask(&self) -> ClosureMask {
+            unreachable!()
+        }
+
+        fn cmp_dyn(&self, _other: &dyn AbstractFunction) -> PartialVMResult<Ordering> {
+            unreachable!()
+        }
+
+        fn clone_dyn(&self) -> PartialVMResult<Box<dyn AbstractFunction>> {
+            unreachable!()
+        }
+
+        fn to_canonical_string(&self) -> String {
+            unreachable!()
+        }
+    }
+
+    fn test_locals_or_struct_fields() -> Vec<(bool, Value)> {
+        vec![
+            // Primitives.
+            (true, Value::bool(true)),
+            (true, Value::u8(1)),
+            (true, Value::u16(1)),
+            (true, Value::u32(1)),
+            (true, Value::u64(1)),
+            (true, Value::u128(1)),
+            (true, Value::u256(U256::ONE)),
+            (true, Value::i8(1)),
+            (true, Value::i16(1)),
+            (true, Value::i32(1)),
+            (true, Value::i64(1)),
+            (true, Value::i128(1)),
+            (true, Value::i256(I256::ONE)),
+            (true, Value::address(AccountAddress::ONE)),
+            (true, Value::delayed_value(DelayedFieldID::from(0))),
+            (true, Value::closure(Box::new(MockAbstractFunction), vec![])),
+            // Non-primitives.
+            (false, Value::vector_u8(vec![1, 2, 3])),
+            (false, Value::struct_(Struct::pack(vec![Value::bool(true)]))),
+        ]
+    }
+
+    fn test_vectors() -> Vec<(bool, Value)> {
+        vec![
+            // Primitives.
+            (true, Value::vector_bool(vec![false])),
+            (true, Value::vector_u8(vec![1])),
+            (true, Value::vector_u16(vec![1])),
+            (true, Value::vector_u32(vec![1])),
+            (true, Value::vector_u64(vec![1])),
+            (true, Value::vector_u128(vec![1])),
+            (true, Value::vector_u256(vec![U256::ONE])),
+            (true, Value::vector_i8(vec![1])),
+            (true, Value::vector_i16(vec![1])),
+            (true, Value::vector_i32(vec![1])),
+            (true, Value::vector_i64(vec![1])),
+            (true, Value::vector_i128(vec![1])),
+            (true, Value::vector_i256(vec![I256::ONE])),
+            (true, Value::vector_address(vec![AccountAddress::ONE])),
+            (
+                true,
+                Value::vector_unchecked(vec![Value::closure(
+                    Box::new(MockAbstractFunction),
+                    vec![],
+                )])
+                .unwrap(),
+            ),
+            // Non-primitives.
+            (
+                false,
+                Value::vector_unchecked(vec![Value::vector_u8(vec![1, 2, 3])]).unwrap(),
+            ),
+            (
+                false,
+                Value::vector_unchecked(vec![Value::vector_i8(vec![1, 2, 3])]).unwrap(),
+            ),
+            (
+                false,
+                Value::vector_unchecked(vec![Value::struct_(Struct::pack(vec![Value::bool(
+                    true,
+                )]))])
+                .unwrap(),
+            ),
+        ]
+    }
+
+    #[test]
+    fn test_locals_indexed_ref() {
+        let values = test_locals_or_struct_fields();
+
+        let mut locals = Locals::new(values.len());
+        for (idx, (is_indexed_ref, value)) in values.into_iter().enumerate() {
+            assert_ok!(locals.store_loc(idx, value));
+            let reference = assert_ok!(locals.borrow_loc(idx));
+            if is_indexed_ref {
+                assert_matches!(reference, Value::IndexedRef(_));
+            } else {
+                assert_matches!(reference, Value::ContainerRef(_));
+            }
+        }
+    }
+
+    #[test]
+    fn test_struct_indexed_ref() {
+        let values = test_locals_or_struct_fields();
+
+        let mut locals = Locals::new(values.len());
+        for (idx, (is_indexed_ref, value)) in values.into_iter().enumerate() {
+            assert_ok!(locals.store_loc(idx, Value::struct_(Struct::pack(vec![value]))));
+
+            let reference = assert_ok!(locals.borrow_loc(idx));
+            let struct_ref = assert_ok!(reference.value_as::<StructRef>());
+            let field = assert_ok!(struct_ref.borrow_field(0));
+
+            if is_indexed_ref {
+                assert_matches!(field, Value::IndexedRef(_));
+            } else {
+                assert_matches!(field, Value::ContainerRef(_));
+            }
+        }
+    }
+
+    #[test]
+    fn test_vector_indexed_ref() {
+        let values = test_vectors();
+
+        let mut locals = Locals::new(values.len());
+        for (idx, (is_indexed_ref, value)) in values.into_iter().enumerate() {
+            assert_ok!(locals.store_loc(idx, value));
+
+            let reference = assert_ok!(locals.borrow_loc(idx));
+            let vector_ref = assert_ok!(reference.value_as::<VectorRef>());
+            let elem = assert_ok!(vector_ref.borrow_elem(0));
+
+            if is_indexed_ref {
+                assert_matches!(elem, Value::IndexedRef(_));
+            } else {
+                assert_matches!(elem, Value::ContainerRef(_));
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod delayed_fields {
     use super::*;
     use crate::delayed_values::delayed_field_id::{
         DelayedFieldID, ExtractUniqueIndex, ExtractWidth,
@@ -237,7 +442,12 @@ mod native_values {
         assert_err!(Value::u32(0).equals(&v));
         assert_err!(Value::u64(0).equals(&v));
         assert_err!(Value::u128(0).equals(&v));
-        assert_err!(Value::u256(U256::ZERO).equals(&v));
+        assert_err!(Value::i8(0).equals(&v));
+        assert_err!(Value::i16(0).equals(&v));
+        assert_err!(Value::i32(0).equals(&v));
+        assert_err!(Value::i64(0).equals(&v));
+        assert_err!(Value::i128(0).equals(&v));
+        assert_err!(Value::i256(I256::ZERO).equals(&v));
 
         assert_err!(Value::address(AccountAddress::ONE).equals(&v));
         assert_err!(Value::master_signer(AccountAddress::ONE).equals(&v));
@@ -251,6 +461,12 @@ mod native_values {
         assert_err!(Value::vector_u64(vec![0, 1]).equals(&v));
         assert_err!(Value::vector_u128(vec![0, 1]).equals(&v));
         assert_err!(Value::vector_u256(vec![U256::ZERO, U256::ONE]).equals(&v));
+        assert_err!(Value::vector_i8(vec![0, 1]).equals(&v));
+        assert_err!(Value::vector_i16(vec![0, 1]).equals(&v));
+        assert_err!(Value::vector_i32(vec![0, 1]).equals(&v));
+        assert_err!(Value::vector_i64(vec![0, 1]).equals(&v));
+        assert_err!(Value::vector_i128(vec![0, 1]).equals(&v));
+        assert_err!(Value::vector_i256(vec![I256::ZERO, I256::ONE]).equals(&v));
 
         assert_err!(
             Value::vector_address(vec![AccountAddress::ONE, AccountAddress::TWO]).equals(&v)

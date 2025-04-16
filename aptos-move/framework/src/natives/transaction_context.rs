@@ -295,25 +295,22 @@ fn native_chain_id_internal(
     }
 }
 
-fn create_option_some_unchecked(enum_option_enabled: bool, value: Value) -> Value {
-    if enum_option_enabled {
+fn create_option_some(enum_option_enabled: bool, value: Value) -> PartialVMResult<Value> {
+    Ok(if enum_option_enabled {
         Value::struct_(Struct::pack_variant(OPTION_SOME_TAG, vec![value]))
     } else {
-        Value::struct_(Struct::pack(vec![Value::vector_unchecked(vec![value])
-            .expect(
-                "The caller must ensure that the type of the value is valid for `Value` vector",
-            )]))
-    }
+        // Note: the collection is homogeneous because it contains only one value.
+        Value::struct_(Struct::pack(vec![Value::vector_unchecked(vec![value])?]))
+    })
 }
 
-fn create_option_none_unchecked(enum_option_enabled: bool) -> Value {
-    if enum_option_enabled {
+fn create_option_none(enum_option_enabled: bool) -> PartialVMResult<Value> {
+    Ok(if enum_option_enabled {
         Value::struct_(Struct::pack_variant(OPTION_NONE_TAG, vec![]))
     } else {
-        Value::struct_(Struct::pack(vec![Value::vector_unchecked(vec![]).expect(
-            "The caller must ensure that the type of the value is valid for `Value` vector",
-        )]))
-    }
+        // We are creating empty vector - this is safe to do.
+        Value::struct_(Struct::pack(vec![Value::vector_unchecked(vec![])?]))
+    })
 }
 
 fn create_string_value(s: String) -> Value {
@@ -355,6 +352,7 @@ fn create_entry_function_payload(
         Value::address(entry_function_payload.account_address),
         create_string_value(entry_function_payload.module_name),
         create_string_value(entry_function_payload.function_name),
+        // SAFETY: both type arguments and arguments are homogeneous collections.
         Value::vector_unchecked(ty_args)?,
         Value::vector_unchecked(args)?,
     ])))
@@ -377,14 +375,9 @@ fn native_entry_function_payload_internal(
                     * NumBytes::new(num_bytes as u64),
             )?;
             let payload = create_entry_function_payload(entry_function_payload)?;
-            // SAFETY: payload is a struct, so it is ok to create a vector out of it. Same applies
-            //         for the None option below.
-            Ok(smallvec![create_option_some_unchecked(
-                enum_option_enabled,
-                payload
-            )])
+            Ok(smallvec![create_option_some(enum_option_enabled, payload)?])
         } else {
-            Ok(smallvec![create_option_none_unchecked(enum_option_enabled)])
+            Ok(smallvec![create_option_none(enum_option_enabled)?])
         }
     } else {
         Err(SafeNativeError::Abort {
@@ -413,20 +406,20 @@ fn native_multisig_payload_internal(
                     )?;
                     let inner_entry_fun_payload =
                         create_entry_function_payload(entry_function_payload)?;
-                    create_option_some_unchecked(enum_option_enabled, inner_entry_fun_payload)
+                    create_option_some(enum_option_enabled, inner_entry_fun_payload)?
                 } else {
-                    create_option_none_unchecked(enum_option_enabled)
+                    create_option_none(enum_option_enabled)?
                 };
             let multisig_payload = Value::struct_(Struct::pack(vec![
                 Value::address(multisig_payload.multisig_address),
                 inner_entry_fun_payload,
             ]));
-            Ok(smallvec![create_option_some_unchecked(
+            Ok(smallvec![create_option_some(
                 enum_option_enabled,
                 multisig_payload
-            )])
+            )?])
         } else {
-            Ok(smallvec![create_option_none_unchecked(enum_option_enabled)])
+            Ok(smallvec![create_option_none(enum_option_enabled)?])
         }
     } else {
         Err(SafeNativeError::Abort {
