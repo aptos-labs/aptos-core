@@ -7742,7 +7742,9 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-language-e2e-tests",
  "aptos-package-builder",
+ "aptos-rest-client",
  "aptos-transaction-generator-lib",
+ "aptos-transaction-simulation",
  "aptos-transaction-workloads-lib",
  "aptos-types",
  "aptos-vm",
@@ -7764,6 +7766,7 @@ dependencies = [
  "serde",
  "sha3 0.9.1",
  "test-case",
+ "tokio",
 ]
 
 [[package]]
