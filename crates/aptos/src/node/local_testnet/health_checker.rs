@@ -71,7 +71,7 @@ impl HealthChecker {
                         indexer_grpc_http2_ping_timeout_secs: 60,
                         indexer_grpc_response_item_timeout_secs: 60,
                         indexer_grpc_reconnection_timeout_secs: 60,
-                        reconnection_max_retries: Default::default(),
+                        indexer_grpc_reconnection_max_retries: Default::default(),
                         transaction_filter: None,
                     };
                     get_chain_id(transaction_stream_config)
