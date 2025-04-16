@@ -78,7 +78,7 @@ fn start_processor(
                 indexer_grpc_http2_ping_timeout_secs: Default::default(),
                 indexer_grpc_reconnection_timeout_secs: Default::default(),
                 indexer_grpc_response_item_timeout_secs: 10,
-                reconnection_max_retries: 5,
+                indexer_grpc_reconnection_max_retries: Default::default(),
                 transaction_filter: Default::default(),
             },
             db_config: DbConfig::PostgresConfig(PostgresConfig {
