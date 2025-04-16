@@ -762,7 +762,6 @@ serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev =
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 serde_with = "3.4.0"
 serde_yaml = "0.8.24"
-server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "bf4dd89677e6929ef21f898a7a4176514e606ebd" }
 set_env = "1.3.4"
 shadow-rs = "0.16.2"
 simplelog = "0.9.0"

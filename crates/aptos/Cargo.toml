@@ -99,7 +99,6 @@ self_update = { git = "https://github.com/banool/self_update.git", rev = "830615
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
-server-framework = { workspace = true }
 set_env = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
