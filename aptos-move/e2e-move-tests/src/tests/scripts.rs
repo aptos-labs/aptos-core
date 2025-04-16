@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_success, build_package, tests::common, MoveHarness};
 use aptos_language_e2e_tests::account::TransactionBuilder;
 use aptos_types::{
@@ -9,13 +10,49 @@ use aptos_types::{
     transaction::{Script, TransactionArgument, TransactionStatus},
 };
 use move_core_types::{language_storage::TypeTag, value::MoveValue};
+use rstest::rstest;
 
-#[test]
-fn test_script_with_object_parameter() {
-    let mut h = MoveHarness::new();
+#[rstest(
+    alice_stateless_account,
+    bob_stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true)
+)]
+fn test_script_with_object_parameter(
+    alice_stateless_account: bool,
+    bob_stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap());
+    let alice = h.new_account_with_key_pair(
+        if alice_stateless_account {
+            None
+        } else {
+            Some(0)
+        },
+    );
+    let bob = h.new_account_at(
+        AccountAddress::from_hex_literal("0xface").unwrap(),
+        if bob_stateless_account {
+            None
+        } else {
+            Some(10)
+        },
+    );
     let root = h.aptos_framework_account();
 
     let mut build_options = aptos_framework::BuildOptions::default();
@@ -96,9 +133,11 @@ fn test_script_with_object_parameter() {
 
     let txn = TransactionBuilder::new(alice.clone())
         .script(script.clone())
-        .sequence_number(13)
+        .sequence_number(3)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
+        .current_time(h.executor.get_block_time_seconds())
+        .upgrade_payload(h.use_txn_payload_v2_format, h.use_orderless_transactions)
         .sign();
 
     let status = h.run(txn);
@@ -108,20 +147,36 @@ fn test_script_with_object_parameter() {
 
     let txn = TransactionBuilder::new(alice.clone())
         .script(script.clone())
-        .sequence_number(14)
+        .sequence_number(4)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
+        .current_time(h.executor.get_block_time_seconds())
+        .upgrade_payload(h.use_txn_payload_v2_format, h.use_orderless_transactions)
         .sign();
 
     let status = h.run(txn);
     assert!(status.is_discarded());
 }
 
-#[test]
-fn test_script_with_type_parameter() {
-    let mut h = MoveHarness::new();
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_script_with_type_parameter(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
+    let alice = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
 
     let package = build_package(
         common::test_dir_path("script_with_ty_param.data/pack"),
@@ -137,21 +192,36 @@ fn test_script_with_type_parameter() {
             std::iter::repeat_with(|| TypeTag::U64).take(33).collect(),
             vec![],
         ))
-        .sequence_number(10)
+        .sequence_number(0)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
+        .current_time(h.executor.get_block_time_seconds())
+        .upgrade_payload(h.use_txn_payload_v2_format, h.use_orderless_transactions)
         .sign();
 
     let status = h.run(txn);
     assert_success!(status);
 }
 
-#[test]
-fn test_script_with_signer_parameter() {
-    let mut h = MoveHarness::new();
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_script_with_signer_parameter(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
-
+    let alice = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
     let package = build_package(
         common::test_dir_path("script_with_signer.data/pack"),
         aptos_framework::BuildOptions::default(),
@@ -169,9 +239,11 @@ fn test_script_with_signer_parameter() {
                     .unwrap(),
             ),
         ]))
-        .sequence_number(10)
+        .sequence_number(0)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
+        .current_time(h.executor.get_block_time_seconds())
+        .upgrade_payload(h.use_txn_payload_v2_format, h.use_orderless_transactions)
         .sign();
 
     let status = h.run(txn);
@@ -185,14 +257,50 @@ fn test_script_with_signer_parameter() {
     );
 }
 
-#[test]
-fn test_two_to_two_transfer() {
-    let mut h = MoveHarness::new();
+#[rstest(
+    alice_stateless_account,
+    bob_stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true)
+)]
+fn test_two_to_two_transfer(
+    alice_stateless_account: bool,
+    bob_stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
-    let carol = h.new_account_at(AccountAddress::from_hex_literal("0xca501").unwrap());
-    let david = h.new_account_at(AccountAddress::from_hex_literal("0xda51d").unwrap());
+    let alice = h.new_account_with_key_pair(
+        if alice_stateless_account {
+            None
+        } else {
+            Some(0)
+        },
+    );
+    let bob = h.new_account_with_key_pair(if bob_stateless_account { None } else { Some(0) });
+
+    // let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap(), if bob_stateless_account { None } else { Some(0)});
+    let carol = h.new_account_at(
+        AccountAddress::from_hex_literal("0xca501").unwrap(),
+        Some(0),
+    );
+    let david = h.new_account_at(
+        AccountAddress::from_hex_literal("0xda51d").unwrap(),
+        Some(0),
+    );
 
     let amount_alice = 100;
     let amount_bob = 200;
@@ -227,13 +335,19 @@ fn test_two_to_two_transfer() {
         TransactionArgument::U64(amount_carol),
     ]);
 
-    let transaction = TransactionBuilder::new(alice.clone())
+    let mut transaction_builder = TransactionBuilder::new(alice.clone())
         .secondary_signers(vec![bob.clone()])
         .script(script)
-        .sequence_number(h.sequence_number(alice.address()))
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
-        .sign_multi_agent();
+        .current_time(h.executor.get_block_time_seconds())
+        .upgrade_payload(h.use_txn_payload_v2_format, h.use_orderless_transactions);
+
+    if !h.use_orderless_transactions {
+        transaction_builder = transaction_builder
+            .sequence_number(h.sequence_number_opt(alice.address()).unwrap_or(0));
+    }
+    let transaction = transaction_builder.sign_multi_agent();
 
     let output = h.executor.execute_transaction(transaction);
     assert_success!(output.status().to_owned());

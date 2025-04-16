@@ -3,12 +3,12 @@
 
 use crate::{assert_abort, assert_success, tests::common, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
+use aptos_framework::BuildOptions;
 use aptos_language_e2e_tests::{
     account::{Account, TransactionBuilder},
     transaction_status_eq,
 };
 use aptos_types::{
-    account_address::AccountAddress,
     account_config::CoinStoreResource,
     move_utils::MemberId,
     on_chain_config::FeatureFlag,
@@ -18,6 +18,7 @@ use aptos_types::{
 use aptos_vm_types::storage::StorageGasParameters;
 use move_core_types::{move_resource::MoveStructType, vm_status::StatusCode};
 use once_cell::sync::Lazy;
+use rstest::rstest;
 
 // Fee payer has several modes and requires several tests to validate:
 // Account exists:
@@ -31,9 +32,24 @@ use once_cell::sync::Lazy;
 // likely a duplicate of the first out of gas, but included.
 // * Invalid transactions are discarded during prologue, specifically the special case of seq num 0
 
-#[test]
-fn test_existing_account_with_fee_payer() {
-    let mut h = MoveHarness::new_with_features(
+#[rstest(
+    bob_stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_existing_account_with_fee_payer(
+    bob_stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(
         vec![
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
@@ -41,8 +57,8 @@ fn test_existing_account_with_fee_payer() {
         vec![],
     );
 
-    let alice = h.new_account_with_balance_and_sequence_number(0, 0);
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
+    let alice = h.new_account_with_balance_and_sequence_number(0, Some(0));
+    let bob = h.new_account_with_key_pair(if bob_stateless_account { None } else { Some(0) });
 
     let alice_start = h.read_aptos_balance(alice.address());
     let bob_start = h.read_aptos_balance(bob.address());
@@ -51,9 +67,11 @@ fn test_existing_account_with_fee_payer() {
     let transaction = TransactionBuilder::new(alice.clone())
         .fee_payer(bob.clone())
         .payload(payload)
-        .sequence_number(h.sequence_number(alice.address()))
         .max_gas_amount(PRICING.new_account_upfront(1) - 100)
         .gas_unit_price(1)
+        .sequence_number(0)
+        .current_time(h.executor.get_block_time_seconds())
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign_fee_payer();
 
     let output = h.run_raw(transaction);
@@ -66,9 +84,24 @@ fn test_existing_account_with_fee_payer() {
     assert!(bob_start > bob_after);
 }
 
-#[test]
-fn test_existing_account_with_fee_payer_aborts() {
-    let mut h = MoveHarness::new_with_features(
+#[rstest(
+    bob_stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_existing_account_with_fee_payer_aborts(
+    bob_stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(
         vec![
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
@@ -76,8 +109,8 @@ fn test_existing_account_with_fee_payer_aborts() {
         vec![],
     );
 
-    let alice = h.new_account_with_balance_and_sequence_number(0, 0);
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
+    let alice = h.new_account_with_balance_and_sequence_number(0, Some(0));
+    let bob = h.new_account_with_key_pair(if bob_stateless_account { None } else { Some(0) });
 
     let alice_start = h.read_aptos_balance(alice.address());
     let bob_start = h.read_aptos_balance(bob.address());
@@ -86,9 +119,11 @@ fn test_existing_account_with_fee_payer_aborts() {
     let transaction = TransactionBuilder::new(alice.clone())
         .fee_payer(bob.clone())
         .payload(payload)
-        .sequence_number(h.sequence_number(alice.address()))
+        .sequence_number(0)
         .max_gas_amount(PRICING.new_account_upfront(1) - 100)
         .gas_unit_price(1)
+        .current_time(h.executor.get_block_time_seconds())
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign_fee_payer();
 
     let output = h.run_raw(transaction);
@@ -102,9 +137,24 @@ fn test_existing_account_with_fee_payer_aborts() {
     assert!(bob_start > bob_after);
 }
 
-#[test]
-fn test_account_not_exist_with_fee_payer() {
-    let mut h = MoveHarness::new_with_features(
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_account_not_exist_with_fee_payer(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(
         vec![
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
@@ -113,7 +163,7 @@ fn test_account_not_exist_with_fee_payer() {
     );
 
     let alice = Account::new();
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
+    let bob = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
 
     let alice_start = h.read_resource::<CoinStoreResource<AptosCoinType>>(
         alice.address(),
@@ -129,9 +179,13 @@ fn test_account_not_exist_with_fee_payer() {
         .sequence_number(0)
         .max_gas_amount(PRICING.new_account_upfront(1))
         .gas_unit_price(1)
+        .current_time(h.executor.get_block_time_seconds())
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign_fee_payer();
 
     let output = h.run_raw(transaction);
+    println!("output gas used {:?}", output.gas_used());
+    println!("new account upfront {:?}", PRICING.new_account_upfront(1));
     assert_success!(*output.status());
 
     let alice_after = h.read_resource::<CoinStoreResource<AptosCoinType>>(
@@ -144,9 +198,22 @@ fn test_account_not_exist_with_fee_payer() {
     assert!(bob_start > bob_after);
 }
 
-#[test]
-fn test_account_not_exist_with_fee_payer_insufficient_gas() {
-    let mut h = MoveHarness::new_with_features(
+// Orderless transactions don't trigger account creation. So, not testing for these cases.
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    // case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    // case(false, true, true),
+)]
+fn test_account_not_exist_with_fee_payer_insufficient_gas(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(
         vec![
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
@@ -155,7 +222,7 @@ fn test_account_not_exist_with_fee_payer_insufficient_gas() {
     );
 
     let alice = Account::new();
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
+    let bob = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
 
     let alice_start = h.read_resource::<CoinStoreResource<AptosCoinType>>(
         alice.address(),
@@ -171,6 +238,8 @@ fn test_account_not_exist_with_fee_payer_insufficient_gas() {
         .sequence_number(0)
         .max_gas_amount(PRICING.new_account_upfront(1) - 1) // This is not enough to execute this transaction
         .gas_unit_price(1)
+        .current_time(h.executor.get_block_time_seconds())
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign_fee_payer();
 
     let output = h.run_raw(transaction);
@@ -188,9 +257,22 @@ fn test_account_not_exist_with_fee_payer_insufficient_gas() {
     assert_eq!(bob_start, bob_after);
 }
 
-#[test]
-fn test_account_not_exist_and_move_abort_with_fee_payer_create_account() {
-    let mut h = MoveHarness::new_with_features(
+// Orderless transactions don't trigger account creation. So, not testing for these cases.
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    // case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    // case(false, true, true),
+)]
+fn test_account_not_exist_and_move_abort_with_fee_payer_create_account(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(
         vec![
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
@@ -199,7 +281,7 @@ fn test_account_not_exist_and_move_abort_with_fee_payer_create_account() {
     );
 
     let alice = Account::new();
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
+    let bob = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
 
     let alice_start = h.read_resource::<CoinStoreResource<AptosCoinType>>(
         alice.address(),
@@ -227,6 +309,8 @@ fn test_account_not_exist_and_move_abort_with_fee_payer_create_account() {
         .sequence_number(0)
         .max_gas_amount(PRICING.new_account_upfront(GAS_UNIT_PRICE))
         .gas_unit_price(GAS_UNIT_PRICE)
+        .current_time(h.executor.get_block_time_seconds())
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign_fee_payer();
 
     let output = h.run_raw(transaction);
@@ -245,13 +329,28 @@ fn test_account_not_exist_and_move_abort_with_fee_payer_create_account() {
     assert!(alice_after.is_none());
     let bob_after = h.read_aptos_balance(bob.address());
 
-    assert_eq!(h.sequence_number(alice.address()), 1);
+    assert_eq!(h.sequence_number_opt(alice.address()).unwrap(), 1);
     assert!(bob_start > bob_after);
 }
 
-#[test]
-fn test_account_not_exist_out_of_gas_with_fee_payer() {
-    let mut h = MoveHarness::new_with_features(
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_account_not_exist_out_of_gas_with_fee_payer(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(
         vec![
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
@@ -260,26 +359,33 @@ fn test_account_not_exist_out_of_gas_with_fee_payer() {
     );
 
     let alice = Account::new();
-    let beef = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
+    let bob = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
 
     // Load the code
-    assert_success!(h.publish_package_cache_building(
-        &beef,
+    let mut build_options = BuildOptions::default();
+    build_options
+        .named_addresses
+        .insert("publisher".to_string(), *bob.address());
+    assert_success!(h.publish_package_with_options(
+        &bob,
         &common::test_dir_path("infinite_loop.data/empty_loop"),
+        build_options,
     ));
 
     let MemberId {
         module_id,
         member_id,
-    } = str::parse("0xbeef::test::run").unwrap();
+    } = str::parse(&format!("{}::test::run", bob.address())).unwrap();
     let payload =
         TransactionPayload::EntryFunction(EntryFunction::new(module_id, member_id, vec![], vec![]));
     let transaction = TransactionBuilder::new(alice.clone())
-        .fee_payer(beef.clone())
+        .fee_payer(bob.clone())
         .payload(payload)
         .sequence_number(0)
         .max_gas_amount(PRICING.new_account_upfront(1)) // This is the minimum to execute this transaction
         .gas_unit_price(1)
+        .current_time(h.executor.get_block_time_seconds())
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign_fee_payer();
     let result = h.run_raw(transaction);
 
@@ -291,9 +397,24 @@ fn test_account_not_exist_out_of_gas_with_fee_payer() {
     );
 }
 
-#[test]
-fn test_account_not_exist_move_abort_with_fee_payer_out_of_gas() {
-    let mut h = MoveHarness::new_with_features(
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_account_not_exist_move_abort_with_fee_payer_out_of_gas(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(
         vec![
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
@@ -302,51 +423,74 @@ fn test_account_not_exist_move_abort_with_fee_payer_out_of_gas() {
     );
 
     let alice = Account::new();
-    let cafe = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-
-    assert_success!(h.publish_package_cache_building(
-        &cafe,
+    let bob = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
+    let mut build_options = BuildOptions::default();
+    build_options
+        .named_addresses
+        .insert("publisher".to_string(), *bob.address());
+    assert_success!(h.publish_package_with_options(
+        &bob,
         &common::test_dir_path("storage_refund.data/pack"),
+        build_options,
     ));
 
     // This function allocates plenty of storage slots and will go out of gas if max_gas_amount isn't huge
     let MemberId {
         module_id,
         member_id,
-    } = str::parse("0xcafe::test::init_collection_of_1000").unwrap();
+    } = str::parse(&format!("{}::test::init_collection_of_1000", bob.address())).unwrap();
 
     let payload =
         TransactionPayload::EntryFunction(EntryFunction::new(module_id, member_id, vec![], vec![]));
     let transaction = TransactionBuilder::new(alice.clone())
-        .fee_payer(cafe.clone())
+        .fee_payer(bob.clone())
         .payload(payload.clone())
         .sequence_number(0)
         .max_gas_amount(PRICING.new_account_upfront(1)) // This is the minimum to execute this transaction
         .gas_unit_price(1)
+        .current_time(h.executor.get_block_time_seconds())
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign_fee_payer();
     let result = h.run_raw(transaction);
     assert_eq!(result.gas_used(), PRICING.new_account_upfront(1));
 
     let new_alice = Account::new();
     let transaction = TransactionBuilder::new(new_alice.clone())
-        .fee_payer(cafe.clone())
+        .fee_payer(bob.clone())
         .payload(payload)
         .sequence_number(0)
         .max_gas_amount(PRICING.new_account_upfront(1) + 1)
         .gas_unit_price(1)
+        .current_time(h.executor.get_block_time_seconds())
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign_fee_payer();
     let result = h.run_raw(transaction);
     assert_eq!(result.gas_used(), PRICING.new_account_upfront(1) + 1);
 }
 
-#[test]
-fn test_account_not_exist_with_fee_payer_without_create_account() {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::GAS_PAYER_ENABLED], vec![
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_account_not_exist_with_fee_payer_without_create_account(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(vec![FeatureFlag::GAS_PAYER_ENABLED], vec![
         FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
     ]);
 
     let alice = Account::new();
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
+    let bob = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
 
     let alice_start = h.read_resource::<CoinStoreResource<AptosCoinType>>(
         alice.address(),
@@ -361,18 +505,41 @@ fn test_account_not_exist_with_fee_payer_without_create_account() {
         .sequence_number(0)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
+        .current_time(h.executor.get_block_time_seconds())
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign_fee_payer();
 
     let output = h.run_raw(transaction);
-    assert!(transaction_status_eq(
-        output.status(),
-        &TransactionStatus::Keep(ExecutionStatus::Success),
-    ));
+    // If the sending account doesn't exist, and a transaction with sequence number 0 is sent, the account will be created.
+    assert_success!(*output.status());
 }
 
-#[test]
-fn test_normal_tx_with_fee_payer_insufficient_funds() {
-    let mut h = MoveHarness::new_with_features(
+#[rstest(
+    alice_stateless_account,
+    bob_stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true)
+)]
+fn test_normal_tx_with_fee_payer_insufficient_funds(
+    alice_stateless_account: bool,
+    bob_stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(
         vec![
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
@@ -380,16 +547,27 @@ fn test_normal_tx_with_fee_payer_insufficient_funds() {
         vec![],
     );
 
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
-    let bob = h.new_account_with_balance_and_sequence_number(1, 0);
+    let alice = h.new_account_with_key_pair(
+        if alice_stateless_account {
+            None
+        } else {
+            Some(0)
+        },
+    );
+    let bob = h.new_account_with_balance_and_sequence_number(
+        1,
+        if bob_stateless_account { None } else { Some(0) },
+    );
 
     let payload = aptos_stdlib::aptos_account_set_allow_direct_coin_transfers(true);
     let transaction = TransactionBuilder::new(alice.clone())
         .fee_payer(bob.clone())
         .payload(payload)
-        .sequence_number(h.sequence_number(alice.address()))
+        .sequence_number(0)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
+        .current_time(h.executor.get_block_time_seconds())
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign_fee_payer();
 
     let output = h.run_raw(transaction);

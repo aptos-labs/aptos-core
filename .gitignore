@@ -138,3 +138,5 @@ ecosystem/indexer-grpc/indexer-transaction-generator/*.yaml
 
 # ignore antithesis
 genesis_antithesis_*/
+# proptest regressions
+storage/aptosdb/proptest-regressions/*

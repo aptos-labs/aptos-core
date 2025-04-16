@@ -7,7 +7,7 @@ use super::ungrouped::{
 };
 use aptos_forge::{
     args::TransactionTypeArg, success_criteria::SuccessCriteria, EmitJobMode, EmitJobRequest,
-    EntryPoints, ForgeConfig, TransactionType, WorkflowProgress,
+    EntryPoints, ForgeConfig, ReplayProtectionType, TransactionType, WorkflowProgress,
 };
 use aptos_testcases::{
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
@@ -38,6 +38,7 @@ pub(crate) fn individual_workload_tests(test_name: String) -> ForgeConfig {
                     add_created_accounts_to_pool: true,
                     max_account_working_set: 20_000_000,
                     creation_balance: 200_000_000,
+                    replay_protection: ReplayProtectionType::SequenceNumber,
                 };
                 let write_type = TransactionType::CallCustomModules {
                     entry_point: Box::new(EntryPoints::BytesMakeOrChange {
@@ -45,6 +46,7 @@ pub(crate) fn individual_workload_tests(test_name: String) -> ForgeConfig {
                     }),
                     num_modules: 1,
                     use_account_pool: true,
+                    replay_protection: ReplayProtectionType::SequenceNumber,
                 };
                 job.transaction_mix_per_phase(vec![
                     // warmup
@@ -64,6 +66,7 @@ pub(crate) fn individual_workload_tests(test_name: String) -> ForgeConfig {
                         1000,
                         false,
                         WorkflowProgress::when_done_default(),
+                        ReplayProtectionType::SequenceNumber,
                     ),
                     _ => unreachable!("{}", test_name),
                 })
@@ -93,19 +96,53 @@ pub(crate) fn workload_vs_perf_benchmark() -> ForgeConfig {
         .add_network_test(LoadVsPerfBenchmark {
             test: Box::new(PerformanceBenchmark),
             workloads: Workloads::TRANSACTIONS(vec![
-                TransactionWorkload::new(TransactionTypeArg::NoOp, 20000),
-                TransactionWorkload::new(TransactionTypeArg::NoOp, 20000).with_unique_senders(),
-                TransactionWorkload::new(TransactionTypeArg::NoOp, 20000).with_num_modules(1000),
-                TransactionWorkload::new(TransactionTypeArg::CoinTransfer, 20000)
-                    .with_unique_senders(),
-                TransactionWorkload::new(TransactionTypeArg::CoinTransfer, 20000)
-                    .with_unique_senders(),
-                TransactionWorkload::new(TransactionTypeArg::AccountResource32B, 20000)
-                    .with_unique_senders(),
-                TransactionWorkload::new(TransactionTypeArg::AccountResource1KB, 20000)
-                    .with_unique_senders(),
-                TransactionWorkload::new(TransactionTypeArg::PublishPackage, 20000)
-                    .with_unique_senders(),
+                TransactionWorkload::new(
+                    TransactionTypeArg::NoOp,
+                    ReplayProtectionType::SequenceNumber,
+                    20000,
+                ),
+                TransactionWorkload::new(
+                    TransactionTypeArg::NoOp,
+                    ReplayProtectionType::SequenceNumber,
+                    20000,
+                )
+                .with_unique_senders(),
+                TransactionWorkload::new(
+                    TransactionTypeArg::NoOp,
+                    ReplayProtectionType::SequenceNumber,
+                    20000,
+                )
+                .with_num_modules(1000),
+                TransactionWorkload::new(
+                    TransactionTypeArg::CoinTransfer,
+                    ReplayProtectionType::SequenceNumber,
+                    20000,
+                )
+                .with_unique_senders(),
+                TransactionWorkload::new(
+                    TransactionTypeArg::CoinTransfer,
+                    ReplayProtectionType::SequenceNumber,
+                    20000,
+                )
+                .with_unique_senders(),
+                TransactionWorkload::new(
+                    TransactionTypeArg::AccountResource32B,
+                    ReplayProtectionType::SequenceNumber,
+                    20000,
+                )
+                .with_unique_senders(),
+                TransactionWorkload::new(
+                    TransactionTypeArg::AccountResource1KB,
+                    ReplayProtectionType::SequenceNumber,
+                    20000,
+                )
+                .with_unique_senders(),
+                TransactionWorkload::new(
+                    TransactionTypeArg::PublishPackage,
+                    ReplayProtectionType::SequenceNumber,
+                    20000,
+                )
+                .with_unique_senders(),
             ]),
             criteria: Vec::new(),
             background_traffic: None,

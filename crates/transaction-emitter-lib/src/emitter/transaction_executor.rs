@@ -166,23 +166,15 @@ async fn warn_detailed_error(
     err: Result<&aptos_types::transaction::TransactionInfo, &RestError>,
 ) {
     let sender = txn.sender();
-    use aptos_types::transaction::TransactionPayload::*;
-    let payload = match txn.payload() {
-        Script(_) => "script".to_string(),
-        ModuleBundle(_) => "module_bundle".to_string(),
-        EntryFunction(entry_function) => format!(
-            "entry {}::{}",
-            entry_function.module(),
-            entry_function.function()
-        ),
-        Multisig(_) => "multisig".to_string(),
-    };
+    let payload = txn.payload().payload_type();
     let (last_transactions, seq_num) =
         if let Ok(account) = rest_client.get_account_bcs(sender).await {
             let inner = account.into_inner();
             (
+                // TODO[Orderless]: Fetch previous sequence numbers doesn't make sense for orderless transactions.
+                // What's the alternative?
                 rest_client
-                    .get_account_transactions_bcs(
+                    .get_account_ordered_transactions_bcs(
                         sender,
                         Some(inner.sequence_number().saturating_sub(1)),
                         Some(5),
@@ -206,11 +198,11 @@ async fn warn_detailed_error(
         .map_or(-1, |v| v.into_inner() as i128);
 
     warn!(
-        "[{:?}] Failed {} transaction: {:?}, seq num: {}, payload: {}, gas: unit {} and max {}, for account {}, last seq_num {:?}, balance of {} and last transaction for account: {:?}",
+        "[{:?}] Failed {} transaction: {:?}, replay protector: {}, payload: {}, gas: unit {} and max {}, for account {}, last seq_num {:?}, balance of {} and last transaction for account: {:?}",
         rest_client.path_prefix_string(),
         call_name,
         err,
-        txn.sequence_number(),
+        txn.replay_protector(),
         payload,
         txn.gas_unit_price(),
         txn.max_gas_amount(),

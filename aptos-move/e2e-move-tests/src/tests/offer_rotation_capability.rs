@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_success, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::SigningKey;
@@ -11,6 +12,7 @@ use aptos_types::{
     chain_id::ChainId,
 };
 use move_core_types::parser::parse_struct_tag;
+use rstest::rstest;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -24,11 +26,50 @@ struct RotationCapabilityOfferProofChallengeV2 {
     recipient_address: AccountAddress,
 }
 
-#[test]
-fn offer_rotation_capability_test() {
-    let mut harness = MoveHarness::new();
-    let offerer_account = harness.new_account_with_key_pair();
-    let delegate_account = harness.new_account_with_key_pair();
+// TODO[Orderless]: Revisit this test for stateless accounts.
+// Should the sequence number in the above test be made optional?
+// Will the rotation capability fail for stateless accounts?
+
+#[rstest(
+    offerer_stateless_account,
+    delegate_stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true)
+)]
+fn offer_rotation_capability_test(
+    offerer_stateless_account: bool,
+    delegate_stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut harness =
+        MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let offerer_account = harness.new_account_with_key_pair(
+        if offerer_stateless_account {
+            None
+        } else {
+            Some(0)
+        },
+    );
+    let delegate_account = harness.new_account_with_key_pair(
+        if delegate_stateless_account {
+            None
+        } else {
+            Some(0)
+        },
+    );
 
     offer_rotation_capability_v2(&mut harness, &offerer_account, &delegate_account);
     revoke_rotation_capability(&mut harness, &offerer_account, *delegate_account.address());

@@ -610,6 +610,7 @@ export interface TransactionPayload {
   scriptPayload?: ScriptPayload | undefined;
   writeSetPayload?: WriteSetPayload | undefined;
   multisigPayload?: MultisigPayload | undefined;
+  extraConfigV1?: ExtraConfigV1 | undefined;
 }
 
 export enum TransactionPayload_Type {
@@ -661,6 +662,11 @@ export function transactionPayload_TypeToJSON(object: TransactionPayload_Type): 
     default:
       return "UNRECOGNIZED";
   }
+}
+
+export interface ExtraConfigV1 {
+  multisigAddress?: string | undefined;
+  replayProtectionNonce?: bigint | undefined;
 }
 
 export interface EntryFunctionPayload {
@@ -6045,6 +6051,7 @@ function createBaseTransactionPayload(): TransactionPayload {
     scriptPayload: undefined,
     writeSetPayload: undefined,
     multisigPayload: undefined,
+    extraConfigV1: undefined,
   };
 }
 
@@ -6064,6 +6071,9 @@ export const TransactionPayload = {
     }
     if (message.multisigPayload !== undefined) {
       MultisigPayload.encode(message.multisigPayload, writer.uint32(50).fork()).ldelim();
+    }
+    if (message.extraConfigV1 !== undefined) {
+      ExtraConfigV1.encode(message.extraConfigV1, writer.uint32(58).fork()).ldelim();
     }
     return writer;
   },
@@ -6109,6 +6119,13 @@ export const TransactionPayload = {
           }
 
           message.multisigPayload = MultisigPayload.decode(reader, reader.uint32());
+          continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.extraConfigV1 = ExtraConfigV1.decode(reader, reader.uint32());
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -6162,6 +6179,7 @@ export const TransactionPayload = {
       scriptPayload: isSet(object.scriptPayload) ? ScriptPayload.fromJSON(object.scriptPayload) : undefined,
       writeSetPayload: isSet(object.writeSetPayload) ? WriteSetPayload.fromJSON(object.writeSetPayload) : undefined,
       multisigPayload: isSet(object.multisigPayload) ? MultisigPayload.fromJSON(object.multisigPayload) : undefined,
+      extraConfigV1: isSet(object.extraConfigV1) ? ExtraConfigV1.fromJSON(object.extraConfigV1) : undefined,
     };
   },
 
@@ -6181,6 +6199,9 @@ export const TransactionPayload = {
     }
     if (message.multisigPayload !== undefined) {
       obj.multisigPayload = MultisigPayload.toJSON(message.multisigPayload);
+    }
+    if (message.extraConfigV1 !== undefined) {
+      obj.extraConfigV1 = ExtraConfigV1.toJSON(message.extraConfigV1);
     }
     return obj;
   },
@@ -6203,6 +6224,118 @@ export const TransactionPayload = {
     message.multisigPayload = (object.multisigPayload !== undefined && object.multisigPayload !== null)
       ? MultisigPayload.fromPartial(object.multisigPayload)
       : undefined;
+    message.extraConfigV1 = (object.extraConfigV1 !== undefined && object.extraConfigV1 !== null)
+      ? ExtraConfigV1.fromPartial(object.extraConfigV1)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseExtraConfigV1(): ExtraConfigV1 {
+  return { multisigAddress: undefined, replayProtectionNonce: undefined };
+}
+
+export const ExtraConfigV1 = {
+  encode(message: ExtraConfigV1, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.multisigAddress !== undefined) {
+      writer.uint32(10).string(message.multisigAddress);
+    }
+    if (message.replayProtectionNonce !== undefined) {
+      if (BigInt.asUintN(64, message.replayProtectionNonce) !== message.replayProtectionNonce) {
+        throw new globalThis.Error("value provided for field message.replayProtectionNonce of type uint64 too large");
+      }
+      writer.uint32(16).uint64(message.replayProtectionNonce.toString());
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ExtraConfigV1 {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseExtraConfigV1();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.multisigAddress = reader.string();
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.replayProtectionNonce = longToBigint(reader.uint64() as Long);
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<ExtraConfigV1, Uint8Array>
+  async *encodeTransform(
+    source: AsyncIterable<ExtraConfigV1 | ExtraConfigV1[]> | Iterable<ExtraConfigV1 | ExtraConfigV1[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ExtraConfigV1.encode(p).finish()];
+        }
+      } else {
+        yield* [ExtraConfigV1.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, ExtraConfigV1>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<ExtraConfigV1> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ExtraConfigV1.decode(p)];
+        }
+      } else {
+        yield* [ExtraConfigV1.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): ExtraConfigV1 {
+    return {
+      multisigAddress: isSet(object.multisigAddress) ? globalThis.String(object.multisigAddress) : undefined,
+      replayProtectionNonce: isSet(object.replayProtectionNonce) ? BigInt(object.replayProtectionNonce) : undefined,
+    };
+  },
+
+  toJSON(message: ExtraConfigV1): unknown {
+    const obj: any = {};
+    if (message.multisigAddress !== undefined) {
+      obj.multisigAddress = message.multisigAddress;
+    }
+    if (message.replayProtectionNonce !== undefined) {
+      obj.replayProtectionNonce = message.replayProtectionNonce.toString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ExtraConfigV1>): ExtraConfigV1 {
+    return ExtraConfigV1.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ExtraConfigV1>): ExtraConfigV1 {
+    const message = createBaseExtraConfigV1();
+    message.multisigAddress = object.multisigAddress ?? undefined;
+    message.replayProtectionNonce = object.replayProtectionNonce ?? undefined;
     return message;
   },
 };

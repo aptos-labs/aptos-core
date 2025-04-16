@@ -36,8 +36,8 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        AccountTransactionsWithProof, TransactionListWithProof, TransactionOutputListWithProof,
-        TransactionWithProof, Version,
+        AccountOrderedTransactionsWithProof, IndexedTransactionSummary, TransactionListWithProof,
+        TransactionOutputListWithProof, TransactionWithProof, Version,
     },
 };
 use async_trait::async_trait;
@@ -245,7 +245,7 @@ mock! {
 
         fn get_latest_commit_metadata(&self) -> Result<(Version, u64)>;
 
-        fn get_account_transaction(
+        fn get_account_ordered_transaction(
             &self,
             address: AccountAddress,
             seq_num: u64,
@@ -253,14 +253,23 @@ mock! {
             ledger_version: Version,
         ) -> Result<Option<TransactionWithProof>>;
 
-        fn get_account_transactions(
+        fn get_account_ordered_transactions(
             &self,
             address: AccountAddress,
             seq_num: u64,
             limit: u64,
             include_events: bool,
             ledger_version: Version,
-        ) -> Result<AccountTransactionsWithProof>;
+        ) -> Result<AccountOrderedTransactionsWithProof>;
+
+        fn get_account_transaction_summaries(
+            &self,
+            address: AccountAddress,
+            start_version: Option<u64>,
+            end_version: Option<u64>,
+            limit: u64,
+            ledger_version: Version,
+        ) -> Result<Vec<IndexedTransactionSummary>>;
 
         fn get_state_proof_with_ledger_info(
             &self,
