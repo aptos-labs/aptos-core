@@ -13,6 +13,7 @@ use aptos_types::{
     },
 };
 use better_any::{Tid, TidAble};
+use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{NumArgs, NumBytes};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
@@ -237,29 +238,21 @@ fn native_chain_id_internal(
     }
 }
 
-fn create_option_some_value(value: Value) -> Value {
-    Value::struct_(Struct::pack(vec![create_singleton_vector(value)]))
+fn create_option_some_unchecked(value: Value) -> Value {
+    Value::struct_(Struct::pack(vec![Value::vector_unchecked(vec![value])
+        .expect(
+            "The caller must ensure that the type of the value is valid for `Value` vector",
+        )]))
 }
 
-fn create_option_none() -> Value {
-    Value::struct_(Struct::pack(vec![create_empty_vector()]))
+fn create_option_none_unchecked() -> Value {
+    Value::struct_(Struct::pack(vec![Value::vector_unchecked(vec![]).expect(
+        "The caller must ensure that the type of the value is valid for `Value` vector",
+    )]))
 }
 
 fn create_string_value(s: String) -> Value {
     Value::struct_(Struct::pack(vec![Value::vector_u8(s.as_bytes().to_vec())]))
-}
-
-fn create_vector_value(vv: Vec<Value>) -> Value {
-    // This is safe because this function is only used to create vectors of homogenous values.
-    Value::vector_for_testing_only(vv)
-}
-
-fn create_singleton_vector(v: Value) -> Value {
-    create_vector_value(vec![v])
-}
-
-fn create_empty_vector() -> Value {
-    create_vector_value(vec![])
 }
 
 fn num_bytes_from_entry_function_payload(entry_function_payload: &EntryFunctionPayload) -> usize {
@@ -278,31 +271,33 @@ fn num_bytes_from_entry_function_payload(entry_function_payload: &EntryFunctionP
             .sum::<usize>()
 }
 
-fn create_entry_function_payload(entry_function_payload: EntryFunctionPayload) -> Value {
+fn create_entry_function_payload(
+    entry_function_payload: EntryFunctionPayload,
+) -> PartialVMResult<Value> {
     let args = entry_function_payload
         .args
-        .iter()
-        .map(|arg| Value::vector_u8(arg.clone()))
+        .into_iter()
+        .map(Value::vector_u8)
         .collect::<Vec<_>>();
 
     let ty_args = entry_function_payload
         .ty_arg_names
-        .iter()
-        .map(|ty_arg| create_string_value(ty_arg.clone()))
+        .into_iter()
+        .map(create_string_value)
         .collect::<Vec<_>>();
 
-    Value::struct_(Struct::pack(vec![
+    Ok(Value::struct_(Struct::pack(vec![
         Value::address(entry_function_payload.account_address),
         create_string_value(entry_function_payload.module_name),
         create_string_value(entry_function_payload.function_name),
-        create_vector_value(ty_args),
-        create_vector_value(args),
-    ]))
+        Value::vector_unchecked(ty_args)?,
+        Value::vector_unchecked(args)?,
+    ])))
 }
 
 fn native_entry_function_payload_internal(
     context: &mut SafeNativeContext,
-    mut _ty_args: Vec<Type>,
+    _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_ENTRY_FUNCTION_PAYLOAD_BASE)?;
@@ -316,10 +311,12 @@ fn native_entry_function_payload_internal(
                 TRANSACTION_CONTEXT_ENTRY_FUNCTION_PAYLOAD_PER_BYTE_IN_STR
                     * NumBytes::new(num_bytes as u64),
             )?;
-            let payload = create_entry_function_payload(entry_function_payload);
-            Ok(smallvec![create_option_some_value(payload)])
+            let payload = create_entry_function_payload(entry_function_payload)?;
+            // SAFETY: payload is a struct, so it is ok to create a vector out of it. Same applies
+            //         for the None option below.
+            Ok(smallvec![create_option_some_unchecked(payload)])
         } else {
-            Ok(smallvec![create_option_none()])
+            Ok(smallvec![create_option_none_unchecked()])
         }
     } else {
         Err(SafeNativeError::Abort {
@@ -330,7 +327,7 @@ fn native_entry_function_payload_internal(
 
 fn native_multisig_payload_internal(
     context: &mut SafeNativeContext,
-    mut _ty_args: Vec<Type>,
+    _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_MULTISIG_PAYLOAD_BASE)?;
@@ -339,27 +336,26 @@ fn native_multisig_payload_internal(
 
     if let Some(transaction_context) = user_transaction_context_opt {
         if let Some(multisig_payload) = transaction_context.multisig_payload() {
-            if let Some(entry_function_payload) = multisig_payload.entry_function_payload {
-                let num_bytes = num_bytes_from_entry_function_payload(&entry_function_payload);
-                context.charge(
-                    TRANSACTION_CONTEXT_MULTISIG_PAYLOAD_PER_BYTE_IN_STR
-                        * NumBytes::new(num_bytes as u64),
-                )?;
-                let inner_entry_fun_payload = create_entry_function_payload(entry_function_payload);
-                let multisig_payload = Value::struct_(Struct::pack(vec![
-                    Value::address(multisig_payload.multisig_address),
-                    create_option_some_value(inner_entry_fun_payload),
-                ]));
-                Ok(smallvec![create_option_some_value(multisig_payload)])
-            } else {
-                let multisig_payload = Value::struct_(Struct::pack(vec![
-                    Value::address(multisig_payload.multisig_address),
-                    create_option_none(),
-                ]));
-                Ok(smallvec![create_option_some_value(multisig_payload)])
-            }
+            let inner_entry_fun_payload =
+                if let Some(entry_function_payload) = multisig_payload.entry_function_payload {
+                    let num_bytes = num_bytes_from_entry_function_payload(&entry_function_payload);
+                    context.charge(
+                        TRANSACTION_CONTEXT_MULTISIG_PAYLOAD_PER_BYTE_IN_STR
+                            * NumBytes::new(num_bytes as u64),
+                    )?;
+                    let inner_entry_fun_payload =
+                        create_entry_function_payload(entry_function_payload)?;
+                    create_option_some_unchecked(inner_entry_fun_payload)
+                } else {
+                    create_option_none_unchecked()
+                };
+            let multisig_payload = Value::struct_(Struct::pack(vec![
+                Value::address(multisig_payload.multisig_address),
+                inner_entry_fun_payload,
+            ]));
+            Ok(smallvec![create_option_some_unchecked(multisig_payload)])
         } else {
-            Ok(smallvec![create_option_none()])
+            Ok(smallvec![create_option_none_unchecked()])
         }
     } else {
         Err(SafeNativeError::Abort {
