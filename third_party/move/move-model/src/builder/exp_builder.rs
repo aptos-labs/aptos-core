@@ -1003,15 +1003,47 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 ReferenceKind::from_is_mut(*is_mut),
                 Box::new(self.translate_type(ty)),
             ),
-            Fun(args, result, abilities) => Type::function(
-                Type::tuple(self.translate_types(args.as_ref())),
-                self.translate_type(result),
-                self.parent.translate_abilities(abilities),
-            ),
+            Fun(args, result, abilities) => {
+                let arg_tys = args
+                    .iter()
+                    .map(|ty| self.translate_function_param_type(ty))
+                    .collect_vec();
+                let result_tys = match &result.value {
+                    Multiple(tys) => tys
+                        .iter()
+                        .map(|ty| self.translate_function_param_type(ty))
+                        .collect_vec(),
+                    Unit => vec![],
+                    _ => {
+                        vec![self.translate_function_param_type(result)]
+                    },
+                };
+                Type::function(
+                    Type::tuple(arg_tys),
+                    Type::tuple(result_tys),
+                    self.parent.translate_abilities(abilities),
+                )
+            },
             Unit => Type::Tuple(vec![]),
             Multiple(vst) => Type::Tuple(self.translate_types(vst.as_ref())),
             UnresolvedError => Type::Error,
         }
+    }
+
+    /// Translates a type and impose constraints for function parameters.
+    fn translate_function_param_type(&mut self, ty: &EA::Type) -> Type {
+        let loc = self.to_loc(&ty.loc);
+        let ty = self.translate_type(ty);
+        for ctr in Constraint::for_fun_parameter() {
+            self.add_constraint_and_report(
+                &loc,
+                &ErrorMessageContext::General,
+                ty.skip_reference(),
+                ctr,
+                None,
+            )
+        }
+        ty
     }
 
     /// Translates a type and imposes the type parameter constraint.
