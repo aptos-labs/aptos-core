@@ -29,7 +29,7 @@ use aptos_api_types::{
     UserTransaction, VersionedEvent, ViewFunction, ViewRequest,
 };
 use aptos_crypto::HashValue;
-use aptos_logger::{debug, info, sample, sample::SampleRate};
+use aptos_logger::{debug, info, sample, sample::SampleRate, warn};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, NewBlockEvent, CORE_CODE_ADDRESS},
@@ -785,7 +785,7 @@ impl Client {
                 Ok(WaitForTransactionResult::NotFound(error)) => {
                     sample!(
                         SampleRate::Duration(Duration::from_secs(5)),
-                        debug!(
+                        warn!(
                             "Cannot yet find transaction in mempool on {:?}, continuing to wait, error is {:?}.",
                             self.path_prefix_string(), error
                         )
