@@ -262,6 +262,74 @@ pub struct Locals(Rc<RefCell<Vec<ValueImpl>>>);
  *
  **************************************************************************************/
 
+/// Value's kind dictates the rules how values can be referenced or stored in containers. For
+/// example, primitive values like u8 cannot be stored in a generic [Container::Vec] and need to
+/// be stored in specialized variant ([Container::VecU8]).
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum ValueKind {
+    /// All primitive types which have a specialized vector container implementation.
+    SpecializedVecPrimitive,
+    /// All primitive types which do not have a specialized vector container implementation.
+    NonSpecializedVecPrimitive,
+    /// A container (struct, vector, locals).
+    Container,
+    /// Anything else, such as invalid local values or references.
+    RefOrInvalid,
+}
+
+impl ValueImpl {
+    /// Returns value's kind. This method must be kept in sync with checks below which return an
+    /// error if value's kind is not valid for a specific use case.
+    fn kind(&self) -> ValueKind {
+        use ValueImpl::*;
+        match self {
+            U8(_) | U16(_) | U32(_) | U64(_) | U128(_) | U256(_) | Bool(_) | Address(_) => {
+                ValueKind::SpecializedVecPrimitive
+            },
+            DelayedFieldID { .. } | ClosureValue(_) => ValueKind::NonSpecializedVecPrimitive,
+            Container(_) => ValueKind::Container,
+            ContainerRef(_) | IndexedRef(_) | Invalid => ValueKind::RefOrInvalid,
+        }
+    }
+
+    /// Returns an error if value's kind is not valid for [Container::Vec].
+    fn check_valid_for_value_vector(&self) -> PartialVMResult<()> {
+        use ValueKind as K;
+
+        match self.kind() {
+            K::NonSpecializedVecPrimitive | K::Container => Ok(()),
+            K::SpecializedVecPrimitive | K::RefOrInvalid => {
+                Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                    .with_message(format!("vector of `Value`s cannot contain {:?}", self)))
+            },
+        }
+    }
+
+    /// [IndexedRef] can only point to primitive types of a container. For non-specialized vectors,
+    /// indexed ref cannot point to primitive types like u8 that have their specialized versions.
+    fn check_valid_for_indexed_ref(&self, indexed_ref: &IndexedRef) -> PartialVMResult<()> {
+        use ValueKind as K;
+
+        let container = indexed_ref.container_ref.container();
+        let is_ok = match self.kind() {
+            K::NonSpecializedVecPrimitive => true,
+            K::SpecializedVecPrimitive => !matches!(container, Container::Vec(_)),
+            K::Container | K::RefOrInvalid => false,
+        };
+        if !is_ok {
+            let msg = format!(
+                "invalid IndexedRef element {:?} for container {:?}",
+                self, container
+            );
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(msg),
+            );
+        }
+        Ok(())
+    }
+}
+
 impl Container {
     fn len(&self) -> usize {
         match self {
@@ -1002,72 +1070,9 @@ impl IndexedRef {
     fn read_ref(self) -> PartialVMResult<Value> {
         use Container::*;
 
-        Ok(Value(match self.container_ref.container() {
-            Vec(r) => {
-                let value = r.borrow()[self.idx].copy_value()?;
-
-                match value {
-                    // IndexedRef to vector must point to delayed fields or closures, because the
-                    // rest of primitive types are handled by specialized containers.
-                    ValueImpl::DelayedFieldID { .. } | ValueImpl::ClosureValue(_) => (),
-
-                    ValueImpl::Invalid
-                    | ValueImpl::U8(_)
-                    | ValueImpl::U16(_)
-                    | ValueImpl::U32(_)
-                    | ValueImpl::U64(_)
-                    | ValueImpl::U128(_)
-                    | ValueImpl::U256(_)
-                    | ValueImpl::Bool(_)
-                    | ValueImpl::Address(_)
-                    | ValueImpl::Container(_)
-                    | ValueImpl::ContainerRef(_)
-                    | ValueImpl::IndexedRef(_) => {
-                        return Err(PartialVMError::new(
-                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                        )
-                        .with_message(format!(
-                            "invalid IndexedRef for vector container of {:?}",
-                            value
-                        )))
-                    },
-                }
-
-                value
-            },
-
-            Struct(r) | Locals(r) => {
-                let value = r.borrow()[self.idx].copy_value()?;
-
-                // IndexedRef of a struct or locals point to primitive types.
-                match value {
-                    ValueImpl::U8(_)
-                    | ValueImpl::U16(_)
-                    | ValueImpl::U32(_)
-                    | ValueImpl::U64(_)
-                    | ValueImpl::U128(_)
-                    | ValueImpl::U256(_)
-                    | ValueImpl::Bool(_)
-                    | ValueImpl::Address(_)
-                    | ValueImpl::DelayedFieldID { .. }
-                    | ValueImpl::ClosureValue(_) => (),
-
-                    ValueImpl::Invalid
-                    | ValueImpl::Container(_)
-                    | ValueImpl::ContainerRef(_)
-                    | ValueImpl::IndexedRef(_) => {
-                        return Err(PartialVMError::new(
-                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                        )
-                        .with_message(format!(
-                            "invalid IndexedRef for struct container of {:?}",
-                            value
-                        )))
-                    },
-                }
-
-                value
-            },
+        let res = match self.container_ref.container() {
+            Vec(r) => r.borrow()[self.idx].copy_value()?,
+            Struct(r) => r.borrow()[self.idx].copy_value()?,
 
             VecU8(r) => ValueImpl::U8(r.borrow()[self.idx]),
             VecU16(r) => ValueImpl::U16(r.borrow()[self.idx]),
@@ -1077,7 +1082,11 @@ impl IndexedRef {
             VecU256(r) => ValueImpl::U256(r.borrow()[self.idx]),
             VecBool(r) => ValueImpl::Bool(r.borrow()[self.idx]),
             VecAddress(r) => ValueImpl::Address(r.borrow()[self.idx]),
-        }))
+
+            Locals(r) => r.borrow()[self.idx].copy_value()?,
+        };
+        res.check_valid_for_indexed_ref(&self)?;
+        Ok(Value(res))
     }
 }
 
@@ -1168,36 +1177,9 @@ impl ContainerRef {
 
 impl IndexedRef {
     fn write_ref(self, x: Value) -> PartialVMResult<()> {
-        let container = self.container_ref.container();
-        let is_invariant_violation = match &x.0 {
-            // Only primitive types can be written to IndexedRef.
-            ValueImpl::DelayedFieldID { .. } | ValueImpl::ClosureValue(_) => false,
+        x.0.check_valid_for_indexed_ref(&self)?;
 
-            // Vector primitive types are handled by specialized containers, so these should not
-            // be possible.
-            ValueImpl::U8(_)
-            | ValueImpl::U16(_)
-            | ValueImpl::U32(_)
-            | ValueImpl::U64(_)
-            | ValueImpl::U128(_)
-            | ValueImpl::U256(_)
-            | ValueImpl::Bool(_)
-            | ValueImpl::Address(_) => matches!(container, Container::Vec(_)),
-
-            ValueImpl::IndexedRef(_)
-            | ValueImpl::ContainerRef(_)
-            | ValueImpl::Invalid
-            | ValueImpl::Container(_) => true,
-        };
-        if is_invariant_violation {
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
-                    format!("cannot write value {:?} to indexed ref {:?}", x, self),
-                ),
-            );
-        }
-
-        match (container, &x.0) {
+        match (self.container_ref.container(), &x.0) {
             (Container::Locals(r), _) | (Container::Vec(r), _) | (Container::Struct(r), _) => {
                 let mut v = r.borrow_mut();
                 v[self.idx] = x.0;
@@ -1942,34 +1924,17 @@ impl Value {
         ))))
     }
 
-    /// Creates a vector of values. Use with caution. It is the caller's responsibility to ensure
-    /// that the values have same types.
+    /// Creates a vector of values.
+    ///
+    /// Use with caution. While there is a check for each value that its type is valid (i.e., it
+    /// cannot be a primitive like u8 for which there are specialized vectors, or a reference), it
+    /// is the caller's responsibility to ensure that the values have the same types and the final
+    /// collection is homogeneous.
     pub fn vector_unchecked(it: impl IntoIterator<Item = Value>) -> PartialVMResult<Self> {
         let values = it
             .into_iter()
             .map(|v| {
-                match &v.0 {
-                    // Primitive types requiring their own specialized vector or not supported types.
-                    ValueImpl::U8(_)
-                    | ValueImpl::U16(_)
-                    | ValueImpl::U32(_)
-                    | ValueImpl::U64(_)
-                    | ValueImpl::U128(_)
-                    | ValueImpl::U256(_)
-                    | ValueImpl::Bool(_)
-                    | ValueImpl::Address(_)
-                    | ValueImpl::Invalid
-                    | ValueImpl::ContainerRef(_)
-                    | ValueImpl::IndexedRef(_) => {
-                        return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                            .with_message(format!("vector of `Value`s cannot contain {:?}", v.0)))
-                    },
-
-                    ValueImpl::DelayedFieldID { .. }
-                    | ValueImpl::ClosureValue(_)
-                    | ValueImpl::Container(_) => (),
-                }
-
+                v.0.check_valid_for_value_vector()?;
                 Ok(v.0)
             })
             .collect::<PartialVMResult<Vec<_>>>()?;
