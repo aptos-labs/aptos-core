@@ -151,7 +151,7 @@ which requires the signer to have the role of treasury compliance.
 
 ## Function `make`
 
-A function to create an error from from a category and a reason.
+A function to create an error from a category and a reason.
 
 
 <pre><code><b>fun</b> <a href="errors.md#0x1_errors_make">make</a>(category: u8, reason: u64): u64

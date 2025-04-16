@@ -245,9 +245,9 @@ module aptos_framework::aptos_account {
 
         // use internal APIs, as they skip:
         // - owner, frozen and dispatchable checks
-        // as APT cannot be frozen or have dispatch, and PFS cannot be transfered
+        // as APT cannot be frozen or have dispatch, and PFS cannot be transferred
         // (PFS could potentially be burned. regular transfer would permanently unburn the store.
-        // Ignoring the check here has the equivalent of unburning, transfers, and then burning again)
+        // Ignoring the check here has the equivalent of unburning, transferring, and then burning again)
         fungible_asset::withdraw_permission_check_by_address(source, sender_store, amount);
         fungible_asset::unchecked_deposit(recipient_store, fungible_asset::unchecked_withdraw(sender_store, amount));
     }

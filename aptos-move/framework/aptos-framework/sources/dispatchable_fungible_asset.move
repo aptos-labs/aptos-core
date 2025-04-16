@@ -5,7 +5,7 @@
 /// to customize the logic for withdraw and deposit operations. For example:
 ///
 /// - Deflation token: a fixed percentage of token will be destructed upon transfer.
-/// - Transfer allowlist: token can only be transfered to addresses in the allow list.
+/// - Transfer allowlist: token can only be transferred to addresses in the allow list.
 /// - Predicated transfer: transfer can only happen when some certain predicate has been met.
 /// - Loyalty token: a fixed loyalty will be paid to a designated address when a fungible asset transfer happens
 ///
