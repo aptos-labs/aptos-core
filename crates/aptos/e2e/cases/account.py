@@ -33,7 +33,7 @@ async def test_account_fund_with_faucet(run_helper: RunHelper, test_name=None):
             run_helper.get_account_info().account_address
         )
     )
-    if balance == amount_in_octa:
+    if balance != amount_in_octa:
         raise TestError(
             f"Account {run_helper.get_account_info().account_address} has balance {balance}, expected {amount_in_octa}"
         )
