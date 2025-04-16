@@ -3,12 +3,12 @@
 
 use super::indexer_api::confirm_metadata_applied;
 use anyhow::{anyhow, Context, Result};
-use aptos_indexer_processor_sdk::aptos_indexer_transaction_stream::{
-    transaction_stream::get_chain_id, TransactionStreamConfig,
+use aptos_indexer_processor_sdk::{
+    aptos_indexer_transaction_stream::{transaction_stream::get_chain_id, TransactionStreamConfig},
+    postgres::processor_metadata_schema::processor_metadata::processor_status,
 };
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl};
 use diesel_async::{pg::AsyncPgConnection, AsyncConnection, RunQueryDsl};
-use processor::schema::processor_status;
 use reqwest::Url;
 use serde::Serialize;
 use std::time::Duration;
