@@ -290,6 +290,8 @@ fn create_entry_function_payload(
         Value::address(entry_function_payload.account_address),
         create_string_value(entry_function_payload.module_name),
         create_string_value(entry_function_payload.function_name),
+        // SAFETY: both type arguments and arguments are homogeneous collections and non-primitive
+        //         types: strings and vectors of bytes.
         Value::vector_unchecked(ty_args)?,
         Value::vector_unchecked(args)?,
     ])))
@@ -345,6 +347,7 @@ fn native_multisig_payload_internal(
                     )?;
                     let inner_entry_fun_payload =
                         create_entry_function_payload(entry_function_payload)?;
+                    // SAFETY: inner payload is a struct, so this is safe.
                     create_option_some_unchecked(inner_entry_fun_payload)
                 } else {
                     create_option_none_unchecked()
@@ -353,6 +356,7 @@ fn native_multisig_payload_internal(
                 Value::address(multisig_payload.multisig_address),
                 inner_entry_fun_payload,
             ]));
+            // SAFETY: multisig payload is a struct, so this is safe.
             Ok(smallvec![create_option_some_unchecked(multisig_payload)])
         } else {
             Ok(smallvec![create_option_none_unchecked()])
