@@ -124,9 +124,9 @@ impl Block {
             "ThisRoundQC cannot be used as entry reason in a block"
         );
 
-        // self.payload()
-        //     .verify(verifier, self)
-        //     .context("Error verifying payload")?;
+        self.payload()
+            .verify(verifier, self)
+            .context("Error verifying payload")?;
         self.reason()
             .verify(self.round(), verifier)
             .context("Error verifying entry reason")?;

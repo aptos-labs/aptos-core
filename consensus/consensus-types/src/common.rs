@@ -23,6 +23,7 @@ use once_cell::sync::OnceCell;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
+    cmp::max,
     collections::HashSet,
     fmt::{self, Write},
     ops::Deref,
@@ -448,7 +449,8 @@ impl Payload {
         proof_cache: &ProofCache,
     ) -> anyhow::Result<()> {
         let unverified: Vec<_> = proofs
-            .iter()
+            .par_iter()
+            .with_min_len(max(proofs.len() / 128, 1))
             .filter(|proof| {
                 proof_cache.get(proof.info()).map_or(true, |cached_proof| {
                     cached_proof != *proof.multi_signature()
@@ -457,7 +459,7 @@ impl Payload {
             .collect();
         unverified
             .par_iter()
-            .with_min_len(2)
+            .with_min_len(max(proofs.len() / 256, 1))
             .try_for_each(|proof| proof.verify(validator, proof_cache))?;
         Ok(())
     }
