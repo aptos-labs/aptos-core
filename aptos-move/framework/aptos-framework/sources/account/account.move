@@ -34,6 +34,29 @@ module aptos_framework::account {
         new_authentication_key: vector<u8>,
     }
 
+    #[event]
+    struct KeyRotationToPublicKey has drop, store {
+        // The address of the account that is rotating its key
+        account: address,
+        // The bitmap of verified public keys.  This indicates which public keys have been verified by the account owner.
+        // The bitmap is 4 bytes long, thus representing 32 bits.  Each bit represents whether a public key has been verified.
+        // In the 32 bit representation, if a bit at index i (read left to right) is 1, then the public key at index i has
+        // been verified in the public key.
+        //
+        // For example: [0x10100000,0x00000000,0x00000000,0x00000000] marks the first and third public keys in the multi-key as verified.
+        //
+        // Note: In the case of a single key, only the first bit is used.
+        verified_public_key_bit_map: vector<u8>,
+        // The scheme of the public key.
+        public_key_scheme: u8,
+        // The byte representation of the public key.
+        public_key: vector<u8>,
+        // The old authentication key on the account
+        old_auth_key: vector<u8>,
+        // The new authentication key which is the hash of [public_key, public_key_scheme]
+        new_auth_key: vector<u8>,
+    }
+
     /// Resource representing an account.
     struct Account has key, store {
         authentication_key: vector<u8>,
@@ -437,21 +460,33 @@ module aptos_framework::account {
     ///
     /// Note: This function does not update the `OriginatingAddress` table.
     entry fun rotate_authentication_key_from_public_key(account: &signer, scheme: u8, new_public_key_bytes: vector<u8>) acquires Account {
-        let auth_key;
+        let addr = signer::address_of(account);
+        let account_resource = &Account[addr];
+        let old_auth_key = account_resource.authentication_key;
+        let new_auth_key;
         if (scheme == ED25519_SCHEME) {
             let from_pk = ed25519::new_unvalidated_public_key_from_bytes(new_public_key_bytes);
-            auth_key = ed25519::unvalidated_public_key_to_authentication_key(&from_pk);
+            new_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&from_pk);
         } else if (scheme == MULTI_ED25519_SCHEME) {
             let from_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(new_public_key_bytes);
-            auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&from_pk);
+            new_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&from_pk);
         } else if (scheme == SINGLE_KEY_SCHEME) {
-            auth_key = single_key::new_public_key_from_bytes(new_public_key_bytes).to_authentication_key();
+            new_auth_key = single_key::new_public_key_from_bytes(new_public_key_bytes).to_authentication_key();
         } else if (scheme == MULTI_KEY_SCHEME) {
-            auth_key = multi_key::new_public_key_from_bytes(new_public_key_bytes).to_authentication_key();
+            new_auth_key = multi_key::new_public_key_from_bytes(new_public_key_bytes).to_authentication_key();
         } else {
             abort error::invalid_argument(EUNRECOGNIZED_SCHEME)
         };
-        rotate_authentication_key_call(account, auth_key);
+        rotate_authentication_key_call(account, new_auth_key);
+        event::emit(KeyRotationToPublicKey {
+            account: addr,
+            // Set verified_public_key_bit_map to [0x00, 0x00, 0x00, 0x00] as the public key(s) are not verified
+            verified_public_key_bit_map: vector[0x00, 0x00, 0x00, 0x00],
+            public_key_scheme: scheme,
+            public_key: new_public_key_bytes,
+            old_auth_key,
+            new_auth_key,
+        });
     }
 
     /// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
@@ -495,7 +530,7 @@ module aptos_framework::account {
         ensure_resource_exists(addr);
         check_rotation_permission(account);
         let account_resource = &mut Account[addr];
-
+        let old_auth_key = account_resource.authentication_key;
         // Verify the given `from_public_key_bytes` matches this account's current authentication key.
         if (from_scheme == ED25519_SCHEME) {
             let from_pk = ed25519::new_unvalidated_public_key_from_bytes(from_public_key_bytes);
@@ -540,6 +575,25 @@ module aptos_framework::account {
 
         // Update the `OriginatingAddress` table.
         update_auth_key_and_originating_address_table(addr, account_resource, new_auth_key);
+
+        let verified_public_key_bit_map;
+        if (to_scheme == ED25519_SCHEME) {
+            // Set verified_public_key_bit_map to [0x80, 0x00, 0x00, 0x00] as the public key is verified and there is only one public key.
+            verified_public_key_bit_map = vector[0x80, 0x00, 0x00, 0x00];
+        } else {
+            // The new key is a multi-ed25519 key, so set the verified_public_key_bit_map to the signature bitmap.
+            let len = vector::length(&cap_update_table);
+            verified_public_key_bit_map = vector::slice(&cap_update_table, len - 4, len);
+        };
+
+        event::emit(KeyRotationToPublicKey {
+            account: addr,
+            verified_public_key_bit_map,
+            public_key_scheme: to_scheme,
+            public_key: to_public_key_bytes,
+            old_auth_key,
+            new_auth_key,
+        });
     }
 
     public entry fun rotate_authentication_key_with_rotation_capability(
@@ -555,6 +609,7 @@ module aptos_framework::account {
         // Check that there exists a rotation capability offer at the offerer's account resource for the delegate.
         let delegate_address = signer::address_of(delegate_signer);
         let offerer_account_resource = &Account[rotation_cap_offerer_address];
+        let old_auth_key = offerer_account_resource.authentication_key;
         assert!(
             offerer_account_resource.rotation_capability_offer.for.contains(&delegate_address),
             error::not_found(ENO_SUCH_ROTATION_CAPABILITY_OFFER)
@@ -583,6 +638,25 @@ module aptos_framework::account {
             offerer_account_resource,
             new_auth_key
         );
+
+        let verified_public_key_bit_map;
+        if (new_scheme == ED25519_SCHEME) {
+            // Set verified_public_key_bit_map to [0x80, 0x00, 0x00, 0x00] as the public key is verified and there is only one public key.
+            verified_public_key_bit_map = vector[0x80, 0x00, 0x00, 0x00];
+        } else {
+            // The new key is a multi-ed25519 key, so set the verified_public_key_bit_map to the signature bitmap.
+            let len = vector::length(&cap_update_table);
+            verified_public_key_bit_map = vector::slice(&cap_update_table, len - 4, len);
+        };
+
+        event::emit(KeyRotationToPublicKey {
+            account: rotation_cap_offerer_address,
+            verified_public_key_bit_map,
+            public_key_scheme: new_scheme,
+            public_key: new_public_key_bytes,
+            old_auth_key,
+            new_auth_key,
+        });
     }
 
     /// Offers rotation capability on behalf of `account` to the account at address `recipient_address`.
