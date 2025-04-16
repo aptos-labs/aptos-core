@@ -64,7 +64,7 @@ fn test_abigen(path: &Path, mut options: Options, suffix: &str) -> anyhow::Resul
     };
 
     let mut error_writer = Buffer::no_color();
-    match run_move_prover_v2(&mut error_writer, options) {
+    match run_move_prover_v2(&mut error_writer, options, vec![]) {
         Ok(()) => {
             for abi_path in get_abi_paths_under_dir(&temp_path)?.iter() {
                 let mut contents = String::new();
