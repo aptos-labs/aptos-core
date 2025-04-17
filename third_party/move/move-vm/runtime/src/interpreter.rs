@@ -1881,6 +1881,7 @@ impl Frame {
                     module_storage,
                     &mut interpreter.operand_stack,
                     instruction,
+                    frame_cache,
                 )?;
 
                 match instruction {
@@ -2736,6 +2737,7 @@ impl Frame {
                     module_storage,
                     &mut interpreter.operand_stack,
                     instruction,
+                    frame_cache,
                 )?;
                 RTTCheck::check_operand_stack_balance(&interpreter.operand_stack)?;
 

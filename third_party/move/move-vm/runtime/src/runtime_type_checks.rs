@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{frame::Frame, interpreter::Stack, LoadedFunction, ModuleStorage};
+use crate::{
+    frame::Frame, frame_type_cache::FrameTypeCache, interpreter::Stack, LoadedFunction,
+    ModuleStorage,
+};
 use move_binary_format::{errors::*, file_format::Bytecode};
 use move_core_types::{
     ability::{Ability, AbilitySet},
@@ -20,6 +23,7 @@ pub(crate) trait RuntimeTypeCheck {
         module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
         instruction: &Bytecode,
+        ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()>;
 
     /// Paranoid type checks to perform after instruction execution.
@@ -28,6 +32,7 @@ pub(crate) trait RuntimeTypeCheck {
         module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
         instruction: &Bytecode,
+        ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()>;
 
     /// Paranoid check that operand and type stacks have the same size
@@ -155,6 +160,7 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
         _module_storage: &impl ModuleStorage,
         _operand_stack: &mut Stack,
         _instruction: &Bytecode,
+        _ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
         Ok(())
     }
@@ -164,6 +170,7 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
         _module_storage: &impl ModuleStorage,
         _operand_stack: &mut Stack,
         _instruction: &Bytecode,
+        _ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
         Ok(())
     }
@@ -186,8 +193,8 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         _module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
         instruction: &Bytecode,
+        ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
-        let mut ty_cache = frame.frame_cache.borrow_mut();
         match instruction {
             // Call instruction will be checked at execute_main.
             Bytecode::Call(_) | Bytecode::CallGeneric(_) => (),
@@ -318,9 +325,9 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
         instruction: &Bytecode,
+        ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
         let ty_builder = frame.ty_builder();
-        let mut ty_cache = frame.frame_cache.borrow_mut();
 
         match instruction {
             Bytecode::BrTrue(_) | Bytecode::BrFalse(_) => (),
