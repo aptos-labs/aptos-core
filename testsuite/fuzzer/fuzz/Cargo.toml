@@ -35,18 +35,6 @@ serde_json = { workspace = true }
 consensus = ["dep:aptos-consensus"]
 
 [[bin]]
-name = "move_bytecode_verifier_code_unit"
-path = "fuzz_targets/move/bytecode_verifier_code_unit.rs"
-test = false
-doc = false
-
-[[bin]]
-name = "move_bytecode_verifier_mixed"
-path = "fuzz_targets/move/bytecode_verifier_mixed.rs"
-test = false
-doc = false
-
-[[bin]]
 name = "move_value_deserialize"
 path = "fuzz_targets/move/value_deserialize.rs"
 test = false
@@ -98,5 +86,11 @@ required-features = ["consensus"]
 [[bin]]
 name = "deserialize_script_module"
 path = "fuzz_targets/move/deserialize_script_module.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "move_bytecode_verifier_compiled_modules"
+path = "fuzz_targets/move/bytecode_verifier_compiled_modules.rs"
 test = false
 doc = false

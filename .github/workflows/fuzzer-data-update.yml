@@ -1,0 +1,54 @@
+name: Fuzzer Data Update
+
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - 'testsuite/fuzzer/data/**'
+
+permissions:
+  contents: read
+  id-token: write # Required for GCP Workload Identity federation
+
+jobs:
+  update-fuzzer-data:
+    runs-on: runs-on,cpu=16,family=m6id,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_FUZZER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL_FUZZER }}
+
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v2'
+        with:
+          version: '>= 418.0.0'
+
+      # The fuzzers for which we have existing seed corpus are:
+      # - move_aptosvm_publish_and_run
+      # - move_bytecode_verifier_compiled_modules
+      # - move_bytecode_verifier_compiled_modules_seed_corpus
+      # All of them reuse the same seed corpus, so we only need to download/upload one of them.
+      - name: Download existing corpus
+        run: |
+          gcloud storage cp gs://aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip move_aptosvm_publish_and_run_seed_corpus.zip
+          unzip -q move_aptosvm_publish_and_run_seed_corpus.zip -d move_aptosvm_publish_and_run_seed_corpus
+
+      - name: Generate runnable states
+        run: |
+          chmod +x ./fuzz.sh
+          ./fuzz.sh block-builder generate_runnable_states_recursive testsuite/fuzzer/data/0x1/ move_aptosvm_publish_and_run_seed_corpus
+
+      - name: Create and upload new corpus
+        run: |
+          zip -r move_aptosvm_publish_and_run_seed_corpus.zip move_aptosvm_publish_and_run_seed_corpus
+          gcloud storage cp move_aptosvm_publish_and_run_seed_corpus.zip gs://aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip
+          gcloud storage objects update gs://aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip --acl-public 
