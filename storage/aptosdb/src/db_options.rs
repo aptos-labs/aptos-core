@@ -155,6 +155,7 @@ where
         let mut cf_opts = Options::default();
         cf_opts.set_compression_type(DBCompressionType::Lz4);
         cf_opts.set_block_based_table_factory(&table_options);
+        cf_opts.add_compact_on_deletion_collector_factory(0, 0, 0.4);
         cf_opts_post_processor(cf_name, &mut cf_opts);
         cfds.push(ColumnFamilyDescriptor::new((*cf_name).to_string(), cf_opts));
     }
