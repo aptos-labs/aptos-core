@@ -892,6 +892,37 @@ impl GlobalEnv {
         target_modules
     }
 
+    /// Find all target modules and their transitive closures and return in a vector
+    pub fn get_target_modules_transitive_closure(&self) -> Vec<ModuleEnv> {
+        let mut target_and_transitive_modules: BTreeSet<ModuleId> = BTreeSet::new();
+        let mut todo_modules: BTreeSet<ModuleId> = BTreeSet::new();
+        for module_env in self.get_modules() {
+            if module_env.is_target() {
+                todo_modules.insert(module_env.get_id());
+            }
+        }
+        while let Some(module_id) = todo_modules.pop_first() {
+            if !target_and_transitive_modules.contains(&module_id) {
+                target_and_transitive_modules.insert(module_id);
+            }
+            let module_env = self.get_module(module_id);
+            for func_env in module_env.get_functions() {
+                let used_functions = func_env
+                    .get_used_functions()
+                    .expect("used functions available");
+                for used_function in used_functions {
+                    if !target_and_transitive_modules.contains(&used_function.module_id) {
+                        todo_modules.insert(used_function.module_id);
+                    }
+                }
+            }
+        }
+        target_and_transitive_modules
+            .iter()
+            .map(|id| self.get_module(*id))
+            .collect_vec()
+    }
+
     /// Find all primary target modules and return in a vector
     pub fn get_primary_target_modules(&self) -> Vec<ModuleEnv> {
         let mut target_modules: Vec<ModuleEnv> = vec![];
