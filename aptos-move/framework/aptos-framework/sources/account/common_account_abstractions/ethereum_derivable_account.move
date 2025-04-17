@@ -43,7 +43,6 @@ module aptos_framework::ethereum_derivable_account {
 
     enum SIWEAbstractSignature has drop {
         EIP1193DerivedSignature {
-            signed_chain_id: u8,
             issued_at: String,
             signature: vector<u8>,
         },
@@ -65,10 +64,9 @@ module aptos_framework::ethereum_derivable_account {
         let stream = bcs_stream::new(*abstract_signature);
         let signature_type = bcs_stream::deserialize_u8(&mut stream);
         if (signature_type == 0x00) {
-            let signed_chain_id = bcs_stream::deserialize_u8(&mut stream);
             let issued_at = bcs_stream::deserialize_string(&mut stream);
             let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
-            SIWEAbstractSignature::EIP1193DerivedSignature { signature, signed_chain_id, issued_at }
+            SIWEAbstractSignature::EIP1193DerivedSignature { issued_at, signature }
         } else {
             abort(EINVALID_SIGNATURE_TYPE)
         }
@@ -193,7 +191,7 @@ module aptos_framework::ethereum_derivable_account {
         }
     }
 
-    public fun base16_utf8_to_vec_u8(str: vector<u8>): vector<u8> {
+    fun base16_utf8_to_vec_u8(str: vector<u8>): vector<u8> {
         let result = vector::empty<u8>();
         let i = 0;
         while (i < vector::length(&str)) {
@@ -269,8 +267,8 @@ module aptos_framework::ethereum_derivable_account {
     }
 
     #[test_only]
-    fun create_raw_signature(signed_chain_id: u8, issued_at: String, signature: vector<u8>): vector<u8> {
-        let abstract_signature = SIWEAbstractSignature::EIP1193DerivedSignature { signature, signed_chain_id, issued_at };
+    fun create_raw_signature(issued_at: String, signature: vector<u8>): vector<u8> {
+        let abstract_signature = SIWEAbstractSignature::EIP1193DerivedSignature { issued_at, signature };
         bcs::to_bytes(&abstract_signature)
     }
 
@@ -293,14 +291,13 @@ module aptos_framework::ethereum_derivable_account {
             58, 209, 105, 56, 204, 253, 73, 82, 201, 197, 201, 139, 201, 19, 65, 215,
             28
         ];
-        let abstract_signature = create_raw_signature(4, utf8(b"2025-01-01T00:00:00.000Z"), signature_bytes);
+        let abstract_signature = create_raw_signature(utf8(b"2025-01-01T00:00:00.000Z"), signature_bytes);
         let siwe_abstract_signature = deserialize_abstract_signature(&abstract_signature);
         assert!(siwe_abstract_signature is SIWEAbstractSignature::EIP1193DerivedSignature);
         match (siwe_abstract_signature) {
-            SIWEAbstractSignature::EIP1193DerivedSignature { signature, signed_chain_id, issued_at } => {
-                assert!(signature == signature_bytes);
-                assert!(signed_chain_id == 4);
+            SIWEAbstractSignature::EIP1193DerivedSignature { signature, issued_at } => {
                 assert!(issued_at == utf8(b"2025-01-01T00:00:00.000Z"));
+                assert!(signature == signature_bytes);
             },
         };
     }
@@ -396,7 +393,7 @@ module aptos_framework::ethereum_derivable_account {
             58, 209, 105, 56, 204, 253, 73, 82, 201, 197, 201, 139, 201, 19, 65, 215,
             28
         ];
-        let abstract_signature = create_raw_signature(4, utf8(b"2025-01-01T00:00:00.000Z"), signature);
+        let abstract_signature = create_raw_signature(utf8(b"2025-01-01T00:00:00.000Z"), signature);
         let ethereum_address = b"0xC7B576Ead6aFb962E2DEcB35814FB29723AEC98a";
         let domain = b"localhost:3001";
         let abstract_public_key = create_abstract_public_key(utf8(ethereum_address), utf8(domain));
@@ -418,7 +415,7 @@ module aptos_framework::ethereum_derivable_account {
             58, 209, 105, 56, 204, 253, 73, 82, 201, 197, 201, 139, 201, 19, 65, 215,
             28
         ];
-        let abstract_signature = create_raw_signature(4, utf8(b"2025-01-01T00:00:00.000Z"), signature);
+        let abstract_signature = create_raw_signature(utf8(b"2025-01-01T00:00:00.000Z"), signature);
         let ethereum_address = b"0xC7B576Ead6aFb962E2DEcB35814FB29723AEC98a";
         let domain = b"localhost:3001";
         let abstract_public_key = create_abstract_public_key(utf8(ethereum_address), utf8(domain));
