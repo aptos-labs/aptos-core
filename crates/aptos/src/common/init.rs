@@ -19,10 +19,6 @@ use crate::{
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
 use aptos_ledger;
-use aptos_rest_client::{
-    aptos_api_types::{AptosError, AptosErrorCode},
-    error::{AptosErrorResponse, RestError},
-};
 use async_trait::async_trait;
 use clap::Parser;
 use reqwest::Url;
@@ -287,35 +283,9 @@ impl CliCommand<()> for InitTool {
 
         // Create account if it doesn't exist (and there's a faucet)
         // Check if account exists
-        let account_exists = match client.get_account(address).await {
-            Ok(_) => true,
-            Err(err) => {
-                if let RestError::Api(AptosErrorResponse {
-                    error:
-                        AptosError {
-                            error_code: AptosErrorCode::ResourceNotFound,
-                            ..
-                        },
-                    ..
-                })
-                | RestError::Api(AptosErrorResponse {
-                    error:
-                        AptosError {
-                            error_code: AptosErrorCode::AccountNotFound,
-                            ..
-                        },
-                    ..
-                }) = err
-                {
-                    false
-                } else {
-                    return Err(CliError::UnexpectedError(format!(
-                        "Failed to check if account exists: {:?}",
-                        err
-                    )));
-                }
-            },
-        };
+        let funded = matches!(client
+            .get_account_balance(address, "0x1::AptosCoin::AptosCoin")
+            .await, Ok(res) if *res.inner() > 0);
 
         // If you want to create a private key, but not fund the account, skipping the faucet is still possible
         let maybe_faucet_url = if self.skip_faucet {
@@ -325,11 +295,11 @@ impl CliCommand<()> for InitTool {
         };
 
         if let Some(faucet_url) = maybe_faucet_url {
-            if account_exists {
-                eprintln!("Account {} has been already found onchain", address);
+            if funded {
+                eprintln!("Account {} has been already funded onchain", address);
             } else {
                 eprintln!(
-                    "Account {} doesn't exist, creating it and funding it with {} Octas",
+                    "Account {} is not funded, funding it with {} Octas",
                     address, NUM_DEFAULT_OCTAS
                 );
                 fund_account(
@@ -343,12 +313,12 @@ impl CliCommand<()> for InitTool {
                 .await?;
                 eprintln!("Account {} funded successfully", address);
             }
-        } else if account_exists {
-            eprintln!("Account {} has been already found on chain", address);
+        } else if funded {
+            eprintln!("Account {} has been already funded onchain", address);
         } else if network == Network::Mainnet || network == Network::Testnet {
             // Do nothing, we print information later.
         } else {
-            eprintln!("Account {} has been initialized locally, but you must transfer coins to it to create the account onchain", address);
+            eprintln!("Account {} has been initialized locally, but you must transfer coins to it to send transactions", address);
         }
 
         // Ensure the loaded config has profiles setup for a possible empty file
@@ -372,14 +342,14 @@ impl CliCommand<()> for InitTool {
             address, profile_name,
         );
 
-        if !account_exists {
+        if !funded {
             match network {
                 Network::Mainnet => {
-                    eprintln!("The account has not been created on chain yet, you will need to create and fund the account by transferring funds from another account");
+                    eprintln!("The account has not been funded on chain yet, you will need to create and fund the account by transferring funds from another account");
                 },
                 Network::Testnet => {
                     let mint_site_url = get_mint_site_url(Some(address));
-                    eprintln!("The account has not been created on chain yet. To create the account and get APT on testnet you must visit {}", mint_site_url);
+                    eprintln!("The account has not been funded on chain yet. To fund the account and get APT on testnet you must visit {}", mint_site_url);
                     // We don't use `prompt_yes_with_override` here because we only want to
                     // automatically open the minting site if they're in an interactive setting.
                     if !self.prompt_options.assume_yes {
