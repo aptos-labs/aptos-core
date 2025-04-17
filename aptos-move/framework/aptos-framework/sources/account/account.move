@@ -214,6 +214,10 @@ module aptos_framework::account {
     const ENO_ACCOUNT_PERMISSION: u64 = 23;
     /// Specified scheme is not recognized. Should be ED25519_SCHEME(0), MULTI_ED25519_SCHEME(1), SINGLE_KEY_SCHEME(2), or MULTI_KEY_SCHEME(3).
     const EUNRECOGNIZED_SCHEME: u64 = 24;
+    /// The provided public key is not a single Keyless public key
+    const ENOT_A_KEYLESS_PUBLIC_KEY: u64 = 25;
+    /// The provided public key is not the original public key for the account
+    const ENOT_THE_ORIGINAL_PUBLIC_KEY: u64 = 26;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const MAX_GUID_CREATION_NUM: u64 = 0x4000000000000;
@@ -484,6 +488,83 @@ module aptos_framework::account {
             verified_public_key_bit_map: vector[0x00, 0x00, 0x00, 0x00],
             public_key_scheme: scheme,
             public_key: new_public_key_bytes,
+            old_auth_key,
+            new_auth_key,
+        });
+    }
+
+    /// Upserts an ED25519 backup key to a keyless account by converting the account's authentication key to a multi-key.
+    /// This function takes a keyless account (identified by having a keyless public key is the original public key) and updates the
+    /// account's authentication key to a multi-key of the original keyless public key and the new backup key that requires 
+    /// 1 signature from either key to authenticate.
+    ///
+    /// Note: This function emits a `KeyRotationToMultiPublicKey` event marking both keys as verified since the keyless public key
+    /// is the original public key of the account and the new backup key has been validated via verifying the challenge signed by the new backup key.
+    ///
+    /// # Arguments
+    /// * `account` - The signer representing the keyless account
+    /// * `keyless_public_key` - The original keyless public key of the account
+    /// * `backup_public_key` - The ED25519 public key to add as a backup
+    /// * `backup_key_proof` - A signature from the backup key proving ownership
+    ///
+    /// # Aborts
+    /// * If the provided public key is not a keyless public key
+    /// * If the keyless public key is not the original public key of the account
+    /// * If the backup key proof signature is invalid
+    ///
+    /// # Events
+    /// * Emits a `KeyRotationToMultiPublicKey` event with the new multi-key configuration
+    entry fun upsert_ed25519_backup_key_on_keyless_account(account: &signer, keyless_public_key: vector<u8>, backup_public_key: vector<u8>, backup_key_proof: vector<u8>) acquires Account {
+        // Check that the provided public key is a keyless public key
+        let keyless_single_key = single_key::new_public_key_from_bytes(keyless_public_key);
+        assert!(single_key::is_keyless_or_federated_keyless_public_key(&keyless_single_key), error::invalid_argument(ENOT_A_KEYLESS_PUBLIC_KEY));
+
+        let addr = signer::address_of(account);
+        let account_resource = &mut Account[addr];
+        let old_auth_key = account_resource.authentication_key;
+
+        // Check that the provided public key is original public key of the account by comparing
+        // its authentication key to the account address.
+        assert!(
+            bcs::to_bytes(&addr) == keyless_single_key.to_authentication_key(),
+            error::invalid_argument(ENOT_THE_ORIGINAL_PUBLIC_KEY)
+        );
+
+        let curr_auth_key_as_address = from_bcs::to_address(old_auth_key);
+        let challenge = RotationProofChallenge {
+            sequence_number: account_resource.sequence_number,
+            originator: addr,
+            current_auth_key: curr_auth_key_as_address,
+            new_public_key: backup_public_key,
+        };
+
+        // Assert the challenges signed by the provided backup key is valid
+        assert_valid_rotation_proof_signature_and_get_auth_key(
+            ED25519_SCHEME,
+            backup_public_key,
+            backup_key_proof,
+            &challenge
+        );
+
+        // Get the backup key as a single key
+        let backup_key_ed25519 = ed25519::new_unvalidated_public_key_from_bytes(backup_public_key);
+        let backup_key_as_single_key = single_key::from_ed25519_public_key_unvalidated(backup_key_ed25519);
+
+        let new_public_key = multi_key::new_multi_key_from_single_keys(vector[keyless_single_key, backup_key_as_single_key], 1);
+        let new_auth_key = new_public_key.to_authentication_key();
+
+        // Rotate the authentication key to the new multi key public key
+        rotate_authentication_key_call(account, new_auth_key);
+
+        event::emit(KeyRotationToPublicKey {
+            account: addr,
+            // This marks that both the keyless public key and the new backup key are verified
+            // The keyless public key is the original public key of the account and the new backup key
+            // has been validated via verifying the challenge signed by the new backup key.
+            // Represents the bitmap 0b11000000000000000000000000000000
+            verified_public_key_bit_map: vector[0xC0, 0x00, 0x00, 0x00],
+            public_key_scheme: MULTI_KEY_SCHEME,
+            public_key: bcs::to_bytes(&new_public_key),
             old_auth_key,
             new_auth_key,
         });
