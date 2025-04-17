@@ -538,11 +538,7 @@ impl Constraint {
                     )?;
                     Ok(true)
                 } else {
-                    Err(TypeUnificationError::ConstraintsIncompatible(
-                        loc.clone(),
-                        self.clone(),
-                        other.clone(),
-                    ))
+                    Ok(false)
                 }
             },
             (
