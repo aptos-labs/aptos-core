@@ -51,7 +51,7 @@ static TP: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
 
 const MAX_TYPE_PARAMETER_VALUE: u16 = 64 / 4 * 16; // third_party/move/move-bytecode-verifier/src/signature_v2.rs#L1306-L1312
 
-const EXECUTION_TIME_GAS_RATIO: u8 = 50;
+const EXECUTION_TIME_GAS_RATIO: u8 = 100;
 
 #[inline(always)]
 fn is_coverage_enabled() -> bool {
