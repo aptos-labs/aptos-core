@@ -77,9 +77,14 @@ pub struct LambdaLiftingOptions {
 
 /// Performs lambda lifting for all target modules in the environment.
 pub fn lift_lambdas(options: LambdaLiftingOptions, env: &mut GlobalEnv) {
-    // Go over all modules one by one. Since in each iteration
-    // we need to mutate the module, iterate over a vector of plain ids.
-    for module_id in env.get_modules().map(|me| me.get_id()).collect_vec() {
+    // Go over target modules and transitive closures one by one.
+    // Since in each iteration we need to mutate the module, iterate over a vector of plain ids.
+    for module_id in env
+        .get_target_modules_transitive_closure()
+        .into_iter()
+        .map(|me| me.get_id())
+        .collect_vec()
+    {
         let module = env.get_module(module_id);
         let mut updated_funs = BTreeMap::new();
         let mut new_funs = vec![];
