@@ -348,8 +348,11 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
 
     if options.experiment_on(Experiment::INLINING) {
         let keep_inline_funs = options.experiment_on(Experiment::KEEP_INLINE_FUNS);
+        let lift_inline_funs = options.experiment_on(Experiment::LIFT_INLINE_FUNS);
         env_pipeline.add("inlining", {
-            move |env| inliner::run_inlining(env, inlining_scope, keep_inline_funs)
+            move |env| {
+                inliner::run_inlining(env, inlining_scope, keep_inline_funs, lift_inline_funs)
+            }
         });
     }
 

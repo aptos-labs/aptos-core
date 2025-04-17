@@ -71,7 +71,7 @@ async fn test_domain_aa() {
 
     let function_info = FunctionInfo::new(
         AccountAddress::ONE,
-        "daa_siws".to_string(),
+        "solana_derivable_account".to_string(),
         "authenticate".to_string(),
     );
 

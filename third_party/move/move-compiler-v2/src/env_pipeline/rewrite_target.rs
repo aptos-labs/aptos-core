@@ -50,6 +50,33 @@ pub struct RewriteTargets {
 }
 
 impl RewriteTargets {
+    /// Create a new set of rewrite targets from `fun_ids`, which
+    /// are initially associated with `Unchanged` state.
+    pub fn create_fun_targets(env: &GlobalEnv, fun_ids: Vec<QualifiedId<FunId>>) -> Self {
+        let mut targets = vec![];
+        let add_spec =
+            |targets: &mut Vec<RewriteTarget>, sb_target: SpecBlockTarget, spec: &Spec| {
+                if !spec.is_empty() {
+                    targets.push(RewriteTarget::SpecBlock(sb_target))
+                }
+            };
+        for fun_id in &fun_ids {
+            targets.push(RewriteTarget::MoveFun(*fun_id));
+            let func: move_model::model::FunctionEnv<'_> = env.get_function(*fun_id);
+            add_spec(
+                &mut targets,
+                SpecBlockTarget::Function(fun_id.module_id, fun_id.id),
+                &func.get_spec(),
+            );
+        }
+        Self {
+            targets: targets
+                .into_iter()
+                .map(|target| (target, RewriteState::Unchanged))
+                .collect(),
+        }
+    }
+
     /// Create a new set of rewrite targets, collecting them as specified by `scope`.
     /// Those targets are initially associated with `Unchanged` state.
     pub fn create(env: &GlobalEnv, scope: RewritingScope) -> Self {
@@ -71,10 +98,15 @@ impl RewriteTargets {
                         &func.get_spec(),
                     );
                 }
-                for (spec_fun_id, _) in module.get_spec_funs() {
+                for (spec_fun_id, fun_spec) in module.get_spec_funs() {
                     targets.push(RewriteTarget::SpecFun(
                         module.get_id().qualified(*spec_fun_id),
                     ));
+                    add_spec(
+                        &mut targets,
+                        SpecBlockTarget::SpecFunction(module.get_id(), *spec_fun_id),
+                        &fun_spec.spec.borrow(),
+                    );
                 }
                 for struct_env in module.get_structs() {
                     add_spec(
@@ -202,5 +234,23 @@ impl RewriteTarget {
                 .unwrap_or(Abstract),
             SpecBlock(sb_target) => Spec(env.get_spec_block(sb_target).clone()),
         }
+    }
+
+    /// Get the qualitifed function id from the rewrite target when possible
+    pub fn get_rewrite_target_fun_id(&self) -> Option<QualifiedId<FunId>> {
+        use RewriteTarget::*;
+        match self {
+            MoveFun(fun_id) => Some(*fun_id),
+            SpecBlock(sb_target) => {
+                if let SpecBlockTarget::Function(mid, fid) = sb_target {
+                    return Some(mid.qualified(*fid));
+                } else if let SpecBlockTarget::FunctionCode(mid, fid, _) = sb_target {
+                    return Some(mid.qualified(*fid));
+                }
+                return None;
+            },
+            _ => None,
+        };
+        None
     }
 }

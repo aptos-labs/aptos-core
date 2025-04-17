@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::vm::module_metadata::{
-    get_metadata_from_compiled_module, ResourceGroupScope, RuntimeModuleMetadataV1,
+    get_metadata_from_compiled_code, ResourceGroupScope, RuntimeModuleMetadataV1,
 };
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use move_binary_format::{
@@ -86,7 +86,7 @@ pub(crate) fn validate_module_and_extract_new_entries(
     BTreeMap<String, StructTag>,
 )> {
     let (new_groups, mut new_members) =
-        if let Some(metadata) = get_metadata_from_compiled_module(module) {
+        if let Some(metadata) = get_metadata_from_compiled_code(module) {
             extract_resource_group_metadata(&metadata)?
         } else {
             (BTreeMap::new(), BTreeMap::new())
@@ -155,7 +155,7 @@ pub(crate) fn extract_resource_group_metadata_from_module(
     let module =
         module_storage.fetch_existing_deserialized_module(module_id.address(), module_id.name());
     let (metadata, module) = if let Ok(module) = module {
-        (get_metadata_from_compiled_module(&module), module)
+        (get_metadata_from_compiled_code(module.as_ref()), module)
     } else {
         // Maintaining backwards compatibility with no validation of deserialization.
         return Ok((BTreeMap::new(), BTreeMap::new(), BTreeSet::new()));

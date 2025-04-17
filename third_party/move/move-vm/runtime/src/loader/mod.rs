@@ -20,11 +20,8 @@ use move_binary_format::{
     },
 };
 use move_core_types::{
-    gas_algebra::NumTypeNodes,
-    identifier::IdentStr,
-    language_storage::{ModuleId, TypeTag},
-    value::MoveTypeLayout,
-    vm_status::StatusCode,
+    gas_algebra::NumTypeNodes, identifier::IdentStr, language_storage::ModuleId,
+    value::MoveTypeLayout, vm_status::StatusCode,
 };
 use move_vm_types::{
     gas::GasMeter,
@@ -519,18 +516,6 @@ impl<'a> Resolver<'a> {
 }
 
 impl<'a> FunctionValueExtension for Resolver<'a> {
-    fn get_function_arg_tys(
-        &self,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
-        ty_arg_tags: Vec<TypeTag>,
-    ) -> PartialVMResult<Vec<Type>> {
-        let function_value_extension = FunctionValueExtensionAdapter {
-            module_storage: self.module_storage,
-        };
-        function_value_extension.get_function_arg_tys(module_id, function_name, ty_arg_tags)
-    }
-
     fn create_from_serialization_data(
         &self,
         data: SerializedFunctionData,
