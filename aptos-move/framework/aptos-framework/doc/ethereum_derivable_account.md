@@ -19,13 +19,14 @@ Chain ID: <chain_id>
 Nonce: <digest>
 Issued At: <issued_at>
 
-2. The abstract public key is a BCS serialized <code>SIWEAbstractPublicKey</code>.
+2. The abstract public key is a BCS serialized <code><a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_SIWEAbstractPublicKey">SIWEAbstractPublicKey</a></code>.
 3. The abstract signature is a BCS serialized <code><a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_SIWEAbstractSignature">SIWEAbstractSignature</a></code>.
 4. This module has been tested for the following wallets:
 - Metamask
 
 
 -  [Enum `SIWEAbstractSignature`](#0x1_ethereum_derivable_account_SIWEAbstractSignature)
+-  [Struct `SIWEAbstractPublicKey`](#0x1_ethereum_derivable_account_SIWEAbstractPublicKey)
 -  [Constants](#@Constants_0)
 -  [Function `deserialize_abstract_public_key`](#0x1_ethereum_derivable_account_deserialize_abstract_public_key)
 -  [Function `deserialize_abstract_signature`](#0x1_ethereum_derivable_account_deserialize_abstract_signature)
@@ -98,6 +99,39 @@ Issued At: <issued_at>
 
 </details>
 
+<a id="0x1_ethereum_derivable_account_SIWEAbstractPublicKey"></a>
+
+## Struct `SIWEAbstractPublicKey`
+
+
+
+<pre><code><b>struct</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_SIWEAbstractPublicKey">SIWEAbstractPublicKey</a> <b>has</b> drop
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>ethereum_address: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>domain: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="@Constants_0"></a>
 
 ## Constants
@@ -158,10 +192,10 @@ Unexpected v value.
 ## Function `deserialize_abstract_public_key`
 
 Deserializes the abstract public key which is supposed to be a bcs
-serialized <code>SIWEAbstractPublicKey</code>.
+serialized <code><a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_SIWEAbstractPublicKey">SIWEAbstractPublicKey</a></code>.
 
 
-<pre><code><b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_deserialize_abstract_public_key">deserialize_abstract_public_key</a>(abstract_public_key: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_deserialize_abstract_public_key">deserialize_abstract_public_key</a>(abstract_public_key: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_SIWEAbstractPublicKey">ethereum_derivable_account::SIWEAbstractPublicKey</a>
 </code></pre>
 
 
@@ -170,12 +204,11 @@ serialized <code>SIWEAbstractPublicKey</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_deserialize_abstract_public_key">deserialize_abstract_public_key</a>(abstract_public_key: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;):
-(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
+<pre><code><b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_deserialize_abstract_public_key">deserialize_abstract_public_key</a>(abstract_public_key: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_SIWEAbstractPublicKey">SIWEAbstractPublicKey</a> {
     <b>let</b> stream = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_new">bcs_stream::new</a>(*abstract_public_key);
     <b>let</b> ethereum_address = *<a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_string">bcs_stream::deserialize_string</a>(&<b>mut</b> stream).bytes();
     <b>let</b> domain = *<a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_string">bcs_stream::deserialize_string</a>(&<b>mut</b> stream).bytes();
-    (ethereum_address, domain)
+    <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_SIWEAbstractPublicKey">SIWEAbstractPublicKey</a> { ethereum_address, domain }
 }
 </code></pre>
 
@@ -438,7 +471,7 @@ We include the issued_at in the signature as it is a required field in the SIWE 
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_base16_utf8_to_vec_u8">base16_utf8_to_vec_u8</a>(str: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_base16_utf8_to_vec_u8">base16_utf8_to_vec_u8</a>(str: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -447,7 +480,7 @@ We include the issued_at in the signature as it is a required field in the SIWE 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_base16_utf8_to_vec_u8">base16_utf8_to_vec_u8</a>(str: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+<pre><code><b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_base16_utf8_to_vec_u8">base16_utf8_to_vec_u8</a>(str: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <b>let</b> result = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
     <b>let</b> i = 0;
     <b>while</b> (i &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&str)) {
@@ -485,11 +518,11 @@ We include the issued_at in the signature as it is a required field in the SIWE 
     entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 ) {
     <b>let</b> abstract_public_key = aa_auth_data.derivable_abstract_public_key();
-    <b>let</b> (ethereum_address, domain) = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_deserialize_abstract_public_key">deserialize_abstract_public_key</a>(abstract_public_key);
+    <b>let</b> abstract_public_key = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_deserialize_abstract_public_key">deserialize_abstract_public_key</a>(abstract_public_key);
     <b>let</b> digest_utf8 = <a href="../../aptos-stdlib/doc/string_utils.md#0x1_string_utils_to_string">string_utils::to_string</a>(aa_auth_data.digest()).bytes();
     <b>let</b> abstract_signature = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_deserialize_abstract_signature">deserialize_abstract_signature</a>(aa_auth_data.derivable_abstract_signature());
     <b>let</b> issued_at = abstract_signature.issued_at.bytes();
-    <b>let</b> message = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_construct_message">construct_message</a>(&ethereum_address, &domain, entry_function_name, digest_utf8, issued_at);
+    <b>let</b> message = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_construct_message">construct_message</a>(&abstract_public_key.ethereum_address, &abstract_public_key.domain, entry_function_name, digest_utf8, issued_at);
     <b>let</b> public_key_bytes = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_recover_public_key">recover_public_key</a>(&abstract_signature.signature, &message);
 
     // 1. Skip the 0x04 prefix (take the bytes after the first byte)
@@ -499,7 +532,7 @@ We include the issued_at in the signature as it is a required field in the SIWE 
     // 3. Slice the last 20 bytes (this is the Ethereum <b>address</b>)
     <b>let</b> recovered_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(&kexHash, 12, 32);
     // 4. Remove the 0x prefix from the base16 <a href="account.md#0x1_account">account</a> <b>address</b>
-    <b>let</b> ethereum_address_without_prefix = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(&ethereum_address, 2, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&ethereum_address));
+    <b>let</b> ethereum_address_without_prefix = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(&abstract_public_key.ethereum_address, 2, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&abstract_public_key.ethereum_address));
 
     <b>let</b> account_address_vec = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_base16_utf8_to_vec_u8">base16_utf8_to_vec_u8</a>(ethereum_address_without_prefix);
     // Verify that the recovered <b>address</b> matches the domain <a href="account.md#0x1_account">account</a> identity

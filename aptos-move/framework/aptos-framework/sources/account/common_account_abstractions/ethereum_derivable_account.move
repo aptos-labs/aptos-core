@@ -48,14 +48,19 @@ module aptos_framework::ethereum_derivable_account {
         },
     }
 
+    struct SIWEAbstractPublicKey has drop {
+        // The Ethereum address with 0x prefix
+        ethereum_address: vector<u8>,
+        domain: vector<u8>,
+    }
+
     /// Deserializes the abstract public key which is supposed to be a bcs
     /// serialized `SIWEAbstractPublicKey`.
-    fun deserialize_abstract_public_key(abstract_public_key: &vector<u8>):
-    (vector<u8>, vector<u8>) {
+    fun deserialize_abstract_public_key(abstract_public_key: &vector<u8>): SIWEAbstractPublicKey {
         let stream = bcs_stream::new(*abstract_public_key);
         let ethereum_address = *bcs_stream::deserialize_string(&mut stream).bytes();
         let domain = *bcs_stream::deserialize_string(&mut stream).bytes();
-        (ethereum_address, domain)
+        SIWEAbstractPublicKey { ethereum_address, domain }
     }
 
     /// Returns a tuple of the signature type and the signature.
@@ -209,11 +214,11 @@ module aptos_framework::ethereum_derivable_account {
         entry_function_name: &vector<u8>
     ) {
         let abstract_public_key = aa_auth_data.derivable_abstract_public_key();
-        let (ethereum_address, domain) = deserialize_abstract_public_key(abstract_public_key);
+        let abstract_public_key = deserialize_abstract_public_key(abstract_public_key);
         let digest_utf8 = string_utils::to_string(aa_auth_data.digest()).bytes();
         let abstract_signature = deserialize_abstract_signature(aa_auth_data.derivable_abstract_signature());
         let issued_at = abstract_signature.issued_at.bytes();
-        let message = construct_message(&ethereum_address, &domain, entry_function_name, digest_utf8, issued_at);
+        let message = construct_message(&abstract_public_key.ethereum_address, &abstract_public_key.domain, entry_function_name, digest_utf8, issued_at);
         let public_key_bytes = recover_public_key(&abstract_signature.signature, &message);
 
         // 1. Skip the 0x04 prefix (take the bytes after the first byte)
@@ -223,7 +228,7 @@ module aptos_framework::ethereum_derivable_account {
         // 3. Slice the last 20 bytes (this is the Ethereum address)
         let recovered_addr = vector::slice(&kexHash, 12, 32);
         // 4. Remove the 0x prefix from the base16 account address
-        let ethereum_address_without_prefix = vector::slice(&ethereum_address, 2, vector::length(&ethereum_address));
+        let ethereum_address_without_prefix = vector::slice(&abstract_public_key.ethereum_address, 2, vector::length(&abstract_public_key.ethereum_address));
 
         let account_address_vec = base16_utf8_to_vec_u8(ethereum_address_without_prefix);
         // Verify that the recovered address matches the domain account identity
@@ -249,16 +254,8 @@ module aptos_framework::ethereum_derivable_account {
     use std::string::utf8;
     #[test_only]
     use aptos_framework::auth_data::{create_derivable_auth_data};
-
     #[test_only]
-    struct SIWEAbstractPublicKey has drop {
-        // The Ethereum address with 0x prefix
-        ethereum_address: String,
-        domain: String,
-    }
-
-    #[test_only]
-    fun create_abstract_public_key(ethereum_address: String, domain: String): vector<u8> {
+    fun create_abstract_public_key(ethereum_address: vector<u8>, domain: vector<u8>): vector<u8> {
         let abstract_public_key = SIWEAbstractPublicKey {
             ethereum_address,
             domain,
@@ -276,10 +273,10 @@ module aptos_framework::ethereum_derivable_account {
     fun test_deserialize_abstract_public_key() {
         let ethereum_address = b"0xC7B576Ead6aFb962E2DEcB35814FB29723AEC98a";
         let domain = b"localhost:3001";
-        let abstract_public_key = create_abstract_public_key(utf8(ethereum_address), utf8(domain));
-        let (account_address, domain) = deserialize_abstract_public_key(&abstract_public_key);
-        assert!(account_address == ethereum_address);
-        assert!(domain == domain);
+        let abstract_public_key = create_abstract_public_key(ethereum_address, domain);
+        let abstract_public_key = deserialize_abstract_public_key(&abstract_public_key);
+        assert!(abstract_public_key.ethereum_address == ethereum_address);
+        assert!(abstract_public_key.domain == domain);
     }
 
     #[test]
@@ -396,7 +393,7 @@ module aptos_framework::ethereum_derivable_account {
         let abstract_signature = create_raw_signature(utf8(b"2025-01-01T00:00:00.000Z"), signature);
         let ethereum_address = b"0xC7B576Ead6aFb962E2DEcB35814FB29723AEC98a";
         let domain = b"localhost:3001";
-        let abstract_public_key = create_abstract_public_key(utf8(ethereum_address), utf8(domain));
+        let abstract_public_key = create_abstract_public_key(ethereum_address, domain);
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
         let entry_function_name = b"0x1::aptos_account::transfer";
         authenticate_auth_data(auth_data, &entry_function_name);
@@ -418,7 +415,7 @@ module aptos_framework::ethereum_derivable_account {
         let abstract_signature = create_raw_signature(utf8(b"2025-01-01T00:00:00.000Z"), signature);
         let ethereum_address = b"0xC7B576Ead6aFb962E2DEcB35814FB29723AEC98a";
         let domain = b"localhost:3001";
-        let abstract_public_key = create_abstract_public_key(utf8(ethereum_address), utf8(domain));
+        let abstract_public_key = create_abstract_public_key(ethereum_address, domain);
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
         let entry_function_name = b"0x1::aptos_account::transfer";
         authenticate_auth_data(auth_data, &entry_function_name);
