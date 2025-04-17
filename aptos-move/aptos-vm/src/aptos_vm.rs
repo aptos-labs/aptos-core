@@ -883,6 +883,7 @@ impl AptosVM {
             traversal_context,
         )
     }
+
     fn execute_automation_registration_txn<'a, 'r, 'l>(
         &'l self,
         resolver: &'r impl AptosMoveResolver,
@@ -1729,6 +1730,18 @@ impl AptosVM {
         is_approved_gov_script: bool,
         traversal_context: &mut TraversalContext,
     ) -> Result<(), VMStatus> {
+        // Check if the native automation feature is active. We do this here so that the check
+        // is executed during verification at the RPC node and mempool as well as during execution.
+        if let TransactionPayload::AutomationRegistration(_) = transaction.payload() {
+            if !self.features().is_enabled(FeatureFlag::SUPRA_NATIVE_AUTOMATION) {
+                return Err(VMStatus::Error {
+                    status_code: StatusCode::FEATURE_UNDER_GATING,
+                    sub_status: None,
+                    message: Some("The Supra Native Automation feature is currently inactive.".to_string()),
+                });
+            }
+        }
+
         // Check transaction format.
         if transaction.contains_duplicate_signers() {
             return Err(VMStatus::error(
