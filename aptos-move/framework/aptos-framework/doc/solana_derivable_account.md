@@ -125,6 +125,26 @@ Signature failed to verify.
 
 
 
+<a id="0x1_solana_derivable_account_EINVALID_SIGNATURE_TYPE"></a>
+
+Invalid signature type.
+
+
+<pre><code><b>const</b> <a href="solana_derivable_account.md#0x1_solana_derivable_account_EINVALID_SIGNATURE_TYPE">EINVALID_SIGNATURE_TYPE</a>: u64 = 4;
+</code></pre>
+
+
+
+<a id="0x1_solana_derivable_account_EMISSING_ENTRY_FUNCTION_PAYLOAD"></a>
+
+Entry function payload is missing.
+
+
+<pre><code><b>const</b> <a href="solana_derivable_account.md#0x1_solana_derivable_account_EMISSING_ENTRY_FUNCTION_PAYLOAD">EMISSING_ENTRY_FUNCTION_PAYLOAD</a>: u64 = 3;
+</code></pre>
+
+
+
 <a id="0x1_solana_derivable_account_BASE_58_ALPHABET"></a>
 
 
@@ -150,26 +170,6 @@ Invalid public key length.
 
 
 <pre><code><b>const</b> <a href="solana_derivable_account.md#0x1_solana_derivable_account_EINVALID_PUBLIC_KEY_LENGTH">EINVALID_PUBLIC_KEY_LENGTH</a>: u64 = 6;
-</code></pre>
-
-
-
-<a id="0x1_solana_derivable_account_EINVALID_SIGNATURE_TYPE"></a>
-
-Invalid signature type.
-
-
-<pre><code><b>const</b> <a href="solana_derivable_account.md#0x1_solana_derivable_account_EINVALID_SIGNATURE_TYPE">EINVALID_SIGNATURE_TYPE</a>: u64 = 4;
-</code></pre>
-
-
-
-<a id="0x1_solana_derivable_account_EMISSING_ENTRY_FUNCTION_PAYLOAD"></a>
-
-Entry function payload is missing.
-
-
-<pre><code><b>const</b> <a href="solana_derivable_account.md#0x1_solana_derivable_account_EMISSING_ENTRY_FUNCTION_PAYLOAD">EMISSING_ENTRY_FUNCTION_PAYLOAD</a>: u64 = 3;
 </code></pre>
 
 
