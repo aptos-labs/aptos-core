@@ -24,8 +24,8 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_FUZZER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL_FUZZER }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
 
       - name: 'Set up Cloud SDK'
         uses: 'google-github-actions/setup-gcloud@v2'
@@ -51,4 +51,4 @@ jobs:
         run: |
           zip -r move_aptosvm_publish_and_run_seed_corpus.zip move_aptosvm_publish_and_run_seed_corpus
           gcloud storage cp move_aptosvm_publish_and_run_seed_corpus.zip gs://aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip
-          gcloud storage objects update gs://aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip --acl-public
+          gcloud storage objects update gs://aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip --add-acl=publicRead
