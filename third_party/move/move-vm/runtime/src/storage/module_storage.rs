@@ -4,7 +4,8 @@
 use crate::{
     loader::{Function, LazyLoadedFunction, LazyLoadedFunctionState, LoadedFunctionOwner, Module},
     logging::expect_no_verification_errors,
-    LayoutConverter, LoadedFunction, StorageLayoutConverter, WithRuntimeEnvironment,
+    storage::ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
+    LoadedFunction, WithRuntimeEnvironment,
 };
 use ambassador::delegatable_trait;
 use bytes::Bytes;
