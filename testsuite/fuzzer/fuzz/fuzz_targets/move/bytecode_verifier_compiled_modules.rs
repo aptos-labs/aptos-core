@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![no_main]
-use move_core_types::vm_status::StatusType;
+use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::errors::VMError;
 use move_bytecode_verifier::VerifierConfig;
-use libfuzzer_sys::{fuzz_target, Corpus};
+use move_core_types::vm_status::StatusType;
 mod utils;
 use utils::vm::RunnableState;
 
